@@ -16643,6 +16643,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     skinColor: '#8a0707', // Demon Red
                     gender: 'female',
                     stance: 'idle',
+                    pose: 'dance',
                     hair: { type: 'demon_dancer', color: '#0a0000' }, // <--- The Ported Hair
                     top: { type: 'sports_bra', color: '#111' },
                     bottom: { type: 'skirt', color: '#111' }
@@ -16760,6 +16761,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Stance fits the weapon (rifles/snipers two-handed); ability users cast
                     // with an extended hand. Recoil is a real kick from the last shot.
                     stance: inCombat ? stanceForWeapon(weaponId) : 'idle',
+                    pose: this._idlePose || undefined,      // e.g. Yenna's crossed arms at the apartment
                     kick: inCombat ? shotKick(this) : 0,
                     weapon: weaponId ? { id: weaponId, ready: inCombat } : null,
                     top:    app.top    || { type: 'suit', color: '#2a0a3a' },
@@ -31794,6 +31796,95 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         /* =====================================================================
+           POSES — what a character does while standing still
+           ---------------------------------------------------------------------
+           A pose sits on top of the stance (idle / pistol / rifle / punch). It
+           fades in once a character has stood still for a moment and out the
+           moment they walk, through the same smoothing that blends stances.
+
+           Each pose is (t, o) → targets, where t = seconds in the pose and
+           o = { still, seed, gender } (still = seconds standing still). In the
+           humanoid's frame (+x is facing, y runs shoulder to shoulder):
+             l, r        where the left/right hand goes      [x, y]
+             le, re      elbows (default: halfway to the hand)
+             lf, rf      feet, as offsets from where they stand
+             torso, hip  extra twist (radians)
+             bounce      body forward/back (px)
+             head        head offset [x, y]; turn = head turn (radians)
+             hint        a face that suits the pose (portraits use it as a fallback)
+           Weapon stances keep their arms; breathing still applies.
+           Pick one with config.pose; 'none' turns the idle life off.
+           ===================================================================== */
+        const POSES = (() => {
+            const TAU = Math.PI * 2;
+            const breath = t => Math.sin(t * TAU / 3.6);
+            const ramp = (x, a, b) => Math.max(0, Math.min(1, (x - a) / (b - a)));
+            // Look one way, hold, look the other: a quick swap every half period
+            const glance = (t, period, amount, phase = 0) => {
+                const f = Math.sin(t * TAU / period + phase);
+                return Math.sign(f) * Math.min(1, Math.abs(f) * 2.5) * amount;
+            };
+            return {
+                // The default idle layer: breathe, then shift weight, then look around
+                idle(t, o) {
+                    const b = breath(t), shiftW = ramp(o.still, 4, 5.5), lookW = ramp(o.still, 6, 7);
+                    const s = Math.sin(t * TAU / 9 + o.seed) * shiftW;
+                    return {
+                        bounce: b * 0.35, torso: b * 0.01 - s * 0.03, hip: s * 0.06,
+                        lf: [Math.max(0, s) * 1.4, -Math.max(0, s) * 0.8], rf: [Math.max(0, -s) * 1.4, Math.max(0, -s) * 0.8],
+                        turn: glance(t, 7, 0.45, o.seed * 2) * lookW
+                    };
+                },
+                breathe(t) { const b = breath(t); return { bounce: b * 0.35, torso: b * 0.01 }; },
+                arms_crossed(t, o) {
+                    const b = breath(t);
+                    return { l: [5.5, 3], r: [6.5, -3], le: [1, -11], re: [1.5, 11], bounce: b * 0.3,
+                             turn: Math.sin(t * TAU / 10 + o.seed) * 0.25, hint: 'neutral' };
+                },
+                lean(t, o) {
+                    const b = breath(t);
+                    return { l: [-6.5, -9.5], r: [-6.5, 9.5], lf: [4, 3.5], rf: [0, 0], bounce: -0.8 + b * 0.3,
+                             torso: -0.06, hip: 0.08, head: [-1, 0], turn: 0.2 + Math.sin(t * TAU / 12 + o.seed) * 0.15, hint: 'sultry' };
+                },
+                lean_rail(t, o) {
+                    const b = breath(t), s = Math.sin(t * TAU / 11 + o.seed);
+                    return { l: [12, -8], r: [12, 8], le: [4, -12], re: [4, 12], bounce: 1 + b * 0.3, head: [1.5, 0],
+                             hip: s * 0.05, lf: [Math.max(0, s), 0], rf: [Math.max(0, -s), 0],
+                             turn: Math.sin(t * TAU / 14 + o.seed) * 0.3, hint: 'neutral' };
+                },
+                fidget(t, o) {
+                    return { l: [-2 + Math.sin(t * 17) * 1.2, -13], r: [-2 + Math.cos(t * 15) * 1.2, 13],
+                             bounce: Math.abs(Math.sin(t * TAU * 2)) * 0.9, torso: Math.sin(t * 5) * 0.03,
+                             lf: [Math.sin(t * 9) * 0.6, 0], rf: [-Math.sin(t * 9) * 0.6, 0],
+                             turn: glance(t, 2.6, 0.35, o.seed), hint: 'grin' };
+                },
+                typing(t) {
+                    const b = breath(t);
+                    return { l: [13, -4 + Math.sin(t * 23) * 0.4], r: [13, 4 + Math.cos(t * 19) * 0.4], le: [4, -11], re: [4, 11],
+                             bounce: 0.8 + b * 0.25, head: [1, 0], turn: Math.sin(t * 0.5) * 0.08, hint: 'neutral' };
+                },
+                hands_on_hips(t) {
+                    const b = breath(t);
+                    return { l: [-1, -8.5], r: [-1, 8.5], le: [-5, -15], re: [-5, 15], bounce: b * 0.3 };
+                },
+                phone(t) {
+                    const b = breath(t);
+                    return { l: [7, -2], r: [9, 2], le: [1, -10], re: [2, 10], bounce: b * 0.25, head: [1.5, 0],
+                             turn: Math.sin(t * 0.7) * 0.06 };
+                },
+                // Three dances; each dancer's seed picks one and offsets the beat
+                dance(t, o) {
+                    const beat = t * TAU * 1.0 + o.seed, s = Math.sin(beat), up = Math.abs(Math.sin(beat * 2));
+                    const v = Math.floor(o.seed) % 3;
+                    const base = { hip: s * 0.25, torso: -s * 0.15, bounce: up * 0.8,
+                                   lf: [0, s * 1.2], rf: [0, s * 1.2], turn: Math.sin(beat * 0.5) * 0.3, hint: 'sultry' };
+                    if (v === 0) return { ...base, l: [4 + s * 4, -12 - s * 2], r: [4 - s * 4, 12 - s * 2] };
+                    if (v === 1) return { ...base, l: [10 + up * 2, -5 + s * 3], r: [10 + up * 2, 5 + s * 3], le: [4, -12], re: [4, 12] };
+                    return { ...base, l: [9 + s * 3, -6 - up * 2], r: [-1, 8.5], re: [-5, 15] };
+                },
+            };
+        })();
+        /* =====================================================================
            EXPRESSIONS — faces for portraits (and a little life in the world)
            ---------------------------------------------------------------------
            An expression is a handful of numbers, all 0 for the neutral face:
@@ -33357,6 +33448,25 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             let hipRotation = 0;    // pose targets; walk sway is added after smoothing
             let torsoRotation = 0;
             const armSwing = isDriving ? 0 : Math.sin(walkCycle + Math.PI) * gaitSpeed;        
+
+            // --- 3b. POSE (ui/poses.js): what the body does while standing still ---
+            // Fades in after a moment standing, out the moment the character walks.
+            let pose = null, poseW = 0;
+            if (!isDriving && config.pose !== 'none') {
+                const ps = entity._pose || (entity._pose = { still: 0, t: 0, name: null, w: 0, last: _gameTimeSec, seed: Math.random() * 97 });
+                const dt = Math.max(0, Math.min(0.1, _gameTimeSec - ps.last));
+                ps.last = _gameTimeSec;
+                const moving = gaitSpeed > 0.15;
+                ps.still = moving ? 0 : ps.still + dt;
+                const name = POSES[config.pose] ? config.pose : 'idle';
+                if (name !== ps.name) { ps.name = name; ps.t = 0; }
+                ps.t += dt;
+                const target = !moving && ps.still > 0.4 ? 1 : 0;
+                ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
+                if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender }); poseW = ps.w; }
+            }
+            const pf = (key, i) => (pose && pose[key] ? pose[key][i] * poseW : 0);
+
             // --- 4. CALCULATE POSITIONS ---
             const lBaseY = -hipWidth / 2 - 1;
             const rBaseY = hipWidth / 2 + 1;
@@ -33366,10 +33476,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const lWalkY = Math.sin(walkCycle) * strafeLen * sideAmt;
             const rWalkY = Math.sin(walkCycle + Math.PI) * strafeLen * sideAmt;
         
-            const lFootX = -3 + lWalkX;
-            const rFootX = -3 + rWalkX;
-            const lFootY = lBaseY + lWalkY;
-            const rFootY = rBaseY + rWalkY;
+            const lFootX = -3 + lWalkX + pf('lf', 0);
+            const rFootX = -3 + rWalkX + pf('rf', 0);
+            const lFootY = lBaseY + lWalkY + pf('lf', 1);
+            const rFootY = rBaseY + rWalkY + pf('rf', 1);
         
             const lKneeX = (hipAnchorX + lFootX) / 2;
             const lKneeY = (lBaseY + lFootY) / 2;
@@ -33449,6 +33559,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 else if (glassHand === 'left') { lFistX += 7; lFistY = -9; }
             }
             const walkArms = !isDriving && stance !== 'pistol' && stance !== 'rifle' && stance !== 'sniper' && stance !== 'punch';
+            // Pose: hands (unarmed only; a hand holding a drink keeps it), twist and breathing
+            if (pose) {
+                if (walkArms && pose.l && glassHand !== 'left') { lFistX += (pose.l[0] - lFistX) * poseW; lFistY += (pose.l[1] - lFistY) * poseW; }
+                if (walkArms && pose.r && glassHand !== 'right') { rFistX += (pose.r[0] - rFistX) * poseW; rFistY += (pose.r[1] - rFistY) * poseW; }
+                torsoRotation += (pose.torso || 0) * poseW;
+                hipRotation += (pose.hip || 0) * poseW;
+                bounce += (pose.bounce || 0) * poseW;
+            }
         
             const lShoulderY = -shoulderSpread;
             const rShoulderY = shoulderSpread;
@@ -33460,6 +33578,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Drink hand: elbow bent softly out to the side
             if (glassHand === 'right' && stance === 'idle') rElbowY += 3.5;
             else if (glassHand === 'left' && stance === 'idle') lElbowY -= 3.5;
+            if (pose && walkArms) {
+                if (pose.le && glassHand !== 'left') { lElbowX += (pose.le[0] - lElbowX) * poseW; lElbowY += (pose.le[1] - lElbowY) * poseW; }
+                if (pose.re && glassHand !== 'right') { rElbowX += (pose.re[0] - rElbowX) * poseW; rElbowY += (pose.re[1] - rElbowY) * poseW; }
+            }
         
             if (isDriving) {
                 lElbowX = 8 + driveOffset; lElbowY = -shoulderSpread - 5;
@@ -33906,13 +34028,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.restore();
         
             // 10. Head & Hair
-            const headX = 0 + bounce - bodyRecoil;
+            const headX = 0 + bounce - bodyRecoil + pf('head', 0);
+            const headY = pf('head', 1), headTurn = pose ? (pose.turn || 0) * poseW : 0;   // looking around
             // 1.0 at the player's base walk speed — keeps the old player hair tuning, now shared by everyone
             const hairMove = gaitSpeed / 5.2;
             // Hair motion comes from the strand physics (hairGeometry): the owner's head
             // position in the world, plus the shoulder sway the strands swing with.
             const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0 };
+            const turning = headY !== 0 || headTurn !== 0;
+            if (turning) { ctx.save(); ctx.translate(headX, headY); ctx.rotate(headTurn); ctx.translate(-headX, 0); }
             drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
+            if (turning) ctx.restore();
         
             // 11. HELD ITEMS
             if (held) {
@@ -36616,11 +36742,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         ];
 
         const APT_IDLE_POSITIONS = {
-            'Victoria': { x: 400, y: 130 },    // Balcony — gazing out
-            'Yenna':    { x: 200, y: 450 },    // Living room corner — quiet vigil
-            'Sabrina':  { x: 1100, y: 700 },   // Kitchen/bathroom area — leaning
-            'Max':      { x: 500, y: 600 },    // Center living room — restless
-            'Josh':     { x: 700, y: 260 },    // Near terminal — always online
+            // pose: what they do while they're here (see ui/poses.js)
+            'Victoria': { x: 400, y: 130, pose: 'lean_rail' },     // Balcony — gazing out
+            'Yenna':    { x: 200, y: 450, pose: 'arms_crossed' },  // Living room corner — quiet vigil
+            'Sabrina':  { x: 1100, y: 700, pose: 'lean' },         // Kitchen/bathroom area — leaning
+            'Max':      { x: 500, y: 600, pose: 'fidget' },        // Center living room — restless
+            'Josh':     { x: 700, y: 260, pose: 'typing' },        // Near terminal — always online
         };
 
         const SPEAKER_COLORS = {
@@ -39991,11 +40118,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let seed = 0; for (const ch of String(speakerName)) seed = (seed * 31 + ch.charCodeAt(0)) % 997;
                 this._dialogueFace = {
                     speaker: speakerName, seed,
-                    expression: mood || (text ? inferMood(text, speakerName) : (CHARACTER_TEMPERAMENT[speakerName] || 'neutral')),
+                    // Tagged mood, else read from the line, else the speaker's temperament, else what their pose suggests
+                    expression: mood || ((text ? inferMood(text, speakerName) : 'neutral') !== 'neutral' || CHARACTER_TEMPERAMENT[speakerName]
+                        ? (text ? inferMood(text, speakerName) : CHARACTER_TEMPERAMENT[speakerName])
+                        : this._poseFace(speakerName)),
                     talkUntil: now + (len ? Math.min(3500, 350 + len * 45) : 0), last: ''
                 };
                 this._paintDialogueFace();
                 if (!this._dialogueFaceTimer) this._dialogueFaceTimer = setInterval(() => this._paintDialogueFace(), 50);
+            },
+
+            /** The face a speaker's current pose suggests (e.g. dancing → sultry), or neutral. */
+            _poseFace(speakerName) {
+                const who = (this.teammates || []).find(t => t.name === speakerName) || (this.npcs || []).find(n => n.name === speakerName);
+                const p = who && who._pose && POSES[who._pose.name] ? POSES[who._pose.name](0, { still: 0, seed: 0 }) : null;
+                return (p && p.hint) || 'neutral';
             },
 
             /** One frame of the living dialogue portrait (repaints only when the face changed). */
@@ -43349,7 +43486,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     placeEntitySmart(tm);
                 }
 
-                // 3b. Apartment idle positions — place recruited teammates at fixed spots
+                // 3b. Apartment idle positions — place recruited teammates at fixed spots,
+                // each doing their thing there (their pose only applies at home)
+                for (const tm of this.teammates) tm._idlePose = null;
                 if (map.id === 'apt_949') {
                     for (const tm of this.teammates) {
                         if (!tm.recruited || tm.downed) continue;
@@ -43359,6 +43498,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             tm.y = pos.y;
                             tm.velX = 0;
                             tm.velY = 0;
+                            tm._idlePose = pos.pose || null;
                             // Face toward center of living room
                             tm.angle = Math.atan2(450 - tm.y, 500 - tm.x);
                         }
@@ -48683,6 +48823,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     train: outfit.train || null,
                     hat: cosmeticConfig.hat,
                     jewelry: cosmeticConfig.jewelry,
+                    pose: typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
                     held: cosmeticConfig.held || outfit.held || null
                 });
                 

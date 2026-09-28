@@ -982,6 +982,25 @@
             let hipRotation = 0;    // pose targets; walk sway is added after smoothing
             let torsoRotation = 0;
             const armSwing = isDriving ? 0 : Math.sin(walkCycle + Math.PI) * gaitSpeed;        
+
+            // --- 3b. POSE (ui/poses.js): what the body does while standing still ---
+            // Fades in after a moment standing, out the moment the character walks.
+            let pose = null, poseW = 0;
+            if (!isDriving && config.pose !== 'none') {
+                const ps = entity._pose || (entity._pose = { still: 0, t: 0, name: null, w: 0, last: _gameTimeSec, seed: Math.random() * 97 });
+                const dt = Math.max(0, Math.min(0.1, _gameTimeSec - ps.last));
+                ps.last = _gameTimeSec;
+                const moving = gaitSpeed > 0.15;
+                ps.still = moving ? 0 : ps.still + dt;
+                const name = POSES[config.pose] ? config.pose : 'idle';
+                if (name !== ps.name) { ps.name = name; ps.t = 0; }
+                ps.t += dt;
+                const target = !moving && ps.still > 0.4 ? 1 : 0;
+                ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
+                if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender }); poseW = ps.w; }
+            }
+            const pf = (key, i) => (pose && pose[key] ? pose[key][i] * poseW : 0);
+
             // --- 4. CALCULATE POSITIONS ---
             const lBaseY = -hipWidth / 2 - 1;
             const rBaseY = hipWidth / 2 + 1;
@@ -991,10 +1010,10 @@
             const lWalkY = Math.sin(walkCycle) * strafeLen * sideAmt;
             const rWalkY = Math.sin(walkCycle + Math.PI) * strafeLen * sideAmt;
         
-            const lFootX = -3 + lWalkX;
-            const rFootX = -3 + rWalkX;
-            const lFootY = lBaseY + lWalkY;
-            const rFootY = rBaseY + rWalkY;
+            const lFootX = -3 + lWalkX + pf('lf', 0);
+            const rFootX = -3 + rWalkX + pf('rf', 0);
+            const lFootY = lBaseY + lWalkY + pf('lf', 1);
+            const rFootY = rBaseY + rWalkY + pf('rf', 1);
         
             const lKneeX = (hipAnchorX + lFootX) / 2;
             const lKneeY = (lBaseY + lFootY) / 2;
@@ -1074,6 +1093,14 @@
                 else if (glassHand === 'left') { lFistX += 7; lFistY = -9; }
             }
             const walkArms = !isDriving && stance !== 'pistol' && stance !== 'rifle' && stance !== 'sniper' && stance !== 'punch';
+            // Pose: hands (unarmed only; a hand holding a drink keeps it), twist and breathing
+            if (pose) {
+                if (walkArms && pose.l && glassHand !== 'left') { lFistX += (pose.l[0] - lFistX) * poseW; lFistY += (pose.l[1] - lFistY) * poseW; }
+                if (walkArms && pose.r && glassHand !== 'right') { rFistX += (pose.r[0] - rFistX) * poseW; rFistY += (pose.r[1] - rFistY) * poseW; }
+                torsoRotation += (pose.torso || 0) * poseW;
+                hipRotation += (pose.hip || 0) * poseW;
+                bounce += (pose.bounce || 0) * poseW;
+            }
         
             const lShoulderY = -shoulderSpread;
             const rShoulderY = shoulderSpread;
@@ -1085,6 +1112,10 @@
             // Drink hand: elbow bent softly out to the side
             if (glassHand === 'right' && stance === 'idle') rElbowY += 3.5;
             else if (glassHand === 'left' && stance === 'idle') lElbowY -= 3.5;
+            if (pose && walkArms) {
+                if (pose.le && glassHand !== 'left') { lElbowX += (pose.le[0] - lElbowX) * poseW; lElbowY += (pose.le[1] - lElbowY) * poseW; }
+                if (pose.re && glassHand !== 'right') { rElbowX += (pose.re[0] - rElbowX) * poseW; rElbowY += (pose.re[1] - rElbowY) * poseW; }
+            }
         
             if (isDriving) {
                 lElbowX = 8 + driveOffset; lElbowY = -shoulderSpread - 5;
@@ -1531,13 +1562,17 @@
             ctx.restore();
         
             // 10. Head & Hair
-            const headX = 0 + bounce - bodyRecoil;
+            const headX = 0 + bounce - bodyRecoil + pf('head', 0);
+            const headY = pf('head', 1), headTurn = pose ? (pose.turn || 0) * poseW : 0;   // looking around
             // 1.0 at the player's base walk speed — keeps the old player hair tuning, now shared by everyone
             const hairMove = gaitSpeed / 5.2;
             // Hair motion comes from the strand physics (hairGeometry): the owner's head
             // position in the world, plus the shoulder sway the strands swing with.
             const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0 };
+            const turning = headY !== 0 || headTurn !== 0;
+            if (turning) { ctx.save(); ctx.translate(headX, headY); ctx.rotate(headTurn); ctx.translate(-headX, 0); }
             drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
+            if (turning) ctx.restore();
         
             // 11. HELD ITEMS
             if (held) {

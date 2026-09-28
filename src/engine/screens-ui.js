@@ -365,11 +365,21 @@
                 let seed = 0; for (const ch of String(speakerName)) seed = (seed * 31 + ch.charCodeAt(0)) % 997;
                 this._dialogueFace = {
                     speaker: speakerName, seed,
-                    expression: mood || (text ? inferMood(text, speakerName) : (CHARACTER_TEMPERAMENT[speakerName] || 'neutral')),
+                    // Tagged mood, else read from the line, else the speaker's temperament, else what their pose suggests
+                    expression: mood || ((text ? inferMood(text, speakerName) : 'neutral') !== 'neutral' || CHARACTER_TEMPERAMENT[speakerName]
+                        ? (text ? inferMood(text, speakerName) : CHARACTER_TEMPERAMENT[speakerName])
+                        : this._poseFace(speakerName)),
                     talkUntil: now + (len ? Math.min(3500, 350 + len * 45) : 0), last: ''
                 };
                 this._paintDialogueFace();
                 if (!this._dialogueFaceTimer) this._dialogueFaceTimer = setInterval(() => this._paintDialogueFace(), 50);
+            },
+
+            /** The face a speaker's current pose suggests (e.g. dancing → sultry), or neutral. */
+            _poseFace(speakerName) {
+                const who = (this.teammates || []).find(t => t.name === speakerName) || (this.npcs || []).find(n => n.name === speakerName);
+                const p = who && who._pose && POSES[who._pose.name] ? POSES[who._pose.name](0, { still: 0, seed: 0 }) : null;
+                return (p && p.hint) || 'neutral';
             },
 
             /** One frame of the living dialogue portrait (repaints only when the face changed). */

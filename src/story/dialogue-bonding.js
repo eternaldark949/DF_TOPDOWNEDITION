@@ -214,11 +214,12 @@
         ];
 
         const APT_IDLE_POSITIONS = {
-            'Victoria': { x: 400, y: 130 },    // Balcony — gazing out
-            'Yenna':    { x: 200, y: 450 },    // Living room corner — quiet vigil
-            'Sabrina':  { x: 1100, y: 700 },   // Kitchen/bathroom area — leaning
-            'Max':      { x: 500, y: 600 },    // Center living room — restless
-            'Josh':     { x: 700, y: 260 },    // Near terminal — always online
+            // pose: what they do while they're here (see ui/poses.js)
+            'Victoria': { x: 400, y: 130, pose: 'lean_rail' },     // Balcony — gazing out
+            'Yenna':    { x: 200, y: 450, pose: 'arms_crossed' },  // Living room corner — quiet vigil
+            'Sabrina':  { x: 1100, y: 700, pose: 'lean' },         // Kitchen/bathroom area — leaning
+            'Max':      { x: 500, y: 600, pose: 'fidget' },        // Center living room — restless
+            'Josh':     { x: 700, y: 260, pose: 'typing' },        // Near terminal — always online
         };
 
         const SPEAKER_COLORS = {

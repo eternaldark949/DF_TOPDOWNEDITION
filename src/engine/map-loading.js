@@ -1304,7 +1304,9 @@
                     placeEntitySmart(tm);
                 }
 
-                // 3b. Apartment idle positions — place recruited teammates at fixed spots
+                // 3b. Apartment idle positions — place recruited teammates at fixed spots,
+                // each doing their thing there (their pose only applies at home)
+                for (const tm of this.teammates) tm._idlePose = null;
                 if (map.id === 'apt_949') {
                     for (const tm of this.teammates) {
                         if (!tm.recruited || tm.downed) continue;
@@ -1314,6 +1316,7 @@
                             tm.y = pos.y;
                             tm.velX = 0;
                             tm.velY = 0;
+                            tm._idlePose = pos.pose || null;
                             // Face toward center of living room
                             tm.angle = Math.atan2(450 - tm.y, 500 - tm.x);
                         }
