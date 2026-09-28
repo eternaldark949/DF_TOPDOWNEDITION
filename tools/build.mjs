@@ -5,13 +5,16 @@
  *   node tools/build.mjs          build "DFAB V8.html"
  *   node tools/build.mjs --check  exit 1 if "DFAB V8.html" is out of date (CI)
  *
+ * Files in assets/images and assets/audio are embedded as data URIs in the
+ * ASSETS table (see src/core/assets.js for getImage / drawAsset / playSound).
+ *
  * No dependencies. The game is plain classic <script> code sharing one global
  * scope, so the ORDER below matters: a file can only use, at load time, what
  * files above it declared (classes before subclasses, systems before the code
  * that instantiates them). Add a new file by putting it in the right place here.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, extname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,6 +28,8 @@ const STYLES = [
 
 const SCRIPTS = [
     'core/config.js',
+    '@assets',              // generated from the assets/ folder
+    'core/assets.js',
     'core/registries.js',
     'core/utils.js',
     'world/navigation.js',
@@ -92,7 +97,39 @@ const SCRIPTS = [
     'app/boot.js',
 ];
 
-const read = (p) => readFileSync(join(ROOT, 'src', p), 'utf8');
+const MIME = {
+    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml',
+    '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac'
+};
+const WARN_BYTES = 8 * 1024 * 1024;
+const assetReport = [];
+
+function scanAssets(kind) {
+    const dir = join(ROOT, 'assets', kind), table = {};
+    if (!existsSync(dir)) return table;
+    const walk = (d) => {
+        for (const name of readdirSync(d).sort()) {
+            if (name.startsWith('.') || name.toLowerCase() === 'readme.md') continue;
+            const full = join(d, name);
+            if (statSync(full).isDirectory()) { walk(full); continue; }
+            const ext = extname(name).toLowerCase(), mime = MIME[ext];
+            if (!mime) { console.warn(`  skipping assets/${kind}/${relative(dir, full)} (unsupported type ${ext})`); continue; }
+            const key = relative(dir, full).slice(0, -ext.length).split(sep).join('/');
+            const bytes = readFileSync(full);
+            table[key] = `data:${mime};base64,${bytes.toString('base64')}`;
+            assetReport.push([`${kind}/${key}`, bytes.length]);
+        }
+    };
+    walk(dir);
+    return table;
+}
+
+function assetsScript() {
+    const table = { images: scanAssets('images'), audio: scanAssets('audio') };
+    return `        const ASSETS = ${JSON.stringify(table)};\n\n`;
+}
+
+const read = (p) => p === '@assets' ? assetsScript() : readFileSync(join(ROOT, 'src', p), 'utf8');
 
 export function build() {
     let html = read('index.html');
@@ -116,5 +153,8 @@ if (process.argv.includes('--check')) {
     console.log(`${OUTPUT} is up to date.`);
 } else {
     writeFileSync(target, out);
-    console.log(`Built ${OUTPUT}: ${(Buffer.byteLength(out) / 1024).toFixed(0)} KB, ${SCRIPTS.length} scripts, ${STYLES.length} stylesheets.`);
+    const size = Buffer.byteLength(out);
+    console.log(`Built ${OUTPUT}: ${(size / 1024).toFixed(0)} KB, ${SCRIPTS.length - 1} scripts, ${STYLES.length} stylesheets, ${assetReport.length} assets.`);
+    for (const [name, bytes] of assetReport) console.log(`  asset ${name}  ${(bytes / 1024).toFixed(0)} KB`);
+    if (size > WARN_BYTES) console.warn(`  warning: the game file is over ${WARN_BYTES / 1048576} MB; long music tracks are the usual cause.`);
 }
