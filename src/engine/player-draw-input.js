@@ -52,6 +52,8 @@
                     bottom: outfit.bottom,
                     shoes: outfit.shoes,
                     train: outfit.train || null,
+                    hat: cosmeticConfig.hat,
+                    jewelry: cosmeticConfig.jewelry,
                     held: cosmeticConfig.held || outfit.held || null
                 });
                 

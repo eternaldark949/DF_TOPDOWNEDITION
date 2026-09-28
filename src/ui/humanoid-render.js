@@ -597,6 +597,14 @@
             ctx.fill();
 
             // ─── SHOULDERS / CLOTHING ───
+            // Wardrobe pieces (ui/wardrobe.js) draw their own front view; anything else is a plain shape
+            const WD = typeof WARDROBE !== 'undefined' ? WARDROBE : null;
+            const P = { cx, cy, fw, fh, w, h, eyeY: cy - fh * 0.15, eyeSpacing: fw * 0.38 };
+            const jewelry = (config.jewelry || []).filter(j => WD && WD.jewelry[j.type]);
+            const topPiece = WD && top ? WD.tops[top.type] : null;
+            if (topPiece) {
+                topPiece.portrait(ctx, P, top, shadowColor);
+            } else {
             if (top) {
                 ctx.fillStyle = top.color || '#222';
             } else {
@@ -618,6 +626,8 @@
                 ctx.quadraticCurveTo(cx, cy + fh * 1.65, cx + fw * 0.35, cy + fh * 1.4);
                 ctx.stroke();
             }
+            }
+            for (const j of jewelry) if (WD.jewelry[j.type].at === 'neck') WD.jewelry[j.type].portrait(ctx, P, j);
 
             // ─── HAIR (BACK LAYER — behind face, over shoulders) ───
             const hairBackSoft = ['long', 'demon_dancer', 'dreadlocks'];
@@ -803,36 +813,36 @@
                 const renderer = PORTRAIT_HAIR_RENDERERS[hair.type];
                 if (renderer) renderer(ctx, hair.color, cx, cy, fw, fh);
             }
+
+            // ─── JEWELRY AND HAT ───
+            for (const j of jewelry) if (WD.jewelry[j.type].at === 'head') WD.jewelry[j.type].portrait(ctx, P, j);
+            const hatPiece = WD && config.hat ? WD.hats[config.hat.type] : null;
+            if (hatPiece) hatPiece.portrait(ctx, P, config.hat);
         }
 
         /** Renders "long" hair behind head, then head+face, then other hair on top. */
-        function drawHeadAndHair(ctx, headX, skinColor, faceDark, faceLight, hair, dyn, hat) {
+        const HAIR_SPILLS_FROM_HOOD = ['long', 'braids', 'dreadlocks', 'ponytail', 'demon_dancer'];
+        function drawHeadAndHair(ctx, headX, skinColor, faceDark, faceLight, hair, dyn, hat, jewelry) {
+            dyn = dyn || {};
+            const hatPiece = hat && typeof WARDROBE !== 'undefined' ? WARDROBE.hats[hat.type] : null;
+            if (hatPiece && hatPiece.back) hatPiece.back(ctx, headX, hat, dyn);   // e.g. the back of a raised hood
             // Head
             ctx.fillStyle = skinColor;
             ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
             ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
-            // Hair (all styles render on top of head) — strand physics via hairGeometry()
-            if (hair) {
+            // Hair (all styles render on top of head) — strand physics via hairGeometry().
+            // A raised hood hides short styles; long ones still spill out from under it.
+            if (hair && !(hatPiece && hatPiece.hides === 'most' && !HAIR_SPILLS_FROM_HOOD.includes(hair.type))) {
                 const renderer = HAIR_RENDERERS[hair.type];
-                if (renderer) renderer(ctx, hair.color, headX, dyn || {}, hairGeometry(ctx, headX, hair, dyn || {}));
+                if (renderer) renderer(ctx, hair.color, headX, dyn, hairGeometry(ctx, headX, hair, dyn));
+            }
+            // Jewelry worn on the head (sunglasses, earrings)
+            if (jewelry && typeof WARDROBE !== 'undefined') {
+                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && piece.at === 'head') piece.draw(ctx, { headX }, j); }
             }
             // Hat (renders on top of everything)
-            if (hat) {
-                if (hat.type === 'wide_brim') {
-                    // Brim — large ellipse
-                    ctx.fillStyle = hat.color || '#590e18';
-                    ctx.strokeStyle = hat.stroke || '#1a0505';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath(); ctx.ellipse(headX, -4 + (dyn.bounce || 0), 24, 18, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-                    // Crown — raised circle
-                    ctx.fillStyle = hat.crownColor || hat.color || '#70121e';
-                    ctx.beginPath(); ctx.arc(headX, -4 + (dyn.bounce || 0), 11, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-                } else if (hat.type === 'beret') {
-                    ctx.fillStyle = hat.color || '#222';
-                    ctx.beginPath(); ctx.ellipse(headX - 2, -8, 10, 6, -0.2, 0, Math.PI*2); ctx.fill();
-                }
-            }
+            if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);
         }
 
         function drawProceduralHumanoid(ctx, entity, config = {}) {
@@ -854,7 +864,8 @@
                 top:    config.top    || null, 
                 bottom: config.bottom || null,
                 shoes:  config.shoes  || null,
-                train:  config.train  || null 
+                train:  config.train  || null,
+                jewelry: config.jewelry || null
             };
         
             const darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * frac)) : '#000';
@@ -1235,6 +1246,23 @@
                 entity._muzzleLocal = { x: rFistX + (mz.x * ca - mz.y * sa) * wScale, y: rFistY + yOff + (mz.x * sa + mz.y * ca) * wScale };
             }
         
+            // Wardrobe pieces for this outfit (see ui/wardrobe.js); unknown types draw as plain colour
+            const WD = typeof WARDROBE !== 'undefined' ? WARDROBE : null;
+            const topP = WD && clothes.top ? WD.tops[clothes.top.type] : null;
+            const botP = WD && clothes.bottom ? WD.bottoms[clothes.bottom.type] : null;
+            const shoeP = WD && clothes.shoes ? WD.shoes[clothes.shoes.type] : null;
+            const sleeve = clothes.top ? (topP ? topP.sleeve : 'long') : 'none';
+            const jewelryAt = (where) => (clothes.jewelry || []).filter(j => WD && WD.jewelry[j.type] && WD.jewelry[j.type].at === where);
+            const headX0 = bounce - bodyRecoil;
+            const g = {
+                darken, skin: skinColor, gender, walkCycle,
+                torso: { x: torsoXOff, w: torsoWidth }, hip: { x: hipXOff, w: hipWidth },
+                headX: headX0, headInTorso: headX0 - hipAnchorX,
+                feet: [[lFootX, lFootY], [rFootX, rFootY]], knees: [[lKneeX, lKneeY], [rKneeX, rKneeY]],
+                hipPt: [[hipAnchorX, lBaseY], [hipAnchorX, rBaseY]],
+                fists: [[lFistX, lFistY], [rFistX, rFistY]], elbows: [[lElbowX, lElbowY], [rElbowX, rElbowY]]
+            };
+
             if (isDriving) {
                 // Driving mode rendering - different poses for shooting vs not shooting
                 ctx.save();
@@ -1251,8 +1279,8 @@
                 ctx.roundRect(torsoXOff - 2, -shoulderSpread - 1, torsoWidth + 4, (shoulderSpread * 2) + 2, 5); 
                 ctx.fill();
                 
-                const sleeveColor = clothes.top ? darken(clothes.top.color, 0.15) : darken(skinColor, 0.15);
-                const skinArmColor = darken(skinColor, 0.3);
+                const sleeveColor = sleeve !== 'none' ? darken(clothes.top.color, 0.15) : darken(skinColor, 0.15);
+                const skinArmColor = sleeve === 'long' ? darken(clothes.top.color, 0.3) : darken(skinColor, 0.3);
                 
                 if (isShootingFromCar) {
                     // --- SHOOTING POSE ---
@@ -1309,7 +1337,7 @@
                 // --- HEAD & HAIR ---
                 const headX = 0 + headForward;
                 const driveDyn = { owner: entity, sway: 0, drag: 0, bounce: 0, wiggle: 0 };
-                drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, driveDyn, clothes.hat);
+                drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, driveDyn, clothes.hat, clothes.jewelry);
                 
                 ctx.restore();
                 return;
@@ -1318,10 +1346,8 @@
             // --- WALKING MODE ---
         
             // 1. Feet
-            if (clothes.shoes && clothes.shoes.type === 'heels') {
-                ctx.fillStyle = darken(clothes.shoes.color, 0.55);
-                ctx.beginPath(); ctx.arc(lFootX, lFootY, 4, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(rFootX, rFootY, 4, 0, Math.PI*2); ctx.fill();
+            if (shoeP) {
+                shoeP.draw(ctx, g, clothes.shoes);
             } else {
                 // The foot point (lFootX, lFootY) is the ANKLE — where the calf ends.
                 // Center the foot across its width on that point and set the ankle a
@@ -1334,18 +1360,24 @@
                 ctx.beginPath(); ctx.roundRect(rFootX - HEEL_TO_ANKLE, rFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();
             }
         
-            // DETERMINE LEG COLOR (Skin if Skirt)
-            const isBareLegs = !clothes.bottom || clothes.bottom.type === 'skirt';
-            const legColor = isBareLegs ? darken(skinColor, 0.15) : darken(clothes.bottom.color, 0.45);
-            const thighColor = isBareLegs ? darken(skinColor, 0.05) : darken(clothes.bottom.color, 0.35);
+            // LEG COLOURS: which parts of the leg the bottom covers ('bare' | 'thigh' | 'full')
+            const legs = clothes.bottom ? (botP ? botP.legs : 'full') : 'bare';
+            const legColor = legs === 'full' ? darken(clothes.bottom.color, (botP && botP.shade) || 0.45) : darken(skinColor, 0.15);
+            const thighColor = legs !== 'bare' ? darken(clothes.bottom.color, 0.35) : darken(skinColor, 0.05);
         
             // 2. Calves
             drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor); 
             drawLimb(rKneeX, rKneeY, rFootX, rFootY, 3, legColor);
+            if (shoeP && shoeP.calf) {                                   // boots come up the calf
+                const bootColor = darken(clothes.shoes.color, 0.45), c = shoeP.calf;
+                drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, 3.4, bootColor);
+                drawLimb(rFootX, rFootY, rFootX + (rKneeX - rFootX) * c, rFootY + (rKneeY - rFootY) * c, 3.4, bootColor);
+            }
         
             // 3. Thighs
             drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor);
             drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor);
+            if (botP && botP.detail) botP.detail(ctx, g, clothes.bottom);   // cuffs, pockets, stripes
         
             // 4. Hips & Skirt
             ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(hipRotation);
@@ -1354,15 +1386,8 @@
             ctx.fillStyle = darken(clothes.bottom ? clothes.bottom.color : skinColor, 0.2);
             ctx.beginPath(); ctx.roundRect(hipXOff, -11, hipWidth, 22, [8, 3, 3, 8]); ctx.fill();
         
-            // SKIRT OVERLAY (Exact Fit)
-            if (clothes.bottom && clothes.bottom.type === 'skirt') {
-                ctx.fillStyle = darken(clothes.bottom.color, 0.2);
-                // Uses the EXACT SAME geometry as the hips [8, 3, 3, 8]
-                // Extended height by 1px (23) to ensure seam coverage
-                ctx.beginPath(); 
-                ctx.roundRect(hipXOff, -11, hipWidth, 23, [8, 3, 3, 8]); 
-                ctx.fill();
-            }
+            // Skirts and other hip overlays (same geometry as the hips)
+            if (botP && botP.hips) botP.hips(ctx, g, clothes.bottom);
             ctx.restore();
         
             // 5. Trains (Dress Train)
@@ -1407,20 +1432,34 @@
                 ctx.restore();
             }
         
+            // 5b. Coat tails
+            if (topP && topP.tail) {
+                ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
+                topP.tail(ctx, g, clothes.top);
+                ctx.restore();
+            }
+
             // 6. Fists
             ctx.fillStyle = darken(skinColor, 0.4);
             ctx.beginPath(); ctx.ellipse(lFistX, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
             ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
         
-            // 7. Forearms
-            const foreColor = darken(clothes.top ? clothes.top.color : skinColor, 0.3);
+            // 7. Forearms (fabric only under long sleeves)
+            const foreColor = sleeve === 'long' ? darken(clothes.top.color, 0.3) : darken(skinColor, 0.3);
             drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor);
             drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor);
+            for (const j of jewelryAt('wrists')) WD.jewelry[j.type].draw(ctx, g, j);
         
-            // 8. Upper Arms
-            const upperColor = darken(clothes.top ? clothes.top.color : skinColor, 0.15);
+            // 8. Upper Arms (fabric under short or long sleeves)
+            const upperColor = sleeve !== 'none' ? darken(clothes.top.color, 0.15) : darken(skinColor, 0.15);
             drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor);
             drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor);
+            if (topP && topP.armStripe) {                                // track-jacket stripes down the sleeves
+                ctx.strokeStyle = clothes.top.trim || '#f5f5f5'; ctx.lineWidth = 0.8; ctx.beginPath();
+                ctx.moveTo(shoulderX, lShoulderY); ctx.lineTo(lElbowX, lElbowY); ctx.lineTo(lFistX, lFistY);
+                ctx.moveTo(shoulderX, rShoulderY); ctx.lineTo(rElbowX, rElbowY); ctx.lineTo(rFistX, rFistY);
+                ctx.stroke();
+            }
         
             // 9. Torso
             ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation);
@@ -1435,28 +1474,11 @@
             }
         
             if (clothes.top) {
-                ctx.fillStyle = darken(clothes.top.color, 0.1);
-                if (clothes.top.type === 'suit') {
-                    ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill();
-                    const lapelX = torsoXOff + torsoWidth - 6;
-                    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(lapelX, -4); ctx.lineTo(lapelX + 3, 0); ctx.lineTo(lapelX, 4); ctx.fill();
-                    if (gender === 'female') {
-                        ctx.fillStyle = darken(clothes.top.color, 0.15);
-                        ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1, -3.5, 3, 0, Math.PI*2); ctx.fill();
-                        ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1, 3.5, 3, 0, Math.PI*2); ctx.fill();
-                    }
-                } 
-                else if (clothes.top.type === 'sports_bra') {
-                    ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill();
-                    if (gender === 'female') {
-                        ctx.fillStyle = darken(clothes.top.color, 0.15);
-                        ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1.5, -3.5, 3.5, 0, Math.PI*2); ctx.fill();
-                        ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1.5, 3.5, 3.5, 0, Math.PI*2); ctx.fill();
-                    }
-                    ctx.fillStyle = darken(clothes.top.color, 0.05); 
-                    ctx.beginPath(); ctx.moveTo(torsoXOff + 2, -10); ctx.lineTo(torsoXOff + torsoWidth/2, -2); ctx.lineTo(torsoXOff + torsoWidth/2, 2); ctx.lineTo(torsoXOff + 2, 10); ctx.lineTo(torsoXOff, 10); ctx.lineTo(torsoXOff, -10); ctx.fill();
-                }
+                if (topP) topP.draw(ctx, g, clothes.top);
+                else { ctx.fillStyle = darken(clothes.top.color, 0.1); ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill(); }
+                if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
             }
+            for (const j of jewelryAt('neck')) WD.jewelry[j.type].draw(ctx, g, j);
             ctx.restore();
         
             // 10. Head & Hair
@@ -1466,7 +1488,7 @@
             // Hair motion comes from the strand physics (hairGeometry): the owner's head
             // position in the world, plus the shoulder sway the strands swing with.
             const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0 };
-            drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat);
+            drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
         
             // 11. HELD ITEMS
             if (held) {

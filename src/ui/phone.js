@@ -1355,7 +1355,7 @@
         const statusText = document.getElementById('neume-status');
         
         function updateNeumeUI() {
-            // Cosmetics loadout slots (all 4 categories)
+            // Cosmetics loadout slots (one row per category)
             const loadout = document.getElementById('neume-loadout');
             let html = '';
             
@@ -1364,6 +1364,8 @@
                 { label: 'W.I.G', category: 'wig', equipped: game.cosmetics.equippedWig },
                 { label: 'S.K.I.N', category: 'skin', equipped: game.cosmetics.equippedSkin },
                 { label: 'V.O.C.A.L', category: 'vocal', equipped: game.cosmetics.equippedVocal },
+                { label: 'H.A.T', category: 'hat', equipped: game.cosmetics.equippedHat },
+                { label: 'J.E.W.E.L.R.Y', category: 'jewelry', equipped: null },
                 { label: 'A.C.C.E.S.S.O.R.Y', category: 'accessory', equipped: game.cosmetics.equippedAccessory }
             ];
 
@@ -1376,12 +1378,13 @@
                 html += `<div style="display:flex; gap:4px; flex-wrap:wrap;">`;
                 
                 for (const item of owned) {
-                    const isEquipped = item.id === slot.equipped;
+                    const isEquipped = game.cosmetics.isEquipped(item.id);
                     let chipColor = '#555';
                     if (slot.category === 'wig') chipColor = item.data.color;
                     else if (slot.category === 'skin') chipColor = item.data.skinColor;
                     else if (slot.category === 'vocal') chipColor = item.data.captionColor;
                     else if (slot.category === 'outfit') chipColor = item.data.top.color;
+                    else if (slot.category === 'hat' || slot.category === 'jewelry') chipColor = item.data.color;
                     else if (slot.category === 'accessory') chipColor = (GLASS_DRINKS[game.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne).liquid;
                     
                     const borderStyle = isEquipped ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)';
@@ -1409,6 +1412,13 @@
                     html += `</div>`;
                     continue;
                 }
+                if (slot.category === 'hat') {
+                    const none = !slot.equipped;
+                    html += `<div class="neume-chip" data-id="" data-cat="hat" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:0.5rem; color:${none ? '#fff' : '#999'};">None</span></div>`;
+                }
+                if (slot.category === 'jewelry' && !owned.length) {
+                    html += `<span style="font-size:0.45rem; color:#777;">None owned yet. Find jewelry at Neural Systems.</span>`;
+                }
                 html += `</div></div>`;
             }
             loadout.innerHTML = html;
@@ -1416,8 +1426,11 @@
             // Bind chip clicks
             loadout.querySelectorAll('.neume-chip').forEach(chip => {
                 chip.addEventListener('click', () => {
-                    if (chip.dataset.cat === 'accessory' && !chip.dataset.id) game.cosmetics.unequipAccessory();
-                    else game.cosmetics.equip(chip.dataset.id);
+                    const id = chip.dataset.id, cat = chip.dataset.cat;
+                    if (cat === 'accessory' && !id) game.cosmetics.unequipAccessory();
+                    else if (cat === 'hat' && !id) game.cosmetics.unequipHat();
+                    else if (cat === 'jewelry' && game.cosmetics.isEquipped(id)) game.cosmetics.unequipJewelry(id);   // jewelry toggles
+                    else game.cosmetics.equip(id);
                     triggerSequencingEffect();
                 });
             });

@@ -4,6 +4,7 @@
         /** Darken a hex color by an absolute RGB amount (0-255). */
         function darkenHex(hex, amount) {
             hex = hex.replace('#', '');
+            if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];   // '#222' → '222222'
             const r = clamp(parseInt(hex.substr(0, 2), 16) - amount, 0, 255);
             const g = clamp(parseInt(hex.substr(2, 2), 16) - amount, 0, 255);
             const b = clamp(parseInt(hex.substr(4, 2), 16) - amount, 0, 255);
@@ -13,6 +14,7 @@
         /** Lighten a hex color by an absolute RGB amount (0-255). */
         function lightenHex(hex, amount) {
             hex = hex.replace('#', '');
+            if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
             const r = clamp(parseInt(hex.substr(0, 2), 16) + amount, 0, 255);
             const g = clamp(parseInt(hex.substr(2, 2), 16) + amount, 0, 255);
             const b = clamp(parseInt(hex.substr(4, 2), 16) + amount, 0, 255);

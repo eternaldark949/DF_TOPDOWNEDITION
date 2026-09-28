@@ -68,6 +68,7 @@ const SCRIPTS = [
     'ui/ui-system.js',
     'ui/music-widget.js',
     'story/narrative-cutscenes.js',
+    'ui/wardrobe.js',
     'ui/humanoid-render.js',
     'world/city-layout.js',
     'world/billboards.js',

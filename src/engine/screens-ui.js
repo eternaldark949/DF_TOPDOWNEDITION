@@ -280,7 +280,7 @@
                 if (speakerName === '949' || speakerName === 'Stella') {
                     if (this.cosmetics) {
                         const c = this.cosmetics.getRenderConfig();
-                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: '#daa520', gender: 'female', top: c.outfit.top };
+                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: '#daa520', gender: 'female', top: c.outfit.top, hat: c.hat, jewelry: c.jewelry };
                     }
                     return { skinColor: '#c68e63', hair: { type: 'curls', color: '#0a0505' }, eyeColor: '#daa520', gender: 'female' };
                 }
@@ -550,16 +550,12 @@
 
                     // Get items for this category
                     const items = Object.values(COSMETICS_REGISTRY).filter(e => e.category === category);
-                    const equippedId = category === 'wig' ? this.cosmetics.equippedWig :
-                                       category === 'skin' ? this.cosmetics.equippedSkin :
-                                       category === 'outfit' ? this.cosmetics.equippedOutfit :
-                                       category === 'accessory' ? this.cosmetics.equippedAccessory :
-                                       this.cosmetics.equippedVocal;
+                    const optional = category === 'accessory' || category === 'hat' || category === 'jewelry';   // these can be taken off
 
                     let html = '';
                     for (const item of items) {
                         const owned = this.cosmetics.isOwned(item.id);
-                        const equipped = item.id === equippedId;
+                        const equipped = this.cosmetics.isEquipped(item.id);
                         const borderCol = equipped ? 'rgba(0,136,255,0.5)' : owned ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)';
                         const bgCol = equipped ? 'rgba(0,136,255,0.08)' : 'rgba(255,255,255,0.03)';
 
@@ -572,6 +568,8 @@
                         } else if (category === 'outfit') {
                             // Two-tone swatch: top color + bottom color
                             swatch = `<div style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg, ${item.data.top.color} 50%, ${item.data.bottom.color} 50%);border:1px solid rgba(255,255,255,0.15);flex-shrink:0;"></div>`;
+                        } else if (category === 'hat' || category === 'jewelry') {
+                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${item.data.color} 45%);border:1px solid rgba(255,255,255,0.2);flex-shrink:0;"></div>`;
                         } else if (category === 'vocal') {
                             swatch = `<div style="width:18px;height:18px;border-radius:50%;background:${item.data.captionColor};border:1px solid rgba(255,255,255,0.15);flex-shrink:0;opacity:0.7;"></div>`;
                         } else if (category === 'accessory') {
@@ -604,7 +602,7 @@
                             html += `<div style="font-family:Orbitron,sans-serif; font-size:0.65rem; color:#ffd700; white-space:nowrap;">${item.price} PP</div>`;
                         } else if (!equipped) {
                             html += `<div style="font-size:0.55rem; color:#0088ff; letter-spacing:1px;">EQUIP</div>`;
-                        } else if (category === 'accessory') {
+                        } else if (optional) {
                             html += `<div style="font-size:0.55rem; color:#ff6688; letter-spacing:1px;">REMOVE</div>`;
                         } else {
                             html += `<div style="font-size:0.55rem; color:#555; letter-spacing:1px;">EQUIPPED</div>`;
@@ -629,8 +627,11 @@
                         el.addEventListener('click', () => {
                             const id = el.dataset.id;
                             const entry = COSMETICS_REGISTRY[id];
-                            if (entry && entry.category === 'accessory' && this.cosmetics.equippedAccessory === id) {
-                                this.cosmetics.unequipAccessory();   // accessories toggle off
+                            if (entry && this.cosmetics.isEquipped(id) && ['accessory', 'hat', 'jewelry'].includes(entry.category)) {
+                                // optional pieces toggle off
+                                if (entry.category === 'accessory') this.cosmetics.unequipAccessory();
+                                else if (entry.category === 'hat') this.cosmetics.unequipHat();
+                                else this.cosmetics.unequipJewelry(id);
                                 audioSys.sfx('ui');
                                 renderTab(activeTab);
                             } else if (this.cosmetics.isOwned(id)) {
@@ -1039,7 +1040,9 @@
                     ['OUTFIT', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedOutfit]?.name || '—').toUpperCase() : '—'],
                     ['W.I.G', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedWig]?.name || '—').toUpperCase() : '—'],
                     ['S.K.I.N', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedSkin]?.name || '—').toUpperCase() : '—'],
-                    ['V.O.C.A.L', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedVocal]?.name || '—').toUpperCase() : '—']
+                    ['V.O.C.A.L', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedVocal]?.name || '—').toUpperCase() : '—'],
+                    ['H.A.T', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedHat]?.name || '—').toUpperCase() : '—'],
+                    ['J.E.W.E.L.R.Y', this.cosmetics && this.cosmetics.equippedJewelry.length ? this.cosmetics.equippedJewelry.map(id => COSMETICS_REGISTRY[id]?.name).filter(Boolean).join(', ').toUpperCase() : '—']
                 ];
                 for (const [label, val] of infoRows) {
                     html += `<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">`;
