@@ -70,6 +70,7 @@ const SCRIPTS = [
     'story/narrative-cutscenes.js',
     'ui/humanoid-render.js',
     'world/city-layout.js',
+    'world/billboards.js',
     'ui/inventory-augments.js',
     'world/bokeh.js',
     'story/missions.js',
