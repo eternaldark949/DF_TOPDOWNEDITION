@@ -280,7 +280,8 @@
                 if (speakerName === '949' || speakerName === 'Stella') {
                     if (this.cosmetics) {
                         const c = this.cosmetics.getRenderConfig();
-                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: '#daa520', gender: 'female', top: c.outfit.top, hat: c.hat, jewelry: c.jewelry };
+                        const face = this.playerExpression ? { expression: this.playerExpression } : {};
+                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: '#daa520', gender: 'female', top: c.outfit.top, hat: c.hat, jewelry: c.jewelry, ...face };
                     }
                     return { skinColor: '#c68e63', hair: { type: 'curls', color: '#0a0505' }, eyeColor: '#daa520', gender: 'female' };
                 }
@@ -354,9 +355,36 @@
                 if (this._portraitCache) this._portraitCache.clear();
             },
 
-            /** Render a character portrait into the dialogue box canvas. */
-            renderDialoguePortrait(speakerName) {
-                this.paintPortraitTo(document.getElementById('dialogue-portrait'), speakerName);
+            /**
+             * Render a character portrait into the dialogue box canvas, wearing the line's
+             * mood (or one read from the text), and keep it alive while the box is open:
+             * the lips move for about as long as the line takes to say, and they blink.
+             */
+            renderDialoguePortrait(speakerName, mood, text) {
+                const now = performance.now(), len = text ? String(text).length : 0;
+                let seed = 0; for (const ch of String(speakerName)) seed = (seed * 31 + ch.charCodeAt(0)) % 997;
+                this._dialogueFace = {
+                    speaker: speakerName, seed,
+                    expression: mood || (text ? inferMood(text, speakerName) : (CHARACTER_TEMPERAMENT[speakerName] || 'neutral')),
+                    talkUntil: now + (len ? Math.min(3500, 350 + len * 45) : 0), last: ''
+                };
+                this._paintDialogueFace();
+                if (!this._dialogueFaceTimer) this._dialogueFaceTimer = setInterval(() => this._paintDialogueFace(), 50);
+            },
+
+            /** One frame of the living dialogue portrait (repaints only when the face changed). */
+            _paintDialogueFace() {
+                const f = this._dialogueFace, canvas = document.getElementById('dialogue-portrait');
+                if (!f || !canvas || !this.dialogueBox || this.dialogueBox.style.display === 'none') {
+                    clearInterval(this._dialogueFaceTimer); this._dialogueFaceTimer = null; return;
+                }
+                const now = performance.now();
+                const blink = Math.round(blinkAmount(now / 1000, f.seed) * 4) / 4;
+                const talk = now < f.talkUntil ? Math.round(Math.abs(Math.sin(now / 1000 * Math.PI * 5.5)) * 4) / 4 * 0.55 : 0;
+                const key = blink + '|' + talk;
+                if (key === f.last) return;
+                f.last = key;
+                this.paintPortraitTo(canvas, f.speaker, undefined, { expression: f.expression, blink, talk });
             },
 
             /**
@@ -366,7 +394,7 @@
              * @param {string} speakerName
              * @param {string} [bg] backdrop fill; pass null to skip it
              */
-            paintPortraitTo(canvas, speakerName, bg = 'rgba(40, 5, 25, 0.95)') {
+            paintPortraitTo(canvas, speakerName, bg = 'rgba(40, 5, 25, 0.95)', face = null) {
                 if (!canvas) return null;
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -377,7 +405,7 @@
                     ctx.fill();
                 }
                 const config = this.resolvePortraitConfig(speakerName);
-                drawCharacterPortrait(ctx, canvas.width, canvas.height, config);
+                drawCharacterPortrait(ctx, canvas.width, canvas.height, face ? { ...config, ...face } : config);
                 return config;
             },
 

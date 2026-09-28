@@ -92,6 +92,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `ui/ui-system.js` | `UISystem`: HUD, banners, prompts |
 | `ui/music-widget.js` | The radio/music widget |
+| `ui/expressions.js` | `EXPRESSIONS`: faces for portraits (smile, sultry, worried…), mood from dialogue text, blinking |
 | `ui/cloth.js` | Cloth physics: coat hems, skirts and trains swing, trail and settle (same method as the hair) |
 | `ui/wardrobe.js` | `WARDROBE`: every top, bottom, shoe, hat and piece of jewelry, in the world and in portraits. The character look format is documented at the top |
 | `ui/humanoid-render.js` | Drawing characters: hair, portraits, bodies, held drinks, weapons |

@@ -31794,6 +31794,89 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         /* =====================================================================
+           EXPRESSIONS — faces for portraits (and a little life in the world)
+           ---------------------------------------------------------------------
+           An expression is a handful of numbers, all 0 for the neutral face:
+             brow:  { lift, tilt, arch, raise }   lift: up/down; tilt: inner ends up (+, worry)
+                                                  or down (−, anger); raise: the right brow only
+             lids:  { top, bottom }               top 0 open … 1 closed; bottom lifts for smiles
+             gaze:  { x, y }                      where the irises look (−1 … 1)
+             mouth: { curve, open, width, smirk } curve −1 frown … +1 smile; smirk lifts one corner
+             blush                                0 … 1
+           Use a name from EXPRESSIONS or your own object in a portrait config:
+             drawCharacterPortrait(ctx, w, h, { ...look, expression: 'sultry', blink: 0, talk: 0 })
+           A dialogue line can name its mood: { speaker, text, mood: 'smirk' }.
+           Without one, inferMood() reads the line and the speaker's temperament.
+           ===================================================================== */
+        const EXPRESSIONS = {
+            neutral:   {},
+            smile:     { brow: { lift: 0.15 }, lids: { bottom: 0.25 }, mouth: { curve: 0.8, width: 0.08 }, blush: 0.15 },
+            grin:      { brow: { lift: 0.25 }, lids: { bottom: 0.35 }, mouth: { curve: 1, open: 0.35, width: 0.18 }, blush: 0.2 },
+            laugh:     { brow: { lift: 0.35, tilt: 0.3 }, lids: { top: 0.55, bottom: 0.45 }, mouth: { curve: 1, open: 0.8, width: 0.2 }, blush: 0.3 },
+            smirk:     { brow: { lift: -0.1, tilt: -0.2, raise: 0.5 }, lids: { top: 0.2 }, gaze: { x: 0.25 }, mouth: { curve: 0.2, smirk: 0.9 } },
+            sultry:    { brow: { lift: -0.15, arch: 0.3 }, lids: { top: 0.42, bottom: 0.1 }, gaze: { x: 0.3 }, mouth: { curve: 0.35, smirk: 0.25, open: 0.08 }, blush: 0.45 },
+            surprised: { brow: { lift: 1, arch: 0.5 }, mouth: { open: 0.6, width: -0.3 } },
+            curious:   { brow: { lift: 0.1, raise: 0.9 }, gaze: { y: -0.2 }, mouth: { curve: 0.1, smirk: 0.3 } },
+            worried:   { brow: { lift: 0.2, tilt: 1 }, lids: { top: 0.1 }, gaze: { y: 0.3 }, mouth: { curve: -0.35, width: -0.1 } },
+            sad:       { brow: { lift: -0.1, tilt: 0.8 }, lids: { top: 0.35 }, gaze: { y: 0.6 }, mouth: { curve: -0.7 } },
+            angry:     { brow: { lift: -0.35, tilt: -1 }, lids: { top: 0.25, bottom: 0.2 }, mouth: { curve: -0.5, width: -0.1 } },
+            annoyed:   { brow: { lift: -0.2, tilt: -0.4 }, lids: { top: 0.4 }, gaze: { x: 0.5 }, mouth: { curve: -0.25, smirk: -0.3 } },
+            sleepy:    { brow: { lift: -0.1 }, lids: { top: 0.7 }, mouth: { curve: 0.05, open: 0.1 } },
+            crying:    { brow: { lift: 0.1, tilt: 1 }, lids: { top: 0.85, bottom: 0.2 }, mouth: { curve: -0.9, open: 0.25 }, blush: 0.35 },
+        };
+
+        /** A full parameter set (every field present) for a name, an object, or nothing. */
+        function resolveExpression(e) {
+            const src = typeof e === 'string' ? (EXPRESSIONS[e] || EXPRESSIONS.neutral) : (e || EXPRESSIONS.neutral);
+            const b = src.brow || {}, l = src.lids || {}, g = src.gaze || {}, m = src.mouth || {};
+            return {
+                brow:  { lift: b.lift || 0, tilt: b.tilt || 0, arch: b.arch || 0, raise: b.raise || 0 },
+                lids:  { top: l.top || 0, bottom: l.bottom || 0 },
+                gaze:  { x: g.x || 0, y: g.y || 0 },
+                mouth: { curve: m.curve || 0, open: m.open || 0, width: m.width || 0, smirk: m.smirk || 0 },
+                blush: src.blush || 0
+            };
+        }
+
+        /** Mix two expressions (names or objects), t = 0 → a, 1 → b. */
+        function blendExpression(a, b, t) {
+            const A = resolveExpression(a), B = resolveExpression(b), out = {};
+            for (const k of Object.keys(A)) {
+                if (typeof A[k] === 'number') { out[k] = A[k] + (B[k] - A[k]) * t; continue; }
+                out[k] = {};
+                for (const f of Object.keys(A[k])) out[k][f] = A[k][f] + (B[k][f] - A[k][f]) * t;
+            }
+            return out;
+        }
+
+        /** Each speaker's resting face when a line gives no other clue. */
+        const CHARACTER_TEMPERAMENT = {
+            '949': 'neutral', 'Victoria': 'smirk', 'Sabrina': 'sultry', 'Yenna': 'neutral', 'Max': 'smile',
+            'Josh': 'neutral', 'Anavia': 'sultry', 'Mirabel': 'smile', 'Biggs': 'grin', 'Bartender': 'smile',
+            'LUVSH4D3': 'sultry', 'Barista Ren': 'smile', 'Ms. Jean': 'smile', 'Contractor': 'annoyed',
+        };
+
+        /** Pick a mood for a line of dialogue from its wording, then the speaker's temperament. */
+        function inferMood(text, speaker) {
+            const t = String(text || '').trim();
+            if (/\b(ha(ha)+|heh|hah|lol)\b/i.test(t)) return 'grin';
+            const bang = t.endsWith('!'), ask = t.endsWith('?');
+            if (bang && t.includes('?')) return 'surprised';
+            if (bang) return 'smile';
+            if (ask) return 'curious';
+            if (t.startsWith('...') || t.endsWith('...') || t.endsWith('…')) return 'worried';
+            if (t && t.split(/\s+/).length <= 2 && t.endsWith('.')) return 'smirk';   // "Cute." "Noted."
+            return CHARACTER_TEMPERAMENT[speaker] || 'neutral';
+        }
+
+        /** 0 → eyes open, 1 → shut: a short blink every few seconds, out of step per `seed`. */
+        function blinkAmount(timeSec, seed) {
+            const period = 3.4 + (seed % 7) * 0.35;                          // 3.4 … 5.5 s
+            const t = (timeSec + seed * 1.37) % period;
+            const d = 0.14;                                                   // a blink lasts ~0.14 s
+            return t < d ? Math.sin(t / d * Math.PI) : 0;
+        }
+        /* =====================================================================
            CLOTH — swinging coat hems, skirts and trains
            ---------------------------------------------------------------------
            Same approach as the hair (hairGeometry in ui/humanoid-render.js):
@@ -32845,6 +32928,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const eyeColor = config.eyeColor || '#daa520'; // Default golden for Stella
             const gender = config.gender || 'female';
             const top = config.top || null;
+            // Expression (ui/expressions.js): every number is 0 for the neutral face
+            const X = resolveExpression(config.expression);
+            const blink = config.blink || 0, talk = config.talk || 0;
 
             // Derived colors from skin
             const skinRGB = hexToRGB(skinColor);
@@ -32956,6 +33042,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.fill();
             ctx.globalAlpha = 1.0;
 
+            // Blush
+            if (X.blush > 0) {
+                ctx.fillStyle = `rgba(214, 72, 104, ${0.2 * X.blush})`;
+                for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * fw * 0.5, cy + fh * 0.2, fw * 0.28, fh * 0.13, side * 0.15, 0, Math.PI * 2); ctx.fill(); }
+            }
+
             // ─── EYEBROWS ───
             const browColor = hair.color || '#1a1a1a';
             const browY = cy - fh * 0.32;
@@ -32963,16 +33055,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.strokeStyle = browColor;
             ctx.lineWidth = fw * 0.12;
             ctx.lineCap = 'round';
-            // Left brow (slight arch)
-            ctx.beginPath();
-            ctx.moveTo(cx - fw * 0.55, browY + fh * 0.04);
-            ctx.quadraticCurveTo(cx - fw * 0.35, browY - fh * 0.08, cx - fw * 0.15, browY + fh * 0.02);
-            ctx.stroke();
-            // Right brow
-            ctx.beginPath();
-            ctx.moveTo(cx + fw * 0.55, browY + fh * 0.04);
-            ctx.quadraticCurveTo(cx + fw * 0.35, browY - fh * 0.08, cx + fw * 0.15, browY + fh * 0.02);
-            ctx.stroke();
+            // Each brow: outer end → arch → inner end. Lift moves it, tilt raises (worry) or
+            // drops (anger) the inner end, arch bends it, raise lifts the right brow alone.
+            const drawBrows = () => {
+                for (const side of [-1, 1]) {
+                    const up = (X.brow.lift + (side > 0 ? X.brow.raise : 0)) * fh * 0.1;
+                    ctx.beginPath();
+                    ctx.moveTo(cx + side * fw * 0.55, browY + fh * 0.04 - up + X.brow.tilt * fh * 0.03);
+                    ctx.quadraticCurveTo(cx + side * fw * 0.35, browY - fh * 0.08 - up - X.brow.arch * fh * 0.08,
+                                         cx + side * fw * 0.15, browY + fh * 0.02 - up - X.brow.tilt * fh * 0.1);
+                    ctx.stroke();
+                }
+            };
+            drawBrows();
             ctx.lineCap = 'butt';
 
             // ─── EYES ───
@@ -32992,41 +33087,66 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.closePath();
                 ctx.fill();
 
-                // Iris
+                // Iris (follows the gaze; kept inside the eye when looking away)
                 const irisR = eyeH * 0.9;
+                const ix = ex + X.gaze.x * eyeW * 0.35, iy = eyeY + X.gaze.y * eyeH * 0.5;
+                const looking = X.gaze.x !== 0 || X.gaze.y !== 0;
+                if (looking) { ctx.save(); ctx.clip(); }
                 ctx.fillStyle = eyeColor;
                 ctx.beginPath();
-                ctx.arc(ex, eyeY, irisR, 0, Math.PI * 2);
+                ctx.arc(ix, iy, irisR, 0, Math.PI * 2);
                 ctx.fill();
                 // Iris ring (darker edge)
                 ctx.strokeStyle = shadowColor;
                 ctx.lineWidth = irisR * 0.15;
                 ctx.globalAlpha = 0.3;
                 ctx.beginPath();
-                ctx.arc(ex, eyeY, irisR, 0, Math.PI * 2);
+                ctx.arc(ix, iy, irisR, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.globalAlpha = 1.0;
 
                 // Pupil
                 ctx.fillStyle = '#0a0a0a';
                 ctx.beginPath();
-                ctx.arc(ex, eyeY, irisR * 0.45, 0, Math.PI * 2);
+                ctx.arc(ix, iy, irisR * 0.45, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Highlight
                 ctx.fillStyle = '#fff';
                 ctx.globalAlpha = 0.85;
                 ctx.beginPath();
-                ctx.arc(ex + irisR * 0.3, eyeY - irisR * 0.35, irisR * 0.25, 0, Math.PI * 2);
+                ctx.arc(ix + irisR * 0.3, iy - irisR * 0.35, irisR * 0.25, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.globalAlpha = 1.0;
+                if (looking) ctx.restore();
+
+                // Lids: the top lid comes down (half-lidded, blinking, closed); the lower
+                // lid rises for smiles. Drawn in skin over the eye.
+                const lidTop = Math.min(1, Math.max(X.lids.top, blink));
+                const lidY = eyeY - eyeH * 1.6 + (eyeH * 2.8) * lidTop;      // control point of the lid's edge
+                if (lidTop > 0) {
+                    ctx.fillStyle = skinColor;
+                    ctx.beginPath();
+                    ctx.moveTo(ex - eyeW - 0.5, eyeY);
+                    ctx.quadraticCurveTo(ex, eyeY - eyeH * 1.75, ex + eyeW + 0.5, eyeY);
+                    ctx.quadraticCurveTo(ex, lidY, ex - eyeW - 0.5, eyeY);
+                    ctx.fill();
+                }
+                if (X.lids.bottom > 0) {
+                    ctx.fillStyle = skinColor;
+                    ctx.beginPath();
+                    ctx.moveTo(ex - eyeW - 0.5, eyeY);
+                    ctx.quadraticCurveTo(ex, eyeY + eyeH * 1.35, ex + eyeW + 0.5, eyeY);
+                    ctx.quadraticCurveTo(ex, eyeY + eyeH * 1.2 - X.lids.bottom * eyeH * 1.6, ex - eyeW - 0.5, eyeY);
+                    ctx.fill();
+                }
 
                 // Eyeliner — top lid line
                 ctx.strokeStyle = '#1a1018';
-                ctx.lineWidth = fw * 0.04;
+                ctx.lineWidth = fw * 0.04 * (1 + lidTop * 0.6);
                 ctx.beginPath();
                 ctx.moveTo(ex - eyeW, eyeY);
-                ctx.quadraticCurveTo(ex, eyeY - eyeH * 1.6, ex + eyeW, eyeY);
+                ctx.quadraticCurveTo(ex, lidY, ex + eyeW, eyeY);
                 ctx.stroke();
                 // Lower lash line (subtle)
                 ctx.globalAlpha = 0.3;
@@ -33064,29 +33184,50 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             // ─── LIPS ───
             const mouthY = cy + fh * 0.48;
-            const mouthW = fw * 0.35;
+            const mouthW = fw * 0.35 * (1 + X.mouth.width);
+            // Corners: curve lifts both (smile) or drops them (frown); smirk lifts one
+            const lcY = mouthY - X.mouth.curve * fh * 0.1 + X.mouth.smirk * fh * 0.02;
+            const rcY = mouthY - X.mouth.curve * fh * 0.1 - X.mouth.smirk * fh * 0.08;
+            const open = Math.min(1, X.mouth.open + talk) * fh * 0.14;     // how far the lower lip drops
+            if (open > 0) {
+                // Inside of the mouth, then a hint of teeth under the upper lip
+                ctx.fillStyle = '#2a0f16';
+                ctx.beginPath();
+                ctx.moveTo(cx - mouthW, lcY);
+                ctx.quadraticCurveTo(cx, mouthY + fh * 0.02, cx + mouthW, rcY);
+                ctx.quadraticCurveTo(cx, mouthY + fh * 0.06 + open * 2, cx - mouthW, lcY);
+                ctx.fill();
+                if (open > fh * 0.035) {
+                    ctx.fillStyle = '#f1ebe4';
+                    ctx.beginPath();
+                    ctx.moveTo(cx - mouthW * 0.8, lcY + fh * 0.01);
+                    ctx.quadraticCurveTo(cx, mouthY + fh * 0.02, cx + mouthW * 0.8, rcY + fh * 0.01);
+                    ctx.quadraticCurveTo(cx, mouthY + fh * 0.02 + open * 0.7, cx - mouthW * 0.8, lcY + fh * 0.01);
+                    ctx.fill();
+                }
+            }
             // Upper lip (darker)
             ctx.fillStyle = lipDark;
             ctx.beginPath();
-            ctx.moveTo(cx - mouthW, mouthY);
+            ctx.moveTo(cx - mouthW, lcY);
             ctx.quadraticCurveTo(cx - mouthW * 0.4, mouthY - fh * 0.09, cx, mouthY - fh * 0.05);
-            ctx.quadraticCurveTo(cx + mouthW * 0.4, mouthY - fh * 0.09, cx + mouthW, mouthY);
-            ctx.quadraticCurveTo(cx, mouthY + fh * 0.02, cx - mouthW, mouthY);
+            ctx.quadraticCurveTo(cx + mouthW * 0.4, mouthY - fh * 0.09, cx + mouthW, rcY);
+            ctx.quadraticCurveTo(cx, mouthY + fh * 0.02, cx - mouthW, lcY);
             ctx.closePath();
             ctx.fill();
             // Lower lip (fuller, lighter)
             ctx.fillStyle = lipColor;
             ctx.beginPath();
-            ctx.moveTo(cx - mouthW, mouthY);
-            ctx.quadraticCurveTo(cx, mouthY + fh * 0.16, cx + mouthW, mouthY);
-            ctx.quadraticCurveTo(cx, mouthY + fh * 0.06, cx - mouthW, mouthY);
+            ctx.moveTo(cx - mouthW, lcY);
+            ctx.quadraticCurveTo(cx, mouthY + fh * 0.16 + open, cx + mouthW, rcY);
+            ctx.quadraticCurveTo(cx, mouthY + fh * 0.06 + open * 2, cx - mouthW, lcY);
             ctx.closePath();
             ctx.fill();
             // Lip shine
             ctx.fillStyle = '#fff';
             ctx.globalAlpha = 0.12;
             ctx.beginPath();
-            ctx.ellipse(cx + mouthW * 0.15, mouthY + fh * 0.05, mouthW * 0.2, fh * 0.03, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx + mouthW * 0.15, mouthY + fh * 0.05 + open, mouthW * 0.2, fh * 0.03, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1.0;
 
@@ -33094,6 +33235,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (hair) {
                 const renderer = PORTRAIT_HAIR_RENDERERS[hair.type];
                 if (renderer) renderer(ctx, hair.color, cx, cy, fw, fh);
+            }
+
+            // An expressive brow shows through the fringe (stylised, like drawn portraits)
+            if (X.brow.lift || X.brow.tilt || X.brow.arch || X.brow.raise) {
+                ctx.save();
+                ctx.lineCap = 'round';
+                ctx.globalAlpha = 0.6; ctx.strokeStyle = skinColor; ctx.lineWidth = fw * 0.15; drawBrows();   // outline so it reads on dark hair
+                ctx.globalAlpha = 1; ctx.strokeStyle = browColor; ctx.lineWidth = fw * 0.1; drawBrows();
+                ctx.restore();
             }
 
             // ─── JEWELRY AND HAT ───
@@ -33111,8 +33261,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Head
             ctx.fillStyle = skinColor;
             ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
-            ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
+            // Eyes — they blink now and then, each character on their own rhythm
+            const owner = dyn.owner;
+            if (owner && owner._blinkSeed === undefined) owner._blinkSeed = Math.floor(Math.random() * 997);
+            if (!owner || blinkAmount(_gameTimeSec, owner._blinkSeed) < 0.5) {
+                ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
+                ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
+            }
             // Hair (all styles render on top of head) — strand physics via hairGeometry().
             // A raised hood hides short styles; long ones still spill out from under it.
             if (hair && !(hatPiece && hatPiece.hides === 'most' && !HAIR_SPILLS_FROM_HOOD.includes(hair.type))) {
@@ -36259,7 +36414,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         { speaker: '949', text: "Just checking in." },
                         { speaker: 'Victoria', text: "Checking in. Cute. Well, I'm still here. Still armed. Still better than whoever's out there trying to kill us." },
                         { speaker: '949', text: "Good to know." },
-                        { speaker: 'Victoria', text: "...Yeah. It is." }
+                        { speaker: 'Victoria', text: "...Yeah. It is.", mood: 'smile' }
                     ],
                     [
                         { speaker: 'Victoria', text: "This apartment's alright. Small though. You ever think about getting a place with more room to store ammunition?" },
@@ -36273,7 +36428,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         { speaker: '949', text: "What happened?" },
                         { speaker: 'Victoria', text: "I found out what they were actually doing with the weapons I was testing. So I took the prototype and walked out." },
                         { speaker: '949', text: "Just like that?" },
-                        { speaker: 'Victoria', text: "Just like that. The glass was bulletproof, by the way. I checked on my way out." }
+                        { speaker: 'Victoria', text: "Just like that. The glass was bulletproof, by the way. I checked on my way out.", mood: 'smirk' }
                     ],
                     [
                         { speaker: 'Victoria', text: "Most people I've worked with are dead or corporate. Same thing, really." },
@@ -36285,14 +36440,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     [
                         { speaker: 'Victoria', text: "I don't say this often and I'll deny it if you repeat it. But this crew? This is the closest thing to family I've had in years." },
                         { speaker: '949', text: "You don't have to deny it." },
-                        { speaker: 'Victoria', text: "...Fine. But if Max makes one more joke about my hair, I'm putting him through the wall. Lovingly." }
+                        { speaker: 'Victoria', text: "...Fine. But if Max makes one more joke about my hair, I'm putting him through the wall. Lovingly.", mood: 'annoyed' }
                     ]
                 ],
                 3: [ // Inner Circle (75-100)
                     [
                         { speaker: 'Victoria', text: "Freelancer. Whatever happens out there — whatever comes through those dimensions — I've got you. No hesitation. No questions." },
                         { speaker: '949', text: "I know." },
-                        { speaker: 'Victoria', text: "Good. Now let's go break something." }
+                        { speaker: 'Victoria', text: "Good. Now let's go break something.", mood: 'grin' }
                     ]
                 ]
             },
@@ -36313,7 +36468,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     [
                         { speaker: 'Yenna', text: "I served three tours in the Rim Conflicts. Saw things that don't make tactical sense. Things that shouldn't exist." },
                         { speaker: '949', text: "Dimensional anomalies?" },
-                        { speaker: 'Yenna', text: "That's the polite term. We called them rips. My unit walked into one. I walked out alone." },
+                        { speaker: 'Yenna', text: "That's the polite term. We called them rips. My unit walked into one. I walked out alone.", mood: 'sad' },
                         { speaker: '949', text: "Yenna..." },
                         { speaker: 'Yenna', text: "I don't need sympathy. I need purpose. This crew gives me that." }
                     ]
@@ -36338,7 +36493,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     [
                         { speaker: 'Sabrina', text: "Oh look, the Freelancer wants to chat. Should I put on tea? Light some candles? Summon a minor demon for ambiance?" },
                         { speaker: '949', text: "Just tea is fine." },
-                        { speaker: 'Sabrina', text: "Boring. But sure." }
+                        { speaker: 'Sabrina', text: "Boring. But sure.", mood: 'smirk' }
                     ],
                     [
                         { speaker: 'Sabrina', text: "You know what I like about this apartment? The walls don't bleed. Low bar, but I've lived in worse." },
@@ -36351,8 +36506,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         { speaker: 'Sabrina', text: "The dark energy thing isn't learned. I was born with it. Mom called it a gift. Dad called it a curse. They were both right." },
                         { speaker: '949', text: "How do you control it?" },
                         { speaker: 'Sabrina', text: "Control is a strong word. I aim it. Big difference." },
-                        { speaker: '949', text: "That's terrifying." },
-                        { speaker: 'Sabrina', text: "I know, right? Kind of awesome though." }
+                        { speaker: '949', text: "That's terrifying.", mood: 'surprised' },
+                        { speaker: 'Sabrina', text: "I know, right? Kind of awesome though.", mood: 'grin' }
                     ]
                 ],
                 2: [
@@ -36361,7 +36516,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         { speaker: '949', text: "Little bit." },
                         { speaker: 'Sabrina', text: "It's easier than admitting that I actually care what happens to these idiots. And to you." },
                         { speaker: '949', text: "The armor's down right now." },
-                        { speaker: 'Sabrina', text: "Don't get used to it. But... yeah. It is." }
+                        { speaker: 'Sabrina', text: "Don't get used to it. But... yeah. It is.", mood: 'sultry' }
                     ]
                 ],
                 3: [
@@ -36381,7 +36536,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ],
                     [
                         { speaker: 'Max', text: "Hey, check this out — *bzzt*" },
-                        { speaker: '949', text: "Did you just shock the toaster?" },
+                        { speaker: '949', text: "Did you just shock the toaster?", mood: 'surprised' },
                         { speaker: 'Max', text: "It was being slow. I helped. That's what I do. I help." }
                     ]
                 ],
@@ -36389,7 +36544,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     [
                         { speaker: 'Max', text: "The sparks aren't just some cool party trick. My nervous system is overclocked. Always has been. Too much electricity, not enough... ground." },
                         { speaker: '949', text: "Is that why you're always moving?" },
-                        { speaker: 'Max', text: "If I stop, I feel like I'll explode. Not metaphorically. I mean actually explode." },
+                        { speaker: 'Max', text: "If I stop, I feel like I'll explode. Not metaphorically. I mean actually explode.", mood: 'worried' },
                         { speaker: '949', text: "That sounds exhausting." },
                         { speaker: 'Max', text: "It is. But it also means I'll never let you down in a fight. Can't slow down even if I wanted to." }
                     ]
@@ -36443,8 +36598,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 3: [
                     [
                         { speaker: 'Josh', text: "Emotional attachment detected. Subject: you. And the team. Severity: significant. Recommended action: none. I don't want it to stop." },
-                        { speaker: '949', text: "Josh, that might be the most human thing you've ever said." },
-                        { speaker: 'Josh', text: "...Don't tell Max." }
+                        { speaker: '949', text: "Josh, that might be the most human thing you've ever said.", mood: 'smile' },
+                        { speaker: 'Josh', text: "...Don't tell Max.", mood: 'smile' }
                     ]
                 ]
             }
@@ -36614,7 +36769,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /**
              * Play a multi-line dialogue sequence.
-             * @param {Array<{speaker: string, text: string}>} lines
+             * @param {Array<{speaker: string, text: string, mood?: string}>} lines  (mood: a name from EXPRESSIONS; otherwise read from the text)
              * @param {Object} [options]
              * @param {Function} [options.onComplete]       - Called after last line is dismissed
              * @param {string}   [options.finalButtonText]  - Button label on last line (default 'Done')
@@ -36664,7 +36819,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 g.npcNameEl.style.color = colors[line.speaker] || SPEAKER_COLORS[line.speaker] || '#ccc';
 
                 // Render portrait for current speaker
-                if (g.renderDialoguePortrait) g.renderDialoguePortrait(line.speaker);
+                if (g.renderDialoguePortrait) g.renderDialoguePortrait(line.speaker, line.mood, line.text);
 
                 // (Transcript capture is handled by GameEngine._installDialogueCapture's
                 // MutationObserver — covers DialogueSequence AND single-line writes.)
@@ -39751,7 +39906,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (speakerName === '949' || speakerName === 'Stella') {
                     if (this.cosmetics) {
                         const c = this.cosmetics.getRenderConfig();
-                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: '#daa520', gender: 'female', top: c.outfit.top, hat: c.hat, jewelry: c.jewelry };
+                        const face = this.playerExpression ? { expression: this.playerExpression } : {};
+                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: '#daa520', gender: 'female', top: c.outfit.top, hat: c.hat, jewelry: c.jewelry, ...face };
                     }
                     return { skinColor: '#c68e63', hair: { type: 'curls', color: '#0a0505' }, eyeColor: '#daa520', gender: 'female' };
                 }
@@ -39825,9 +39981,36 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this._portraitCache) this._portraitCache.clear();
             },
 
-            /** Render a character portrait into the dialogue box canvas. */
-            renderDialoguePortrait(speakerName) {
-                this.paintPortraitTo(document.getElementById('dialogue-portrait'), speakerName);
+            /**
+             * Render a character portrait into the dialogue box canvas, wearing the line's
+             * mood (or one read from the text), and keep it alive while the box is open:
+             * the lips move for about as long as the line takes to say, and they blink.
+             */
+            renderDialoguePortrait(speakerName, mood, text) {
+                const now = performance.now(), len = text ? String(text).length : 0;
+                let seed = 0; for (const ch of String(speakerName)) seed = (seed * 31 + ch.charCodeAt(0)) % 997;
+                this._dialogueFace = {
+                    speaker: speakerName, seed,
+                    expression: mood || (text ? inferMood(text, speakerName) : (CHARACTER_TEMPERAMENT[speakerName] || 'neutral')),
+                    talkUntil: now + (len ? Math.min(3500, 350 + len * 45) : 0), last: ''
+                };
+                this._paintDialogueFace();
+                if (!this._dialogueFaceTimer) this._dialogueFaceTimer = setInterval(() => this._paintDialogueFace(), 50);
+            },
+
+            /** One frame of the living dialogue portrait (repaints only when the face changed). */
+            _paintDialogueFace() {
+                const f = this._dialogueFace, canvas = document.getElementById('dialogue-portrait');
+                if (!f || !canvas || !this.dialogueBox || this.dialogueBox.style.display === 'none') {
+                    clearInterval(this._dialogueFaceTimer); this._dialogueFaceTimer = null; return;
+                }
+                const now = performance.now();
+                const blink = Math.round(blinkAmount(now / 1000, f.seed) * 4) / 4;
+                const talk = now < f.talkUntil ? Math.round(Math.abs(Math.sin(now / 1000 * Math.PI * 5.5)) * 4) / 4 * 0.55 : 0;
+                const key = blink + '|' + talk;
+                if (key === f.last) return;
+                f.last = key;
+                this.paintPortraitTo(canvas, f.speaker, undefined, { expression: f.expression, blink, talk });
             },
 
             /**
@@ -39837,7 +40020,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * @param {string} speakerName
              * @param {string} [bg] backdrop fill; pass null to skip it
              */
-            paintPortraitTo(canvas, speakerName, bg = 'rgba(40, 5, 25, 0.95)') {
+            paintPortraitTo(canvas, speakerName, bg = 'rgba(40, 5, 25, 0.95)', face = null) {
                 if (!canvas) return null;
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -39848,7 +40031,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fill();
                 }
                 const config = this.resolvePortraitConfig(speakerName);
-                drawCharacterPortrait(ctx, canvas.width, canvas.height, config);
+                drawCharacterPortrait(ctx, canvas.width, canvas.height, face ? { ...config, ...face } : config);
                 return config;
             },
 
@@ -48517,6 +48700,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!emoji) return;
                 this.playerEmote.text = emoji;
                 this.playerEmote.age = 0;
+                // 949's face follows the emote while the bubble is up (sidebar, phone, dialogue)
+                const faces = { smile: 'smile', zany: { brow: { lift: 0.3, raise: 0.8 }, lids: { bottom: 0.3 }, gaze: { x: 0.4 }, mouth: { curve: 1, open: 0.4, smirk: 0.4 }, blush: 0.2 }, cry: 'crying', frown: 'annoyed' };
+                this.playerExpression = faces[key];
+                this.renderSidebarPortrait();
 
                 // Trigger nearest reactor's response within range — slight delay
                 // so it feels like processing rather than reflex. Eligible
@@ -48614,6 +48801,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.playerEmote.age >= this.playerEmote.duration) {
                     this.playerEmote.text = null;
                     this.playerEmote.age = 0;
+                    this.playerExpression = null;
+                    this.renderSidebarPortrait();
                 }
             },
 
