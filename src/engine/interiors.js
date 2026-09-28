@@ -1,0 +1,729 @@
+        // GameEngine — Apartment and clinic interiors, the city backdrop from the veranda, mission marker.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
+            /* =====================================================================
+               APARTMENT CITY BACKDROP
+               ---------------------------------------------------------------------
+               Draws a simplified city view visible from the apartment veranda.
+               Small buildings, neon glows, tiny car/pedestrian sprites for life.
+               ===================================================================== */
+            /** Clinic floor details: tiles, wayfinding stripe, scanner platform, curtain tracks. */
+            /** apt_949 floor art: veranda deck, living-room planks, kitchen tiles, rugs, bedroom boards, bathroom tiles. */
+            drawApartmentInterior(ctx) {
+                const lines = (x0, y0, x1, y1, step, vertical, color, lw = 1) => {
+                    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
+                    if (vertical) for (let x = x0 + step; x < x1; x += step) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
+                    else for (let y = y0 + step; y < y1; y += step) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
+                    ctx.stroke();
+                };
+                const rug = (x, y, w, h, base, border, inner) => {
+                    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 3, w, h, 8); ctx.fill();
+                    ctx.fillStyle = base; ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill();
+                    ctx.strokeStyle = border; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x + 7, y + 7, w - 14, h - 14, 5); ctx.stroke();
+                    if (inner) { ctx.strokeStyle = inner; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 14, y + 14, w - 28, h - 28, 4); ctx.stroke(); }
+                };
+                ctx.save();
+                lines(8, 8, 1392, 200, 14, false, 'rgba(0,0,0,0.16)');                                   // veranda deck boards
+                lines(8, 208, 900, 892, 28, true, 'rgba(0,0,0,0.14)');                                   // living-room planks
+                ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath();                                   // staggered plank joints
+                for (let i = 0, x = 8; x < 900; x += 28, i++) for (let y = 208 + (i % 3) * 70; y < 892; y += 210) { ctx.moveTo(x, y); ctx.lineTo(x + 28, y); }
+                ctx.stroke();
+                ctx.fillStyle = '#4a2a2c'; ctx.fillRect(84, 690, 520, 202);                              // kitchen stone tiles
+                lines(84, 690, 604, 892, 40, true, 'rgba(0,0,0,0.2)'); lines(84, 690, 604, 892, 40, false, 'rgba(0,0,0,0.2)');
+                ctx.strokeStyle = 'rgba(239,230,220,0.12)'; ctx.lineWidth = 1; ctx.strokeRect(84.5, 690.5, 520, 202);
+                rug(320, 396, 334, 214, APT.wineLt, APT.blush, 'rgba(239,230,220,0.35)');                  // lounge rug
+                lines(908, 208, 1392, 548, 24, true, 'rgba(255,255,255,0.05)');                          // bedroom boards
+                rug(975, 270, 160, 130, '#8a5560', APT.blushLt, null);                                   // bedroom rug under the bed foot
+                lines(908, 556, 1392, 892, 32, true, 'rgba(0,0,0,0.09)'); lines(908, 556, 1392, 892, 32, false, 'rgba(0,0,0,0.09)');   // bathroom tiles
+                ctx.fillStyle = APT.blushLt; ctx.beginPath(); ctx.roundRect(1270, 672, 76, 30, 8); ctx.fill();   // bath mat
+                ctx.restore();
+            },
+
+            /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
+            drawApartmentGlow(ctx) {
+                const t = _frameTime / 1000, rs = this.roomSystem;
+                const dark = (x, y) => { const r = rs && rs.active ? rs.getRoomAt(x, y) : null; return !!(r && r.lightsOff); };
+                const glow = (x, y, r, c0, c1) => { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // Lamp shades and bar pendants (they follow the room switches)
+                const shades = [[353, 484, 30], [573, 484, 30], [991, 232, 28], [1115, 232, 28], [307, 439, 34], [700, 700, 34], [109, 463, 34], [231, 759, 22], [350, 759, 22], [469, 759, 22]];
+                for (const [x, y, r] of shades) {
+                    if (dark(x, y)) continue;
+                    glow(x, y, r, 'rgba(255,210,160,0.26)', 'rgba(255,190,140,0)');
+                    ctx.fillStyle = 'rgba(255,236,210,0.8)'; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+                }
+                // Fireplace
+                const ff = 0.8 + 0.2 * Math.sin(t * 6.3) * Math.sin(t * 2.1);
+                glow(580, 432, 60, `rgba(255,140,60,${0.35 * ff})`, 'rgba(255,120,40,0)');
+                // Induction zones (warm red) and two gas burners (blue flame)
+                for (const [x, y] of [[433, 864], [460, 877]]) glow(x, y, 12, 'rgba(255,70,40,0.55)', 'rgba(255,60,30,0)');
+                for (const [x, y, r] of [[312, 859, 7], [329, 873, 5.5]]) {
+                    ctx.strokeStyle = `rgba(90,160,255,${0.6 + 0.3 * Math.sin(t * 14 + x)})`; ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.arc(x, y, r - 1, 0, Math.PI * 2); ctx.stroke();
+                    glow(x, y, r + 6, 'rgba(90,150,255,0.25)', 'rgba(90,150,255,0)');
+                }
+                // Candles on the tub rim
+                for (const [x, y] of [[1248, 619], [1256, 612], [1368, 619]]) {
+                    const f = 0.75 + 0.25 * Math.sin(t * 9 + x);
+                    glow(x, y, 12, `rgba(255,200,130,${0.5 * f})`, 'rgba(255,180,110,0)');
+                }
+                // Festoon string lights swagged along the veranda railing
+                for (let s = 0; s < 8; s++) {
+                    const x0 = 20 + s * 170, x1 = x0 + 170;
+                    for (let i = 0; i <= 8; i++) {
+                        const u = i / 8, x = x0 + (x1 - x0) * u, y = 14 + Math.sin(u * Math.PI) * 12;
+                        const f = 0.7 + 0.3 * Math.sin(t * 1.3 + s * 3 + i * 1.7);
+                        glow(x, y, 9, `rgba(255,214,160,${0.45 * f})`, 'rgba(255,200,140,0)');
+                        ctx.fillStyle = `rgba(255,240,215,${0.9 * f})`; ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+                ctx.restore();
+            },
+
+            drawClinicInterior(ctx) {
+                const t = _gameTimeSec;
+                ctx.save();
+                // Tile grid with a faint alternating tint
+                for (let ty = 50; ty < 750; ty += 50) {
+                    for (let tx = 50; tx < 750; tx += 50) {
+                        if (((tx + ty) / 50) % 2) { ctx.fillStyle = 'rgba(255,255,255,0.035)'; ctx.fillRect(tx, ty, 50, 50); }
+                    }
+                }
+                ctx.strokeStyle = 'rgba(40,55,65,0.22)'; ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let v = 50; v <= 750; v += 50) { ctx.moveTo(v, 50); ctx.lineTo(v, 750); ctx.moveTo(50, v); ctx.lineTo(750, v); }
+                ctx.stroke();
+                // Recovery-bay floor mats under the beds
+                ctx.fillStyle = 'rgba(63,143,163,0.16)';
+                ctx.fillRect(50, 270, 170, 320); ctx.fillRect(580, 270, 170, 320);
+                // Wayfinding stripe: door → desk, splitting to both bays
+                ctx.strokeStyle = 'rgba(63,182,201,0.55)'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(400, 745); ctx.lineTo(400, 560); ctx.moveTo(400, 400); ctx.lineTo(400, 275);
+                ctx.moveTo(400, 620); ctx.lineTo(240, 620); ctx.lineTo(240, 430); ctx.moveTo(400, 620); ctx.lineTo(560, 620); ctx.lineTo(560, 430);
+                ctx.stroke(); ctx.lineCap = 'butt';
+                // Diagnostic scanner platform (walk-on), slowly sweeping ring
+                const cx = 400, cy = 480;
+                ctx.fillStyle = '#5d6b74'; ctx.beginPath(); ctx.arc(cx, cy, 64, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#44525b'; ctx.beginPath(); ctx.arc(cx, cy, 56, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = 'rgba(63,227,255,0.85)'; ctx.lineWidth = 3; ctx.shadowColor = '#3fe3ff'; ctx.shadowBlur = 12;
+                ctx.beginPath(); ctx.arc(cx, cy, 58, 0, Math.PI * 2); ctx.stroke();
+                const sweep = (t * 0.9) % (Math.PI * 2);
+                ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(cx, cy, 58, sweep, sweep + 0.9); ctx.stroke();
+                ctx.shadowBlur = 0;
+                const pulse = 0.5 + 0.5 * Math.sin(t * 2);
+                ctx.strokeStyle = `rgba(63,227,255,${0.25 + 0.35 * pulse})`; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.arc(cx, cy, 30 + 18 * pulse, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = 'rgba(63,227,255,0.18)'; ctx.beginPath(); ctx.arc(cx, cy, 24, 0, Math.PI * 2); ctx.fill();
+                // Medical cross inlay in front of the desk
+                ctx.fillStyle = 'rgba(220,60,70,0.55)';
+                ctx.fillRect(390, 300, 20, 56); ctx.fillRect(372, 318, 56, 20);
+                // Privacy curtains between beds (ceiling tracks with drawn-back curtains)
+                const curtain = (x0, x1, y) => {
+                    ctx.strokeStyle = 'rgba(200,210,215,0.9)'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+                    ctx.fillStyle = 'rgba(170,215,225,0.55)';
+                    ctx.beginPath(); ctx.moveTo(x0, y - 4);
+                    for (let xx = x0; xx <= x0 + 60; xx += 6) ctx.lineTo(xx, y + ((xx / 6) % 2 ? 4 : -4));
+                    ctx.lineTo(x0 + 60, y + 4); ctx.lineTo(x0, y + 4); ctx.closePath(); ctx.fill();
+                };
+                curtain(55, 215, 413); curtain(585, 745, 413);
+                ctx.restore();
+            },
+
+            drawApartmentBackdrop(ctx) {
+                /* ------------------------------------------------------------------
+                   THE STREET, SEEN FROM HIGH ABOVE.
+                   The veranda railing sits at y 0-8; we are looking straight DOWN
+                   over it. Everything below uses the same visual grammar as the main
+                   city — asphalt, dashed lane lines, tiled pavement, rooftops — but
+                   rendered small. The miniature scale is what reads as altitude.
+
+                   "d" = distance out from the base of our building (0 at the railing).
+                   Larger d = further away = higher on screen = hazier.
+
+                   PERFORMANCE: all static geometry (ground, roads, markings, roofs,
+                   streetlight pools) is baked ONCE into an offscreen canvas. Per frame
+                   we blit that and draw only the living things — traffic, pedestrians,
+                   signal cycles, neon pulse.
+                   ------------------------------------------------------------------ */
+                const backdropBottom = 6;    // world Y of the railing line
+                const backdropDepth  = 400;  // how far out we can see
+                const backdropTop    = backdropBottom - backdropDepth;
+                const mapW = this.activeMap.width;
+                const t = _frameTime;
+
+                // --- DEPTH BANDS -------------------------------------------------
+                const D_CHASM   = 26;   // shadowed ground at our own building's base
+                const D_WALK_N  = 50;   // near pavement ends / street begins
+                const D_STREET  = 120;  // main street ends
+                const D_WALK_F  = 144;  // far pavement ends / first block begins
+                const D_BLOCK1  = 206;  // first row of rooftops ends
+                const D_ALLEY   = 222;  // service alley ends
+                const D_BLOCK2  = 292;  // second row ends
+                const D_ALLEY2  = 308;  // second alley ends
+                const D_MAX     = backdropDepth;
+                const yAt = (d) => backdropBottom - d;
+
+                // =================================================================
+                // ONE-TIME LAYOUT SEED
+                // Deterministic PRNG so the street below her window is the SAME
+                // street every session — it shouldn't rearrange itself between visits.
+                // =================================================================
+                if (!this._backdropCity) {
+                    let _s = 0x9491949;
+                    const rnd = () => {
+                        _s |= 0; _s = (_s + 0x6D2B79F5) | 0;
+                        let x = Math.imul(_s ^ (_s >>> 15), 1 | _s);
+                        x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+                        return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+                    };
+                    const rand = (a, b) => a + rnd() * (b - a);
+                    const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+
+                    const city = { cross: [], blocks: [], cars: [], peds: [], lamps: [], signs: [], flicker: [] };
+
+                    // --- CROSS STREETS (run away from us, perpendicular to the main road)
+                    let cx = rand(80, 150);
+                    while (cx < mapW - 90) {
+                        city.cross.push({ x: cx, w: rand(40, 54), phase: rnd() * 12000 });
+                        cx += rand(300, 440);
+                    }
+
+                    // --- CITY BLOCKS in the gaps between cross streets
+                    const gaps = [];
+                    let prev = -40;
+                    for (const cs of city.cross) { gaps.push([prev, cs.x]); prev = cs.x + cs.w; }
+                    gaps.push([prev, mapW + 40]);
+
+                    const roofTones = ['#191922', '#1e1e28', '#15151e', '#20202b'];
+                    const rows = [
+                        { d0: D_WALK_F, d1: D_BLOCK1 },
+                        { d0: D_ALLEY,  d1: D_BLOCK2 },
+                        { d0: D_ALLEY2, d1: D_MAX + 20 }   // furthest row runs off the top edge
+                    ];
+                    for (const [gx0, gx1] of gaps) {
+                        for (let ri = 0; ri < rows.length; ri++) {
+                            const row = rows[ri];
+                            let bx = gx0 + rand(2, 12);
+                            while (bx < gx1 - 30) {
+                                const bw = Math.min(rand(58, 155), gx1 - bx - 4);
+                                if (bw < 28) break;
+                                const d0 = row.d0 + rand(0, 15);
+                                // Occasionally a tower deep enough to swallow the alley
+                                // behind it, so the rows don't read as a perfect grid.
+                                const deep = ri < rows.length - 1 && rnd() < 0.17;
+                                const d1 = (deep ? rows[ri + 1].d1 : row.d1) - rand(0, 13);
+
+                                // Rooftop clutter — AC units, stairwell housings, water tanks
+                                const props = [];
+                                const pn = 1 + Math.floor(rnd() * 4);
+                                for (let i = 0; i < pn; i++) {
+                                    props.push({
+                                        fx: rand(0.14, 0.86), fd: rand(0.22, 0.8),
+                                        w: rand(6, 15), h: rand(5, 11),
+                                        kind: rnd() < 0.22 ? 'tank' : 'ac'
+                                    });
+                                }
+                                city.blocks.push({
+                                    x: bx, w: bw, d0, d1,
+                                    kind: (!deep && rnd() < 0.11) ? 'lot' : 'roof',
+                                    tone: pick(roofTones),
+                                    props,
+                                    beacon: rnd() < 0.34,
+                                    beaconPhase: rnd() * 3000,
+                                    litSeed: rnd() * 100
+                                });
+
+                                // Neon on the face turned toward us
+                                if (rnd() < 0.42) {
+                                    city.signs.push({
+                                        x: bx + rand(0.15, 0.6) * bw,
+                                        d: d0 - rand(1, 3),
+                                        w: rand(10, 26), h: rand(2.5, 4),
+                                        color: pick(['#ff1493', '#00ff88', '#ffaa00', '#a469ff', '#00f3ff', '#ff3355']),
+                                        phase: rnd() * 6000,
+                                        rate: rand(0.0011, 0.0026)
+                                    });
+                                }
+                                bx += bw + rand(5, 14);
+                            }
+                        }
+                    }
+
+                    // --- TRAFFIC on the main street: 4 lanes, 2 each way
+                    const laneW = (D_STREET - D_WALK_N) / 4;
+                    const carColors = ['#6a6a78', '#8a3040', '#30506a', '#7a7060', '#404050', '#5a3a6a'];
+                    for (let i = 0; i < 20; i++) {
+                        const lane = Math.floor(rnd() * 4);
+                        city.cars.push({
+                            axis: 'h',
+                            d: D_WALK_N + laneW * (lane + 0.5),
+                            dir: lane < 2 ? 1 : -1,          // near lanes head east, far lanes west
+                            speed: rand(0.030, 0.062),
+                            offset: rnd() * (mapW + 160),
+                            len: rand(8, 12), wid: rand(4.2, 5.4),
+                            body: pick(carColors)
+                        });
+                    }
+                    // --- TRAFFIC on the cross streets (far side of the intersection only)
+                    for (const cs of city.cross) {
+                        const n = 1 + Math.floor(rnd() * 3);
+                        for (let i = 0; i < n; i++) {
+                            const outbound = rnd() < 0.5;
+                            city.cars.push({
+                                axis: 'v', cx: cs.x + cs.w * (outbound ? 0.68 : 0.32),
+                                dir: outbound ? 1 : -1,
+                                speed: rand(0.022, 0.048),
+                                offset: rnd() * 150,
+                                len: rand(8, 11), wid: rand(4.2, 5.2),
+                                body: pick(carColors)
+                            });
+                        }
+                    }
+
+                    // --- PEDESTRIANS on both pavements
+                    for (let i = 0; i < 28; i++) {
+                        const far = rnd() < 0.5;
+                        city.peds.push({
+                            d: far ? rand(D_STREET + 5, D_WALK_F - 4) : rand(D_CHASM - 12, D_WALK_N - 4),
+                            dir: rnd() < 0.5 ? 1 : -1,
+                            speed: rand(0.006, 0.013),
+                            offset: rnd() * (mapW + 40),
+                            bob: rnd() * 6,
+                            tint: pick(['#9aa0aa', '#8a8f99', '#a8a2b0', '#93a2a8'])
+                        });
+                    }
+
+                    // --- STREETLIGHTS down both kerbs, staggered
+                    for (let x = 40; x < mapW; x += 118) {
+                        city.lamps.push({ x, d: D_WALK_N - 5 });
+                        city.lamps.push({ x: x + 59, d: D_STREET + 5 });
+                    }
+
+                    // --- A few windows that flicker, for life in the static roofs
+                    for (let i = 0; i < 10; i++) {
+                        city.flicker.push({
+                            x: rand(30, mapW - 30), d: rand(D_WALK_F - 4, D_WALK_F),
+                            phase: rnd() * 9000, rate: rand(0.0004, 0.0015)
+                        });
+                    }
+
+                    this._backdropCity = city;
+                    this._backdropStatic = null;  // force bake
+                }
+
+                const city = this._backdropCity;
+
+                // =================================================================
+                // BAKE STATIC LAYER (once)
+                // =================================================================
+                if (!this._backdropStatic || this._backdropStaticW !== mapW) {
+                    const off = document.createElement('canvas');
+                    off.width = mapW;
+                    off.height = backdropDepth;
+                    const g = off.getContext('2d');
+                    g.translate(0, -backdropTop);   // draw in world coords
+
+                    const ASPHALT = '#222225';
+                    const PAVE    = '#2a2a30';
+
+                    // Ground base — unlit gaps between everything
+                    g.fillStyle = '#0b0b12';
+                    g.fillRect(0, backdropTop, mapW, backdropDepth);
+
+                    // Service alleys between the rows of blocks. Drawn FIRST so the
+                    // buildings sit on top of them and the alley edges come out ragged.
+                    g.fillStyle = '#131318';
+                    g.fillRect(0, yAt(D_ALLEY),  mapW, D_ALLEY  - D_BLOCK1);
+                    g.fillRect(0, yAt(D_ALLEY2), mapW, D_ALLEY2 - D_BLOCK2);
+
+                    // --- PAVEMENTS (near + far), matching the Pavement class treatment
+                    const drawPave = (x, y, w, h) => {
+                        g.fillStyle = PAVE;
+                        g.fillRect(x, y, w, h);
+                        g.strokeStyle = '#222228';
+                        g.lineWidth = 0.6;
+                        g.beginPath();
+                        for (let tx = x; tx < x + w; tx += 17) { g.moveTo(tx, y); g.lineTo(tx, y + h); }
+                        for (let ty = y; ty < y + h; ty += 17) { g.moveTo(x, ty); g.lineTo(x + w, ty); }
+                        g.stroke();
+                        g.strokeStyle = '#16161c';
+                        g.lineWidth = 1;
+                        g.strokeRect(x, y, w, h);
+                    };
+                    // Near pavement is wider — we're almost directly above it
+                    drawPave(0, yAt(D_WALK_N), mapW, D_WALK_N - 6);
+                    drawPave(0, yAt(D_WALK_F), mapW, D_WALK_F - D_STREET);
+
+                    // --- MAIN STREET ASPHALT
+                    g.fillStyle = ASPHALT;
+                    g.fillRect(0, yAt(D_STREET), mapW, D_STREET - D_WALK_N);
+
+                    // --- LANE MARKINGS (miniature version of Road.draw)
+                    const laneW = (D_STREET - D_WALK_N) / 4;
+                    const line = (y, style) => {
+                        g.strokeStyle = style === 'dash' ? '#888' : (style === 'solid' ? '#ddd' : '#444');
+                        g.setLineDash(style === 'dash' ? [7, 6] : []);
+                        g.lineWidth = style === 'edge' ? 0.8 : 1;
+                        g.beginPath(); g.moveTo(0, y); g.lineTo(mapW, y); g.stroke();
+                    };
+                    line(yAt(D_WALK_N), 'edge');
+                    line(yAt(D_WALK_N + laneW), 'dash');
+                    line(yAt(D_WALK_N + laneW * 2), 'solid');   // centre line
+                    line(yAt(D_WALK_N + laneW * 3), 'dash');
+                    line(yAt(D_STREET), 'edge');
+                    g.setLineDash([]);
+
+                    // --- CROSS STREETS: asphalt over the top, which cuts the far
+                    //     pavement and blanks the main street's markings at junctions
+                    for (const cs of city.cross) {
+                        // T-junctions: they stop at the near kerb — our building fronts
+                        // the main road, so the pavement below us runs unbroken.
+                        g.fillStyle = ASPHALT;
+                        g.fillRect(cs.x, backdropTop, cs.w, yAt(D_WALK_N) - backdropTop);
+                        // Kerb edges beyond the junction
+                        g.strokeStyle = '#444'; g.lineWidth = 0.8;
+                        g.beginPath();
+                        g.moveTo(cs.x, yAt(D_STREET)); g.lineTo(cs.x, backdropTop);
+                        g.moveTo(cs.x + cs.w, yAt(D_STREET)); g.lineTo(cs.x + cs.w, backdropTop);
+                        g.stroke();
+                        // Centre dash beyond the junction
+                        g.strokeStyle = '#888'; g.setLineDash([7, 6]); g.lineWidth = 1;
+                        g.beginPath();
+                        g.moveTo(cs.x + cs.w / 2, yAt(D_WALK_F)); g.lineTo(cs.x + cs.w / 2, backdropTop);
+                        g.stroke();
+                        g.setLineDash([]);
+
+                        // Zebra crossings either side of the junction (bars run WITH traffic)
+                        g.fillStyle = 'rgba(225,225,230,0.42)';
+                        for (const zx of [cs.x - 15, cs.x + cs.w + 6]) {
+                            for (let d = D_WALK_N + 5; d < D_STREET - 2; d += 9) {
+                                g.fillRect(zx, yAt(d), 9, 5);
+                            }
+                        }
+                        // Stop line where the side street meets the kerb
+                        g.fillStyle = 'rgba(225,225,230,0.45)';
+                        g.fillRect(cs.x + 2, yAt(D_STREET + 4), cs.w / 2 - 3, 2);
+                    }
+
+                    // --- ROOFTOPS
+                    for (const b of city.blocks) {
+                        const ry = yAt(b.d1), rh = b.d1 - b.d0;
+
+                        // Open lot — gravel, bay markings, a few cars left overnight
+                        if (b.kind === 'lot') {
+                            g.fillStyle = '#1a1a20';
+                            g.fillRect(b.x, ry, b.w, rh);
+                            g.strokeStyle = '#101016'; g.lineWidth = 1;
+                            g.strokeRect(b.x + 0.5, ry + 0.5, b.w - 1, rh - 1);
+                            g.strokeStyle = 'rgba(200,200,215,0.15)'; g.lineWidth = 0.7;
+                            g.beginPath();
+                            const bay = Math.min(15, rh * 0.34);
+                            for (let lx = b.x + 8; lx < b.x + b.w - 6; lx += 9) {
+                                g.moveTo(lx, ry + 5);      g.lineTo(lx, ry + 5 + bay);
+                                g.moveTo(lx, ry + rh - 5); g.lineTo(lx, ry + rh - 5 - bay);
+                            }
+                            g.stroke();
+                            for (const p of b.props) {
+                                const px = b.x + p.fx * (b.w - 14) + 4;
+                                const py = ry + (p.fd < 0.5 ? 7 : rh - 17);
+                                g.fillStyle = '#33333d';
+                                g.fillRect(px, py, 5, 9);
+                                g.fillStyle = 'rgba(190,195,215,0.10)';
+                                g.fillRect(px + 1, py + 2, 3, 5);
+                            }
+                            continue;
+                        }
+
+                        // The face turned toward us — we're above and to the south, so a
+                        // sliver of the near wall shows. Further blocks show more of it.
+                        const face = 3 + (b.d0 - D_WALK_F) * 0.055;
+                        g.fillStyle = '#0a0a10';
+                        g.fillRect(b.x, yAt(b.d0), b.w, face);
+                        // Lit windows in that sliver
+                        for (let wx = b.x + 3; wx < b.x + b.w - 3; wx += 7) {
+                            if (Math.sin(wx * 3.7 + b.litSeed) > -0.1) {
+                                const warm = Math.sin(wx * 1.3 + b.litSeed) > 0.3;
+                                g.fillStyle = warm ? 'rgba(255,208,128,0.55)' : 'rgba(120,150,190,0.32)';
+                                g.fillRect(wx, yAt(b.d0) + 1, 3, Math.max(1.5, face - 2));
+                            }
+                        }
+
+                        // Roof slab
+                        g.fillStyle = b.tone;
+                        g.fillRect(b.x, ry, b.w, rh);
+                        g.strokeStyle = '#0d0d14'; g.lineWidth = 1;
+                        g.strokeRect(b.x + 0.5, ry + 0.5, b.w - 1, rh - 1);
+                        // Parapet catching a little skyglow
+                        g.strokeStyle = 'rgba(150,150,180,0.13)'; g.lineWidth = 1;
+                        g.strokeRect(b.x + 2.5, ry + 2.5, b.w - 5, rh - 5);
+
+                        // Rooftop clutter
+                        for (const p of b.props) {
+                            const px = b.x + p.fx * b.w - p.w / 2;
+                            const py = ry + p.fd * rh - p.h / 2;
+                            if (p.kind === 'tank') {
+                                g.fillStyle = '#2a2a34';
+                                g.beginPath();
+                                g.arc(px + p.w / 2, py + p.h / 2, Math.min(p.w, p.h) / 2, 0, Math.PI * 2);
+                                g.fill();
+                                g.strokeStyle = '#3a3a46'; g.lineWidth = 0.7; g.stroke();
+                            } else {
+                                g.fillStyle = '#26262f';
+                                g.fillRect(px, py, p.w, p.h);
+                                g.fillStyle = 'rgba(160,160,190,0.10)';
+                                g.fillRect(px, py, p.w, 1.5);
+                            }
+                            // Contact shadow, thrown away from us
+                            g.fillStyle = 'rgba(0,0,0,0.35)';
+                            g.fillRect(px + 1, py - 2, p.w, 2);
+                        }
+                    }
+
+                    // --- STREETLIGHT POOLS (baked; the lamps don't move)
+                    const R = 30;
+                    const pool = document.createElement('canvas');
+                    pool.width = pool.height = R * 2;
+                    const pg = pool.getContext('2d');
+                    const grd = pg.createRadialGradient(R, R, 0, R, R, R);
+                    grd.addColorStop(0,    'rgba(255,226,170,0.50)');
+                    grd.addColorStop(0.35, 'rgba(255,208,140,0.19)');
+                    grd.addColorStop(1,    'rgba(255,190,110,0)');
+                    pg.fillStyle = grd;
+                    pg.fillRect(0, 0, R * 2, R * 2);
+
+                    g.globalCompositeOperation = 'lighter';
+                    for (const L of city.lamps) {
+                        g.drawImage(pool, L.x - R, yAt(L.d) - R);
+                    }
+                    g.globalCompositeOperation = 'source-over';
+                    // Lamp heads
+                    for (const L of city.lamps) {
+                        g.fillStyle = '#ffe6b0';
+                        g.fillRect(L.x - 1, yAt(L.d) - 1, 2, 2);
+                    }
+
+                    this._backdropStatic = off;
+                    this._backdropStaticW = mapW;
+                }
+
+                // =================================================================
+                // PER-FRAME RENDER
+                // =================================================================
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(0, backdropTop, mapW, backdropDepth);
+                ctx.clip();
+
+                // 1. Baked city
+                ctx.drawImage(this._backdropStatic, 0, backdropTop);
+
+                // 2. NEON PULSE on the near faces
+                ctx.globalCompositeOperation = 'lighter';
+                for (const s of city.signs) {
+                    const pulse = 0.45 + 0.35 * Math.sin((t + s.phase) * s.rate);
+                    ctx.globalAlpha = pulse * 0.75;
+                    ctx.fillStyle = s.color;
+                    ctx.fillRect(s.x, yAt(s.d), s.w, s.h);
+                    ctx.globalAlpha = pulse * 0.13;
+                    ctx.fillRect(s.x - 5, yAt(s.d) - 5, s.w + 10, s.h + 10);
+                }
+                ctx.globalAlpha = 1;
+                ctx.globalCompositeOperation = 'source-over';
+
+                // 3. TRAFFIC
+                for (const car of city.cars) {
+                    let cx, cy, alpha = 0.9;
+                    if (car.axis === 'h') {
+                        const span = mapW + 160;
+                        cx = ((t * car.speed * car.dir + car.offset) % span + span) % span - 80;
+                        cy = yAt(car.d) - car.wid / 2;
+                        ctx.fillStyle = car.body;
+                        ctx.globalAlpha = alpha;
+                        ctx.fillRect(cx, cy, car.len, car.wid);
+                        // Roof highlight
+                        ctx.fillStyle = 'rgba(190,195,215,0.16)';
+                        ctx.fillRect(cx + 1.5, cy + 1, car.len - 3, car.wid - 2);
+                        // Headlight wash ahead, tail glow behind
+                        ctx.globalCompositeOperation = 'lighter';
+                        ctx.globalAlpha = 0.16;
+                        ctx.fillStyle = '#fff3d0';
+                        ctx.fillRect(cx + (car.dir > 0 ? car.len : -14), cy - 1.5, 14, car.wid + 3);
+                        ctx.globalAlpha = 0.5;
+                        ctx.fillStyle = '#ff2a00';
+                        ctx.fillRect(cx + (car.dir > 0 ? -1.5 : car.len), cy + 0.6, 1.5, car.wid - 1.2);
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.globalAlpha = 1;
+                    } else {
+                        // Cross-street traffic lives beyond the junction; fade at the ends
+                        const dMin = D_WALK_F - 6, dMax = D_BLOCK2 + 30, span = dMax - dMin;
+                        const d = dMin + (((t * car.speed * car.dir + car.offset) % span) + span) % span;
+                        const edge = Math.min(d - dMin, dMax - d);
+                        alpha = Math.max(0, Math.min(1, edge / 14)) * 0.9;
+                        if (alpha <= 0.02) continue;
+                        cx = car.cx - car.wid / 2;
+                        cy = yAt(d);
+                        ctx.globalAlpha = alpha;
+                        ctx.fillStyle = car.body;
+                        ctx.fillRect(cx, cy, car.wid, car.len);
+                        ctx.fillStyle = 'rgba(190,195,215,0.16)';
+                        ctx.fillRect(cx + 1, cy + 1.5, car.wid - 2, car.len - 3);
+                        ctx.globalCompositeOperation = 'lighter';
+                        ctx.globalAlpha = alpha * 0.16;
+                        ctx.fillStyle = '#fff3d0';
+                        // dir +1 = travelling away from us = up the screen
+                        ctx.fillRect(cx - 1.5, cy + (car.dir > 0 ? -14 : car.len), car.wid + 3, 14);
+                        ctx.globalAlpha = alpha * 0.5;
+                        ctx.fillStyle = '#ff2a00';
+                        ctx.fillRect(cx + 0.6, cy + (car.dir > 0 ? car.len : -1.5), car.wid - 1.2, 1.5);
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.globalAlpha = 1;
+                    }
+                }
+
+                // 4. PEDESTRIANS — tiny dots with a slight walking bob
+                for (const ped of city.peds) {
+                    const span = mapW + 40;
+                    const px = ((t * ped.speed * ped.dir + ped.offset) % span + span) % span - 20;
+                    const py = yAt(ped.d) + Math.sin(t * 0.006 + ped.bob) * 0.7;
+                    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+                    ctx.fillRect(px + 0.8, py + 0.8, 2.2, 2.2);
+                    ctx.fillStyle = ped.tint;
+                    ctx.globalAlpha = 0.85;
+                    ctx.fillRect(px, py, 2.2, 2.2);
+                    ctx.globalAlpha = 1;
+                }
+
+                // 5. TRAFFIC SIGNALS at each junction, on a shared 11s cycle
+                for (const cs of city.cross) {
+                    const ph = ((t + cs.phase) % 11000) / 11000;
+                    const col = ph < 0.46 ? '#00ff66' : (ph < 0.54 ? '#ffaa00' : '#ff2a2a');
+                    ctx.globalCompositeOperation = 'lighter';
+                    for (const corner of [[cs.x - 3, D_STREET + 3], [cs.x + cs.w + 3, D_WALK_N - 3]]) {
+                        ctx.fillStyle = col;
+                        ctx.globalAlpha = 0.95;
+                        ctx.fillRect(corner[0], yAt(corner[1]), 2, 2);
+                        ctx.globalAlpha = 0.20;
+                        ctx.fillRect(corner[0] - 2.5, yAt(corner[1]) - 2.5, 7, 7);
+                    }
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.globalAlpha = 1;
+                }
+
+                // 6. ROOFTOP AVIATION BEACONS
+                ctx.globalCompositeOperation = 'lighter';
+                for (const b of city.blocks) {
+                    if (!b.beacon) continue;
+                    const blink = Math.sin((t + b.beaconPhase) * 0.0016);
+                    if (blink < 0.55) continue;
+                    const bx = b.x + b.w * 0.5, by = yAt(b.d1) + 5;
+                    ctx.fillStyle = '#ff3040';
+                    ctx.globalAlpha = (blink - 0.55) / 0.45;
+                    ctx.fillRect(bx - 1, by - 1, 2, 2);
+                    ctx.globalAlpha *= 0.28;
+                    ctx.fillRect(bx - 4, by - 4, 8, 8);
+                }
+                ctx.globalAlpha = 1;
+
+                // 7. FLICKERING WINDOWS
+                for (const f of city.flicker) {
+                    const v = Math.sin((t + f.phase) * f.rate);
+                    if (v < 0.6) continue;
+                    ctx.fillStyle = '#ffd080';
+                    ctx.globalAlpha = (v - 0.6) / 0.4 * 0.5;
+                    ctx.fillRect(f.x, yAt(f.d) + 1, 3, 2.5);
+                }
+                ctx.globalAlpha = 1;
+                ctx.globalCompositeOperation = 'source-over';
+
+                // 8. DISTANCE HAZE — the further down/out, the more air in the way
+                const haze = ctx.createLinearGradient(0, backdropTop, 0, yAt(34));
+                haze.addColorStop(0,    'rgba(5, 4, 12, 0.97)');   // merges into the black beyond
+                haze.addColorStop(0.16, 'rgba(16, 12, 30, 0.72)');
+                haze.addColorStop(0.42, 'rgba(19, 15, 36, 0.42)');
+                haze.addColorStop(0.72, 'rgba(17, 13, 32, 0.17)');
+                haze.addColorStop(1,    'rgba(14, 10, 26, 0)');
+                ctx.fillStyle = haze;
+                ctx.fillRect(0, backdropTop, mapW, backdropDepth);
+
+                // 9. OUR OWN BUILDING'S SHADOW falling on the ground directly below
+                const shad = ctx.createLinearGradient(0, backdropBottom, 0, yAt(D_CHASM + 10));
+                shad.addColorStop(0, 'rgba(0,0,0,0.90)');
+                shad.addColorStop(0.55, 'rgba(0,0,0,0.42)');
+                shad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = shad;
+                ctx.fillRect(0, yAt(D_CHASM + 10), mapW, D_CHASM + 16);
+
+                ctx.restore();
+            },
+
+            /* =====================================================================
+               MISSION WAYPOINT MARKER
+               ---------------------------------------------------------------------
+               Draws a screen-edge indicator pointing toward the active mission target.
+               ===================================================================== */
+            drawMissionMarker() {
+                const m = this.missions.activeMission;
+                if (!m || m.status !== 'active') return;
+                
+                let targetX, targetY;
+                if (m.type === MISSION_TYPES.DELIVERY && !m.pickedUp && this.deliveryVehicle) {
+                    targetX = this.deliveryVehicle.x;
+                    targetY = this.deliveryVehicle.y;
+                } else {
+                    targetX = m.targetX;
+                    targetY = m.targetY;
+                }
+                
+                const dx = targetX - this.player.x;
+                const dy = targetY - this.player.y;
+                const dist = Math.hypot(dx, dy);
+                
+                if (dist < (m.targetRadius || 80)) return; // Already there
+                
+                this.ctx.save();
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+                
+                const angle = Math.atan2(dy, dx);
+                const margin = 60;
+                const cx = this.canvas.width / 2;
+                const cy = this.canvas.height / 2;
+                
+                // Clamp to screen edge
+                const edgeX = Math.max(margin, Math.min(this.canvas.width - margin, cx + Math.cos(angle) * (cx - margin)));
+                const edgeY = Math.max(margin, Math.min(this.canvas.height - margin, cy + Math.sin(angle) * (cy - margin)));
+                
+                // Pulsing arrow
+                const pulse = (Math.sin(_frameTime / 400) + 1) / 2;
+                const color = m.type === MISSION_TYPES.DELIVERY ? '#ffaa00' : '#ff3355';
+                
+                this.ctx.save();
+                this.ctx.translate(edgeX, edgeY);
+                this.ctx.rotate(angle);
+                
+                // Arrow
+                this.ctx.shadowColor = color;
+                this.ctx.shadowBlur = 10 + pulse * 8;
+                this.ctx.fillStyle = color;
+                this.ctx.globalAlpha = 0.7 + pulse * 0.3;
+                this.ctx.beginPath();
+                this.ctx.moveTo(12, 0);
+                this.ctx.lineTo(-6, -8);
+                this.ctx.lineTo(-6, 8);
+                this.ctx.closePath();
+                this.ctx.fill();
+                
+                this.ctx.restore();
+                
+                // Distance text
+                this.ctx.font = 'bold 10px Courier New';
+                this.ctx.fillStyle = color;
+                this.ctx.globalAlpha = 0.8;
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`${Math.round(dist)}m`, edgeX, edgeY + 20);
+                
+                this.ctx.restore();
+            },
+
+        });
+

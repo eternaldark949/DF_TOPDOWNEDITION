@@ -1,0 +1,1403 @@
+        // GameEngine — loadMap / _doLoadMap (building every map), baked lighting.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
+            loadMap(mapId, spawnAt) {
+                // 1. Initial Load (No Fade)
+                if (!this.activeMap) {
+                    this._doLoadMap(mapId, spawnAt);
+                    this.bakeStaticLighting(); // <--- ADDED: Bake immediately on first load
+                    return;
+                }
+                
+                this.lightingBaked = false;
+                
+                // 2. Start Fade Out
+                const fadeOverlay = document.getElementById('fade-overlay');
+                fadeOverlay.classList.add('active');
+                
+                // Pause game
+                this.pauseSystem.acquire('map_load');
+                
+                // 3. Wait for Screen to go Black (400ms)
+                setTimeout(() => {
+                    // A. Switch the Map Data
+                    this._doLoadMap(mapId, spawnAt);
+                    
+                    // B. Bake Lighting for the NEW Map
+                    // Now that activeMap is updated, this will calculate the correct lines
+                    this.bakeStaticLighting(); 
+                    
+                    // C. Fade Back In
+                    setTimeout(() => {
+                        fadeOverlay.classList.remove('active');
+                        this.pauseSystem.release('map_load');
+                    }, 100);
+                }, 400);
+            },
+            
+            _doLoadMap(mapId, spawnAt) {
+                // =========================================================
+                //  PHASE 1: CLEANUP
+                // =========================================================
+                CollisionSystem.clearSpatialGrid();
+                
+                if (this._staticWallEntities) {
+                    for (let entity of this._staticWallEntities) {
+                        entity.active = false; entity.markedForDestroy = true; entity._finalDestroy();
+                    }
+                }
+                this._staticWallEntities = [];
+                if (this._staticBuildingEntities) {
+                    for (let entity of this._staticBuildingEntities) {
+                        entity.active = false; entity.markedForDestroy = true; entity._finalDestroy();
+                    }
+                }
+                this._staticBuildingEntities = [];
+                
+                for (let proj of this.projectiles) {
+                    if (proj instanceof GameEntity) { proj.active = false; proj.markedForDestroy = true; }
+                }
+                this.projectiles = [];
+                this.stickyOrbs = [];
+                
+                GameEntity.queueEnabled = true;
+                GameEntity.clearQueue();
+                GameEntity.clearAll();
+                
+                this.neonSigns = [];
+                
+                if (this.activeMap && (this.activeMap.id === 'hub_949' || this.activeMap.id === 'road_test')) { 
+                    this.hubState.carX = this.car.x; this.hubState.carY = this.car.y; this.hubState.carAngle = this.car.angle; 
+                }
+                
+                if (mapId !== 'hub_949' && mapId !== 'road_test') {
+                    this.traffic.reset();
+                    this.pedestrians.reset();
+                }
+                
+                // Clear landmark registry for fresh map
+                this.landmarkRegistry = {};
+                this.dropOffRegistry = {};
+                
+                // Clear all particles on map transition
+                if (this.weather) {
+                    this.weather.particles = [];
+                }
+
+                // =========================================================
+                //  PHASE 2: DEFINE ASSETS & MAPS
+                // =========================================================
+                
+                // --- HUB ASSETS (lazy: only create for hub map) ---
+                // --- BUILD MAP FROM DATA LAYER ---
+                const entities = createMapEntities(mapId);
+                const maps = {};
+                for (const id in MAP_DATA) {
+                    if (id === mapId) {
+                        maps[id] = { ...MAP_DATA[id], ...entities };
+                    } else {
+                        maps[id] = { ...MAP_DATA[id], props: [], npcs: [], lamps: [] };
+                    }
+                }
+
+                // =========================================================
+                //  PHASE 3: PROCEDURAL GENERATION & AUTOMATION
+                // =========================================================
+                
+                // --- HUB 949 (CITYLAYOUT V2) ---
+                if (mapId === 'hub_949') {
+                    const mapData = maps['hub_949'];
+                    
+                    if (this._hubCache) {
+                        // =============================================================
+                        //  FAST PATH: Restore from cache (skips all procedural generation)
+                        // =============================================================
+                        const c = this._hubCache;
+                        
+                        // Restore non-GameEntity data directly
+                        mapData.buildings = c.buildings;
+                        mapData.buildingColliders = c.buildingColliders;
+                        mapData.cityLayout = c.cityLayout;
+                        mapData.ferrisWheel = c.ferrisWheel;
+                        mapData.pavements = c.pavements.map(p => new Pavement(p.x, p.y, p.w, p.h));
+                        mapData.crosswalks = [...c.crosswalks];
+                        mapData.foliage = [...c.foliage];
+                        mapData.walls = c.wallRects.map(w => ({...w}));
+                        
+                        // Restore road network + pedestrian sidewalk network
+                        this.traffic.network = c.network;
+                        this.pedestrians.setNetwork(c.sidewalkNetwork);
+                        
+                        // Recreate street/intersection LampEntity instances (GameEntities must be fresh)
+                        mapData.lamps = c.lampConfigs.map(cfg => new LampEntity(cfg));
+                        
+                        // Regenerate building lights (old instances were destroyed by GameEntity.clearAll)
+                        // Phase 4 will harvest these into mapData.lamps
+                        mapData.buildings.forEach(b => {
+                            if (b.regenerateLights) b.regenerateLights();
+                        });
+                        
+                        // Flag so Phase 4 skips sign harvest (already handled below) but still harvests lights
+                        this._hubCacheSkipSigns = true;
+                        
+                        // Recreate graveyard PropEntity instances
+                        c.gravestoneConfigs.forEach(cfg => mapData.props.push(new PropEntity(cfg)));
+                        
+                        // Neon signs from cached buildings (NeonSign is NOT a GameEntity)
+                        this.neonSigns = [];
+                        mapData.buildings.forEach(b => {
+                            if (b.attachedSign) this.neonSigns.push(b.attachedSign);
+                        });
+                        
+                        // Restore landmarks
+                        this.landmarkRegistry = {...c.landmarks};
+                        this.dropOffRegistry = {...(c.dropOffs || {})};
+                        
+                        // Process queued GameEntities
+                        GameEntity.processQueue();
+                        
+                        console.log('[HUB CACHE] Restored from cache — skipped procedural generation');
+                        
+                    } else {
+                    // =============================================================
+                    //  SLOW PATH: First-time procedural generation (cached after)
+                    // =============================================================
+                    
+                    // Track original prop count so we can extract graveyard stones for cache later
+                    this._hubCache_hubPropCount = mapData.props.length;
+                    
+                    // 1. CREATE CITY LAYOUT
+                    const city = new CityLayout({
+                        width: 4000,
+                        height: 8500,
+                        margin: 25
+                    });
+                    
+                    // 2. DEFINE ROAD GRID
+                    // Horizontal roads (Y = center position)
+                    // First road pushed south to accommodate larger Silver Queen Apartments
+                    city.addHorizontalRoad(1200, 'Hotel Dr.', 2);
+                    city.addHorizontalRoad(2500, 'Crimson Blvd', 3);     // Main artery
+                    city.addHorizontalRoad(3800, 'Commerce Blvd', 2);
+                    city.addHorizontalRoad(4900, 'Skyline Ave', 2);
+                    city.addHorizontalRoad(6100, 'Clinic Way', 2);
+                    city.addHorizontalRoad(7400, 'Gridlock Ln', 3);
+                    
+                    // Vertical highways
+                    city.addVerticalRoad(1200, 'West Ave', 2);
+                    city.addVerticalRoad(2800, 'East Ave', 2);
+                    
+                    // 3. GENERATE BLOCKS (must be done before placing buildings)
+                    city.generateBlocks();
+                    
+                    // Debug: Log blocks to console
+                    console.log('CityLayout Blocks:', city.listBlocks());
+                    
+                    // 4. REGISTER BUILDING TEMPLATES
+                    // V2 buildings are auto-registered from BuildingV2Registry
+                    city.registerV2Buildings();
+                    
+                    // Register V1 templates and override V2 landmarkIds where needed
+                    city.registerTemplates({
+                        // V2 buildings: just specify landmarkId (dimensions come from registry)
+                        silver_queen: { landmarkId: 'parking_spot' },
+                        enni_cole: { landmarkId: 'enni_cole' },
+                        double_nights: { landmarkId: 'hotel_entrance' },
+                        cozy_cafe: { landmarkId: 'cozy_cafe' },
+                        
+                        // V2 buildings (auto-detected from BuildingV2Registry)
+                        moon_city: {
+                            landmarkId: 'club_entrance',
+                            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff00aa' }
+                        },
+                        neural_sys: {
+                            landmarkId: 'neural_systems',
+                            door: { target: 'neural_sys_interior', label: 'Enter Neural Systems', lightColor: '#0088ff' }
+                        },
+                        torque_auto: { landmarkId: 'torque_auto' },
+                        cozy_cafe: { landmarkId: 'cozy_cafe' },
+                        biggs_park: { landmarkId: 'biggs_park' },
+                        dr_yins: {
+                            landmarkId: 'clinic',
+                            door: { target: 'medbay_sw', label: 'Enter Clinic', lightColor: '#00f3ff' }
+                        },
+                        // Generic V2 templates for auto-fill (detected from BuildingV2Registry)
+                        apartment_small: {
+                            weight: 3
+                        },
+                        shop_small: {
+                            weight: 3
+                        },
+                        warehouse: {
+                            weight: 2
+                        }
+                    });
+                    
+                    // 5. PLACE KEY BUILDINGS
+                    // Block naming: block_[row]_[col]
+                    // Rows: 0, 2, 4, 6, 8, 10 (even numbers - odd rows are road zones)
+                    // Cols: 0, 2, 4 (even numbers - odd cols are road zones)
+                    // Col 0 = west side, Col 2 = center, Col 4 = east side
+                    
+                    city.placeBuilding('silver_queen', 'block_0_0', { align: 'center' });   // Silver Queen Apartments - NW
+                    city.placeBuilding('double_nights', 'block_0_2', { align: 'center' });  // Double Nights Hotel - N center
+                    city.placeBuilding('moon_city', 'block_2_2', { align: 'center' });      // Moon City Nightclub - center
+                    city.placeBuilding('enni_cole', 'block_2_4', { align: 'center' });      // Enni Cole - E side
+                    city.placeBuilding('cozy_cafe', 'block_4_0', { align: 'center' });      // Cozy Cafe - W side
+                    city.placeBuilding('dr_yins', 'block_4_4', { align: 'center' });        // Dr. Yin's Clinic - E side
+                    city.placeBuilding('neural_sys', 'block_6_2', { align: 'center' });     // Neural Systems - S center
+                    city.placeBuilding('torque_auto', 'block_2_0', { align: 'center' });   // Torque Auto - W center
+                    city.placeBuilding('biggs_park', 'block_4_2', { align: 'center' });    // Biggs Amusement Park - center
+                    
+                    // 5b. SET CUSTOM LAMP COLORS FOR V1 BUILDINGS
+                    // V2 buildings auto-set their block lamp colors from accent color
+                    city.setBlockLampColors({
+                        'block_2_2': '#ff00aa',    // Moon City Nightclub - hot pink
+                        'block_4_4': '#00f3ff',    // Dr. Yin's Clinic - medical cyan
+                        'block_6_2': '#0088ff',    // Neural Systems - tech blue
+                        'block_4_2': '#ff8800'     // Biggs Amusement Park - carnival amber
+                    });
+                    
+                    // 5b. RESERVE SCRIPTED NPC ANCHORS
+                    // Must happen BEFORE autoFillAll — _findValidPosition rejects any
+                    // candidate rect that intersects a safe zone, so reserving here is
+                    // what stops a filler building spawning on Mirabel or Anavia.
+                    for (const a of HUB_NPC_ANCHORS) {
+                        city._addSafeZone(
+                            a.x - HUB_NPC_CLEARANCE, a.y - HUB_NPC_CLEARANCE,
+                            HUB_NPC_CLEARANCE * 2, HUB_NPC_CLEARANCE * 2,
+                            `NPC: ${a.name}`
+                        );
+                    }
+
+                    // 6. AUTO-FILL REMAINING BLOCKS
+                    city.autoFillAll({
+                        density: 0.4,
+                        categories: ['residential', 'shopping', 'commercial']
+                    });
+                    
+                    // 7. CREATE ROAD NETWORK
+                    resetRoadNetworkIds();
+                    this.traffic.network = new RoadNetwork();
+                    {
+                        const net = this.traffic.network;
+                        
+                        // Add horizontal roads
+                        city.horizontalRoads.forEach(r => {
+                            net.addRoad(createRoad(0, r.y, city.width, r.roadHeight, 'H', r.name, r.lanes, true, true));
+                        });
+                        
+                        // Add vertical roads
+                        city.verticalRoads.forEach(r => {
+                            net.addRoad(createRoad(r.x, 0, r.roadWidth, city.height, 'V', r.name, r.lanes, true, true));
+                        });
+                        
+                        net.buildGraph();
+                    }
+                    const net = this.traffic.network;
+                    
+                    // 8. CREATE BUILDINGS
+                    const buildings = city.placedBuildings.map(p => {
+                        const t = p.template;
+                        
+                        // Check BuildingV2Registry first (single source of truth)
+                        if (t.isV2 && BuildingV2Registry.has(p.templateId)) {
+                            const building = BuildingV2Registry.create(p.templateId, p.x, p.y, { 
+                                doorTarget: t.door?.target 
+                            });
+                            // Propagate mapCategory from template for map icons
+                            if (t.mapCategory) building.mapCategory = t.mapCategory;
+                            return building;
+                        }
+                        
+                        // Legacy V1 buildings
+                        const config = {};
+                        if (t.sign) config.sign = { ...t.sign };
+                        if (t.door) config.door = { ...t.door };
+                        return new Building(p.x, p.y, p.w, p.h, t.color, t.label, t.type, config);
+                    });
+                    mapData.buildings = buildings;
+                    
+                    // Compute Zib taxi drop-off points (south-curb projection per landmark).
+                    // Stored on mapData and merged into game registry below alongside landmarks.
+                    mapData.dropOffs = city.computeDropOffs(net, buildings);
+                    console.log(`Computed ${Object.keys(mapData.dropOffs).length} Zib drop-offs`);
+                    
+                    // Create Ferris Wheel next to Biggs Amusement Park
+                    const biggsBuilding = buildings.find(b => b.id === 'biggs_park');
+                    const biggsBlock = city.blockMap['block_4_2'];
+                    if (biggsBuilding && biggsBlock) {
+                        const blockCenterX = biggsBlock.x + biggsBlock.w / 2;
+                        const aboveBuildingY = biggsBuilding.y - 100; // Just above the building
+                        mapData.ferrisWheel = new FerrisWheel(
+                            blockCenterX,
+                            aboveBuildingY,
+                            { radius: 560, axleHeight: 600, gondolas: 8, speed: 0.003, rimGap: 112, facing: 0 }
+                        );
+                    }
+                    
+                    // Build per-section collision shapes for old-style collision checks
+                    // (vehicles, NPCs, LOS). Flattens V2 multi-section buildings.
+                    mapData.buildingColliders = [];
+                    buildings.forEach(b => {
+                        if (b.isV2 && b.getCollisionShapes) {
+                            mapData.buildingColliders.push(...b.getCollisionShapes());
+                        } else {
+                            mapData.buildingColliders.push({ x: b.x, y: b.y, w: b.w, h: b.h });
+                        }
+                    });
+                    
+                    // Store city reference for later lamp color application
+                    mapData.cityLayout = city;
+                    
+                    // ── RESTRICTED ZONE (Hostile farming area) ──
+                    // Place in block_10_4 — deep southeast, between Clinic Way & Gridlock Ln
+                    const rzBlock = city.blockMap['block_10_4'];
+                    console.log('[RESTRICTED ZONE] block_10_4:', rzBlock ? `${rzBlock.x},${rzBlock.y} ${rzBlock.w}x${rzBlock.h}` : 'NOT FOUND');
+                    if (rzBlock) {
+                        this.restrictedZone = new RestrictedZone({
+                            id: 'rz_scrapyard',
+                            name: 'THE SCRAPYARD',
+                            x: rzBlock.x + 10,
+                            y: rzBlock.y + 10,
+                            w: rzBlock.w - 20,
+                            h: rzBlock.h - 20,
+                            hostileCount: 8,
+                            respawnDelay: 900, // ~15 seconds
+                            mapId: 'hub_949'
+                        });
+                        // Set block lamp color to danger crimson
+                        city.setBlockLampColors({ 'block_10_4': '#ff2200' });
+                        
+                        // Ground visual — dark crimson floor tint so the zone is visible in-world
+                        mapData.floorZones.push({
+                            x: rzBlock.x, y: rzBlock.y, w: rzBlock.w, h: rzBlock.h,
+                            color: '#1a0505'
+                        });
+                        
+                        console.log('[RESTRICTED ZONE] Created at', this.restrictedZone.x, this.restrictedZone.y, this.restrictedZone.w, 'x', this.restrictedZone.h);
+                    } else {
+                        console.warn('[RESTRICTED ZONE] block_10_4 not found in city layout! Available blocks:', Object.keys(city.blockMap).join(', '));
+                    }
+                    
+                    // 8b. EXTRACT LANDMARKS FROM BUILDINGS
+                    const buildingLandmarks = city.extractLandmarks();
+                    console.log('Building Landmarks:', Object.keys(buildingLandmarks));
+                    
+                    // Merge into game's landmark registry
+                    this.landmarkRegistry = {
+                        ...this.landmarkRegistry,
+                        ...buildingLandmarks
+                    };
+                    
+                    // Merge Zib drop-offs into game registry (one entry per landmarkId).
+                    this.dropOffRegistry = { ...(mapData.dropOffs || {}) };
+                    
+                    // 9. GENERATE SMART PAVEMENTS
+                    const generateSmartPavements = (road) => {
+                        const paves = [];
+                        const pavW = 75;
+                        const intersections = net.getIntersectionsForRoad(road);
+                        const exclusions = [];
+                        
+                        intersections.forEach(ix => {
+                            let start, end;
+                            if (road.orientation === 'H') {
+                                start = ix.x - road.x;
+                                end = (ix.x + ix.width) - road.x;
+                            } else {
+                                start = ix.y - road.y;
+                                end = (ix.y + ix.height) - road.y;
+                            }
+                            exclusions.push({ s: start - 2, e: end + 2 });
+                        });
+                        
+                        exclusions.sort((a, b) => a.s - b.s);
+                        
+                        const segments = [];
+                        let curr = 0;
+                        exclusions.forEach(ex => {
+                            if (ex.s > curr) segments.push({ s: curr, e: ex.s });
+                            curr = Math.max(curr, ex.e);
+                        });
+                        if (curr < road.length) segments.push({ s: curr, e: road.length });
+                        
+                        segments.forEach(seg => {
+                            const len = seg.e - seg.s;
+                            if (len < 10) return;
+                            
+                            if (road.orientation === 'H') {
+                                paves.push(new Pavement(road.x + seg.s, road.y - pavW, len, pavW));
+                                paves.push(new Pavement(road.x + seg.s, road.y + road.h, len, pavW));
+                            } else {
+                                paves.push(new Pavement(road.x - pavW, road.y + seg.s, pavW, len));
+                                paves.push(new Pavement(road.x + road.w, road.y + seg.s, pavW, len));
+                            }
+                        });
+                        return paves;
+                    };
+                    
+                    mapData.pavements = [];
+                    net.roads.forEach(r => {
+                        mapData.pavements.push(...generateSmartPavements(r));
+                    });
+                    
+                    // Generate crosswalks from CityLayout (knows all intersection positions)
+                    mapData.crosswalks = city.generateCrosswalks();
+                    
+                    // Generate sidewalk network for pedestrians
+                    const sidewalkNetwork = city.generateSidewalkNetwork();
+                    this.pedestrians.setNetwork(sidewalkNetwork);
+                    console.log(`Sidewalk Network: ${sidewalkNetwork.nodes.length} nodes, ${sidewalkNetwork.crosswalks.length} crosswalks`);
+                    
+                    // 10. GENERATE WALLS (Automatic from CityLayout!)
+                    const generatedWalls = city.generateWalls(mapData.width, mapData.height);
+                    // Push generated boundary walls into mapData.walls so Phase 4
+                    // creates static entities for them (fixes boundary collision)
+                    mapData.walls.push(...generatedWalls);
+                    
+                    // 11. GENERATE LAMPS
+                    mapData.lamps = [];
+                    net.roads.forEach(r => {
+                        mapData.lamps.push(...r.generateLamps(net, 350));
+                    });
+                    
+                    // 11b. APPLY CUSTOM BLOCK LAMP COLORS
+                    city.applyBlockLampColors(mapData.lamps);
+                    
+                    // 11b2. ADD INTERSECTION CORNER LAMPS
+                    const cornerInset = 40; // Distance from intersection edge
+                    net.intersections.forEach(ix => {
+                        // Four corners of each intersection
+                        const corners = [
+                            { x: ix.x - cornerInset, y: ix.y - cornerInset },                    // Top-left
+                            { x: ix.x + ix.width + cornerInset, y: ix.y - cornerInset },        // Top-right
+                            { x: ix.x - cornerInset, y: ix.y + ix.height + cornerInset },       // Bottom-left
+                            { x: ix.x + ix.width + cornerInset, y: ix.y + ix.height + cornerInset } // Bottom-right
+                        ];
+                        
+                        corners.forEach(corner => {
+                            mapData.lamps.push(new LampEntity({
+                                x: corner.x,
+                                y: corner.y,
+                                lampType: 2,
+                                color: '#ffaa44',
+                                lightRadius: 280
+                            }));
+                        });
+                    });
+                    
+                    console.log(`Added ${net.intersections.length * 4} intersection corner lamps`);
+                    
+                    // 11c. GENERATE FOLIAGE (Trees and Bushes along streets)
+                    mapData.foliage = [];
+                    const foliageSpacing = 180; // Distance between trees
+                    const foliageInset = 50;    // Distance from road edge
+                    
+                    net.roads.forEach(road => {
+                        // Get intersections to avoid placing trees there
+                        const intersections = net.getIntersectionsForRoad(road);
+                        const exclusions = [];
+                        
+                        intersections.forEach(ix => {
+                            let start, end;
+                            if (road.orientation === 'H') {
+                                start = ix.x - road.x - 80;
+                                end = (ix.x + ix.width) - road.x + 80;
+                            } else {
+                                start = ix.y - road.y - 80;
+                                end = (ix.y + ix.height) - road.y + 80;
+                            }
+                            exclusions.push({ start, end });
+                        });
+                        exclusions.sort((a, b) => a.start - b.start);
+                        
+                        // Merge overlapping exclusions
+                        const merged = [];
+                        if (exclusions.length > 0) {
+                            let curr = exclusions[0];
+                            for (let i = 1; i < exclusions.length; i++) {
+                                if (curr.end >= exclusions[i].start) {
+                                    curr.end = Math.max(curr.end, exclusions[i].end);
+                                } else {
+                                    merged.push(curr);
+                                    curr = exclusions[i];
+                                }
+                            }
+                            merged.push(curr);
+                        }
+                        
+                        // Find valid segments
+                        const segments = [];
+                        let cursor = 50; // Start a bit in from road start
+                        merged.forEach(ex => {
+                            if (ex.start > cursor) segments.push({ start: cursor, end: ex.start });
+                            cursor = Math.max(cursor, ex.end);
+                        });
+                        if (cursor < road.length - 50) segments.push({ start: cursor, end: road.length - 50 });
+                        
+                        // Place foliage along both sides
+                        segments.forEach(seg => {
+                            const len = seg.end - seg.start;
+                            if (len < foliageSpacing) return;
+                            
+                            const count = Math.floor(len / foliageSpacing);
+                            
+                            // Glowing tree types for variety
+                            const glowTypes = ['glow_purple', 'glow_pink', 'glow_gold', 'glow_green', 'glow_cyan'];
+                            
+                            for (let i = 0; i < count; i++) {
+                                const offset = seg.start + foliageSpacing * (i + 0.5) + (Math.random() - 0.5) * 30;
+                                
+                                // Randomly choose type (60% trees, 15% bushes, 10% palms, 15% glowing)
+                                const rand = Math.random();
+                                let type, size;
+                                if (rand < 0.60) {
+                                    type = 'tree';
+                                    size = 1.4 + Math.random() * 0.6;
+                                } else if (rand < 0.75) {
+                                    type = 'bush';
+                                    size = 1.0 + Math.random() * 0.5;
+                                } else if (rand < 0.85) {
+                                    type = 'palm';
+                                    size = 1.4 + Math.random() * 0.6;
+                                } else {
+                                    // Glowing tree!
+                                    type = glowTypes[Math.floor(Math.random() * glowTypes.length)];
+                                    size = 1.3 + Math.random() * 0.5;
+                                }
+                                
+                                if (road.orientation === 'H') {
+                                    // Top side
+                                    mapData.foliage.push(new Foliage(
+                                        road.x + offset,
+                                        road.y - foliageInset - Math.random() * 20,
+                                        type, size
+                                    ));
+                                    // Bottom side (different type for variety)
+                                    const rand2 = Math.random();
+                                    const type2 = rand2 < 0.5 ? 'tree' : (rand2 < 0.7 ? 'bush' : glowTypes[Math.floor(Math.random() * glowTypes.length)]);
+                                    mapData.foliage.push(new Foliage(
+                                        road.x + offset + (Math.random() - 0.5) * 40,
+                                        road.y + road.h + foliageInset + Math.random() * 20,
+                                        type2, 1.2 + Math.random() * 0.6
+                                    ));
+                                } else {
+                                    // Left side
+                                    mapData.foliage.push(new Foliage(
+                                        road.x - foliageInset - Math.random() * 20,
+                                        road.y + offset,
+                                        type, size
+                                    ));
+                                    // Right side
+                                    const rand2 = Math.random();
+                                    const type2 = rand2 < 0.5 ? 'tree' : (rand2 < 0.7 ? 'bush' : glowTypes[Math.floor(Math.random() * glowTypes.length)]);
+                                    mapData.foliage.push(new Foliage(
+                                        road.x + road.w + foliageInset + Math.random() * 20,
+                                        road.y + offset + (Math.random() - 0.5) * 40,
+                                        type2, 1.2 + Math.random() * 0.6
+                                    ));
+                                }
+                            }
+                        });
+                    });
+                    
+                    // Keep the Silver Queen forecourt (portico, steps, carpet) clear of street trees
+                    const _sqBld = (mapData.buildings || []).find(b => b.id === 'silver_queen');
+                    const _sqCourt = _sqBld && _sqBld._sqForecourt ? _sqBld._sqForecourt() : null;
+                    if (_sqCourt) {
+                        const inCourt = (o) => o.x > _sqCourt.x && o.x < _sqCourt.x + _sqCourt.w && o.y > _sqCourt.y && o.y < _sqCourt.y + _sqCourt.h;
+                        mapData.foliage = mapData.foliage.filter(f => !inCourt(f));
+                        mapData.lamps = mapData.lamps.filter(l => !inCourt(l));
+                    }
+                    console.log(`Generated ${mapData.foliage.length} foliage elements (including glowing trees)`);
+                    
+                    // 11d. SOUTHERN GRAVEYARD
+                    // Large cemetery south of the road grid with stone walls, warm lamps,
+                    // gravestones, and Ms. Jean's spawn point at center.
+                    {
+                        const gx = 500, gy = 8800, gw = 3000, gh = 2000;
+                        const wallT = 30;         // Wall thickness
+                        const gateW = 300;        // North entrance gap width
+                        const gateCX = gx + gw / 2; // Gate center X
+                        
+                        // Stone walls (added directly as StaticEntities)
+                        const graveyardWalls = [
+                            // North wall - left of gate
+                            { x: gx, y: gy, w: gateCX - gateW / 2 - gx, h: wallT },
+                            // North wall - right of gate
+                            { x: gateCX + gateW / 2, y: gy, w: (gx + gw) - (gateCX + gateW / 2), h: wallT },
+                            // South wall
+                            { x: gx, y: gy + gh - wallT, w: gw, h: wallT },
+                            // West wall
+                            { x: gx, y: gy, w: wallT, h: gh },
+                            // East wall
+                            { x: gx + gw - wallT, y: gy, w: wallT, h: gh }
+                        ];
+                        
+                        graveyardWalls.forEach(w => {
+                            this._staticWallEntities.push(new GameEntity({
+                                type: 'wall', x: w.x, y: w.y,
+                                width: w.w, height: w.h,
+                                hasCollision: true,
+                                collisionLayer: GameEntity.LAYER.STATIC,
+                                collisionShape: GameEntity.SHAPE.AABB,
+                                isStatic: true
+                            }));
+                            // Also add to mapData.walls for rendering
+                            mapData.walls.push(w);
+                        });
+                        
+                        // Gravestones - scattered in rows throughout the graveyard
+                        const stoneMargin = 120;     // Inset from walls
+                        const rowSpacing = 160;       // Y gap between rows
+                        const colSpacing = 120;       // X gap between stones
+                        const stoneArea = {
+                            x: gx + stoneMargin,
+                            y: gy + stoneMargin,
+                            w: gw - stoneMargin * 2,
+                            h: gh - stoneMargin * 2
+                        };
+                        
+                        const seed = 949;
+                        const rng = (i) => { const s = Math.sin(seed + i * 127.1) * 43758.5453; return s - Math.floor(s); };
+                        let si = 0;
+                        
+                        for (let row = stoneArea.y; row < stoneArea.y + stoneArea.h - 40; row += rowSpacing) {
+                            for (let col = stoneArea.x; col < stoneArea.x + stoneArea.w - 30; col += colSpacing) {
+                                // Slight random offset for organic feel
+                                const ox = (rng(si++) - 0.5) * 30;
+                                const oy = (rng(si++) - 0.5) * 20;
+                                // Skip ~20% for gaps and paths
+                                if (rng(si++) < 0.2) continue;
+                                
+                                mapData.props.push(new PropEntity({
+                                    x: col + ox, y: row + oy,
+                                    width: 30 + rng(si++) * 15,
+                                    height: 45 + rng(si++) * 20,
+                                    color: '#555',
+                                    mass: 50000 // Immovable
+                                }));
+                            }
+                        }
+                        
+                        // Warm single-bulb lamps - evenly distributed throughout graveyard
+                        const lampSpacing = 350;
+                        const lampMargin = 100;
+                        
+                        for (let ly = gy + lampMargin; ly < gy + gh - lampMargin; ly += lampSpacing) {
+                            for (let lx = gx + lampMargin; lx < gx + gw - lampMargin; lx += lampSpacing) {
+                                mapData.lamps.push(new LampEntity({
+                                    x: lx, y: ly,
+                                    lampType: 1,         // Antiquated single-bulb
+                                    color: '#ffaa55',    // Warm amber
+                                    lightRadius: 300
+                                }));
+                            }
+                        }
+                        
+                        // Gate lamps - flanking the north entrance
+                        mapData.lamps.push(new LampEntity({ x: gateCX - gateW / 2 - 15, y: gy, lampType: 1, color: '#ffaa55', lightRadius: 350 }));
+                        mapData.lamps.push(new LampEntity({ x: gateCX + gateW / 2 + 15, y: gy, lampType: 1, color: '#ffaa55', lightRadius: 350 }));
+                        
+                        // Register graveyard landmark (for Ms. Jean spawn)
+                        this.landmarkRegistry['graveyard_center'] = { x: gateCX, y: gy + gh / 2 };
+                        
+                        console.log(`Graveyard: ${graveyardWalls.length} walls, ${mapData.props.length - entities.props.length} gravestones, lamps placed`);
+                    }
+                    
+                    // 12. REGISTER NEON SIGNS
+                    this.neonSigns = [];
+                    buildings.forEach(build => {
+                        if (build.attachedSign) this.neonSigns.push(build.attachedSign);
+                    });
+                    
+                    // 13. PROCESS ENTITY QUEUE
+                    GameEntity.processQueue();
+                    
+                    console.log(`CityLayout v2: Generated ${buildings.length} buildings, ${city.blocks.length} blocks`);
+                    
+                    // =========================================================
+                    //  CACHE RESULTS for instant restore on future visits
+                    // =========================================================
+                    this._hubCache = {
+                        buildings: mapData.buildings,
+                        buildingColliders: mapData.buildingColliders,
+                        cityLayout: mapData.cityLayout,
+                        ferrisWheel: mapData.ferrisWheel || null,
+                        network: this.traffic.network,
+                        sidewalkNetwork: sidewalkNetwork,
+                        pavements: mapData.pavements.map(p => ({...p})),
+                        crosswalks: mapData.crosswalks.map(c => ({...c})),
+                        foliage: [...mapData.foliage],
+                        wallRects: mapData.walls.map(w => ({...w})),
+                        landmarks: {...this.landmarkRegistry},
+                        dropOffs: {...this.dropOffRegistry},
+                        lampConfigs: mapData.lamps.map(l => ({
+                            x: l.x, y: l.y, lampType: l.lampType,
+                            color: l.color, lightRadius: l.lightRadius,
+                            angle: l.angle || 0
+                        })),
+                        gravestoneConfigs: (() => {
+                            // All props after the initial entity props are graveyard gravestones
+                            const hubPropCount = this._hubCache_hubPropCount;
+                            return mapData.props.slice(hubPropCount).map(p => ({
+                                x: p.x, y: p.y, width: p.width, height: p.height,
+                                color: p.color, mass: p.mass
+                            }));
+                        })()
+                    };
+                    console.log('[HUB CACHE] Cached procedural generation results');
+                    
+                    } // end of else (!this._hubCache) — first-time generation
+                }
+                
+                // --- ROAD TEST (AUTOMATED) ---
+                if (mapId === 'road_test') {
+                    // Initialize road network
+                    resetRoadNetworkIds();
+                    this.traffic.network = new RoadNetwork();
+                    const net = this.traffic.network;
+                    const mapData = maps['road_test'];
+                    
+                    const gridLines = [600, 1300, 2000, 2700, 3400];
+                    const extension = 250; 
+                    const startCoord = gridLines[0] - extension; 
+                    const endCoord = gridLines[gridLines.length-1] + extension;
+                    const roadLength = endCoord - startCoord;
+                    const lampColors = ['#ff007f', '#ccccff', '#ffd700', '#8a2be2']; 
+
+                    const addLampsToSegment = (x, y1, y2, orientation) => {
+                        const mid = (y1 + y2) / 2;
+                        const segmentLen = Math.abs(y2 - y1);
+                        const count = segmentLen > 600 ? 2 : 1;
+                        const offset = segmentLen > 600 ? 150 : 0; 
+                        const positions = (count === 1) ? [mid] : [mid - offset, mid + offset];
+                        positions.forEach(pos => {
+                            const color = lampColors[Math.floor(Math.random() * lampColors.length)];
+                            if (orientation === 'V') mapData.lamps.push(new LampEntity({ x: x, y: pos, lampType: 2, color: color }));
+                            else mapData.lamps.push(new LampEntity({ x: pos, y: x, lampType: 2, color: color }));
+                        });
+                    };
+
+                    gridLines.forEach(x => {
+                        const lanes = Math.floor(Math.random() * 3) + 1; 
+                        const width = (lanes * 2) * 60;
+                        const road = createRoad(x - width/2, startCoord, width, roadLength, 'V', '', lanes, true, true);
+                        net.addRoad(road);
+                        const lxL = road.x - 37.5; const lxR = road.x + road.w + 37.5;
+                        addLampsToSegment(lxL, startCoord, gridLines[0], 'V'); addLampsToSegment(lxR, startCoord, gridLines[0], 'V');
+                        for(let i=0; i<gridLines.length-1; i++) { addLampsToSegment(lxL, gridLines[i], gridLines[i+1], 'V'); addLampsToSegment(lxR, gridLines[i], gridLines[i+1], 'V'); }
+                        addLampsToSegment(lxL, gridLines[gridLines.length-1], endCoord, 'V'); addLampsToSegment(lxR, gridLines[gridLines.length-1], endCoord, 'V');
+                    });
+
+                    gridLines.forEach(y => {
+                        const lanes = Math.floor(Math.random() * 3) + 1;
+                        const width = (lanes * 2) * 60;
+                        const road = createRoad(startCoord, y - width/2, roadLength, width, 'H', '', lanes, true, true);
+                        net.addRoad(road);
+                        const lyT = road.y - 37.5; const lyB = road.y + road.h + 37.5;
+                        addLampsToSegment(lyT, startCoord, gridLines[0], 'H'); addLampsToSegment(lyB, startCoord, gridLines[0], 'H');
+                        for(let i=0; i<gridLines.length-1; i++) { addLampsToSegment(lyT, gridLines[i], gridLines[i+1], 'H'); addLampsToSegment(lyB, gridLines[i], gridLines[i+1], 'H'); }
+                        addLampsToSegment(lyT, gridLines[gridLines.length-1], endCoord, 'H'); addLampsToSegment(lyB, gridLines[gridLines.length-1], endCoord, 'H');
+                    });
+
+                    net.buildGraph();
+                    net.roads.forEach(road => { mapData.pavements.push(...road.getPavements()); });
+                    const autoCrosswalks = net.generateCrosswalks(mapData.pavements);
+                    mapData.crosswalks.push(...autoCrosswalks);
+                    this.traffic.vehicles = []; 
+                    
+                    console.log(`[ROAD TEST] Road network initialized`);
+                }
+
+                // =========================================================
+                //  PHASE 4: LOAD MAP DATA
+                // =========================================================
+                this.activeMap = maps[mapId] || maps['hub_949'];
+                this.uiLocation.textContent = this.activeMap.label;
+
+                // --- WEATHER: adopt this map's climate ---
+                // Only outdoor maps change the odds table. Indoor maps leave it
+                // alone: you haven't left the city by walking into a cafe, and
+                // the sky should be unchanged when you come back out.
+                if (this.weather) {
+                    if (this.activeMap.climate) {
+                        this.weather.setClimate(this.activeMap.climate);
+                    } else if (this.activeMap.type === 'outdoor') {
+                        this.weather.setClimate('_default');
+                    }
+                    // Suppression is reset further down, once the room system for
+                    // this map has actually been built — see "WEATHER: resolve
+                    // indoor suppression" below.
+                }
+
+                // --- NEW: HARVEST ATTACHMENTS FROM BUILDINGS ---
+                // This automatically pulls signs and doors defined in the Building constructor
+                if (this.activeMap.buildings) {
+                    // Strip building-generated transitions from previous loads
+                    // (prevents accumulation when MAP_DATA arrays get mutated by push)
+                    if (this.activeMap.transitions) {
+                        this.activeMap.transitions = this.activeMap.transitions.filter(t => !t._fromBuilding);
+                    } else {
+                        this.activeMap.transitions = [];
+                    }
+                    
+                    // On cache restore, signs are already collected — only skip sign harvest
+                    const skipSigns = this._hubCacheSkipSigns;
+                    this._hubCacheSkipSigns = false; // Reset flag
+                    
+                    this.activeMap.buildings.forEach(b => {
+                        // 1. Harvest Sign (skip on cache restore — already collected)
+                        if (!skipSigns && b.attachedSign) {
+                            this.neonSigns.push(b.attachedSign);
+                        }
+                        // 2. Harvest Transition (Door) — tag to prevent accumulation
+                        if (b.attachedTransition) {
+                            b.attachedTransition._fromBuilding = true;
+                            this.activeMap.transitions.push(b.attachedTransition);
+                        }
+                        // 3. Harvest Lights — always needed (regenerated fresh on cache restore)
+                        if (b.attachedLights && b.attachedLights.length > 0) {
+                            this.activeMap.lamps.push(...b.attachedLights);
+                        }
+                    });
+                    
+                    // 3b. Re-apply block lamp colors to include building lights
+                    // This ensures V2 building lights match street lamp colors on their block
+                    if (this.activeMap.cityLayout && this.activeMap.cityLayout.applyBlockLampColors) {
+                        this.activeMap.cityLayout.applyBlockLampColors(this.activeMap.lamps);
+                    }
+                    
+                    // Add Road Test Map transition (at bottom center of hub)
+                    if (this.activeMap.id === 'hub_949') {
+                        this.activeMap.transitions.push({
+                            x: 1960, y: 8400, w: 80, h: 60,
+                            target: 'road_test',
+                            label: 'Enter Road Test Zone',
+                            _fromBuilding: true
+                        });
+                        this.activeMap.transitions.push({
+                            x: 1960, y: 8500, w: 80, h: 60,
+                            target: 'ollo_test',
+                            label: 'Visit OllO Plaza',
+                            _fromBuilding: true
+                        });
+                        // Cache hub buildings for delivery mission generation from any map
+                        this._hubBuildingsCache = this.activeMap.buildings;
+                    }
+                }
+                
+                // POPULATE LANDMARK REGISTRY FROM MAP DATA
+                if (this.activeMap.landmarks) {
+                    for (const lm of this.activeMap.landmarks) {
+                        this.landmarkRegistry[lm.id] = { x: lm.x, y: lm.y };
+                    }
+                    console.log(`Loaded ${this.activeMap.landmarks.length} landmarks for ${mapId}`);
+                }
+                
+                // Also auto-generate landmarks from transitions (door positions)
+                if (this.activeMap.transitions) {
+                    for (const t of this.activeMap.transitions) {
+                        // Create a landmark for each transition's center point
+                        const transitionLandmarkId = `${mapId}_to_${t.target}`;
+                        this.landmarkRegistry[transitionLandmarkId] = {
+                            x: t.x + t.w / 2,
+                            y: t.y + t.h / 2
+                        };
+                    }
+                }
+                
+                // Build spatial transition grid for O(1) lookups (replaces per-frame .find())
+                this._transitionGrid.build(this.activeMap.transitions);
+                
+                // Build render grids for static geometry — O(visible cells) draw instead of O(N)
+                this._renderGridWalls = new RenderGrid(400);
+                this._renderGridWalls.build(this.activeMap.walls);
+                
+                if (this.activeMap.floorZones) {
+                    this._renderGridFloorZones = new RenderGrid(400);
+                    this._renderGridFloorZones.build(this.activeMap.floorZones);
+                } else {
+                    this._renderGridFloorZones = null;
+                }
+                
+                if (this.activeMap.pavements) {
+                    this._renderGridPavements = new RenderGrid(400);
+                    this._renderGridPavements.build(this.activeMap.pavements);
+                } else {
+                    this._renderGridPavements = null;
+                }
+                
+                if (this.activeMap.crosswalks) {
+                    this._renderGridCrosswalks = new RenderGrid(400);
+                    this._renderGridCrosswalks.build(this.activeMap.crosswalks);
+                } else {
+                    this._renderGridCrosswalks = null;
+                }
+                
+                // Build Indoor V2 Room System (if this map has room definitions)
+                if (ROOM_DEFS[mapId]) {
+                    this.roomSystem.build(ROOM_DEFS[mapId]);
+                    
+                    // AUTO WALL CUTTER — Split walls wherever doors are placed
+                    if (this.roomSystem.doors.length > 0 && this.activeMap.walls) {
+                        this.activeMap.walls = RoomSystem.cutWallsForDoors(
+                            this.activeMap.walls,
+                            ROOM_DEFS[mapId].doors || []
+                        );
+                    }
+                } else {
+                    this.roomSystem.clear();
+                }
+                
+                // --- WEATHER: resolve indoor suppression for the new map ---
+                // Runs after roomSystem.build() so `active` reflects THIS map.
+                // Outdoor maps always show the sky. Indoor maps hide it, unless
+                // they run a room system — those get it recomputed per frame in
+                // the update loop, since a map can mix indoor rooms with a
+                // veranda or courtyard that should still get rained on.
+                if (this.weather) {
+                    if (this.activeMap.type === 'outdoor') {
+                        this.weather.setIndoorSuppressed(false);
+                    } else if (!this.roomSystem.active) {
+                        this.weather.setIndoorSuppressed(true);
+                    }
+                }
+                
+                // -------------------------------------------------------
+
+                this.props = this.activeMap.props || [];
+                this.npcs = this.activeMap.npcs || [];
+                this.lamps = this.activeMap.lamps || [];
+                this.enemies = []; this.loot = []; 
+                
+                // Auto-tag lamps with their containing room ID for per-room light control
+                if (this.roomSystem.active) {
+                    this.roomSystem.tagLamps(this.lamps);
+                } 
+                
+                this.decals.clear(); 
+                
+                // Deactivate current map entities (non-target maps have empty arrays from lazy creation)
+                const targetMapData = maps[mapId];
+                if (targetMapData) {
+                    if (targetMapData.props) { for (let prop of targetMapData.props) { if (prop instanceof GameEntity) { prop.active = false; prop.markedForDestroy = false; } } }
+                    if (targetMapData.npcs) { for (let npc of targetMapData.npcs) { if (npc instanceof GameEntity) { npc.active = false; npc.markedForDestroy = false; } } }
+                }
+                
+                // Re-register persistents
+                if (this.player) { this.player.active = true; this.player.markedForDestroy = false; this.player.reregister(); }
+                if (this.ownedCar && this.ownedCar instanceof VehicleEntity) { this.ownedCar.active = true; this.ownedCar.markedForDestroy = false; this.ownedCar.dead = false; this.ownedCar.reregister(); }
+                for (let tm of this.teammates) { if (tm instanceof ActorEntity) { tm.active = true; tm.markedForDestroy = false; tm.reregister(); } }
+                
+                // Activate current map entities
+                for (let prop of this.props) { if (prop instanceof GameEntity) { prop.active = true; prop.markedForDestroy = false; prop.reregister(); } }
+                for (let npc of this.npcs) { if (npc instanceof GameEntity) { npc.active = true; npc.markedForDestroy = false; npc.dead = false; npc.reregister(); } }
+                
+                GameEntity.clearType('projectile'); 
+
+                if (this.useNewCollisionSystem) {
+                    if (this.activeMap.walls) { this._staticWallEntities = createStaticEntitiesFromWalls(this.activeMap.walls); }
+                    if (this.activeMap.buildings) { this._staticBuildingEntities = createStaticEntitiesFromBuildings(this.activeMap.buildings); }
+                }
+                
+                CollisionSystem.processQueue();
+                GameEntity.queueEnabled = false;
+                
+                if (this.activeMap.id === 'hub_949' && this.questState.ambushCleared) { 
+                    this.npcs.push(new NPC(2000, 9800, "Ms. Jean", 'ms_jean')); 
+                }
+                
+                // Spawn Grum North near the Scrapyard
+                if (this.activeMap.id === 'hub_949' && this.restrictedZone) {
+                    const rz = this.restrictedZone;
+                    // Place Grum just south of the zone entrance, on the road
+                    this.npcs.push(new NPC(rz.x + rz.w / 2 - 40, rz.y + rz.h + 60, "Grum North", 'arena_master'));
+                }
+                
+                // Create HordeGauntlet (persists across map switches)
+                if (!this.hordeGauntlet) {
+                    this.hordeGauntlet = new HordeGauntlet();
+                }
+                
+                // Spawn bounty target on hub if active bounty mission
+                // Must re-spawn on every hub entry because enemies array is cleared on map load
+                if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission
+                    && this.missions.activeMission.type === MISSION_TYPES.BOUNTY
+                    && this.missions.activeMission.status === 'active') {
+                    // Clear stale entity reference (entity was destroyed on previous map unload)
+                    this.missions.activeMission.targetEntity = null;
+                    this.missions.spawnBountyTarget(this);
+                }
+                
+                // Spawn salvage guards on hub if active salvage mission
+                if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission
+                    && this.missions.activeMission.type === MISSION_TYPES.SALVAGE
+                    && this.missions.activeMission.status === 'active'
+                    && !this.missions.activeMission.crateCollected) {
+                    // Reset guard spawns for fresh map load
+                    this.missions.activeMission.guardsSpawned = false;
+                    this.missions.activeMission._guardEntities = [];
+                    this.missions.activeMission.crateSpawned = false;
+                    this.missions.spawnSalvageGuards(this);
+                }
+                
+                // Show active mission guidance on hub load
+                if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission) {
+                    const m = this.missions.activeMission;
+                    if (m.status === 'active') {
+                        setTimeout(() => {
+                            if (this.ui && this.ui.showMissionBanner) {
+                                const text = this.missions.getObjectiveText();
+                                if (text) this.ui.showMissionBanner(text, 'gold', 'IN PROGRESS');
+                            }
+                        }, 800);
+                    }
+                }
+                
+                // --- VELVET CAT ---
+                if (this.activeMap.id === 'hub_949') {
+                    if (this.questState.hasVelvetCat) {
+                        // Owned — temp position, repositioned by placeEntitySmart in Phase 5
+                        this.velvetCat = new VelvetCat(this.activeMap.spawn.x, this.activeMap.spawn.y);
+                    } else {
+                        // Discoverable — sitting near the hub spawn (apartment area)
+                        this.velvetCat = new VelvetCat(900, 580);
+                        this.velvetCat.state = 'idle';
+                        this.velvetCat.idleBehavior = 'sit';
+                        this.velvetCat._discoverable = true; // Flag for interaction
+                    }
+                } else if (this.questState.hasVelvetCat) {
+                    // Owned + indoor/other maps — temp position, repositioned in Phase 5
+                    this.velvetCat = new VelvetCat(this.activeMap.spawn.x, this.activeMap.spawn.y);
+                } else {
+                    this.velvetCat = null;
+                }
+
+                // =========================================================
+                //  PHASE 5: PLAYER POSITIONING (DYNAMIC LINKING)
+                // =========================================================
+                
+                // CASE A: DYNAMIC RETURN (e.g. Exiting a building to the Hub)
+                if (spawnAt && spawnAt.linkFrom) {
+                    // Find the transition on the NEW map that targets the OLD map
+                    // Example: If loading 'hub_949' coming from 'apt_949', find the Hub door that points to 'apt_949'
+                    const returnGate = this._transitionGrid.findByTarget(spawnAt.linkFrom);
+                    
+                    if (returnGate) {
+                        // Spawn at the center of the gate
+                        this.player.x = returnGate.x + returnGate.w / 2;
+                        
+                        // Offset Y to step "out" of the door
+                        // Note: Most buildings are "North", so "Out" is South (Positive Y).
+                        // We add 35px to clear the building wall/door trigger.
+                        this.player.y = returnGate.y + returnGate.h + 35;
+                        
+                        // Face Down (South)
+                        this.player.angle = Math.PI / 2; 
+                    } else {
+                        // Fallback: If no linking door found, use map default
+                        console.warn(`Link connection to ${spawnAt.linkFrom} not found. Using default spawn.`);
+                        this.player.x = this.activeMap.spawn.x;
+                        this.player.y = this.activeMap.spawn.y;
+                    }
+                } 
+                
+                // CASE B: EXPLICIT COORDINATES (e.g. Save Game load, or debug teleport)
+                else if (spawnAt && typeof spawnAt.x === 'number') { 
+                    this.player.x = spawnAt.x; 
+                    this.player.y = spawnAt.y; 
+                } 
+                
+                // CASE C: DEFAULT SPAWN (e.g. Entering an interior for the first time)
+                else { 
+                    this.player.x = this.activeMap.spawn.x; 
+                    this.player.y = this.activeMap.spawn.y; 
+                }
+                
+                // Setup Car for Hub
+                if (this.activeMap.id === 'hub_949' || this.activeMap.id === 'road_test') {
+                    this.car.x = this.hubState.carX; 
+                    this.car.y = this.hubState.carY; 
+                    this.car.angle = this.hubState.carAngle;
+                    this.car.visible = true; 
+                    this.car.active = true;  // Enable collision on outdoor maps
+                    this.car.controlMode = 'PLAYER'; 
+                    this.player.visible = true; 
+                    this.isDriving = false;
+                } else {
+                    this.car.visible = false; 
+                    this.car.active = false;  // Disable collision on indoor maps
+                    this.car.controlMode = 'PARKED';
+                    this.isDriving = false; 
+                    this.player.visible = true;
+                }
+                
+                // --- DELIVERY VEHICLE (Amber LADY Blackmark V3, parked near Cozy Cafe) ---
+                if (this.activeMap.id === 'hub_949') {
+                    // Get cafe landmark position for parking nearby
+                    const cafeLandmark = this.landmarkRegistry['cozy_cafe'];
+                    if (cafeLandmark && !this.deliveryVehicle) {
+                        this.deliveryVehicle = new TrafficVehicle(null, 'LADY', 'suv2', 'PARKED');
+                        //this.deliveryVehicle.color = '#1a0b2e'; // Deep violet body
+                        this.deliveryVehicle.color = '#58391C'
+                        this.deliveryVehicle.glowColor = '#a469ff'; // Violet underglow
+                        this.deliveryVehicle.headlightColor = '#a469ff'; // Violet headlights
+                        this.deliveryVehicle.isDeliveryVehicle = true;
+                        this.deliveryVehicle.controlMode = 'PARKED';
+                        this.deliveryVehicle.hasDriver = false;
+                        // Park near cafe entrance (offset to the side so it doesn't block door)
+                        this.deliveryVehicle.x = cafeLandmark.x - 80;
+                        this.deliveryVehicle.y = cafeLandmark.y + 20;
+                        this.deliveryVehicle.angle = Math.PI / 2; // Facing south
+                        this.deliveryVehicle.visible = true;
+                        this.deliveryVehicle.active = true;
+                    } else if (this.deliveryVehicle) {
+                        // Re-show on return to hub
+                        this.deliveryVehicle.visible = true;
+                        this.deliveryVehicle.active = true;
+                        this.deliveryVehicle.reregister();
+                    }
+                } else {
+                    // Hide delivery vehicle on indoor maps
+                    if (this.deliveryVehicle) {
+                        this.deliveryVehicle.visible = false;
+                        this.deliveryVehicle.active = false;
+                    }
+                }
+                
+                // =========================================================
+                // SMART COMPANION PLACEMENT (Teammates & Dancers)
+                // =========================================================
+                // Config: 40px start offset, Smart Cone Search, Transition Safe-zones
+            
+                const occupiedSpots = [];
+                const map = this.activeMap;
+                const pX = this.player.x;
+                const pY = this.player.y;
+                const pAngle = this.player.angle || 0; // Direction player is looking
+            
+                // 1. Helper: Collision Check (includes Door Override)
+                const isSpotValid = (x, y) => {
+                    const r = 10; // Entity radius
+                    
+                    // Bounds
+                    if (x < r || x > map.width - r || y < r || y > map.height - r) return false;
+            
+                    // Transition/Door Override (ALWAYS VALID)
+                    // This ensures they can spawn on door mats even if near walls
+                    if (map.transitions) {
+                        for (let t of map.transitions) {
+                            if (x > t.x && x < t.x + t.w && y > t.y && y < t.y + t.h) return true;
+                        }
+                    }
+            
+                    // Walls
+                    if (map.walls) {
+                        for (let w of map.walls) {
+                            if (x + r > w.x && x - r < w.x + w.w &&
+                                y + r > w.y && y - r < w.y + w.h) return false;
+                        }
+                    }
+            
+                    // Buildings (Visual Footprint)
+                    const placeColliders = getColliders(map);
+                    if (placeColliders) {
+                        for (let b of placeColliders) {
+                            if (x + r > b.x && x - r < b.x + b.w &&
+                                y + r > b.y && y - r < b.y + b.h) return false;
+                        }
+                    }
+                    return true;
+                };
+            
+                // 2. Helper: The Smart Search Logic
+                const placeEntitySmart = (entity) => {
+                    let validPosFound = false;
+                    
+                    // SETTINGS: Start at 40px as requested
+                    const startRadius = 40; 
+                    const ringStep = 20;
+                    const maxRings = 10; 
+            
+                    searchLoop:
+                    for (let r = 0; r < maxRings; r++) {
+                        const currentDist = startRadius + (r * ringStep);
+                        const steps = 12 + (r * 4); // Increase angular resolution further out
+                        
+                        // Cone Search: Alternating angles (0, +15, -15, +30, -30...)
+                        // Prioritizes looking where the player is looking
+                        for (let i = 0; i < steps; i++) {
+                            const offsetIdx = Math.ceil(i/2) * (i%2 === 0 ? 1 : -1);
+                            const angleOffset = (offsetIdx / steps) * Math.PI * 2; 
+                            const angle = pAngle + angleOffset;
+                            
+                            const tx = pX + Math.cos(angle) * currentDist;
+                            const ty = pY + Math.sin(angle) * currentDist;
+            
+                            // A. Environment Check
+                            if (!isSpotValid(tx, ty)) continue;
+            
+                            // B. Overlap Check (prevent stacking)
+                            let overlaps = false;
+                            for (let spot of occupiedSpots) {
+                                if (Math.hypot(tx - spot.x, ty - spot.y) < 20) {
+                                    overlaps = true;
+                                    break;
+                                }
+                            }
+                            if (overlaps) continue;
+            
+                            // Success
+                            entity.x = tx;
+                            entity.y = ty;
+                            entity.vx = 0; // Stop sliding
+                            entity.vy = 0;
+                            occupiedSpots.push({x: tx, y: ty});
+                            validPosFound = true;
+                            break searchLoop;
+                        }
+                    }
+            
+                    // Fallback: If trapped in valid geometry, stack on player
+                    if (!validPosFound) {
+                        entity.x = pX;
+                        entity.y = pY;
+                    }
+                };
+            
+                // 3. Execute for Teammates
+                for (let tm of this.teammates) {
+                    if (!tm.recruited) {
+                        // Unrecruited logic
+                        if (map.id === 'moon_city_nightclub') { tm.x = 1100; tm.y = 150; }
+                        else { tm.x = -5000; tm.y = -5000; }
+                        continue;
+                    }
+                    // Downed teammates recover at the apartment
+                    if (tm.downed) {
+                        if (map.id === 'apt_949') {
+                            tm.downed = false;
+                            tm.dead = false;
+                            tm.active = true;
+                            tm.visible = true;
+                            tm.hp = tm.maxHp;
+                            tm.teammateStims = tm.maxTeammateStims || 3;
+                            showMessage(`${tm.name.toUpperCase()} HAS RECOVERED.`);
+                            placeEntitySmart(tm);
+                        } else {
+                            // Still downed — hide offscreen
+                            tm.x = -5000; tm.y = -5000;
+                            tm.visible = false;
+                        }
+                        continue;
+                    }
+                    placeEntitySmart(tm);
+                }
+
+                // 3b. Apartment idle positions — place recruited teammates at fixed spots
+                if (map.id === 'apt_949') {
+                    for (const tm of this.teammates) {
+                        if (!tm.recruited || tm.downed) continue;
+                        const pos = APT_IDLE_POSITIONS[tm.name];
+                        if (pos) {
+                            tm.x = pos.x;
+                            tm.y = pos.y;
+                            tm.velX = 0;
+                            tm.velY = 0;
+                            // Face toward center of living room
+                            tm.angle = Math.atan2(450 - tm.y, 500 - tm.x);
+                        }
+                    }
+                }
+
+                // 4. Reposition Velvet Cat near player (after player position is final)
+                if (this.velvetCat && this.questState.hasVelvetCat) {
+                    placeEntitySmart(this.velvetCat);
+                }
+
+                // 5. Reset animation state AFTER all positioning to prevent limb splay
+                resetHumanoidAnim(this.player);
+                this.teammates.forEach(t => resetHumanoidAnim(t));
+
+                this.camera.zoom = 1; 
+                this.resize();
+            },
+            
+            /**
+             * COMPUTE LAMP SHADOWS (Geometry-Only)
+             * -----------------------------------------------------------
+             * Pre-computes shadow polygon geometry per lamp and caches it
+             * on the lamp object. NO map-sized canvas allocation.
+             * 
+             * Old approach: 4000×11000 shadowCanvas = 44M pixels in VRAM
+             * New approach: ~100 polygon points per lamp = ~50KB total
+             * 
+             * The shadow polygons are drawn per-frame into the screen-sized
+             * lightCanvas for only visible lamps (AABB culled).
+             */
+            bakeStaticLighting() {
+                if (!this.activeMap) return;
+            
+                // 1. RESET DEBUG DATA
+                this.debugLightData = []; 
+                
+                let allObstacles = [...this.activeMap.walls];
+                if (this.activeMap.buildingColliders) {
+                    allObstacles = allObstacles.concat(this.activeMap.buildingColliders);
+                } else if (this.activeMap.buildings) {
+                    allObstacles = allObstacles.concat(this.activeMap.buildings);
+                }
+            
+                // 2. COMPUTE SHADOW POLYGON PER LAMP (cached on lamp object)
+                for (let lamp of this.lamps) {
+                    const range = lamp.radius;
+                    const relevantObstacles = allObstacles.filter(o => 
+                        Math.hypot(o.x + o.w/2 - lamp.x, o.y + o.h/2 - lamp.y) < range + Math.max(o.w, o.h)
+                    );
+            
+                    let points = [];
+                    for (let o of relevantObstacles) {
+                        points.push({x: o.x, y: o.y});
+                        points.push({x: o.x + o.w, y: o.y});
+                        points.push({x: o.x + o.w, y: o.y + o.h});
+                        points.push({x: o.x, y: o.y + o.h});
+                    }
+                    // Map corners as boundary points
+                    points.push({x: 0, y: 0}, {x: this.activeMap.width, y: 0}, 
+                                {x: this.activeMap.width, y: this.activeMap.height}, {x: 0, y: this.activeMap.height});
+            
+                    let intersections = [];
+                    for (let p of points) {
+                        const angle = Math.atan2(p.y - lamp.y, p.x - lamp.x);
+                        [-0.0001, 0, 0.0001].forEach(offset => {
+                            const rayAngle = angle + offset;
+                            const dx = Math.cos(rayAngle);
+                            const dy = Math.sin(rayAngle);
+                            let closestDist = range;
+                            for (let o of relevantObstacles) {
+                                const hits = getLineRectIntersections(lamp.x, lamp.y, lamp.x + dx * range, lamp.y + dy * range, o.x, o.y, o.w, o.h);
+                                for (let hit of hits) {
+                                    const dist = Math.hypot(hit.x - lamp.x, hit.y - lamp.y);
+                                    if (dist < closestDist) closestDist = dist;
+                                }
+                            }
+                            intersections.push({ angle: rayAngle, x: lamp.x + dx * closestDist, y: lamp.y + dy * closestDist });
+                        });
+                    }
+                    intersections.sort((a, b) => a.angle - b.angle);
+            
+                    // Cache the shadow polygon on the lamp — NO canvas needed
+                    lamp._shadowPoly = intersections;
+                    
+                    // Debug data
+                    if (intersections.length > 0) {
+                        this.debugLightData.push({ source: {x: lamp.x, y: lamp.y}, points: intersections });
+                    }
+                }
+                this.lightingBaked = true;
+            },
+            
+        });
+
