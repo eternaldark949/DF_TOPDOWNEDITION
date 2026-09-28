@@ -1797,6 +1797,9 @@
         .ggp-label { font-family:var(--font-tech); font-size:7px; color:#888; width:52px; text-align:right; flex-shrink:0; text-transform:uppercase; letter-spacing:0.5px; }
         .ggp-slider { flex:1; -webkit-appearance:none; appearance:none; height:10px; border-radius:2px; outline:none; cursor:pointer; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.06); pointer-events:auto; }
         .ggp-slider::-webkit-slider-thumb { -webkit-appearance:none; width:10px; height:16px; border-radius:2px; background:#ccc; border:1px solid #000; cursor:pointer; }
+        .amb-slider-wrap { display:flex; align-items:center; gap:10px; }
+        .amb-slider { flex:0 0 auto; width:120px; touch-action:none; }
+        .amb-val { min-width:2.2em; text-align:right; font-size:0.8em; opacity:0.8; }
         .ggp-val { font-size:8px; color:#888; width:24px; text-align:left; font-family:monospace; }
         .ggp-presets { display:flex; gap:4px; margin-top:8px; flex-wrap:wrap; }
         .ggp-preset { padding:3px 6px; font-family:var(--font-tech); font-size:7px; border-radius:3px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:#888; cursor:pointer; text-transform:uppercase; letter-spacing:0.5px; pointer-events:auto; }
@@ -2425,6 +2428,11 @@
                         <div class="row-left"><div class="desc-box">Mute all SFX and music.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-audio">Master Audio: ON</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="row-ambience">
+                        <div class="row-left"><div class="desc-box">Rain, wind, city and room sounds.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn amb-slider-wrap"><span id="lbl-ambience">Ambience: 70</span><input type="range" class="ggp-slider amb-slider" id="main-ambience" min="0" max="100" step="5" value="70"></div></div>
+                        <div class="row-right"><div class="input-prompt">slide</div></div>
                     </div>
                     <div class="menu-item-row" id="btn-toggle-fps">
                         <div class="row-left"><div class="desc-box">Cap frame rate to save power.<span class="arrow">▶</span></div></div>
@@ -3122,6 +3130,10 @@
                 <div class="settings-row">
                     <span class="settings-label">Master Audio</span>
                     <span class="settings-value val-on" id="set-audio" data-key="audioEnabled">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Ambience</span>
+                    <span class="amb-slider-wrap"><input type="range" class="ggp-slider amb-slider" id="set-ambience" min="0" max="100" step="5" value="70"><span class="amb-val" id="set-ambience-val">70</span></span>
                 </div>
                 
                 <div class="settings-section-label">Performance</div>
@@ -5184,7 +5196,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.
-            ambienceVolume: 0.7,            // Rain, wind, city, room tone, fireplace (0..1)
+            ambienceVolume: (() => {        // Rain, wind, city, room tone, fireplace (0..1); kept outside saves too
+                try {
+                    const v = parseFloat(localStorage.getItem('dfab_ambience_volume'));
+                    if (!isNaN(v)) return Math.max(0, Math.min(1, v));
+                } catch (e) { /* private mode */ }
+                return 0.7;
+            })(),
             
             // --- PERFORMANCE ---
             fpsLimit: 0,
@@ -40401,6 +40419,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         colorGrade: GameSettings.colorGrade,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
+                        ambienceVolume: GameSettings.ambienceVolume,
                         fullscreen: GameSettings.fullscreen,
                     },
                 };
@@ -41004,6 +41023,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         GameSettings.colorGrade = save.settings.colorGrade || 'none';
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;
+                        if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
+                        if (typeof syncAmbienceSliders === 'function') syncAmbienceSliders();
                         // Apply lighting scale
                         this.lightingScale = GameSettings.lightingQuality === 'low' ? 0.5 : GameSettings.lightingQuality === 'medium' ? 0.75 : 1.0;
                         GameSettings.applyFilmGrain();
@@ -50644,6 +50665,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._updateValueEl('set-atmosphere', GameSettings.atmosphereTint || 'off');
                 this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
                 this._updateValueEl('set-audio', GameSettings.audioEnabled ? 'on' : 'off');
+                syncAmbienceSliders();
                 this._updateValueEl('set-fullscreen', !FullscreenManager.supported()
                     ? 'n/a' : (FullscreenManager.isActive() ? 'on' : 'off'));
                 this._updateValueEl('set-fps', GameSettings.fpsLimit === 0 ? 'none' : String(GameSettings.fpsLimit));
@@ -50868,7 +50890,31 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 GameSettings.audioEnabled ? '' : '#666');
             lbl('lbl-fps', `FPS Limit: ${GameSettings.fpsLimit === 0 ? 'NONE' : GameSettings.fpsLimit}`,
                 GameSettings.fpsLimit > 0 ? '#4CAF50' : '');
+            syncAmbienceSliders();
         }
+
+        // Ambience volume: one setting, two sliders (main menu + pause panel), kept in step
+        function syncAmbienceSliders() {
+            const v = Math.round((GameSettings.ambienceVolume ?? 0.7) * 100);
+            for (const id of ['main-ambience', 'set-ambience']) { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = v; }
+            const a = document.getElementById('lbl-ambience'); if (a) a.textContent = `Ambience: ${v}`;
+            const b = document.getElementById('set-ambience-val'); if (b) b.textContent = v;
+        }
+        let _ambPreviewAt = 0;
+        function setAmbienceVolume(v) {
+            GameSettings.ambienceVolume = Math.max(0, Math.min(1, v));
+            try { localStorage.setItem('dfab_ambience_volume', String(GameSettings.ambienceVolume)); } catch (e) { /* private mode */ }
+            syncAmbienceSliders();
+            const now = performance.now();
+            if (now - _ambPreviewAt > 180 && GameSettings.ambienceVolume > 0) { _ambPreviewAt = now; audioSys.init(); audioSys.sfx('ui'); }
+        }
+        for (const id of ['main-ambience', 'set-ambience']) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            el.addEventListener('input', () => setAmbienceVolume(el.value / 100));
+            for (const ev of ['click', 'pointerdown', 'touchstart', 'keydown']) el.addEventListener(ev, e => e.stopPropagation());
+        }
+        syncAmbienceSliders();
         
         // Toggle Lighting Quality
         document.getElementById('btn-toggle-lighting').addEventListener('click', () => {
