@@ -21,6 +21,7 @@
              g.headInTorso        head centre x in the torso frame
              g.feet/knees/fists/elbows/hipPt = [[lx,ly],[rx,ry]]  (hipPt = where each thigh starts)
              g.headX              head centre x in the body frame
+             g.cloth(key, spec)   simulated cloth drawn in the current frame (see ui/cloth.js)
            Tops also say which parts of the arm are fabric (`sleeve`), bottoms which
            parts of the leg (`legs`), hats how much hair they hide (`hides`).
            Portrait versions take P = { cx, cy, fw, fh, w, h, eyeY, eyeSpacing }.
@@ -44,15 +45,14 @@
                 ctx.beginPath(); ctx.arc(g.headInTorso, 0, r, 0, Math.PI * 2); ctx.stroke();
             };
             const coatTail = (ctx, g, c, len) => {                       // the hem seen from above: flares past the hips, split at the back vent
-                const sway = Math.sin(g.walkCycle) * 1.6, back = g.hip.x + 1, front = g.hip.x + g.hip.w - 1;
-                ctx.fillStyle = g.darken(c.color, 0.22); ctx.strokeStyle = g.darken(c.color, 0.4); ctx.lineWidth = 0.6;
+                const back = g.hip.x + 1, front = g.hip.x + g.hip.w - 1, mid = (front + back) / 2;
                 for (const s of [-1, 1]) {
-                    const w = s * sway;                                   // the hem swings with the stride
-                    ctx.beginPath(); ctx.moveTo(front, s * 4);
-                    ctx.quadraticCurveTo(front - 1, s * 13.5, back - len * 0.35, s * (13 + w * 0.5));
-                    ctx.quadraticCurveTo(back - len * 0.8, s * (12 + w), back - len, s * (7 + w));
-                    ctx.lineTo(back - len + 2.5, s * 1.2); ctx.lineTo(back, s * 1);
-                    ctx.closePath(); ctx.fill(); ctx.stroke();
+                    const hem = g.cloth(s < 0 ? 'coat_l' : 'coat_r', { segs: 3, stiffness: 0.1, damping: 0.88, keepOut: 7, chains: [
+                        { a: { x: front - 1, y: s * 9 },  t: { x: front - 2, y: s * 13 } },
+                        { a: { x: mid, y: s * 10.5 },     t: { x: back - len * 0.35, y: s * 13.3 } },
+                        { a: { x: back, y: s * 8 },       t: { x: back - len * 0.85, y: s * 10.5 } },
+                        { a: { x: back, y: s * 2 },       t: { x: back - len + 2.5, y: s * 1.5 } } ] });
+                    drawClothPanel(ctx, hem, g.darken(c.color, 0.22), g.darken(c.color, 0.4));
                 }
             };
             // Portrait helpers ------------------------------------------------
@@ -127,11 +127,14 @@
                         for (const s of [-1, 1]) { ctx.moveTo(g.torso.x + g.torso.w - 1, s * 2.5); ctx.lineTo(g.torso.x + g.torso.w + 2.5, s * 2.8); }
                         ctx.stroke();
                     },
-                    collar(ctx, g, c) {                                   // the hood, bunched behind the neck
+                    collar(ctx, g, c) {                                   // the hood, bunched behind the neck; it bobs as you move
+                        const h = g.headInTorso, bob = g.cloth('hood', { segs: 2, stiffness: 0.22, damping: 0.8,
+                            chains: [{ a: { x: h - 4, y: 0 }, t: { x: h - 8, y: 0 } }] })[0];
+                        const dx = bob[2].x - (h - 8), dy = bob[2].y;
                         ctx.fillStyle = g.darken(c.color, 0.2);
-                        ctx.beginPath(); ctx.ellipse(g.headInTorso - 7, 0, 4.2, 8.5, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.ellipse(h - 7 + dx * 0.8, dy * 0.8, 4.2, 8.5, 0, 0, Math.PI * 2); ctx.fill();
                         ctx.fillStyle = g.darken(c.color, 0.35);
-                        ctx.beginPath(); ctx.ellipse(g.headInTorso - 7.5, 0, 2, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.ellipse(h - 7.5 + dx, dy, 2, 5.5, 0, 0, Math.PI * 2); ctx.fill();
                     },
                     portrait(ctx, P, c) {
                         const { cx, cy, fw, fh } = P;
@@ -208,10 +211,23 @@
                     for (const [[x1, y1], [x2, y2]] of [[g.hipPt[0], g.knees[0]], [g.hipPt[1], g.knees[1]]]) { const mx = x1 + (x2 - x1) * 0.55, my = y1 + (y2 - y1) * 0.55; ctx.beginPath(); ctx.roundRect(mx - 2, my - 1.8 + (my < 0 ? -1.4 : 1.4), 4, 3.6, 0.8); ctx.fill(); }
                 } },
                 shorts:   { legs: 'thigh', detail(ctx, g, c) { ctx.fillStyle = g.darken(c.color, 0.5); for (const [x, y] of g.knees) { ctx.beginPath(); ctx.arc(x + 1.5, y, 3.2, 0, Math.PI * 2); ctx.fill(); } } },
-                skirt:    { legs: 'bare', hips(ctx, g, c) { rr(ctx, g.hip.x, -11, g.hip.w, 23, [8, 3, 3, 8], g.darken(c.color, 0.2)); } },
+                skirt:    { legs: 'bare', hips(ctx, g, c) {
+                    const x = g.hip.x;                                    // a short flare at the back that flips as you move
+                    drawClothPanel(ctx, g.cloth('skirt', { segs: 2, stiffness: 0.2, damping: 0.84, chains: [
+                        { a: { x: x + 1, y: -10 }, t: { x: x - 1.5, y: -12 } }, { a: { x: x, y: -4 }, t: { x: x - 3, y: -4.5 } },
+                        { a: { x: x, y: 4 }, t: { x: x - 3, y: 4.5 } },         { a: { x: x + 1, y: 10 }, t: { x: x - 1.5, y: 12 } } ] }),
+                        g.darken(c.color, 0.26));
+                    rr(ctx, g.hip.x, -11, g.hip.w, 23, [8, 3, 3, 8], g.darken(c.color, 0.2));
+                } },
                 long_skirt: { legs: 'full', shade: 0.25, hips(ctx, g, c) {
-                    const sway = Math.sin(g.walkCycle) * 1.2;
-                    rr(ctx, g.hip.x - 3, -13 - sway, g.hip.w + 3, 26 + sway * 2, [10, 3, 3, 10], g.darken(c.color, 0.18));
+                    // The hem swings around the legs: a ring of chains from one front side, round the back, to the other
+                    const x0 = g.hip.x + g.hip.w - 2, xb = g.hip.x - 2, mid = (x0 + xb) / 2;
+                    const ring = [[x0, 12, x0 - 1, 15], [mid, 13, mid - 2, 16], [xb + 2, 11, xb - 2, 13.5], [xb, 4, xb - 4, 5]];
+                    const chains = [...ring.map(([ax, ay, tx, ty]) => ({ a: { x: ax, y: -ay }, t: { x: tx, y: -ty } })),
+                                    ...ring.slice().reverse().map(([ax, ay, tx, ty]) => ({ a: { x: ax, y: ay }, t: { x: tx, y: ty } }))];
+                    drawClothPanel(ctx, g.cloth('long_skirt', { segs: 2, stiffness: 0.12, damping: 0.87, keepOut: 6, chains }),
+                        g.darken(c.color, 0.24), g.darken(c.color, 0.34));
+                    rr(ctx, g.hip.x - 3, -13, g.hip.w + 3, 26, [10, 3, 3, 10], g.darken(c.color, 0.18));
                     ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 0.7; ctx.beginPath();
                     for (const y of [-6, 0, 6]) { ctx.moveTo(g.hip.x - 2, y); ctx.lineTo(g.hip.x + g.hip.w - 1, y * 0.8); }
                     ctx.stroke();

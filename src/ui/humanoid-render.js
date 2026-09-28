@@ -49,15 +49,9 @@
             const layout = HAIR_LAYOUTS[hair.type];
             if (!layout) return { strands: [], jig: { x: 0, y: 0 } };
             const owner = dyn && dyn.owner, sway = (dyn && dyn.sway) || 0;
-            if (!owner || !_worldMatrix || ctx.canvas !== _worldCanvas) return { strands: _hairRest(layout, headX, sway * 0.5), jig: { x: 0, y: 0 } };
-
-            // Head frame → world (camera and shake cancel out)
-            const M = _worldMatrix.inverse().multiply(ctx.getTransform());
-            const toW = (x, y) => ({ x: M.a * x + M.c * y + M.e, y: M.b * x + M.d * y + M.f });
-            const det = M.a * M.d - M.b * M.c;
-            const toL = (x, y) => { const dx = x - M.e, dy = y - M.f; return { x: (M.d * dx - M.c * dy) / det, y: (-M.b * dx + M.a * dy) / det }; };
-            const sc = Math.hypot(M.a, M.b) || 1;
-            const baseAngle = Math.atan2(M.b, M.a);            // head frame's +x in world
+            const T = owner ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js)
+            if (!T) return { strands: _hairRest(layout, headX, sway * 0.5), jig: { x: 0, y: 0 } };
+            const { toW, toL, sc, ang: baseAngle } = T;
             const head = toW(headX, 0);
 
             let sim = owner._hairSim;
@@ -70,11 +64,7 @@
             }
 
             // How many fixed slices of game time to run this frame
-            sim.acc += Math.max(0, _gameTimeSec - sim.t) / HAIR_SIM.STEP;
-            sim.t = _gameTimeSec;
-            let steps = Math.floor(sim.acc);
-            sim.acc -= steps;
-            if (steps > HAIR_SIM.MAX_STEPS) { steps = HAIR_SIM.MAX_STEPS; sim.acc = 0; }
+            const steps = _simSteps(sim, HAIR_SIM.STEP, HAIR_SIM.MAX_STEPS);
 
             const specs = layout.strands || [];
             const hx0 = sim.headX, hy0 = sim.headY, a0 = sim.ang;
@@ -1254,13 +1244,16 @@
             const sleeve = clothes.top ? (topP ? topP.sleeve : 'long') : 'none';
             const jewelryAt = (where) => (clothes.jewelry || []).filter(j => WD && WD.jewelry[j.type] && WD.jewelry[j.type].at === where);
             const headX0 = bounce - bodyRecoil;
+            const clothDyn = { wind: null };                               // weather will blow on this (roadmap step 7)
             const g = {
                 darken, skin: skinColor, gender, walkCycle,
                 torso: { x: torsoXOff, w: torsoWidth }, hip: { x: hipXOff, w: hipWidth },
                 headX: headX0, headInTorso: headX0 - hipAnchorX,
                 feet: [[lFootX, lFootY], [rFootX, rFootY]], knees: [[lKneeX, lKneeY], [rKneeX, rKneeY]],
                 hipPt: [[hipAnchorX, lBaseY], [hipAnchorX, rBaseY]],
-                fists: [[lFistX, lFistY], [rFistX, rFistY]], elbows: [[lElbowX, lElbowY], [rElbowX, rElbowY]]
+                fists: [[lFistX, lFistY], [rFistX, rFistY]], elbows: [[lElbowX, lElbowY], [rElbowX, rElbowY]],
+                // Cloth simulated in whatever frame the piece draws in; seated drivers get the rest shape
+                cloth: (key, spec) => clothGeometry(ctx, isDriving ? null : entity, key, spec, clothDyn)
             };
 
             if (isDriving) {
@@ -1393,39 +1386,23 @@
             // 5. Trains (Dress Train)
             if (clothes.train) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
-                ctx.fillStyle = darken(clothes.train.color, 0.1); 
                 if (clothes.train.type === 'dress_train') {
-                    const tailSway = Math.sin(walkCycle) * 3;
-                    // Attach to hip geometry
-                    ctx.beginPath(); ctx.moveTo(hipXOff + 2, -10); 
-                    ctx.quadraticCurveTo(-25, -12+tailSway, -30, -14+tailSway); 
-                    ctx.lineTo(-30, -2+tailSway); 
-                    ctx.lineTo(hipXOff + 2, 2); 
-                    ctx.fill();
-                    // Mirrored
-                    ctx.beginPath(); ctx.moveTo(hipXOff + 2, 10); 
-                    ctx.quadraticCurveTo(-25, 12+tailSway, -30, 14+tailSway); 
-                    ctx.lineTo(-30, 2+tailSway); 
-                    ctx.lineTo(hipXOff + 2, -2); 
-                    ctx.fill();
+                    // Two heavy panels trailing from the hips
+                    for (const s of [-1, 1]) {
+                        const panel = g.cloth(s < 0 ? 'train_l' : 'train_r', { segs: 4, stiffness: 0.07, damping: 0.9, chains: [
+                            { a: { x: hipXOff + 2, y: s * 10 }, t: { x: -30, y: s * 14 } },
+                            { a: { x: hipXOff + 2, y: s * 6 },  t: { x: -30, y: s * 8 } },
+                            { a: { x: hipXOff + 2, y: s * 2 },  t: { x: -30, y: s * 2 } } ] });
+                        drawClothPanel(ctx, panel, darken(clothes.train.color, 0.1));
+                    }
                 } else if (clothes.train.type === 'silk_flow') {
-                    // FIX: Define globalTime for wind physics
-                    const globalTime = _frameTime / 150;
-
-                    // Periwinkle Silk Physics: Low gravity, high drag
-                    const tailSway = Math.sin(walkCycle * 0.5) * 5; 
-                    const wind = Math.sin(globalTime) * 2; 
-                    
-                    ctx.fillStyle = clothes.train.color;
-                    ctx.globalAlpha = 0.9; 
-                    
-                    ctx.beginPath(); 
-                    ctx.moveTo(hipXOff + 2, -10); 
-                    // Long, flowing curve
-                    ctx.bezierCurveTo(-35, -15 + tailSway + wind, -45, 0 + tailSway, -40, 10 + tailSway + wind);
-                    ctx.lineTo(hipXOff + 2, 2); 
-                    ctx.fill();
-                    
+                    // Periwinkle silk: light, floaty, never quite still
+                    const panel = g.cloth('train_silk', { segs: 5, stiffness: 0.045, damping: 0.93, drift: 0.25, chains: [
+                        { a: { x: hipXOff + 2, y: -10 }, t: { x: -36, y: -12 } },
+                        { a: { x: hipXOff + 2, y: -5 },  t: { x: -42, y: -2 } },
+                        { a: { x: hipXOff + 2, y: 0 },   t: { x: -40, y: 8 } } ] });
+                    ctx.globalAlpha = 0.9;
+                    drawClothPanel(ctx, panel, clothes.train.color);
                     ctx.globalAlpha = 1.0;
                 }
 
