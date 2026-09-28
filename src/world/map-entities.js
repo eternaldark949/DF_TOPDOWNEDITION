@@ -102,7 +102,8 @@
                         new LampEntity({ x: 600, y: 884, lampType: 5, color: '#ffaa55', lightRadius: 300, angle: Math.PI / 2 }),   // beside the exit, not in it
                         new LampEntity({ x: 800, y: 884, lampType: 5, color: '#ffaa55', lightRadius: 300, angle: Math.PI / 2 }),
                     ];
-                    // Shadowless soft lights: the light the decor casts on the floor around it
+                    // Shadowless soft lights: the light the decor casts on the floor around it.
+                    // Round ones take a radius; area lights take w, h (optional `round` = corner size, `soft` = gentler edge).
                     const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
                     e.softLights = [
                         S(991, 232, 100, '#ffd2a8'), S(1115, 232, 100, '#ffd2a8'),                       // nightstand lamps
@@ -115,7 +116,8 @@
                         S(1150, 720, 130, '#ece6f2', 0.7),                                                 // bathroom ceiling light
                         S(1246, 476, 100, '#ffd2a8', 0.75),                                                // bedroom reading chair
                         S(390, 236, 80, '#ffd9b0', 0.55),                                                  // bookshelf
-                        ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => S(105 + i * 170, 22, 100, '#ffd6a0', 0.7, 1.3))   // veranda string lights
+                        { x: 700, y: 102, w: 1384, h: 212, round: 110, color: '#ffd6a0', intensity: 0.9, soft: true },   // veranda string lights: area light over the deck
+                        { x: 700, y: 24, w: 1370, h: 70, round: 35, color: '#ffe2b8', intensity: 0.75, soft: true }       // …and brighter right under the bulbs
                     ];
                     break;
                 }
