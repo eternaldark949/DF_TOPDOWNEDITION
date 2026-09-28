@@ -1,0 +1,1743 @@
+        const HAIR_SIM = {
+            STEP: 1 / 120,          // game seconds per physics slice
+            MAX_STEPS: 12,          // catch-up cap after a stall
+            SNAP: 80,               // a root jump bigger than this (teleport) resets the hair
+            HEAD_R: 8.5             // strands are kept outside the head
+        };
+
+        /** Evenly spaced roots on the back half of the head, fanning outward. */
+        function _hairFan(count, radius, fromDeg, toDeg, fan, segs, len, extra = {}) {
+            const out = [];
+            for (let i = 0; i < count; i++) {
+                const t = count === 1 ? 0.5 : i / (count - 1);
+                const th = (fromDeg + (toDeg - fromDeg) * t) * Math.PI / 180;
+                out.push(Object.assign({ root: { x: -2 + Math.cos(th) * radius, y: Math.sin(th) * radius },
+                                         dir: Math.PI + (th - Math.PI) * fan, segs, len, i }, extra));
+            }
+            return out;
+        }
+
+        const HAIR_LAYOUTS = {
+            ponytail:     { damping: 0.955, stiffness: 0.020, strands: [{ root: { x: -9, y: 0 }, dir: Math.PI, segs: 6, len: 4.4 }] },
+            braids:       { damping: 0.95,  stiffness: 0.018, strands: [
+                              { root: { x: -5, y: -6 }, dir: Math.PI + 0.35, segs: 7, len: 3.2 },
+                              { root: { x: -5, y:  6 }, dir: Math.PI - 0.35, segs: 7, len: 3.2 }] },
+            long:         { damping: 0.93,  stiffness: 0.030, strands: _hairFan(7, 9, 105, 255, 0.35, 5, 5.2) },
+            dreadlocks:   { damping: 0.94,  stiffness: 0.035, strands: _hairFan(8, 8, 100, 260, 0.6, 4, 4.5) },
+            demon_dancer: { damping: 0.965, stiffness: 0.010, wiggle: 0.05, strands: _hairFan(5, 8, 130, 230, 1.25, 8, 5.6) },
+            afro:  { jiggle: 1.0 },
+            curls: { jiggle: 1.4 },
+            short: { jiggle: 0.4 }
+        };
+
+        /** Rest pose in the head frame (also the fallback when there's no physics). */
+        function _hairRest(layout, headX, sway = 0) {
+            return (layout.strands || []).map(s => {
+                const pts = [], a = s.dir - sway;
+                let x = headX + s.root.x, y = s.root.y;
+                pts.push({ x, y });
+                for (let i = 1; i <= s.segs; i++) { x += Math.cos(a) * s.len; y += Math.sin(a) * s.len; pts.push({ x, y }); }
+                return pts;
+            });
+        }
+
+        /**
+         * Current hair geometry in the head frame: { strands: [[{x,y}...]...], jig: {x,y} }.
+         * Steps the owner's physics when drawn on the main canvas; otherwise the rest pose.
+         */
+        function hairGeometry(ctx, headX, hair, dyn) {
+            const layout = HAIR_LAYOUTS[hair.type];
+            if (!layout) return { strands: [], jig: { x: 0, y: 0 } };
+            const owner = dyn && dyn.owner, sway = (dyn && dyn.sway) || 0;
+            if (!owner || !_worldMatrix || ctx.canvas !== _worldCanvas) return { strands: _hairRest(layout, headX, sway * 0.5), jig: { x: 0, y: 0 } };
+
+            // Head frame → world (camera and shake cancel out)
+            const M = _worldMatrix.inverse().multiply(ctx.getTransform());
+            const toW = (x, y) => ({ x: M.a * x + M.c * y + M.e, y: M.b * x + M.d * y + M.f });
+            const det = M.a * M.d - M.b * M.c;
+            const toL = (x, y) => { const dx = x - M.e, dy = y - M.f; return { x: (M.d * dx - M.c * dy) / det, y: (-M.b * dx + M.a * dy) / det }; };
+            const sc = Math.hypot(M.a, M.b) || 1;
+            const baseAngle = Math.atan2(M.b, M.a);            // head frame's +x in world
+            const head = toW(headX, 0);
+
+            let sim = owner._hairSim;
+            const reset = !sim || sim.type !== hair.type || Math.hypot(sim.headX - head.x, sim.headY - head.y) > HAIR_SIM.SNAP * sc;
+            if (reset) {
+                sim = owner._hairSim = { type: hair.type, t: _gameTimeSec, acc: 0, headX: head.x, headY: head.y, ang: baseAngle,
+                                         jig: { x: head.x, y: head.y, vx: 0, vy: 0 }, strands: [] };
+                const rest = _hairRest(layout, headX, sway * 0.5);
+                sim.strands = rest.map(pts => pts.map(p => { const w = toW(p.x, p.y); return { x: w.x, y: w.y, px: w.x, py: w.y }; }));
+            }
+
+            // How many fixed slices of game time to run this frame
+            sim.acc += Math.max(0, _gameTimeSec - sim.t) / HAIR_SIM.STEP;
+            sim.t = _gameTimeSec;
+            let steps = Math.floor(sim.acc);
+            sim.acc -= steps;
+            if (steps > HAIR_SIM.MAX_STEPS) { steps = HAIR_SIM.MAX_STEPS; sim.acc = 0; }
+
+            const specs = layout.strands || [];
+            const hx0 = sim.headX, hy0 = sim.headY, a0 = sim.ang;
+            let dA = baseAngle - a0; while (dA > Math.PI) dA -= Math.PI * 2; while (dA < -Math.PI) dA += Math.PI * 2;
+
+            if (steps === 0) {
+                // Between slices: carry the hair rigidly with the head so it stays attached
+                const dx = head.x - hx0, dy = head.y - hy0;
+                for (let si = 0; si < sim.strands.length; si++) {
+                    const pts = sim.strands[si], root = toW(headX + specs[si].root.x, specs[si].root.y);
+                    const rx = root.x - pts[0].x, ry = root.y - pts[0].y;
+                    for (const p of pts) { p.x += rx; p.y += ry; p.px += rx; p.py += ry; }
+                }
+                sim.jig.x += dx; sim.jig.y += dy;
+            }
+            for (let k = 1; k <= steps; k++) {
+                const f = k / steps;
+                // Head pose for this slice, interpolated from last frame's pose
+                const ang = a0 + dA * f;
+                const c = Math.cos(ang), s = Math.sin(ang);
+                const hx = hx0 + (head.x - hx0) * f, hy = hy0 + (head.y - hy0) * f;
+                const sliceW = (lx, ly) => ({ x: hx + (c * (lx - headX) - s * ly) * sc, y: hy + (s * (lx - headX) + c * ly) * sc });
+                const time = sim.t + (k - steps) * HAIR_SIM.STEP;
+
+                for (let si = 0; si < sim.strands.length; si++) {
+                    const spec = specs[si], pts = sim.strands[si];
+                    const root = sliceW(headX + spec.root.x, spec.root.y);
+                    pts[0].px = pts[0].x; pts[0].py = pts[0].y; pts[0].x = root.x; pts[0].y = root.y;
+                    const restA = ang + spec.dir - sway * 0.5;          // rest direction swings with the shoulders
+                    const rc = Math.cos(restA), rs = Math.sin(restA);
+                    const n = pts.length - 1, L = spec.len * sc;
+                    for (let i = 1; i <= n; i++) {
+                        const p = pts[i];
+                        const vx = (p.x - p.px) * layout.damping, vy = (p.y - p.py) * layout.damping;
+                        // Spring toward the rest pose — stiff near the scalp, loose at the tips
+                        const k0 = layout.stiffness * (1 - 0.6 * (i / n));
+                        let ax = (root.x + rc * L * i - p.x) * k0, ay = (root.y + rs * L * i - p.y) * k0;
+                        if (layout.wiggle) {                           // restless tendrils
+                            const w = Math.sin(time * 5 + i * 0.9 + si * 1.7) * layout.wiggle * sc * (i / n);
+                            ax += -rs * w; ay += rc * w;
+                        }
+                        p.px = p.x; p.py = p.y;
+                        p.x += vx + ax; p.y += vy + ay;
+                    }
+                    // Keep segment lengths exact (follow the leader) and strands off the head, then
+                    // feed each correction back into the previous point's velocity (Müller's
+                    // "dynamic FTL") — plain FTL pumps energy in and makes strands zigzag.
+                    const R = HAIR_SIM.HEAD_R * sc;
+                    let corrX = sim._cx || (sim._cx = []), corrY = sim._cy || (sim._cy = []);
+                    for (let i = 1; i <= n; i++) {
+                        const a = pts[i - 1], p = pts[i];
+                        const bx = p.x, by = p.y;
+                        const hdx = p.x - hx, hdy = p.y - hy, hd = Math.hypot(hdx, hdy);
+                        if (hd < R && hd > 0.001) { p.x = hx + hdx / hd * R; p.y = hy + hdy / hd * R; }
+                        const dx = p.x - a.x, dy = p.y - a.y, d = Math.hypot(dx, dy) || 1;
+                        p.x = a.x + dx / d * L; p.y = a.y + dy / d * L;
+                        corrX[i] = p.x - bx; corrY[i] = p.y - by;
+                    }
+                    for (let i = 1; i < n; i++) { pts[i].px += 0.9 * corrX[i + 1]; pts[i].py += 0.9 * corrY[i + 1]; }
+                }
+                // Volume jiggle: a damped spring chasing the head
+                if (layout.jiggle) {
+                    const j = sim.jig;
+                    j.vx = (j.vx + (hx - j.x) * 0.12) * 0.82;
+                    j.vy = (j.vy + (hy - j.y) * 0.12) * 0.82;
+                    j.x += j.vx; j.y += j.vy;
+                }
+            }
+            sim.headX = head.x; sim.headY = head.y; sim.ang = baseAngle;
+
+            const strands = sim.strands.map(pts => pts.map(p => toL(p.x, p.y)));
+            let jig = { x: 0, y: 0 };
+            if (layout.jiggle) {
+                const l0 = toL(head.x, head.y), l1 = toL(sim.jig.x, sim.jig.y);
+                let jx = (l1.x - l0.x) * layout.jiggle, jy = (l1.y - l0.y) * layout.jiggle;
+                const jm = Math.hypot(jx, jy), cap = 3;
+                if (jm > cap) { jx *= cap / jm; jy *= cap / jm; }
+                jig = { x: jx, y: jy };
+            }
+            return { strands, jig };
+        }
+
+        /** Stroke a strand with a width that tapers from w0 (root) to w1 (tip). */
+        function _taperedStrand(ctx, pts, w0, w1) {
+            ctx.lineCap = 'round';
+            for (let i = 1; i < pts.length; i++) {
+                ctx.lineWidth = w0 + (w1 - w0) * ((i - 1) / Math.max(1, pts.length - 2));
+                ctx.beginPath(); ctx.moveTo(pts[i - 1].x, pts[i - 1].y); ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke();
+            }
+            ctx.lineCap = 'butt';
+        }
+
+        // Hair renderers: (ctx, color, headX, dyn, geo) where geo = hairGeometry(...)
+        const HAIR_RENDERERS = {
+            long(ctx, color, headX, dyn, geo) {
+                const S = geo.strands;
+                ctx.fillStyle = color; ctx.strokeStyle = color;
+                if (S.length) {
+                    // Curtain: down the outer strands, across the tips, back up
+                    const L = S[0], R = S[S.length - 1];
+                    ctx.beginPath();
+                    ctx.moveTo(L[0].x, L[0].y);
+                    for (let i = 1; i < L.length; i++) ctx.lineTo(L[i].x, L[i].y);
+                    for (let s = 1; s < S.length - 1; s++) { const tip = S[s][S[s].length - 1]; ctx.lineTo(tip.x, tip.y); }
+                    for (let i = R.length - 1; i >= 0; i--) ctx.lineTo(R[i].x, R[i].y);
+                    ctx.closePath(); ctx.fill();
+                    // Soft rounded ends and strand texture
+                    for (const st of S) _taperedStrand(ctx, st, 4, 3);
+                    const a0 = ctx.globalAlpha;
+                    ctx.strokeStyle = _hairShade(color, 0.25); ctx.globalAlpha = a0 * 0.35;
+                    for (let s = 1; s < S.length - 1; s++) _taperedStrand(ctx, S[s], 1, 0.6);
+                    ctx.globalAlpha = a0;
+                }
+                // Crown
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.ellipse(headX - 2, 0, 10.5, 10, 0, 0, Math.PI * 2); ctx.fill();
+            },
+            afro(ctx, color, headX, dyn, geo) {
+                ctx.fillStyle = color;
+                const j = geo.jig, hx = headX - 3 + j.x, hy = j.y;
+                ctx.beginPath(); ctx.arc(hx, hy, 11, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(hx + 2 + j.x * 0.4, -8 + hy * 1.3, 7, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(hx - 6 + j.x * 0.4, -3 + hy * 1.2, 8, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(hx - 2 + j.x * 0.4, 7 + hy * 1.3, 7, 0, Math.PI * 2); ctx.fill();
+            },
+            curls(ctx, color, headX, dyn, geo) {
+                const j = geo.jig, cx = headX - 1;
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.arc(cx + j.x * 0.5, j.y * 0.5, 9.5, 0, Math.PI * 2); ctx.fill();
+                // An even ring of curls around the crown; outer curls bounce more
+                const curlsN = 10;
+                for (let i = 0; i < curlsN; i++) {
+                    const th = (i / curlsN) * Math.PI * 2 + 0.3;
+                    const back = Math.cos(th) < 0 ? 1 : 0.6;          // fuller toward the back
+                    const r = 4 + (i % 2) * 0.8;
+                    ctx.beginPath();
+                    ctx.arc(cx + Math.cos(th) * 8.5 * back + j.x * (1 + (i % 2) * 0.5), Math.sin(th) * 8.5 + j.y * (1 + (i % 2) * 0.5), r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                // Tight texture highlights
+                const a0 = ctx.globalAlpha;
+                ctx.fillStyle = _hairShade(color, -0.15); ctx.globalAlpha = a0 * 0.35;
+                for (let i = 0; i < 5; i++) { const th = i * 1.3; ctx.beginPath(); ctx.arc(cx + Math.cos(th) * 4 + j.x * 0.5, Math.sin(th) * 4 + j.y * 0.5, 1.6, 0, Math.PI * 2); ctx.fill(); }
+                ctx.globalAlpha = a0;
+            },
+            demon_dancer(ctx, color, headX, dyn, geo) {
+                const hairColor = color || '#0a0000';
+                ctx.strokeStyle = hairColor; ctx.fillStyle = hairColor;
+                // 4–5 separate tendrils of varied weight; the thin ones are translucent
+                const a0 = ctx.globalAlpha;
+                geo.strands.forEach((st, i) => {
+                    ctx.globalAlpha = a0 * (i % 2 ? 0.65 : 1);
+                    _taperedStrand(ctx, st, i % 2 ? 2.6 : 4.4, 0.8);
+                });
+                ctx.globalAlpha = a0;
+                ctx.beginPath(); ctx.ellipse(headX - 1, 0, 9.5, 8.5, 0, 0, Math.PI * 2); ctx.fill();
+            },
+            short(ctx, color, headX, dyn, geo) {
+                const j = geo.jig;
+                ctx.fillStyle = color;
+                // Full cap with small side ruffles; no trailing tail — short hair doesn't trail
+                ctx.beginPath(); ctx.ellipse(headX + j.x * 0.3, j.y * 0.3, 10, 9, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(headX - 7 + j.x, -3 + j.y, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(headX - 7 + j.x, 3 + j.y, 3.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(headX + 5, -3, 3.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(headX + 5, 3, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(headX - 8 + j.x, j.y, 3.5, 5, 0, 0, Math.PI * 2); ctx.fill();
+            },
+            braids(ctx, color, headX, dyn, geo) {
+                ctx.fillStyle = color; ctx.strokeStyle = color;
+                const dark = _hairShade(color, 0.3);
+                for (const st of geo.strands) {
+                    _taperedStrand(ctx, st, 3.6, 2.8);
+                    // Woven look: alternating plaits along the braid
+                    for (let i = 1; i < st.length; i++) {
+                        const a = st[i - 1], b = st[i], ang = Math.atan2(b.y - a.y, b.x - a.x);
+                        ctx.save(); ctx.translate((a.x + b.x) / 2, (a.y + b.y) / 2); ctx.rotate(ang + (i % 2 ? 0.5 : -0.5));
+                        ctx.fillStyle = i % 2 ? color : dark;
+                        ctx.beginPath(); ctx.ellipse(0, 0, 2.2, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.restore();
+                    }
+                    const tip = st[st.length - 1];
+                    ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(tip.x, tip.y, 1.8, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.ellipse(headX - 1, 0, 10, 9, 0, 0, Math.PI * 2); ctx.fill();
+                // Centre part
+                const a0 = ctx.globalAlpha;
+                ctx.strokeStyle = dark; ctx.lineWidth = 1; ctx.globalAlpha = a0 * 0.6;
+                ctx.beginPath(); ctx.moveTo(headX + 7, 0); ctx.lineTo(headX - 8, 0); ctx.stroke();
+                ctx.globalAlpha = a0;
+            },
+            dreadlocks(ctx, color, headX, dyn, geo) {
+                ctx.strokeStyle = color; ctx.fillStyle = color;
+                for (const st of geo.strands) _taperedStrand(ctx, st, 4, 3.2);
+                ctx.beginPath(); ctx.ellipse(headX, 0, 10, 9, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(headX - 7, -3, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(headX - 7, 3, 4, 0, Math.PI * 2); ctx.fill();
+            },
+            ponytail(ctx, color, headX, dyn, geo) {
+                ctx.fillStyle = color; ctx.strokeStyle = color;
+                for (const st of geo.strands) _taperedStrand(ctx, st, 5, 3);
+                // Sleek base pulled tight over the head, tight side volume, and the tie
+                ctx.beginPath(); ctx.ellipse(headX, 0, 10, 9, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(headX - 7, -3, 3.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(headX - 7, 3, 3.5, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = _hairShade(color, 0.35);
+                ctx.beginPath(); ctx.arc(headX - 9, 0, 2.6, 0, Math.PI * 2); ctx.fill();
+            }
+        };
+        
+        // ════════════════════════════════════════════════════════════════════════
+        //  PORTRAIT RENDERER — Front-facing bust portrait for sidebar & UI
+        //  Uses same appearance config as drawProceduralHumanoid.
+        //  PORTRAIT_HAIR_RENDERERS mirrors HAIR_RENDERERS but front-facing.
+        // ════════════════════════════════════════════════════════════════════════
+
+        const PORTRAIT_HAIR_RENDERERS = {
+            // Each renderer: (ctx, color, cx, cy, fw, fh)
+            //   cx, cy = face center;  fw, fh = face width/height radii
+
+            afro_back(ctx, color, cx, cy, fw, fh) {
+                // Full afro volume rendered BEHIND the face
+                ctx.fillStyle = color;
+                const r = Math.max(fw, fh) * 1.7;
+                ctx.beginPath(); ctx.arc(cx, cy - fh * 0.15, r, 0, Math.PI * 2); ctx.fill();
+                // Side volume clusters (visible around face edges)
+                const clusters = [
+                    [cx - fw * 1.1, cy - fh * 0.1, r * 0.3],
+                    [cx + fw * 1.1, cy - fh * 0.1, r * 0.3],
+                    [cx - fw * 1.0, cy + fh * 0.4, r * 0.28],
+                    [cx + fw * 1.0, cy + fh * 0.4, r * 0.28],
+                    [cx - fw * 0.9, cy - fh * 0.8, r * 0.35],
+                    [cx + fw * 0.9, cy - fh * 0.8, r * 0.35],
+                    [cx, cy - fh * 1.35, r * 0.4],
+                    [cx - fw * 0.5, cy - fh * 1.2, r * 0.32],
+                    [cx + fw * 0.5, cy - fh * 1.2, r * 0.32],
+                ];
+                for (const [x, y, cr] of clusters) {
+                    ctx.beginPath(); ctx.arc(x, y, cr, 0, Math.PI * 2); ctx.fill();
+                }
+            },
+
+            afro(ctx, color, cx, cy, fw, fh) {
+                // FRONT layer — only the top crown above the forehead
+                ctx.fillStyle = color;
+                // Crown arc sitting on top of head
+                ctx.beginPath();
+                ctx.ellipse(cx, cy - fh * 0.85, fw * 1.25, fh * 0.55, 0, Math.PI, Math.PI * 2);
+                ctx.fill();
+                // Texture clusters on top only
+                const topClusters = [
+                    [cx, cy - fh * 1.3, fw * 0.38],
+                    [cx - fw * 0.55, cy - fh * 1.15, fw * 0.3],
+                    [cx + fw * 0.55, cy - fh * 1.15, fw * 0.3],
+                    [cx - fw * 0.9, cy - fh * 0.8, fw * 0.28],
+                    [cx + fw * 0.9, cy - fh * 0.8, fw * 0.28],
+                ];
+                for (const [x, y, cr] of topClusters) {
+                    ctx.beginPath(); ctx.arc(x, y, cr, 0, Math.PI * 2); ctx.fill();
+                }
+            },
+
+            curls(ctx, color, cx, cy, fw, fh) {
+                ctx.fillStyle = color;
+                // Volume cap on top
+                ctx.beginPath();
+                ctx.ellipse(cx, cy - fh * 0.7, fw * 1.15, fh * 0.6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Side curls framing face
+                const curlPositions = [
+                    // Left side
+                    [cx - fw * 1.0, cy - fh * 0.3, fw * 0.32],
+                    [cx - fw * 1.05, cy + fh * 0.1, fw * 0.30],
+                    [cx - fw * 0.95, cy + fh * 0.5, fw * 0.28],
+                    [cx - fw * 0.82, cy + fh * 0.85, fw * 0.25],
+                    // Right side
+                    [cx + fw * 1.0, cy - fh * 0.3, fw * 0.32],
+                    [cx + fw * 1.05, cy + fh * 0.1, fw * 0.30],
+                    [cx + fw * 0.95, cy + fh * 0.5, fw * 0.28],
+                    [cx + fw * 0.82, cy + fh * 0.85, fw * 0.25],
+                    // Top clusters
+                    [cx - fw * 0.5, cy - fh * 1.0, fw * 0.3],
+                    [cx + fw * 0.5, cy - fh * 1.0, fw * 0.3],
+                    [cx, cy - fh * 1.1, fw * 0.28],
+                ];
+                for (const [x, y, r] of curlPositions) {
+                    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+                }
+            },
+
+            long(ctx, color, cx, cy, fw, fh) {
+                ctx.fillStyle = color;
+                // Top volume
+                ctx.beginPath();
+                ctx.ellipse(cx, cy - fh * 0.6, fw * 1.1, fh * 0.55, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Left cascade
+                ctx.beginPath();
+                ctx.moveTo(cx - fw * 0.9, cy - fh * 0.6);
+                ctx.quadraticCurveTo(cx - fw * 1.3, cy + fh * 0.5, cx - fw * 0.9, cy + fh * 1.6);
+                ctx.lineTo(cx - fw * 0.5, cy + fh * 1.5);
+                ctx.quadraticCurveTo(cx - fw * 0.7, cy + fh * 0.3, cx - fw * 0.7, cy - fh * 0.3);
+                ctx.closePath();
+                ctx.fill();
+                // Right cascade
+                ctx.beginPath();
+                ctx.moveTo(cx + fw * 0.9, cy - fh * 0.6);
+                ctx.quadraticCurveTo(cx + fw * 1.3, cy + fh * 0.5, cx + fw * 0.9, cy + fh * 1.6);
+                ctx.lineTo(cx + fw * 0.5, cy + fh * 1.5);
+                ctx.quadraticCurveTo(cx + fw * 0.7, cy + fh * 0.3, cx + fw * 0.7, cy - fh * 0.3);
+                ctx.closePath();
+                ctx.fill();
+            },
+
+            short(ctx, color, cx, cy, fw, fh) {
+                ctx.fillStyle = color;
+                // Close-fitting cap
+                ctx.beginPath();
+                ctx.ellipse(cx, cy - fh * 0.45, fw * 1.08, fh * 0.7, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Side texture
+                ctx.beginPath(); ctx.arc(cx - fw * 0.85, cy - fh * 0.1, fw * 0.22, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + fw * 0.85, cy - fh * 0.1, fw * 0.22, 0, Math.PI * 2); ctx.fill();
+                // Top texture
+                ctx.beginPath(); ctx.arc(cx - fw * 0.3, cy - fh * 0.95, fw * 0.2, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + fw * 0.3, cy - fh * 0.95, fw * 0.2, 0, Math.PI * 2); ctx.fill();
+            },
+
+            braids(ctx, color, cx, cy, fw, fh) {
+                ctx.fillStyle = color;
+                // Top volume (pulled back, less poofy)
+                ctx.beginPath();
+                ctx.ellipse(cx, cy - fh * 0.55, fw * 1.05, fh * 0.55, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Left braid
+                ctx.lineWidth = fw * 0.2;
+                ctx.strokeStyle = color;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(cx - fw * 0.75, cy - fh * 0.1);
+                ctx.quadraticCurveTo(cx - fw * 1.0, cy + fh * 0.6, cx - fw * 0.7, cy + fh * 1.4);
+                ctx.stroke();
+                // Right braid
+                ctx.beginPath();
+                ctx.moveTo(cx + fw * 0.75, cy - fh * 0.1);
+                ctx.quadraticCurveTo(cx + fw * 1.0, cy + fh * 0.6, cx + fw * 0.7, cy + fh * 1.4);
+                ctx.stroke();
+                // Braid texture bumps
+                for (let i = 0; i < 4; i++) {
+                    const t = 0.2 + i * 0.22;
+                    const ly = cy - fh * 0.1 + (fh * 1.5) * t;
+                    const lx = cx - fw * 0.75 - Math.sin(t * 3) * fw * 0.15;
+                    const rx = cx + fw * 0.75 + Math.sin(t * 3) * fw * 0.15;
+                    ctx.beginPath(); ctx.arc(lx, ly, fw * 0.12, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(rx, ly, fw * 0.12, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.lineCap = 'butt';
+            },
+
+            dreadlocks(ctx, color, cx, cy, fw, fh) {
+                ctx.fillStyle = color;
+                // Head coverage
+                ctx.beginPath();
+                ctx.ellipse(cx, cy - fh * 0.45, fw * 1.1, fh * 0.65, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Individual locs hanging down
+                ctx.lineWidth = fw * 0.16;
+                ctx.strokeStyle = color;
+                ctx.lineCap = 'round';
+                const locs = [
+                    { sx: -0.9, sy: -0.2, ex: -1.1, ey: 1.3 },
+                    { sx: -0.7, sy: 0.0,  ex: -0.9, ey: 1.5 },
+                    { sx: -0.5, sy: 0.1,  ex: -0.55, ey: 1.4 },
+                    { sx: 0.9,  sy: -0.2, ex: 1.1,  ey: 1.3 },
+                    { sx: 0.7,  sy: 0.0,  ex: 0.9,  ey: 1.5 },
+                    { sx: 0.5,  sy: 0.1,  ex: 0.55, ey: 1.4 },
+                    // Back locs peeking out on sides
+                    { sx: -1.05, sy: -0.4, ex: -1.25, ey: 1.0 },
+                    { sx: 1.05,  sy: -0.4, ex: 1.25,  ey: 1.0 },
+                ];
+                for (const loc of locs) {
+                    ctx.beginPath();
+                    ctx.moveTo(cx + fw * loc.sx, cy + fh * loc.sy);
+                    ctx.quadraticCurveTo(
+                        cx + fw * (loc.sx + loc.ex) * 0.55, cy + fh * (loc.sy + loc.ey) * 0.6,
+                        cx + fw * loc.ex, cy + fh * loc.ey
+                    );
+                    ctx.stroke();
+                }
+                ctx.lineCap = 'butt';
+            },
+
+            ponytail(ctx, color, cx, cy, fw, fh) {
+                ctx.fillStyle = color;
+                // Sleek pulled-back top — tight to head
+                ctx.beginPath();
+                ctx.ellipse(cx, cy - fh * 0.5, fw * 1.05, fh * 0.6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Slight part line
+                ctx.strokeStyle = ctx.fillStyle;
+                ctx.lineWidth = 1;
+                // Ponytail peeking behind on one side
+                ctx.lineWidth = fw * 0.22;
+                ctx.strokeStyle = color;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(cx + fw * 0.3, cy - fh * 0.85);
+                ctx.bezierCurveTo(
+                    cx + fw * 0.8, cy - fh * 1.2,
+                    cx + fw * 1.2, cy - fh * 0.5,
+                    cx + fw * 1.0, cy + fh * 0.3
+                );
+                ctx.stroke();
+                ctx.lineCap = 'butt';
+            },
+
+            demon_dancer(ctx, color, cx, cy, fw, fh) {
+                const c = color || '#0a0000';
+                ctx.fillStyle = c;
+                // Wild volume on top
+                ctx.beginPath();
+                ctx.ellipse(cx, cy - fh * 0.6, fw * 1.2, fh * 0.65, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Tendrils flying outward
+                ctx.strokeStyle = c;
+                ctx.lineWidth = fw * 0.14;
+                ctx.lineCap = 'round';
+                const tendrils = [
+                    { sx: -0.8, sy: -0.7, cx1: -1.8, cy1: -1.0, ex: -2.0, ey: -0.3 },
+                    { sx: 0.8,  sy: -0.7, cx1: 1.8,  cy1: -1.0, ex: 2.0,  ey: -0.3 },
+                    { sx: -0.6, sy: -0.9, cx1: -1.5, cy1: -1.5, ex: -1.6, ey: -0.8 },
+                    { sx: 0.6,  sy: -0.9, cx1: 1.5,  cy1: -1.5, ex: 1.6,  ey: -0.8 },
+                    { sx: -0.9, sy: -0.2, cx1: -1.6, cy1: 0.0,  ex: -1.8, ey: 0.8 },
+                    { sx: 0.9,  sy: -0.2, cx1: 1.6,  cy1: 0.0,  ex: 1.8,  ey: 0.8 },
+                ];
+                for (const t of tendrils) {
+                    ctx.beginPath();
+                    ctx.moveTo(cx + fw * t.sx, cy + fh * t.sy);
+                    ctx.quadraticCurveTo(cx + fw * t.cx1, cy + fh * t.cy1, cx + fw * t.ex, cy + fh * t.ey);
+                    ctx.stroke();
+                }
+                // Secondary wisps
+                ctx.globalAlpha = 0.5;
+                ctx.lineWidth = fw * 0.08;
+                ctx.beginPath();
+                ctx.moveTo(cx - fw * 1.0, cy - fh * 0.5);
+                ctx.quadraticCurveTo(cx - fw * 2.2, cy - fh * 0.2, cx - fw * 2.0, cy + fh * 0.6);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(cx + fw * 1.0, cy - fh * 0.5);
+                ctx.quadraticCurveTo(cx + fw * 2.2, cy - fh * 0.2, cx + fw * 2.0, cy + fh * 0.6);
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+                ctx.lineCap = 'butt';
+            }
+        };
+
+        /**
+         * Draws a front-facing character portrait (bust/head).
+         * Works for player (via cosmetics) and NPCs (via appearance config).
+         * 
+         * @param {CanvasRenderingContext2D} ctx
+         * @param {number} w - Canvas width
+         * @param {number} h - Canvas height
+         * @param {Object} config
+         *   @param {string} config.skinColor - Hex skin color
+         *   @param {Object} config.hair - { type, color }
+         *   @param {string} [config.eyeColor='#daa520'] - Iris color
+         *   @param {string} [config.gender='female']
+         *   @param {Object} [config.top] - Clothing top { type, color }
+         */
+        /** Convert hex color to {r, g, b} object. */
+        function hexToRGB(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : { r: 200, g: 150, b: 100 };
+        }
+
+        function drawCharacterPortrait(ctx, w, h, config) {
+            const skinColor = config.skinColor || '#c68e63';
+            const hair = config.hair || { type: 'curls', color: '#0a0505' };
+            const eyeColor = config.eyeColor || '#daa520'; // Default golden for Stella
+            const gender = config.gender || 'female';
+            const top = config.top || null;
+
+            // Derived colors from skin
+            const skinRGB = hexToRGB(skinColor);
+            const shadowColor = `rgb(${Math.max(0, skinRGB.r - 35)}, ${Math.max(0, skinRGB.g - 30)}, ${Math.max(0, skinRGB.b - 25)})`;
+            const highlightColor = `rgb(${Math.min(255, skinRGB.r + 20)}, ${Math.min(255, skinRGB.g + 15)}, ${Math.min(255, skinRGB.b + 10)})`;
+            const lipColor = `rgb(${Math.min(255, skinRGB.r + 10)}, ${Math.max(0, skinRGB.g - 20)}, ${Math.max(0, skinRGB.b - 15)})`;
+            const lipDark = `rgb(${Math.max(0, skinRGB.r - 10)}, ${Math.max(0, skinRGB.g - 35)}, ${Math.max(0, skinRGB.b - 30)})`;
+
+            // Layout proportions (relative to canvas)
+            const cx = w * 0.5;      // Face center X
+            const cy = h * 0.48;     // Face center Y — slightly above center for hair room
+            const fw = w * 0.195;    // Face width radius
+            const fh = h * 0.24;    // Face height radius (oval)
+
+            // ─── HAIR (DEEP BACK — behind neck/shoulders) ───
+            const hairBackFull = ['afro'];
+            if (hair && hairBackFull.includes(hair.type)) {
+                ctx.save();
+                const renderer = PORTRAIT_HAIR_RENDERERS[hair.type + '_back'];
+                if (renderer) renderer(ctx, hair.color, cx, cy, fw, fh);
+                ctx.restore();
+            }
+
+            // ─── NECK ───
+            ctx.fillStyle = shadowColor;
+            ctx.beginPath();
+            ctx.moveTo(cx - fw * 0.4, cy + fh * 0.85);
+            ctx.lineTo(cx - fw * 0.35, cy + fh * 1.6);
+            ctx.lineTo(cx + fw * 0.35, cy + fh * 1.6);
+            ctx.lineTo(cx + fw * 0.4, cy + fh * 0.85);
+            ctx.closePath();
+            ctx.fill();
+
+            // ─── SHOULDERS / CLOTHING ───
+            if (top) {
+                ctx.fillStyle = top.color || '#222';
+            } else {
+                ctx.fillStyle = shadowColor;
+            }
+            ctx.beginPath();
+            ctx.moveTo(cx - fw * 0.35, cy + fh * 1.4);
+            ctx.quadraticCurveTo(cx - fw * 1.8, cy + fh * 1.6, cx - fw * 2.5, cy + fh * 2.8);
+            ctx.lineTo(cx + fw * 2.5, cy + fh * 2.8);
+            ctx.quadraticCurveTo(cx + fw * 1.8, cy + fh * 1.6, cx + fw * 0.35, cy + fh * 1.4);
+            ctx.closePath();
+            ctx.fill();
+            // Collar line
+            if (top) {
+                ctx.strokeStyle = `rgba(255,255,255,0.08)`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(cx - fw * 0.35, cy + fh * 1.4);
+                ctx.quadraticCurveTo(cx, cy + fh * 1.65, cx + fw * 0.35, cy + fh * 1.4);
+                ctx.stroke();
+            }
+
+            // ─── HAIR (BACK LAYER — behind face, over shoulders) ───
+            const hairBackSoft = ['long', 'demon_dancer', 'dreadlocks'];
+            if (hair && hairBackSoft.includes(hair.type)) {
+                ctx.save();
+                ctx.globalAlpha = 0.6;
+                const renderer = PORTRAIT_HAIR_RENDERERS[hair.type];
+                if (renderer) renderer(ctx, hair.color, cx, cy, fw, fh);
+                ctx.globalAlpha = 1.0;
+                ctx.restore();
+            }
+
+            // ─── FACE ───
+            // Main oval
+            ctx.fillStyle = skinColor;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, fw, fh, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Subtle jaw definition (narrower lower face)
+            ctx.fillStyle = skinColor;
+            ctx.beginPath();
+            ctx.moveTo(cx - fw, cy);
+            ctx.quadraticCurveTo(cx - fw * 0.75, cy + fh * 1.1, cx, cy + fh * 1.05);
+            ctx.quadraticCurveTo(cx + fw * 0.75, cy + fh * 1.1, cx + fw, cy);
+            ctx.fill();
+
+            // Cheek highlight
+            ctx.fillStyle = highlightColor;
+            ctx.globalAlpha = 0.15;
+            ctx.beginPath();
+            ctx.ellipse(cx - fw * 0.45, cy + fh * 0.15, fw * 0.3, fh * 0.2, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx + fw * 0.45, cy + fh * 0.15, fw * 0.3, fh * 0.2, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // Forehead shadow gradient (under hair)
+            ctx.fillStyle = shadowColor;
+            ctx.globalAlpha = 0.2;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy - fh * 0.55, fw * 0.9, fh * 0.35, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // ─── EYEBROWS ───
+            const browColor = hair.color || '#1a1a1a';
+            const browY = cy - fh * 0.32;
+            const browW = fw * 0.38;
+            ctx.strokeStyle = browColor;
+            ctx.lineWidth = fw * 0.12;
+            ctx.lineCap = 'round';
+            // Left brow (slight arch)
+            ctx.beginPath();
+            ctx.moveTo(cx - fw * 0.55, browY + fh * 0.04);
+            ctx.quadraticCurveTo(cx - fw * 0.35, browY - fh * 0.08, cx - fw * 0.15, browY + fh * 0.02);
+            ctx.stroke();
+            // Right brow
+            ctx.beginPath();
+            ctx.moveTo(cx + fw * 0.55, browY + fh * 0.04);
+            ctx.quadraticCurveTo(cx + fw * 0.35, browY - fh * 0.08, cx + fw * 0.15, browY + fh * 0.02);
+            ctx.stroke();
+            ctx.lineCap = 'butt';
+
+            // ─── EYES ───
+            const eyeY = cy - fh * 0.15;
+            const eyeSpacing = fw * 0.38;
+            const eyeW = fw * 0.28;
+            const eyeH = fh * 0.14;
+
+            for (const side of [-1, 1]) {
+                const ex = cx + side * eyeSpacing;
+                // Eye white (almond shape)
+                ctx.fillStyle = '#f0eee8';
+                ctx.beginPath();
+                ctx.moveTo(ex - eyeW, eyeY);
+                ctx.quadraticCurveTo(ex, eyeY - eyeH * 1.6, ex + eyeW, eyeY);
+                ctx.quadraticCurveTo(ex, eyeY + eyeH * 1.2, ex - eyeW, eyeY);
+                ctx.closePath();
+                ctx.fill();
+
+                // Iris
+                const irisR = eyeH * 0.9;
+                ctx.fillStyle = eyeColor;
+                ctx.beginPath();
+                ctx.arc(ex, eyeY, irisR, 0, Math.PI * 2);
+                ctx.fill();
+                // Iris ring (darker edge)
+                ctx.strokeStyle = shadowColor;
+                ctx.lineWidth = irisR * 0.15;
+                ctx.globalAlpha = 0.3;
+                ctx.beginPath();
+                ctx.arc(ex, eyeY, irisR, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+
+                // Pupil
+                ctx.fillStyle = '#0a0a0a';
+                ctx.beginPath();
+                ctx.arc(ex, eyeY, irisR * 0.45, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Highlight
+                ctx.fillStyle = '#fff';
+                ctx.globalAlpha = 0.85;
+                ctx.beginPath();
+                ctx.arc(ex + irisR * 0.3, eyeY - irisR * 0.35, irisR * 0.25, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+
+                // Eyeliner — top lid line
+                ctx.strokeStyle = '#1a1018';
+                ctx.lineWidth = fw * 0.04;
+                ctx.beginPath();
+                ctx.moveTo(ex - eyeW, eyeY);
+                ctx.quadraticCurveTo(ex, eyeY - eyeH * 1.6, ex + eyeW, eyeY);
+                ctx.stroke();
+                // Lower lash line (subtle)
+                ctx.globalAlpha = 0.3;
+                ctx.beginPath();
+                ctx.moveTo(ex - eyeW * 0.7, eyeY + eyeH * 0.3);
+                ctx.quadraticCurveTo(ex, eyeY + eyeH * 1.0, ex + eyeW * 0.7, eyeY + eyeH * 0.3);
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+
+            // ─── NOSE ───
+            const noseY = cy + fh * 0.15;
+            ctx.strokeStyle = shadowColor;
+            ctx.lineWidth = fw * 0.04;
+            ctx.globalAlpha = 0.4;
+            // Bridge (very subtle)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - fh * 0.05);
+            ctx.lineTo(cx, noseY);
+            ctx.stroke();
+            // Tip
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            ctx.arc(cx, noseY + fh * 0.04, fw * 0.09, 0, Math.PI * 2);
+            ctx.stroke();
+            // Nostrils
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.arc(cx - fw * 0.1, noseY + fh * 0.06, fw * 0.04, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(cx + fw * 0.1, noseY + fh * 0.06, fw * 0.04, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // ─── LIPS ───
+            const mouthY = cy + fh * 0.48;
+            const mouthW = fw * 0.35;
+            // Upper lip (darker)
+            ctx.fillStyle = lipDark;
+            ctx.beginPath();
+            ctx.moveTo(cx - mouthW, mouthY);
+            ctx.quadraticCurveTo(cx - mouthW * 0.4, mouthY - fh * 0.09, cx, mouthY - fh * 0.05);
+            ctx.quadraticCurveTo(cx + mouthW * 0.4, mouthY - fh * 0.09, cx + mouthW, mouthY);
+            ctx.quadraticCurveTo(cx, mouthY + fh * 0.02, cx - mouthW, mouthY);
+            ctx.closePath();
+            ctx.fill();
+            // Lower lip (fuller, lighter)
+            ctx.fillStyle = lipColor;
+            ctx.beginPath();
+            ctx.moveTo(cx - mouthW, mouthY);
+            ctx.quadraticCurveTo(cx, mouthY + fh * 0.16, cx + mouthW, mouthY);
+            ctx.quadraticCurveTo(cx, mouthY + fh * 0.06, cx - mouthW, mouthY);
+            ctx.closePath();
+            ctx.fill();
+            // Lip shine
+            ctx.fillStyle = '#fff';
+            ctx.globalAlpha = 0.12;
+            ctx.beginPath();
+            ctx.ellipse(cx + mouthW * 0.15, mouthY + fh * 0.05, mouthW * 0.2, fh * 0.03, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // ─── HAIR (FRONT LAYER — on top of face) ───
+            if (hair) {
+                const renderer = PORTRAIT_HAIR_RENDERERS[hair.type];
+                if (renderer) renderer(ctx, hair.color, cx, cy, fw, fh);
+            }
+        }
+
+        /** Renders "long" hair behind head, then head+face, then other hair on top. */
+        function drawHeadAndHair(ctx, headX, skinColor, faceDark, faceLight, hair, dyn, hat) {
+            // Head
+            ctx.fillStyle = skinColor;
+            ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
+            ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
+            // Hair (all styles render on top of head) — strand physics via hairGeometry()
+            if (hair) {
+                const renderer = HAIR_RENDERERS[hair.type];
+                if (renderer) renderer(ctx, hair.color, headX, dyn || {}, hairGeometry(ctx, headX, hair, dyn || {}));
+            }
+            // Hat (renders on top of everything)
+            if (hat) {
+                if (hat.type === 'wide_brim') {
+                    // Brim — large ellipse
+                    ctx.fillStyle = hat.color || '#590e18';
+                    ctx.strokeStyle = hat.stroke || '#1a0505';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.ellipse(headX, -4 + (dyn.bounce || 0), 24, 18, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                    // Crown — raised circle
+                    ctx.fillStyle = hat.crownColor || hat.color || '#70121e';
+                    ctx.beginPath(); ctx.arc(headX, -4 + (dyn.bounce || 0), 11, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                } else if (hat.type === 'beret') {
+                    ctx.fillStyle = hat.color || '#222';
+                    ctx.beginPath(); ctx.ellipse(headX - 2, -8, 10, 6, -0.2, 0, Math.PI*2); ctx.fill();
+                }
+            }
+        }
+
+        function drawProceduralHumanoid(ctx, entity, config = {}) {
+            // --- 1. CONFIGURATION ---
+            const skinColor = config.skinColor || '#8d5524';
+            const isDriving = config.isDriving || false;
+            const isShootingFromCar = config.isShootingFromCar || false;
+            const carAngle = config.carAngle || 0;
+            const recoil = config.recoil || 0;
+            const gender = config.gender || 'androgynous';
+            const stance = config.stance || 'idle'; 
+            const held = config.held || null;
+            // Which hand (if any) is holding a drink — it's held out and swings less
+            const glassHand = (held && !isDrivingCfg(config) && (held.type === 'glass' || held.type === 'champagne_glass')) ? (held.hand || 'right') : null;
+        
+            const clothes = {
+                hair:   config.hair   || null,
+                hat:    config.hat    || null,
+                top:    config.top    || null, 
+                bottom: config.bottom || null,
+                shoes:  config.shoes  || null,
+                train:  config.train  || null 
+            };
+        
+            const darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * frac)) : '#000';
+        
+            // --- 2. PROPORTIONS ---
+            let shoulderSpread = 9; let hipWidth = 8; let hipXOff = -5; let torsoWidth = 10; let torsoXOff = -3;
+            if (gender === 'female') {
+                shoulderSpread = 7; hipWidth = 12; hipXOff = -8; torsoWidth = 9; torsoXOff = -2.5;
+            } else if (gender === 'male') {
+                shoulderSpread = 12; hipWidth = 7; hipXOff = -4.5; torsoWidth = 13; torsoXOff = -4.5;
+            }
+        
+            // --- 3. GAIT (shared controller — see CONFIG.GAIT / syncHumanoidGait) ---
+            const gait = syncHumanoidGait(entity);
+            const gaitSpeed = isDriving ? 0 : gait.speed;
+            const strideLen = humanoidStrideLength(gaitSpeed);
+            const strafeLen = strideLen * CONFIG.GAIT.STRAFE_RATIO;
+            const sway = Math.min(1, gaitSpeed / CONFIG.GAIT.FULL_SWAY_SPEED);
+        
+            // Directional orientation (travel direction relative to facing)
+            let fwdAmt = 1.0, sideAmt = 0.0;
+            if (gaitSpeed > 0 && entity.angle !== undefined) {
+                const cos = Math.cos(-entity.angle);
+                const sin = Math.sin(-entity.angle);
+                fwdAmt = gait.dirX * cos - gait.dirY * sin;
+                sideAmt = gait.dirX * sin + gait.dirY * cos;
+            }
+        
+            // Walk phase blends with the body when RenderInterp has this entity mid-tick
+            let walkCycle = entity.walkPhase || 0;
+            if (entity._ipActive && gait.phasePrev !== undefined && Math.abs(walkCycle - gait.phasePrev) < 2) {
+                walkCycle = gait.phasePrev + (walkCycle - gait.phasePrev) * RenderInterp.alpha;
+            }
+            // Walk oscillations. Like the arm swing, these are applied AFTER the pose
+            // smoothing in step 6 — the per-render lerp there would mute and delay
+            // them — so the pose targets below are built without them.
+            const walkBounce = isDriving ? 0 : Math.abs(Math.sin(walkCycle)) * (gaitSpeed * 0.2); // Bounce scales with speed
+            const walkSway = Math.sin(walkCycle) * 0.3 * sway;  // sway is 0 when driving or stopped
+            let bounce = 0;         // pose-target bounce; walk bounce is added after smoothing
+        
+            // Punch strike 0..1 (null unless the caller passes punchTicks). Applied after
+            // smoothing in step 6; the body lean follows the same curve.
+            const punchStrike = (stance === 'punch' && typeof config.punchTicks === 'number')
+                ? humanoidPunchCurve(config.punchTicks) : null;
+            let bodyRecoil = punchStrike !== null ? punchStrike * CONFIG.PUNCH.BODY_LEAN : recoil * 2;
+            const driveOffset = isDriving ? 14 : 0;
+            const hipAnchorX = -3 + walkBounce - bodyRecoil + driveOffset;
+            const shoulderX = hipAnchorX;
+            // Elbow targets use the shoulder without walk bounce (re-added after smoothing),
+            // and without the punch lean (also applied after smoothing)
+            const shoulderPoseX = hipAnchorX - walkBounce + (punchStrike !== null ? bodyRecoil : 0);
+            let hipRotation = 0;    // pose targets; walk sway is added after smoothing
+            let torsoRotation = 0;
+            const armSwing = isDriving ? 0 : Math.sin(walkCycle + Math.PI) * gaitSpeed;        
+            // --- 4. CALCULATE POSITIONS ---
+            const lBaseY = -hipWidth / 2 - 1;
+            const rBaseY = hipWidth / 2 + 1;
+        
+            const lWalkX = Math.sin(walkCycle) * strideLen * fwdAmt;
+            const rWalkX = Math.sin(walkCycle + Math.PI) * strideLen * fwdAmt;
+            const lWalkY = Math.sin(walkCycle) * strafeLen * sideAmt;
+            const rWalkY = Math.sin(walkCycle + Math.PI) * strafeLen * sideAmt;
+        
+            const lFootX = -3 + lWalkX;
+            const rFootX = -3 + rWalkX;
+            const lFootY = lBaseY + lWalkY;
+            const rFootY = rBaseY + rWalkY;
+        
+            const lKneeX = (hipAnchorX + lFootX) / 2;
+            const lKneeY = (lBaseY + lFootY) / 2;
+            const rKneeX = (hipAnchorX + rFootX) / 2;
+            const rKneeY = (rBaseY + rFootY) / 2;        
+            // --- 5. HAND POSITIONS ---
+            let lFistX, rFistX, lFistY, rFistY;
+        
+            if (isDriving) {
+                lFistX = 18 + driveOffset; rFistX = 18 + driveOffset;
+                lFistY = -3; rFistY = 3;
+            } else if (stance === 'pistol') {
+                // Base pose only — the walk swing is added after smoothing (step 6)
+                lFistX = -5 + bounce - bodyRecoil;
+                lFistY = -11 + bounce - bodyRecoil;
+                rFistX = 22 + bounce - bodyRecoil - (recoil * 6);
+                rFistY = 3 + bounce - bodyRecoil;
+            } else if (stance === 'rifle' || stance === 'sniper') {
+                // Two-handed: stock hand at the right shoulder, support hand forward ON the
+                // gun line (it used to sit ~8px inside the gun, and both hands' Y was
+                // accidentally computed from the forward aim value).
+                rFistX = 6 + bounce - bodyRecoil - (recoil * 6);
+                rFistY = 14;
+                const gunLineY = stance === 'sniper' ? rFistY + 0.5 : rFistY - 0.5;   // centerline of the drawn model
+                lFistX = rFistX + (stance === 'sniper' ? 18 : 14);                   // on the handguard / fore-end
+                lFistY = gunLineY;
+            } else if (stance === 'punch' && punchStrike !== null) {
+                // --- PUNCH: guard pose only. The strike (reach, cross, off-hand pull,
+                // torso twist, lean) is shaped by CONFIG.PUNCH and added after smoothing.
+                lFistX = 6;
+                rFistX = 6;
+                lFistY = -8;
+                rFistY = 8;
+            } else if (stance === 'punch') {
+                // --- LEGACY PUNCH (callers that don't pass punchTicks) ---
+                
+                // 1. Base Guard Position
+                lFistX = 6 + bounce - bodyRecoil;
+                rFistX = 6 + bounce - bodyRecoil;
+                lFistY = -8; 
+                rFistY = 8;
+                
+                // 2. Check for active punch
+                if (recoil > 0) {
+                    const punchExt = recoil * 15;
+                    // Retrieve punch side from entity, default to right
+                    const punchSide = entity.punchSide || 'right';
+        
+                    if (punchSide === 'right') {
+                        // -- RIGHT PUNCH --
+                        torsoRotation += recoil * 0.5; // Twist Left
+                        rFistX += punchExt;
+                        rFistY -= punchExt * 0.2; // Cross inward
+                        lFistX -= recoil * 3;     // Retract Left
+                    } else {
+                        // -- LEFT PUNCH --
+                        torsoRotation -= recoil * 0.5; // Twist Right
+                        lFistX += punchExt;
+                        lFistY += punchExt * 0.2; // Cross inward (Positive Y moves from -8 towards 0)
+                        rFistX -= recoil * 3;     // Retract Right
+                    }
+                } else {
+                    // Idle Breathing
+                    const breath = Math.sin(_frameTime / 250) * 1.5;
+                    lFistX += breath;
+                    rFistX += breath;
+                }
+            } else {
+                // Idle/Walking — base pose only. The walk swing is added after the
+                // smoothing below so the lerp can't soak it up.
+                lFistX = -2 + bounce - bodyRecoil;
+                rFistX = -2 + bounce - bodyRecoil;
+                lFistY = -13;
+                rFistY = 13;
+                // Holding a drink: that hand is held out a little in front, elbow softly bent
+                if (glassHand === 'right') { rFistX += 7; rFistY = 9; }
+                else if (glassHand === 'left') { lFistX += 7; lFistY = -9; }
+            }
+            const walkArms = !isDriving && stance !== 'pistol' && stance !== 'rifle' && stance !== 'sniper' && stance !== 'punch';
+        
+            const lShoulderY = -shoulderSpread;
+            const rShoulderY = shoulderSpread;
+        
+            let lElbowX = (shoulderPoseX + lFistX) / 2;
+            let rElbowX = (shoulderPoseX + rFistX) / 2;
+            let lElbowY = (lShoulderY + lFistY) / 2;
+            let rElbowY = (rShoulderY + rFistY) / 2;
+            // Drink hand: elbow bent softly out to the side
+            if (glassHand === 'right' && stance === 'idle') rElbowY += 3.5;
+            else if (glassHand === 'left' && stance === 'idle') lElbowY -= 3.5;
+        
+            if (isDriving) {
+                lElbowX = 8 + driveOffset; lElbowY = -shoulderSpread - 5;
+                rElbowX = 8 + driveOffset; rElbowY = shoulderSpread + 5;
+            }
+            
+            if (stance === 'rifle' || stance === 'sniper') {
+                lElbowY -= 4; rElbowY += 4;
+            } else if (stance === 'punch') {
+                lElbowY -= 6;
+                rElbowY += 6;
+            }
+            
+            // Guard-pose targets, kept so the punch can blend onto them (see step 6)
+            const punchGuard = punchStrike !== null
+                ? [lFistX, lFistY, rFistX, rFistY, lElbowX, lElbowY, rElbowX, rElbowY] : null;
+
+            // --- 6. ANIMATION INTERPOLATION ---
+            // Smoothly interpolate limb positions to avoid snappy transitions
+            const lerpSpeed = config.lerpSpeed || 0.15;
+            
+            // Initialize animation state on entity if not present
+            if (!entity._animState) {
+                entity._animState = {
+                    lFistX: lFistX, lFistY: lFistY,
+                    rFistX: rFistX, rFistY: rFistY,
+                    lElbowX: lElbowX, lElbowY: lElbowY,
+                    rElbowX: rElbowX, rElbowY: rElbowY,
+                    hipRotation: hipRotation,
+                    torsoRotation: torsoRotation,
+                    bounce: bounce
+                };
+            }
+            
+            const anim = entity._animState;
+            
+            // Lerp function
+            const lerp = (current, target, speed) => current + (target - current) * speed;
+            
+            // Interpolate hand positions (key for stance transitions)
+            anim.lFistX = lerp(anim.lFistX, lFistX, lerpSpeed);
+            anim.lFistY = lerp(anim.lFistY, lFistY, lerpSpeed);
+            anim.rFistX = lerp(anim.rFistX, rFistX, lerpSpeed);
+            anim.rFistY = lerp(anim.rFistY, rFistY, lerpSpeed);
+            
+            // Interpolate elbow positions
+            anim.lElbowX = lerp(anim.lElbowX, lElbowX, lerpSpeed);
+            anim.lElbowY = lerp(anim.lElbowY, lElbowY, lerpSpeed);
+            anim.rElbowX = lerp(anim.rElbowX, rElbowX, lerpSpeed);
+            anim.rElbowY = lerp(anim.rElbowY, rElbowY, lerpSpeed);
+            
+            // Interpolate body rotations
+            anim.hipRotation = lerp(anim.hipRotation, hipRotation, lerpSpeed);
+            anim.torsoRotation = lerp(anim.torsoRotation, torsoRotation, lerpSpeed);
+            anim.bounce = lerp(anim.bounce, bounce, lerpSpeed * 2); // Bounce can be faster
+            
+            // Use interpolated values for rendering
+            lFistX = anim.lFistX;
+            lFistY = anim.lFistY;
+            rFistX = anim.rFistX;
+            rFistY = anim.rFistY;
+            lElbowX = anim.lElbowX;
+            lElbowY = anim.lElbowY;
+            rElbowX = anim.rElbowX;
+            rElbowY = anim.rElbowY;
+
+            // Unarmed walk arm swing, applied AFTER smoothing. The per-render lerp
+            // above acts as a low-pass filter: fed an oscillating target it only
+            // passed ~34-58% of the swing (less at lower frame rates) and lagged
+            // it behind the legs. Arms mirror the opposite leg and scale with
+            // stride; the weight fades in/out on stance changes so there's no pop.
+            if (anim.armSwingW === undefined) anim.armSwingW = walkArms ? 1 : 0;
+            anim.armSwingW = lerp(anim.armSwingW, walkArms ? 1 : 0, lerpSpeed);
+            if (anim.armSwingW > 0.001 && strideLen > 0) {
+                const handSwing = Math.sin(walkCycle + Math.PI) * strideLen * CONFIG.GAIT.ARM_SWING_RATIO * anim.armSwingW;
+                const ls = glassHand === 'left' ? 0.25 : 1, rs = glassHand === 'right' ? 0.25 : 1;   // keep the drink steady
+                lFistX += handSwing * ls;
+                rFistX -= handSwing * rs;
+                lElbowX += handSwing * 0.5 * ls;   // elbow sits midway between shoulder and hand
+                rElbowX -= handSwing * 0.5 * rs;
+            }
+            hipRotation = anim.hipRotation;
+            torsoRotation = anim.torsoRotation;
+            bounce = anim.bounce;
+
+            // Pistol walk swing, after smoothing: the off hand swings diagonally and the
+            // gun hand sways slightly sideways (same amounts as before, now unmuted).
+            // Fades in/out on stance changes like the unarmed swing.
+            const pistolWalk = !isDriving && stance === 'pistol';
+            if (anim.pistolSwingW === undefined) anim.pistolSwingW = pistolWalk ? 1 : 0;
+            anim.pistolSwingW = lerp(anim.pistolSwingW, pistolWalk ? 1 : 0, lerpSpeed);
+            if (anim.pistolSwingW > 0.001 && armSwing !== 0) {
+                const ps = armSwing * 0.5 * anim.pistolSwingW;
+                lFistX += ps; lFistY += ps; rFistY += ps;
+                lElbowX += ps * 0.5; lElbowY += ps * 0.5; rElbowY += ps * 0.5;  // elbows sit midway
+            }
+
+            // Walk sway and bounce on top of the smoothed pose (in step with the legs)
+            hipRotation += walkSway;
+            torsoRotation -= walkSway;
+            bounce += walkBounce;
+            lFistX += walkBounce; rFistX += walkBounce;
+            lElbowX += walkBounce; rElbowX += walkBounce;
+            if (stance === 'pistol') {
+                // The pistol pose's hand targets carry bounce on Y as well
+                lFistY += walkBounce; rFistY += walkBounce;
+                lElbowY += walkBounce * 0.5; rElbowY += walkBounce * 0.5;
+            }
+
+            // Weapon kick for NPC shooters (config.kick 0..1), after smoothing so it isn't muted.
+            // Two-handed weapons ride the kick with both hands.
+            if (!isDriving && config.kick > 0 && (stance === 'pistol' || stance === 'rifle' || stance === 'sniper')) {
+                const kx = config.kick * 6;
+                rFistX -= kx; rElbowX -= kx * 0.5;
+                if (stance !== 'pistol') { lFistX -= kx; lElbowX -= kx * 0.5; }
+            }
+
+            // Punch strike on top of the smoothed guard pose
+            if (punchStrike !== null) {
+                const P = CONFIG.PUNCH;
+                // As the strike builds, blend the hands onto the guard pose, so a punch
+                // thrown from a relaxed stance still lands at full reach while the
+                // smoothed pose is catching up (at strike 0 nothing changes).
+                const k = punchStrike, G = punchGuard;
+                lFistX += (G[0] + walkBounce - lFistX) * k;  lFistY += (G[1] - lFistY) * k;
+                rFistX += (G[2] + walkBounce - rFistX) * k;  rFistY += (G[3] - rFistY) * k;
+                lElbowX += (G[4] + walkBounce - lElbowX) * k; lElbowY += (G[5] - lElbowY) * k;
+                rElbowX += (G[6] + walkBounce - rElbowX) * k; rElbowY += (G[7] - rElbowY) * k;
+
+                const reach = punchStrike * P.REACH;
+                const pull = punchStrike * P.OFFHAND_PULL;
+                // Hands move with the body lean (shoulders already have it via hipAnchorX)
+                lFistX -= bodyRecoil; rFistX -= bodyRecoil;
+                lElbowX -= bodyRecoil; rElbowX -= bodyRecoil;
+                if ((entity.punchSide || 'right') === 'right') {
+                    rFistX += reach;  rFistY -= reach * P.CROSS;              // jab crosses inward
+                    rElbowX += reach * 0.5; rElbowY -= reach * P.CROSS * 0.5;
+                    lFistX -= pull;   lElbowX -= pull * 0.5;                  // other fist pulls back
+                    torsoRotation += punchStrike * P.TWIST;                   // twist into the punch
+                } else {
+                    lFistX += reach;  lFistY += reach * P.CROSS;
+                    lElbowX += reach * 0.5; lElbowY += reach * P.CROSS * 0.5;
+                    rFistX -= pull;   rElbowX -= pull * 0.5;
+                    torsoRotation -= punchStrike * P.TWIST;
+                }
+            }
+            
+            const drawLimb = (x1, y1, x2, y2, width, color) => {
+                const len = Math.hypot(x2-x1, y2-y1)/2 + 2;
+                const ang = Math.atan2(y2-y1, x2-x1);
+                ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.ellipse(0, 0, len, width, 0, 0, Math.PI*2); ctx.fill();
+                ctx.restore();
+            };
+            
+            // --- DRAW WEAPON (Behind hands) ---
+            // Only draw if player and has a weapon, and NOT driving (driving has its own weapon logic)
+            if (!isDriving && entity.type === 'player' && entity._game && entity._game.currentWeapon) {
+                const game = entity._game;
+
+                // Step the holster animation toward target (~0.2s of game time, same at any frame rate)
+                const target = (game.holsterAnimTarget !== undefined) ? game.holsterAnimTarget : 1;
+                if (game.holsterAnim === undefined) { game.holsterAnim = 1; game._holsterT = _gameTimeSec; }
+                const hdt = Math.max(0, Math.min(0.1, _gameTimeSec - (game._holsterT ?? _gameTimeSec)));
+                game._holsterT = _gameTimeSec;
+                const hd = target - game.holsterAnim;
+                game.holsterAnim += Math.sign(hd) * Math.min(Math.abs(hd), hdt / 0.2);
+
+                const anim = game.holsterAnim;
+                entity._muzzleLocal = null;
+
+                // Skip rendering once fully holstered — weapon is "stowed"
+                if (anim > 0.02) {
+                    const weaponId = game.currentWeapon.id;
+
+                    // Lerp from hip-ish stow position back to the fist as anim → 1
+                    const hipX = rFistX * 0.4 - 2;
+                    const hipY = rFistY * 0.4 + 6;
+                    const wx = hipX + (rFistX - hipX) * anim;
+                    const wyBase = hipY + ((rFistY - 2) - hipY) * anim;
+
+                    const scale = 0.5 + 0.5 * anim;
+
+                    ctx.save();
+                    ctx.globalAlpha = anim;
+
+                    // Draw whenever a weapon mode is active (not from the visual `stance`,
+                    // which flips to 'idle' the moment holster is toggled and would skip
+                    // the retract). Sniper models sit 2px lower in the hand, matching NPCs.
+                    if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
+                        const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
+                        drawWeapon(ctx, weaponId, wx, wy, 0, scale);
+                        // Muzzle in the player's frame — laser sight and shots start here
+                        const mz = weaponMuzzleLocal(weaponId);
+                        entity._muzzleLocal = { x: wx + mz.x * scale, y: wy + mz.y * scale };
+                        entity._muzzleReady = anim > 0.95;
+                    }
+
+                    ctx.restore();
+                }
+            }
+        
+            // --- NPC WEAPON (teammates, gangers): the real weapon model, in the gun hand ---
+            // config.weapon = { id, ready }. Ready: aimed in the stance's gun hand, like the
+            // player's. Not ready: carried at low ready in the right hand, muzzle angled out.
+            // The raise/lower eases over ~0.2s of game time (same at any frame rate).
+            if (!isDriving && config.weapon && config.weapon.id && entity.type !== 'player') {
+                const W = config.weapon, target = W.ready ? 1 : 0;
+                if (entity._wpnReady === undefined) { entity._wpnReady = target; entity._wpnT = _gameTimeSec; }
+                const dt = Math.max(0, Math.min(0.1, _gameTimeSec - entity._wpnT));
+                entity._wpnT = _gameTimeSec;
+                const d = target - entity._wpnReady;
+                entity._wpnReady += Math.sign(d) * Math.min(Math.abs(d), dt / 0.2);
+                const k = entity._wpnReady;
+                const yOff = (W.id.includes('sniper') ? 2 : -2) * k;          // matches the player's hand offsets
+                const wAng = 0.9 * (1 - k), wScale = 0.8 + 0.2 * k;
+                drawWeapon(ctx, W.id, rFistX, rFistY + yOff, wAng, wScale);
+                // Muzzle in the actor's frame — shots leave from here (see aimFromMuzzle)
+                const mz = weaponMuzzleLocal(W.id), ca = Math.cos(wAng), sa = Math.sin(wAng);
+                entity._muzzleLocal = { x: rFistX + (mz.x * ca - mz.y * sa) * wScale, y: rFistY + yOff + (mz.x * sa + mz.y * ca) * wScale };
+            }
+        
+            if (isDriving) {
+                // Driving mode rendering - different poses for shooting vs not shooting
+                ctx.save();
+                
+                // Calculate lean amount for shooting
+                const shootLean = isShootingFromCar ? 8 : 0; // Lean forward when shooting
+                const headForward = isShootingFromCar ? 6 : 0; // Head moves forward when shooting
+                
+                ctx.translate(driveOffset - bodyRecoil + shootLean, 0);
+                
+                // --- TORSO ---
+                ctx.fillStyle = darken(clothes.top ? clothes.top.color : skinColor, 0.1);
+                ctx.beginPath(); 
+                ctx.roundRect(torsoXOff - 2, -shoulderSpread - 1, torsoWidth + 4, (shoulderSpread * 2) + 2, 5); 
+                ctx.fill();
+                
+                const sleeveColor = clothes.top ? darken(clothes.top.color, 0.15) : darken(skinColor, 0.15);
+                const skinArmColor = darken(skinColor, 0.3);
+                
+                if (isShootingFromCar) {
+                    // --- SHOOTING POSE ---
+                    // Left arm extended out window with weapon
+                    // Right arm can stay on wheel or brace
+                    
+                    // Adjust positions for lean
+                    const adjDriveOffset = driveOffset - bodyRecoil - shootLean;
+                    
+                    // Right arm on wheel (stays relatively normal)
+                    const rElbowXAdj = 4;
+                    const rElbowYAdj = shoulderSpread + 3;
+                    const rFistXAdj = 10;
+                    const rFistYAdj = 4;
+                    
+                    drawLimb(0, rShoulderY, rElbowXAdj, rElbowYAdj, 3.5, sleeveColor);
+                    drawLimb(rElbowXAdj, rElbowYAdj, rFistXAdj, rFistYAdj, 3, skinArmColor);
+                    ctx.fillStyle = darken(skinColor, 0.4);
+                    ctx.beginPath(); ctx.ellipse(rFistXAdj, rFistYAdj, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                    
+                    // Left arm extended out window (shooting arm)
+                    // Arm reaches forward-left out the driver window
+                    const lElbowXAdj = 10;
+                    const lElbowYAdj = -shoulderSpread - 8;
+                    const lFistXAdj = 20 - (recoil * 4); // Recoil pulls back
+                    const lFistYAdj = -12;
+                    
+                    drawLimb(0, lShoulderY, lElbowXAdj, lElbowYAdj, 3.5, sleeveColor);
+                    drawLimb(lElbowXAdj, lElbowYAdj, lFistXAdj, lFistYAdj, 3, skinArmColor);
+                    ctx.fillStyle = darken(skinColor, 0.4);
+                    ctx.beginPath(); ctx.ellipse(lFistXAdj, lFistYAdj, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                    
+                    // Draw weapon in left hand
+                    if (entity.type === 'player' && entity._game && entity._game.currentWeapon) {
+                        const weaponId = entity._game.currentWeapon.id;
+                        drawWeapon(ctx, weaponId, lFistXAdj + 2, lFistYAdj, 0, 0.9);
+                    }
+                    
+                } else {
+                    // --- NORMAL DRIVING POSE (hands on wheel) ---
+                    const adjDriveOffset = driveOffset - bodyRecoil;
+                    
+                    // Both arms forward to steering wheel
+                    drawLimb(0, lShoulderY, lElbowX - adjDriveOffset, lElbowY, 3.5, sleeveColor);
+                    drawLimb(0, rShoulderY, rElbowX - adjDriveOffset, rElbowY, 3.5, sleeveColor);
+                    drawLimb(lElbowX - adjDriveOffset, lElbowY, lFistX - adjDriveOffset, lFistY, 3, skinArmColor);
+                    drawLimb(rElbowX - adjDriveOffset, rElbowY, rFistX - adjDriveOffset, rFistY, 3, skinArmColor);
+                    ctx.fillStyle = darken(skinColor, 0.4);
+                    ctx.beginPath(); ctx.ellipse(lFistX - adjDriveOffset, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(rFistX - adjDriveOffset, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                    // NO weapon drawn when not shooting
+                }
+                
+                // --- HEAD & HAIR ---
+                const headX = 0 + headForward;
+                const driveDyn = { owner: entity, sway: 0, drag: 0, bounce: 0, wiggle: 0 };
+                drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, driveDyn, clothes.hat);
+                
+                ctx.restore();
+                return;
+            }
+        
+            // --- WALKING MODE ---
+        
+            // 1. Feet
+            if (clothes.shoes && clothes.shoes.type === 'heels') {
+                ctx.fillStyle = darken(clothes.shoes.color, 0.55);
+                ctx.beginPath(); ctx.arc(lFootX, lFootY, 4, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(rFootX, rFootY, 4, 0, Math.PI*2); ctx.fill();
+            } else {
+                // The foot point (lFootX, lFootY) is the ANKLE — where the calf ends.
+                // Center the foot across its width on that point and set the ankle a
+                // quarter of the way in from the heel. (Previously the ankle sat on the
+                // foot's top-left corner, so both feet hung 3px to the body's right and
+                // the whole foot projected forward of the leg.)
+                const FOOT_LEN = 12, FOOT_W = 6, HEEL_TO_ANKLE = 3;
+                ctx.fillStyle = darken(clothes.shoes ? clothes.shoes.color : skinColor, 0.55);
+                ctx.beginPath(); ctx.roundRect(lFootX - HEEL_TO_ANKLE, lFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();
+                ctx.beginPath(); ctx.roundRect(rFootX - HEEL_TO_ANKLE, rFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();
+            }
+        
+            // DETERMINE LEG COLOR (Skin if Skirt)
+            const isBareLegs = !clothes.bottom || clothes.bottom.type === 'skirt';
+            const legColor = isBareLegs ? darken(skinColor, 0.15) : darken(clothes.bottom.color, 0.45);
+            const thighColor = isBareLegs ? darken(skinColor, 0.05) : darken(clothes.bottom.color, 0.35);
+        
+            // 2. Calves
+            drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor); 
+            drawLimb(rKneeX, rKneeY, rFootX, rFootY, 3, legColor);
+        
+            // 3. Thighs
+            drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor);
+            drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor);
+        
+            // 4. Hips & Skirt
+            ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(hipRotation);
+        
+            // Base Hips
+            ctx.fillStyle = darken(clothes.bottom ? clothes.bottom.color : skinColor, 0.2);
+            ctx.beginPath(); ctx.roundRect(hipXOff, -11, hipWidth, 22, [8, 3, 3, 8]); ctx.fill();
+        
+            // SKIRT OVERLAY (Exact Fit)
+            if (clothes.bottom && clothes.bottom.type === 'skirt') {
+                ctx.fillStyle = darken(clothes.bottom.color, 0.2);
+                // Uses the EXACT SAME geometry as the hips [8, 3, 3, 8]
+                // Extended height by 1px (23) to ensure seam coverage
+                ctx.beginPath(); 
+                ctx.roundRect(hipXOff, -11, hipWidth, 23, [8, 3, 3, 8]); 
+                ctx.fill();
+            }
+            ctx.restore();
+        
+            // 5. Trains (Dress Train)
+            if (clothes.train) {
+                ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
+                ctx.fillStyle = darken(clothes.train.color, 0.1); 
+                if (clothes.train.type === 'dress_train') {
+                    const tailSway = Math.sin(walkCycle) * 3;
+                    // Attach to hip geometry
+                    ctx.beginPath(); ctx.moveTo(hipXOff + 2, -10); 
+                    ctx.quadraticCurveTo(-25, -12+tailSway, -30, -14+tailSway); 
+                    ctx.lineTo(-30, -2+tailSway); 
+                    ctx.lineTo(hipXOff + 2, 2); 
+                    ctx.fill();
+                    // Mirrored
+                    ctx.beginPath(); ctx.moveTo(hipXOff + 2, 10); 
+                    ctx.quadraticCurveTo(-25, 12+tailSway, -30, 14+tailSway); 
+                    ctx.lineTo(-30, 2+tailSway); 
+                    ctx.lineTo(hipXOff + 2, -2); 
+                    ctx.fill();
+                } else if (clothes.train.type === 'silk_flow') {
+                    // FIX: Define globalTime for wind physics
+                    const globalTime = _frameTime / 150;
+
+                    // Periwinkle Silk Physics: Low gravity, high drag
+                    const tailSway = Math.sin(walkCycle * 0.5) * 5; 
+                    const wind = Math.sin(globalTime) * 2; 
+                    
+                    ctx.fillStyle = clothes.train.color;
+                    ctx.globalAlpha = 0.9; 
+                    
+                    ctx.beginPath(); 
+                    ctx.moveTo(hipXOff + 2, -10); 
+                    // Long, flowing curve
+                    ctx.bezierCurveTo(-35, -15 + tailSway + wind, -45, 0 + tailSway, -40, 10 + tailSway + wind);
+                    ctx.lineTo(hipXOff + 2, 2); 
+                    ctx.fill();
+                    
+                    ctx.globalAlpha = 1.0;
+                }
+
+                ctx.restore();
+            }
+        
+            // 6. Fists
+            ctx.fillStyle = darken(skinColor, 0.4);
+            ctx.beginPath(); ctx.ellipse(lFistX, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+        
+            // 7. Forearms
+            const foreColor = darken(clothes.top ? clothes.top.color : skinColor, 0.3);
+            drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor);
+            drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor);
+        
+            // 8. Upper Arms
+            const upperColor = darken(clothes.top ? clothes.top.color : skinColor, 0.15);
+            drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor);
+            drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor);
+        
+            // 9. Torso
+            ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation);
+            
+            ctx.fillStyle = darken(skinColor, 0.1);
+            ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill();
+        
+            if (gender === 'female' && !clothes.top) {
+                ctx.fillStyle = darken(skinColor, 0.15);
+                ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1.5, -3.5, 3.5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1.5, 3.5, 3.5, 0, Math.PI*2); ctx.fill();
+            }
+        
+            if (clothes.top) {
+                ctx.fillStyle = darken(clothes.top.color, 0.1);
+                if (clothes.top.type === 'suit') {
+                    ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill();
+                    const lapelX = torsoXOff + torsoWidth - 6;
+                    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(lapelX, -4); ctx.lineTo(lapelX + 3, 0); ctx.lineTo(lapelX, 4); ctx.fill();
+                    if (gender === 'female') {
+                        ctx.fillStyle = darken(clothes.top.color, 0.15);
+                        ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1, -3.5, 3, 0, Math.PI*2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1, 3.5, 3, 0, Math.PI*2); ctx.fill();
+                    }
+                } 
+                else if (clothes.top.type === 'sports_bra') {
+                    ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill();
+                    if (gender === 'female') {
+                        ctx.fillStyle = darken(clothes.top.color, 0.15);
+                        ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1.5, -3.5, 3.5, 0, Math.PI*2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1.5, 3.5, 3.5, 0, Math.PI*2); ctx.fill();
+                    }
+                    ctx.fillStyle = darken(clothes.top.color, 0.05); 
+                    ctx.beginPath(); ctx.moveTo(torsoXOff + 2, -10); ctx.lineTo(torsoXOff + torsoWidth/2, -2); ctx.lineTo(torsoXOff + torsoWidth/2, 2); ctx.lineTo(torsoXOff + 2, 10); ctx.lineTo(torsoXOff, 10); ctx.lineTo(torsoXOff, -10); ctx.fill();
+                }
+            }
+            ctx.restore();
+        
+            // 10. Head & Hair
+            const headX = 0 + bounce - bodyRecoil;
+            // 1.0 at the player's base walk speed — keeps the old player hair tuning, now shared by everyone
+            const hairMove = gaitSpeed / 5.2;
+            // Hair motion comes from the strand physics (hairGeometry): the owner's head
+            // position in the world, plus the shoulder sway the strands swing with.
+            const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0 };
+            drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat);
+        
+            // 11. HELD ITEMS
+            if (held) {
+                let hX, hY;
+                if (held.hand === 'left') { hX = lFistX; hY = lFistY; } else { hX = rFistX; hY = rFistY; }
+                // 'champagne_glass' is the legacy id (NPC configs); it's the glass with champagne
+                if (held.type === 'glass' || held.type === 'champagne_glass') {
+                    drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand);
+                }
+            }
+            
+            // DEBUG: Red circle at entity center point
+            if (typeof game !== 'undefined' && game.debugMode) {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+                ctx.beginPath();
+                ctx.arc(0, 0, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        /**
+         * A glass held in hand, seen from above. The rim, liquid and highlights are
+         * drawn as circles; highlights are pinned to the screen's upper-left (the
+         * glass turns with the body, the light doesn't). The drink sloshes a little
+         * when the hand moves (a small spring in world space, stepped on game time).
+         * Keeps the original sparkle: an occasional star glint on the rim.
+         */
+        function isDrivingCfg(config) { return !!(config && config.isDriving); }
+
+        function drawHeldGlass(ctx, hX, hY, drinkId, owner, hand) {
+            const D = GLASS_DRINKS[drinkId] || GLASS_DRINKS.champagne;
+            const TAU = Math.PI * 2, R = D.rim;
+            const side = hand === 'left' ? -1 : 1;
+            const gx = hX + 1.5, gy = hY + side * 3.5;          // just past the fingers
+            const T = ctx.getTransform();
+            const light = -Math.PI * 0.75 - Math.atan2(T.b, T.a);  // toward screen upper-left, in local space
+            const lx = Math.cos(light), ly = Math.sin(light);
+
+            // Slosh: the liquid lags the glass's motion through the world
+            let sx = 0, sy = 0;
+            if (owner && _worldMatrix && ctx.canvas === _worldCanvas) {
+                const M = _worldMatrix.inverse().multiply(T);
+                const wx = M.a * gx + M.c * gy + M.e, wy = M.b * gx + M.d * gy + M.f;
+                let s = owner._glassSlosh;
+                if (!s || Math.hypot(s.x - wx, s.y - wy) > 60) s = owner._glassSlosh = { x: wx, y: wy, vx: 0, vy: 0, t: _gameTimeSec, acc: 0 };
+                s.acc += Math.max(0, _gameTimeSec - s.t) * 120; s.t = _gameTimeSec;
+                let n = Math.min(12, Math.floor(s.acc)); s.acc -= Math.floor(s.acc);
+                while (n-- > 0) { s.vx = (s.vx + (wx - s.x) * 0.18) * 0.8; s.vy = (s.vy + (wy - s.y) * 0.18) * 0.8; s.x += s.vx; s.y += s.vy; }
+                // world offset → local offset (inverse of M's linear part)
+                const det = M.a * M.d - M.b * M.c, ox = s.x - wx, oy = s.y - wy;
+                sx = (M.d * ox - M.c * oy) / det * 0.35; sy = (-M.b * ox + M.a * oy) / det * 0.35;
+                const sm = Math.hypot(sx, sy), cap = R * 0.22;
+                if (sm > cap) { sx *= cap / sm; sy *= cap / sm; }
+            }
+
+            ctx.save();
+            ctx.translate(gx, gy);
+            const a0 = ctx.globalAlpha;
+
+            // Contact shadow, cast away from the light
+            ctx.fillStyle = 'rgba(0,0,0,0.28)';
+            ctx.beginPath(); ctx.arc(-lx * 1.4, -ly * 1.4, R * 1.02, 0, TAU); ctx.fill();
+
+            // Foot of stemmed glasses peeks out on the shadow side (a hint of the stem below)
+            if (D.glass !== 'tumbler' && D.glass !== 'soda') {
+                ctx.strokeStyle = 'rgba(220,240,255,0.35)'; ctx.lineWidth = 0.5;
+                ctx.beginPath(); ctx.arc(-lx * 1.1, -ly * 1.1, R * 0.78, 0, TAU); ctx.stroke();
+            }
+
+            // Glass body: faint cool tint
+            ctx.fillStyle = 'rgba(210,235,255,0.16)';
+            ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+
+            // Liquid — darker at the edge, brighter toward the light (depth)
+            const lr = R * (D.glass === 'martini' ? 0.8 : (D.glass === 'tumbler' || D.glass === 'soda') ? 0.78 : D.glass === 'flute' ? 0.7 : 0.74);
+            const g = ctx.createRadialGradient(sx + lx * lr * 0.35, sy + ly * lr * 0.35, 0, sx, sy, lr);
+            g.addColorStop(0, D.liquid2 ? '#ffffff' : lightenHex(D.liquid, 70));
+            g.addColorStop(0.35, D.liquid);
+            g.addColorStop(1, D.liquid2 || darkenHex(D.liquid, 40));
+            if (D.glow) { ctx.shadowColor = D.liquid; ctx.shadowBlur = 6; }
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(sx, sy, lr, 0, TAU); ctx.fill();
+            ctx.shadowBlur = 0;
+            // Meniscus: a bright hairline where liquid meets glass
+            ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.35;
+            ctx.beginPath(); ctx.arc(sx, sy, lr, 0, TAU); ctx.stroke();
+
+            const t = _gameTimeSec;
+            if (D.foam) {                                       // creamy head around the edge
+                ctx.fillStyle = 'rgba(255,246,240,0.9)';
+                for (let i = 0; i < 10; i++) {
+                    const a = (i / 10) * Math.PI * 2 + 0.3;
+                    ctx.beginPath(); ctx.arc(sx + Math.cos(a) * lr * 0.82, sy + Math.sin(a) * lr * 0.82, lr * (0.2 + (i % 3) * 0.04), 0, Math.PI * 2); ctx.fill();
+                }
+            }
+            if (D.bubbles) {                                   // rising bubbles
+                ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                for (let i = 0; i < 4; i++) {
+                    const ph = (t * 0.8 + i * 0.27) % 1;
+                    const ang = i * 2.1 + t * 0.6;
+                    const rr = lr * (0.15 + 0.55 * ph);
+                    ctx.globalAlpha = a0 * (1 - ph) * 0.9;
+                    ctx.beginPath(); ctx.arc(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr, 0.35, 0, TAU); ctx.fill();
+                }
+                ctx.globalAlpha = a0;
+            }
+            if (D.ice) {                                        // two cubes, drifting slowly
+                for (let i = 0; i < 2; i++) {
+                    const ang = t * 0.5 + i * Math.PI, rr = lr * 0.35;
+                    ctx.save(); ctx.translate(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr); ctx.rotate(ang * 0.7 + i);
+                    ctx.fillStyle = 'rgba(235,248,255,0.55)'; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.3;
+                    ctx.beginPath(); ctx.roundRect(-1.1, -1.1, 2.2, 2.2, 0.5); ctx.fill(); ctx.stroke();
+                    ctx.restore();
+                }
+            }
+            if (D.garnish === 'olive') {                        // olive on a pick
+                ctx.strokeStyle = '#d9c38a'; ctx.lineWidth = 0.35;
+                ctx.beginPath(); ctx.moveTo(R * 0.95, -R * 0.35); ctx.lineTo(-R * 0.1, R * 0.15); ctx.stroke();
+                ctx.fillStyle = '#6d8b2f'; ctx.beginPath(); ctx.arc(R * 0.2, 0, 1.1, 0, TAU); ctx.fill();
+                ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(R * 0.2 + 0.35, -0.2, 0.4, 0, TAU); ctx.fill();
+            }
+            if (D.garnish === 'citrus') {                       // citrus wheel on the rim
+                ctx.save(); ctx.translate(-lx * R * 0.9, -ly * R * 0.9);
+                ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(0, 0, 1.5, 0, TAU); ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.25;
+                for (let i = 0; i < 4; i++) { const a = i * Math.PI / 4; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 1.3, Math.sin(a) * 1.3); ctx.lineTo(-Math.cos(a) * 1.3, -Math.sin(a) * 1.3); ctx.stroke(); }
+                ctx.restore();
+            }
+
+            if (D.straw) {                                      // striped straw leaning out over the rim
+                const sa = light + Math.PI * 0.8, x0 = sx + Math.cos(sa) * lr * 0.2, y0 = sy + Math.sin(sa) * lr * 0.2;
+                const x1 = Math.cos(sa) * R * 1.35, y1 = Math.sin(sa) * R * 1.35;
+                ctx.lineCap = 'round'; ctx.lineWidth = 0.9;
+                ctx.strokeStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+                ctx.strokeStyle = D.straw; ctx.setLineDash([0.8, 0.8]); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+                ctx.setLineDash([]); ctx.lineCap = 'butt';
+            }
+
+            // Inner refraction line (the glass wall seen edge-on), darker on the far side
+            ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 0.4;
+            ctx.beginPath(); ctx.arc(-lx * 0.3, -ly * 0.3, R * 0.9, light + Math.PI * 0.35, light + Math.PI * 1.65); ctx.stroke();
+            // Rim
+            ctx.strokeStyle = 'rgba(245,252,255,0.85)'; ctx.lineWidth = D.glass === 'tumbler' ? 1.1 : D.glass === 'soda' ? 0.8 : 0.55;
+            ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke();
+            if (D.glass === 'tumbler' || D.glass === 'soda') {  // thick glass: second inner ring
+                ctx.strokeStyle = 'rgba(245,252,255,0.35)'; ctx.lineWidth = 0.4;
+                ctx.beginPath(); ctx.arc(0, 0, R * 0.84, 0, TAU); ctx.stroke();
+            }
+            // Specular crescent + pin highlight on the lit side
+            ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 0.7; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.arc(0, 0, R * 0.8, light - 0.55, light + 0.35); ctx.stroke();
+            ctx.lineCap = 'butt';
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath(); ctx.arc(lx * R * 0.45, ly * R * 0.45, 0.45, 0, TAU); ctx.fill();
+
+            // The sparkle: an occasional four-point glint on the rim
+            const phase = owner && owner._glintPhase !== undefined ? owner._glintPhase : (owner ? (owner._glintPhase = Math.random() * 60) : 0);
+            if (Math.sin(_frameTime / 100 + phase) > 0.95) {
+                ctx.save(); ctx.translate(lx * R, ly * R);
+                ctx.fillStyle = '#fff'; ctx.shadowColor = '#fff'; ctx.shadowBlur = 5;
+                ctx.beginPath();
+                ctx.moveTo(0, -2.4); ctx.lineTo(0.45, -0.45); ctx.lineTo(2.4, 0); ctx.lineTo(0.45, 0.45);
+                ctx.lineTo(0, 2.4); ctx.lineTo(-0.45, 0.45); ctx.lineTo(-2.4, 0); ctx.lineTo(-0.45, -0.45);
+                ctx.closePath(); ctx.fill();
+                ctx.restore();
+            }
+            ctx.globalAlpha = a0;
+            ctx.restore();
+        }
+
+        /**
+         * Renders a weapon using canvas primitives.
+         * Used by both Player (equipped) and Loot (dropped).
+         */
+        function drawWeapon(ctx, type, x, y, angle, scale = 1.0) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.scale(scale, scale);
+        
+            // Common styling
+            ctx.shadowBlur = 0;
+            
+            if (type.includes('pistol')) {
+                // --- PISTOL (Short, compact) ---
+                // Grip (held in hand)
+                ctx.fillStyle = '#333';
+                ctx.fillRect(-2, 2, 4, 6); 
+                
+                // Body/Slide
+                ctx.fillStyle = type.includes('anavia') ? '#CCCCFF' : '#555'; // Anavia is periwinkle
+                ctx.fillRect(-2, -2, 12, 6);
+                
+                // Barrel Tip
+                ctx.fillStyle = '#111';
+                ctx.fillRect(10, -1, 2, 4);
+                
+                // Laser/Glow
+                ctx.fillStyle = type.includes('anavia') ? '#00f3ff' : '#ff0000';
+                ctx.fillRect(8, 0, 2, 2);
+                
+            } else if (type.includes('sniper')) {
+                // --- SNIPER (Long, scope) ---
+                // Stock
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(-10, 0, 10, 6);
+                
+                // Body
+                ctx.fillStyle = '#C5A000'; // Gold body for "YourGirlSara"
+                ctx.fillRect(0, -2, 25, 5);
+                
+                // Long Barrel
+                ctx.fillStyle = '#111';
+                ctx.fillRect(25, -1, 30, 3);
+                
+                // Scope
+                ctx.fillStyle = '#333';
+                ctx.fillRect(5, -6, 12, 3); // Scope body
+                ctx.fillStyle = '#00f3ff';
+                ctx.fillRect(5, -6, 2, 3);  // Lens
+                
+            } else if (type.includes('rifle')) {
+                // --- RIFLE / SMG ---
+                // Stock
+                ctx.fillStyle = '#222';
+                ctx.fillRect(-8, 0, 8, 8);
+                
+                // Body
+                ctx.fillStyle = '#00ffcc'; // Teal for RB-98
+                ctx.fillRect(0, -2, 18, 7);
+                
+                // Mag
+                ctx.fillStyle = '#111';
+                ctx.fillRect(4, 5, 4, 6);
+                
+                // Barrel
+                ctx.fillStyle = '#333';
+                ctx.fillRect(18, 0, 10, 3);
+                
+            } else if (type.includes('golden')) {
+                // --- GOLDEN CHILD (Orb launcher) ---
+                // Grip
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(-2, 2, 5, 7);
+                
+                // Body — rounded gold housing
+                ctx.fillStyle = '#B8860B';
+                ctx.beginPath();
+                ctx.roundRect(-2, -3, 16, 8, 3);
+                ctx.fill();
+                
+                // Gold trim
+                ctx.fillStyle = '#FFD700';
+                ctx.fillRect(0, -2, 12, 2);
+                
+                // Barrel — wide bore for orbs
+                ctx.fillStyle = '#222';
+                ctx.beginPath();
+                ctx.roundRect(14, -2, 6, 6, [0, 2, 2, 0]);
+                ctx.fill();
+                
+                // Orb glow in barrel
+                ctx.fillStyle = '#FFD700';
+                ctx.shadowColor = '#FFD700';
+                ctx.shadowBlur = 6;
+                ctx.beginPath();
+                ctx.arc(17, 1, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        
+            ctx.restore();
+        }
+        

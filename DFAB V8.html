@@ -3573,6 +3573,67 @@
             }
         });
 
+        const ASSETS = {"images":{},"audio":{}};
+
+        /* =====================================================================
+           YOUR ASSETS — images and sounds from the assets/ folder
+           ---------------------------------------------------------------------
+           tools/build.mjs bakes every file in assets/images and assets/audio into
+           the ASSETS table just above this file, so the game stays one offline
+           file. A file's name (without extension, subfolders kept) is its key:
+               assets/images/portrait_949.png        -> 'portrait_949'
+               assets/images/signs/ollo.webp         -> 'signs/ollo'
+               assets/audio/door_bell.mp3            -> 'door_bell'
+
+           Usage:
+               drawAsset(ctx, 'portrait_949', x, y, 64, 64);   // draws once it's loaded
+               const img = getImage('portrait_949');           // the Image itself
+               playSound('door_bell', { volume: 0.8 });        // one-shot through the game's audio
+               playSound('rain_loop', { loop: true }).then(s => s && s.stop());
+           ===================================================================== */
+        const _assetImages = {};
+        function getImage(name) {
+            if (_assetImages[name]) return _assetImages[name];
+            const src = ASSETS.images[name];
+            if (!src) { console.warn(`getImage: no image named "${name}" in assets/images`); return null; }
+            const img = new Image();
+            img.src = src;
+            return (_assetImages[name] = img);
+        }
+
+        function drawAsset(ctx, name, x, y, w, h) {
+            const img = getImage(name);
+            if (!img || !img.complete || !img.naturalWidth) return false;
+            ctx.drawImage(img, x, y, w ?? img.naturalWidth, h ?? img.naturalHeight);
+            return true;
+        }
+
+        const _assetSounds = {};
+        /** Plays an asset sound through the master bus (so the audio toggle mutes it). Resolves to the source node, or null. */
+        function playSound(name, opts = {}) {
+            const src = ASSETS.audio[name];
+            if (!src) { console.warn(`playSound: no sound named "${name}" in assets/audio`); return Promise.resolve(null); }
+            const ctx = audioSys.ctx;
+            if (!_assetSounds[name]) {
+                const bin = atob(src.slice(src.indexOf(',') + 1)), bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                _assetSounds[name] = ctx.decodeAudioData(bytes.buffer).catch(e => { console.warn(`playSound: could not decode "${name}"`, e); return null; });
+            }
+            return _assetSounds[name].then(buffer => {
+                if (!buffer) return null;
+                if (ctx.state === 'suspended') ctx.resume();
+                const s = ctx.createBufferSource(), g = ctx.createGain();
+                s.buffer = buffer; s.loop = !!opts.loop; s.playbackRate.value = opts.rate || 1;
+                g.gain.value = opts.volume ?? 1;
+                s.connect(g); g.connect(audioSys.masterGain);
+                s.start();
+                return s;
+            });
+        }
+
+        // Start decoding every image right away so the first frame that uses one has it ready
+        for (const name of Object.keys(ASSETS.images)) getImage(name);
+
         // ============================================================================
         //  NOTE REGISTRY — Readable documents, letters, briefings, lore.
         //  Each entry defines content + visual style. Found notes are tracked
@@ -36487,6 +36548,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (idx > -1) this.teammates.splice(idx, 1);
             }
 
+        }
+
+        // The rest of GameEngine's methods live in engine/*.js and are attached with
+        // engineMixin(). Descriptors are made non-enumerable so the prototype looks
+        // exactly as if the methods were written inside the class body.
+        function engineMixin(methods) {
+            const d = Object.getOwnPropertyDescriptors(methods);
+            for (const k of Object.keys(d)) d[k].enumerable = false;
+            Object.defineProperties(GameEngine.prototype, d);
+        }
+
+        // GameEngine — Input and UI event wiring (keyboard, touch, buttons).
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             initEvents() {
                 window.addEventListener('resize', () => { this.resize(); });
                 window.addEventListener('keydown', (e) => { 
@@ -37119,8 +37194,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                     this.endDialogue(); 
                 });
-            }
+            },
 
+        });
+
+        // GameEngine — Screen shake, time slow, death, resize, firing, boosters, player damage.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             triggerShake(amount) {
                 if (amount > this.camera.shake) {
                     this.camera.shake = amount;
@@ -37131,7 +37211,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         navigator.vibrate(amount * 10); 
                     }
                 }
-            }
+            },
             
             /**
              * Trigger a dramatic time slow effect.
@@ -37153,7 +37233,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!smoothTransition) {
                     this.timeSlowState.scale = slowPercent;
                 }
-            }
+            },
             
             /**
              * Update the time slow state each frame.
@@ -37196,7 +37276,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 
                 return false;
-            }
+            },
             
             triggerDeathSequence() {
                 const ds = document.getElementById('death-screen');
@@ -37226,7 +37306,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.updateUI();
                     }, 1000);
                 }, 1500);
-            }
+            },
 
 
             /**
@@ -37237,7 +37317,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             simDue(interval, phase = 0) {
                 if (!CONFIG.SIM.DECIMATE || interval <= 1) return true;
                 return ((this.simStep + phase) % interval) === 0;
-            }
+            },
 
             resize() { 
                 /* ── INTERNAL RENDER SCALE ──────────────────────────────────────
@@ -37277,7 +37357,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if(this.activeMap) {
                     this.bakeStaticLighting(); 
                 }
-            }
+            },
 
             fireWeapon() {
                 // 1. VISIBILITY CHECKS
@@ -37390,7 +37470,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     color: shotColor, // Flash matches bullet color
                     life: 3 
                 });
-            }
+            },
 
             // Inside GameEngine class
             
@@ -37417,7 +37497,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         4.0                      // Life Multiplier (Lingers 2x longer)
                     );
                 }
-            }
+            },
 
             
             
@@ -37436,7 +37516,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let max = this.maxBoosters;
                 if (this.augments && this.augments.isEquipped('vital_link')) max += 2;
                 return max;
-            }
+            },
             
             useBooster() {
                 if (this.playerHealth >= this.maxPlayerHealth) { 
@@ -37452,7 +37532,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 } else { 
                     showMessage("NO BOOSTERS REMAINING."); 
                 }
-            }
+            },
             
             /**
              * Share a stim with the nearest damaged teammate.
@@ -37492,7 +37572,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Visual feedback — green flash on the teammate
                 nearestTm.invincibleTimer = 10;
-            }
+            },
             
             /* =========================================================
                STIM REFILL (Clinic/Checkpoint)
@@ -37517,8 +37597,62 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 this.updateUI();
                 showMessage("STIMS REFILLED & VITALS NORMALIZED. ALLIES RESTORED.");
-            }
+            },
 
+            /* =========================================================
+               DAMAGE SYSTEM
+               ---------------------------------------------------------
+               Called when player takes damage from enemies/hazards.
+               Now delegates to PlayerEntity for unified damage handling.
+               FLIT ability grants brief invulnerability.
+               Death triggers respawn at nearest medbay.
+               ========================================================= */
+            damagePlayer(amount) {
+                // Apply augment damage reduction
+                if (this.augments && this.augments.isEquipped('armor_plate')) {
+                    amount = Math.floor(amount * 0.8); // 20% reduction
+                }
+                
+                // Shield absorption (any buff with active shield)
+                const shieldBuff = this.player.buffSystem.getShieldBuff();
+                if (shieldBuff) {
+                    if (amount <= shieldBuff.shield) {
+                        shieldBuff.shield -= amount;
+                        // Visual feedback — gold flash
+                        this.triggerShake(2);
+                        this.updateUI();
+                        return; // Shield absorbed all damage
+                    } else {
+                        // Shield breaks — remaining damage goes to HP
+                        amount -= shieldBuff.shield;
+                        shieldBuff.shield = 0;
+                        showMessage("GOLDEN SHIELD BROKEN.");
+                        this.triggerShake(6);
+                        this.updateUI();
+                    }
+                }
+                
+                // Delegate to PlayerEntity - it handles FLIT invulnerability,
+                // health tracking, UI updates, and death/respawn
+                this.player.takeDamage(amount);
+                
+                // Larissa flit hint: first time player takes damage while enemies are telegraphing
+                if (!this.questState.larissa_flit_hint && this.story && this.enemies.length > 0) {
+                    const anyTelegraphing = this.enemies.some(e => e.isTelegraphing && !e.dead);
+                    if (anyTelegraphing) {
+                        this.questState.larissa_flit_hint = true;
+                        setTimeout(() => {
+                            this.story.triggerComms("LARISSA", "You saw it coming. The flit is faster than they are.", 5000);
+                        }, 1200);
+                    }
+                }
+            },
+            
+        });
+
+        // GameEngine — Vending, garage, auto shop, Zib rides, sleep menu.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             /* =========================================================
                NEON BLUE BUBBLE TEA (Consumable Buff)
                ---------------------------------------------------------
@@ -37549,12 +37683,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 document.getElementById('vend-item-jean').onclick = () => this.vendPurchase('jeanSoda');
                 if (stellarEl) stellarEl.onclick = () => this.vendPurchase('stellarLemonade');
                 document.getElementById('btn-vend-close').onclick = () => this.closeVendingMenu();
-            }
+            },
             
             closeVendingMenu() {
                 document.getElementById('vending-menu').style.display = 'none';
                 this.pauseSystem.release('vending');
-            }
+            },
             
             vendPurchase(itemId) {
                 if (this.player.buffSystem.activate(itemId, this.worldMinutes, this)) {
@@ -37562,10 +37696,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     document.getElementById('vend-balance').textContent = `BALANCE: ${this.currency} PERSONICS`;
                 }
                 this.closeVendingMenu();
-            }
+            },
             
             // Legacy alias
-            buyBubbleTea() { this.openVendingMenu(); }
+            buyBubbleTea() { this.openVendingMenu(); },
 
             // =========================================================
             //  GARAGE VEHICLE MANAGEMENT
@@ -37609,7 +37743,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const name = this.garage.getDisplayName(garageIndex);
                 showMessage(`ACTIVE VEHICLE: ${name.toUpperCase()}`);
                 return true;
-            }
+            },
             
             /**
              * Apply customization changes to a garage car and sync to the live vehicle.
@@ -37622,7 +37756,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (garageIndex === this.garage.activeIndex) {
                     this.garage.applyToVehicle(this.ownedCar);
                 }
-            }
+            },
             
             /**
              * Reset a garage car to factory defaults and sync if active.
@@ -37633,7 +37767,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.garage.applyToVehicle(this.ownedCar);
                 }
                 showMessage('VEHICLE RESET TO FACTORY DEFAULTS.');
-            }
+            },
 
             // =========================================================
             //  AUTO SHOP UI — Browse, Garage Management, Customize
@@ -37675,14 +37809,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
 
                 this.renderAutoShopTab();
-            }
+            },
 
             closeAutoShop() {
                 document.getElementById('auto-shop-overlay').style.display = 'none';
                 this._customizeOriginal = null;
                 this._customizePending = null;
                 this.pauseSystem.release('auto_shop');
-            }
+            },
 
             renderAutoShopTab() {
                 const container = document.getElementById('auto-shop-content');
@@ -37699,7 +37833,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     case 'garage': this._renderGarageTab(container); break;
                     case 'customize': this._renderCustomizeTab(container); break;
                 }
-            }
+            },
 
             // ── BROWSE TAB: Purchase new vehicles ──
             _renderBrowseTab(container) {
@@ -37778,7 +37912,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                     });
                 });
-            }
+            },
 
             // ── GARAGE TAB: View owned cars, switch active, sell ──
             _renderGarageTab(container) {
@@ -37891,7 +38025,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                     });
                 });
-            }
+            },
 
             // ── CUSTOMIZE TAB: Paint, underglow, headlights ──
             _renderCustomizeTab(container) {
@@ -38046,7 +38180,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         self._renderCustomizeTab(container);
                     });
                 }
-            }
+            },
             
             // =========================================================
             //  ZIB TAXI DESTINATION PICKER
@@ -38101,13 +38235,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // Wire close
                 document.getElementById('zib-close').onclick = () => this.closeZibMenu();
-            }
+            },
 
             closeZibMenu() {
                 document.getElementById('zib-menu').style.display = 'none';
                 this._pendingZib = null;
                 this.pauseSystem.release('zib_menu');
-            }
+            },
 
             openSleepMenu() {
                 this.pauseSystem.acquire('sleep_menu');
@@ -38142,7 +38276,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     menu.style.display = 'none';
                     this.pauseSystem.release('sleep_menu');
                 };
-            }
+            },
         
             sleep(targetHour) {
                 // 1. Fade to Black
@@ -38186,8 +38320,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }, 1000);
                     
                 }, 1500); // 1.5 second blackout
-            }
+            },
             
+        });
+
+        // GameEngine — Daytime exposure, flit teleport effects, graveyard ghosts.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             updateDaytimeExposure() {
                 const overlay = document.getElementById('daytime-filter');
                 if (!overlay) return;
@@ -38221,7 +38360,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 overlay.style.backdropFilter = filterString;
                 overlay.style.webkitBackdropFilter = filterString;
-            }
+            },
 
             triggerFlit() {
                 if (this.isDriving || this.paused) return;
@@ -38336,7 +38475,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Play flit sound
                 audioSys.sfx('flit');
-            }
+            },
 
             /* =========================================================
                FLIT VISUAL EFFECTS SYSTEM
@@ -38396,7 +38535,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.flitVFX.splice(i, 1);
                     }
                 }
-            }
+            },
 
             drawFlitVFX(ctx) {
                 for (const vfx of this.flitVFX) {
@@ -38564,7 +38703,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                     ctx.restore();
                 }
-            }
+            },
 
             /* =========================================================
                GRAVEYARD GHOST RENDERING
@@ -38618,8 +38757,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.restore();
                     ctx.restore();
                 }
-            }
+            },
 
+        });
+
+        // GameEngine — HUD update, dialogue and portraits, shops, character/team/story/collection screens, notes, crafting.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             /* =========================================================
                UNIFIED UI UPDATE SYSTEM
                ---------------------------------------------------------
@@ -38669,7 +38813,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Random bar heights create a "playing music" effect
                 const bars = document.querySelectorAll('#audio-viz .viz-bar');
                 bars.forEach(bar => bar.style.height = `${20 + Math.random() * 80}%`);
-            }
+            },
             
             /* =========================================================
                LOOT SPAWNING
@@ -38682,7 +38826,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (rand < 0.4) this.loot.push(new Loot(x, y, 'pp')); 
                 else if (rand < 0.7) this.loot.push(new Loot(x, y, 'scrap')); 
                 else if (rand < 0.9) this.loot.push(new Loot(x, y, 'stim')); 
-            }
+            },
 
             startDialogue(entity) {
                 // BONDING INTERCEPT — recruited teammates in apartment
@@ -38863,7 +39007,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // 4. LOCK UI INTERACTIONS (Except Dialogue Box)
                 document.getElementById('game-ui').style.pointerEvents = 'none'; 
                 this.dialogueBox.style.pointerEvents = 'auto';
-            }
+            },
 
             /**
              * Resolve a speaker name to a drawCharacterPortrait() config.
@@ -38929,29 +39073,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // 5. Silhouette
                 return { skinColor: '#555', hair: { type: 'short', color: '#333' }, eyeColor: '#222', gender: 'male', isFallback: true };
-            }
-
-            /**
-             * Paint a resolved portrait into any canvas, with the circular backdrop.
-             * Shared by the dialogue box and available to any future surface.
-             * @param {HTMLCanvasElement} canvas
-             * @param {string} speakerName
-             * @param {string} [bg] backdrop fill; pass null to skip it
-             */
-            paintPortraitTo(canvas, speakerName, bg = 'rgba(40, 5, 25, 0.95)') {
-                if (!canvas) return null;
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if (bg) {
-                    ctx.fillStyle = bg;
-                    ctx.beginPath();
-                    ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                const config = this.resolvePortraitConfig(speakerName);
-                drawCharacterPortrait(ctx, canvas.width, canvas.height, config);
-                return config;
-            }
+            },
 
             /** Deterministic serialisation — key order can't affect the result. */
             _stableStringify(v) {
@@ -38960,7 +39082,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return '{' + Object.keys(v).sort()
                     .map(k => JSON.stringify(k) + ':' + this._stableStringify(v[k]))
                     .join(',') + '}';
-            }
+            },
 
             /**
              * Cache key for a portrait config.
@@ -38987,7 +39109,40 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const visual = { ...config };
                 delete visual.isFallback;
                 return this._stableStringify(visual);
-            }
+            },
+
+            /** Drop all cached portraits. Not needed for appearance changes — the key
+             *  handles those — but useful for teardown and tests. */
+            clearPortraitCache() {
+                if (this._portraitCache) this._portraitCache.clear();
+            },
+
+            /** Render a character portrait into the dialogue box canvas. */
+            renderDialoguePortrait(speakerName) {
+                this.paintPortraitTo(document.getElementById('dialogue-portrait'), speakerName);
+            },
+
+            /**
+             * Paint a resolved portrait into any canvas, with the circular backdrop.
+             * Shared by the dialogue box and available to any future surface.
+             * @param {HTMLCanvasElement} canvas
+             * @param {string} speakerName
+             * @param {string} [bg] backdrop fill; pass null to skip it
+             */
+            paintPortraitTo(canvas, speakerName, bg = 'rgba(40, 5, 25, 0.95)') {
+                if (!canvas) return null;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (bg) {
+                    ctx.fillStyle = bg;
+                    ctx.beginPath();
+                    ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                const config = this.resolvePortraitConfig(speakerName);
+                drawCharacterPortrait(ctx, canvas.width, canvas.height, config);
+                return config;
+            },
 
             /**
              * Offscreen canvas for a character at a given size, cached by appearance.
@@ -39023,7 +39178,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this._portraitCache.delete(this._portraitCache.keys().next().value);
                 }
                 return entry;
-            }
+            },
 
             /**
              * Data URL for a character portrait, for use as an <img src> in DOM lists.
@@ -39034,18 +39189,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const entry = this.getPortraitCanvas(speakerName, size, bg);
                 if (!entry.url) entry.url = entry.canvas.toDataURL('image/png');
                 return entry.url;
-            }
-
-            /** Drop all cached portraits. Not needed for appearance changes — the key
-             *  handles those — but useful for teardown and tests. */
-            clearPortraitCache() {
-                if (this._portraitCache) this._portraitCache.clear();
-            }
-
-            /** Render a character portrait into the dialogue box canvas. */
-            renderDialoguePortrait(speakerName) {
-                this.paintPortraitTo(document.getElementById('dialogue-portrait'), speakerName);
-            }
+            },
 
             /**
              * Install a MutationObserver on npcTextEl so EVERY dialogue line ever
@@ -39084,7 +39228,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const observer = new MutationObserver(captureCurrentLine);
                 observer.observe(this.npcTextEl, { childList: true, characterData: true, subtree: true });
                 this._dialogueObserver = observer;
-            }
+            },
             
             endDialogue() {
                 this.pauseSystem.release('dialogue'); 
@@ -39108,7 +39252,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const buttons = document.querySelectorAll('.game-btn, #btn-fire, #btn-heal, #btn-flit, #btn-autodrive, #btn-nv, #btn-holster'); 
                 buttons.forEach(b => b.style.pointerEvents = 'auto');
                 document.getElementById('input-zone-left').style.pointerEvents = 'auto';
-            }
+            },
 
             // --- AUGMENT SHOP ---
             openAugmentShop() {
@@ -39143,7 +39287,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     shop.classList.remove('active');
                     this.pauseSystem.release('augment_shop');
                 };
-            }
+            },
 
             // ── COSMETICS SHOP (Neural Systems) ──
             openCosmeticsShop() {
@@ -39283,7 +39427,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     overlay.style.display = 'none';
                     this.pauseSystem.release('cosmetics_shop');
                 };
-            }
+            },
 
             // Render augments management in the sidebar screen
             renderAugmentManagement() {
@@ -39337,7 +39481,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 html += '</div></div>';
                 
                 container.innerHTML = html;
-            }
+            },
 
             // Render contacts screen in the sidebar
             renderContactsScreen() {
@@ -39401,7 +39545,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
 
                 container.innerHTML = html;
-            }
+            },
 
             // =========================================================
             //  TEAM MANAGEMENT SCREEN
@@ -39619,7 +39763,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                     });
                 });
-            }
+            },
 
             // =========================================================
             //  CHARACTER SCREEN
@@ -39812,7 +39956,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
 
                 container.innerHTML = html;
-            }
+            },
 
             // ── STORY/MISSIONS SCREEN ──
             renderStoryScreen() {
@@ -39985,7 +40129,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.renderStoryScreen();
                     });
                 });
-            }
+            },
 
             // ── COLLECTION SCREEN ──
             renderCollectionScreen() {
@@ -40054,7 +40198,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.toggleInlineNote(card.dataset.noteId, card);
                     });
                 });
-            }
+            },
 
             /**
              * Inline note viewer for the COLLECTION screen.
@@ -40153,7 +40297,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 
                 audioSys.sfx('ui');
-            }
+            },
 
             // ── NOTE READING SYSTEM ──
             openNote(noteId) {
@@ -40209,7 +40353,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }, 200);
 
                 audioSys.sfx('ui');
-            }
+            },
 
             // --- CRAFTING SYSTEM ---
             openCraftingTable() {
@@ -40254,57 +40398,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     shop.querySelector('.aug-shop-subtitle').textContent = "DR. YIN'S CLINIC";
                     this.pauseSystem.release('crafting');
                 };
-            }
+            },
 
-            /* =========================================================
-               DAMAGE SYSTEM
-               ---------------------------------------------------------
-               Called when player takes damage from enemies/hazards.
-               Now delegates to PlayerEntity for unified damage handling.
-               FLIT ability grants brief invulnerability.
-               Death triggers respawn at nearest medbay.
-               ========================================================= */
-            damagePlayer(amount) {
-                // Apply augment damage reduction
-                if (this.augments && this.augments.isEquipped('armor_plate')) {
-                    amount = Math.floor(amount * 0.8); // 20% reduction
-                }
-                
-                // Shield absorption (any buff with active shield)
-                const shieldBuff = this.player.buffSystem.getShieldBuff();
-                if (shieldBuff) {
-                    if (amount <= shieldBuff.shield) {
-                        shieldBuff.shield -= amount;
-                        // Visual feedback — gold flash
-                        this.triggerShake(2);
-                        this.updateUI();
-                        return; // Shield absorbed all damage
-                    } else {
-                        // Shield breaks — remaining damage goes to HP
-                        amount -= shieldBuff.shield;
-                        shieldBuff.shield = 0;
-                        showMessage("GOLDEN SHIELD BROKEN.");
-                        this.triggerShake(6);
-                        this.updateUI();
-                    }
-                }
-                
-                // Delegate to PlayerEntity - it handles FLIT invulnerability,
-                // health tracking, UI updates, and death/respawn
-                this.player.takeDamage(amount);
-                
-                // Larissa flit hint: first time player takes damage while enemies are telegraphing
-                if (!this.questState.larissa_flit_hint && this.story && this.enemies.length > 0) {
-                    const anyTelegraphing = this.enemies.some(e => e.isTelegraphing && !e.dead);
-                    if (anyTelegraphing) {
-                        this.questState.larissa_flit_hint = true;
-                        setTimeout(() => {
-                            this.story.triggerComms("LARISSA", "You saw it coming. The flit is faster than they are.", 5000);
-                        }, 1200);
-                    }
-                }
-            }
-            
+        });
+
+        // GameEngine — Save schema, migrations, saveGame / loadGame.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             // ========================================
             // MODULAR SAVE/LOAD SYSTEM
             // ========================================
@@ -40423,7 +40523,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         fullscreen: GameSettings.fullscreen,
                     },
                 };
-            }
+            },
             
             /**
              * Get default values for loading (separate from current state).
@@ -40482,7 +40582,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     hordeGauntlet: null,
                     settings: null          // null = use GameSettings defaults (or auto-detect)
                 };
-            }
+            },
             
             /**
              * Deep merge saved data with defaults.
@@ -40524,7 +40624,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 
                 return result;
-            }
+            },
 
             // ────────────────────────────────────────────────────────────────────────
             //  SAVE VERSIONING & MIGRATIONS
@@ -40535,7 +40635,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // ────────────────────────────────────────────────────────────────────────
 
             /** Current save schema version. Single source of truth. */
-            getSaveVersion() { return 2; }
+            getSaveVersion() { return 2; },
 
             /**
              * Migration registry. Each function takes a save at version N and returns
@@ -40553,7 +40653,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // are all additive — mergeSaveData fills them from defaults.
                     1: (save) => save,
                 };
-            }
+            },
 
             /**
              * Walk a raw save through migrations until it matches the current version,
@@ -40579,7 +40679,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     console.warn(`[MIGRATE] No migration registered from v${version} to v${targetVersion}; loading as-is and relying on default-merge`);
                 }
                 return save;
-            }
+            },
 
             // ────────────────────────────────────────────────────────────────────────
             //  SAVE INTEGRITY VALIDATOR
@@ -40676,7 +40776,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     console.log('[VALIDATE] Save integrity OK');
                 }
                 return save;
-            }
+            },
 
             saveGame() {
                 // Build save data from schema (captures current game state)
@@ -40714,7 +40814,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     console.log('[SAVE] Phone data:', saveData.phone);
                     console.log('[SAVE] Message history contacts:', Object.keys(saveData.phone.messageHistory || {}));
                 }
-            }
+            },
         
             loadGame() {
                 const slotKey = (typeof saveSlotManager !== 'undefined') ? saveSlotManager.getActiveKey() : 'dfab_save_slot_0';
@@ -41045,8 +41145,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     showMessage("ERROR LOADING SAVE FILE.");
                     return false;
                 }
-            }
+            },
 
+        });
+
+        // GameEngine — loadMap / _doLoadMap (building every map), baked lighting.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             loadMap(mapId, spawnAt) {
                 // 1. Initial Load (No Fade)
                 if (!this.activeMap) {
@@ -41079,7 +41184,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.pauseSystem.release('map_load');
                     }, 100);
                 }, 400);
-            }
+            },
             
             _doLoadMap(mapId, spawnAt) {
                 // =========================================================
@@ -42369,7 +42474,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 this.camera.zoom = 1; 
                 this.resize();
-            }
+            },
             
             /**
              * COMPUTE LAMP SHADOWS (Geometry-Only)
@@ -42443,8 +42548,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 this.lightingBaked = true;
-            }
+            },
             
+        });
+
+        // GameEngine — Emissive pass, debug views, transitions, vehicles, visibility, time of day, darkness, landmarks.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             /**
              * Laser sight geometry for this frame: from the drawn muzzle along the line the
              * next shot will fly (same aimFromMuzzle call as fireWeapon), clipped at the
@@ -42467,7 +42577,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const hitD = raycastNearest(shot.x, shot.y, ex, ey, [...(this.activeMap.walls || []), ...getColliders(this.activeMap)], beamLength);
                 this._laserGeom = { x0: shot.x, y0: shot.y, x1: shot.x + Math.cos(shot.angle) * hitD, y1: shot.y + Math.sin(shot.angle) * hitD, angle: shot.angle };
                 return this._laserGeom;
-            }
+            },
 
             /** After lighting: building windows/neon/rooftop lights, then the sky layer. */
             drawEmissivePass(ctx) {
@@ -42487,7 +42597,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (!this.skyLayer || this.skyLayer.map !== this.activeMap) this.skyLayer = new SkyLayer(this.activeMap);
                     this.skyLayer.draw(ctx, this.camera, this.canvas, dark);
                 }
-            }
+            },
 
             /** Debug overlay: blocked nav cells in view, companion paths, spots and shot lines. */
             drawNavDebug(ctx) {
@@ -42528,7 +42638,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 ctx.restore();
-            }
+            },
 
             drawDebugLighting(ctx) {
                 // If there is no data (because bake hasn't run), do nothing
@@ -42564,7 +42674,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fillRect(light.source.x - 2, light.source.y - 2, 4, 4);
                 }
                 ctx.restore();
-            }
+            },
 
             triggerTransition() {
                 if (!this.activeMap.transitions) return;
@@ -42615,7 +42725,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // 3. Spawn the player exactly at that point
                     this.loadMap(t.target, { linkFrom: this.activeMap.id });
                 }
-            }
+            },
 
             toggleVehicle() {
                 if (this.activeMap.type === 'indoor') { showMessage("CANNOT USE VEHICLE INDOORS."); return; }
@@ -42767,7 +42877,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Cat rides along (doesn't take a seat)
                     if (this.velvetCat && this.questState.hasVelvetCat) this.velvetCat.inCar = true;
                 }
-            }
+            },
             
             // Inside GameEngine class
             toggleAutoDrive() {
@@ -42825,7 +42935,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         showMessage("AUTO-DRIVE FAILED - ROAD BLOCKED OR TOO FAR");
                     }
                 }
-            }
+            },
             
             // Check if player has reached navigation destination
             checkNavArrival() {
@@ -42861,7 +42971,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.autodriveBtn.classList.remove('engaged');
                     }
                 }
-            }
+            },
             
             hijackVehicle(target) {
                 // 1. Handle returning to owned car
@@ -42949,18 +43059,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
                 // 5. Enter
                 this.toggleVehicle();
-            }
+            },
 
             checkRectCollision(cx, cy, cw, ch, angle, walls) {
                 const cos = Math.cos(angle); const sin = Math.sin(angle); const hw = cw / 2; const hh = ch / 2;
                 const corners = [ { x: cx + (hw * cos - hh * sin), y: cy + (hw * sin + hh * cos) }, { x: cx + (hw * cos + hh * sin), y: cy + (hw * sin - hh * cos) }, { x: cx + (-hw * cos + hh * sin), y: cy + (-hw * sin - hh * cos) }, { x: cx + (-hw * cos - hh * sin), y: cy + (-hw * sin + hh * cos) } ];
                 for (let w of walls) { if (cx + cw < w.x || cx - cw > w.x + w.w || cy + ch < w.y || cy - ch > w.y + w.h) continue; for(let p of corners) { if(p.x > w.x && p.x < w.x + w.w && p.y > w.y && p.y < w.y + w.h) return true; } } return false;
-            }
+            },
             
             // Raycast check for Light Occlusion (Shadows)
             checkLineOfSight(x1, y1, x2, y2) {
                 return !isLineBlocked(x1, y1, x2, y2, this.activeMap.walls, getColliders(this.activeMap));
-            }
+            },
             
             calculatePlayerVisibility() {
                 // 1. BASE: Start with Ambient Light Level (World Darkness)
@@ -43107,14 +43217,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (buffUI.textContent.includes('HIDDEN')) {
                     buffUI.style.display = 'none';
                 }
-            }
+            },
 
             checkPlayerCarCollision(px, py) {
                 if (!this.car.visible) return false;
                 const dx = px - this.car.x; const dy = py - this.car.y; const cos = Math.cos(-this.car.angle); const sin = Math.sin(-this.car.angle);
                 const localX = dx * cos - dy * sin; const localY = dx * sin + dy * cos; const halfLen = this.car.length / 2 + 15; const halfWid = this.car.width / 2 + 15;
                 if (Math.abs(localX) < halfLen && Math.abs(localY) < halfWid) return true; return false;
-            }
+            },
 
             updateTime(force = false) {
                 // Counted in sim ticks (not wall-clock) so the clock follows
@@ -43154,7 +43264,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                     }
                 }
-            }
+            },
             
             getAmbientDarkness() {
                 // Per-map override (e.g. well-lit interiors like arenas)
@@ -43187,7 +43297,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
                 // NIGHT (20:00 to 5:00)
                 return maxDarkness;
-            }
+            },
             
             /* --- ADD TO GameEngine CLASS --- */
             
@@ -43215,7 +43325,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // 3. Fallback - warn and return player position
                 console.warn(`Landmark ID not found: '${id}' - Available: [${Object.keys(this.landmarkRegistry).join(', ')}]`);
                 return { x: this.player.x, y: this.player.y };
-            }
+            },
             
             /**
              * Debug helper - call game.debugLandmarks() in console to see all registered landmarks
@@ -43228,8 +43338,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     console.log(`  ${id}: (${pos.x}, ${pos.y})`);
                 }
                 return this.landmarkRegistry;
-            }
+            },
 
+        });
+
+        // GameEngine — The per-tick simulation (update) and traffic collision helpers.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             /* =====================================================================
                MAIN GAME LOOP (UPDATE)
                ---------------------------------------------------------------------
@@ -44607,7 +44722,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 this.profiler.stop('Logic:UI_Interact');
                 this.profiler.stop('Update:Total');
-            }
+            },
 
             
             resolveTrafficCollisions() {
@@ -44689,7 +44804,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // 2. VEHICLE vs VEHICLE Collisions
                 this.traffic.resolveCollisions(this.car, this.player, this.weather, audioSys, this.ownedCar, this.decals);
-            }
+            },
 
             // Helper: Checks if two rotated cars intersect
             checkCarIntersect(c1, c2) {
@@ -44707,7 +44822,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if(this.isPointInRotatedRect(p.x, p.y, c1)) return true;
                 }
                 return false;
-            }
+            },
             
             getOBBCorners(c) {
                 const cos = Math.cos(c.angle); const sin = Math.sin(c.angle);
@@ -44718,7 +44833,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: c.x + (-hw * cos + hh * sin), y: c.y + (-hw * sin - hh * cos) },
                     { x: c.x + (-hw * cos - hh * sin), y: c.y + (-hw * sin + hh * cos) }
                 ];
-            }
+            },
             
             isPointInRotatedRect(x, y, rect) {
                 // Translate point to rect local space
@@ -44731,8 +44846,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Check AABB in local space
                 return (Math.abs(localX) < rect.length/2 && Math.abs(localY) < rect.width/2);
-            }
+            },
 
+        });
+
+        // GameEngine — The frame renderer (draw).
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             /* =====================================================================
                MAIN RENDER LOOP (DRAW)
                ---------------------------------------------------------------------
@@ -46038,8 +46158,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // sweep is always visible while it runs.
                 PerfBench.draw(this.ctx, 20, this.canvas.height - 110);
                 this.profiler.tick(); 
-            }
+            },
 
+        });
+
+        // GameEngine — Apartment and clinic interiors, the city backdrop from the veranda, mission marker.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             /* =====================================================================
                APARTMENT CITY BACKDROP
                ---------------------------------------------------------------------
@@ -46076,7 +46201,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 lines(908, 556, 1392, 892, 32, true, 'rgba(0,0,0,0.09)'); lines(908, 556, 1392, 892, 32, false, 'rgba(0,0,0,0.09)');   // bathroom tiles
                 ctx.fillStyle = APT.blushLt; ctx.beginPath(); ctx.roundRect(1270, 672, 76, 30, 8); ctx.fill();   // bath mat
                 ctx.restore();
-            }
+            },
 
             /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
             drawApartmentGlow(ctx) {
@@ -46117,7 +46242,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 ctx.restore();
-            }
+            },
 
             drawClinicInterior(ctx) {
                 const t = _gameTimeSec;
@@ -46167,7 +46292,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 };
                 curtain(55, 215, 413); curtain(585, 745, 413);
                 ctx.restore();
-            }
+            },
 
             drawApartmentBackdrop(ctx) {
                 /* ------------------------------------------------------------------
@@ -46694,7 +46819,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.fillRect(0, yAt(D_CHASM + 10), mapW, D_CHASM + 16);
 
                 ctx.restore();
-            }
+            },
 
             /* =====================================================================
                MISSION WAYPOINT MARKER
@@ -46762,8 +46887,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.ctx.fillText(`${Math.round(dist)}m`, edgeX, edgeY + 20);
                 
                 this.ctx.restore();
-            }
+            },
 
+        });
+
+        // GameEngine — Lighting, bloom, wet reflections, atmosphere, colour grade.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             /* =====================================================================
                LIGHTING SYSTEM RENDERER (OPTIMIZED)
                ---------------------------------------------------------------------
@@ -47381,9 +47511,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
                 }
                 ctx.restore();
-            }
+            },
             
-            darkenColor(hex, amount) { return darkenHex(hex, Math.floor(255 * amount)); }
+            darkenColor(hex, amount) { return darkenHex(hex, Math.floor(255 * amount)); },
 
             // ═══ WET-WORLD POST-PROCESSING ═══
             
@@ -47413,7 +47543,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.globalAlpha = 1.0;
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.restore();
-            }
+            },
             
             drawWetReflections(ctx) {
                 if (!GameSettings.wetReflections || !this.lamps || this.lamps.length === 0) return;
@@ -47455,7 +47585,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.restore();
-            }
+            },
             
             drawAtmospherePass(ctx) {
                 const tintMap = {
@@ -47470,7 +47600,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.fillStyle = tint;
                 ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
                 ctx.restore();
-            }
+            },
             
             applyColorGrade() {
                 const GRADES = {
@@ -47504,10 +47634,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (g.vignette > 0) {
                     this.canvas.style.boxShadow = `inset 0 0 ${g.vignette * 2}px ${g.vignette}px rgba(0,0,0,${g.vignette / 100})`;
                 } else { this.canvas.style.boxShadow = 'none'; }
-            }
+            },
 
-            roundRect(x, y, w, h, r) { if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2; this.ctx.beginPath(); this.ctx.moveTo(x + r, y); this.ctx.arcTo(x + w, y, x + w, y + h, r); this.ctx.arcTo(x + w, y + h, x, y + h, r); this.ctx.arcTo(x, y + h, x, y, r); this.ctx.arcTo(x, y, x + w, y, r); this.ctx.closePath(); }
+            roundRect(x, y, w, h, r) { if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2; this.ctx.beginPath(); this.ctx.moveTo(x + r, y); this.ctx.arcTo(x + w, y, x + w, y + h, r); this.ctx.arcTo(x + w, y + h, x, y + h, r); this.ctx.arcTo(x, y + h, x, y, r); this.ctx.arcTo(x, y, x + w, y, r); this.ctx.closePath(); },
 
+        });
+
+        // GameEngine — Drawing the player, emotes, pausable timers, sidebar portrait, joysticks.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             drawPlayer() {
                 this.ctx.save(); 
                 this.ctx.translate(this.player.x, this.player.y); 
@@ -47563,7 +47698,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 });
                 
                 this.ctx.restore();
-            }
+            },
 
             /**
              * Spawn an emote bubble above the player. Map of slot key → emoji.
@@ -47629,7 +47764,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         nearest.reactToEmote(key);
                     }, delay);
                 }
-            }
+            },
 
             /**
              * Schedule a callback to fire after `ms` of in-game time. Unlike
@@ -47641,11 +47776,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const timer = { msRemaining: ms, cb: callback };
                 this.pausableTimers.push(timer);
                 return timer;
-            }
+            },
             cancelPausableTimeout(timer) {
                 const idx = this.pausableTimers.indexOf(timer);
                 if (idx !== -1) this.pausableTimers.splice(idx, 1);
-            }
+            },
             _tickPausableTimers() {
                 const now = performance.now();
                 if (this._lastPausableTimerTick === undefined) this._lastPausableTimerTick = now;
@@ -47660,7 +47795,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         try { t.cb(); } catch (e) { console.error('[pausableTimer]', e); }
                     }
                 }
-            }
+            },
 
             /**
              * Tick the player emote bubble's age. Called from update() so it
@@ -47674,7 +47809,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.playerEmote.text = null;
                     this.playerEmote.age = 0;
                 }
-            }
+            },
 
             /**
              * Render the player emote bubble in world space above the player.
@@ -47730,7 +47865,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.textBaseline = 'middle';
                 ctx.fillText(this.playerEmote.text, 0, 1);
                 ctx.restore();
-            }
+            },
             
             renderSidebarPortrait() {
                 const canvasIds = ['portrait-canvas-map', 'portrait-canvas-inv'];
@@ -47750,7 +47885,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // never disagree with the portrait shown when 949 speaks.
                     drawCharacterPortrait(ctx, canvas.width, canvas.height, this.resolvePortraitConfig('949'));
                 }
-            }
+            },
             
             initJoystick() {
                 const inputZone = document.getElementById('input-zone-left'); const visualZone = document.getElementById('joystick-zone'); const knob = document.getElementById('joystick-knob');
@@ -47758,7 +47893,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 inputZone.addEventListener('touchmove', (e) => { e.preventDefault(); if (!this.joystick.active) return; for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.joystick.id) { const touch = e.changedTouches[i]; const deltaX = touch.clientX - this.joystick.originX; const deltaY = touch.clientY - this.joystick.originY; const maxDist = 35; const distance = Math.min(Math.sqrt(deltaX*deltaX + deltaY*deltaY), maxDist); const angle = Math.atan2(deltaY, deltaX); const moveX = Math.cos(angle) * distance; const moveY = Math.sin(angle) * distance; knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`; this.joystick.dx = moveX / maxDist; this.joystick.dy = moveY / maxDist; break; } } }, {passive: false});
                 const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.joystick.id) { this.joystick.active = false; this.joystick.dx = 0; this.joystick.dy = 0; visualZone.style.display = 'none'; break; } } };
                 inputZone.addEventListener('touchend', endHandler); inputZone.addEventListener('touchcancel', endHandler);
-            }
+            },
 
             initFireJoystick() {
                 const fireZone = document.getElementById('btn-fire'); const knob = document.getElementById('fire-joystick-knob');
@@ -47766,8 +47901,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 fireZone.addEventListener('touchmove', (e) => { e.preventDefault(); if (!this.fireJoystick.active) return; for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.fireJoystick.id) { const touch = e.changedTouches[i]; const deltaX = touch.clientX - this.fireJoystick.originX; const deltaY = touch.clientY - this.fireJoystick.originY; const maxDist = 35; const distance = Math.min(Math.sqrt(deltaX*deltaX + deltaY*deltaY), maxDist); const angle = Math.atan2(deltaY, deltaX); const moveX = Math.cos(angle) * distance; const moveY = Math.sin(angle) * distance; knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`; this.fireJoystick.dx = moveX / maxDist; this.fireJoystick.dy = moveY / maxDist; break; } } }, {passive: false});
                 const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.fireJoystick.id) { this.fireJoystick.active = false; this.fireJoystick.dx = 0; this.fireJoystick.dy = 0; knob.style.transform = `translate(-50%, -50%)`; break; } } };
                 fireZone.addEventListener('touchend', endHandler); fireZone.addEventListener('touchcancel', endHandler);
-            }
+            },
 
+        });
+
+        // GameEngine — start / stop / reset and the main loop.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
             start(mapId) { 
                 // Auto-detect mobile on first load (no saved settings override)
                 if (GameSettings._isMobile && !localStorage.getItem('dimensions_save_data') && !localStorage.getItem('dfab_save_slot_0')) {
@@ -47778,7 +47918,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     console.log('[AUTO-DETECT] Mobile device — applied MEDIUM preset');
                 }
                 this.running = true; this.loadMap(mapId); document.getElementById('ui-layer').style.display = 'none'; document.getElementById('game-container').style.display = 'block'; if (this.ui) this.ui.showMissionBanner("WELCOME TO SOUTHERN DIMENSIONS CITY", "new", "WELCOME"); this.loop(); 
-            }
+            },
             stop() {
                 this.running = false;
                 ambience.silence();
@@ -47791,7 +47931,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Reset all gameplay state so New Game starts fresh
                 this.resetGameState();
-            }
+            },
             
             /**
              * Reset all gameplay state to new-game defaults.
@@ -47952,7 +48092,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 
                 console.log('[RESET] Game state cleared to defaults');
-            }
+            },
             loop() {
                 if (!this.running) return;
                 ambience.update(this);
@@ -48040,8 +48180,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (interp) RenderInterp.restore(this);
                 }
                 requestAnimationFrame(() => this.loop()); 
-            }
-        }
+            },
+        });
 
         const game = new GameEngine();
 

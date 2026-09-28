@@ -1,0 +1,42 @@
+name: Build game file
+
+# Rebuilds "DFAB V8.html" from src/ and assets/.
+#  - On main: if the built file changed (e.g. an image was uploaded to assets/ from the
+#    GitHub website), commit the fresh build back to main.
+#  - On pull requests: fail if the committed build is out of date.
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'assets/**', 'tools/**', 'DFAB V8.html', '.github/workflows/build.yml']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check build is up to date (pull requests)
+        if: github.event_name == 'pull_request'
+        run: node tools/build.mjs --check
+
+      - name: Build and commit (main)
+        if: github.event_name != 'pull_request'
+        run: |
+          node tools/build.mjs
+          if git diff --quiet -- "DFAB V8.html"; then
+            echo "Game file already up to date."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "DFAB V8.html"
+            git commit -m "Rebuild DFAB V8.html"
+            git push
+          fi

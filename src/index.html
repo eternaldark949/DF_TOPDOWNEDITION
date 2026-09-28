@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<!-- DIMENSIONS: FREELANCER | V8 | Developer: ETERNAL | See CHANGELOG.md -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dimensions: Freelancer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@400;600;800;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+<!-- @styles -->
+    </style>
+</head>
+<body>
+
+    <!-- AUGMENT SHOP (Dr. Yin's) -->
+    <div id="augment-shop">
+        <div class="aug-shop-title">CYBERNETIC AUGMENTS</div>
+        <div class="aug-shop-subtitle">DR. YIN'S CLINIC</div>
+        <div class="aug-shop-balance" id="aug-shop-balance">BALANCE: 0 PP</div>
+        <div class="aug-shop-grid" id="aug-shop-grid"></div>
+        <button class="aug-shop-close" id="aug-shop-close">CLOSE</button>
+    </div>
+
+    <!-- AUTO SHOP (Torque's) -->
+    <div id="auto-shop-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
+        <div style="max-width:700px; margin:30px auto; padding:20px;">
+            <!-- Header -->
+            <div style="font-family:Orbitron,sans-serif; font-size:1.2rem; letter-spacing:4px; color:#ff8800; text-shadow:0 0 10px rgba(255,136,0,0.4); margin-bottom:2px;">TORQUE AUTO</div>
+            <div style="font-size:0.6rem; color:#666; letter-spacing:2px; margin-bottom:8px;">SERVICE BAY — SOUTHERN DIMENSIONS CITY</div>
+            <div id="auto-shop-balance" style="font-family:Orbitron,sans-serif; font-size:0.7rem; color:#ffd700; letter-spacing:1px; margin-bottom:16px;">BALANCE: 0 PP</div>
+            
+            <!-- Tabs -->
+            <div id="auto-shop-tabs" style="display:flex; gap:4px; margin-bottom:16px;">
+                <button class="auto-tab" data-tab="browse" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:8px 16px; background:rgba(255,136,0,0.15); border:1px solid rgba(255,136,0,0.4); color:#ff8800; cursor:pointer; flex:1;">BROWSE</button>
+                <button class="auto-tab" data-tab="garage" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:8px 16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">MY GARAGE</button>
+                <button class="auto-tab" data-tab="customize" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:8px 16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">CUSTOMIZE</button>
+            </div>
+            
+            <!-- Content -->
+            <div id="auto-shop-content"></div>
+            
+            <!-- Close -->
+            <button id="auto-shop-close" style="font-family:Orbitron,sans-serif; font-size:0.65rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.15); color:#888; cursor:pointer; width:100%; margin-top:16px;">CLOSE</button>
+        </div>
+    </div>
+
+    <!-- COSMETICS SHOP (Neural Systems / Prisma) -->
+    <div id="cosmetics-shop-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(5,5,20,0.95); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
+        <div style="max-width:700px; margin:30px auto; padding:20px;">
+            <!-- Header -->
+            <div style="font-family:Orbitron,sans-serif; font-size:1.2rem; letter-spacing:4px; color:#0088ff; text-shadow:0 0 12px rgba(0,136,255,0.4); margin-bottom:2px;">NEURAL SYSTEMS</div>
+            <div style="font-size:0.6rem; color:#666; letter-spacing:2px; margin-bottom:4px;">IDENTITY SEQUENCING LAB — SOUTHERN DIMENSIONS CITY</div>
+            <div id="cosmetics-shop-balance" style="font-family:Orbitron,sans-serif; font-size:0.7rem; color:#ffd700; letter-spacing:1px; margin-bottom:16px;">BALANCE: 0 PP</div>
+            
+            <!-- Tabs -->
+            <div id="cosmetics-shop-tabs" style="display:flex; gap:4px; margin-bottom:16px;">
+                <button class="cosmetics-tab" data-tab="wig" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(0,136,255,0.15); border:1px solid rgba(0,136,255,0.4); color:#0088ff; cursor:pointer; flex:1;">W.I.G.s</button>
+                <button class="cosmetics-tab" data-tab="skin" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">S.K.I.N.s</button>
+                <button class="cosmetics-tab" data-tab="outfit" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">O.U.T.F.I.T.s</button>
+                <button class="cosmetics-tab" data-tab="vocal" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">V.O.C.A.L.s</button>
+                <button class="cosmetics-tab" data-tab="accessory" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">A.C.C.E.S.S.</button>
+            </div>
+            
+            <!-- Content -->
+            <div id="cosmetics-shop-content"></div>
+            
+            <!-- Close -->
+            <button id="cosmetics-shop-close" style="font-family:Orbitron,sans-serif; font-size:0.65rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.15); color:#888; cursor:pointer; width:100%; margin-top:16px;">CLOSE</button>
+        </div>
+    </div>
+
+    <!-- ZIB TAXI DESTINATION PICKER -->
+    <div id="zib-menu" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(10,5,30,0.94); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
+        <div style="max-width:500px; margin:40px auto; padding:20px;">
+            <div style="font-family:Orbitron,sans-serif; font-size:1.1rem; letter-spacing:4px; color:#8a2be2; text-shadow:0 0 12px rgba(138,43,226,0.5); margin-bottom:2px;">ZIB</div>
+            <div style="font-size:0.55rem; color:#666; letter-spacing:2px; margin-bottom:4px;">AUTONOMOUS TRANSIT — SOUTHERN DIMENSIONS CITY</div>
+            <div id="zib-balance" style="font-family:Orbitron,sans-serif; font-size:0.65rem; color:#ffd700; letter-spacing:1px; margin-bottom:16px;">BALANCE: 0 PP</div>
+            <div style="font-size:0.6rem; color:#888; letter-spacing:1px; margin-bottom:10px; border-bottom:1px solid rgba(138,43,226,0.15); padding-bottom:6px;">SELECT DESTINATION</div>
+            <div id="zib-destinations"></div>
+            <button id="zib-close" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.12); color:#888; cursor:pointer; width:100%; margin-top:14px;">CANCEL</button>
+        </div>
+    </div>
+
+    <!-- NOTE READING OVERLAY -->
+    <div id="note-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:350; pointer-events:auto;">
+        <!-- Darkened blurred background -->
+        <div id="note-backdrop" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(6px);"></div>
+        <!-- Note document -->
+        <div id="note-document" style="position:relative; max-width:550px; max-height:80vh; margin:5vh auto; overflow-y:auto; z-index:1;">
+            <div id="note-header" style="text-align:center; padding:20px 24px 10px;"></div>
+            <div id="note-body" style="padding:0 28px 16px; line-height:1.7;"></div>
+            <div id="note-signature" style="text-align:right; padding:0 28px 20px;"></div>
+            <div id="note-close-hint" style="text-align:center; padding:8px 0 16px; font-size:0.55rem; letter-spacing:3px; opacity:0.4;">TAP ANYWHERE TO CLOSE</div>
+        </div>
+    </div>
+
+    <div id="fade-overlay"></div>
+    
+    <div id="cinematic-bars">
+        <div class="cine-bar"></div>
+        <div class="cine-bar"></div>
+    </div>
+    
+    <div id="intro-title-overlay">
+        <div class="intro-main">PART ONE</div>
+        <div class="intro-sub">BEYOND STEEL AND SYNTHETICS</div>
+    </div>
+    
+    <div id="comms-bar">
+        <div id="comms-portrait"></div> 
+        <div class="comms-content">
+            <div id="comms-speaker">UNKNOWN</div>
+            <div id="comms-text">Signal Established...</div>
+        </div>
+    </div>
+            
+    <!-- Legacy audio-input removed - MusicWidgetSystem handles all music upload -->
+
+    <div id="ui-layer">
+        <div id="main-menu">
+            <div class="title-container">
+                <h1 class="title-script">Dimensions</h1>
+                <div class="title-sub">Freelancer</div>
+            </div>
+            
+            <div class="menu-list-container">
+                <div id="main-menu-list">
+                    <div class="menu-item-row" id="btn-new-game">
+                        <div class="row-left"><div class="desc-box">Starts a new journey.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn">Start New Game</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    
+                    <div class="menu-item-row" id="btn-load-game">
+                        <div class="row-left"><div class="desc-box">Choose a save slot to resume.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn">Load Saved Game</div></div>
+                        <div class="row-right"><div class="input-prompt">L</div></div>
+                    </div>
+
+                    <div class="menu-item-row" id="btn-settings">
+                        <div class="row-left"><div class="desc-box">Graphics & Performance.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn">Settings</div></div>
+                        <div class="row-right"><div class="input-prompt">S</div></div>
+                    </div>
+
+                    <div class="menu-item-row" id="btn-exit">
+                        <div class="row-left"><div class="desc-box">Quits game.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn">Exit</div></div>
+                        <div class="row-right"><div class="input-prompt">esc</div></div>
+                    </div>
+                </div>
+
+                <div id="settings-menu-list" class="hidden">
+                    <div class="menu-item-row" id="btn-toggle-lighting">
+                        <div class="row-left"><div class="desc-box">Low improves FPS significantly.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-lighting">Lighting: HIGH</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-traffic">
+                        <div class="row-left"><div class="desc-box">Fewer cars improves FPS.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-traffic">Traffic: HIGH</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-peds">
+                        <div class="row-left"><div class="desc-box">Fewer civilians on streets.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-peds">Pedestrians: HIGH</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-foliage">
+                        <div class="row-left"><div class="desc-box">Reduces trees & bushes.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-foliage">Foliage: HIGH</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-grain">
+                        <div class="row-left"><div class="desc-box">Cinematic noise overlay.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-grain">Film Grain: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-softshadows">
+                        <div class="row-left"><div class="desc-box">Blur shadow edges. Costly.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-softshadows">Soft Shadows: OFF</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-audio">
+                        <div class="row-left"><div class="desc-box">Mute all SFX and music.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-audio">Master Audio: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="row-ambience">
+                        <div class="row-left"><div class="desc-box">Rain, wind, city and room sounds.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn amb-slider-wrap"><span id="lbl-ambience">Ambience: 70</span><input type="range" class="ggp-slider amb-slider" id="main-ambience" min="0" max="100" step="5" value="70"></div></div>
+                        <div class="row-right"><div class="input-prompt">slide</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-fps">
+                        <div class="row-left"><div class="desc-box">Cap frame rate to save power.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-fps">FPS Limit: NONE</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    
+                    <div class="menu-item-row" id="btn-settings-back">
+                        <div class="row-left"><div class="desc-box">Return to main menu.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn">Back</div></div>
+                        <div class="row-right"><div class="input-prompt">esc</div></div>
+                    </div>
+                </div>
+
+                <div id="story-mode-list" class="hidden">
+                    <div class="menu-item-row" id="btn-story-949">
+                        <div class="row-left"><div class="desc-box">The Sister<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn">Story of 949</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-story-747">
+                        <div class="row-left"><div class="desc-box">The Brother<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn">Story of 747</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-story-back">
+                        <div class="row-left"><div class="desc-box">Return to main menu.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn">Back</div></div>
+                        <div class="row-right"><div class="input-prompt">esc</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+    
+        <div id="daytime-filter" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; transition: backdrop-filter 0.5s linear;"></div>
+        
+        <div id="scanlines"></div>
+
+        <div id="game-ui">
+            <div id="death-screen">
+                <div class="death-text" id="death-text-off"><span style="color:#ff0000">OFF</span><span style="color:#888">LINE</span></div>
+                <div class="death-text" id="death-text-on" style="display:none"><span style="color:#00f3ff">ON</span><span style="color:#000">LINE</span></div>
+            </div>
+
+            <div id="music-widget" class="theme-wave stashed"> 
+                <div id="mw-station-capsule">
+                    <div id="mw-brand-text">Wave Radio</div>
+                </div>
+                <div id="mw-play-tab">
+                    <div id="mw-play-btn">▶</div>
+                </div>
+                <div id="mw-info">
+                    <div class="mw-label">Now Playing</div>
+                    <div class="mw-track" id="mw-track-text">INSERT TAPE...</div>
+                </div>
+                <div id="music-recall-node" class="visible"></div>
+                <div id="mw-node"></div>
+                <input type="file" id="music-upload-widget" accept="audio/*" style="display:none">
+            </div>
+
+            <div id="ui-location">Unknown Location</div>
+            <div id="btn-pause">⏸</div>
+            <div id="ui-stats">
+                <div id="ui-time">21:00</div>
+                <div id="ui-currency">PP: 0</div>
+                <div id="ui-scrap">Scrap: 0</div>
+                <div id="ui-buffs"></div>
+            </div>
+            
+            <div id="ui-stealth-indicator">HIDDEN (100%)</div>
+
+            <div id="ui-health">
+                <div id="health-bar" style="width: 100%;"></div>
+            </div>
+            <div id="ui-shield-bar" style="display:none; position:absolute; top:52px; left:20px; width:200px; height:8px; background:rgba(20,15,0,0.95); border-radius:0px; overflow:hidden; z-index:20; box-shadow:0 0 8px rgba(255,215,0,0.2);">
+                <div id="shield-bar-fill" style="width:100%; height:100%; background:linear-gradient(90deg, #B8860B, #FFD700, #FFA500); border-radius:0px; transition:width 0.15s; box-shadow:inset 0 1px 0 rgba(255,255,200,0.2);"></div>
+            </div>
+            
+            <div id="ui-flit-bar-container">
+                <div id="flit-bar" style="width: 100%;"></div>
+            </div>
+            
+            <div id="btn-phone">M <div id="phone-notification-badge">1</div></div>
+            
+            <div id="audio-viz">
+                <div class="viz-bar" style="animation-delay: 0s"></div>
+                <div class="viz-bar" style="animation-delay: 0.2s"></div>
+                <div class="viz-bar" style="animation-delay: 0.4s"></div>
+                <div class="viz-bar" style="animation-delay: 0.1s"></div>
+            </div>
+
+            <div id="dialogue-box">
+                <div class="dialogue-inner">
+                    <canvas id="dialogue-portrait" width="120" height="120"></canvas>
+                    <div class="dialogue-text-col">
+                        <div id="npc-name">NPC Name</div>
+                        <div id="dialogue-peek-indicator">↩ reviewing earlier line</div>
+                        <div id="npc-text">Dialogue Text goes here...</div>
+                        <div class="dialogue-options">
+                            <button class="dialogue-btn dialogue-nav-btn" id="btn-dialogue-prev" title="Previous line">◀</button>
+                            <button class="dialogue-btn dialogue-nav-btn" id="btn-dialogue-next" title="Forward">▶</button>
+                            <button class="dialogue-btn" id="btn-accept">Accept</button>
+                            <button class="dialogue-btn" id="btn-decline">Decline</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="utility-dock">
+                <div id="dock-toggle">⚙</div> 
+                <div id="dock-buttons">
+                    <button class="game-btn" id="btn-weapon-mode" style="border-color: #00f3ff; color: #00f3ff;">🔫 Normal</button>
+                    <button class="game-btn" id="btn-save-game" style="border-color: #00ff00; color: #00ff00;">💾 Save</button> 
+                    <button class="game-btn" id="btn-open-map" style="border-color: #FFD700; color: #FFD700;">🗺️ Map</button>
+                    <button class="game-btn" id="btn-inventory" style="border-color: #a469ff; color: #a469ff;">🎒 Items</button>
+                    <button class="game-btn" id="btn-toggle-weather">☁ Weather</button>
+                    <button class="game-btn" id="btn-colorgrade" style="border-color: #d4a84b; color: #d4a84b;">🎨 Grade</button>
+                    <button class="game-btn" id="btn-profiler" style="border-color: #00f3ff; color: #00f3ff;">📊 Profiler</button>
+                    <button class="game-btn" id="btn-debug">⚡ Debug</button>
+                    <button class="game-btn" id="btn-game-exit">✕ Exit</button>
+                </div>
+            </div>
+            
+            <!-- COLOR GRADE PANEL -->
+            <div id="game-grade-panel">
+                <div class="ggp-title"><span>COLOR GRADE</span><button onclick="document.getElementById('game-grade-panel').classList.remove('visible')">✕</button></div>
+                <div class="ggp-row"><span class="ggp-label">Exposure</span><input type="range" class="ggp-slider" id="ggpExposure" min="-100" max="100" value="0" oninput="updateGameGrade()"><span class="ggp-val" id="ggpExposureVal">0</span></div>
+                <div class="ggp-row"><span class="ggp-label">Brightness</span><input type="range" class="ggp-slider" id="ggpBrightness" min="50" max="150" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpBrightnessVal">100</span></div>
+                <div class="ggp-row"><span class="ggp-label">Contrast</span><input type="range" class="ggp-slider" id="ggpContrast" min="50" max="200" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpContrastVal">100</span></div>
+                <div class="ggp-row"><span class="ggp-label">Saturation</span><input type="range" class="ggp-slider" id="ggpSaturate" min="0" max="200" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpSaturateVal">100</span></div>
+                <div class="ggp-row"><span class="ggp-label">Temp</span><input type="range" class="ggp-slider" id="ggpTemp" min="-100" max="100" value="0" oninput="updateGameGrade()" style="background:linear-gradient(to right,#4488ff,#888,#ffaa44)"><span class="ggp-val" id="ggpTempVal">0</span></div>
+                <div class="ggp-row"><span class="ggp-label">Tint</span><input type="range" class="ggp-slider" id="ggpTint" min="-100" max="100" value="0" oninput="updateGameGrade()" style="background:linear-gradient(to right,#44cc66,#888,#cc44aa)"><span class="ggp-val" id="ggpTintVal">0</span></div>
+                <div class="ggp-row"><span class="ggp-label">Vignette</span><input type="range" class="ggp-slider" id="ggpVignette" min="0" max="100" value="0" oninput="updateGameGrade()"><span class="ggp-val" id="ggpVignetteVal">0</span></div>
+                <div class="ggp-presets" id="ggpPresets"></div>
+            </div>
+            
+            <div class="game-btn" id="btn-interact">Enter<br><span style="font-size:0.5rem;opacity:0.7">(E)</span></div>
+            <button class="game-btn" id="btn-transition">Enter Building<br><span style="font-size:0.6rem;opacity:0.7">(F)</span></button>
+            
+            <div id="btn-fire">
+                <div id="fire-joystick-knob"></div>
+            </div>
+            <div id="btn-emote"><div id="emote-joystick-knob">😊</div></div>
+            <div id="emote-smile" class="emote-overlay">😊</div>
+            <div id="emote-zany"  class="emote-overlay">🤪</div>
+            <div id="emote-cry"   class="emote-overlay">😭</div>
+            <div id="emote-frown" class="emote-overlay">😞</div>
+            <div id="btn-heal">✚<br><span>4</span></div>
+            <div id="btn-flit">⚡</div>
+            <div id="btn-autodrive">AUTO<br>DRIVE</div>
+            <div id="btn-zib-skip" style="display:none;">SKIP<br><span style="font-size:0.5rem;opacity:0.7">(T)</span></div>
+            <div id="btn-holster">HOLSTER</div>
+            <div id="btn-nv">👁️</div>
+
+            <div id="input-zone-left"></div> 
+            <div id="joystick-zone">
+                <div id="joystick-knob"></div>
+            </div>
+            
+            <div id="phone-overlay">
+                <div id="phone-container">
+                    <div id="phone-notch"></div>
+                    <div id="phone-screen">
+                        
+                        <div id="phone-home">
+                            <div id="phone-home-m">M</div>
+                            <div id="phone-time">9:49 <span id="phone-time-suffix">PM</span></div>
+                            <div id="phone-weather-widget">
+                                <div class="weather-line-main">
+                                    <span id="weather-icon">🌧️</span>
+                                    <span id="weather-text">Raining</span>
+                                </div>
+                                <div class="weather-temp">21°C</div>
+                            </div>
+                        
+                            <div id="phone-apps">
+                                <div class="phone-app-container" id="app-contacts">
+                                    <div class="phone-app-icon-circle" style="position:relative;">
+                                        👤 <div class="app-badge" id="badge-contacts"></div> 
+                                    </div>
+                                    <div class="phone-app-name">Contacts</div>
+                                </div>
+                                <div class="phone-app-container" id="app-maps">
+                                    <div class="phone-app-icon-circle">🗺️</div>
+                                    <div class="phone-app-name">UMaps</div>
+                                </div>
+                                <div class="phone-app-container" id="app-sticky">
+                                    <div class="phone-app-icon-circle">📍</div>
+                                    <div class="phone-app-name">Sticky.ME</div>
+                                </div>
+                                <div class="phone-app-container" id="app-carme">
+                                    <div class="phone-app-icon-circle">🚗</div>
+                                    <div class="phone-app-name">Car.ME</div>
+                                </div>
+                                <div class="phone-app-container" id="app-skyme">
+                                    <div class="phone-app-icon-circle" style="border-color: rgba(106,169,255,0.3);" id="skyme-icon">🌧️</div>
+                                    <div class="phone-app-name">Sky.ME</div>
+                                </div>
+                                <div class="phone-app-container" id="app-zibme">
+                                    <div class="phone-app-icon-circle" style="border-color: rgba(138,43,226,0.3);">🚕</div>
+                                    <div class="phone-app-name">Zib.ME</div>
+                                </div>
+                                <div class="phone-app-container" id="app-neume">
+                                    <div class="phone-app-icon-circle" style="border-color: rgba(255,0,255,0.2);">🧬</div>
+                                    <div class="phone-app-name">NEU.ME</div>
+                                </div>
+                                <div class="phone-app-container" id="app-help">
+                                    <div class="phone-app-icon-circle">❓</div>
+                                    <div class="phone-app-name">Help.ME</div>
+                                </div>
+                                <div class="phone-app-container" id="app-log">
+                                    <div class="phone-app-icon-circle" style="border-color: rgba(218,165,32,0.3);">📜</div>
+                                    <div class="phone-app-name">Log.ME</div>
+                                </div>
+                            </div>
+
+                            <div id="phone-now-playing">
+                                <div class="np-label">Now Playing</div>
+                                <div class="np-title" id="np-track-name">ETERNAL — Night Escape</div>
+                            </div>
+                        </div>
+                        
+                        <div class="phone-app-screen" id="screen-contacts">
+                            <div class="phone-app-header">
+                                <button class="phone-back-btn" id="contacts-back">◀</button>
+                                <span class="phone-app-title">Contacts</span>
+                            </div>
+                            <div class="phone-app-content" id="contacts-list"></div>
+                        </div>
+                        
+                        <div class="phone-app-screen" id="screen-contact-detail">
+                            <div class="phone-app-header">
+                                <button class="phone-back-btn" id="contact-detail-back">◀</button>
+                                <div class="thread-avatar-slot" id="contact-detail-avatar"></div>
+                                <span class="phone-app-title" id="contact-detail-name">Name</span>
+                            </div>
+                            <div class="phone-app-content contact-detail" id="contact-detail-content"></div>
+                            <div id="contact-reply-bar">
+                                <div id="contact-reply-options"></div>
+                                <div id="contact-reply-input">
+                                    <span id="contact-reply-hint">No reply needed</span>
+                                    <span id="contact-reply-send">➤</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="phone-app-screen" id="screen-maps">
+                            <div class="phone-app-header">
+                                <button class="phone-back-btn" id="maps-back">◀</button>
+                                <span class="phone-app-title">UMaps</span>
+                            </div>
+                            <div class="phone-app-content">
+                                <canvas id="phone-map-canvas"></canvas>
+                                <p style="color: #888; font-size: 0.7rem; text-align: center; margin-top: 10px;">🔴 You Are Here</p>
+                            </div>
+                        </div>
+                        
+                        <div class="phone-app-screen" id="screen-help">
+                            <div class="phone-app-header">
+                                <button class="phone-back-btn" id="help-back">◀</button>
+                                <span class="phone-app-title">Help.ME</span>
+                            </div>
+                            <div class="phone-app-content">
+                                <div class="help-section">
+                                    <h4>⌨️ KEYBOARD CONTROLS</h4>
+                                    <p><strong>WASD / Arrows:</strong> Move & Drive</p>
+                                    <p><strong>SPACE:</strong> Fire Weapon</p>
+                                    <p><strong>E:</strong> Interact / Enter & Exit Car</p>
+                                    <p><strong>F:</strong> Use Transition Point (Enter Building)</p>
+                                    <p><strong>M:</strong> Open/Close Map</p>
+                                    <p><strong>P:</strong> Open/Close Phone</p>
+                                    <p><strong>Q:</strong> Toggle Auto-Drive (In Car)</p>
+                                    <p><strong>H:</strong> Use Stim Pack (Heal)</p>
+                                    <p><strong>B:</strong> Back / Close Menu</p>
+                                </div>
+                                <div class="help-section">
+                                    <h4>🗺️ NAVIGATION</h4>
+                                    <p><strong>Double-Click Map:</strong> Set destination marker</p>
+                                    <p><strong>Long-Press Map:</strong> Set destination (touch)</p>
+                                    <p><strong>Auto-Drive + Marker:</strong> Car follows route to destination</p>
+                                </div>
+                                <div class="help-section">
+                                    <h4>👻 STEALTH & COMBAT</h4>
+                                    <p><strong>Visibility:</strong> Watch the "HIDDEN" indicator. Standing in light makes you easier to spot.</p>
+                                    <p><strong>Night Vision:</strong> Click the Eye icon (bottom right) to see in dark areas.</p>
+                                    <p><strong>Flit (⚡):</strong> Dash through enemies to escape.</p>
+                                </div>
+                                <div class="help-section">
+                                    <h4>🚗 VEHICLES</h4>
+                                    <p><strong>Ownership:</strong> You can hijack any car, but your personal vehicle is marked yellow.</p>
+                                    <p><strong>Auto-Drive:</strong> While driving, press 'Q' or the HUD button to let the AI drive you to a safe lane.</p>
+                                    <p><strong>Delivery:</strong> Use the <em>Car.ME</em> app to summon your car to your location.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="phone-app-screen" id="screen-log">
+                            <div class="phone-app-header">
+                                <button class="phone-back-btn" id="log-back">◀</button>
+                                <span class="phone-app-title">Log.ME</span>
+                                <button id="log-clear-btn" title="Clear transcript">Clear</button>
+                            </div>
+                            <div class="phone-app-content" id="log-content"></div>
+                        </div>
+                        <div class="phone-app-screen" id="screen-neume">
+                            <div class="phone-app-header">
+                                <button class="phone-back-btn" id="neume-back">◀</button>
+                                <span class="phone-app-title" style="color:#ff00ff; text-shadow:0 0 10px #ff00ff;">NEU.ME</span>
+                            </div>
+                            <div class="phone-app-content" style="display:flex; flex-direction:column; align-items:center; gap:12px; padding-top:12px;">
+                                <div style="width:100px; height:100px; background:#111; border:2px solid #ff00ff; border-radius:50%; display:flex; justify-content:center; align-items:center; overflow:hidden; box-shadow:0 0 20px rgba(255,0,255,0.3);">
+                                    <div id="neume-preview" style="font-size:2.5rem;">🧬</div>
+                                </div>
+                                <div style="text-align:center; color:#fff; font-family:'Montserrat'; font-size:0.7rem;">
+                                    IDENTITY PROTOCOLS<br><span style="color:#888; font-size:0.6rem;">Mix & match from owned cosmetics</span>
+                                </div>
+
+                                <!-- Cosmetics loadout slots -->
+                                <div id="neume-loadout" style="width:100%; padding:0 10px; display:flex; flex-direction:column; gap:6px;"></div>
+                                
+                                <div id="neume-status" style="color:#ff00ff; font-size:0.65rem; margin-top:4px; opacity:0; transition:opacity 0.5s;">
+                                    RE-SEQUENCING DNA...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sky.ME Weather Monitor -->
+                        <div class="phone-app-screen" id="screen-skyme">
+                            <div class="phone-app-header">
+                                <button class="phone-back-btn" id="skyme-back">◀</button>
+                                <span class="phone-app-title" style="color:#6aa9ff; text-shadow:0 0 8px rgba(106,169,255,0.4);">Sky.ME</span>
+                            </div>
+                            <div class="phone-app-content" id="skyme-content" style="padding:2px 2px 10px; overflow-y:auto;">
+                                <!-- Populated dynamically by _renderSkyMe() -->
+                            </div>
+                        </div>
+
+                        <!-- Car.ME Garage Screen -->
+                        <div class="phone-app-screen" id="screen-carme">
+                            <div class="phone-app-header">
+                                <button class="phone-back-btn" id="carme-back">◀</button>
+                                <span class="phone-app-title" style="color:#ff8800; text-shadow:0 0 8px rgba(255,136,0,0.4);">Car.ME</span>
+                            </div>
+                            <div class="phone-app-content" id="carme-content" style="padding:10px; overflow-y:auto;">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                    <div id="phone-typing-indicator" class="phone-typing-indicator">
+                        <span class="typing-name"></span>
+                        <span>is typing</span>
+                        <div class="typing-dots"><span></span><span></span><span></span></div>
+                    </div>
+                    <div id="phone-close">✕</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dialogue-caption">
+        <div class="caption-speaker"></div>
+        <div class="caption-text"></div>
+    </div>
+    
+    <div id="message-modal"></div>
+    
+    <div id="mission-banner" class="mission-banner">
+        <div class="mission-banner-content">
+            <div class="mission-text" id="mission-text">ARRIVE AT THE DOUBLE NIGHTS HOTEL</div>
+            <div class="mission-status" id="mission-status">
+                <span class="mission-status-text" id="mission-status-text">NEW</span>
+                <span class="mission-spinner"></span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="map-interface">
+        <!-- Left Sidebar (Navigation) -->
+        <div class="screen-sidebar-left" id="map-sidebar-left">
+            <div class="sidebar-portrait">
+                <canvas id="portrait-canvas-map" width="100" height="100" style="border-radius:50%;"></canvas>
+            </div>
+            
+            <nav class="sidebar-nav" data-nav-screen="map">
+                <!-- populated from FREELANCER_NAV_ITEMS at startup -->
+            </nav>
+            
+            <div class="sidebar-back-container">
+                <div id="map-close-btn" class="screen-back-btn"><span class="btn-arrow">◀</span> BACK <span class="btn-hint">(B)</span></div>
+            </div>
+        </div>
+        
+        <!-- Left Handle (shown when sidebar collapsed) -->
+        <div class="sidebar-handle sidebar-handle-left" id="map-handle-left">
+            <div class="sidebar-handle-diamond"></div>
+        </div>
+        
+        <!-- Map Canvas (Main Content) -->
+        <canvas id="golden-map-canvas"></canvas>
+        
+        <!-- Right Handle (shown when sidebar collapsed) -->
+        <div class="sidebar-handle sidebar-handle-right" id="map-handle-right">
+            <div class="sidebar-handle-diamond"></div>
+        </div>
+        
+        <!-- Right Sidebar (Filters) -->
+        <div class="screen-sidebar-right" id="map-sidebar-right">
+            <div class="filter-header">
+                <span class="filter-title-text">Filter</span>
+                <div class="filter-toggle">
+                    <div class="filter-toggle-labels">
+                        <span>OFF</span>
+                        <span class="active">ON</span>
+                    </div>
+                    <div class="filter-toggle-track on" id="map-filter-toggle">
+                        <div class="filter-toggle-knob"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="filter-list" id="map-filter-list">
+                <div class="filter-item active" data-filter="missions">MISSIONS</div>
+                <div class="filter-item" data-filter="restaurants">RESTAURANTS</div>
+                <div class="filter-item" data-filter="workshops">WORKSHOPS</div>
+                <div class="filter-item" data-filter="homebases">HOME BASES</div>
+                <div class="filter-item" data-filter="pawnshops">PAWN SHOPS/VENDORS</div>
+                <div class="filter-item" data-filter="clients">CLIENTS</div>
+                <div class="filter-item" data-filter="attractions">ATTRACTIONS</div>
+                <div class="filter-item" data-filter="events">SPECIAL EVENTS</div>
+                <div class="filter-item" data-filter="danger">DANGER ZONES</div>
+            </div>
+        </div>
+    </div>
+        
+    <div id="freelancer-menu" style="display:none;">
+        <!-- Left Sidebar (Navigation) -->
+        <div class="screen-sidebar-left" id="inv-sidebar-left">
+            <div class="sidebar-portrait">
+                <canvas id="portrait-canvas-inv" width="100" height="100" style="border-radius:50%;"></canvas>
+            </div>
+            
+            <nav class="sidebar-nav" data-nav-screen="inventory">
+                <!-- populated from FREELANCER_NAV_ITEMS at startup -->
+            </nav>
+            
+            <div class="sidebar-back-container">
+                <button id="close-menu" class="screen-back-btn"><span class="btn-arrow">◀</span> BACK <span class="btn-hint">(B)</span></button>
+            </div>
+        </div>
+        
+        <!-- Left Handle (shown when sidebar collapsed) -->
+        <div class="sidebar-handle sidebar-handle-left" id="inv-handle-left">
+            <div class="sidebar-handle-diamond"></div>
+        </div>
+        
+        <!-- Main Content Area -->
+        <div class="screen-main-content" id="inv-main-content">
+            <h1 class="screen-title" id="screen-title-text">Inventory</h1>
+            <div id="inventory-list-container">
+                <div id="inventory-list"></div>
+            </div>
+            <!-- AUGMENTS MANAGEMENT SCREEN (hidden by default) -->
+            <div id="augments-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
+                <div id="augments-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            <!-- CONTACTS SCREEN (hidden by default) -->
+            <div id="contacts-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
+                <div id="contacts-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            <!-- TEAM MANAGEMENT SCREEN (hidden by default) -->
+            <div id="team-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
+                <div id="team-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+                    <!-- Populated dynamically by renderTeamScreen() -->
+                </div>
+            </div>
+            <!-- CHARACTER SCREEN (hidden by default) -->
+            <div id="character-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
+                <div id="character-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+                    <!-- Populated dynamically by renderCharacterScreen() -->
+                </div>
+            </div>
+            <!-- STORY/MISSIONS SCREEN (hidden by default) -->
+            <div id="story-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
+                <div id="story-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+                    <!-- Populated dynamically by renderStoryScreen() -->
+                </div>
+            </div>
+            <!-- COLLECTION SCREEN (hidden by default) -->
+            <div id="collection-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
+                <div id="collection-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+                    <!-- Populated dynamically by renderCollectionScreen() -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Handle (shown when sidebar collapsed) -->
+        <div class="sidebar-handle sidebar-handle-right" id="inv-handle-right">
+            <div class="sidebar-handle-diamond"></div>
+        </div>
+        
+        <!-- Right Sidebar (Filters) -->
+        <div class="screen-sidebar-right" id="inv-sidebar-right">
+            <div class="filter-header">
+                <span class="filter-title-text">Filter</span>
+                <div class="filter-toggle">
+                    <div class="filter-toggle-labels">
+                        <span>OFF</span>
+                        <span class="active">ON</span>
+                    </div>
+                    <div class="filter-toggle-track on" id="inv-filter-toggle">
+                        <div class="filter-toggle-knob"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="filter-list" id="inv-filter-list">
+                <div class="filter-item active" data-filter="all">ITEMS</div>
+                <div class="filter-item" data-filter="collectibles">COLLECTIBLES</div>
+                <div class="filter-item" data-filter="weapons">WEAPONS</div>
+                <div class="filter-item" data-filter="pets">PETS</div>
+                <div class="filter-item" data-filter="mounts">MOUNTS</div>
+                <div class="filter-item" data-filter="vehicles">VEHICLES</div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="sleep-menu" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(10, 5, 20, 0.95); border:1px solid #a469ff; padding:30px; text-align:center; z-index:200; box-shadow:0 0 30px rgba(0,0,0,0.9); border-radius:15px; width: 320px; pointer-events: auto;">
+        <h2 style="color:#fff; font-family:'Orbitron'; margin-top:0; margin-bottom:20px; letter-spacing:3px; text-shadow:0 0 10px #a469ff;">REST MODE</h2>
+        
+        <div style="margin-bottom:30px; background:rgba(255,255,255,0.05); padding:20px; border-radius:10px;">
+            <label style="color:#aaa; font-family:'Montserrat'; display:block; margin-bottom:15px; font-size:0.8rem; text-transform:uppercase;">Wake up time</label>
+            <input type="range" id="sleep-slider" min="0" max="23" value="8" style="width:100%; height:4px; background:#444; outline:none; -webkit-appearance:none; margin-bottom:15px;">
+            <div id="sleep-time-display" style="color:#ffd700; font-family:'Orbitron'; font-size:2.5rem; text-shadow:0 0 15px #ffaa00;">08:00</div>
+        </div>
+        
+        <button id="btn-sleep-confirm" class="game-btn" style="width:100%; margin-bottom:10px; border-color:#00f3ff; color:#00f3ff; padding:15px; font-size:1rem;">SLEEP</button>
+        <button id="btn-sleep-cancel" class="game-btn" style="width:100%; border-color:#555; color:#aaa;">CANCEL</button>
+    </div>
+    
+    <!-- VENDING MACHINE MENU -->
+    <div id="vending-menu" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:200; pointer-events:auto;">
+        <div style="background:rgba(5, 2, 15, 0.96); border:1px solid rgba(0, 243, 255, 0.3); border-radius:16px; padding:0; width:320px; box-shadow:0 0 40px rgba(0,0,0,0.9), 0 0 15px rgba(0,243,255,0.1); overflow:hidden;">
+            <!-- Header -->
+            <div style="background:linear-gradient(180deg, rgba(0,243,255,0.08) 0%, transparent 100%); padding:18px 20px 14px; border-bottom:1px solid rgba(0,243,255,0.1);">
+                <div style="font-family:'Orbitron'; font-size:0.65rem; letter-spacing:4px; color:rgba(0,243,255,0.5); text-transform:uppercase; margin-bottom:4px;">Vending Machine</div>
+                <div style="font-family:'Montserrat'; font-size:1.1rem; font-weight:700; color:#fff; letter-spacing:1px;">SELECT DRINK</div>
+            </div>
+            
+            <!-- Items -->
+            <div style="padding:12px 14px;">
+                <!-- Bubble Tea -->
+                <div id="vend-item-bubble" class="vend-item" style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; cursor:pointer; transition:background 0.2s; margin-bottom:8px; border:1px solid rgba(255,255,255,0.04);">
+                    <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #7B2FBE, #00C9FF); display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0;">🧋</div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-family:'Montserrat'; font-size:0.8rem; font-weight:600; color:#e0e0e0; margin-bottom:3px;">Bubble Tea</div>
+                        <div style="font-family:'Montserrat'; font-size:0.6rem; color:#888; line-height:1.3;">Stella's little shtick. Loves it so much it gives her wings...figuratively.</div>
+                    </div>
+                    <div style="font-family:'Orbitron'; font-size:0.75rem; color:#ffd700; text-shadow:0 0 6px rgba(255,215,0,0.3); flex-shrink:0; white-space:nowrap;">30 ¤</div>
+                </div>
+                
+                <!-- Ms. Jean Soda -->
+                <div id="vend-item-jean" class="vend-item" style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; cursor:pointer; transition:background 0.2s; margin-bottom:8px; border:1px solid rgba(255,255,255,0.04);">
+                    <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #D4447C, #FFB6C1); display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0;">💋</div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-family:'Montserrat'; font-size:0.8rem; font-weight:600; color:#e0e0e0; margin-bottom:3px;">Ms. Jean <span style="font-size:0.6rem; color:#999; font-weight:400;">(Vanilla Crème)</span></div>
+                        <div style="font-family:'Montserrat'; font-size:0.6rem; color:#888; line-height:1.3;">Classic, refreshing, lovely cream soda.</div>
+                    </div>
+                    <div style="font-family:'Orbitron'; font-size:0.75rem; color:#ffd700; text-shadow:0 0 6px rgba(255,215,0,0.3); flex-shrink:0; white-space:nowrap;">20 ¤</div>
+                </div>
+                
+                <!-- Stellar Lemonade (unlocked after Anavia salvage missions) -->
+                <div id="vend-item-stellar" class="vend-item" style="display:none; align-items:center; gap:12px; padding:12px; border-radius:10px; cursor:pointer; transition:background 0.2s; margin-bottom:4px; border:1px solid rgba(255,215,0,0.15);">
+                    <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #FFD700, #FFA500); display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0;">⭐</div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-family:'Montserrat'; font-size:0.8rem; font-weight:600; color:#FFD700; margin-bottom:3px;">Stellar Lemonade</div>
+                        <div style="font-family:'Montserrat'; font-size:0.6rem; color:#b89730; line-height:1.3;">Blazing speed, razor reflexes. Burns bright, burns fast. Golden shield included.</div>
+                    </div>
+                    <div style="font-family:'Orbitron'; font-size:0.75rem; color:#ffd700; text-shadow:0 0 6px rgba(255,215,0,0.3); flex-shrink:0; white-space:nowrap;">75 ¤</div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="padding:8px 14px 14px; border-top:1px solid rgba(255,255,255,0.04);">
+                <div id="vend-balance" style="font-family:'Orbitron'; font-size:0.65rem; color:#ffd700; text-align:center; margin-bottom:10px; letter-spacing:1px;"></div>
+                <button id="btn-vend-close" style="width:100%; padding:10px; background:transparent; border:1px solid rgba(255,255,255,0.12); border-radius:6px; color:#777; font-family:'Montserrat'; font-size:0.75rem; font-weight:500; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all 0.2s;">CLOSE</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- PAUSE MENU -->
+    <div id="pause-menu">
+        <div class="pause-backdrop"></div>
+        <div class="pause-content">
+            <div class="pause-header">
+                <h1 class="pause-title">Paused</h1>
+            </div>
+            <div class="pause-mission" id="pause-mission">
+                <div class="pause-mission-label">OBJECTIVES</div>
+                
+                <div class="pause-obj-block story" id="pause-obj-story">
+                    <div class="pause-obj-label">STORY</div>
+                    <div class="pause-obj-text" id="pause-obj-story-text"><span class="pause-obj-none">—</span></div>
+                </div>
+
+                <div class="pause-obj-block optional" id="pause-obj-optional">
+                    <div class="pause-obj-label">OPTIONAL</div>
+                    <div class="pause-obj-text" id="pause-obj-optional-text"><span class="pause-obj-none">—</span></div>
+                </div>
+
+                <div class="pause-obj-block side" id="pause-obj-side">
+                    <div class="pause-obj-label">SIDE MISSION</div>
+                    <div class="pause-obj-text" id="pause-obj-side-text"><span class="pause-obj-none">—</span></div>
+                    <div id="pause-mission-cancel" style="display:none; margin-top: 6px;">
+                        <button id="btn-abandon-mission" style="background: transparent; border: 1px solid rgba(255,50,50,0.3); color: #ff5555; padding: 3px 10px; cursor: pointer; font-family: 'Montserrat', sans-serif; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; border-radius: 3px;">ABANDON</button>
+                    </div>
+                </div>
+            </div>
+            <nav class="pause-menu-list" id="pause-nav-main">
+                <div class="pause-menu-item active" data-action="resume" tabindex="0">RESUME GAME</div>
+                <div class="pause-menu-item" data-action="save" tabindex="0">SAVE GAME</div>
+                <div class="pause-menu-item" data-action="load" tabindex="0">SWITCH TO ANOTHER SAVED GAME</div>
+                <div class="pause-menu-item" data-action="inventory" tabindex="0">INVENTORY</div>
+                <div class="pause-menu-item" data-action="map" tabindex="0">MAP</div>
+                <div class="pause-menu-item" data-action="team" tabindex="0">TEAM MANAGEMENT</div>
+                <div class="pause-menu-item" data-action="settings" tabindex="0">SETTINGS</div>
+                <div class="pause-menu-item" data-action="dlc" tabindex="0">MANAGE DLC</div>
+                <div class="pause-menu-item" data-action="manual" tabindex="0">GAME MANUAL</div>
+                <div class="pause-menu-item" data-action="quit" tabindex="0">QUIT TO MAIN MENU</div>
+            </nav>
+            
+            <!-- SETTINGS PANEL (replaces nav when active) -->
+            <div class="pause-settings-panel" id="pause-settings-panel">
+                <div class="settings-section-label">Density</div>
+                <div class="settings-row">
+                    <span class="settings-label">Traffic</span>
+                    <span class="settings-value val-high" id="set-traffic" data-key="trafficDensity">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Pedestrians</span>
+                    <span class="settings-value val-high" id="set-pedestrians" data-key="pedestrianDensity">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Foliage</span>
+                    <span class="settings-value val-high" id="set-foliage" data-key="foliageDensity">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Rain</span>
+                    <span class="settings-value val-high" id="set-rain" data-key="rainDensity">HIGH</span>
+                </div>
+                
+                <div class="settings-section-label">Visual</div>
+                <div class="settings-row">
+                    <span class="settings-label">Lighting</span>
+                    <span class="settings-value val-high" id="set-lighting" data-key="lightingQuality">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Film Grain</span>
+                    <span class="settings-value val-on" id="set-grain" data-key="filmGrain">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Soft Shadows</span>
+                    <span class="settings-value val-off" id="set-softshadows" data-key="softShadows">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Bloom</span>
+                    <span class="settings-value val-on" id="set-bloom" data-key="bloom">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Wet Reflections</span>
+                    <span class="settings-value val-on" id="set-wetreflections" data-key="wetReflections">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Atmosphere</span>
+                    <span class="settings-value" id="set-atmosphere" data-key="atmosphereTint">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Color Grade</span>
+                    <span class="settings-value" id="set-colorgrade" data-key="colorGrade">NONE</span>
+                </div>
+                
+                <div class="settings-section-label">Display</div>
+                <div class="settings-row">
+                    <span class="settings-label">Fullscreen</span>
+                    <span class="settings-value val-high" id="set-fullscreen" data-key="fullscreen">ON</span>
+                </div>
+                
+                <div class="settings-section-label">Audio</div>
+                <div class="settings-row">
+                    <span class="settings-label">Master Audio</span>
+                    <span class="settings-value val-on" id="set-audio" data-key="audioEnabled">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Ambience</span>
+                    <span class="amb-slider-wrap"><input type="range" class="ggp-slider amb-slider" id="set-ambience" min="0" max="100" step="5" value="70"><span class="amb-val" id="set-ambience-val">70</span></span>
+                </div>
+                
+                <div class="settings-section-label">Performance</div>
+                <div class="settings-row">
+                    <span class="settings-label">Frame Limit</span>
+                    <span class="settings-value" id="set-fps" data-key="fpsLimit">NONE</span>
+                </div>
+                
+                <div class="settings-back-btn" id="pause-settings-back">◁ BACK</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SAVE SLOT OVERLAY -->
+    <div id="save-slot-overlay"></div>
+    
+    <svg style="position: absolute; height: 0; width: 0; overflow: hidden;">
+        <defs>
+            <filter id="stealthEdge">
+                <feConvolveMatrix order="3" kernelMatrix="0 -1 0   -1 4 -1   0 -1 0" preserveAlpha="false"/>
+                <feColorMatrix type="matrix" values="0 0 0 0 1 
+                                                     0 0 0 0 1 
+                                                     0 0 0 0 1 
+                                                     50 50 50 0 -5" />
+            </filter>
+        </defs>
+    </svg>
+    <script>
+<!-- @scripts -->
+    </script>
+    
+    <svg style="position: absolute; height: 0; width: 0; overflow: hidden;">
+        <defs>
+            <filter id="stealthEdge">
+                <feConvolveMatrix order="3" kernelMatrix="0 -1 0   -1 4 -1   0 -1 0" preserveAlpha="false"/>
+                
+                <feColorMatrix type="matrix" values="0 0 0 0 1 
+                                                     0 0 0 0 1 
+                                                     0 0 0 0 1 
+                                                     50 50 50 0 -5" />
+            </filter>
+        </defs>
+    </svg>
+</body>
+</html>
+
