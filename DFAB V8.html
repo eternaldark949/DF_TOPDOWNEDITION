@@ -1797,6 +1797,9 @@
         .ggp-label { font-family:var(--font-tech); font-size:7px; color:#888; width:52px; text-align:right; flex-shrink:0; text-transform:uppercase; letter-spacing:0.5px; }
         .ggp-slider { flex:1; -webkit-appearance:none; appearance:none; height:10px; border-radius:2px; outline:none; cursor:pointer; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.06); pointer-events:auto; }
         .ggp-slider::-webkit-slider-thumb { -webkit-appearance:none; width:10px; height:16px; border-radius:2px; background:#ccc; border:1px solid #000; cursor:pointer; }
+        .amb-slider-wrap { display:flex; align-items:center; gap:10px; }
+        .amb-slider { flex:0 0 auto; width:120px; touch-action:none; }
+        .amb-val { min-width:2.2em; text-align:right; font-size:0.8em; opacity:0.8; }
         .ggp-val { font-size:8px; color:#888; width:24px; text-align:left; font-family:monospace; }
         .ggp-presets { display:flex; gap:4px; margin-top:8px; flex-wrap:wrap; }
         .ggp-preset { padding:3px 6px; font-family:var(--font-tech); font-size:7px; border-radius:3px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:#888; cursor:pointer; text-transform:uppercase; letter-spacing:0.5px; pointer-events:auto; }
@@ -2425,6 +2428,11 @@
                         <div class="row-left"><div class="desc-box">Mute all SFX and music.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-audio">Master Audio: ON</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="row-ambience">
+                        <div class="row-left"><div class="desc-box">Rain, wind, city and room sounds.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn amb-slider-wrap"><span id="lbl-ambience">Ambience: 70</span><input type="range" class="ggp-slider amb-slider" id="main-ambience" min="0" max="100" step="5" value="70"></div></div>
+                        <div class="row-right"><div class="input-prompt">slide</div></div>
                     </div>
                     <div class="menu-item-row" id="btn-toggle-fps">
                         <div class="row-left"><div class="desc-box">Cap frame rate to save power.<span class="arrow">▶</span></div></div>
@@ -3122,6 +3130,10 @@
                 <div class="settings-row">
                     <span class="settings-label">Master Audio</span>
                     <span class="settings-value val-on" id="set-audio" data-key="audioEnabled">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Ambience</span>
+                    <span class="amb-slider-wrap"><input type="range" class="ggp-slider amb-slider" id="set-ambience" min="0" max="100" step="5" value="70"><span class="amb-val" id="set-ambience-val">70</span></span>
                 </div>
                 
                 <div class="settings-section-label">Performance</div>
@@ -5184,6 +5196,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.
+            ambienceVolume: (() => {        // Rain, wind, city, room tone, fireplace (0..1); kept outside saves too
+                try {
+                    const v = parseFloat(localStorage.getItem('dfab_ambience_volume'));
+                    if (!isNaN(v)) return Math.max(0, Math.min(1, v));
+                } catch (e) { /* private mode */ }
+                return 0.7;
+            })(),
             
             // --- PERFORMANCE ---
             fpsLimit: 0,
@@ -6340,15 +6359,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                4. Set frequency/volume envelopes over time
                5. Start and stop at precise times
                --------------------------------------------------------------- */
-            sfx(type) {
+            sfx(type, opts = {}) {
                 // Ensure audio context is active
                 if (this.ctx.state === 'suspended') this.ctx.resume();
-                
+
+                // Muffled = heard through walls: a lowpass in front of the master bus
+                let out = this.masterGain;
+                if (opts.muffled) {
+                    out = this.ctx.createBiquadFilter(); out.type = 'lowpass'; out.frequency.value = 160;
+                    const trim = this.ctx.createGain(); trim.gain.value = 0.6;
+                    out.connect(trim); trim.connect(this.masterGain);
+                }
+
                 // Create audio nodes
                 const osc = this.ctx.createOscillator();  // Generates the tone
                 const gain = this.ctx.createGain();       // Controls volume
                 osc.connect(gain);
-                gain.connect(this.masterGain);            // Route through master mute bus
+                gain.connect(out);                        // Route through master mute bus
 
                 const now = this.ctx.currentTime;
 
@@ -6392,7 +6419,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const sub = this.ctx.createOscillator();
                     const subGain = this.ctx.createGain();
                     sub.connect(subGain);
-                    subGain.connect(this.masterGain);
+                    subGain.connect(out);
                     sub.type = 'triangle';
                     sub.frequency.setValueAtTime(base * 0.5, now);
                     sub.frequency.exponentialRampToValueAtTime(base * 0.2, now + dur);
@@ -6425,6 +6452,204 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         // Global audio system instance
         const audioSys = new AudioSystem();
+
+        /* =====================================================================
+           AMBIENCE — procedural sound beds that crossfade with place and weather
+           ---------------------------------------------------------------------
+           Looping noise layers (rain, rain-on-roof, wind, city, room tone,
+           fireplace) whose gains glide toward targets recomputed every frame
+           from the map, the room you're in, the weather and the time of day,
+           plus sparse one-shots (crackles, passing cars, horns, drips, doors).
+           Everything is generated in code; it all runs through masterGain, so
+           the existing audio toggle mutes it.
+           ===================================================================== */
+        class AmbienceSystem {
+            constructor(audio) {
+                this.audio = audio;
+                this.ready = false;
+                this.voices = 0;
+                this.next = { car: 0, horn: 0, drip: 0 };
+            }
+
+            _build() {
+                const ctx = this.audio.ctx, sr = ctx.sampleRate, len = Math.floor(sr * 3);
+                const pink = ctx.createBuffer(1, len, sr), brown = ctx.createBuffer(1, len, sr);
+                const pd = pink.getChannelData(0), bd = brown.getChannelData(0);
+                let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0;
+                for (let i = 0; i < len; i++) {
+                    const w = Math.random() * 2 - 1;                  // Paul Kellet's pink filter
+                    b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+                    b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+                    pd[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926;
+                    last = (last + 0.02 * w) / 1.02; bd[i] = last * 3.5;   // brown: leaky integrated white
+                }
+                this.pink = pink; this.brown = brown;
+                this.bus = ctx.createGain(); this.bus.gain.value = 0; this.bus.connect(this.audio.masterGain);
+                const bq = (type, f, Q = 0.7) => { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = Q; return n; };
+                const layer = (buf, filters, rate) => {
+                    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.playbackRate.value = rate;
+                    let node = src; for (const f of filters) { node.connect(f); node = f; }
+                    const g = ctx.createGain(); g.gain.value = 0; node.connect(g); g.connect(this.bus);
+                    src.start(0, Math.random() * 2.5);
+                    return { g, t: 0 };
+                };
+                const windBand = bq('bandpass', 600, 0.9);
+                this.L = {
+                    rain: layer(pink, [bq('highpass', 400), bq('lowpass', 7000)], 1),
+                    rainIn: layer(pink, [bq('lowpass', 700)], 0.93),
+                    wind: layer(pink, [windBand], 0.87),
+                    city: layer(brown, [bq('lowpass', 380)], 1.07),
+                    fire: layer(brown, [bq('lowpass', 250)], 0.81),
+                    room: layer(brown, [bq('lowpass', 140)], 0.71)
+                };
+                const lfo = ctx.createOscillator(), lfoAmt = ctx.createGain();   // wind gusts drift the band around
+                lfo.frequency.value = 0.07; lfoAmt.gain.value = 300; lfo.connect(lfoAmt); lfoAmt.connect(windBand.frequency); lfo.start();
+                for (const f of [58, 116]) {                                      // appliance hum in the room tone
+                    const o = ctx.createOscillator(), og = ctx.createGain();
+                    o.frequency.value = f; og.gain.value = f === 58 ? 0.5 : 0.18; o.connect(og); og.connect(this.L.room.g); o.start();
+                }
+                this.ready = true;
+            }
+
+            _set(layer, v, tc) {
+                if (Math.abs(v - layer.t) < 0.003) return;
+                layer.t = v; layer.g.gain.setTargetAtTime(v, this.audio.ctx.currentTime, tc);
+            }
+
+            /** Called every frame from GameEngine.loop (also while paused). */
+            update(game) {
+                const a = this.audio;
+                if (!this.ready) { if (a.ctx.state !== 'running') return; this._build(); }
+                const map = game.activeMap; if (!map) return;
+                const now = a.ctx.currentTime, w = game.weather, rs = game.roomSystem;
+                const indoorMap = map.type === 'indoor', veranda = !!(rs && rs.active && rs.isPlayerOutdoor());
+                const outside = !indoorMap || veranda, apt = map.id === 'apt_949';
+                const thresh = (CONFIG.WEATHER && CONFIG.WEATHER.SCHED_RAIN_THRESHOLD) || 0.15;
+                const rain = w && w.intensity > thresh ? Math.min(1, w.intensity) : 0;
+                const wind = w ? Math.min(1, w.wind || 0) : 0;
+                const hour = ((game.worldMinutes || 0) % 1440) / 60, day = Math.max(0, 1 - Math.abs(13 - hour) / 7);
+                const p = game.player, fireD = apt && p ? Math.hypot(p.x - 580, p.y - 432) : 1e9, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
+                const paused = !!game.paused;
+                const vol = GameSettings.ambienceVolume ?? 0.7;
+
+                this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1), now, 0.4);   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
+                this._set(this.L.rain, outside ? 0.3 * rain : 0, 0.8);
+                this._set(this.L.rainIn, outside ? 0 : 0.22 * rain, 0.8);
+                this._set(this.L.wind, outside ? 0.04 + 0.12 * wind : 0.015 * wind, 1.2);
+                this._set(this.L.city, !indoorMap ? 0.1 + 0.07 * day : veranda ? 0.09 : apt ? 0.025 : 0.015, 1.0);
+                this._set(this.L.room, apt && !veranda ? 0.035 : 0, 1.0);
+                this._set(this.L.fire, 0.22 * fire, 0.5);
+                if (paused) return;
+
+                // Sparse one-shots
+                if (fire > 0.02 && Math.random() < 0.09) this._crackle(0.35 * fire);
+                if (outside && now > this.next.car) { this._carPass(indoorMap ? 0.05 : 0.08); this.next.car = now + 6 + Math.random() * 9; }
+                if (outside && now > this.next.horn) { if (this.next.horn) this._horn(indoorMap ? 0.012 : 0.02); this.next.horn = now + 20 + Math.random() * 30; }
+                if (!outside && rain > 0 && now > this.next.drip) { this._drip(0.02 * rain); this.next.drip = now + 0.6 + Math.random() * 2.4; }
+            }
+
+            /** Map menu / game stop: let everything fade out. */
+            silence() { if (this.ready) this.bus.gain.setTargetAtTime(0, this.audio.ctx.currentTime, 0.3); }
+
+            _voice(nodes, dur) {
+                if (this.voices >= 6) return false;
+                this.voices++; setTimeout(() => { this.voices--; }, dur * 1000 + 50);
+                return true;
+            }
+
+            _burst(buf, dur, filter, gain, env) {
+                const ctx = this.audio.ctx, now = ctx.currentTime;
+                const src = ctx.createBufferSource(); src.buffer = buf;
+                const g = ctx.createGain(); src.connect(filter); filter.connect(g); g.connect(this.bus);
+                env(g.gain, now, gain);
+                src.start(now, Math.random() * 2.5, dur + 0.05);
+                return { src, filter, g, now };
+            }
+
+            _crackle(v) {
+                if (!this._voice(null, 0.05)) return;
+                const ctx = this.audio.ctx, f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2000 + Math.random() * 3000; f.Q.value = 1.5;
+                const d = 0.005 + Math.random() * 0.035;
+                this._burst(this.pink, d, f, v * (0.4 + Math.random() * 0.6), (g, t, a) => { g.setValueAtTime(a, t); g.exponentialRampToValueAtTime(0.0001, t + d); });
+            }
+
+            _carPass(v) {
+                if (!this._voice(null, 2.4)) return;
+                const ctx = this.audio.ctx, f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+                const now = ctx.currentTime;
+                f.frequency.setValueAtTime(300, now); f.frequency.linearRampToValueAtTime(900, now + 1.1); f.frequency.linearRampToValueAtTime(300, now + 2.3);
+                let node = f;
+                if (ctx.createStereoPanner) {
+                    const pan = ctx.createStereoPanner(), dir = Math.random() < 0.5 ? -1 : 1;
+                    pan.pan.setValueAtTime(-0.8 * dir, now); pan.pan.linearRampToValueAtTime(0.8 * dir, now + 2.3);
+                    f.connect(pan); node = pan;
+                }
+                const src = ctx.createBufferSource(); src.buffer = this.brown; src.playbackRate.value = 1.6;
+                const g = ctx.createGain(); src.connect(f); node.connect(g); g.connect(this.bus);
+                g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(v, now + 1.1); g.gain.exponentialRampToValueAtTime(0.0001, now + 2.3);
+                src.start(now, Math.random() * 2.5, 2.4);
+            }
+
+            _horn(v) {
+                if (!this._voice(null, 0.8)) return;
+                const ctx = this.audio.ctx, now = ctx.currentTime, lp = ctx.createBiquadFilter(), g = ctx.createGain();
+                lp.type = 'lowpass'; lp.frequency.value = 900; lp.connect(g); g.connect(this.bus);
+                for (const f of [392, 397]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * (0.9 + Math.random() * 0.2); o.connect(lp); o.start(now); o.stop(now + 0.75); }
+                g.gain.setValueAtTime(0.0001, now);
+                g.gain.exponentialRampToValueAtTime(v, now + 0.03); g.gain.setValueAtTime(v, now + 0.22); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+                g.gain.exponentialRampToValueAtTime(v, now + 0.4); g.gain.setValueAtTime(v, now + 0.62); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.72);
+            }
+
+            _drip(v) {
+                if (!this._voice(null, 0.1)) return;
+                const ctx = this.audio.ctx, now = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+                o.type = 'sine'; o.frequency.setValueAtTime(1800 + Math.random() * 900, now); o.frequency.exponentialRampToValueAtTime(900, now + 0.05);
+                o.connect(g); g.connect(this.bus);
+                g.gain.setValueAtTime(v, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+                o.start(now); o.stop(now + 0.07);
+            }
+
+            /** Door sounds: 'creak' | 'latch' | 'whoosh', quieter with distance from the player. */
+            doorEvent(kind, door) {
+                if (!this.ready || typeof game === 'undefined' || game.paused) return;
+                const p = game.player, cx = door.x + door.w / 2, cy = door.y + door.h / 2;
+                const near = p ? Math.max(0, 1 - Math.hypot(p.x - cx, p.y - cy) / 500) : 1;
+                if (near <= 0.02) return;
+                this.eventCounts = this.eventCounts || {}; this.eventCounts[kind] = (this.eventCounts[kind] || 0) + 1;
+                const ctx = this.audio.ctx, now = ctx.currentTime;
+                if (kind === 'creak') {
+                    if (!this._voice(null, 0.6)) return;
+                    const o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+                    o.type = 'sawtooth'; bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 4;
+                    const f0 = 170 + Math.random() * 60;
+                    o.frequency.setValueAtTime(f0, now); o.frequency.linearRampToValueAtTime(f0 * 1.25, now + 0.18);
+                    o.frequency.linearRampToValueAtTime(f0 * 0.95, now + 0.34); o.frequency.linearRampToValueAtTime(f0 * 1.15, now + 0.5);
+                    o.connect(bp); bp.connect(g); g.connect(this.bus);
+                    g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.05 * near, now + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+                    o.start(now); o.stop(now + 0.56);
+                } else if (kind === 'latch') {
+                    if (!this._voice(null, 0.1)) return;
+                    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 3200; f.Q.value = 3;
+                    this._burst(this.pink, 0.025, f, 0.18 * near, (gg, t, amp) => { gg.setValueAtTime(amp, t); gg.exponentialRampToValueAtTime(0.0001, t + 0.025); });
+                    const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.frequency.setValueAtTime(140, now); o.frequency.exponentialRampToValueAtTime(70, now + 0.07);
+                    o.connect(g); g.connect(this.bus); g.gain.setValueAtTime(0.09 * near, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+                    o.start(now); o.stop(now + 0.09);
+                } else if (kind === 'whoosh') {
+                    if (!this._voice(null, 0.4)) return;
+                    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 0.8;
+                    f.frequency.setValueAtTime(700, now); f.frequency.exponentialRampToValueAtTime(2600, now + 0.3);
+                    this._burst(this.pink, 0.35, f, 0.07 * near, (gg, t, amp) => { gg.setValueAtTime(0.0001, t); gg.exponentialRampToValueAtTime(amp, t + 0.1); gg.exponentialRampToValueAtTime(0.0001, t + 0.35); });
+                }
+            }
+        }
+        const ambience = new AmbienceSystem(audioSys);
+
+        // Nothing plays in a background tab
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) audioSys.ctx.suspend();
+            else if (typeof game !== 'undefined' && game.running) audioSys.ctx.resume();
+        });
 
 
         /* =====================================================================
@@ -7176,7 +7401,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.triggerLightning();
                         if (typeof audioSys !== 'undefined' && audioSys.sfx) {
                             // Thunder trails the flash slightly — light before sound.
-                            setTimeout(() => audioSys.sfx('thunder'), 220 + Math.random() * 500);
+                            setTimeout(() => audioSys.sfx('thunder', { muffled: this.indoorSuppressed }), 220 + Math.random() * 500);
                         }
                     }
                 }
@@ -8276,44 +8501,72 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.targetOpen = 0;
                 this.speed = config.speed || 0.08;
                 
-                // Hinged door: swing direction based on player approach
-                this.hingeAngle = 0;
+                // Hinged door: a physical leaf that actors push open and a spring swings shut.
+                // angle 0 = closed; either sign = open to one side or the other.
                 this.hingeSide = config.hingeSide || 'left';
-                this.swingDir = 1;          // +1 or -1 — set by player approach direction
-                this._lastPlayerX = 0;
-                this._lastPlayerY = 0;
+                this.angle = 0;
+                this.angVel = 0;
+                this.thickness = 6;
+                if (this.orientation === 'H') {
+                    this.hx = this.hingeSide === 'left' ? this.x : this.x + this.w; this.hy = this.y + this.h / 2;
+                    this.baseAngle = this.hingeSide === 'left' ? 0 : Math.PI; this.length = this.w;
+                } else {
+                    this.hx = this.x + this.w / 2; this.hy = this.hingeSide === 'left' ? this.y : this.y + this.h;
+                    this.baseAngle = this.hingeSide === 'left' ? Math.PI / 2 : -Math.PI / 2; this.length = this.h;
+                }
             }
-            
+
             update(playerX, playerY) {
+                if (this.type === 'hinged') return;                 // hinged doors move in stepPhysics
                 const cx = this.x + this.w / 2;
                 const cy = this.y + this.h / 2;
                 const dist = Math.hypot(playerX - cx, playerY - cy);
-                
-                const wasOpen = this.targetOpen > 0.5;
+                const wasOpen = this.targetOpen;
                 this.targetOpen = dist < this.triggerRadius ? 1 : 0;
-                
-                // On open trigger, determine swing direction from player movement
-                if (!wasOpen && this.targetOpen > 0.5 && this.type === 'hinged') {
-                    if (this.orientation === 'H') {
-                        // Player moving downward → swing down (+1), upward → swing up (-1)
-                        const dy = playerY - this._lastPlayerY;
-                        this.swingDir = dy >= 0 ? 1 : -1;
-                    } else {
-                        const dx = playerX - this._lastPlayerX;
-                        this.swingDir = dx >= 0 ? 1 : -1;
-                    }
-                }
-                
-                this._lastPlayerX = playerX;
-                this._lastPlayerY = playerY;
-                
+                if (this.targetOpen && !wasOpen && typeof ambience !== 'undefined') ambience.doorEvent('whoosh', this);
                 this.openAmount += (this.targetOpen - this.openAmount) * this.speed;
                 if (this.openAmount < 0.01) this.openAmount = 0;
                 if (this.openAmount > 0.99) this.openAmount = 1;
-                
-                if (this.type === 'hinged') {
-                    this.hingeAngle = this.openAmount * (Math.PI / 2);
+            }
+
+            /** One tick of hinge physics: actors (circles) push the leaf, it pushes back, a spring closes it. */
+            stepPhysics(actors) {
+                if (this.type !== 'hinged') return;
+                const L = this.length, half = this.thickness / 2, MAX = Math.PI / 2 - 0.05;
+                const a = this.baseAngle + this.angle, ux = Math.cos(a), uy = Math.sin(a);
+                for (const act of actors) {
+                    const r = act.radius || 12;
+                    const px = act.x - this.hx, py = act.y - this.hy;
+                    if (px * px + py * py > (L + r + 4) * (L + r + 4)) continue;
+                    const s = Math.max(0, Math.min(L, px * ux + py * uy));           // closest point along the leaf
+                    const dx = px - ux * s, dy = py - uy * s, dist = Math.hypot(dx, dy);
+                    const depth = r + half - dist;
+                    if (depth <= 0) continue;
+                    let nx, ny;
+                    if (dist > 1e-4) { nx = dx / dist; ny = dy / dist; }
+                    else { nx = -uy; ny = ux; }
+                    const jammed = Math.abs(this.angle) >= MAX - 0.01 && Math.sign(ux * -ny - uy * -nx) === Math.sign(this.angle);
+                    const give = jammed || s < 4 ? 1 : 0.7;                         // near the hinge or at the stop it can't yield
+                    act.x += nx * depth * give; act.y += ny * depth * give;
+                    // Torque from the actor pushing along -n at distance s from the hinge
+                    const torque = s * (ux * -ny - uy * -nx) * depth;
+                    this.angVel += torque * 0.9 / (L * L / 3);
                 }
+                const prev = this.angle;
+                this.angVel += -0.018 * this.angle;                                 // closing spring
+                this.angVel *= 0.88;
+                this.angle += this.angVel;
+                if (this.angle > MAX) { this.angle = MAX; this.angVel *= -0.3; }
+                if (this.angle < -MAX) { this.angle = -MAX; this.angVel *= -0.3; }
+                if (Math.abs(this.angle) < 0.002 && Math.abs(this.angVel) < 0.0005) { this.angle = 0; this.angVel = 0; }
+                // Sounds: a creak as it's pushed open, a latch click when it swings home
+                if (typeof ambience !== 'undefined') {
+                    const t = _frameTime / 1000;
+                    this._maxOpen = Math.max(this._maxOpen || 0, Math.abs(this.angle));
+                    if (Math.abs(this.angVel) > 0.02 && Math.abs(this.angle) > Math.abs(prev) && t - (this._creakAt || -9) > 0.6) { this._creakAt = t; ambience.doorEvent('creak', this); }
+                    if (prev !== 0 && Math.abs(this.angle) < 0.03 && Math.abs(prev) >= 0.03 && this._maxOpen > 0.3) { this._maxOpen = 0; ambience.doorEvent('latch', this); }
+                }
+                this.openAmount = Math.abs(this.angle) / (Math.PI / 2);
             }
             
             draw(ctx) {
@@ -8346,39 +8599,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             drawHinged(ctx) {
-                ctx.translate(this.x, this.y);
-                const dir = this.swingDir; // Player-direction-based swing
-                
-                if (this.orientation === 'H') {
-                    const hingeX = this.hingeSide === 'left' ? 0 : this.w;
-                    ctx.save();
-                    ctx.translate(hingeX, this.h / 2);
-                    ctx.rotate(this.hingeAngle * dir);
-                    ctx.fillStyle = this.color;
-                    ctx.fillRect(this.hingeSide === 'left' ? 0 : -this.w, -this.h / 2, this.w, this.h);
-                    ctx.fillStyle = '#888';
-                    const handleX = this.hingeSide === 'left' ? this.w * 0.75 : -this.w * 0.75;
-                    ctx.fillRect(handleX - 2, -1, 4, 2);
-                    ctx.restore();
-                } else {
-                    const hingeY = this.hingeSide === 'left' ? 0 : this.h;
-                    ctx.save();
-                    ctx.translate(this.w / 2, hingeY);
-                    ctx.rotate(this.hingeAngle * dir);
-                    ctx.fillStyle = this.color;
-                    ctx.fillRect(-this.w / 2, this.hingeSide === 'left' ? 0 : -this.h, this.w, this.h);
-                    ctx.restore();
+                const L = this.length, t = this.thickness;
+                ctx.translate(this.hx, this.hy);
+                if (Math.abs(this.angle) > 0.17) {                                  // faint sweep on the floor
+                    ctx.strokeStyle = 'rgba(255,217,176,0.12)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+                    ctx.beginPath(); ctx.arc(0, 0, L, this.baseAngle, this.baseAngle + this.angle, this.angle < 0); ctx.stroke();
+                    ctx.setLineDash([]);
                 }
-                
-                // Hinge pin
-                ctx.fillStyle = '#777';
-                ctx.beginPath();
-                ctx.arc(
-                    this.hingeSide === 'left' ? 0 : this.w,
-                    this.orientation === 'H' ? this.h / 2 : (this.hingeSide === 'left' ? 0 : this.h),
-                    2, 0, Math.PI * 2
-                );
-                ctx.fill();
+                ctx.rotate(this.baseAngle + this.angle);
+                ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(2, -t / 2 + 2, L - 2, t);        // shadow
+                ctx.fillStyle = this.color; ctx.fillRect(0, -t / 2, L, t);
+                ctx.fillStyle = 'rgba(255,220,190,0.12)'; ctx.fillRect(3, -t / 2 + 1, L - 6, 1.2); // panel sheen
+                ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.8; ctx.strokeRect(0, -t / 2, L, t);
+                ctx.fillStyle = '#c9a46a';                                           // brass handles on both faces
+                ctx.fillRect(L * 0.82, -t / 2 - 2, 5, 2); ctx.fillRect(L * 0.82, t / 2, 5, 2);
+                ctx.fillStyle = '#8a7048'; ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, Math.PI * 2); ctx.fill();   // hinge pin
             }
         }
         
@@ -8574,6 +8809,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             isPlayerOutdoor() {
                 return this.active && this.currentRoom && this.currentRoom.type === 'outdoor';
+            }
+
+            /** Hinged-door physics, run from the actor collision pass so doors block and get pushed. */
+            stepDoorPhysics(actors) {
+                if (!this.active) return;
+                for (const door of this.doors) if (door.type === 'hinged') door.stepPhysics(actors);
             }
             
             /**
@@ -8888,7 +9129,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: 0, y: 0, w: 1400, h: 200, color: '#2a3035' },
                     { x: 8, y: 208, w: 892, h: 684, color: '#3a1520', texture: 'carpet' },
                     { x: 908, y: 208, w: 484, h: 340, color: '#1a1520' },
-                    { x: 908, y: 556, w: 484, h: 336, color: '#d0d5d8' },
+                    { x: 908, y: 556, w: 484, h: 336, color: '#bfb7b4' },
                 ],
                 walls: [
                     { x: 0, y: 0, w: 1400, h: 8 }, { x: 0, y: 0, w: 8, h: 200 },
@@ -9258,18 +9499,44 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     e.npcs = [ new NPC(400, 500, "Lost Soul", 'spirit'), new NPC(800, 500, "Wandering Spirit", 'spirit'), new NPC(600, 350, "Spirit Guide", 'spirit') ];
                     break;
 
-                case 'apt_949':
+                case 'apt_949': {
+                    // Cozy-modern suite. Furniture art lives in drawApartmentDecorProp, floor art
+                    // (planks, tiles, rugs, deck) in drawApartmentInterior, glows in drawApartmentGlow.
+                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#4a3a30', decorType }, extra));
                     e.props = [
-                        new PropEntity({ x: 400, y: 500, width: 120, height: 70, color: '#4a2832', interactionType: 'couch_two_seater' }),
-                        new PropEntity({ x: 550, y: 420, width: 60, height: 25, color: '#ff6622', interactionType: 'tv_screen' }),
-                        new PropEntity({ x: 340, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table' }),
-                        new PropEntity({ x: 560, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table' }),
+                        new PropEntity({ x: 400, y: 500, width: 120, height: 70, color: '#4a2832', interactionType: 'couch_two_seater', decorType: 'apt_sofa' }),
+                        new PropEntity({ x: 550, y: 420, width: 60, height: 25, color: '#ff6622', interactionType: 'tv_screen', decorType: 'apt_fireplace' }),
+                        new PropEntity({ x: 340, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table', decorType: 'apt_side' }),
+                        new PropEntity({ x: 560, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table', decorType: 'apt_side' }),
                         new PropEntity({ x: 30, y: 340, width: 44, height: 50, color: '#2a2a3a', interactionType: 'armory' }),
                         new PropEntity({ x: 30, y: 540, width: 44, height: 36, color: '#00f3ff', interactionType: 'vending_machine' }),
-                        new PropEntity({ x: 1060, y: 290, width: 18, height: 14, color: '#3a4a6a', interactionType: 'read_note', noteId: 'larissa_briefing_darklands' }),
+                        new PropEntity({ x: 1111, y: 226, width: 18, height: 14, color: '#3a4a6a', interactionType: 'read_note', noteId: 'larissa_briefing_darklands' }),
                         new PropEntity({ x: 30, y: 750, width: 44, height: 36, color: '#0f0', interactionType: 'medbay_refill' }),
-                        new PropEntity({ x: 1000, y: 260, width: 40, height: 80, color: '#334466', interactionType: 'bed_sleep' }),
+                        new PropEntity({ x: 1010, y: 216, width: 90, height: 110, color: '#334466', interactionType: 'bed_sleep', decorType: 'apt_bed', mass: 1e7 }),
                         new PropEntity({ x: 750, y: 750, width: 60, height: 35, color: '#2a2a3a', interactionType: 'crafting_table' }),
+                        // Living room: lounge
+                        F(438, 452, 64, 30, 'apt_coffee'), F(600, 505, 40, 40, 'apt_chair'),
+                        F(300, 212, 180, 20, 'apt_bookshelf'), F(640, 212, 140, 22, 'apt_console'),
+                        F(26, 222, 30, 30, 'apt_plant'), F(852, 450, 30, 30, 'apt_plant'), F(846, 820, 34, 34, 'apt_plant'),
+                        F(296, 428, 22, 22, 'apt_floor_lamp'), F(689, 689, 22, 22, 'apt_floor_lamp'), F(98, 452, 22, 22, 'apt_floor_lamp'),
+                        // Living room: kitchen along the south wall + open bar island
+                        F(96, 834, 44, 50, 'apt_fridge'), F(140, 848, 110, 36, 'apt_sink'), F(250, 848, 20, 36, 'apt_counter'),
+                        F(270, 846, 84, 38, 'apt_gas_range'), F(354, 848, 60, 36, 'apt_counter'), F(414, 848, 64, 36, 'apt_induction'),
+                        F(478, 848, 112, 36, 'apt_counter'),
+                        F(170, 742, 360, 34, 'apt_island'),
+                        F(212, 712, 18, 18, 'apt_stool'), F(292, 712, 18, 18, 'apt_stool'), F(372, 712, 18, 18, 'apt_stool'), F(452, 712, 18, 18, 'apt_stool'),
+                        // Bedroom
+                        F(980, 220, 26, 26, 'apt_nightstand'), F(1104, 220, 26, 26, 'apt_nightstand'),
+                        F(1348, 226, 36, 110, 'apt_wardrobe'), F(1340, 392, 44, 64, 'apt_vanity'),
+                        F(1226, 456, 40, 40, 'apt_chair'), F(1350, 500, 28, 28, 'apt_plant'),
+                        // Bathroom
+                        F(1244, 598, 128, 64, 'apt_tub'), F(952, 850, 150, 34, 'apt_bath_vanity'),
+                        F(1286, 776, 98, 108, 'apt_shower'), F(914, 620, 12, 90, 'apt_towels'),
+                        F(1212, 598, 26, 26, 'apt_plant'), F(1120, 850, 26, 26, 'apt_plant'),
+                        // Veranda
+                        F(300, 52, 26, 64, 'apt_lounger'), F(336, 72, 22, 22, 'apt_side'), F(368, 52, 26, 64, 'apt_lounger'),
+                        F(990, 60, 70, 50, 'apt_bistro'), F(770, 22, 22, 34, 'apt_telescope'),
+                        F(16, 20, 60, 22, 'apt_planter'), F(1324, 20, 60, 22, 'apt_planter'), F(560, 20, 60, 22, 'apt_planter'),
                         // Light Switches — one per indoor room
                         new PropEntity({ x: 275, y: 210, width: 10, height: 14, color: '#2a2a2a', interactionType: 'light_switch', roomId: 'main_room', mass: 999999 }),
                         new PropEntity({ x: 912, y: 296, width: 10, height: 14, color: '#2a2a2a', interactionType: 'light_switch', roomId: 'bedroom', mass: 999999 }),
@@ -9287,18 +9554,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new LampEntity({ x: 450, y: 214, lampType: 5, color: '#ffccaa', lightRadius: 500, angle: 0 }),
                         new LampEntity({ x: 750, y: 214, lampType: 5, color: '#ffccaa', lightRadius: 500, angle: 0 }),
                         new LampEntity({ x: 450, y: 884, lampType: 5, color: '#ff9977', lightRadius: 400, angle: 0 }),
-                        new LampEntity({ x: 450, y: 500, lampType: 4, color: '#ff8866', lightRadius: 500 }),
+                        new LampEntity({ x: 307, y: 439, lampType: 4, color: '#ff8866', lightRadius: 500 }),
                         new LampEntity({ x: 700, y: 700, lampType: 4, color: '#ffaa88', lightRadius: 450 }),
-                        new LampEntity({ x: 250, y: 550, lampType: 4, color: '#ffbb99', lightRadius: 400 }),
+                        new LampEntity({ x: 109, y: 463, lampType: 4, color: '#ffbb99', lightRadius: 400 }),
+                        new LampEntity({ x: 290, y: 759, lampType: 4, color: '#ffb880', lightRadius: 170 }),   // bar pendants
+                        new LampEntity({ x: 410, y: 759, lampType: 4, color: '#ffb880', lightRadius: 170 }),
                         new LampEntity({ x: 1100, y: 214, lampType: 5, color: '#ffaabb', lightRadius: 450, angle: 0 }),
                         new LampEntity({ x: 1384, y: 350, lampType: 5, color: '#ff99aa', lightRadius: 450, angle: Math.PI }),
                         new LampEntity({ x: 1100, y: 400, lampType: 4, color: '#ff99bb', lightRadius: 400 }),
-                        new LampEntity({ x: 1100, y: 562, lampType: 5, color: '#ddeeff', lightRadius: 400, angle: 0 }),
-                        new LampEntity({ x: 1384, y: 700, lampType: 5, color: '#ddeeff', lightRadius: 400, angle: Math.PI }),
+                        new LampEntity({ x: 1100, y: 562, lampType: 5, color: '#e8e4f0', lightRadius: 300, angle: 0 }),
+                        new LampEntity({ x: 1384, y: 700, lampType: 5, color: '#e8e4f0', lightRadius: 320, angle: Math.PI }),
+                        new LampEntity({ x: 1027, y: 884, lampType: 5, color: '#ffe0cc', lightRadius: 260, angle: 0 }),   // vanity mirror light
                         new LampEntity({ x: 620, y: 884, lampType: 5, color: '#ffaa55', lightRadius: 300, angle: 0 }),
                         new LampEntity({ x: 780, y: 884, lampType: 5, color: '#ffaa55', lightRadius: 300, angle: Math.PI }),
                     ];
                     break;
+                }
 
                 case 'hotel_lobby':
                     e.props = [ new PropEntity({ x: 400, y: 500, width: 200, height: 50, color: '#333' }) ];
@@ -10713,7 +10984,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                     }
                 }
-                
+
+                // Actor vs hinged doors (they swing when pushed)
+                if (game && game.roomSystem && game.roomSystem.active) game.roomSystem.stepDoorPhysics(actors);
+
                 // Actor vs Dynamic (circle vs OBB)
                 for (let actor of actors) {
                     const nearby = this.spatialGrid.getNearby(actor);
@@ -11373,7 +11647,260 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * - Special rendering for medbay/vending machines
          */
         /** Top-down furniture art for clinic props (beds, monitors, IV stands, cabinets, desk...). */
+        // Cozy-modern apartment palette (apt_949): wine and blush, cream, walnut, brass, deep greens.
+        const APT = {
+            wine: '#5a2230', wineDk: '#3f1722', wineLt: '#7a2e3c', blush: '#c98f95', blushLt: '#e8b4b8',
+            cream: '#efe6dc', creamDk: '#d8cbbd', walnut: '#4a3a30', walnutLt: '#6b5444', brass: '#c9a46a',
+            ink: '#1b1718', leaf: '#2f5a3e', leafLt: '#3f7a52', stone: '#e9e6e3'
+        };
+
+        function drawApartmentDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000, A = APT;
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const shadow = () => rr(x + 3, y + 3, w, h, 5, 'rgba(0,0,0,0.28)');
+            const lampShade = (cx, cy, r) => { circ(cx, cy, r, A.cream, A.creamDk, 1); circ(cx, cy, r * 0.35, '#ffd9b0'); };
+            const counterTop = (X, Y, W, H) => {                          // cream quartz with a walnut front edge (north side)
+                rr(X, Y, W, H, 2, A.cream);
+                ctx.strokeStyle = 'rgba(160,140,125,0.25)'; ctx.lineWidth = 0.7; ctx.beginPath();
+                for (let i = 0; i < W; i += 23) { ctx.moveTo(X + i, Y + 4); ctx.quadraticCurveTo(X + i + 9, Y + H * 0.5, X + i + 4, Y + H - 3); }
+                ctx.stroke();
+                ctx.fillStyle = A.walnut; ctx.fillRect(X, Y, W, 3);
+            };
+            switch (p.decorType) {
+                case 'apt_sofa': {                                         // faces north: back along the bottom edge
+                    shadow();
+                    rr(x, y, w, h, 10, A.wine);
+                    rr(x + 2, y + h - 20, w - 4, 18, 8, A.wineDk);                                   // back
+                    rr(x, y + 4, 16, h - 6, 7, A.wineDk); rr(x + w - 16, y + 4, 16, h - 6, 7, A.wineDk);   // arms
+                    rr(x + 17, y + 6, (w - 36) / 2 - 1, h - 28, 6, A.wineLt); rr(x + w / 2 + 1, y + 6, (w - 36) / 2 - 1, h - 28, 6, A.wineLt);
+                    rr(x + 20, y + h - 30, 22, 13, 5, A.blushLt); rr(x + w - 44, y + h - 31, 22, 14, 5, A.cream);    // cushions
+                    ctx.save(); ctx.globalAlpha = 0.92;                                               // knit throw over one arm
+                    rr(x + w - 30, y + 2, 26, h - 10, 4, '#e9dcc8');
+                    ctx.strokeStyle = 'rgba(150,120,100,0.35)'; ctx.lineWidth = 1; ctx.beginPath();
+                    for (let i = 0; i < 4; i++) { ctx.moveTo(x + w - 26 + i * 6, y + 5); ctx.lineTo(x + w - 26 + i * 6, y + h - 12); }
+                    ctx.stroke(); ctx.restore();
+                    break;
+                }
+                case 'apt_fireplace': {                                    // linear glass fireplace set into a stone slab
+                    rr(x - 6, y - 4, w + 12, h + 8, 3, '#2b2224', 'rgba(239,230,220,0.35)', 1);
+                    rr(x, y + 3, w, h - 6, 2, '#120c0c');
+                    for (let i = 0; i < 6; i++) {
+                        const fx = x + 5 + i * (w - 10) / 5, fl = 0.6 + 0.4 * Math.sin(t * 7 + i * 1.9);
+                        ctx.fillStyle = `rgba(255,${140 + 60 * fl | 0},60,${0.55 + 0.35 * fl})`;
+                        ctx.beginPath(); ctx.ellipse(fx, y + h / 2, 3.5, (h - 10) / 2 * fl, 0, 0, Math.PI * 2); ctx.fill();
+                    }
+                    break;
+                }
+                case 'apt_side': case 'apt_nightstand': {
+                    shadow(); rr(x, y, w, h, 5, A.walnut, A.walnutLt, 1);
+                    lampShade(x + w * 0.42, y + h * 0.45, Math.min(w, h) * 0.3);
+                    if (p.decorType === 'apt_nightstand') { ctx.fillStyle = A.brass; ctx.fillRect(x + w / 2 - 3, y + h - 3, 6, 1.5); }
+                    break;
+                }
+                case 'apt_coffee': {
+                    shadow(); rr(x, y, w, h, h / 2, A.walnut, A.walnutLt, 1);
+                    rr(x + 5, y + 4, w - 10, h - 8, (h - 8) / 2, 'rgba(255,240,230,0.08)');
+                    rr(x + 8, y + 8, 16, 11, 1, A.cream); rr(x + 10, y + 10, 16, 11, 1, A.blush);           // books
+                    circ(x + w - 16, y + h / 2, 5, '#d8cbbd'); for (let i = 0; i < 5; i++) circ(x + w - 16 + Math.cos(i * 1.26) * 4, y + h / 2 + Math.sin(i * 1.26) * 4, 2.2, i % 2 ? A.blushLt : '#f3e3ea');   // vase of flowers
+                    break;
+                }
+                case 'apt_chair': {
+                    shadow(); rr(x, y, w, h, 12, A.blush);
+                    rr(x + 5, y + 5, w - 10, h - 14, 9, '#e6c3c2'); rr(x + 3, y + h - 10, w - 6, 8, 4, '#b27a82');
+                    break;
+                }
+                case 'apt_bookshelf': {
+                    shadow(); rr(x, y, w, h, 2, A.walnut);
+                    const cols = [A.wine, A.cream, A.blush, A.leaf, A.brass, '#8c6d5e', A.wineLt];
+                    let bx = x + 3, i = 0;
+                    while (bx < x + w - 4) {
+                        const bw = 3 + ((i * 7) % 4); if ((i % 9) === 5) { bx += 8; i++; continue; }        // gaps for ornaments
+                        ctx.fillStyle = cols[(i * 5) % cols.length]; ctx.fillRect(bx, y + 3, bw, h - 6); bx += bw + 0.6; i++;
+                    }
+                    circ(x + w - 14, y + h / 2, 6, A.leafLt);
+                    break;
+                }
+                case 'apt_console': {
+                    shadow(); rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
+                    ctx.fillStyle = '#2a2020'; ctx.fillRect(x + 6, y + 4, 26, h - 8); ctx.fillRect(x + w - 32, y + 4, 26, h - 8);   // speakers
+                    ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 4; i++) { ctx.fillRect(x + 8, y + 6 + i * 3.5, 22, 1); ctx.fillRect(x + w - 30, y + 6 + i * 3.5, 22, 1); }
+                    const cx = x + w / 2 - 6, cy = y + h / 2;                                           // turntable
+                    circ(cx, cy, 9, A.ink); circ(cx, cy, 3, A.wineLt);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(cx, cy, 6, t * 3.5, t * 3.5 + 1.2); ctx.stroke();
+                    ctx.strokeStyle = A.brass; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx + 14, cy - 7); ctx.lineTo(cx + 5, cy + 2); ctx.stroke();
+                    break;
+                }
+                case 'apt_plant': {
+                    const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2;
+                    circ(cx + 2, cy + 2, r * 0.62, 'rgba(0,0,0,0.3)'); circ(cx, cy, r * 0.6, A.cream, A.creamDk, 1);
+                    for (let i = 0; i < 7; i++) {
+                        const a = i * 0.9 + (x % 7), sway = Math.sin(t * 0.8 + i) * 0.05;
+                        ctx.fillStyle = i % 2 ? A.leaf : A.leafLt;
+                        ctx.beginPath(); ctx.ellipse(cx + Math.cos(a) * r * 0.55, cy + Math.sin(a) * r * 0.55, r * 0.55, r * 0.26, a + sway, 0, Math.PI * 2); ctx.fill();
+                    }
+                    break;
+                }
+                case 'apt_floor_lamp': {
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 2, cy + 2, w / 2, 'rgba(0,0,0,0.25)'); circ(cx, cy, w / 2, A.cream, A.brass, 1.5); circ(cx, cy, w / 5, '#ffd9b0');
+                    break;
+                }
+                case 'apt_fridge': {
+                    shadow(); rr(x, y, w, h, 2, '#8e8986'); rr(x + 2, y + 2, w - 4, h - 4, 1.5, '#b6b1ad');
+                    ctx.fillStyle = A.brass; ctx.fillRect(x + 4, y + 3, w - 8, 1.6);
+                    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x + w / 2 - 0.5, y + 4, 1, h - 8);
+                    break;
+                }
+                case 'apt_counter': counterTop(x, y, w, h); break;
+                case 'apt_sink': {
+                    counterTop(x, y, w, h);
+                    rr(x + w / 2 - 26, y + 8, 52, h - 14, 5, '#b9b4b0'); rr(x + w / 2 - 23, y + 10, 46, h - 18, 4, '#8f8a87');
+                    ctx.strokeStyle = A.brass; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x + w / 2, y + h - 4, 7, Math.PI, Math.PI * 2); ctx.stroke();   // arched tap
+                    break;
+                }
+                case 'apt_gas_range': {                                    // five-burner range: black steel, brass knobs
+                    rr(x, y, w, h, 2, A.ink, '#3a3334', 1);
+                    const pts = [[0.2, 0.35], [0.5, 0.35], [0.8, 0.35], [0.3, 0.72], [0.7, 0.72]];
+                    pts.forEach(([u, v], i) => {
+                        const cx = x + w * u, cy = y + h * v, r = i === 1 ? 7 : 5.5;
+                        circ(cx, cy, r, '#2a2526', '#4a4244', 1.2);
+                        ctx.strokeStyle = '#4a4244'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy); ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r); ctx.stroke();
+                    });
+                    for (let i = 0; i < 5; i++) circ(x + 10 + i * (w - 20) / 4, y + 4, 2, A.brass);
+                    break;
+                }
+                case 'apt_induction': {                                    // black glass, four zones
+                    counterTop(x, y, w, h);
+                    rr(x + 3, y + 5, w - 6, h - 8, 3, '#141012', 'rgba(255,255,255,0.12)', 1);
+                    [[0.3, 0.4, 7], [0.72, 0.4, 5.5], [0.3, 0.78, 5], [0.72, 0.78, 6.5]].forEach(([u, v, r]) => circ(x + w * u, y + (h - 3) * v + 2, r, null, 'rgba(255,255,255,0.22)', 1));
+                    break;
+                }
+                case 'apt_island': {                                       // open bar: quartz top, waterfall ends, overhang on the seating side
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(x + 4, y + 4, w, h);
+                    counterTop(x, y, w, h);
+                    ctx.fillStyle = A.creamDk; ctx.fillRect(x, y, 6, h); ctx.fillRect(x + w - 6, y, 6, h);                   // waterfall edges
+                    ctx.fillStyle = A.walnut; ctx.fillRect(x + 6, y + h - 4, w - 12, 4);
+                    for (const u of [0.17, 0.5, 0.83]) { circ(x + w * u, y + h / 2, 7, A.brass, '#9a7c4a', 1); circ(x + w * u, y + h / 2, 3, '#ffe6c4'); }   // pendant shades above
+                    rr(x + w * 0.62, y + 8, 14, 9, 2, A.wineLt); circ(x + w * 0.4, y + 12, 4, '#f3e3ea');                     // fruit bowl, glasses
+                    break;
+                }
+                case 'apt_stool': {
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 1.5, cy + 1.5, w / 2, 'rgba(0,0,0,0.3)'); circ(cx, cy, w / 2, A.brass); circ(cx, cy, w / 2 - 2.5, A.wine);
+                    break;
+                }
+                case 'apt_bed': {                                          // queen bed, headboard against the top wall
+                    shadow(); rr(x - 2, y, w + 4, h, 5, A.walnut);
+                    rr(x - 4, y - 2, w + 8, 12, 4, A.blush);                                          // channel-tufted headboard
+                    ctx.strokeStyle = 'rgba(90,34,48,0.35)'; ctx.lineWidth = 1; ctx.beginPath();
+                    for (let i = 1; i < 8; i++) { ctx.moveTo(x - 4 + (w + 8) * i / 8, y - 1); ctx.lineTo(x - 4 + (w + 8) * i / 8, y + 9); }
+                    ctx.stroke();
+                    rr(x + 3, y + 10, w - 6, h - 14, 4, A.cream);                                     // mattress
+                    rr(x + 8, y + 14, (w - 22) / 2, 16, 6, '#fbf6f0'); rr(x + w / 2 + 3, y + 14, (w - 22) / 2, 16, 6, '#fbf6f0');
+                    rr(x + w / 2 - 12, y + 24, 24, 12, 5, A.blushLt);                                // accent pillow
+                    rr(x + 3, y + 40, w - 6, h - 44, 4, A.wine);                                      // duvet
+                    ctx.fillStyle = A.cream; ctx.fillRect(x + 3, y + 40, w - 6, 6);                    // folded sheet
+                    ctx.fillStyle = '#e9dcc8'; ctx.fillRect(x + 1, y + h - 26, w - 2, 16);            // knit throw at the foot
+                    ctx.strokeStyle = 'rgba(150,120,100,0.35)'; ctx.beginPath();
+                    for (let i = 0; i < 8; i++) { ctx.moveTo(x + 6 + i * (w - 12) / 7, y + h - 25); ctx.lineTo(x + 6 + i * (w - 12) / 7, y + h - 11); }
+                    ctx.stroke();
+                    break;
+                }
+                case 'apt_wardrobe': {
+                    shadow(); rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(x + 2, y + h / 2 - 0.5, w - 4, 1);
+                    ctx.fillStyle = A.brass; ctx.fillRect(x + 4, y + h / 2 - 6, 1.5, 5); ctx.fillRect(x + 4, y + h / 2 + 1, 1.5, 5);
+                    break;
+                }
+                case 'apt_vanity': {                                       // against the east wall: round mirror, stool in front
+                    shadow(); rr(x + 14, y, w - 14, h, 3, A.walnut, A.walnutLt, 1);
+                    const mx = x + w - 6, my = y + h / 2;
+                    circ(mx, my, 16, A.brass); circ(mx, my, 14, '#d9d6de');
+                    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(mx - 2, my - 1, 8, 1.9, 4.2); ctx.stroke();   // the one crescent
+                    circ(x + 20, y + 12, 2.5, A.blushLt); circ(x + 22, y + 20, 2, A.brass); rr(x + 18, y + h - 16, 8, 10, 2, '#f3e3ea');
+                    circ(x + 5, y + h / 2, 8, A.blush, '#b27a82', 1);                                  // stool
+                    break;
+                }
+                case 'apt_tub': {                                          // freestanding oval tub with petals
+                    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 3, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#f7f4f0'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#cfe0e6'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 7, h / 2 - 7, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 14 + Math.sin(t) * 2, h / 2 - 14, 0, 0, Math.PI * 2); ctx.stroke();
+                    for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 3 ? A.blushLt : A.blush; ctx.beginPath(); ctx.ellipse(x + w * (0.25 + ((i * 37) % 50) / 100), y + h * (0.3 + ((i * 23) % 40) / 100), 2.6, 1.6, i, 0, Math.PI * 2); ctx.fill(); }
+                    ctx.strokeStyle = A.brass; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x + w - 2, y + h / 2); ctx.lineTo(x + w - 12, y + h / 2); ctx.stroke();
+                    break;
+                }
+                case 'apt_bath_vanity': {                                  // double marble vanity against the south wall
+                    shadow(); rr(x, y, w, h, 2, A.stone, '#c9c4c0', 1);
+                    ctx.fillStyle = '#cfd6da'; ctx.fillRect(x + 4, y + h - 4, w - 8, 3);                  // mirror edge on the wall
+                    for (const u of [0.28, 0.72]) {
+                        ctx.fillStyle = '#d4d0cc'; ctx.beginPath(); ctx.ellipse(x + w * u, y + h * 0.45, 18, 9, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = A.brass; ctx.fillRect(x + w * u - 1, y + h * 0.45 + 8, 2, 7);
+                    }
+                    circ(x + w * 0.5, y + h * 0.4, 3, A.blushLt); circ(x + w * 0.5 + 6, y + h * 0.55, 2, A.brass);
+                    break;
+                }
+                case 'apt_shower': {                                       // walk-in shower: tiled floor, glass screen, brass rain head
+                    rr(x, y, w, h, 2, '#b8c1c3');
+                    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.6; ctx.beginPath();
+                    for (let i = 8; i < w; i += 8) { ctx.moveTo(x + i, y); ctx.lineTo(x + i, y + h); }
+                    for (let j = 8; j < h; j += 8) { ctx.moveTo(x, y + j); ctx.lineTo(x + w, y + j); }
+                    ctx.stroke();
+                    ctx.strokeStyle = 'rgba(210,235,245,0.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x, y); ctx.lineTo(x + w * 0.65, y); ctx.stroke();
+                    circ(x + w * 0.6, y + h * 0.6, 9, A.brass); circ(x + w * 0.6, y + h * 0.6, 7, '#9a7c4a');
+                    break;
+                }
+                case 'apt_towels': {
+                    ctx.fillStyle = A.walnut; ctx.fillRect(x, y, 2, h); ctx.fillRect(x + w - 2, y, 2, h);
+                    rr(x - 1, y + 10, w + 2, 26, 2, A.blushLt); rr(x - 1, y + 48, w + 2, 26, 2, A.cream);
+                    break;
+                }
+                case 'apt_lounger': {                                      // veranda lounger, head toward the railing (north)
+                    shadow(); rr(x, y, w, h, 4, A.walnut);
+                    rr(x + 2, y + 2, w - 4, h - 4, 4, A.cream); rr(x + 3, y + 3, w - 6, 16, 4, '#fbf6f0');
+                    rr(x + 1, y + h - 22, w - 2, 14, 3, A.blush);
+                    break;
+                }
+                case 'apt_bistro': {
+                    const cx = x + w / 2, cy = y + h / 2;
+                    for (const s of [-1, 1]) { circ(cx + s * 24, cy + 2, 8, A.ink, A.brass, 1); }
+                    circ(cx + 2, cy + 2, 13, 'rgba(0,0,0,0.3)'); circ(cx, cy, 13, A.stone, A.brass, 1.5);
+                    circ(cx - 3, cy - 2, 3, '#f3e3ea'); circ(cx + 4, cy + 2, 2.5, A.blush);
+                    break;
+                }
+                case 'apt_telescope': {
+                    const cx = x + w / 2, cy = y + h - 8;
+                    ctx.strokeStyle = A.walnutLt; ctx.lineWidth = 1.5; ctx.beginPath();
+                    for (let i = 0; i < 3; i++) { const a = Math.PI / 2 + i * 2.1; ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * 9, cy + Math.sin(a) * 9); }
+                    ctx.stroke();
+                    ctx.save(); ctx.translate(cx, cy); ctx.rotate(-Math.PI / 2 + 0.25 * Math.sin(t * 0.2));
+                    rr(-3, -3.5, 26, 7, 3, A.brass); rr(20, -4.5, 6, 9, 2, '#9a7c4a'); ctx.restore();
+                    break;
+                }
+                case 'apt_planter': {
+                    shadow(); rr(x, y, w, h, 3, '#8c7f76', '#a79a90', 1); rr(x + 3, y + 3, w - 6, h - 6, 2, '#3a2a24');
+                    for (let i = 0; i < 6; i++) {
+                        const lx = x + 6 + i * (w - 12) / 5;
+                        ctx.fillStyle = i % 2 ? A.leaf : A.leafLt; ctx.beginPath(); ctx.ellipse(lx, y + h / 2, 6, 4, i, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = A.leaf; ctx.beginPath(); ctx.ellipse(lx + 2, y + h + 3, 3, 5, 0.3, 0, Math.PI * 2); ctx.fill();   // trailing
+                    }
+                    circ(x + w * 0.3, y + h / 2, 2, A.blushLt); circ(x + w * 0.7, y + h / 2 - 2, 2, '#f3e3ea');
+                    break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
+            if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
@@ -20024,6 +20551,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.strokeRect(sx + 2.5, sy + 2.5, section.w - 5, section.h - 5);
                     if (sq) { ctx.strokeStyle = 'rgba(45,29,89,0.45)'; ctx.lineWidth = 1; ctx.strokeRect(sx + 6, sy + 6, section.w - 12, section.h - 12); }
                 });
+                if (sq) this._sqRoofEdgeLights(ctx, false);
                 if (this.style) this._drawRoofFeatures(ctx, false);
                 else this._drawRoofProps(ctx);
                 ctx.restore();
@@ -20051,6 +20579,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.style) { ctx.shadowColor = rim; ctx.shadowBlur = 8; }
                 this.sections.forEach(section => ctx.strokeRect(this.x + section.x + 1, this.y + section.y + 1, section.w - 2, section.h - 2));
                 ctx.shadowBlur = 0; ctx.globalAlpha = glow;
+                if (this.style === 'silver_queen') this._sqRoofEdgeLights(ctx, true);
                 if (this.style) this._drawRoofFeatures(ctx, true);
                 ctx.restore();
                 if (this.style === 'silver_queen') { this._sqDrawCrown(ctx, true); this._sqDrawBeams(ctx, dark); }
@@ -21139,6 +21668,41 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     sqHex(ctx, x, y, r - 1.5); ctx.fillStyle = 'rgba(236,224,255,0.9)'; ctx.fill();
                     ctx.strokeStyle = 'rgba(214,190,255,0.8)'; ctx.lineWidth = 0.8; wing(-1); ctx.stroke(); wing(1); ctx.stroke();
                 }
+            },
+
+            /** Fairy lights tracing the inside of the roof outline (outer edges only); each bulb shimmers on its own. */
+            _sqRoofEdgeLights(ctx, emissive) {
+                const lod = _zoomLOD;
+                if (lod >= 2 || (emissive && (this._sqDark || 0) <= 0.05)) return;
+                if (!this._sqBulbs) {
+                    const inset = 10, step = 22, bulbs = [];
+                    for (const f of this._leanFaces()) {
+                        const horiz = f.y1 === f.y2, lo = horiz ? f.x1 : f.y1, hi = horiz ? f.x2 : f.y2;
+                        const inward = f.side === 'S' || f.side === 'E' ? -inset : inset;
+                        const n = Math.max(1, Math.round((hi - lo - 2 * inset) / step));
+                        for (let i = 0; i <= n; i++) {
+                            const u = lo + inset + (hi - lo - 2 * inset) * i / n;
+                            bulbs.push(horiz ? [u, f.y1 + inward] : [f.x1 + inward, u]);
+                        }
+                    }
+                    this._sqBulbs = bulbs;
+                }
+                const t = _gameTimeSec;
+                ctx.save();
+                if (!emissive) {
+                    ctx.fillStyle = '#e9e4fb';
+                    for (const [x, y] of this._sqBulbs) { ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill(); }
+                } else {
+                    ctx.globalCompositeOperation = 'lighter';
+                    this._sqBulbs.forEach(([x, y], i) => {
+                        const h = _bldHash(5151, i), on = 0.55 + 0.45 * Math.pow(Math.max(0, Math.sin(t * (1.1 + h) + h * 20)), 4);
+                        const warm = i % 2 === 0;
+                        if (lod === 0) sqGlow(ctx, x, y, 7, warm ? `rgba(255,217,160,${0.45 * on})` : `rgba(217,194,255,${0.45 * on})`, 'rgba(255,217,160,0)');
+                        ctx.fillStyle = warm ? `rgba(255,236,205,${on})` : `rgba(236,224,255,${on})`;
+                        ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
+                    });
+                }
+                ctx.restore();
             }
         });
 
@@ -39855,6 +40419,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         colorGrade: GameSettings.colorGrade,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
+                        ambienceVolume: GameSettings.ambienceVolume,
                         fullscreen: GameSettings.fullscreen,
                     },
                 };
@@ -40458,6 +41023,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         GameSettings.colorGrade = save.settings.colorGrade || 'none';
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;
+                        if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
+                        if (typeof syncAmbienceSliders === 'function') syncAmbienceSliders();
                         // Apply lighting scale
                         this.lightingScale = GameSettings.lightingQuality === 'low' ? 0.5 : GameSettings.lightingQuality === 'medium' ? 0.75 : 1.0;
                         GameSettings.applyFilmGrain();
@@ -41905,6 +42472,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** After lighting: building windows/neon/rooftop lights, then the sky layer. */
             drawEmissivePass(ctx) {
                 const dark = this.getAmbientDarkness();
+                if (this.activeMap.id === 'apt_949') this.drawApartmentGlow(ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const z = this.camera.zoom || 1;
                     const hw = this.canvas.width / 2 / z + 200, hh = this.canvas.height / 2 / z + 200;
@@ -44401,6 +44969,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Draw AFTER zones so it overwrites the veranda zone color with a living cityscape
                 if (this.activeMap.id === 'apt_949') {
                     this.drawApartmentBackdrop(this.ctx);
+                    this.drawApartmentInterior(this.ctx);
                 }
                 if (this.activeMap.id === 'medbay_sw') {
                     this.drawClinicInterior(this.ctx);
@@ -45478,6 +46047,78 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                Small buildings, neon glows, tiny car/pedestrian sprites for life.
                ===================================================================== */
             /** Clinic floor details: tiles, wayfinding stripe, scanner platform, curtain tracks. */
+            /** apt_949 floor art: veranda deck, living-room planks, kitchen tiles, rugs, bedroom boards, bathroom tiles. */
+            drawApartmentInterior(ctx) {
+                const lines = (x0, y0, x1, y1, step, vertical, color, lw = 1) => {
+                    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
+                    if (vertical) for (let x = x0 + step; x < x1; x += step) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
+                    else for (let y = y0 + step; y < y1; y += step) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
+                    ctx.stroke();
+                };
+                const rug = (x, y, w, h, base, border, inner) => {
+                    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 3, w, h, 8); ctx.fill();
+                    ctx.fillStyle = base; ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill();
+                    ctx.strokeStyle = border; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x + 7, y + 7, w - 14, h - 14, 5); ctx.stroke();
+                    if (inner) { ctx.strokeStyle = inner; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 14, y + 14, w - 28, h - 28, 4); ctx.stroke(); }
+                };
+                ctx.save();
+                lines(8, 8, 1392, 200, 14, false, 'rgba(0,0,0,0.16)');                                   // veranda deck boards
+                lines(8, 208, 900, 892, 28, true, 'rgba(0,0,0,0.14)');                                   // living-room planks
+                ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath();                                   // staggered plank joints
+                for (let i = 0, x = 8; x < 900; x += 28, i++) for (let y = 208 + (i % 3) * 70; y < 892; y += 210) { ctx.moveTo(x, y); ctx.lineTo(x + 28, y); }
+                ctx.stroke();
+                ctx.fillStyle = '#4a2a2c'; ctx.fillRect(84, 690, 520, 202);                              // kitchen stone tiles
+                lines(84, 690, 604, 892, 40, true, 'rgba(0,0,0,0.2)'); lines(84, 690, 604, 892, 40, false, 'rgba(0,0,0,0.2)');
+                ctx.strokeStyle = 'rgba(239,230,220,0.12)'; ctx.lineWidth = 1; ctx.strokeRect(84.5, 690.5, 520, 202);
+                rug(320, 396, 334, 214, APT.wineLt, APT.blush, 'rgba(239,230,220,0.35)');                  // lounge rug
+                lines(908, 208, 1392, 548, 24, true, 'rgba(255,255,255,0.05)');                          // bedroom boards
+                rug(975, 270, 160, 130, '#8a5560', APT.blushLt, null);                                   // bedroom rug under the bed foot
+                lines(908, 556, 1392, 892, 32, true, 'rgba(0,0,0,0.09)'); lines(908, 556, 1392, 892, 32, false, 'rgba(0,0,0,0.09)');   // bathroom tiles
+                ctx.fillStyle = APT.blushLt; ctx.beginPath(); ctx.roundRect(1270, 672, 76, 30, 8); ctx.fill();   // bath mat
+                ctx.restore();
+            }
+
+            /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
+            drawApartmentGlow(ctx) {
+                const t = _frameTime / 1000, rs = this.roomSystem;
+                const dark = (x, y) => { const r = rs && rs.active ? rs.getRoomAt(x, y) : null; return !!(r && r.lightsOff); };
+                const glow = (x, y, r, c0, c1) => { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // Lamp shades and bar pendants (they follow the room switches)
+                const shades = [[353, 484, 30], [573, 484, 30], [991, 232, 28], [1115, 232, 28], [307, 439, 34], [700, 700, 34], [109, 463, 34], [231, 759, 22], [350, 759, 22], [469, 759, 22]];
+                for (const [x, y, r] of shades) {
+                    if (dark(x, y)) continue;
+                    glow(x, y, r, 'rgba(255,210,160,0.26)', 'rgba(255,190,140,0)');
+                    ctx.fillStyle = 'rgba(255,236,210,0.8)'; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+                }
+                // Fireplace
+                const ff = 0.8 + 0.2 * Math.sin(t * 6.3) * Math.sin(t * 2.1);
+                glow(580, 432, 60, `rgba(255,140,60,${0.35 * ff})`, 'rgba(255,120,40,0)');
+                // Induction zones (warm red) and two gas burners (blue flame)
+                for (const [x, y] of [[433, 864], [460, 877]]) glow(x, y, 12, 'rgba(255,70,40,0.55)', 'rgba(255,60,30,0)');
+                for (const [x, y, r] of [[312, 859, 7], [329, 873, 5.5]]) {
+                    ctx.strokeStyle = `rgba(90,160,255,${0.6 + 0.3 * Math.sin(t * 14 + x)})`; ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.arc(x, y, r - 1, 0, Math.PI * 2); ctx.stroke();
+                    glow(x, y, r + 6, 'rgba(90,150,255,0.25)', 'rgba(90,150,255,0)');
+                }
+                // Candles on the tub rim
+                for (const [x, y] of [[1248, 619], [1256, 612], [1368, 619]]) {
+                    const f = 0.75 + 0.25 * Math.sin(t * 9 + x);
+                    glow(x, y, 12, `rgba(255,200,130,${0.5 * f})`, 'rgba(255,180,110,0)');
+                }
+                // Festoon string lights swagged along the veranda railing
+                for (let s = 0; s < 8; s++) {
+                    const x0 = 20 + s * 170, x1 = x0 + 170;
+                    for (let i = 0; i <= 8; i++) {
+                        const u = i / 8, x = x0 + (x1 - x0) * u, y = 14 + Math.sin(u * Math.PI) * 12;
+                        const f = 0.7 + 0.3 * Math.sin(t * 1.3 + s * 3 + i * 1.7);
+                        glow(x, y, 9, `rgba(255,214,160,${0.45 * f})`, 'rgba(255,200,140,0)');
+                        ctx.fillStyle = `rgba(255,240,215,${0.9 * f})`; ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+
             drawClinicInterior(ctx) {
                 const t = _gameTimeSec;
                 ctx.save();
@@ -47138,8 +47779,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 this.running = true; this.loadMap(mapId); document.getElementById('ui-layer').style.display = 'none'; document.getElementById('game-container').style.display = 'block'; if (this.ui) this.ui.showMissionBanner("WELCOME TO SOUTHERN DIMENSIONS CITY", "new", "WELCOME"); this.loop(); 
             }
-            stop() { 
-                this.running = false; 
+            stop() {
+                this.running = false;
+                ambience.silence();
                 this.pauseSystem.clear();
                 document.getElementById('game-container').style.display = 'none'; 
                 document.getElementById('ui-layer').style.display = 'flex'; 
@@ -47311,8 +47953,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 console.log('[RESET] Game state cleared to defaults');
             }
-            loop() { 
-                if (!this.running) return; 
+            loop() {
+                if (!this.running) return;
+                ambience.update(this);
                 
                 /* FPS LIMITER — skip frame if too soon.
                    Scheduled against a running due-time rather than the last
@@ -50022,6 +50665,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._updateValueEl('set-atmosphere', GameSettings.atmosphereTint || 'off');
                 this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
                 this._updateValueEl('set-audio', GameSettings.audioEnabled ? 'on' : 'off');
+                syncAmbienceSliders();
                 this._updateValueEl('set-fullscreen', !FullscreenManager.supported()
                     ? 'n/a' : (FullscreenManager.isActive() ? 'on' : 'off'));
                 this._updateValueEl('set-fps', GameSettings.fpsLimit === 0 ? 'none' : String(GameSettings.fpsLimit));
@@ -50246,7 +50890,31 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 GameSettings.audioEnabled ? '' : '#666');
             lbl('lbl-fps', `FPS Limit: ${GameSettings.fpsLimit === 0 ? 'NONE' : GameSettings.fpsLimit}`,
                 GameSettings.fpsLimit > 0 ? '#4CAF50' : '');
+            syncAmbienceSliders();
         }
+
+        // Ambience volume: one setting, two sliders (main menu + pause panel), kept in step
+        function syncAmbienceSliders() {
+            const v = Math.round((GameSettings.ambienceVolume ?? 0.7) * 100);
+            for (const id of ['main-ambience', 'set-ambience']) { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = v; }
+            const a = document.getElementById('lbl-ambience'); if (a) a.textContent = `Ambience: ${v}`;
+            const b = document.getElementById('set-ambience-val'); if (b) b.textContent = v;
+        }
+        let _ambPreviewAt = 0;
+        function setAmbienceVolume(v) {
+            GameSettings.ambienceVolume = Math.max(0, Math.min(1, v));
+            try { localStorage.setItem('dfab_ambience_volume', String(GameSettings.ambienceVolume)); } catch (e) { /* private mode */ }
+            syncAmbienceSliders();
+            const now = performance.now();
+            if (now - _ambPreviewAt > 180 && GameSettings.ambienceVolume > 0) { _ambPreviewAt = now; audioSys.init(); audioSys.sfx('ui'); }
+        }
+        for (const id of ['main-ambience', 'set-ambience']) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            el.addEventListener('input', () => setAmbienceVolume(el.value / 100));
+            for (const ev of ['click', 'pointerdown', 'touchstart', 'keydown']) el.addEventListener(ev, e => e.stopPropagation());
+        }
+        syncAmbienceSliders();
         
         // Toggle Lighting Quality
         document.getElementById('btn-toggle-lighting').addEventListener('click', () => {
