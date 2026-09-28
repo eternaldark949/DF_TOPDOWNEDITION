@@ -372,10 +372,41 @@
                     this.roomSystem.drawWindowLightProjections(this.lightCtx, this._windowDaylight || 0);
                 }
                 
+                // Soft lights: shadowless glow holes for decor lamps, candles, fire, string lights.
+                // Fixed ones come from activeMap.softLights; props with a `light` carry theirs
+                // with them when pushed. Lights in a room whose switch is off stay dark.
+                const cbProps = lightCullBounds.props;
+                const softLights = [];
+                {
+                    const rs = this.roomSystem, tNow = _frameTime / 1000;
+                    const push = (src, x, y) => {
+                        if (x < cbProps.left - src.radius || x > cbProps.right + src.radius || y < cbProps.top - src.radius || y > cbProps.bottom + src.radius) return;
+                        if (rs && rs.active) { const room = rs.getRoomAt(x, y); if (room && room.lightsOff) return; }
+                        const f = src.flicker ? 0.82 + 0.18 * Math.sin(tNow * src.flicker + x * 0.7) * Math.sin(tNow * src.flicker * 0.37 + y) : 1;
+                        softLights.push({ src, x, y, r: src.radius, a: (src.intensity ?? 0.8) * f });
+                    };
+                    for (const s of (this.activeMap.softLights || [])) push(s, s.x, s.y);
+                    for (const p of this.props) if (p.light && p.visible !== false) { const c = p.getCenter(); push(p.light, c.x + (p.light.dx || 0), c.y + (p.light.dy || 0)); }
+                }
+                const softGrad = (s, key, make) => {               // gradients are reused while the light stays put
+                    const k = s.x + ',' + s.y;
+                    if (s.src[key] && s.src[key + 'At'] === k) return s.src[key];
+                    s.src[key + 'At'] = k; return (s.src[key] = make());
+                };
+                for (const s of softLights) {
+                    this.lightCtx.globalAlpha = Math.min(1, s.a);
+                    this.lightCtx.fillStyle = softGrad(s, '_holeGrad', () => {
+                        const g = this.lightCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
+                        g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+                        return g;
+                    });
+                    this.lightCtx.beginPath(); this.lightCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2); this.lightCtx.fill();
+                }
+                this.lightCtx.globalAlpha = 1;
+
                 // Prop Glows (Vending/Medbay) - PERFORMANCE: AABB culling
                 // FIX: Use getCenter() for accurate tracking of pushed/rotated props
                 // and stable entity ID seed so animation doesn't jump on movement
-                const cbProps = lightCullBounds.props;
                 this.props.forEach(p => {
                     if (p.interactionType === 'medbay_refill' || p.interactionType === 'vending_machine') {
                         const center = p.getCenter();
@@ -460,6 +491,18 @@
                     }
                 });
             
+                // Soft light colour (the warm pool each decor light casts)
+                for (const s of softLights) {
+                    this.lightCtx.globalAlpha = Math.min(1, 0.22 * s.a);
+                    this.lightCtx.fillStyle = softGrad(s, '_tintGrad', () => {
+                        const g = this.lightCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
+                        g.addColorStop(0, s.src.color || '#ffd9b0'); g.addColorStop(1, 'rgba(0,0,0,0)');
+                        return g;
+                    });
+                    this.lightCtx.beginPath(); this.lightCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2); this.lightCtx.fill();
+                }
+                this.lightCtx.globalAlpha = 1;
+
                 // Car Headlights (Color Haze)
                 if (this.isDriving) {
                     this.lightCtx.globalAlpha = baseAlpha; 

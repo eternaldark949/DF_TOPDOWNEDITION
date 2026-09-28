@@ -415,6 +415,7 @@
                 this.color = config.color || '#00CED1';
                 this.interactionType = config.interactionType || null;
                 this.decorType = config.decorType || null;       // custom furniture art (clinic)
+                this.light = config.light || null;               // soft light that follows the prop: { radius, color, intensity, dx, dy }
                 this.headSide = config.headSide || null;
                 this.patient = !!config.patient;
                 this.noteId = config.noteId || null;
