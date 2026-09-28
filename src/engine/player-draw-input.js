@@ -71,6 +71,10 @@
                 if (!emoji) return;
                 this.playerEmote.text = emoji;
                 this.playerEmote.age = 0;
+                // 949's face follows the emote while the bubble is up (sidebar, phone, dialogue)
+                const faces = { smile: 'smile', zany: { brow: { lift: 0.3, raise: 0.8 }, lids: { bottom: 0.3 }, gaze: { x: 0.4 }, mouth: { curve: 1, open: 0.4, smirk: 0.4 }, blush: 0.2 }, cry: 'crying', frown: 'annoyed' };
+                this.playerExpression = faces[key];
+                this.renderSidebarPortrait();
 
                 // Trigger nearest reactor's response within range — slight delay
                 // so it feels like processing rather than reflex. Eligible
@@ -168,6 +172,8 @@
                 if (this.playerEmote.age >= this.playerEmote.duration) {
                     this.playerEmote.text = null;
                     this.playerEmote.age = 0;
+                    this.playerExpression = null;
+                    this.renderSidebarPortrait();
                 }
             },
 

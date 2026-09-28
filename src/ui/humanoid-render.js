@@ -553,6 +553,9 @@
             const eyeColor = config.eyeColor || '#daa520'; // Default golden for Stella
             const gender = config.gender || 'female';
             const top = config.top || null;
+            // Expression (ui/expressions.js): every number is 0 for the neutral face
+            const X = resolveExpression(config.expression);
+            const blink = config.blink || 0, talk = config.talk || 0;
 
             // Derived colors from skin
             const skinRGB = hexToRGB(skinColor);
@@ -664,6 +667,12 @@
             ctx.fill();
             ctx.globalAlpha = 1.0;
 
+            // Blush
+            if (X.blush > 0) {
+                ctx.fillStyle = `rgba(214, 72, 104, ${0.2 * X.blush})`;
+                for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * fw * 0.5, cy + fh * 0.2, fw * 0.28, fh * 0.13, side * 0.15, 0, Math.PI * 2); ctx.fill(); }
+            }
+
             // ─── EYEBROWS ───
             const browColor = hair.color || '#1a1a1a';
             const browY = cy - fh * 0.32;
@@ -671,16 +680,19 @@
             ctx.strokeStyle = browColor;
             ctx.lineWidth = fw * 0.12;
             ctx.lineCap = 'round';
-            // Left brow (slight arch)
-            ctx.beginPath();
-            ctx.moveTo(cx - fw * 0.55, browY + fh * 0.04);
-            ctx.quadraticCurveTo(cx - fw * 0.35, browY - fh * 0.08, cx - fw * 0.15, browY + fh * 0.02);
-            ctx.stroke();
-            // Right brow
-            ctx.beginPath();
-            ctx.moveTo(cx + fw * 0.55, browY + fh * 0.04);
-            ctx.quadraticCurveTo(cx + fw * 0.35, browY - fh * 0.08, cx + fw * 0.15, browY + fh * 0.02);
-            ctx.stroke();
+            // Each brow: outer end → arch → inner end. Lift moves it, tilt raises (worry) or
+            // drops (anger) the inner end, arch bends it, raise lifts the right brow alone.
+            const drawBrows = () => {
+                for (const side of [-1, 1]) {
+                    const up = (X.brow.lift + (side > 0 ? X.brow.raise : 0)) * fh * 0.1;
+                    ctx.beginPath();
+                    ctx.moveTo(cx + side * fw * 0.55, browY + fh * 0.04 - up + X.brow.tilt * fh * 0.03);
+                    ctx.quadraticCurveTo(cx + side * fw * 0.35, browY - fh * 0.08 - up - X.brow.arch * fh * 0.08,
+                                         cx + side * fw * 0.15, browY + fh * 0.02 - up - X.brow.tilt * fh * 0.1);
+                    ctx.stroke();
+                }
+            };
+            drawBrows();
             ctx.lineCap = 'butt';
 
             // ─── EYES ───
@@ -700,41 +712,66 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // Iris
+                // Iris (follows the gaze; kept inside the eye when looking away)
                 const irisR = eyeH * 0.9;
+                const ix = ex + X.gaze.x * eyeW * 0.35, iy = eyeY + X.gaze.y * eyeH * 0.5;
+                const looking = X.gaze.x !== 0 || X.gaze.y !== 0;
+                if (looking) { ctx.save(); ctx.clip(); }
                 ctx.fillStyle = eyeColor;
                 ctx.beginPath();
-                ctx.arc(ex, eyeY, irisR, 0, Math.PI * 2);
+                ctx.arc(ix, iy, irisR, 0, Math.PI * 2);
                 ctx.fill();
                 // Iris ring (darker edge)
                 ctx.strokeStyle = shadowColor;
                 ctx.lineWidth = irisR * 0.15;
                 ctx.globalAlpha = 0.3;
                 ctx.beginPath();
-                ctx.arc(ex, eyeY, irisR, 0, Math.PI * 2);
+                ctx.arc(ix, iy, irisR, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.globalAlpha = 1.0;
 
                 // Pupil
                 ctx.fillStyle = '#0a0a0a';
                 ctx.beginPath();
-                ctx.arc(ex, eyeY, irisR * 0.45, 0, Math.PI * 2);
+                ctx.arc(ix, iy, irisR * 0.45, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Highlight
                 ctx.fillStyle = '#fff';
                 ctx.globalAlpha = 0.85;
                 ctx.beginPath();
-                ctx.arc(ex + irisR * 0.3, eyeY - irisR * 0.35, irisR * 0.25, 0, Math.PI * 2);
+                ctx.arc(ix + irisR * 0.3, iy - irisR * 0.35, irisR * 0.25, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.globalAlpha = 1.0;
+                if (looking) ctx.restore();
+
+                // Lids: the top lid comes down (half-lidded, blinking, closed); the lower
+                // lid rises for smiles. Drawn in skin over the eye.
+                const lidTop = Math.min(1, Math.max(X.lids.top, blink));
+                const lidY = eyeY - eyeH * 1.6 + (eyeH * 2.8) * lidTop;      // control point of the lid's edge
+                if (lidTop > 0) {
+                    ctx.fillStyle = skinColor;
+                    ctx.beginPath();
+                    ctx.moveTo(ex - eyeW - 0.5, eyeY);
+                    ctx.quadraticCurveTo(ex, eyeY - eyeH * 1.75, ex + eyeW + 0.5, eyeY);
+                    ctx.quadraticCurveTo(ex, lidY, ex - eyeW - 0.5, eyeY);
+                    ctx.fill();
+                }
+                if (X.lids.bottom > 0) {
+                    ctx.fillStyle = skinColor;
+                    ctx.beginPath();
+                    ctx.moveTo(ex - eyeW - 0.5, eyeY);
+                    ctx.quadraticCurveTo(ex, eyeY + eyeH * 1.35, ex + eyeW + 0.5, eyeY);
+                    ctx.quadraticCurveTo(ex, eyeY + eyeH * 1.2 - X.lids.bottom * eyeH * 1.6, ex - eyeW - 0.5, eyeY);
+                    ctx.fill();
+                }
 
                 // Eyeliner — top lid line
                 ctx.strokeStyle = '#1a1018';
-                ctx.lineWidth = fw * 0.04;
+                ctx.lineWidth = fw * 0.04 * (1 + lidTop * 0.6);
                 ctx.beginPath();
                 ctx.moveTo(ex - eyeW, eyeY);
-                ctx.quadraticCurveTo(ex, eyeY - eyeH * 1.6, ex + eyeW, eyeY);
+                ctx.quadraticCurveTo(ex, lidY, ex + eyeW, eyeY);
                 ctx.stroke();
                 // Lower lash line (subtle)
                 ctx.globalAlpha = 0.3;
@@ -772,29 +809,50 @@
 
             // ─── LIPS ───
             const mouthY = cy + fh * 0.48;
-            const mouthW = fw * 0.35;
+            const mouthW = fw * 0.35 * (1 + X.mouth.width);
+            // Corners: curve lifts both (smile) or drops them (frown); smirk lifts one
+            const lcY = mouthY - X.mouth.curve * fh * 0.1 + X.mouth.smirk * fh * 0.02;
+            const rcY = mouthY - X.mouth.curve * fh * 0.1 - X.mouth.smirk * fh * 0.08;
+            const open = Math.min(1, X.mouth.open + talk) * fh * 0.14;     // how far the lower lip drops
+            if (open > 0) {
+                // Inside of the mouth, then a hint of teeth under the upper lip
+                ctx.fillStyle = '#2a0f16';
+                ctx.beginPath();
+                ctx.moveTo(cx - mouthW, lcY);
+                ctx.quadraticCurveTo(cx, mouthY + fh * 0.02, cx + mouthW, rcY);
+                ctx.quadraticCurveTo(cx, mouthY + fh * 0.06 + open * 2, cx - mouthW, lcY);
+                ctx.fill();
+                if (open > fh * 0.035) {
+                    ctx.fillStyle = '#f1ebe4';
+                    ctx.beginPath();
+                    ctx.moveTo(cx - mouthW * 0.8, lcY + fh * 0.01);
+                    ctx.quadraticCurveTo(cx, mouthY + fh * 0.02, cx + mouthW * 0.8, rcY + fh * 0.01);
+                    ctx.quadraticCurveTo(cx, mouthY + fh * 0.02 + open * 0.7, cx - mouthW * 0.8, lcY + fh * 0.01);
+                    ctx.fill();
+                }
+            }
             // Upper lip (darker)
             ctx.fillStyle = lipDark;
             ctx.beginPath();
-            ctx.moveTo(cx - mouthW, mouthY);
+            ctx.moveTo(cx - mouthW, lcY);
             ctx.quadraticCurveTo(cx - mouthW * 0.4, mouthY - fh * 0.09, cx, mouthY - fh * 0.05);
-            ctx.quadraticCurveTo(cx + mouthW * 0.4, mouthY - fh * 0.09, cx + mouthW, mouthY);
-            ctx.quadraticCurveTo(cx, mouthY + fh * 0.02, cx - mouthW, mouthY);
+            ctx.quadraticCurveTo(cx + mouthW * 0.4, mouthY - fh * 0.09, cx + mouthW, rcY);
+            ctx.quadraticCurveTo(cx, mouthY + fh * 0.02, cx - mouthW, lcY);
             ctx.closePath();
             ctx.fill();
             // Lower lip (fuller, lighter)
             ctx.fillStyle = lipColor;
             ctx.beginPath();
-            ctx.moveTo(cx - mouthW, mouthY);
-            ctx.quadraticCurveTo(cx, mouthY + fh * 0.16, cx + mouthW, mouthY);
-            ctx.quadraticCurveTo(cx, mouthY + fh * 0.06, cx - mouthW, mouthY);
+            ctx.moveTo(cx - mouthW, lcY);
+            ctx.quadraticCurveTo(cx, mouthY + fh * 0.16 + open, cx + mouthW, rcY);
+            ctx.quadraticCurveTo(cx, mouthY + fh * 0.06 + open * 2, cx - mouthW, lcY);
             ctx.closePath();
             ctx.fill();
             // Lip shine
             ctx.fillStyle = '#fff';
             ctx.globalAlpha = 0.12;
             ctx.beginPath();
-            ctx.ellipse(cx + mouthW * 0.15, mouthY + fh * 0.05, mouthW * 0.2, fh * 0.03, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx + mouthW * 0.15, mouthY + fh * 0.05 + open, mouthW * 0.2, fh * 0.03, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1.0;
 
@@ -802,6 +860,15 @@
             if (hair) {
                 const renderer = PORTRAIT_HAIR_RENDERERS[hair.type];
                 if (renderer) renderer(ctx, hair.color, cx, cy, fw, fh);
+            }
+
+            // An expressive brow shows through the fringe (stylised, like drawn portraits)
+            if (X.brow.lift || X.brow.tilt || X.brow.arch || X.brow.raise) {
+                ctx.save();
+                ctx.lineCap = 'round';
+                ctx.globalAlpha = 0.6; ctx.strokeStyle = skinColor; ctx.lineWidth = fw * 0.15; drawBrows();   // outline so it reads on dark hair
+                ctx.globalAlpha = 1; ctx.strokeStyle = browColor; ctx.lineWidth = fw * 0.1; drawBrows();
+                ctx.restore();
             }
 
             // ─── JEWELRY AND HAT ───
@@ -819,8 +886,13 @@
             // Head
             ctx.fillStyle = skinColor;
             ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
-            ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
+            // Eyes — they blink now and then, each character on their own rhythm
+            const owner = dyn.owner;
+            if (owner && owner._blinkSeed === undefined) owner._blinkSeed = Math.floor(Math.random() * 997);
+            if (!owner || blinkAmount(_gameTimeSec, owner._blinkSeed) < 0.5) {
+                ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
+                ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
+            }
             // Hair (all styles render on top of head) — strand physics via hairGeometry().
             // A raised hood hides short styles; long ones still spill out from under it.
             if (hair && !(hatPiece && hatPiece.hides === 'most' && !HAIR_SPILLS_FROM_HOOD.includes(hair.type))) {

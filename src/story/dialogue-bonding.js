@@ -12,7 +12,7 @@
                         { speaker: '949', text: "Just checking in." },
                         { speaker: 'Victoria', text: "Checking in. Cute. Well, I'm still here. Still armed. Still better than whoever's out there trying to kill us." },
                         { speaker: '949', text: "Good to know." },
-                        { speaker: 'Victoria', text: "...Yeah. It is." }
+                        { speaker: 'Victoria', text: "...Yeah. It is.", mood: 'smile' }
                     ],
                     [
                         { speaker: 'Victoria', text: "This apartment's alright. Small though. You ever think about getting a place with more room to store ammunition?" },
@@ -26,7 +26,7 @@
                         { speaker: '949', text: "What happened?" },
                         { speaker: 'Victoria', text: "I found out what they were actually doing with the weapons I was testing. So I took the prototype and walked out." },
                         { speaker: '949', text: "Just like that?" },
-                        { speaker: 'Victoria', text: "Just like that. The glass was bulletproof, by the way. I checked on my way out." }
+                        { speaker: 'Victoria', text: "Just like that. The glass was bulletproof, by the way. I checked on my way out.", mood: 'smirk' }
                     ],
                     [
                         { speaker: 'Victoria', text: "Most people I've worked with are dead or corporate. Same thing, really." },
@@ -38,14 +38,14 @@
                     [
                         { speaker: 'Victoria', text: "I don't say this often and I'll deny it if you repeat it. But this crew? This is the closest thing to family I've had in years." },
                         { speaker: '949', text: "You don't have to deny it." },
-                        { speaker: 'Victoria', text: "...Fine. But if Max makes one more joke about my hair, I'm putting him through the wall. Lovingly." }
+                        { speaker: 'Victoria', text: "...Fine. But if Max makes one more joke about my hair, I'm putting him through the wall. Lovingly.", mood: 'annoyed' }
                     ]
                 ],
                 3: [ // Inner Circle (75-100)
                     [
                         { speaker: 'Victoria', text: "Freelancer. Whatever happens out there — whatever comes through those dimensions — I've got you. No hesitation. No questions." },
                         { speaker: '949', text: "I know." },
-                        { speaker: 'Victoria', text: "Good. Now let's go break something." }
+                        { speaker: 'Victoria', text: "Good. Now let's go break something.", mood: 'grin' }
                     ]
                 ]
             },
@@ -66,7 +66,7 @@
                     [
                         { speaker: 'Yenna', text: "I served three tours in the Rim Conflicts. Saw things that don't make tactical sense. Things that shouldn't exist." },
                         { speaker: '949', text: "Dimensional anomalies?" },
-                        { speaker: 'Yenna', text: "That's the polite term. We called them rips. My unit walked into one. I walked out alone." },
+                        { speaker: 'Yenna', text: "That's the polite term. We called them rips. My unit walked into one. I walked out alone.", mood: 'sad' },
                         { speaker: '949', text: "Yenna..." },
                         { speaker: 'Yenna', text: "I don't need sympathy. I need purpose. This crew gives me that." }
                     ]
@@ -91,7 +91,7 @@
                     [
                         { speaker: 'Sabrina', text: "Oh look, the Freelancer wants to chat. Should I put on tea? Light some candles? Summon a minor demon for ambiance?" },
                         { speaker: '949', text: "Just tea is fine." },
-                        { speaker: 'Sabrina', text: "Boring. But sure." }
+                        { speaker: 'Sabrina', text: "Boring. But sure.", mood: 'smirk' }
                     ],
                     [
                         { speaker: 'Sabrina', text: "You know what I like about this apartment? The walls don't bleed. Low bar, but I've lived in worse." },
@@ -104,8 +104,8 @@
                         { speaker: 'Sabrina', text: "The dark energy thing isn't learned. I was born with it. Mom called it a gift. Dad called it a curse. They were both right." },
                         { speaker: '949', text: "How do you control it?" },
                         { speaker: 'Sabrina', text: "Control is a strong word. I aim it. Big difference." },
-                        { speaker: '949', text: "That's terrifying." },
-                        { speaker: 'Sabrina', text: "I know, right? Kind of awesome though." }
+                        { speaker: '949', text: "That's terrifying.", mood: 'surprised' },
+                        { speaker: 'Sabrina', text: "I know, right? Kind of awesome though.", mood: 'grin' }
                     ]
                 ],
                 2: [
@@ -114,7 +114,7 @@
                         { speaker: '949', text: "Little bit." },
                         { speaker: 'Sabrina', text: "It's easier than admitting that I actually care what happens to these idiots. And to you." },
                         { speaker: '949', text: "The armor's down right now." },
-                        { speaker: 'Sabrina', text: "Don't get used to it. But... yeah. It is." }
+                        { speaker: 'Sabrina', text: "Don't get used to it. But... yeah. It is.", mood: 'sultry' }
                     ]
                 ],
                 3: [
@@ -134,7 +134,7 @@
                     ],
                     [
                         { speaker: 'Max', text: "Hey, check this out — *bzzt*" },
-                        { speaker: '949', text: "Did you just shock the toaster?" },
+                        { speaker: '949', text: "Did you just shock the toaster?", mood: 'surprised' },
                         { speaker: 'Max', text: "It was being slow. I helped. That's what I do. I help." }
                     ]
                 ],
@@ -142,7 +142,7 @@
                     [
                         { speaker: 'Max', text: "The sparks aren't just some cool party trick. My nervous system is overclocked. Always has been. Too much electricity, not enough... ground." },
                         { speaker: '949', text: "Is that why you're always moving?" },
-                        { speaker: 'Max', text: "If I stop, I feel like I'll explode. Not metaphorically. I mean actually explode." },
+                        { speaker: 'Max', text: "If I stop, I feel like I'll explode. Not metaphorically. I mean actually explode.", mood: 'worried' },
                         { speaker: '949', text: "That sounds exhausting." },
                         { speaker: 'Max', text: "It is. But it also means I'll never let you down in a fight. Can't slow down even if I wanted to." }
                     ]
@@ -196,8 +196,8 @@
                 3: [
                     [
                         { speaker: 'Josh', text: "Emotional attachment detected. Subject: you. And the team. Severity: significant. Recommended action: none. I don't want it to stop." },
-                        { speaker: '949', text: "Josh, that might be the most human thing you've ever said." },
-                        { speaker: 'Josh', text: "...Don't tell Max." }
+                        { speaker: '949', text: "Josh, that might be the most human thing you've ever said.", mood: 'smile' },
+                        { speaker: 'Josh', text: "...Don't tell Max.", mood: 'smile' }
                     ]
                 ]
             }
@@ -367,7 +367,7 @@
 
             /**
              * Play a multi-line dialogue sequence.
-             * @param {Array<{speaker: string, text: string}>} lines
+             * @param {Array<{speaker: string, text: string, mood?: string}>} lines  (mood: a name from EXPRESSIONS; otherwise read from the text)
              * @param {Object} [options]
              * @param {Function} [options.onComplete]       - Called after last line is dismissed
              * @param {string}   [options.finalButtonText]  - Button label on last line (default 'Done')
@@ -417,7 +417,7 @@
                 g.npcNameEl.style.color = colors[line.speaker] || SPEAKER_COLORS[line.speaker] || '#ccc';
 
                 // Render portrait for current speaker
-                if (g.renderDialoguePortrait) g.renderDialoguePortrait(line.speaker);
+                if (g.renderDialoguePortrait) g.renderDialoguePortrait(line.speaker, line.mood, line.text);
 
                 // (Transcript capture is handled by GameEngine._installDialogueCapture's
                 // MutationObserver — covers DialogueSequence AND single-line writes.)
