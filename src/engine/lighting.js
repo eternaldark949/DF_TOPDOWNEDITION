@@ -380,10 +380,11 @@
                 {
                     const rs = this.roomSystem, tNow = _frameTime / 1000;
                     const push = (src, x, y) => {
+                        if (!src.radius) src.radius = Math.max(src.w || 0, src.h || 0) / 2;
                         if (x < cbProps.left - src.radius || x > cbProps.right + src.radius || y < cbProps.top - src.radius || y > cbProps.bottom + src.radius) return;
                         if (rs && rs.active) { const room = rs.getRoomAt(x, y); if (room && room.lightsOff) return; }
                         const f = src.flicker ? 0.82 + 0.18 * Math.sin(tNow * src.flicker + x * 0.7) * Math.sin(tNow * src.flicker * 0.37 + y) : 1;
-                        softLights.push({ src, x, y, r: src.radius, a: (src.intensity ?? 0.8) * f });
+                        softLights.push({ src, x, y, r: src.radius || Math.max(src.w, src.h) / 2, a: (src.intensity ?? 0.8) * f });
                     };
                     for (const s of (this.activeMap.softLights || [])) push(s, s.x, s.y);
                     for (const p of this.props) if (p.light && p.visible !== false) { const c = p.getCenter(); push(p.light, c.x + (p.light.dx || 0), c.y + (p.light.dy || 0)); }
@@ -393,8 +394,36 @@
                     if (s.src[key] && s.src[key + 'At'] === k) return s.src[key];
                     s.src[key + 'At'] = k; return (s.src[key] = make());
                 };
+                // Area lights (w × h): a rounded rectangle with a soft edge. A band across the
+                // middle plus two half-oval end caps that share the same falloff, so no seams.
+                // stops: [[offset from the centre line 0..1, colour], …]
+                const softArea = (s, key, stops) => {
+                    const ctx = this.lightCtx, hw = s.src.w / 2, hh = s.src.h / 2, r = Math.min(hw, s.src.round ?? hh);
+                    const x0 = s.x - hw + r, x1 = s.x + hw - r;
+                    const band = softGrad(s, key + 'Band', () => {
+                        const g = ctx.createLinearGradient(0, s.y - hh, 0, s.y + hh);
+                        for (const [o, c] of stops) { g.addColorStop(0.5 - o / 2, c); g.addColorStop(0.5 + o / 2, c); }
+                        return g;
+                    });
+                    ctx.fillStyle = band; ctx.fillRect(x0, s.y - hh, x1 - x0, hh * 2);
+                    const cap = s.src[key + 'Cap'] || (s.src[key + 'Cap'] = (() => {
+                        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+                        for (const [o, c] of stops) g.addColorStop(o, c);
+                        return g;
+                    })());
+                    for (const side of [-1, 1]) {
+                        ctx.save();
+                        ctx.beginPath(); ctx.rect(side < 0 ? x0 - r : x1, s.y - hh, r, hh * 2); ctx.clip();
+                        ctx.translate(side < 0 ? x0 : x1, s.y); ctx.scale(r, hh);
+                        ctx.fillStyle = cap; ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+                        ctx.restore();
+                    }
+                };
+                const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
+                const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
                 for (const s of softLights) {
                     this.lightCtx.globalAlpha = Math.min(1, s.a);
+                    if (s.src.w) { softArea(s, '_hole', s.src.soft ? HOLE_AREA_SOFT : HOLE_AREA); continue; }
                     this.lightCtx.fillStyle = softGrad(s, '_holeGrad', () => {
                         const g = this.lightCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
                         g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)');
@@ -494,6 +523,7 @@
                 // Soft light colour (the warm pool each decor light casts)
                 for (const s of softLights) {
                     this.lightCtx.globalAlpha = Math.min(1, 0.22 * s.a);
+                    if (s.src.w) { softArea(s, '_tint', [[0, s.src.color || '#ffd9b0'], [0.55, s.src.color || '#ffd9b0'], [1, 'rgba(0,0,0,0)']]); continue; }
                     this.lightCtx.fillStyle = softGrad(s, '_tintGrad', () => {
                         const g = this.lightCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
                         g.addColorStop(0, s.src.color || '#ffd9b0'); g.addColorStop(1, 'rgba(0,0,0,0)');
