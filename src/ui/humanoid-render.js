@@ -548,8 +548,9 @@
         }
 
         function drawCharacterPortrait(ctx, w, h, config) {
-            const skinColor = config.skinColor || '#c68e63';
-            const hair = config.hair || { type: 'curls', color: '#0a0505' };
+            const A = androidLook(config.body);                              // Double Nights android (ui/bodies.js)
+            const skinColor = A ? A.plate : (config.skinColor || '#c68e63');
+            const hair = A ? (config.hair || null) : (config.hair || { type: 'curls', color: '#0a0505' });
             const eyeColor = config.eyeColor || '#daa520'; // Default golden for Stella
             const gender = config.gender || 'female';
             const top = config.top || null;
@@ -592,7 +593,8 @@
             // ─── SHOULDERS / CLOTHING ───
             // Wardrobe pieces (ui/wardrobe.js) draw their own front view; anything else is a plain shape
             const WD = typeof WARDROBE !== 'undefined' ? WARDROBE : null;
-            const P = { cx, cy, fw, fh, w, h, eyeY: cy - fh * 0.15, eyeSpacing: fw * 0.38 };
+            const bw = portraitBreadth(config);                               // shoulder breadth from the build
+            const P = { cx, cy, fw, fh, w, h, eyeY: cy - fh * 0.15, eyeSpacing: fw * 0.38, bw };
             const jewelry = (config.jewelry || []).filter(j => WD && WD.jewelry[j.type]);
             const topPiece = WD && top ? WD.tops[top.type] : null;
             if (topPiece) {
@@ -605,9 +607,9 @@
             }
             ctx.beginPath();
             ctx.moveTo(cx - fw * 0.35, cy + fh * 1.4);
-            ctx.quadraticCurveTo(cx - fw * 1.8, cy + fh * 1.6, cx - fw * 2.5, cy + fh * 2.8);
-            ctx.lineTo(cx + fw * 2.5, cy + fh * 2.8);
-            ctx.quadraticCurveTo(cx + fw * 1.8, cy + fh * 1.6, cx + fw * 0.35, cy + fh * 1.4);
+            ctx.quadraticCurveTo(cx - fw * 1.8 * bw, cy + fh * 1.6, cx - fw * 2.5 * bw, cy + fh * 2.8);
+            ctx.lineTo(cx + fw * 2.5 * bw, cy + fh * 2.8);
+            ctx.quadraticCurveTo(cx + fw * 1.8 * bw, cy + fh * 1.6, cx + fw * 0.35, cy + fh * 1.4);
             ctx.closePath();
             ctx.fill();
             // Collar line
@@ -673,8 +675,12 @@
                 for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * fw * 0.5, cy + fh * 0.2, fw * 0.28, fh * 0.13, side * 0.15, 0, Math.PI * 2); ctx.fill(); }
             }
 
+            // Androids get a plated face and visor instead of human features
+            let drawBrows = null, browColor = null;
+            if (A) drawAndroidPortraitFace(ctx, P, A, X, blink, talk);
+            else {
             // ─── EYEBROWS ───
-            const browColor = hair.color || '#1a1a1a';
+            browColor = hair.color || '#1a1a1a';
             const browY = cy - fh * 0.32;
             const browW = fw * 0.38;
             ctx.strokeStyle = browColor;
@@ -682,7 +688,7 @@
             ctx.lineCap = 'round';
             // Each brow: outer end → arch → inner end. Lift moves it, tilt raises (worry) or
             // drops (anger) the inner end, arch bends it, raise lifts the right brow alone.
-            const drawBrows = () => {
+            drawBrows = () => {
                 for (const side of [-1, 1]) {
                     const up = (X.brow.lift + (side > 0 ? X.brow.raise : 0)) * fh * 0.1;
                     ctx.beginPath();
@@ -855,6 +861,7 @@
             ctx.ellipse(cx + mouthW * 0.15, mouthY + fh * 0.05 + open, mouthW * 0.2, fh * 0.03, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1.0;
+            }
 
             // ─── HAIR (FRONT LAYER — on top of face) ───
             if (hair) {
@@ -863,7 +870,7 @@
             }
 
             // An expressive brow shows through the fringe (stylised, like drawn portraits)
-            if (X.brow.lift || X.brow.tilt || X.brow.arch || X.brow.raise) {
+            if (drawBrows && (X.brow.lift || X.brow.tilt || X.brow.arch || X.brow.raise)) {
                 ctx.save();
                 ctx.lineCap = 'round';
                 ctx.globalAlpha = 0.6; ctx.strokeStyle = skinColor; ctx.lineWidth = fw * 0.15; drawBrows();   // outline so it reads on dark hair
@@ -883,15 +890,19 @@
             dyn = dyn || {};
             const hatPiece = hat && typeof WARDROBE !== 'undefined' ? WARDROBE.hats[hat.type] : null;
             if (hatPiece && hatPiece.back) hatPiece.back(ctx, headX, hat, dyn);   // e.g. the back of a raised hood
-            // Head
-            ctx.fillStyle = skinColor;
-            ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();
             // Eyes — they blink now and then, each character on their own rhythm
             const owner = dyn.owner;
             if (owner && owner._blinkSeed === undefined) owner._blinkSeed = Math.floor(Math.random() * 997);
-            if (!owner || blinkAmount(_gameTimeSec, owner._blinkSeed) < 0.5) {
-                ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
-                ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
+            const blinkNow = owner ? blinkAmount(_gameTimeSec, owner._blinkSeed) : 0;
+            if (dyn.android) {
+                drawAndroidHead(ctx, headX, dyn.android, blinkNow);        // plated dome and visor (ui/bodies.js)
+            } else {
+                ctx.fillStyle = skinColor;
+                ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();
+                if (blinkNow < 0.5) {
+                    ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
+                    ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
+                }
             }
             // Hair (all styles render on top of head) — strand physics via hairGeometry().
             // A raised hood hides short styles; long ones still spill out from under it.
@@ -907,9 +918,32 @@
             if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);
         }
 
+        /**
+         * Draw a procedural character. Builds and height (ui/bodies.js) scale the body
+         * frame here; a hovering android bobs over a soft glow.
+         */
         function drawProceduralHumanoid(ctx, entity, config = {}) {
+            const S = bodyScale(config), A = androidLook(config.body);
+            const hover = A && A.hover && !config.isDriving;
+            if (!S && !hover) return _drawHumanoidBody(ctx, entity, config, null, A);
+            const bob = hover ? 1 + Math.sin(_gameTimeSec * 2.2 + (entity.x || 0) * 0.01) * 0.035 : 1;
+            if (hover) {                                                    // light under a floating android
+                const gl = ctx.createRadialGradient(-3, 0, 0, -3, 0, 15);
+                gl.addColorStop(0, hexToRgba(A.glow, 0.35 * (2 - bob))); gl.addColorStop(1, hexToRgba(A.glow, 0));
+                ctx.fillStyle = gl; ctx.beginPath(); ctx.ellipse(-3, 0, 15, 13, 0, 0, Math.PI * 2); ctx.fill();
+            }
+            const sx = (S ? S.x : 1) * bob, sy = (S ? S.y : 1) * bob;
+            const muzzle = entity._muzzleLocal;
+            ctx.save(); ctx.scale(sx, sy);
+            try { _drawHumanoidBody(ctx, entity, config, { x: sx, y: sy, k: (S ? S.k : 1) * bob }, A); }
+            finally { ctx.restore(); }
+            // Shots leave from the drawn muzzle, so carry the scale into it
+            if (entity._muzzleLocal && entity._muzzleLocal !== muzzle) entity._muzzleLocal = { x: entity._muzzleLocal.x * sx, y: entity._muzzleLocal.y * sy };
+        }
+
+        function _drawHumanoidBody(ctx, entity, config, S, A) {
             // --- 1. CONFIGURATION ---
-            const skinColor = config.skinColor || '#8d5524';
+            const skinColor = A ? A.plate : (config.skinColor || '#8d5524');
             const isDriving = config.isDriving || false;
             const isShootingFromCar = config.isShootingFromCar || false;
             const carAngle = config.carAngle || 0;
@@ -939,11 +973,20 @@
             } else if (gender === 'male') {
                 shoulderSpread = 12; hipWidth = 7; hipXOff = -4.5; torsoWidth = 13; torsoXOff = -4.5;
             }
+            const build = BUILDS[config.build];
+            if (build && build.hip) { hipXOff -= hipWidth * (build.hip - 1) / 2; hipWidth *= build.hip; }
+            if (build && build.shoulder) shoulderSpread *= build.shoulder;
+            // Head keeps its shape under a build's scale: draw it through this
+            const withHead = (hx, draw) => {
+                if (!S) return draw(hx);
+                ctx.save(); ctx.scale(S.k / S.x, S.k / S.y); draw(hx * S.x / S.k); ctx.restore();
+            };
         
             // --- 3. GAIT (shared controller — see CONFIG.GAIT / syncHumanoidGait) ---
             const gait = syncHumanoidGait(entity);
             const gaitSpeed = isDriving ? 0 : gait.speed;
-            const strideLen = humanoidStrideLength(gaitSpeed);
+            const hovering = !!(A && A.hover);                              // floats instead of walking
+            const strideLen = hovering ? 0 : humanoidStrideLength(gaitSpeed);
             const strafeLen = strideLen * CONFIG.GAIT.STRAFE_RATIO;
             const sway = Math.min(1, gaitSpeed / CONFIG.GAIT.FULL_SWAY_SPEED);
         
@@ -964,7 +1007,7 @@
             // Walk oscillations. Like the arm swing, these are applied AFTER the pose
             // smoothing in step 6 — the per-render lerp there would mute and delay
             // them — so the pose targets below are built without them.
-            const walkBounce = isDriving ? 0 : Math.abs(Math.sin(walkCycle)) * (gaitSpeed * 0.2); // Bounce scales with speed
+            const walkBounce = (isDriving || hovering) ? 0 : Math.abs(Math.sin(walkCycle)) * (gaitSpeed * 0.2); // Bounce scales with speed
             const walkSway = Math.sin(walkCycle) * 0.3 * sway;  // sway is 0 when driving or stopped
             let bounce = 0;         // pose-target bounce; walk bounce is added after smoothing
         
@@ -1345,11 +1388,14 @@
             const botP = WD && clothes.bottom ? WD.bottoms[clothes.bottom.type] : null;
             const shoeP = WD && clothes.shoes ? WD.shoes[clothes.shoes.type] : null;
             const sleeve = clothes.top ? (topP ? topP.sleeve : 'long') : 'none';
+            // Sleeves can come from the shirt under a vest; legs from trousers under an apron
+            const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : clothes.top.color) : null;
+            const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
             const jewelryAt = (where) => (clothes.jewelry || []).filter(j => WD && WD.jewelry[j.type] && WD.jewelry[j.type].at === where);
             const headX0 = bounce - bodyRecoil;
             const clothDyn = { wind: null };                               // weather will blow on this (roadmap step 7)
             const g = {
-                darken, skin: skinColor, gender, walkCycle,
+                darken, skin: skinColor, gender, walkCycle, android: A,
                 torso: { x: torsoXOff, w: torsoWidth }, hip: { x: hipXOff, w: hipWidth },
                 headX: headX0, headInTorso: headX0 - hipAnchorX,
                 feet: [[lFootX, lFootY], [rFootX, rFootY]], knees: [[lKneeX, lKneeY], [rKneeX, rKneeY]],
@@ -1375,8 +1421,8 @@
                 ctx.roundRect(torsoXOff - 2, -shoulderSpread - 1, torsoWidth + 4, (shoulderSpread * 2) + 2, 5); 
                 ctx.fill();
                 
-                const sleeveColor = sleeve !== 'none' ? darken(clothes.top.color, 0.15) : darken(skinColor, 0.15);
-                const skinArmColor = sleeve === 'long' ? darken(clothes.top.color, 0.3) : darken(skinColor, 0.3);
+                const sleeveColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
+                const skinArmColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
                 
                 if (isShootingFromCar) {
                     // --- SHOOTING POSE ---
@@ -1433,7 +1479,8 @@
                 // --- HEAD & HAIR ---
                 const headX = 0 + headForward;
                 const driveDyn = { owner: entity, sway: 0, drag: 0, bounce: 0, wiggle: 0 };
-                drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, driveDyn, clothes.hat, clothes.jewelry);
+                driveDyn.android = A;
+                withHead(headX, hx => drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, driveDyn, clothes.hat, clothes.jewelry));
                 
                 ctx.restore();
                 return;
@@ -1458,8 +1505,8 @@
         
             // LEG COLOURS: which parts of the leg the bottom covers ('bare' | 'thigh' | 'full')
             const legs = clothes.bottom ? (botP ? botP.legs : 'full') : 'bare';
-            const legColor = legs === 'full' ? darken(clothes.bottom.color, (botP && botP.shade) || 0.45) : darken(skinColor, 0.15);
-            const thighColor = legs !== 'bare' ? darken(clothes.bottom.color, 0.35) : darken(skinColor, 0.05);
+            const legColor = legs === 'full' ? darken(legCol, (botP && botP.shade) || 0.45) : darken(skinColor, 0.15);
+            const thighColor = legs !== 'bare' ? darken(legCol, 0.35) : darken(skinColor, 0.05);
         
             // 2. Calves
             drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor); 
@@ -1473,6 +1520,10 @@
             // 3. Thighs
             drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor);
             drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor);
+            if (A && legs !== 'full') {                                     // android knees
+                ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
+                for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
+            }
             if (botP && botP.detail) botP.detail(ctx, g, clothes.bottom);   // cuffs, pockets, stripes
         
             // 4. Hips & Skirt
@@ -1525,15 +1576,19 @@
             ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
         
             // 7. Forearms (fabric only under long sleeves)
-            const foreColor = sleeve === 'long' ? darken(clothes.top.color, 0.3) : darken(skinColor, 0.3);
+            const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
             drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor);
             drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor);
             for (const j of jewelryAt('wrists')) WD.jewelry[j.type].draw(ctx, g, j);
         
             // 8. Upper Arms (fabric under short or long sleeves)
-            const upperColor = sleeve !== 'none' ? darken(clothes.top.color, 0.15) : darken(skinColor, 0.15);
+            const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
             drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor);
             drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor);
+            if (A) {                                                        // android joints: seam rings at elbows and wrists
+                ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
+                for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY], [lFistX, lFistY], [rFistX, rFistY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
+            }
             if (topP && topP.armStripe) {                                // track-jacket stripes down the sleeves
                 ctx.strokeStyle = clothes.top.trim || '#f5f5f5'; ctx.lineWidth = 0.8; ctx.beginPath();
                 ctx.moveTo(shoulderX, lShoulderY); ctx.lineTo(lElbowX, lElbowY); ctx.lineTo(lFistX, lFistY);
@@ -1559,6 +1614,13 @@
                 if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
             }
             for (const j of jewelryAt('neck')) WD.jewelry[j.type].draw(ctx, g, j);
+            if (A && !clothes.top) {                                        // bare plating: chest panel seams and the Double Nights mark
+                ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6; ctx.beginPath();
+                ctx.moveTo(torsoXOff + 1, 0); ctx.lineTo(torsoXOff + torsoWidth - 1, 0);
+                for (const y of [-7, 7]) { ctx.moveTo(torsoXOff + 1, y); ctx.lineTo(torsoXOff + torsoWidth - 1.5, y * 0.9); }
+                ctx.stroke();
+                if (A.emblem) drawDNEmblem(ctx, torsoXOff + torsoWidth * 0.62, -4, 2, A.glow);
+            }
             ctx.restore();
         
             // 10. Head & Hair
@@ -1569,10 +1631,13 @@
             // Hair motion comes from the strand physics (hairGeometry): the owner's head
             // position in the world, plus the shoulder sway the strands swing with.
             const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0 };
+            walkDyn.android = A;
             const turning = headY !== 0 || headTurn !== 0;
-            if (turning) { ctx.save(); ctx.translate(headX, headY); ctx.rotate(headTurn); ctx.translate(-headX, 0); }
-            drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
-            if (turning) ctx.restore();
+            withHead(headX, hx => {
+                if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }
+                drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
+                if (turning) ctx.restore();
+            });
         
             // 11. HELD ITEMS
             if (held) {

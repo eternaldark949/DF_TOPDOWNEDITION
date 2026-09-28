@@ -26,6 +26,65 @@
                 { name: 'tourist', bodyColor: '#48cae4', headColor: '#c9a87c', hairColor: '#654321', hasHat: true, hatColor: '#fff' },
                 { name: 'delivery', bodyColor: '#2ec4b6', headColor: '#dcc6ac', hairColor: '#1a1a1a', hasHat: true, hatColor: '#2ec4b6' }
             ];
+
+            /**
+             * A person built from an archetype: their gender, build, height, skin, hair and
+             * an outfit in the archetype's signature colour (bodyColor), so the crowd is
+             * varied but workers still read as workers, tourists as tourists.
+             */
+            static makeLook(ap, r) {
+                const pick = list => pickFrom(r, list);
+                const c = ap.bodyColor;
+                const gender = ap.name.endsWith('_male') ? 'male' : ap.name.endsWith('_female') ? 'female' : pick(['female', 'male', 'androgynous']);
+                const hairTypes = gender === 'female' ? ['long', 'ponytail', 'braids', 'curls', 'afro', 'short', 'dreadlocks']
+                                : gender === 'male' ? ['short', 'short', 'afro', 'dreadlocks', 'curls', 'braids'] : ['short', 'curls', 'ponytail', 'afro'];
+                const look = {
+                    gender, skinColor: pick(_SKIN_TONES),
+                    build: pick([undefined, undefined, 'slim', 'athletic', 'curvy', 'broad', 'heavy']),
+                    height: 0.93 + r() * 0.14,
+                    hair: { type: pick(hairTypes), color: r() < 0.6 ? ap.hairColor : pick(_HAIR_COLORS) },
+                    shoes: { type: 'sneakers', color: '#e8e8e8' }
+                };
+                const skirtOr = alt => gender === 'female' && r() < 0.5 ? { type: pick(['skirt', 'long_skirt']), color: '#1c1c24' } : alt;
+                switch (ap.name) {
+                    case 'suit_male': case 'suit_female': case 'corporate':
+                        look.top = { type: pick(['suit', 'suit', 'jacket']), color: c, inner: '#e8e8e8' };
+                        look.bottom = skirtOr({ type: 'pants', color: '#1e1e26' });
+                        look.shoes = { type: gender === 'female' && r() < 0.5 ? 'heels' : 'loafers', color: '#111111' };
+                        if (r() < 0.2) look.jewelry = [{ type: 'sunglasses', color: '#141414' }];
+                        break;
+                    case 'casual_male': case 'casual_female':
+                        look.top = { type: pick(gender === 'female' ? ['tshirt', 'crop_top', 'tank', 'turtleneck'] : ['tshirt', 'tank', 'hoodie']), color: c, trim: '#f2f2f2' };
+                        look.bottom = skirtOr({ type: pick(['pants', 'shorts', 'joggers']), color: pick(['#34495e', '#2b2b2b', '#6b5b45']) });
+                        if (gender === 'female' && r() < 0.4) look.jewelry = [{ type: 'hoops', color: '#e8c27a' }];
+                        break;
+                    case 'worker':
+                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'cargo', color: '#4a4a3a' };
+                        look.shoes = { type: 'boots', color: '#3a2a1a' }; look.hat = { type: 'cap', color: ap.hatColor, trim: '#222222' };
+                        break;
+                    case 'hipster':
+                        look.top = { type: 'jacket', color: c, inner: '#d8d2c0' }; look.bottom = { type: pick(['pants', 'joggers']), color: '#2b2b2b' };
+                        look.hat = { type: 'beanie', color: ap.hatColor, trim: '#555555' };
+                        break;
+                    case 'punk':
+                        look.top = { type: pick(['tank', 'track_jacket', 'crop_top']), color: c, trim: '#111111' };
+                        look.bottom = { type: 'leggings', color: '#111111' }; look.shoes = { type: 'boots', color: '#111111' };
+                        look.hair = { type: pick(['short', 'afro', 'braids', 'dreadlocks']), color: ap.hairColor };
+                        look.jewelry = [{ type: 'hoops', color: '#c0c0c0' }];
+                        break;
+                    case 'tourist':
+                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'shorts', color: '#c2b280' };
+                        look.hat = { type: 'cap', color: ap.hatColor, trim: '#48cae4' }; look.jewelry = [{ type: 'sunglasses', color: '#141414' }];
+                        break;
+                    case 'delivery':
+                        look.top = { type: 'hoodie', color: c, trim: '#f2f2f2' }; look.bottom = { type: 'joggers', color: '#1e2a2a' };
+                        look.hat = { type: 'cap', color: ap.hatColor, trim: '#ffffff' };
+                        break;
+                    default:
+                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'pants', color: '#222222' };
+                }
+                return look;
+            }
             
             constructor(x, y, network) {
                 super({
@@ -77,6 +136,7 @@
                 this.hairColor = appearance.hairColor;
                 this.hasHat = appearance.hasHat;
                 this.hatColor = appearance.hatColor || '#333';
+                this.look = Pedestrian.makeLook(appearance, seededRandom(Math.random()));   // who this person is (stable)
                 
                 // Animation
                 this.walkPhase = Math.random() * Math.PI * 2;
@@ -707,36 +767,11 @@
                 ctx.ellipse(-12, 0, 5, 10, 0, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Build config for drawProceduralHumanoid
-                const config = {
-                    skinColor: this.headColor,
-                    gender: 'androgynous',
-                    stance: 'idle',
-                    top: { type: 'suit', color: this.bodyColor },
-                    bottom: { type: 'pants', color: '#222' },
-                    shoes: { type: 'shoes', color: '#111' },
-                    lerpSpeed: 0.15 // Smooth animation transitions
-                };
-                
-                // Add hair or hat
-                if (this.hasHat) {
-                    // Use hair slot for hat visual (we'll draw hat separately)
-                    config.hair = { type: 'short', color: this.hairColor };
-                } else {
-                    config.hair = { type: 'short', color: this.hairColor };
-                }
-                
-                drawProceduralHumanoid(ctx, this, config);
-                
-                // Draw hat on top if needed (head is at +X)
-                if (this.hasHat) {
-                    const bounce = Math.abs(Math.sin(this.walkPhase || 0)) * (speed * 0.3);
-                    ctx.fillStyle = this.hatColor;
-                    ctx.beginPath();
-                    ctx.ellipse(bounce * 0.2, 0, 5, 10, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.fillRect(-4, -6, 5, 12);
-                }
+                // Their own look (Pedestrian.makeLook) — hats, hair and all. Zoomed out (more of
+                // the crowd on screen, too small to read details) they get simple hair, no jewelry.
+                const far = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 1;
+                const look = far && this.look.hair ? { ...this.look, hair: { type: 'short', color: this.look.hair.color }, jewelry: null } : this.look;
+                drawProceduralHumanoid(ctx, this, { ...look, stance: 'idle', lerpSpeed: 0.15 });
                 
                 // Waiting indicator (if at crosswalk) - above head at +X
                 if (this.state === 'waiting') {

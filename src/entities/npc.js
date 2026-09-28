@@ -17,6 +17,57 @@
          * - Wall collision handled automatically by CollisionSystem
          * - Preserves all existing visual rendering exactly
          */
+        /* ---------------------------------------------------------------------
+           STAFF_LOOKS — how the staff and androids look, in the world and in
+           their portraits (NPC_PORTRAIT_CONFIGS reads these too). Double Nights'
+           AI staff come in moon silver, sun-on-moon gold, or Blood Moon rose red.
+           --------------------------------------------------------------------- */
+        const _DN_GUARD = { gender: 'male', build: 'broad', body: { kind: 'android', finish: 'gold', glow: '#00ffff' },
+            top: { type: 'dn_uniform', color: '#2a2418', trim: '#e8c27a' }, bottom: { type: 'pants', color: '#1a1614' },
+            shoes: { type: 'boots', color: '#111111' }, pose: 'hands_on_hips' };
+        const STAFF_LOOKS = {
+            'Guard Unit Alpha': _DN_GUARD,
+            'Guard Unit Beta':  _DN_GUARD,
+            'Concierge Lux':    { gender: 'androgynous', build: 'slim', body: { kind: 'android', finish: 'gold' },
+                                  top: { type: 'dn_uniform', color: '#2a2418', trim: '#e8c27a' }, bottom: { type: 'pants', color: '#1a1a1a' },
+                                  shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge' },
+            'LUVSH4D3':         { gender: 'female', build: 'curvy', body: { kind: 'android', finish: 'bloodmoon', hover: true },
+                                  hair: { type: 'long', color: '#ff88cc' } },
+            'Bartender':        { skinColor: '#c9a87c', gender: 'male', hair: { type: 'short', color: '#1a1a1a' },
+                                  top: { type: 'vest', color: '#1a0020', inner: '#f2f2f2', trim: '#8b0000' }, bottom: { type: 'pants', color: '#111111' },
+                                  shoes: { type: 'loafers', color: '#111111' }, pose: 'polish' },
+            'Barista Ren':      { skinColor: '#a0724a', gender: 'female', hair: { type: 'ponytail', color: '#2a1500' },
+                                  top: { type: 'tshirt', color: '#654321' }, bottom: { type: 'apron', color: '#3a2a1a', under: '#222222' },
+                                  shoes: { type: 'sneakers', color: '#eeeeee' }, pose: 'polish' },
+            // The Empereal Lord's scientist and medic; she keeps Stella and 747 running
+            'Dr. Yin':          { skinColor: '#e8d0b8', gender: 'female', build: 'slim', hair: { type: 'short', color: '#222222' },
+                                  top: { type: 'lab_coat', inner: '#1a3a4a' }, bottom: { type: 'pants', color: '#1a3a4a' },
+                                  shoes: { type: 'loafers', color: '#222222' }, pose: 'arms_crossed' },
+        };
+
+        const _SKIN_TONES = ['#3d2b1f', '#6b3a2a', '#8d5524', '#a0522d', '#c68642', '#c68e63', '#dcc6ac', '#e8d0b8', '#f5deb3'];
+        const _HAIR_COLORS = ['#0a0505', '#1a1a1a', '#2a1500', '#4a3728', '#8b4513', '#654321', '#c0c0c0'];
+
+        /** A stable look for NPCs without a named look: medics and the club's male dancers. */
+        function seededNpcLook(npc) {
+            const r = seededRandom(npc.name + '|' + npc.role + '|' + Math.round(npc.spawnX || npc.x) + ',' + Math.round(npc.spawnY || npc.y));
+            const skinColor = pickFrom(r, _SKIN_TONES);
+            if (npc.role === 'medic') {
+                const gender = r() < 0.5 ? 'female' : 'male';
+                return { skinColor, gender, build: pickFrom(r, [undefined, 'slim', 'athletic', 'curvy', 'heavy']),
+                         hair: { type: pickFrom(r, ['short', 'ponytail', 'braids', 'curls', 'afro']), color: pickFrom(r, _HAIR_COLORS) },
+                         top: { type: 'scrubs', color: pickFrom(r, ['#3aa6a0', '#4a7fb5', '#e8ecef']) },
+                         bottom: { type: 'pants', color: '#3a6f80' }, shoes: { type: 'sneakers', color: '#ffffff' } };
+            }
+            // Male dancer: bare chest or an open jacket, black trousers, and a dance of his own
+            const jacket = r() < 0.5;
+            return { skinColor, gender: 'male', build: pickFrom(r, ['athletic', 'athletic', 'slim', 'broad']), height: 0.97 + r() * 0.08,
+                     hair: { type: pickFrom(r, ['short', 'dreadlocks', 'braids', 'afro', 'curls', 'ponytail']), color: pickFrom(r, ['#0a0505', '#1a1a1a', '#8a0707', '#c0c0c0']) },
+                     top: jacket ? { type: 'jacket', color: pickFrom(r, ['#111111', '#2a0a3a', '#590e18']), inner: skinColor } : null,
+                     bottom: { type: 'pants', color: '#111111' }, shoes: { type: 'loafers', color: '#111111' },
+                     jewelry: r() < 0.5 ? [{ type: 'necklace', color: '#e8c27a' }] : null, pose: 'dance' };
+        }
+
         class NPC extends ActorEntity {
             /**
              * Unified NPC class — handles civilians, quest givers, dancers, AND teammates.
@@ -575,9 +626,10 @@
                 ctx.translate(this.x, this.y);
                 
                 // --- ROTATION LOGIC ---
-                // drawProceduralHumanoid faces Right (0 radians) — dancers & teammates use raw angle.
-                // Other NPCs are drawn facing Down (PI/2) — subtract PI/2 to correct.
-                const usesRawAngle = (this.role === 'red_demon_dancer' || this.role === 'dancer' || this.role === 'teammate');
+                // Every NPC is a procedural humanoid now, which faces Right (0 radians).
+                // (The −PI/2 correction was for the old sprites that were drawn facing Down.)
+                const usesRawAngle = true;
+                const staffLook = this._staffLook();
                 
                 if (this.combatTargetTimer > 0 && this.combatTargetAngle !== undefined) {
                     // In combat: face target
@@ -593,6 +645,8 @@
                     // IDLE & HIRED/RECRUITED: Face Player
                     const angle = Math.atan2(player.y - this.y, player.x - this.x);
                     ctx.rotate(usesRawAngle ? angle : angle - Math.PI/2);
+                } else if (staffLook && staffLook.idleAngle !== undefined) {
+                    ctx.rotate(staffLook.idleAngle);                          // staff face the room when idle
                 } else {
                     // Default Idle
                     if (!usesRawAngle) ctx.rotate(0);
@@ -602,17 +656,11 @@
                 if (this.name === 'Anavia') {
                     this.drawAnavia(ctx); 
                 } 
-                else if (this.role === 'red_demon_dancer' || this.role === 'dancer') { // <--- Added 'else'
-                    if (this.gender === 'male') this.drawMaleDancer(ctx, this.walkPhase);
-                    else this.drawFemaleDancer(ctx, this.walkPhase, speed);
-                }
+                else if (staffLook) this.drawStaff(ctx, staffLook);
+                else if (this.role === 'red_demon_dancer' || this.role === 'dancer') this.drawFemaleDancer(ctx, this.walkPhase, speed);
                 
                 else if (this.name === 'Ms. Jean' || this.role === 'ms_jean') this.drawMsJean(ctx);
                 else if (this.name === 'Mirabel') this.drawMirabell(ctx);
-                else if (this.name === 'LUVSH4D3') this.drawLuvshade(ctx);
-                else if (this.role.includes('robot')) this.drawGuardUnit(ctx);
-                else if (this.role === 'bartender') this.drawBartender(ctx);
-                else if (this.role === 'medic' || this.name === 'Dr. Yin') this.drawMedic(ctx);
                 else if (this.name === 'Prisma') this.drawPrisma(ctx);
                 else if (this.name === 'Torque') this.drawTorque(ctx);
                 else if (this.name === 'Biggs') this.drawBiggs(ctx);
@@ -769,6 +817,26 @@
                 });
             }
             
+            /**
+             * The look for staff, androids, medics and male dancers (STAFF_LOOKS or a
+             * seeded one), or null for NPCs with their own draw method. Cached.
+             */
+            _staffLook() {
+                if (this._look !== undefined) return this._look;
+                let look = STAFF_LOOKS[this.name] || null;
+                if (!look && (this.role === 'medic' || ((this.role === 'dancer' || this.role === 'red_demon_dancer') && this.gender === 'male')))
+                    look = seededNpcLook(this);
+                if (!look && this.role && this.role.includes('robot'))       // unnamed Double Nights staff: silver
+                    look = { gender: 'androgynous', body: { kind: 'android', finish: 'silver' }, top: { type: 'dn_uniform', color: '#1c2030', trim: '#dfe6ff' },
+                             bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge' };
+                if (look && look.pose !== 'dance') look = { idleAngle: Math.PI / 2, ...look };
+                return (this._look = look);
+            }
+
+            drawStaff(ctx, look) {
+                drawProceduralHumanoid(ctx, this, { stance: 'idle', ...look });
+            }
+
             drawFemaleDancer(ctx, phase, speed) {
                 
                 if (this.walkPhase === undefined) this.walkPhase = 0;
@@ -788,7 +856,6 @@
             
             
 
-            drawMaleDancer(ctx, phase) { const skinColor = '#8d5524'; const bounce = Math.abs(Math.sin(phase)) * 1; const shoulderSway = Math.sin(phase) * 0.2; ctx.fillStyle = '#111'; ctx.beginPath(); ctx.roundRect(-8 + Math.sin(phase)*5, -7, 10, 6, 2); ctx.fill(); ctx.beginPath(); ctx.roundRect(-8 + Math.sin(phase+Math.PI)*5, 1, 10, 6, 2); ctx.fill(); ctx.save(); ctx.rotate(shoulderSway); ctx.fillStyle = '#111'; ctx.beginPath(); ctx.ellipse(-2 + bounce, 0, 6, 7, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = skinColor; ctx.beginPath(); ctx.moveTo(0 + bounce, -8); ctx.lineTo(10 + bounce, -12); ctx.lineTo(12 + bounce, 0); ctx.lineTo(10 + bounce, 12); ctx.lineTo(0 + bounce, 8); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(6 + bounce, -5, 4, 4); ctx.fillRect(6 + bounce, 1, 4, 4); ctx.fillStyle = skinColor; ctx.beginPath(); ctx.arc(11 + bounce, 0, 7, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(10 + bounce, 0, 6.5, Math.PI/2, -Math.PI/2); ctx.fill(); ctx.restore(); }
             drawMirabell(ctx) {
                 if (this.walkPhase === undefined) this.walkPhase = 0;
                 if (this.velX === undefined) this.velX = 0;
@@ -804,10 +871,6 @@
                     hat:    { type: 'wide_brim', color: '#590e18', crownColor: '#70121e', stroke: '#1a0505' }
                 });
             }
-            drawLuvshade(ctx) { const time = _frameTime + this.animOffset; const hover = Math.sin(time / 400) * 3; const shadowScale = 1.0 - (hover/20); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(0, 15, 12 * shadowScale, 6 * shadowScale, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#DC143C'; ctx.shadowColor = '#ff0055'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(0, 0 + hover, 14, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; ctx.fillStyle = '#8B0000'; ctx.beginPath(); ctx.ellipse(0, 8 + hover, 10, 8, 0, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.shadowColor = '#fff'; ctx.shadowBlur = 5; ctx.beginPath(); ctx.arc(-3, -2 + hover, 4, 0.5 * Math.PI, 1.5 * Math.PI); ctx.stroke(); ctx.beginPath(); ctx.arc(3, -2 + hover, 4, 1.5 * Math.PI, 0.5 * Math.PI); ctx.stroke(); ctx.shadowBlur = 0; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.roundRect(-8, -5 + hover, 16, 4, 2); ctx.fill(); ctx.fillStyle = '#ff9999'; ctx.globalAlpha = 0.8 + Math.sin(time / 100) * 0.2; ctx.fillRect(-6, -4 + hover, 12, 2); ctx.globalAlpha = 1.0; }
-            drawGuardUnit(ctx) { const time = _frameTime + this.animOffset; const scanAngle = Math.sin(time / 800) * 0.5; ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.ellipse(0, 10, 18, 8, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#DAA520'; ctx.beginPath(); ctx.roundRect(-16, -10, 32, 24, 4); ctx.fill(); ctx.fillStyle = '#FFD700'; ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 5; ctx.beginPath(); ctx.arc(-14, -8, 8, 0, Math.PI*2); ctx.arc(14, -8, 8, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; ctx.save(); ctx.rotate(scanAngle); ctx.fillStyle = '#B8860B'; ctx.beginPath(); ctx.rect(-8, -14, 16, 14); ctx.fill(); ctx.fillStyle = '#00ffff'; ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 8; ctx.fillRect(-6, -10, 12, 4); ctx.shadowBlur = 0; ctx.restore(); ctx.fillStyle = '#333'; ctx.fillRect(-6, 2, 12, 2); ctx.fillRect(-6, 6, 12, 2); }
-            drawBartender(ctx) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(0, 10, 15, 8, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#dcc6ac'; ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(-8, 5); ctx.lineTo(8, 5); ctx.lineTo(10, 25); ctx.lineTo(-10, 25); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(-3, 8, 6, 3); }
-            drawMedic(ctx) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(0, 10, 15, 8, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f00'; ctx.fillRect(-4, -4, 8, 8); ctx.fillStyle = '#fff'; ctx.fillRect(-1, -3, 2, 6); ctx.fillRect(-3, -1, 6, 2); }
 
             drawPrisma(ctx) {
                 drawProceduralHumanoid(ctx, this, {

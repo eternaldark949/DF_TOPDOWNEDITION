@@ -59,6 +59,7 @@
             '949': 'neutral', 'Victoria': 'smirk', 'Sabrina': 'sultry', 'Yenna': 'neutral', 'Max': 'smile',
             'Josh': 'neutral', 'Anavia': 'sultry', 'Mirabel': 'smile', 'Biggs': 'grin', 'Bartender': 'smile',
             'LUVSH4D3': 'sultry', 'Barista Ren': 'smile', 'Ms. Jean': 'smile', 'Contractor': 'annoyed',
+            'Guard Unit Alpha': 'neutral', 'Guard Unit Beta': 'neutral', 'Concierge Lux': 'smile', 'Dr. Yin': 'neutral',
         };
 
         /** Pick a mood for a line of dialogue from its wording, then the speaker's temperament. */
