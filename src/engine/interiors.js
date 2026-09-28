@@ -46,7 +46,10 @@
                 const glow = (x, y, r, c0, c1) => { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // Lamp shades and bar pendants (they follow the room switches)
-                const shades = [[353, 484, 30], [573, 484, 30], [991, 232, 28], [1115, 232, 28], [307, 439, 34], [700, 700, 34], [109, 463, 34], [231, 759, 22], [350, 759, 22], [469, 759, 22]];
+                const shades = [[991, 232, 28], [1115, 232, 28], [307, 439, 34], [700, 700, 34], [109, 463, 34], [231, 759, 22], [350, 759, 22], [469, 759, 22]];
+                for (const p of this.props) if (p.light && p.decorType === 'apt_side') {   // table lamps travel with their tables
+                    const c = p.getCenter(); shades.push([c.x - 2, c.y - 1, 30]);
+                }
                 for (const [x, y, r] of shades) {
                     if (dark(x, y)) continue;
                     glow(x, y, r, 'rgba(255,210,160,0.26)', 'rgba(255,190,140,0)');

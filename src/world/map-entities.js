@@ -40,8 +40,8 @@
                     e.props = [
                         new PropEntity({ x: 400, y: 500, width: 120, height: 70, color: '#4a2832', interactionType: 'couch_two_seater', decorType: 'apt_sofa' }),
                         new PropEntity({ x: 550, y: 420, width: 60, height: 25, color: '#ff6622', interactionType: 'tv_screen', decorType: 'apt_fireplace' }),
-                        new PropEntity({ x: 340, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table', decorType: 'apt_side' }),
-                        new PropEntity({ x: 560, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table', decorType: 'apt_side' }),
+                        new PropEntity({ x: 340, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table', decorType: 'apt_side', light: { radius: 110, color: '#ffd2a8', intensity: 0.85, dx: -2, dy: -1 } }),
+                        new PropEntity({ x: 560, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table', decorType: 'apt_side', light: { radius: 110, color: '#ffd2a8', intensity: 0.85, dx: -2, dy: -1 } }),
                         new PropEntity({ x: 30, y: 340, width: 44, height: 50, color: '#2a2a3a', interactionType: 'armory' }),
                         new PropEntity({ x: 30, y: 540, width: 44, height: 36, color: '#00f3ff', interactionType: 'vending_machine' }),
                         new PropEntity({ x: 1111, y: 226, width: 18, height: 14, color: '#3a4a6a', interactionType: 'read_note', noteId: 'larissa_briefing_darklands' }),
@@ -78,29 +78,44 @@
                     ];
                     e.lamps = [
                         new LampEntity({ x: 16, y: 100, lampType: 5, color: '#ffaa88', lightRadius: 400, angle: 0 }),
-                        new LampEntity({ x: 350, y: 194, lampType: 5, color: '#ff8899', lightRadius: 400, angle: 0 }),
-                        new LampEntity({ x: 700, y: 194, lampType: 5, color: '#ff8899', lightRadius: 400, angle: 0 }),
-                        new LampEntity({ x: 1050, y: 194, lampType: 5, color: '#ff8899', lightRadius: 400, angle: 0 }),
+                        new LampEntity({ x: 350, y: 194, lampType: 5, color: '#ff8899', lightRadius: 400, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 700, y: 194, lampType: 5, color: '#ff8899', lightRadius: 400, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 1050, y: 194, lampType: 5, color: '#ff8899', lightRadius: 400, angle: Math.PI / 2 }),
                         new LampEntity({ x: 1384, y: 100, lampType: 5, color: '#ffaa88', lightRadius: 400, angle: Math.PI }),
                         new LampEntity({ x: 16, y: 350, lampType: 5, color: '#ffbb88', lightRadius: 500, angle: 0 }),
                         new LampEntity({ x: 16, y: 600, lampType: 5, color: '#ffaa77', lightRadius: 500, angle: 0 }),
                         new LampEntity({ x: 16, y: 800, lampType: 5, color: '#ffbb88', lightRadius: 450, angle: 0 }),
-                        new LampEntity({ x: 450, y: 214, lampType: 5, color: '#ffccaa', lightRadius: 500, angle: 0 }),
-                        new LampEntity({ x: 750, y: 214, lampType: 5, color: '#ffccaa', lightRadius: 500, angle: 0 }),
-                        new LampEntity({ x: 450, y: 884, lampType: 5, color: '#ff9977', lightRadius: 400, angle: 0 }),
+                        new LampEntity({ x: 450, y: 214, lampType: 5, color: '#ffccaa', lightRadius: 500, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 750, y: 214, lampType: 5, color: '#ffccaa', lightRadius: 500, angle: Math.PI / 2 }),
+                        new LampEntity({ x: 450, y: 884, lampType: 5, color: '#ff9977', lightRadius: 400, angle: Math.PI / 2 }),
                         new LampEntity({ x: 307, y: 439, lampType: 4, color: '#ff8866', lightRadius: 500 }),
                         new LampEntity({ x: 700, y: 700, lampType: 4, color: '#ffaa88', lightRadius: 450 }),
                         new LampEntity({ x: 109, y: 463, lampType: 4, color: '#ffbb99', lightRadius: 400 }),
                         new LampEntity({ x: 290, y: 759, lampType: 4, color: '#ffb880', lightRadius: 170 }),   // bar pendants
                         new LampEntity({ x: 410, y: 759, lampType: 4, color: '#ffb880', lightRadius: 170 }),
-                        new LampEntity({ x: 1100, y: 214, lampType: 5, color: '#ffaabb', lightRadius: 450, angle: 0 }),
+                        new LampEntity({ x: 1100, y: 214, lampType: 5, color: '#ffaabb', lightRadius: 450, angle: Math.PI / 2 }),
                         new LampEntity({ x: 1384, y: 350, lampType: 5, color: '#ff99aa', lightRadius: 450, angle: Math.PI }),
                         new LampEntity({ x: 1100, y: 400, lampType: 4, color: '#ff99bb', lightRadius: 400 }),
-                        new LampEntity({ x: 1100, y: 562, lampType: 5, color: '#e8e4f0', lightRadius: 300, angle: 0 }),
+                        new LampEntity({ x: 1250, y: 562, lampType: 5, color: '#e8e4f0', lightRadius: 300, angle: Math.PI / 2 }),   // clear of the bathroom door
                         new LampEntity({ x: 1384, y: 700, lampType: 5, color: '#e8e4f0', lightRadius: 320, angle: Math.PI }),
-                        new LampEntity({ x: 1027, y: 884, lampType: 5, color: '#ffe0cc', lightRadius: 260, angle: 0 }),   // vanity mirror light
-                        new LampEntity({ x: 620, y: 884, lampType: 5, color: '#ffaa55', lightRadius: 300, angle: 0 }),
-                        new LampEntity({ x: 780, y: 884, lampType: 5, color: '#ffaa55', lightRadius: 300, angle: Math.PI }),
+                        new LampEntity({ x: 1027, y: 884, lampType: 5, color: '#ffe0cc', lightRadius: 260, angle: Math.PI / 2 }),   // vanity mirror light
+                        new LampEntity({ x: 600, y: 884, lampType: 5, color: '#ffaa55', lightRadius: 300, angle: Math.PI / 2 }),   // beside the exit, not in it
+                        new LampEntity({ x: 800, y: 884, lampType: 5, color: '#ffaa55', lightRadius: 300, angle: Math.PI / 2 }),
+                    ];
+                    // Shadowless soft lights: the light the decor casts on the floor around it
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    e.softLights = [
+                        S(991, 232, 100, '#ffd2a8'), S(1115, 232, 100, '#ffd2a8'),                       // nightstand lamps
+                        S(307, 439, 90, '#ffd9b0', 0.7), S(700, 700, 90, '#ffd9b0', 0.7), S(109, 463, 90, '#ffd9b0', 0.7),   // floor lamp halos
+                        S(231, 759, 90, '#ffc38a', 0.75), S(350, 759, 90, '#ffc38a', 0.75), S(469, 759, 90, '#ffc38a', 0.75), // bar pendants
+                        S(580, 440, 140, '#ff9a50', 0.9, 6),                                             // fireplace
+                        S(433, 864, 60, '#ff5a30', 0.6), S(312, 859, 55, '#7aa8ff', 0.5, 14),              // induction zone, gas burner
+                        S(1252, 616, 70, '#ffc890', 0.75, 9), S(1368, 619, 60, '#ffc890', 0.7, 9),         // tub candles
+                        S(1027, 866, 90, '#ffe0cc', 0.6),                                                  // vanity mirror
+                        S(1150, 720, 130, '#ece6f2', 0.7),                                                 // bathroom ceiling light
+                        S(1246, 476, 100, '#ffd2a8', 0.75),                                                // bedroom reading chair
+                        S(390, 236, 80, '#ffd9b0', 0.55),                                                  // bookshelf
+                        ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => S(105 + i * 170, 22, 100, '#ffd6a0', 0.7, 1.3))   // veranda string lights
                     ];
                     break;
                 }
