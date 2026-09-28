@@ -1,0 +1,192 @@
+        /* =========================================
+           1. CORE VARIABLES & SETUP
+           -----------------------------------------
+           CSS Custom Properties (variables) defined here
+           can be used throughout the stylesheet.
+           
+           Usage: var(--variable-name)
+           ========================================= */
+        :root {
+            --glow-color: #a469ff;        /* Main purple accent */
+            --text-color: #e0e0e0;        /* Default text (light gray) */
+            --bg-color: #030005;          /* Deep black background */
+            --font-script: 'Great Vibes', cursive;   /* Elegant script font */
+            --font-ui: 'Montserrat', sans-serif;     /* Clean UI font */
+            --font-tech: 'Orbitron', sans-serif;     /* Sci-fi tech font */
+            --gold-primary: #FFD700;      /* Bright gold */
+            --gold-dim: #C5A000;          /* Muted gold */
+            --purple-neon: #a469ff;       /* Neon purple */
+            --red-deep: #550000;          /* Deep red (danger) */
+            --glass-dark: rgba(10, 5, 10, 0.85);  /* Dark glass effect */
+            --message-modal-color: #ffeed8;
+            color-scheme: light only;     /* Prevent dark mode interference */
+        }
+        
+        /* Reset and base styles */
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            background-color: var(--bg-color);
+            background: radial-gradient(circle at center, #1a0b2e 0%, #000000 100%);
+            font-family: var(--font-ui); color: var(--text-color);
+            user-select: none;                        /* Prevent text selection */
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+            touch-action: none;                       /* Disable browser touch gestures */
+        }
+        canvas { display: block; }
+        
+        /* =========================================
+           FILM GRAIN OVERLAY
+           -----------------------------------------
+           SVG noise filter applied over the game
+           for cinematic texture. Uses CSS blend mode.
+           ========================================= */
+        #game-container::after {
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+            pointer-events: none; z-index: 10; opacity: 0.4; mix-blend-mode: overlay;
+        }
+        /* Disable grain overlay when toggled off */
+        #game-container.no-grain::after { display: none; }
+        
+        /* Vending Machine Items */
+        .vend-item:hover { background: rgba(255, 255, 255, 0.05) !important; border-color: rgba(0, 243, 255, 0.15) !important; }
+        .vend-item:active { transform: scale(0.98); }
+        #btn-vend-close:hover { border-color: rgba(255, 255, 255, 0.3); color: #ccc; }
+        
+        /* =========================================
+           MAP TRANSITION FADE
+           -----------------------------------------
+           Full-screen black overlay that fades in/out
+           during map transitions for smooth scene changes.
+           ========================================= */
+        /* NOTE READING OVERLAY — style variants */
+        #note-document { border-radius: 4px; }
+        #note-document::-webkit-scrollbar { width: 4px; }
+        #note-document::-webkit-scrollbar-track { background: transparent; }
+        #note-document::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+        
+        /* LETTER — warm parchment, handwritten feel */
+        #note-document.note-letter {
+            background: linear-gradient(170deg, #2a1f14 0%, #1a1208 100%);
+            border: 1px solid rgba(180,140,80,0.2);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6), inset 0 0 60px rgba(120,80,30,0.06);
+            color: #c8b090;
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 0.85rem;
+        }
+        #note-document.note-letter #note-header { color: #d4af37; font-family: Georgia, serif; }
+        #note-document.note-letter #note-signature { color: #aa8844; font-style: italic; font-family: Georgia, serif; }
+        #note-document.note-letter #note-close-hint { color: #7a6a50; }
+
+        /* BRIEFING — cold, professional, Guild document */
+        #note-document.note-briefing {
+            background: linear-gradient(170deg, #0a0a14 0%, #0e0e1a 100%);
+            border: 1px solid rgba(100,120,180,0.15);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6), inset 0 0 60px rgba(60,80,140,0.04);
+            color: #a0a8c0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.78rem;
+        }
+        #note-document.note-briefing #note-header { color: #6688cc; font-family: Orbitron, sans-serif; }
+        #note-document.note-briefing #note-signature { color: #556688; font-family: 'Courier New', monospace; }
+        #note-document.note-briefing #note-close-hint { color: #3a4a60; }
+
+        /* ANCIENT — dark mystical parchment */
+        #note-document.note-ancient {
+            background: linear-gradient(170deg, #1a0a1a 0%, #0a050a 100%);
+            border: 1px solid rgba(160,80,200,0.15);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6), inset 0 0 60px rgba(120,40,180,0.05);
+            color: #b898c8;
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 0.82rem;
+            font-style: italic;
+        }
+        #note-document.note-ancient #note-header { color: #cc88ff; }
+        #note-document.note-ancient #note-signature { color: #8855aa; }
+        #note-document.note-ancient #note-close-hint { color: #5a3a6a; }
+
+        /* DIGITAL — tech hologram */
+        #note-document.note-digital {
+            background: linear-gradient(170deg, #040810 0%, #080c14 100%);
+            border: 1px solid rgba(0,200,255,0.12);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 30px rgba(0,140,255,0.05);
+            color: #88ccdd;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.78rem;
+        }
+        #note-document.note-digital #note-header { color: #00bbff; font-family: Orbitron, sans-serif; }
+        #note-document.note-digital #note-signature { color: #336688; }
+        #note-document.note-digital #note-close-hint { color: #224455; }
+
+        #fade-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; opacity: 0; pointer-events: none; z-index: 1000;
+            transition: opacity 0.4s ease;
+        }
+        #fade-overlay.active { opacity: 1; }
+
+        /* --- CINEMATIC BARS (Letterboxing) --- */
+        #cinematic-bars {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 1100; /* Above fade overlay */
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .cine-bar {
+            width: 100%; height: 0vh; background: #000;
+            transition: height 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #cinematic-bars.active .cine-bar { height: 12vh; }
+
+        /* --- INTRO TITLES (Fixed Z-Index to show above fade) --- */
+        #intro-title-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            /* TITLE SCRIM: soft elliptical darkening behind the text, plus a very
+               light global dim. Because this lives on the overlay itself, it fades
+               in and out on the exact same 2s curve as the title — no JS needed.
+               To remove the scrim entirely, restore: background: rgba(0,0,0,0); */
+            background:
+                radial-gradient(ellipse 62% 30% at 50% 50%,
+                    rgba(0,0,0,0.75) 0%,
+                    rgba(0,0,0,0.55) 40%,
+                    rgba(0,0,0,0.20) 68%,
+                    rgba(0,0,0,0) 82%),
+                rgba(0,0,0,0.18);
+            pointer-events: none; 
+            z-index: 1200; /* Highest Priority */
+            opacity: 0; transition: opacity 2s ease-in-out;
+        }
+        .intro-main {
+            font-family: 'Montserrat', sans-serif; font-size: 3rem; font-weight: 700;
+            letter-spacing: 5px;
+            background: linear-gradient(180deg, #FFF4C4 0%, #FFD700 35%, #DAA520 65%, #B8860B 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            /* Dark passes come FIRST so they hug the glyph edges; the gold glows
+               then bloom around the result. Order matters — each drop-shadow uses
+               the previous filter's output as its source. */
+            filter:
+                drop-shadow(0 0 3px rgba(0, 0, 0, 0.95))
+                drop-shadow(0 3px 6px rgba(0, 0, 0, 0.85))
+                drop-shadow(0 0 12px rgba(255, 215, 0, 0.7))
+                drop-shadow(0 0 30px rgba(218, 165, 32, 0.4));
+            margin-bottom: 10px; text-align: center;
+        }
+        /* --- INTRO SUBTITLE UPDATE --- */
+        .intro-sub {
+            font-family: 'Montserrat', sans-serif; 
+            font-size: 1rem; 
+            font-weight: 400;
+            letter-spacing: 3px; 
+            text-transform: uppercase; 
+            text-align: center;
+            background: linear-gradient(180deg, #FFFFFF 0%, #D0D0D0 30%, #A8A8A8 60%, #C0C0C0 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter:
+                drop-shadow(0 0 2px rgba(0, 0, 0, 0.95))
+                drop-shadow(0 2px 4px rgba(0, 0, 0, 0.85))
+                drop-shadow(0 0 8px rgba(192, 192, 192, 0.5))
+                drop-shadow(0 0 20px rgba(160, 160, 160, 0.3));
+        }
+        
