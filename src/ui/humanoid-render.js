@@ -1260,6 +1260,12 @@
             hipRotation += walkSway;
             torsoRotation -= walkSway;
             bounce += walkBounce;
+            // Hit flinch (engine/combat-fx.js sets _hitT): twist away from the blow, head knocked back
+            const hitK = entity._hitT !== undefined ? Math.max(0, 1 - (_gameTimeSec - entity._hitT) / 0.18) : 0;
+            if (hitK > 0) {
+                const side = Math.sin((entity._hitDir || 0) - (entity.angle || 0)) >= 0 ? 1 : -1;
+                torsoRotation += hitK * 0.32 * side; hipRotation += hitK * 0.12 * side; bounce -= hitK * 1.6;
+            }
             lFistX += walkBounce; rFistX += walkBounce;
             lElbowX += walkBounce; rElbowX += walkBounce;
             if (stance === 'pistol') {
@@ -1638,6 +1644,13 @@
                 drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
                 if (turning) ctx.restore();
             });
+            if (hitK > 0.05) {                                              // the flash of the hit
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                const fl = ctx.createRadialGradient(headX * 0.5, 0, 0, headX * 0.5, 0, 15);
+                fl.addColorStop(0, `rgba(255, 235, 235, ${0.45 * hitK})`); fl.addColorStop(1, 'rgba(255, 235, 235, 0)');
+                ctx.fillStyle = fl; ctx.beginPath(); ctx.arc(headX * 0.5, 0, 15, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
         
             // 11. HELD ITEMS
             if (held) {

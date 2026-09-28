@@ -1,6 +1,29 @@
         // GameEngine — Lighting, bloom, wet reflections, atmosphere, colour grade.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /**
+             * Clip the light canvas to what a headlight beam can reach: a visibility polygon cast
+             * from where the beam's edges meet (just behind the bumper), ignoring anything nearer
+             * than the bumper, so buildings and walls cast the beam's shadow. Cached per vehicle.
+             */
+            _clipBeam(ctx, owner, cx, cy, beamLength, beamWidth) {
+                const a = owner.angle, slope = Math.max(0.05, (beamWidth - 15) / beamLength);
+                const back = 15 / slope, half = Math.atan(slope) + 0.02;
+                const c = owner._beamCache;
+                let poly;
+                if (c && Math.abs(c.x - cx) < 1.5 && Math.abs(c.y - cy) < 1.5 && Math.abs(c.a - a) < 0.01 && c.L === beamLength && c.map === this.activeMap) poly = c.poly;
+                else {
+                    const ax = cx - Math.cos(a) * back, ay = cy - Math.sin(a) * back;
+                    poly = computeVisibilityPoly(ax, ay, beamLength + back, getOccluders(this.activeMap),
+                        { aMin: a - half, aMax: a + half, arcStep: 0.1, minDist: back });
+                    poly.ax = ax; poly.ay = ay;
+                    owner._beamCache = { x: cx, y: cy, a, L: beamLength, map: this.activeMap, poly };
+                }
+                ctx.beginPath(); ctx.moveTo(poly.ax, poly.ay);
+                for (const pt of poly) ctx.lineTo(pt.x, pt.y);
+                ctx.closePath(); ctx.clip();
+            },
+
             /* =====================================================================
                LIGHTING SYSTEM RENDERER (OPTIMIZED)
                ---------------------------------------------------------------------
@@ -251,6 +274,7 @@
                     const beamWidth = lightStat * 1.5;
             
                     this.lightCtx.save(); 
+                    this._clipBeam(this.lightCtx, this.car, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
                     this.lightCtx.translate(cx, cy); 
                     this.lightCtx.rotate(this.car.angle);
                     
@@ -306,6 +330,7 @@
                         const beamWidth = lightStat * 1.5;
                         
                         this.lightCtx.save();
+                        this._clipBeam(this.lightCtx, v, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
                         this.lightCtx.translate(cx, cy);
                         this.lightCtx.rotate(v.angle);
                         
@@ -341,6 +366,7 @@
                         const beamWidth = lightStat * 1.5;
                         
                         this.lightCtx.save();
+                        this._clipBeam(this.lightCtx, car, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
                         this.lightCtx.translate(cx, cy);
                         this.lightCtx.rotate(car.angle);
                         
@@ -545,6 +571,7 @@
                     const beamWidth = lightStat * 1.5;
             
                     this.lightCtx.save(); 
+                    this._clipBeam(this.lightCtx, this.car, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
                     this.lightCtx.translate(cx, cy); 
                     this.lightCtx.rotate(this.car.angle);
                     
@@ -596,6 +623,7 @@
                         const beamWidth = lightStat * 1.5;
                         
                         this.lightCtx.save();
+                        this._clipBeam(this.lightCtx, v, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
                         this.lightCtx.translate(cx, cy);
                         this.lightCtx.rotate(v.angle);
                         
@@ -632,6 +660,7 @@
                         const beamWidth = lightStat * 1.5;
                         
                         this.lightCtx.save();
+                        this._clipBeam(this.lightCtx, car, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
                         this.lightCtx.translate(cx, cy);
                         this.lightCtx.rotate(car.angle);
                         

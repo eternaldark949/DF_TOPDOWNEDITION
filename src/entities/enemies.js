@@ -482,9 +482,7 @@
                 ctx.arc(Math.cos(rOffset + 2)*20, Math.sin(rOffset + 2)*20, 4, 0, Math.PI*2); 
                 ctx.fill();
                 
-                // HP Bar
-                drawHPBar(ctx, -15, -25, 30, 4, this.hp/this.maxHp);
-                
+                // (Health bar: drawn with the other combat overlays once hit — engine/combat-fx.js)
                 ctx.restore();
 
                 // Telegraph aim line (world space)
@@ -793,8 +791,7 @@
                     ctx.shadowBlur = 0;
                 }
                 
-                // HP Bar
-                drawHPBar(ctx, -20, -30, 40, 4, this.hp/this.maxHp);
+                // (Health bar: drawn with the other combat overlays once hit — engine/combat-fx.js)
                 ctx.restore();
 
                 // Telegraph aim line (world space)
@@ -1342,6 +1339,16 @@
                 } else { this.takeDamage(projectile.damage); }
             }
 
+            /** The vision cone's outline in world space, cast against the map's walls and buildings (cached). */
+            _visionCone() {
+                const r = this._coneRange || this.visionRange, c = this._coneCache;
+                if (c && Math.abs(c.x - this.x) < 2 && Math.abs(c.y - this.y) < 2 && Math.abs(c.a - this.angle) < 0.02 && Math.abs(c.r - r) < 2) return c.poly;
+                const map = typeof game !== 'undefined' && game.activeMap;
+                const poly = computeVisibilityPoly(this.x, this.y, r, getOccluders(map), { aMin: this.angle - this.visionFov / 2, aMax: this.angle + this.visionFov / 2, arcStep: 0.08 });
+                this._coneCache = { x: this.x, y: this.y, a: this.angle, r, poly };
+                return poly;
+            }
+
             draw(ctx) {
                 if (this.dead) return;
                 
@@ -1350,17 +1357,22 @@
                 ctx.translate(this.x, this.y); 
                 ctx.rotate(this.angle);
                 
-                // VISION CONE (Rotates with body)
+                // VISION CONE — exactly what they can see: it stops at walls and buildings, and it
+                // shrinks with anything that dulls their senses (Ms. Jean soda: detectionRange ×0.6)
                 let coneColor = 'rgba(255, 255, 255, 0.05)';
                 if (this.state === 'SUSPICIOUS') coneColor = 'rgba(255, 255, 0, 0.15)';
-                if (this.state === 'ALERT') coneColor = 'rgba(255, 0, 0, 0.2)';
-                
+                if (this.state === 'ALERT' || this.state === 'SUPPRESSING') coneColor = 'rgba(255, 0, 0, 0.2)';
+                const pl = typeof game !== 'undefined' && game.player;
+                const wantRange = pl && pl.buffSystem ? pl.buffSystem.getStat('detectionRange', this.visionRange) : this.visionRange;
+                this._coneRange = this._coneRange === undefined ? wantRange : this._coneRange + (wantRange - this._coneRange) * 0.08;
+                const cone = this._visionCone();
+                ctx.save();
+                ctx.rotate(-this.angle); ctx.translate(-this.x, -this.y);   // the cone is in world space
                 ctx.fillStyle = coneColor;
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.arc(0, 0, this.visionRange, -this.visionFov/2, this.visionFov/2);
-                ctx.lineTo(0, 0);
-                ctx.fill();
+                ctx.beginPath(); ctx.moveTo(this.x, this.y);
+                for (const pt of cone) ctx.lineTo(pt.x, pt.y);
+                ctx.closePath(); ctx.fill();
+                ctx.restore();
 
                 // PROCEDURAL BODY (Rotates with body) — aims in the weapon's stance while
                 // alert/suppressing and holds the real weapon model; low ready otherwise.

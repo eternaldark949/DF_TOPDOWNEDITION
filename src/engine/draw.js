@@ -1028,6 +1028,8 @@
                 this.drawLightingSystem(this.ctx);
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
                 this.drawEmissivePass(this.ctx);
+                // Health bars and damage numbers, above the darkness so they read at night
+                this.drawCombatOverlays(this.ctx, cullBounds.entities);
                 
                 // Profiler (independent of debug mode)
                 if (this.showProfiler) {

@@ -699,6 +699,23 @@
                 }
             }
             
+            /** A spray of droplets (blood, coolant…) fanning out along `dir`. color: 'rgba(r, g, b, 1)'. */
+            spawnSpray(x, y, dir, color, amount = 8) {
+                for (let i = 0; i < amount; i++) {
+                    const ang = dir + (Math.random() - 0.5) * 1.1;
+                    const spd = 1.5 + Math.random() * 4.5;
+                    const p = this._particlePool.acquire();
+                    p.type = 'explosion';                                    // damped, drawn as a fading dot
+                    p.x = x; p.y = y;
+                    p.vx = Math.cos(ang) * spd; p.vy = Math.sin(ang) * spd;
+                    p.life = 1.0;
+                    p.decay = 0.06 + Math.random() * 0.05;
+                    p.color = color;
+                    p.size = 1 + Math.random() * 1.8;
+                    this.particles.push(p);
+                }
+            }
+
             // Called every frame from main game loop
             update(camera) {
                 /* --- WEATHER STATE RESOLUTION (runs before anything renders) ---
