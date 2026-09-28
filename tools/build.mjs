@@ -70,6 +70,7 @@ const SCRIPTS = [
     'story/narrative-cutscenes.js',
     'ui/poses.js',
     'ui/expressions.js',
+    'ui/bodies.js',
     'ui/cloth.js',
     'ui/wardrobe.js',
     'ui/humanoid-render.js',

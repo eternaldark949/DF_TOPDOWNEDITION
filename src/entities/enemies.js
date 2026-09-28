@@ -891,6 +891,33 @@
            - Will suppress (shoot at) last known position
            ===================================================================== */
         class Ganger extends ActorEntity {
+            /**
+             * THE GANGER LOOK: always a hot pink top over dark maroon — that's the gang,
+             * readable at a glance from above. Everything else varies per ganger: the (sleeved) cut,
+             * hair (often pink-dyed), skin, build, and the odd pink cap, shades or hoops.
+             */
+            static makeLook(r) {
+                const pick = list => pickFrom(r, list);
+                const gender = r() < 0.5 ? 'female' : 'male';
+                // Sleeved cuts only: from above, the pink sleeves are what you see most
+                const cut = pick(['suit', 'jacket', 'track_jacket', 'hoodie', 'tshirt', 'turtleneck']);
+                const look = {
+                    gender, skinColor: pick(_SKIN_TONES),
+                    build: pick([undefined, 'athletic', 'broad', 'slim', 'heavy', gender === 'female' ? 'curvy' : 'athletic']),
+                    height: 0.94 + r() * 0.12,
+                    top: { type: cut, color: '#ff0055', inner: '#111111', trim: '#111111' },
+                    bottom: { type: pick(['pants', 'cargo', 'joggers']), color: '#550022', trim: '#ff0055' },
+                    shoes: { type: pick(['boots', 'sneakers']), color: '#111111' },
+                    hair: r() < 0.15 ? null : { type: pick(['short', 'afro', 'braids', 'dreadlocks', 'ponytail', 'curls', gender === 'female' ? 'long' : 'short']),
+                                                color: pick(['#0a0a0a', '#1a1a1a', '#ff0055', '#ff0055', '#3a0a1a']) },
+                    hat: r() < 0.25 ? { type: pick(['cap', 'beanie']), color: '#ff0055', trim: '#111111' } : null,
+                    jewelry: []
+                };
+                if (r() < 0.25) look.jewelry.push({ type: 'sunglasses', color: '#141414' });
+                if (r() < 0.25) look.jewelry.push({ type: pick(['hoops', 'necklace']), color: '#e8c27a' });
+                return look;
+            }
+
             constructor(x, y, config) {
                 const cfg = config || {};
                 super({
@@ -1339,16 +1366,12 @@
                 // alert/suppressing and holds the real weapon model; low ready otherwise.
                 const aiming = this.state === 'ALERT' || this.state === 'SUPPRESSING';
                 const weaponId = this.equippedWeaponId || 'pistol_ganger';   // default: the hot pink pistol
+                if (!this.look) this.look = Ganger.makeLook(seededRandom(Math.random()));
                 drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#8d5524',
+                    ...this.look,
                     stance: aiming ? stanceForWeapon(weaponId) : 'idle',
                     kick: aiming ? shotKick(this) : 0,
                     weapon: { id: weaponId, ready: aiming },
-                    // THE GANGER LOOK: Hot Pink Suit, Dark Maroon Pants
-                    top: { type: 'suit', color: '#ff0055' }, 
-                    bottom: { type: 'pants', color: '#550022' }, 
-                    shoes: { type: 'boots', color: '#111' }, 
-                    hair: null
                 });
 
                 // 2. RESTORE CONTEXT (BACK TO UPRIGHT / SCREEN SPACE)

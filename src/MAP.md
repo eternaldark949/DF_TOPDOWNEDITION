@@ -56,7 +56,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `entities/actors.js` | `ActorEntity`, `PlayerEntity`, projectiles, triggers |
 | `entities/static-builders-profiler.js` | Turning walls/buildings into colliders, perf bench, profiler |
 | `entities/street-objects.js` | Neon signs, loot, pavement, foliage |
-| `entities/npc.js` | `NPC` companions and characters, quips and emotes |
+| `entities/npc.js` | `NPC` companions and characters, quips and emotes; `STAFF_LOOKS` (bartenders, Dr. Yin, Double Nights androids) |
 | `entities/pedestrians.js` | Pedestrians and their manager |
 | `entities/enemies.js` | Velvet cat, drones, gunners, gangers, restricted zone, horde gauntlet |
 
@@ -94,6 +94,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `ui/music-widget.js` | The radio/music widget |
 | `ui/poses.js` | `POSES`: idle life (breathing, weight shift, looking around) and poses: arms crossed, lean, fidget, typing, phone, dance… |
 | `ui/expressions.js` | `EXPRESSIONS`: faces for portraits (smile, sultry, worried…), mood from dialogue text, blinking |
+| `ui/bodies.js` | `BUILDS` (slim, athletic, curvy, broad, heavy) and height; Double Nights androids (silver, gold, Blood Moon): plating, visor, emblem, hover |
 | `ui/cloth.js` | Cloth physics: coat hems, skirts and trains swing, trail and settle (same method as the hair) |
 | `ui/wardrobe.js` | `WARDROBE`: every top, bottom, shoe, hat and piece of jewelry, in the world and in portraits. The character look format is documented at the top |
 | `ui/humanoid-render.js` | Drawing characters: hair, portraits, bodies, held drinks, weapons |

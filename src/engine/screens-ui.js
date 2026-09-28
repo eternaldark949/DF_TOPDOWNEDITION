@@ -301,6 +301,9 @@
                 // read their role and gender, so numerous cast members (dancers,
                 // spirits) get a correct bust without per-name entries.
                 const npc = (this.npcs || []).find(n => n.name === speakerName);
+                // Staff, androids, medics and male dancers: the same look as their body in the world
+                const staff = npc && npc._staffLook ? npc._staffLook() : null;
+                if (staff) return { ...staff, eyeColor: '#332211' };
                 const roleCfg = npc && ROLE_PORTRAIT_CONFIGS[npc.role];
                 if (roleCfg) {
                     const resolved = roleCfg.byGender

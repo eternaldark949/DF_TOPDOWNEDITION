@@ -15881,6 +15881,57 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * - Wall collision handled automatically by CollisionSystem
          * - Preserves all existing visual rendering exactly
          */
+        /* ---------------------------------------------------------------------
+           STAFF_LOOKS — how the staff and androids look, in the world and in
+           their portraits (NPC_PORTRAIT_CONFIGS reads these too). Double Nights'
+           AI staff come in moon silver, sun-on-moon gold, or Blood Moon rose red.
+           --------------------------------------------------------------------- */
+        const _DN_GUARD = { gender: 'male', build: 'broad', body: { kind: 'android', finish: 'gold', glow: '#00ffff' },
+            top: { type: 'dn_uniform', color: '#2a2418', trim: '#e8c27a' }, bottom: { type: 'pants', color: '#1a1614' },
+            shoes: { type: 'boots', color: '#111111' }, pose: 'hands_on_hips' };
+        const STAFF_LOOKS = {
+            'Guard Unit Alpha': _DN_GUARD,
+            'Guard Unit Beta':  _DN_GUARD,
+            'Concierge Lux':    { gender: 'androgynous', build: 'slim', body: { kind: 'android', finish: 'gold' },
+                                  top: { type: 'dn_uniform', color: '#2a2418', trim: '#e8c27a' }, bottom: { type: 'pants', color: '#1a1a1a' },
+                                  shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge' },
+            'LUVSH4D3':         { gender: 'female', build: 'curvy', body: { kind: 'android', finish: 'bloodmoon', hover: true },
+                                  hair: { type: 'long', color: '#ff88cc' } },
+            'Bartender':        { skinColor: '#c9a87c', gender: 'male', hair: { type: 'short', color: '#1a1a1a' },
+                                  top: { type: 'vest', color: '#1a0020', inner: '#f2f2f2', trim: '#8b0000' }, bottom: { type: 'pants', color: '#111111' },
+                                  shoes: { type: 'loafers', color: '#111111' }, pose: 'polish' },
+            'Barista Ren':      { skinColor: '#a0724a', gender: 'female', hair: { type: 'ponytail', color: '#2a1500' },
+                                  top: { type: 'tshirt', color: '#654321' }, bottom: { type: 'apron', color: '#3a2a1a', under: '#222222' },
+                                  shoes: { type: 'sneakers', color: '#eeeeee' }, pose: 'polish' },
+            // The Empereal Lord's scientist and medic; she keeps Stella and 747 running
+            'Dr. Yin':          { skinColor: '#e8d0b8', gender: 'female', build: 'slim', hair: { type: 'short', color: '#222222' },
+                                  top: { type: 'lab_coat', inner: '#1a3a4a' }, bottom: { type: 'pants', color: '#1a3a4a' },
+                                  shoes: { type: 'loafers', color: '#222222' }, pose: 'arms_crossed' },
+        };
+
+        const _SKIN_TONES = ['#3d2b1f', '#6b3a2a', '#8d5524', '#a0522d', '#c68642', '#c68e63', '#dcc6ac', '#e8d0b8', '#f5deb3'];
+        const _HAIR_COLORS = ['#0a0505', '#1a1a1a', '#2a1500', '#4a3728', '#8b4513', '#654321', '#c0c0c0'];
+
+        /** A stable look for NPCs without a named look: medics and the club's male dancers. */
+        function seededNpcLook(npc) {
+            const r = seededRandom(npc.name + '|' + npc.role + '|' + Math.round(npc.spawnX || npc.x) + ',' + Math.round(npc.spawnY || npc.y));
+            const skinColor = pickFrom(r, _SKIN_TONES);
+            if (npc.role === 'medic') {
+                const gender = r() < 0.5 ? 'female' : 'male';
+                return { skinColor, gender, build: pickFrom(r, [undefined, 'slim', 'athletic', 'curvy', 'heavy']),
+                         hair: { type: pickFrom(r, ['short', 'ponytail', 'braids', 'curls', 'afro']), color: pickFrom(r, _HAIR_COLORS) },
+                         top: { type: 'scrubs', color: pickFrom(r, ['#3aa6a0', '#4a7fb5', '#e8ecef']) },
+                         bottom: { type: 'pants', color: '#3a6f80' }, shoes: { type: 'sneakers', color: '#ffffff' } };
+            }
+            // Male dancer: bare chest or an open jacket, black trousers, and a dance of his own
+            const jacket = r() < 0.5;
+            return { skinColor, gender: 'male', build: pickFrom(r, ['athletic', 'athletic', 'slim', 'broad']), height: 0.97 + r() * 0.08,
+                     hair: { type: pickFrom(r, ['short', 'dreadlocks', 'braids', 'afro', 'curls', 'ponytail']), color: pickFrom(r, ['#0a0505', '#1a1a1a', '#8a0707', '#c0c0c0']) },
+                     top: jacket ? { type: 'jacket', color: pickFrom(r, ['#111111', '#2a0a3a', '#590e18']), inner: skinColor } : null,
+                     bottom: { type: 'pants', color: '#111111' }, shoes: { type: 'loafers', color: '#111111' },
+                     jewelry: r() < 0.5 ? [{ type: 'necklace', color: '#e8c27a' }] : null, pose: 'dance' };
+        }
+
         class NPC extends ActorEntity {
             /**
              * Unified NPC class — handles civilians, quest givers, dancers, AND teammates.
@@ -16439,9 +16490,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.translate(this.x, this.y);
                 
                 // --- ROTATION LOGIC ---
-                // drawProceduralHumanoid faces Right (0 radians) — dancers & teammates use raw angle.
-                // Other NPCs are drawn facing Down (PI/2) — subtract PI/2 to correct.
-                const usesRawAngle = (this.role === 'red_demon_dancer' || this.role === 'dancer' || this.role === 'teammate');
+                // Every NPC is a procedural humanoid now, which faces Right (0 radians).
+                // (The −PI/2 correction was for the old sprites that were drawn facing Down.)
+                const usesRawAngle = true;
+                const staffLook = this._staffLook();
                 
                 if (this.combatTargetTimer > 0 && this.combatTargetAngle !== undefined) {
                     // In combat: face target
@@ -16457,6 +16509,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // IDLE & HIRED/RECRUITED: Face Player
                     const angle = Math.atan2(player.y - this.y, player.x - this.x);
                     ctx.rotate(usesRawAngle ? angle : angle - Math.PI/2);
+                } else if (staffLook && staffLook.idleAngle !== undefined) {
+                    ctx.rotate(staffLook.idleAngle);                          // staff face the room when idle
                 } else {
                     // Default Idle
                     if (!usesRawAngle) ctx.rotate(0);
@@ -16466,17 +16520,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.name === 'Anavia') {
                     this.drawAnavia(ctx); 
                 } 
-                else if (this.role === 'red_demon_dancer' || this.role === 'dancer') { // <--- Added 'else'
-                    if (this.gender === 'male') this.drawMaleDancer(ctx, this.walkPhase);
-                    else this.drawFemaleDancer(ctx, this.walkPhase, speed);
-                }
+                else if (staffLook) this.drawStaff(ctx, staffLook);
+                else if (this.role === 'red_demon_dancer' || this.role === 'dancer') this.drawFemaleDancer(ctx, this.walkPhase, speed);
                 
                 else if (this.name === 'Ms. Jean' || this.role === 'ms_jean') this.drawMsJean(ctx);
                 else if (this.name === 'Mirabel') this.drawMirabell(ctx);
-                else if (this.name === 'LUVSH4D3') this.drawLuvshade(ctx);
-                else if (this.role.includes('robot')) this.drawGuardUnit(ctx);
-                else if (this.role === 'bartender') this.drawBartender(ctx);
-                else if (this.role === 'medic' || this.name === 'Dr. Yin') this.drawMedic(ctx);
                 else if (this.name === 'Prisma') this.drawPrisma(ctx);
                 else if (this.name === 'Torque') this.drawTorque(ctx);
                 else if (this.name === 'Biggs') this.drawBiggs(ctx);
@@ -16633,6 +16681,26 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 });
             }
             
+            /**
+             * The look for staff, androids, medics and male dancers (STAFF_LOOKS or a
+             * seeded one), or null for NPCs with their own draw method. Cached.
+             */
+            _staffLook() {
+                if (this._look !== undefined) return this._look;
+                let look = STAFF_LOOKS[this.name] || null;
+                if (!look && (this.role === 'medic' || ((this.role === 'dancer' || this.role === 'red_demon_dancer') && this.gender === 'male')))
+                    look = seededNpcLook(this);
+                if (!look && this.role && this.role.includes('robot'))       // unnamed Double Nights staff: silver
+                    look = { gender: 'androgynous', body: { kind: 'android', finish: 'silver' }, top: { type: 'dn_uniform', color: '#1c2030', trim: '#dfe6ff' },
+                             bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge' };
+                if (look && look.pose !== 'dance') look = { idleAngle: Math.PI / 2, ...look };
+                return (this._look = look);
+            }
+
+            drawStaff(ctx, look) {
+                drawProceduralHumanoid(ctx, this, { stance: 'idle', ...look });
+            }
+
             drawFemaleDancer(ctx, phase, speed) {
                 
                 if (this.walkPhase === undefined) this.walkPhase = 0;
@@ -16652,7 +16720,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             
 
-            drawMaleDancer(ctx, phase) { const skinColor = '#8d5524'; const bounce = Math.abs(Math.sin(phase)) * 1; const shoulderSway = Math.sin(phase) * 0.2; ctx.fillStyle = '#111'; ctx.beginPath(); ctx.roundRect(-8 + Math.sin(phase)*5, -7, 10, 6, 2); ctx.fill(); ctx.beginPath(); ctx.roundRect(-8 + Math.sin(phase+Math.PI)*5, 1, 10, 6, 2); ctx.fill(); ctx.save(); ctx.rotate(shoulderSway); ctx.fillStyle = '#111'; ctx.beginPath(); ctx.ellipse(-2 + bounce, 0, 6, 7, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = skinColor; ctx.beginPath(); ctx.moveTo(0 + bounce, -8); ctx.lineTo(10 + bounce, -12); ctx.lineTo(12 + bounce, 0); ctx.lineTo(10 + bounce, 12); ctx.lineTo(0 + bounce, 8); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(6 + bounce, -5, 4, 4); ctx.fillRect(6 + bounce, 1, 4, 4); ctx.fillStyle = skinColor; ctx.beginPath(); ctx.arc(11 + bounce, 0, 7, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(10 + bounce, 0, 6.5, Math.PI/2, -Math.PI/2); ctx.fill(); ctx.restore(); }
             drawMirabell(ctx) {
                 if (this.walkPhase === undefined) this.walkPhase = 0;
                 if (this.velX === undefined) this.velX = 0;
@@ -16668,10 +16735,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     hat:    { type: 'wide_brim', color: '#590e18', crownColor: '#70121e', stroke: '#1a0505' }
                 });
             }
-            drawLuvshade(ctx) { const time = _frameTime + this.animOffset; const hover = Math.sin(time / 400) * 3; const shadowScale = 1.0 - (hover/20); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(0, 15, 12 * shadowScale, 6 * shadowScale, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#DC143C'; ctx.shadowColor = '#ff0055'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(0, 0 + hover, 14, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; ctx.fillStyle = '#8B0000'; ctx.beginPath(); ctx.ellipse(0, 8 + hover, 10, 8, 0, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.shadowColor = '#fff'; ctx.shadowBlur = 5; ctx.beginPath(); ctx.arc(-3, -2 + hover, 4, 0.5 * Math.PI, 1.5 * Math.PI); ctx.stroke(); ctx.beginPath(); ctx.arc(3, -2 + hover, 4, 1.5 * Math.PI, 0.5 * Math.PI); ctx.stroke(); ctx.shadowBlur = 0; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.roundRect(-8, -5 + hover, 16, 4, 2); ctx.fill(); ctx.fillStyle = '#ff9999'; ctx.globalAlpha = 0.8 + Math.sin(time / 100) * 0.2; ctx.fillRect(-6, -4 + hover, 12, 2); ctx.globalAlpha = 1.0; }
-            drawGuardUnit(ctx) { const time = _frameTime + this.animOffset; const scanAngle = Math.sin(time / 800) * 0.5; ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.ellipse(0, 10, 18, 8, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#DAA520'; ctx.beginPath(); ctx.roundRect(-16, -10, 32, 24, 4); ctx.fill(); ctx.fillStyle = '#FFD700'; ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 5; ctx.beginPath(); ctx.arc(-14, -8, 8, 0, Math.PI*2); ctx.arc(14, -8, 8, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; ctx.save(); ctx.rotate(scanAngle); ctx.fillStyle = '#B8860B'; ctx.beginPath(); ctx.rect(-8, -14, 16, 14); ctx.fill(); ctx.fillStyle = '#00ffff'; ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 8; ctx.fillRect(-6, -10, 12, 4); ctx.shadowBlur = 0; ctx.restore(); ctx.fillStyle = '#333'; ctx.fillRect(-6, 2, 12, 2); ctx.fillRect(-6, 6, 12, 2); }
-            drawBartender(ctx) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(0, 10, 15, 8, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#dcc6ac'; ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(-8, 5); ctx.lineTo(8, 5); ctx.lineTo(10, 25); ctx.lineTo(-10, 25); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(-3, 8, 6, 3); }
-            drawMedic(ctx) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(0, 10, 15, 8, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f00'; ctx.fillRect(-4, -4, 8, 8); ctx.fillStyle = '#fff'; ctx.fillRect(-1, -3, 2, 6); ctx.fillRect(-3, -1, 6, 2); }
 
             drawPrisma(ctx) {
                 drawProceduralHumanoid(ctx, this, {
@@ -17123,6 +17186,65 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 { name: 'tourist', bodyColor: '#48cae4', headColor: '#c9a87c', hairColor: '#654321', hasHat: true, hatColor: '#fff' },
                 { name: 'delivery', bodyColor: '#2ec4b6', headColor: '#dcc6ac', hairColor: '#1a1a1a', hasHat: true, hatColor: '#2ec4b6' }
             ];
+
+            /**
+             * A person built from an archetype: their gender, build, height, skin, hair and
+             * an outfit in the archetype's signature colour (bodyColor), so the crowd is
+             * varied but workers still read as workers, tourists as tourists.
+             */
+            static makeLook(ap, r) {
+                const pick = list => pickFrom(r, list);
+                const c = ap.bodyColor;
+                const gender = ap.name.endsWith('_male') ? 'male' : ap.name.endsWith('_female') ? 'female' : pick(['female', 'male', 'androgynous']);
+                const hairTypes = gender === 'female' ? ['long', 'ponytail', 'braids', 'curls', 'afro', 'short', 'dreadlocks']
+                                : gender === 'male' ? ['short', 'short', 'afro', 'dreadlocks', 'curls', 'braids'] : ['short', 'curls', 'ponytail', 'afro'];
+                const look = {
+                    gender, skinColor: pick(_SKIN_TONES),
+                    build: pick([undefined, undefined, 'slim', 'athletic', 'curvy', 'broad', 'heavy']),
+                    height: 0.93 + r() * 0.14,
+                    hair: { type: pick(hairTypes), color: r() < 0.6 ? ap.hairColor : pick(_HAIR_COLORS) },
+                    shoes: { type: 'sneakers', color: '#e8e8e8' }
+                };
+                const skirtOr = alt => gender === 'female' && r() < 0.5 ? { type: pick(['skirt', 'long_skirt']), color: '#1c1c24' } : alt;
+                switch (ap.name) {
+                    case 'suit_male': case 'suit_female': case 'corporate':
+                        look.top = { type: pick(['suit', 'suit', 'jacket']), color: c, inner: '#e8e8e8' };
+                        look.bottom = skirtOr({ type: 'pants', color: '#1e1e26' });
+                        look.shoes = { type: gender === 'female' && r() < 0.5 ? 'heels' : 'loafers', color: '#111111' };
+                        if (r() < 0.2) look.jewelry = [{ type: 'sunglasses', color: '#141414' }];
+                        break;
+                    case 'casual_male': case 'casual_female':
+                        look.top = { type: pick(gender === 'female' ? ['tshirt', 'crop_top', 'tank', 'turtleneck'] : ['tshirt', 'tank', 'hoodie']), color: c, trim: '#f2f2f2' };
+                        look.bottom = skirtOr({ type: pick(['pants', 'shorts', 'joggers']), color: pick(['#34495e', '#2b2b2b', '#6b5b45']) });
+                        if (gender === 'female' && r() < 0.4) look.jewelry = [{ type: 'hoops', color: '#e8c27a' }];
+                        break;
+                    case 'worker':
+                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'cargo', color: '#4a4a3a' };
+                        look.shoes = { type: 'boots', color: '#3a2a1a' }; look.hat = { type: 'cap', color: ap.hatColor, trim: '#222222' };
+                        break;
+                    case 'hipster':
+                        look.top = { type: 'jacket', color: c, inner: '#d8d2c0' }; look.bottom = { type: pick(['pants', 'joggers']), color: '#2b2b2b' };
+                        look.hat = { type: 'beanie', color: ap.hatColor, trim: '#555555' };
+                        break;
+                    case 'punk':
+                        look.top = { type: pick(['tank', 'track_jacket', 'crop_top']), color: c, trim: '#111111' };
+                        look.bottom = { type: 'leggings', color: '#111111' }; look.shoes = { type: 'boots', color: '#111111' };
+                        look.hair = { type: pick(['short', 'afro', 'braids', 'dreadlocks']), color: ap.hairColor };
+                        look.jewelry = [{ type: 'hoops', color: '#c0c0c0' }];
+                        break;
+                    case 'tourist':
+                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'shorts', color: '#c2b280' };
+                        look.hat = { type: 'cap', color: ap.hatColor, trim: '#48cae4' }; look.jewelry = [{ type: 'sunglasses', color: '#141414' }];
+                        break;
+                    case 'delivery':
+                        look.top = { type: 'hoodie', color: c, trim: '#f2f2f2' }; look.bottom = { type: 'joggers', color: '#1e2a2a' };
+                        look.hat = { type: 'cap', color: ap.hatColor, trim: '#ffffff' };
+                        break;
+                    default:
+                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'pants', color: '#222222' };
+                }
+                return look;
+            }
             
             constructor(x, y, network) {
                 super({
@@ -17174,6 +17296,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.hairColor = appearance.hairColor;
                 this.hasHat = appearance.hasHat;
                 this.hatColor = appearance.hatColor || '#333';
+                this.look = Pedestrian.makeLook(appearance, seededRandom(Math.random()));   // who this person is (stable)
                 
                 // Animation
                 this.walkPhase = Math.random() * Math.PI * 2;
@@ -17804,36 +17927,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.ellipse(-12, 0, 5, 10, 0, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Build config for drawProceduralHumanoid
-                const config = {
-                    skinColor: this.headColor,
-                    gender: 'androgynous',
-                    stance: 'idle',
-                    top: { type: 'suit', color: this.bodyColor },
-                    bottom: { type: 'pants', color: '#222' },
-                    shoes: { type: 'shoes', color: '#111' },
-                    lerpSpeed: 0.15 // Smooth animation transitions
-                };
-                
-                // Add hair or hat
-                if (this.hasHat) {
-                    // Use hair slot for hat visual (we'll draw hat separately)
-                    config.hair = { type: 'short', color: this.hairColor };
-                } else {
-                    config.hair = { type: 'short', color: this.hairColor };
-                }
-                
-                drawProceduralHumanoid(ctx, this, config);
-                
-                // Draw hat on top if needed (head is at +X)
-                if (this.hasHat) {
-                    const bounce = Math.abs(Math.sin(this.walkPhase || 0)) * (speed * 0.3);
-                    ctx.fillStyle = this.hatColor;
-                    ctx.beginPath();
-                    ctx.ellipse(bounce * 0.2, 0, 5, 10, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.fillRect(-4, -6, 5, 12);
-                }
+                // Their own look (Pedestrian.makeLook) — hats, hair and all. Zoomed out (more of
+                // the crowd on screen, too small to read details) they get simple hair, no jewelry.
+                const far = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 1;
+                const look = far && this.look.hair ? { ...this.look, hair: { type: 'short', color: this.look.hair.color }, jewelry: null } : this.look;
+                drawProceduralHumanoid(ctx, this, { ...look, stance: 'idle', lerpSpeed: 0.15 });
                 
                 // Waiting indicator (if at crosswalk) - above head at +X
                 if (this.state === 'waiting') {
@@ -18953,6 +19051,33 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            - Will suppress (shoot at) last known position
            ===================================================================== */
         class Ganger extends ActorEntity {
+            /**
+             * THE GANGER LOOK: always a hot pink top over dark maroon — that's the gang,
+             * readable at a glance from above. Everything else varies per ganger: the (sleeved) cut,
+             * hair (often pink-dyed), skin, build, and the odd pink cap, shades or hoops.
+             */
+            static makeLook(r) {
+                const pick = list => pickFrom(r, list);
+                const gender = r() < 0.5 ? 'female' : 'male';
+                // Sleeved cuts only: from above, the pink sleeves are what you see most
+                const cut = pick(['suit', 'jacket', 'track_jacket', 'hoodie', 'tshirt', 'turtleneck']);
+                const look = {
+                    gender, skinColor: pick(_SKIN_TONES),
+                    build: pick([undefined, 'athletic', 'broad', 'slim', 'heavy', gender === 'female' ? 'curvy' : 'athletic']),
+                    height: 0.94 + r() * 0.12,
+                    top: { type: cut, color: '#ff0055', inner: '#111111', trim: '#111111' },
+                    bottom: { type: pick(['pants', 'cargo', 'joggers']), color: '#550022', trim: '#ff0055' },
+                    shoes: { type: pick(['boots', 'sneakers']), color: '#111111' },
+                    hair: r() < 0.15 ? null : { type: pick(['short', 'afro', 'braids', 'dreadlocks', 'ponytail', 'curls', gender === 'female' ? 'long' : 'short']),
+                                                color: pick(['#0a0a0a', '#1a1a1a', '#ff0055', '#ff0055', '#3a0a1a']) },
+                    hat: r() < 0.25 ? { type: pick(['cap', 'beanie']), color: '#ff0055', trim: '#111111' } : null,
+                    jewelry: []
+                };
+                if (r() < 0.25) look.jewelry.push({ type: 'sunglasses', color: '#141414' });
+                if (r() < 0.25) look.jewelry.push({ type: pick(['hoops', 'necklace']), color: '#e8c27a' });
+                return look;
+            }
+
             constructor(x, y, config) {
                 const cfg = config || {};
                 super({
@@ -19401,16 +19526,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // alert/suppressing and holds the real weapon model; low ready otherwise.
                 const aiming = this.state === 'ALERT' || this.state === 'SUPPRESSING';
                 const weaponId = this.equippedWeaponId || 'pistol_ganger';   // default: the hot pink pistol
+                if (!this.look) this.look = Ganger.makeLook(seededRandom(Math.random()));
                 drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#8d5524',
+                    ...this.look,
                     stance: aiming ? stanceForWeapon(weaponId) : 'idle',
                     kick: aiming ? shotKick(this) : 0,
                     weapon: { id: weaponId, ready: aiming },
-                    // THE GANGER LOOK: Hot Pink Suit, Dark Maroon Pants
-                    top: { type: 'suit', color: '#ff0055' }, 
-                    bottom: { type: 'pants', color: '#550022' }, 
-                    shoes: { type: 'boots', color: '#111' }, 
-                    hair: null
                 });
 
                 // 2. RESTORE CONTEXT (BACK TO UPRIGHT / SCREEN SPACE)
@@ -31863,6 +31984,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     return { l: [13, -4 + Math.sin(t * 23) * 0.4], r: [13, 4 + Math.cos(t * 19) * 0.4], le: [4, -11], re: [4, 11],
                              bounce: 0.8 + b * 0.25, head: [1, 0], turn: Math.sin(t * 0.5) * 0.08, hint: 'neutral' };
                 },
+                // Front-of-house: hands clasped low in front, a polite slow look around
+                concierge(t, o) {
+                    const b = breath(t);
+                    return { l: [5, -1.5], r: [5.5, 1.5], le: [-1, -10.5], re: [-1, 10.5], bounce: b * 0.3,
+                             turn: Math.sin(t * TAU / 9 + o.seed) * 0.3, hint: 'smile' };
+                },
+                // Behind the bar: one hand holds a glass, the other wipes it in small circles
+                polish(t, o) {
+                    const b = breath(t), a = t * TAU * 0.9;
+                    return { r: [11, 3], re: [3, 11], l: [11 + Math.cos(a) * 1.4, 1 + Math.sin(a) * 1.4], le: [3, -10],
+                             bounce: 0.6 + b * 0.25, head: [1, 0], turn: glance(t, 11, 0.3, o.seed) * ramp(t, 3, 4), hint: 'smile' };
+                },
                 hands_on_hips(t) {
                     const b = breath(t);
                     return { l: [-1, -8.5], r: [-1, 8.5], le: [-5, -15], re: [-5, 15], bounce: b * 0.3 };
@@ -31945,6 +32078,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             '949': 'neutral', 'Victoria': 'smirk', 'Sabrina': 'sultry', 'Yenna': 'neutral', 'Max': 'smile',
             'Josh': 'neutral', 'Anavia': 'sultry', 'Mirabel': 'smile', 'Biggs': 'grin', 'Bartender': 'smile',
             'LUVSH4D3': 'sultry', 'Barista Ren': 'smile', 'Ms. Jean': 'smile', 'Contractor': 'annoyed',
+            'Guard Unit Alpha': 'neutral', 'Guard Unit Beta': 'neutral', 'Concierge Lux': 'smile', 'Dr. Yin': 'neutral',
         };
 
         /** Pick a mood for a line of dialogue from its wording, then the speaker's temperament. */
@@ -31967,6 +32101,137 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const d = 0.14;                                                   // a blink lasts ~0.14 s
             return t < d ? Math.sin(t / d * Math.PI) : 0;
         }
+        /* =====================================================================
+           BODIES — builds, height, and Double Nights androids
+           ---------------------------------------------------------------------
+           config.build   'slim' | 'athletic' | 'curvy' | 'broad' | 'heavy'
+                          (none = the classic shape for the character's gender)
+           config.height  0.9 … 1.1 (1 = classic)
+           config.body    { kind: 'android', finish: 'silver' | 'gold' | 'bloodmoon',
+                            glow: '#hex' (visor colour), hover: true, emblem: false }
+           Builds scale the body (breadth y, depth x) and keep the head's shape;
+           height scales everything. Both are visual only — collision is unchanged.
+
+           Double Nights' AI staff are finished in the ethereal silver of the moon,
+           the soft gold of sunlight on the moon, or — a select few — Blood Moon
+           rose red. Their mark is two overlapping crescent moons.
+           ===================================================================== */
+        const BUILDS = {
+            //         breadth  depth   head   hips (extra, curvy)  shoulders (extra)
+            slim:     { w: 0.88, d: 0.92, head: 0.98 },
+            athletic: { w: 1.05, d: 1.02, head: 1.0, shoulder: 1.08 },
+            curvy:    { w: 1.04, d: 1.04, head: 1.0, hip: 1.25 },
+            broad:    { w: 1.15, d: 1.08, head: 1.02, shoulder: 1.1 },
+            heavy:    { w: 1.2,  d: 1.22, head: 1.05, hip: 1.1 },
+        };
+
+        /** Scale for a character's body frame, or null for the classic shape. */
+        function bodyScale(config) {
+            const b = BUILDS[config.build], h = config.height || 1;
+            if (!b && h === 1) return null;
+            const B = b || { w: 1, d: 1, head: 1 };
+            return { x: h * B.d, y: h * B.w, k: h * B.head };
+        }
+
+        /** How wide a build's shoulders read in a portrait (1 = classic). */
+        function portraitBreadth(config) {
+            const b = BUILDS[config.build];
+            return b ? b.w * (b.shoulder || 1) : 1;
+        }
+
+        const ANDROID_FINISHES = {
+            silver:    { plate: '#c9ccd8', trim: '#7d8196', sheen: '#f4f6ff', glow: '#bfe6ff' },
+            gold:      { plate: '#d9b45a', trim: '#8c6a24', sheen: '#fff1c2', glow: '#00ffff' },
+            bloodmoon: { plate: '#b3203c', trim: '#5e0c1e', sheen: '#ff9fb2', glow: '#ff7aa8' },
+        };
+
+        /** Colours for an android body config, or null for a human. */
+        function androidLook(body) {
+            if (!body || body.kind !== 'android') return null;
+            const f = ANDROID_FINISHES[body.finish] || ANDROID_FINISHES.silver;
+            return { ...f, glow: body.glow || f.glow, hover: !!body.hover, emblem: body.emblem !== false };
+        }
+
+        /** The Double Nights mark: two overlapping crescent moons. */
+        function drawDNEmblem(ctx, x, y, r, color) {
+            ctx.save();
+            ctx.strokeStyle = color; ctx.lineWidth = r * 0.42; ctx.lineCap = 'round';
+            for (const dx of [-r * 0.32, r * 0.32]) {
+                ctx.beginPath(); ctx.arc(x + dx, y, r, Math.PI * 0.62, Math.PI * 1.38); ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        /** An android's head from above: a polished dome with a glowing visor across the face. */
+        function drawAndroidHead(ctx, headX, A, blink) {
+            const g = ctx.createRadialGradient(headX - 2, -2.5, 1, headX, 0, 8.5);
+            g.addColorStop(0, A.sheen); g.addColorStop(0.45, A.plate); g.addColorStop(1, A.trim);
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;                        // crown seam
+            ctx.beginPath(); ctx.moveTo(headX - 6.5, 0); ctx.lineTo(headX + 2, 0); ctx.stroke();
+            // Visor: a band wrapping the front of the head; a blink is a flicker
+            ctx.save();
+            ctx.globalAlpha = 1 - 0.7 * blink;
+            ctx.strokeStyle = A.glow; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+            ctx.shadowColor = A.glow; ctx.shadowBlur = 4;
+            ctx.beginPath(); ctx.arc(headX, 0, 6.6, -0.75, 0.75); ctx.stroke();
+            ctx.restore();
+        }
+
+        /**
+         * An android's face for portraits: polished plating, seams, and a glowing visor
+         * that carries the expression (it curves with a smile, droops when sad, narrows
+         * when half-lidded, and pulses while talking).
+         */
+        function drawAndroidPortraitFace(ctx, P, A, X, blink, talk) {
+            const { cx, cy, fw, fh } = P;
+            // Sheen across the brow and cheek
+            const sh = ctx.createRadialGradient(cx - fw * 0.35, cy - fh * 0.45, 0, cx - fw * 0.35, cy - fh * 0.45, fw * 1.1);
+            sh.addColorStop(0, A.sheen); sh.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.save(); ctx.globalAlpha = 0.55; ctx.fillStyle = sh;
+            ctx.beginPath(); ctx.ellipse(cx, cy, fw, fh, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            // Seams: jawline, a cheek panel either side, the centre of the brow
+            ctx.strokeStyle = A.trim; ctx.lineWidth = Math.max(0.6, fw * 0.03); ctx.globalAlpha = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(cx - fw * 0.82, cy + fh * 0.25); ctx.quadraticCurveTo(cx, cy + fh * 1.02, cx + fw * 0.82, cy + fh * 0.25);
+            for (const s of [-1, 1]) { ctx.moveTo(cx + s * fw * 0.72, cy - fh * 0.05); ctx.lineTo(cx + s * fw * 0.55, cy + fh * 0.45); }
+            ctx.moveTo(cx, cy - fh * 0.95); ctx.lineTo(cx, cy - fh * 0.55);
+            ctx.stroke(); ctx.globalAlpha = 1;
+            // Visor
+            const eyeY = cy - fh * 0.15;
+            const open = Math.max(0.12, 1 - Math.max(X.lids.top, blink) * 0.85);
+            const bend = X.mouth.curve * fh * 0.08 - X.brow.tilt * fh * 0.03;    // smile curves it up at the ends
+            const bright = Math.max(0.35, 0.85 + X.blush * 0.15 - Math.max(0, -X.mouth.curve) * 0.3 + talk * 0.25);
+            ctx.save();
+            ctx.shadowColor = A.glow; ctx.shadowBlur = fw * 0.35;
+            ctx.globalAlpha = bright; ctx.fillStyle = A.glow;
+            const w = fw * 0.82, h = fh * 0.13 * open;
+            ctx.beginPath();
+            ctx.moveTo(cx - w, eyeY - bend);
+            ctx.quadraticCurveTo(cx, eyeY + bend - h * 1.4, cx + w, eyeY - bend);
+            ctx.quadraticCurveTo(cx, eyeY + bend + h * 1.4, cx - w, eyeY - bend);
+            ctx.fill();
+            ctx.restore();
+            // Pupils of light, following the gaze
+            ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.85 * open;
+            for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + s * fw * 0.38 + X.gaze.x * fw * 0.1, eyeY + X.gaze.y * fh * 0.03, fw * 0.06, 0, Math.PI * 2); ctx.fill(); }
+            ctx.globalAlpha = 1;
+            // Speaker grille where a mouth would be; it glows while talking
+            const my = cy + fh * 0.5 - X.mouth.curve * fh * 0.03;
+            ctx.strokeStyle = talk > 0 ? A.glow : A.trim; ctx.lineWidth = Math.max(0.6, fw * 0.035); ctx.globalAlpha = talk > 0 ? 0.6 + talk * 0.4 : 0.7;
+            ctx.beginPath();
+            for (let i = -1; i <= 1; i++) { const yy = my + i * fh * 0.045; ctx.moveTo(cx - fw * 0.22, yy); ctx.lineTo(cx + fw * 0.22, yy); }
+            ctx.stroke(); ctx.globalAlpha = 1;
+        }
+
+        /** A small deterministic random generator from a string or number (same seed → same look). */
+        function seededRandom(seed) {
+            let h = 2166136261;
+            for (const ch of String(seed)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+            return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+        }
+        const pickFrom = (rng, list) => list[Math.floor(rng() * list.length) % list.length];
         /* =====================================================================
            CLOTH — swinging coat hems, skirts and trains
            ---------------------------------------------------------------------
@@ -32205,12 +32470,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             };
             // Portrait helpers ------------------------------------------------
             const pShoulders = (ctx, P, color, neckW = 0.35) => {
-                const { cx, cy, fw, fh } = P;
+                const { cx, cy, fw, fh } = P, bw = P.bw || 1;                // bw: shoulder breadth from the build
                 ctx.fillStyle = color; ctx.beginPath();
                 ctx.moveTo(cx - fw * neckW, cy + fh * 1.4);
-                ctx.quadraticCurveTo(cx - fw * 1.8, cy + fh * 1.6, cx - fw * 2.5, cy + fh * 2.8);
-                ctx.lineTo(cx + fw * 2.5, cy + fh * 2.8);
-                ctx.quadraticCurveTo(cx + fw * 1.8, cy + fh * 1.6, cx + fw * neckW, cy + fh * 1.4);
+                ctx.quadraticCurveTo(cx - fw * 1.8 * bw, cy + fh * 1.6, cx - fw * 2.5 * bw, cy + fh * 2.8);
+                ctx.lineTo(cx + fw * 2.5 * bw, cy + fh * 2.8);
+                ctx.quadraticCurveTo(cx + fw * 1.8 * bw, cy + fh * 1.6, cx + fw * neckW, cy + fh * 1.4);
                 ctx.closePath(); ctx.fill();
             };
             const pNeckline = (ctx, P, color, depth, width = 0.45) => {   // skin showing through a neckline
@@ -32341,12 +32606,96 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.fillStyle = g_d(c.color, 0.15);                  // high collar
                         for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(cx + s * fw * 0.5, cy + fh * 1.45); ctx.lineTo(cx + s * fw * 0.85, cy + fh * 0.95); ctx.lineTo(cx + s * fw * 1.15, cy + fh * 1.55); ctx.closePath(); ctx.fill(); }
                     }
+                },
+                // Waistcoat over a shirt (inner, default white); the sleeves are the shirt's; bow tie in trim
+                vest: {
+                    sleeve: 'long', sleeveFrom: 'inner',
+                    draw(ctx, g, c) {
+                        const shirt = c.inner || '#f2f2f2';
+                        rr(ctx, g.torso.x, -10, g.torso.w, 20, TORSO_R, g.darken(shirt, 0.08));
+                        const front = g.torso.x + g.torso.w;
+                        ctx.fillStyle = g.darken(c.color, 0.1);                  // the two vest panels, open in a V at the front
+                        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(g.torso.x, s * 10); ctx.lineTo(front - 1, s * 9.5); ctx.lineTo(front - 1, s * 2); ctx.lineTo(g.torso.x + g.torso.w * 0.35, s * 1); ctx.lineTo(g.torso.x, s * 1.5); ctx.closePath(); ctx.fill(); }
+                        bust(ctx, g, { color: c.color }, 0.14, 2.8);
+                        ctx.fillStyle = c.trim || '#8b0000';                      // bow tie
+                        ctx.beginPath(); ctx.moveTo(front - 1.5, 0); ctx.lineTo(front + 0.5, -2); ctx.lineTo(front + 0.5, 2); ctx.closePath(); ctx.fill();
+                    },
+                    portrait(ctx, P, c) {
+                        const { cx, cy, fw, fh } = P, shirt = c.inner || '#f2f2f2';
+                        pShoulders(ctx, P, shirt);
+                        ctx.fillStyle = c.color;
+                        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(cx + s * fw * 0.45, cy + fh * 1.75); ctx.lineTo(cx + s * fw * 0.15, cy + fh * 2.8); ctx.lineTo(cx + s * fw * 1.6 * (P.bw || 1), cy + fh * 2.8); ctx.lineTo(cx + s * fw * 1.2, cy + fh * 1.7); ctx.closePath(); ctx.fill(); }
+                        ctx.fillStyle = c.trim || '#8b0000';
+                        ctx.beginPath(); ctx.moveTo(cx, cy + fh * 1.5); ctx.lineTo(cx - fw * 0.3, cy + fh * 1.38); ctx.lineTo(cx - fw * 0.3, cy + fh * 1.62); ctx.closePath(); ctx.moveTo(cx, cy + fh * 1.5); ctx.lineTo(cx + fw * 0.3, cy + fh * 1.38); ctx.lineTo(cx + fw * 0.3, cy + fh * 1.62); ctx.closePath(); ctx.fill();
+                    }
+                },
+                // Doctor's white coat: breast pocket, a small red-cross pin, a swinging hem
+                lab_coat: {
+                    sleeve: 'long',
+                    draw(ctx, g, c) {
+                        tops.jacket.draw(ctx, g, { ...c, color: c.color || '#f1f3f5' });
+                        const front = g.torso.x + g.torso.w;
+                        ctx.fillStyle = '#d9342b';
+                        ctx.fillRect(front - 4, -7.2, 2.4, 0.8); ctx.fillRect(front - 3.6, -7.6, 0.8, 1.6);   // the pin
+                    },
+                    tail(ctx, g, c) { coatTail(ctx, g, { ...c, color: c.color || '#f1f3f5' }, 8); },
+                    portrait(ctx, P, c, skinShadow) {
+                        const col = c.color || '#f1f3f5';
+                        tops.jacket.portrait(ctx, P, { ...c, color: col }, skinShadow);
+                        const { cx, cy, fw, fh } = P;
+                        ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1;
+                        ctx.strokeRect(cx + fw * 0.9, cy + fh * 2.1, fw * 0.55, fh * 0.35);                    // pocket
+                        ctx.fillStyle = '#d9342b';
+                        ctx.fillRect(cx - fw * 1.35, cy + fh * 2.02, fw * 0.3, fh * 0.07); ctx.fillRect(cx - fw * 1.235, cy + fh * 1.95, fw * 0.07, fh * 0.21);
+                    }
+                },
+                // Medical scrubs: short sleeves, V-neck
+                scrubs: {
+                    sleeve: 'short',
+                    draw(ctx, g, c) {
+                        body(ctx, g, c); shoulderSeams(ctx, g, c); bust(ctx, g, c, 0.16, 3);
+                        const front = g.torso.x + g.torso.w;
+                        ctx.fillStyle = g.skin; ctx.beginPath(); ctx.moveTo(front - 1, -2.5); ctx.lineTo(front - 4.5, 0); ctx.lineTo(front - 1, 2.5); ctx.closePath(); ctx.fill();
+                    },
+                    portrait(ctx, P, c, skinShadow) {
+                        pShoulders(ctx, P, c.color); const { cx, cy, fw, fh } = P;
+                        ctx.fillStyle = skinShadow; ctx.beginPath(); ctx.moveTo(cx - fw * 0.45, cy + fh * 1.42); ctx.lineTo(cx, cy + fh * 2.05); ctx.lineTo(cx + fw * 0.45, cy + fh * 1.42); ctx.closePath(); ctx.fill();
+                        ctx.strokeStyle = g_d(c.color, 0.2); ctx.lineWidth = 1.2; ctx.stroke();
+                    }
+                },
+                // Double Nights staff jacket: mandarin collar, accent piping, the double-crescent mark
+                dn_uniform: {
+                    sleeve: 'long',
+                    draw(ctx, g, c) {
+                        body(ctx, g, c, 0.08); bust(ctx, g, c, 0.14, 3);
+                        const front = g.torso.x + g.torso.w, accent = c.trim || '#e8c27a';
+                        ctx.strokeStyle = accent; ctx.lineWidth = 0.8; ctx.beginPath();
+                        ctx.moveTo(front - 1, -9); ctx.lineTo(front - 1, 9); ctx.stroke();                       // button line
+                        drawDNEmblem(ctx, g.torso.x + g.torso.w * 0.55, -5, 1.9, accent);
+                    },
+                    collar(ctx, g, c) { collarRing(ctx, g, g.darken(c.color, 0.2), 9, 1.4); },
+                    portrait(ctx, P, c) {
+                        pShoulders(ctx, P, c.color); const { cx, cy, fw, fh } = P, accent = c.trim || '#e8c27a';
+                        rr(ctx, cx - fw * 0.45, cy + fh * 1.05, fw * 0.9, fh * 0.45, fw * 0.12, g_d(c.color, 0.12));   // mandarin collar
+                        ctx.strokeStyle = accent; ctx.lineWidth = Math.max(1, fw * 0.05);
+                        ctx.beginPath(); ctx.moveTo(cx, cy + fh * 1.5); ctx.lineTo(cx, cy + fh * 2.8); ctx.stroke();
+                        drawDNEmblem(ctx, cx - fw * 1.05, cy + fh * 2.05, fw * 0.2, accent);
+                    }
                 }
             };
             function g_d(hex, frac) { return darkenHex(hex, Math.floor(255 * frac)); }
 
             const bottoms = {
                 pants:    { legs: 'full' },
+                // Waist apron (color) over trousers (under); ties at the back
+                apron:    { legs: 'full', hips(ctx, g, c) {
+                    const front = g.hip.x + g.hip.w;
+                    rr(ctx, front - 3, -8.5, 5.5, 17, [1, 3, 3, 1], g.darken(c.color, 0.12));
+                    ctx.strokeStyle = g.darken(c.color, 0.3); ctx.lineWidth = 0.7; ctx.beginPath();
+                    ctx.moveTo(g.hip.x + 1, -9.5); ctx.lineTo(front - 2, -9); ctx.moveTo(g.hip.x + 1, 9.5); ctx.lineTo(front - 2, 9);
+                    ctx.moveTo(g.hip.x + 1, -2); ctx.lineTo(g.hip.x - 2, -3.5); ctx.moveTo(g.hip.x + 1, 2); ctx.lineTo(g.hip.x - 2, 3.5);   // bow at the back
+                    ctx.stroke();
+                } },
                 leggings: { legs: 'full', shade: 0.5, detail(ctx, g, c) { ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.6; for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.moveTo(g.hipPt[i][0], g.hipPt[i][1]); ctx.lineTo(g.feet[i][0], g.feet[i][1]); ctx.stroke(); } } },
                 joggers:  { legs: 'full', detail(ctx, g, c) {
                     ctx.fillStyle = g.darken(c.color, 0.6);                 // cuffs at the ankles
@@ -33014,8 +33363,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         function drawCharacterPortrait(ctx, w, h, config) {
-            const skinColor = config.skinColor || '#c68e63';
-            const hair = config.hair || { type: 'curls', color: '#0a0505' };
+            const A = androidLook(config.body);                              // Double Nights android (ui/bodies.js)
+            const skinColor = A ? A.plate : (config.skinColor || '#c68e63');
+            const hair = A ? (config.hair || null) : (config.hair || { type: 'curls', color: '#0a0505' });
             const eyeColor = config.eyeColor || '#daa520'; // Default golden for Stella
             const gender = config.gender || 'female';
             const top = config.top || null;
@@ -33058,7 +33408,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // ─── SHOULDERS / CLOTHING ───
             // Wardrobe pieces (ui/wardrobe.js) draw their own front view; anything else is a plain shape
             const WD = typeof WARDROBE !== 'undefined' ? WARDROBE : null;
-            const P = { cx, cy, fw, fh, w, h, eyeY: cy - fh * 0.15, eyeSpacing: fw * 0.38 };
+            const bw = portraitBreadth(config);                               // shoulder breadth from the build
+            const P = { cx, cy, fw, fh, w, h, eyeY: cy - fh * 0.15, eyeSpacing: fw * 0.38, bw };
             const jewelry = (config.jewelry || []).filter(j => WD && WD.jewelry[j.type]);
             const topPiece = WD && top ? WD.tops[top.type] : null;
             if (topPiece) {
@@ -33071,9 +33422,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             ctx.beginPath();
             ctx.moveTo(cx - fw * 0.35, cy + fh * 1.4);
-            ctx.quadraticCurveTo(cx - fw * 1.8, cy + fh * 1.6, cx - fw * 2.5, cy + fh * 2.8);
-            ctx.lineTo(cx + fw * 2.5, cy + fh * 2.8);
-            ctx.quadraticCurveTo(cx + fw * 1.8, cy + fh * 1.6, cx + fw * 0.35, cy + fh * 1.4);
+            ctx.quadraticCurveTo(cx - fw * 1.8 * bw, cy + fh * 1.6, cx - fw * 2.5 * bw, cy + fh * 2.8);
+            ctx.lineTo(cx + fw * 2.5 * bw, cy + fh * 2.8);
+            ctx.quadraticCurveTo(cx + fw * 1.8 * bw, cy + fh * 1.6, cx + fw * 0.35, cy + fh * 1.4);
             ctx.closePath();
             ctx.fill();
             // Collar line
@@ -33139,8 +33490,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * fw * 0.5, cy + fh * 0.2, fw * 0.28, fh * 0.13, side * 0.15, 0, Math.PI * 2); ctx.fill(); }
             }
 
+            // Androids get a plated face and visor instead of human features
+            let drawBrows = null, browColor = null;
+            if (A) drawAndroidPortraitFace(ctx, P, A, X, blink, talk);
+            else {
             // ─── EYEBROWS ───
-            const browColor = hair.color || '#1a1a1a';
+            browColor = hair.color || '#1a1a1a';
             const browY = cy - fh * 0.32;
             const browW = fw * 0.38;
             ctx.strokeStyle = browColor;
@@ -33148,7 +33503,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.lineCap = 'round';
             // Each brow: outer end → arch → inner end. Lift moves it, tilt raises (worry) or
             // drops (anger) the inner end, arch bends it, raise lifts the right brow alone.
-            const drawBrows = () => {
+            drawBrows = () => {
                 for (const side of [-1, 1]) {
                     const up = (X.brow.lift + (side > 0 ? X.brow.raise : 0)) * fh * 0.1;
                     ctx.beginPath();
@@ -33321,6 +33676,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.ellipse(cx + mouthW * 0.15, mouthY + fh * 0.05 + open, mouthW * 0.2, fh * 0.03, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1.0;
+            }
 
             // ─── HAIR (FRONT LAYER — on top of face) ───
             if (hair) {
@@ -33329,7 +33685,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             // An expressive brow shows through the fringe (stylised, like drawn portraits)
-            if (X.brow.lift || X.brow.tilt || X.brow.arch || X.brow.raise) {
+            if (drawBrows && (X.brow.lift || X.brow.tilt || X.brow.arch || X.brow.raise)) {
                 ctx.save();
                 ctx.lineCap = 'round';
                 ctx.globalAlpha = 0.6; ctx.strokeStyle = skinColor; ctx.lineWidth = fw * 0.15; drawBrows();   // outline so it reads on dark hair
@@ -33349,15 +33705,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             dyn = dyn || {};
             const hatPiece = hat && typeof WARDROBE !== 'undefined' ? WARDROBE.hats[hat.type] : null;
             if (hatPiece && hatPiece.back) hatPiece.back(ctx, headX, hat, dyn);   // e.g. the back of a raised hood
-            // Head
-            ctx.fillStyle = skinColor;
-            ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();
             // Eyes — they blink now and then, each character on their own rhythm
             const owner = dyn.owner;
             if (owner && owner._blinkSeed === undefined) owner._blinkSeed = Math.floor(Math.random() * 997);
-            if (!owner || blinkAmount(_gameTimeSec, owner._blinkSeed) < 0.5) {
-                ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
-                ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
+            const blinkNow = owner ? blinkAmount(_gameTimeSec, owner._blinkSeed) : 0;
+            if (dyn.android) {
+                drawAndroidHead(ctx, headX, dyn.android, blinkNow);        // plated dome and visor (ui/bodies.js)
+            } else {
+                ctx.fillStyle = skinColor;
+                ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();
+                if (blinkNow < 0.5) {
+                    ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
+                    ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
+                }
             }
             // Hair (all styles render on top of head) — strand physics via hairGeometry().
             // A raised hood hides short styles; long ones still spill out from under it.
@@ -33373,9 +33733,32 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);
         }
 
+        /**
+         * Draw a procedural character. Builds and height (ui/bodies.js) scale the body
+         * frame here; a hovering android bobs over a soft glow.
+         */
         function drawProceduralHumanoid(ctx, entity, config = {}) {
+            const S = bodyScale(config), A = androidLook(config.body);
+            const hover = A && A.hover && !config.isDriving;
+            if (!S && !hover) return _drawHumanoidBody(ctx, entity, config, null, A);
+            const bob = hover ? 1 + Math.sin(_gameTimeSec * 2.2 + (entity.x || 0) * 0.01) * 0.035 : 1;
+            if (hover) {                                                    // light under a floating android
+                const gl = ctx.createRadialGradient(-3, 0, 0, -3, 0, 15);
+                gl.addColorStop(0, hexToRgba(A.glow, 0.35 * (2 - bob))); gl.addColorStop(1, hexToRgba(A.glow, 0));
+                ctx.fillStyle = gl; ctx.beginPath(); ctx.ellipse(-3, 0, 15, 13, 0, 0, Math.PI * 2); ctx.fill();
+            }
+            const sx = (S ? S.x : 1) * bob, sy = (S ? S.y : 1) * bob;
+            const muzzle = entity._muzzleLocal;
+            ctx.save(); ctx.scale(sx, sy);
+            try { _drawHumanoidBody(ctx, entity, config, { x: sx, y: sy, k: (S ? S.k : 1) * bob }, A); }
+            finally { ctx.restore(); }
+            // Shots leave from the drawn muzzle, so carry the scale into it
+            if (entity._muzzleLocal && entity._muzzleLocal !== muzzle) entity._muzzleLocal = { x: entity._muzzleLocal.x * sx, y: entity._muzzleLocal.y * sy };
+        }
+
+        function _drawHumanoidBody(ctx, entity, config, S, A) {
             // --- 1. CONFIGURATION ---
-            const skinColor = config.skinColor || '#8d5524';
+            const skinColor = A ? A.plate : (config.skinColor || '#8d5524');
             const isDriving = config.isDriving || false;
             const isShootingFromCar = config.isShootingFromCar || false;
             const carAngle = config.carAngle || 0;
@@ -33405,11 +33788,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             } else if (gender === 'male') {
                 shoulderSpread = 12; hipWidth = 7; hipXOff = -4.5; torsoWidth = 13; torsoXOff = -4.5;
             }
+            const build = BUILDS[config.build];
+            if (build && build.hip) { hipXOff -= hipWidth * (build.hip - 1) / 2; hipWidth *= build.hip; }
+            if (build && build.shoulder) shoulderSpread *= build.shoulder;
+            // Head keeps its shape under a build's scale: draw it through this
+            const withHead = (hx, draw) => {
+                if (!S) return draw(hx);
+                ctx.save(); ctx.scale(S.k / S.x, S.k / S.y); draw(hx * S.x / S.k); ctx.restore();
+            };
         
             // --- 3. GAIT (shared controller — see CONFIG.GAIT / syncHumanoidGait) ---
             const gait = syncHumanoidGait(entity);
             const gaitSpeed = isDriving ? 0 : gait.speed;
-            const strideLen = humanoidStrideLength(gaitSpeed);
+            const hovering = !!(A && A.hover);                              // floats instead of walking
+            const strideLen = hovering ? 0 : humanoidStrideLength(gaitSpeed);
             const strafeLen = strideLen * CONFIG.GAIT.STRAFE_RATIO;
             const sway = Math.min(1, gaitSpeed / CONFIG.GAIT.FULL_SWAY_SPEED);
         
@@ -33430,7 +33822,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Walk oscillations. Like the arm swing, these are applied AFTER the pose
             // smoothing in step 6 — the per-render lerp there would mute and delay
             // them — so the pose targets below are built without them.
-            const walkBounce = isDriving ? 0 : Math.abs(Math.sin(walkCycle)) * (gaitSpeed * 0.2); // Bounce scales with speed
+            const walkBounce = (isDriving || hovering) ? 0 : Math.abs(Math.sin(walkCycle)) * (gaitSpeed * 0.2); // Bounce scales with speed
             const walkSway = Math.sin(walkCycle) * 0.3 * sway;  // sway is 0 when driving or stopped
             let bounce = 0;         // pose-target bounce; walk bounce is added after smoothing
         
@@ -33811,11 +34203,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const botP = WD && clothes.bottom ? WD.bottoms[clothes.bottom.type] : null;
             const shoeP = WD && clothes.shoes ? WD.shoes[clothes.shoes.type] : null;
             const sleeve = clothes.top ? (topP ? topP.sleeve : 'long') : 'none';
+            // Sleeves can come from the shirt under a vest; legs from trousers under an apron
+            const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : clothes.top.color) : null;
+            const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
             const jewelryAt = (where) => (clothes.jewelry || []).filter(j => WD && WD.jewelry[j.type] && WD.jewelry[j.type].at === where);
             const headX0 = bounce - bodyRecoil;
             const clothDyn = { wind: null };                               // weather will blow on this (roadmap step 7)
             const g = {
-                darken, skin: skinColor, gender, walkCycle,
+                darken, skin: skinColor, gender, walkCycle, android: A,
                 torso: { x: torsoXOff, w: torsoWidth }, hip: { x: hipXOff, w: hipWidth },
                 headX: headX0, headInTorso: headX0 - hipAnchorX,
                 feet: [[lFootX, lFootY], [rFootX, rFootY]], knees: [[lKneeX, lKneeY], [rKneeX, rKneeY]],
@@ -33841,8 +34236,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.roundRect(torsoXOff - 2, -shoulderSpread - 1, torsoWidth + 4, (shoulderSpread * 2) + 2, 5); 
                 ctx.fill();
                 
-                const sleeveColor = sleeve !== 'none' ? darken(clothes.top.color, 0.15) : darken(skinColor, 0.15);
-                const skinArmColor = sleeve === 'long' ? darken(clothes.top.color, 0.3) : darken(skinColor, 0.3);
+                const sleeveColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
+                const skinArmColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
                 
                 if (isShootingFromCar) {
                     // --- SHOOTING POSE ---
@@ -33899,7 +34294,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // --- HEAD & HAIR ---
                 const headX = 0 + headForward;
                 const driveDyn = { owner: entity, sway: 0, drag: 0, bounce: 0, wiggle: 0 };
-                drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, driveDyn, clothes.hat, clothes.jewelry);
+                driveDyn.android = A;
+                withHead(headX, hx => drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, driveDyn, clothes.hat, clothes.jewelry));
                 
                 ctx.restore();
                 return;
@@ -33924,8 +34320,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         
             // LEG COLOURS: which parts of the leg the bottom covers ('bare' | 'thigh' | 'full')
             const legs = clothes.bottom ? (botP ? botP.legs : 'full') : 'bare';
-            const legColor = legs === 'full' ? darken(clothes.bottom.color, (botP && botP.shade) || 0.45) : darken(skinColor, 0.15);
-            const thighColor = legs !== 'bare' ? darken(clothes.bottom.color, 0.35) : darken(skinColor, 0.05);
+            const legColor = legs === 'full' ? darken(legCol, (botP && botP.shade) || 0.45) : darken(skinColor, 0.15);
+            const thighColor = legs !== 'bare' ? darken(legCol, 0.35) : darken(skinColor, 0.05);
         
             // 2. Calves
             drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor); 
@@ -33939,6 +34335,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // 3. Thighs
             drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor);
             drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor);
+            if (A && legs !== 'full') {                                     // android knees
+                ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
+                for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
+            }
             if (botP && botP.detail) botP.detail(ctx, g, clothes.bottom);   // cuffs, pockets, stripes
         
             // 4. Hips & Skirt
@@ -33991,15 +34391,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
         
             // 7. Forearms (fabric only under long sleeves)
-            const foreColor = sleeve === 'long' ? darken(clothes.top.color, 0.3) : darken(skinColor, 0.3);
+            const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
             drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor);
             drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor);
             for (const j of jewelryAt('wrists')) WD.jewelry[j.type].draw(ctx, g, j);
         
             // 8. Upper Arms (fabric under short or long sleeves)
-            const upperColor = sleeve !== 'none' ? darken(clothes.top.color, 0.15) : darken(skinColor, 0.15);
+            const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
             drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor);
             drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor);
+            if (A) {                                                        // android joints: seam rings at elbows and wrists
+                ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
+                for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY], [lFistX, lFistY], [rFistX, rFistY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
+            }
             if (topP && topP.armStripe) {                                // track-jacket stripes down the sleeves
                 ctx.strokeStyle = clothes.top.trim || '#f5f5f5'; ctx.lineWidth = 0.8; ctx.beginPath();
                 ctx.moveTo(shoulderX, lShoulderY); ctx.lineTo(lElbowX, lElbowY); ctx.lineTo(lFistX, lFistY);
@@ -34025,6 +34429,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
             }
             for (const j of jewelryAt('neck')) WD.jewelry[j.type].draw(ctx, g, j);
+            if (A && !clothes.top) {                                        // bare plating: chest panel seams and the Double Nights mark
+                ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6; ctx.beginPath();
+                ctx.moveTo(torsoXOff + 1, 0); ctx.lineTo(torsoXOff + torsoWidth - 1, 0);
+                for (const y of [-7, 7]) { ctx.moveTo(torsoXOff + 1, y); ctx.lineTo(torsoXOff + torsoWidth - 1.5, y * 0.9); }
+                ctx.stroke();
+                if (A.emblem) drawDNEmblem(ctx, torsoXOff + torsoWidth * 0.62, -4, 2, A.glow);
+            }
             ctx.restore();
         
             // 10. Head & Hair
@@ -34035,10 +34446,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Hair motion comes from the strand physics (hairGeometry): the owner's head
             // position in the world, plus the shoulder sway the strands swing with.
             const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0 };
+            walkDyn.android = A;
             const turning = headY !== 0 || headTurn !== 0;
-            if (turning) { ctx.save(); ctx.translate(headX, headY); ctx.rotate(headTurn); ctx.translate(-headX, 0); }
-            drawHeadAndHair(ctx, headX, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
-            if (turning) ctx.restore();
+            withHead(headX, hx => {
+                if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }
+                drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
+                if (turning) ctx.restore();
+            });
         
             // 11. HELD ITEMS
             if (held) {
@@ -36762,12 +37176,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         const NPC_PORTRAIT_CONFIGS = {
             'Biggs':       { skinColor: '#c68642', gender: 'male', hair: { type: 'afro', color: '#ff6600' }, top: { type: 'tshirt', color: '#ff8800' } },
-            'Dr. Yin':     { skinColor: '#e8d0b8', gender: 'male', hair: { type: 'short', color: '#222' }, top: { type: 'suit', color: '#1a3a4a' } },
+            'Dr. Yin':     { ...STAFF_LOOKS['Dr. Yin'], eyeColor: '#3a2a1a' },
             'Prisma':      { skinColor: '#d4a8e0', gender: 'female', hair: { type: 'long', color: '#9900ff' }, top: { type: 'tshirt', color: '#2a1a3a' } },
-            'Barista Ren': { skinColor: '#a0724a', gender: 'female', hair: { type: 'ponytail', color: '#2a1500' }, top: { type: 'tshirt', color: '#654321' } },
+            'Barista Ren': STAFF_LOOKS['Barista Ren'],
             'Torque':      { skinColor: '#8d5524', gender: 'male', hair: { type: 'short', color: '#111' }, top: { type: 'tshirt', color: '#444' } },
-            'Bartender':   { skinColor: '#c9a87c', gender: 'male', hair: { type: 'short', color: '#1a1a1a' }, top: { type: 'suit', color: '#1a0020' } },
-            'LUVSH4D3':    { skinColor: '#f5deb3', gender: 'female', hair: { type: 'long', color: '#ff88cc' }, top: { type: 'suit', color: '#330022' } },
+            'Bartender':   STAFF_LOOKS['Bartender'],
+            'LUVSH4D3':    STAFF_LOOKS['LUVSH4D3'],                        // Blood Moon android (Double Nights)
+            'Guard Unit Alpha': STAFF_LOOKS['Guard Unit Alpha'],
+            'Guard Unit Beta':  STAFF_LOOKS['Guard Unit Beta'],
+            'Concierge Lux':    STAFF_LOOKS['Concierge Lux'],
             'Ms. Jean':    { skinColor: '#c68e63', gender: 'female', hair: { type: 'curls', color: '#888' }, top: { type: 'suit', color: '#2a2a1a' } },
             'Contractor':  { skinColor: '#c9a87c', gender: 'male', hair: { type: 'short', color: '#111' }, top: { type: 'suit', color: '#222' } },
             'Anavia':      { skinColor: '#8B4513', gender: 'female', hair: { type: 'braids', color: '#1a0a00' }, top: { type: 'tshirt', color: '#1a3a2a' } },
@@ -36783,8 +37200,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         //  NPC_PORTRAIT_CONFIGS and before the grey silhouette. Covers the cast that
         //  exists in numbers and doesn't warrant per-name entries (dancers, spirits),
         //  so any future NPC sharing a role is drawn correctly with no new data.
-        //  Palettes mirror the in-world renderers (drawFemaleDancer, drawMaleDancer)
-        //  so the dialogue bust matches the sprite on screen.
+        //  Palettes mirror the in-world renderers (drawFemaleDancer) so the dialogue
+        //  bust matches the body on screen. (Male dancers, medics and staff use
+        //  their own look — NPC._staffLook — before these.)
         //  `byGender` lets one role serve both variants — NPC.gender is derived from
         //  the name in the constructor, so "Male Dancer 3" resolves to the male entry.
         // ============================================================================
@@ -40054,6 +40472,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // read their role and gender, so numerous cast members (dancers,
                 // spirits) get a correct bust without per-name entries.
                 const npc = (this.npcs || []).find(n => n.name === speakerName);
+                // Staff, androids, medics and male dancers: the same look as their body in the world
+                const staff = npc && npc._staffLook ? npc._staffLook() : null;
+                if (staff) return { ...staff, eyeColor: '#332211' };
                 const roleCfg = npc && ROLE_PORTRAIT_CONFIGS[npc.role];
                 if (roleCfg) {
                     const resolved = roleCfg.byGender

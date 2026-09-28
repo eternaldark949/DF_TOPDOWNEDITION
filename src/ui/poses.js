@@ -66,6 +66,18 @@
                     return { l: [13, -4 + Math.sin(t * 23) * 0.4], r: [13, 4 + Math.cos(t * 19) * 0.4], le: [4, -11], re: [4, 11],
                              bounce: 0.8 + b * 0.25, head: [1, 0], turn: Math.sin(t * 0.5) * 0.08, hint: 'neutral' };
                 },
+                // Front-of-house: hands clasped low in front, a polite slow look around
+                concierge(t, o) {
+                    const b = breath(t);
+                    return { l: [5, -1.5], r: [5.5, 1.5], le: [-1, -10.5], re: [-1, 10.5], bounce: b * 0.3,
+                             turn: Math.sin(t * TAU / 9 + o.seed) * 0.3, hint: 'smile' };
+                },
+                // Behind the bar: one hand holds a glass, the other wipes it in small circles
+                polish(t, o) {
+                    const b = breath(t), a = t * TAU * 0.9;
+                    return { r: [11, 3], re: [3, 11], l: [11 + Math.cos(a) * 1.4, 1 + Math.sin(a) * 1.4], le: [3, -10],
+                             bounce: 0.6 + b * 0.25, head: [1, 0], turn: glance(t, 11, 0.3, o.seed) * ramp(t, 3, 4), hint: 'smile' };
+                },
                 hands_on_hips(t) {
                     const b = breath(t);
                     return { l: [-1, -8.5], r: [-1, 8.5], le: [-5, -15], re: [-5, 15], bounce: b * 0.3 };

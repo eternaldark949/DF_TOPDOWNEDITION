@@ -57,12 +57,12 @@
             };
             // Portrait helpers ------------------------------------------------
             const pShoulders = (ctx, P, color, neckW = 0.35) => {
-                const { cx, cy, fw, fh } = P;
+                const { cx, cy, fw, fh } = P, bw = P.bw || 1;                // bw: shoulder breadth from the build
                 ctx.fillStyle = color; ctx.beginPath();
                 ctx.moveTo(cx - fw * neckW, cy + fh * 1.4);
-                ctx.quadraticCurveTo(cx - fw * 1.8, cy + fh * 1.6, cx - fw * 2.5, cy + fh * 2.8);
-                ctx.lineTo(cx + fw * 2.5, cy + fh * 2.8);
-                ctx.quadraticCurveTo(cx + fw * 1.8, cy + fh * 1.6, cx + fw * neckW, cy + fh * 1.4);
+                ctx.quadraticCurveTo(cx - fw * 1.8 * bw, cy + fh * 1.6, cx - fw * 2.5 * bw, cy + fh * 2.8);
+                ctx.lineTo(cx + fw * 2.5 * bw, cy + fh * 2.8);
+                ctx.quadraticCurveTo(cx + fw * 1.8 * bw, cy + fh * 1.6, cx + fw * neckW, cy + fh * 1.4);
                 ctx.closePath(); ctx.fill();
             };
             const pNeckline = (ctx, P, color, depth, width = 0.45) => {   // skin showing through a neckline
@@ -193,12 +193,96 @@
                         ctx.fillStyle = g_d(c.color, 0.15);                  // high collar
                         for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(cx + s * fw * 0.5, cy + fh * 1.45); ctx.lineTo(cx + s * fw * 0.85, cy + fh * 0.95); ctx.lineTo(cx + s * fw * 1.15, cy + fh * 1.55); ctx.closePath(); ctx.fill(); }
                     }
+                },
+                // Waistcoat over a shirt (inner, default white); the sleeves are the shirt's; bow tie in trim
+                vest: {
+                    sleeve: 'long', sleeveFrom: 'inner',
+                    draw(ctx, g, c) {
+                        const shirt = c.inner || '#f2f2f2';
+                        rr(ctx, g.torso.x, -10, g.torso.w, 20, TORSO_R, g.darken(shirt, 0.08));
+                        const front = g.torso.x + g.torso.w;
+                        ctx.fillStyle = g.darken(c.color, 0.1);                  // the two vest panels, open in a V at the front
+                        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(g.torso.x, s * 10); ctx.lineTo(front - 1, s * 9.5); ctx.lineTo(front - 1, s * 2); ctx.lineTo(g.torso.x + g.torso.w * 0.35, s * 1); ctx.lineTo(g.torso.x, s * 1.5); ctx.closePath(); ctx.fill(); }
+                        bust(ctx, g, { color: c.color }, 0.14, 2.8);
+                        ctx.fillStyle = c.trim || '#8b0000';                      // bow tie
+                        ctx.beginPath(); ctx.moveTo(front - 1.5, 0); ctx.lineTo(front + 0.5, -2); ctx.lineTo(front + 0.5, 2); ctx.closePath(); ctx.fill();
+                    },
+                    portrait(ctx, P, c) {
+                        const { cx, cy, fw, fh } = P, shirt = c.inner || '#f2f2f2';
+                        pShoulders(ctx, P, shirt);
+                        ctx.fillStyle = c.color;
+                        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(cx + s * fw * 0.45, cy + fh * 1.75); ctx.lineTo(cx + s * fw * 0.15, cy + fh * 2.8); ctx.lineTo(cx + s * fw * 1.6 * (P.bw || 1), cy + fh * 2.8); ctx.lineTo(cx + s * fw * 1.2, cy + fh * 1.7); ctx.closePath(); ctx.fill(); }
+                        ctx.fillStyle = c.trim || '#8b0000';
+                        ctx.beginPath(); ctx.moveTo(cx, cy + fh * 1.5); ctx.lineTo(cx - fw * 0.3, cy + fh * 1.38); ctx.lineTo(cx - fw * 0.3, cy + fh * 1.62); ctx.closePath(); ctx.moveTo(cx, cy + fh * 1.5); ctx.lineTo(cx + fw * 0.3, cy + fh * 1.38); ctx.lineTo(cx + fw * 0.3, cy + fh * 1.62); ctx.closePath(); ctx.fill();
+                    }
+                },
+                // Doctor's white coat: breast pocket, a small red-cross pin, a swinging hem
+                lab_coat: {
+                    sleeve: 'long',
+                    draw(ctx, g, c) {
+                        tops.jacket.draw(ctx, g, { ...c, color: c.color || '#f1f3f5' });
+                        const front = g.torso.x + g.torso.w;
+                        ctx.fillStyle = '#d9342b';
+                        ctx.fillRect(front - 4, -7.2, 2.4, 0.8); ctx.fillRect(front - 3.6, -7.6, 0.8, 1.6);   // the pin
+                    },
+                    tail(ctx, g, c) { coatTail(ctx, g, { ...c, color: c.color || '#f1f3f5' }, 8); },
+                    portrait(ctx, P, c, skinShadow) {
+                        const col = c.color || '#f1f3f5';
+                        tops.jacket.portrait(ctx, P, { ...c, color: col }, skinShadow);
+                        const { cx, cy, fw, fh } = P;
+                        ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1;
+                        ctx.strokeRect(cx + fw * 0.9, cy + fh * 2.1, fw * 0.55, fh * 0.35);                    // pocket
+                        ctx.fillStyle = '#d9342b';
+                        ctx.fillRect(cx - fw * 1.35, cy + fh * 2.02, fw * 0.3, fh * 0.07); ctx.fillRect(cx - fw * 1.235, cy + fh * 1.95, fw * 0.07, fh * 0.21);
+                    }
+                },
+                // Medical scrubs: short sleeves, V-neck
+                scrubs: {
+                    sleeve: 'short',
+                    draw(ctx, g, c) {
+                        body(ctx, g, c); shoulderSeams(ctx, g, c); bust(ctx, g, c, 0.16, 3);
+                        const front = g.torso.x + g.torso.w;
+                        ctx.fillStyle = g.skin; ctx.beginPath(); ctx.moveTo(front - 1, -2.5); ctx.lineTo(front - 4.5, 0); ctx.lineTo(front - 1, 2.5); ctx.closePath(); ctx.fill();
+                    },
+                    portrait(ctx, P, c, skinShadow) {
+                        pShoulders(ctx, P, c.color); const { cx, cy, fw, fh } = P;
+                        ctx.fillStyle = skinShadow; ctx.beginPath(); ctx.moveTo(cx - fw * 0.45, cy + fh * 1.42); ctx.lineTo(cx, cy + fh * 2.05); ctx.lineTo(cx + fw * 0.45, cy + fh * 1.42); ctx.closePath(); ctx.fill();
+                        ctx.strokeStyle = g_d(c.color, 0.2); ctx.lineWidth = 1.2; ctx.stroke();
+                    }
+                },
+                // Double Nights staff jacket: mandarin collar, accent piping, the double-crescent mark
+                dn_uniform: {
+                    sleeve: 'long',
+                    draw(ctx, g, c) {
+                        body(ctx, g, c, 0.08); bust(ctx, g, c, 0.14, 3);
+                        const front = g.torso.x + g.torso.w, accent = c.trim || '#e8c27a';
+                        ctx.strokeStyle = accent; ctx.lineWidth = 0.8; ctx.beginPath();
+                        ctx.moveTo(front - 1, -9); ctx.lineTo(front - 1, 9); ctx.stroke();                       // button line
+                        drawDNEmblem(ctx, g.torso.x + g.torso.w * 0.55, -5, 1.9, accent);
+                    },
+                    collar(ctx, g, c) { collarRing(ctx, g, g.darken(c.color, 0.2), 9, 1.4); },
+                    portrait(ctx, P, c) {
+                        pShoulders(ctx, P, c.color); const { cx, cy, fw, fh } = P, accent = c.trim || '#e8c27a';
+                        rr(ctx, cx - fw * 0.45, cy + fh * 1.05, fw * 0.9, fh * 0.45, fw * 0.12, g_d(c.color, 0.12));   // mandarin collar
+                        ctx.strokeStyle = accent; ctx.lineWidth = Math.max(1, fw * 0.05);
+                        ctx.beginPath(); ctx.moveTo(cx, cy + fh * 1.5); ctx.lineTo(cx, cy + fh * 2.8); ctx.stroke();
+                        drawDNEmblem(ctx, cx - fw * 1.05, cy + fh * 2.05, fw * 0.2, accent);
+                    }
                 }
             };
             function g_d(hex, frac) { return darkenHex(hex, Math.floor(255 * frac)); }
 
             const bottoms = {
                 pants:    { legs: 'full' },
+                // Waist apron (color) over trousers (under); ties at the back
+                apron:    { legs: 'full', hips(ctx, g, c) {
+                    const front = g.hip.x + g.hip.w;
+                    rr(ctx, front - 3, -8.5, 5.5, 17, [1, 3, 3, 1], g.darken(c.color, 0.12));
+                    ctx.strokeStyle = g.darken(c.color, 0.3); ctx.lineWidth = 0.7; ctx.beginPath();
+                    ctx.moveTo(g.hip.x + 1, -9.5); ctx.lineTo(front - 2, -9); ctx.moveTo(g.hip.x + 1, 9.5); ctx.lineTo(front - 2, 9);
+                    ctx.moveTo(g.hip.x + 1, -2); ctx.lineTo(g.hip.x - 2, -3.5); ctx.moveTo(g.hip.x + 1, 2); ctx.lineTo(g.hip.x - 2, 3.5);   // bow at the back
+                    ctx.stroke();
+                } },
                 leggings: { legs: 'full', shade: 0.5, detail(ctx, g, c) { ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.6; for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.moveTo(g.hipPt[i][0], g.hipPt[i][1]); ctx.lineTo(g.feet[i][0], g.feet[i][1]); ctx.stroke(); } } },
                 joggers:  { legs: 'full', detail(ctx, g, c) {
                     ctx.fillStyle = g.darken(c.color, 0.6);                 // cuffs at the ankles
