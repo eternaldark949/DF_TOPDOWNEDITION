@@ -854,6 +854,11 @@
                     });
                 }
                 
+                // Billboards — tilted panels standing up from the ground, drawn over the player like roofs
+                if (this.activeMap.billboards) {
+                    for (const bb of this.activeMap.billboards) if (bb.inView(cullBounds.buildingTops)) bb.drawTop(this.ctx);
+                }
+
                 // BuildingV3 — Editor-exported buildings (full render with details)
                 if (this.activeMap._v3Buildings) {
                     this.activeMap._v3Buildings.forEach(b => {

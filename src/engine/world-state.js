@@ -39,6 +39,10 @@
                         b.drawEmissive(ctx, dark);
                     }
                 }
+                if (this.activeMap.billboards) {
+                    const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z + 250, hh = this.canvas.height / 2 / z + 250, c = this.camera;
+                    for (const bb of this.activeMap.billboards) if (bb.inView({ left: c.x - hw, right: c.x + hw, top: c.y - hh, bottom: c.y + hh })) bb.drawEmissive(ctx, dark);
+                }
                 if (this.activeMap.type === 'outdoor') {
                     if (!this.skyLayer || this.skyLayer.map !== this.activeMap) this.skyLayer = new SkyLayer(this.activeMap);
                     this.skyLayer.draw(ctx, this.camera, this.canvas, dark);

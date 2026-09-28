@@ -53,6 +53,12 @@
                     }
                 }
                 this._staticBuildingEntities = [];
+                if (this._staticBillboardEntities) {
+                    for (let entity of this._staticBillboardEntities) {
+                        entity.active = false; entity.markedForDestroy = true; entity._finalDestroy();
+                    }
+                }
+                this._staticBillboardEntities = [];
                 
                 for (let proj of this.projectiles) {
                     if (proj instanceof GameEntity) { proj.active = false; proj.markedForDestroy = true; }
@@ -1001,6 +1007,8 @@
                     if (this.activeMap.walls) { this._staticWallEntities = createStaticEntitiesFromWalls(this.activeMap.walls); }
                     if (this.activeMap.buildings) { this._staticBuildingEntities = createStaticEntitiesFromBuildings(this.activeMap.buildings); }
                 }
+                this.activeMap.billboards = BILLBOARDS.filter(b => b.map === this.activeMap.id).map(cfg => new Billboard(cfg));
+                if (this.useNewCollisionSystem) this._staticBillboardEntities = this.activeMap.billboards.flatMap(b => b.colliders());
                 
                 CollisionSystem.processQueue();
                 GameEntity.queueEnabled = false;

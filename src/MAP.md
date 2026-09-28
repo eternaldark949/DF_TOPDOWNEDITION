@@ -31,6 +31,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `world/rooms.js` | Room System: windows, doors (hinged doors with swing physics), silk linens, `RoomSystem`, `ROOM_DEFS` |
 | `world/maps.js` | `MAP_DATA`: every map's size, floor zones, walls, transitions, landmarks |
 | `world/map-entities.js` | `createMapEntities`: props, NPCs and lamps per map (the apartment suite's furniture is here) |
+| `world/billboards.js` | `BILLBOARDS`: your artwork on tilted panels around the city. Add one by copying a line |
 | `world/city-layout.js` | `CityLayout`: blocks, roads and building placement for the city |
 | `world/bokeh.js` | Screen-space bokeh effect |
 
