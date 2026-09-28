@@ -17,7 +17,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `core/config.js` | Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…) |
 | *(generated)* | `ASSETS`: your images and audio from `assets/`, built automatically |
 | `core/assets.js` | `getImage`, `drawAsset`, `playSound` for your assets |
-| `core/registries.js` | Notes, consumables, drinks, cosmetics tables; `CosmeticsSystem`, `BuffSystem` |
+| `core/registries.js` | Notes, consumables, drinks, cosmetics (wigs, skins, outfits, hats, jewelry…); `CosmeticsSystem`, `BuffSystem` |
 | `core/utils.js` | Maths helpers, humanoid gait/animation helpers, weapon muzzle helpers, `RenderInterp` |
 | `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, HP bars, enemy telegraphs |
 | `core/settings.js` | `FullscreenManager`, `GameSettings`, object pools, perf utilities, `showMessage` |
@@ -92,6 +92,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `ui/ui-system.js` | `UISystem`: HUD, banners, prompts |
 | `ui/music-widget.js` | The radio/music widget |
+| `ui/wardrobe.js` | `WARDROBE`: every top, bottom, shoe, hat and piece of jewelry, in the world and in portraits. The character look format is documented at the top |
 | `ui/humanoid-render.js` | Drawing characters: hair, portraits, bodies, held drinks, weapons |
 | `ui/inventory-augments.js` | Items, abilities, inventory, augments |
 | `ui/phone.js` | The phone (contacts, messages, map, apps), NEUME UI, global keys |

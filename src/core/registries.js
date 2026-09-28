@@ -175,12 +175,30 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'outfit_suited':       { id: 'outfit_suited',       category: 'outfit', name: 'Periwinkle Silk',     desc: 'Silk periwinkle top and skirt. Gold heels. Pairs with a Crystal Glass.', price: 0, data: { top: { type: 'sports_bra', color: '#CCCCFF' }, bottom: { type: 'skirt', color: '#CCCCFF' }, shoes: { type: 'heels', color: '#FFD700' }, train: null, held: null }, default: true, pairsWith: 'acc_glass' },
             'outfit_stealth':      { id: 'outfit_stealth',      category: 'outfit', name: 'Blackout',            desc: 'All-black tactical. Invisible in the dark.',          price: 300,  data: { top: { type: 'sports_bra', color: '#0a0a0a' }, bottom: { type: 'pants', color: '#111' }, shoes: { type: 'sneakers', color: '#0a0a0a' }, train: null, held: null } },
             'outfit_crimson':      { id: 'outfit_crimson',      category: 'outfit', name: 'Crimson Flame',       desc: 'Deep red dress. Danger on arrival.',                   price: 350,  data: { top: { type: 'sports_bra', color: '#dc143c' }, bottom: { type: 'skirt', color: '#8b0000' }, shoes: { type: 'heels', color: '#dc143c' }, train: null, held: null } },
-            'outfit_gold':         { id: 'outfit_gold',         category: 'outfit', name: 'Gold Standard',       desc: 'Full gold tracksuit. Unmissable.',                     price: 400,  data: { top: { type: 'tshirt', color: '#daa520' }, bottom: { type: 'pants', color: '#b8860b' }, shoes: { type: 'sneakers', color: '#ffd700' }, train: null, held: null } },
-            'outfit_noir':         { id: 'outfit_noir',         category: 'outfit', name: 'Midnight Noir',       desc: 'Dark violet coat over black. Detective energy.',       price: 350,  data: { top: { type: 'tshirt', color: '#2a1a3a' }, bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'shoes', color: '#222' }, train: null, held: null } },
+            'outfit_gold':         { id: 'outfit_gold',         category: 'outfit', name: 'Gold Standard',       desc: 'Full gold tracksuit. Unmissable.',                     price: 400,  data: { top: { type: 'track_jacket', color: '#daa520', trim: '#fff4c9' }, bottom: { type: 'joggers', color: '#b8860b', trim: '#fff4c9' }, shoes: { type: 'sneakers', color: '#ffd700' }, train: null, held: null } },
+            'outfit_noir':         { id: 'outfit_noir',         category: 'outfit', name: 'Midnight Noir',       desc: 'Dark violet coat over black. Detective energy.',       price: 350,  data: { top: { type: 'coat', color: '#2a1a3a', inner: '#111111' }, bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'boots', color: '#222222' }, train: null, held: null } },
             'outfit_neon':         { id: 'outfit_neon',         category: 'outfit', name: 'Neon Circuit',        desc: 'Teal and magenta. Walking billboard.',                 price: 300,  data: { top: { type: 'sports_bra', color: '#00ffcc' }, bottom: { type: 'skirt', color: '#ff00ff' }, shoes: { type: 'heels', color: '#00ffcc' }, train: null, held: null } },
             'outfit_angel':        { id: 'outfit_angel',        category: 'outfit', name: 'Angelic White',       desc: 'Pure white everything. Heavenly.',                     price: 500,  data: { top: { type: 'sports_bra', color: '#f0f0f0' }, bottom: { type: 'skirt', color: '#ffffff' }, shoes: { type: 'heels', color: '#f5f5f5' }, train: null, held: null } },
             'outfit_amber':        { id: 'outfit_amber',        category: 'outfit', name: 'Amber Warmth',        desc: 'Warm amber tones. Like a sunset.',                     price: 250,  data: { top: { type: 'tshirt', color: '#cc7722' }, bottom: { type: 'pants', color: '#8b5a2b' }, shoes: { type: 'shoes', color: '#a0522d' }, train: null, held: null } },
+            'outfit_artbuilds':    { id: 'outfit_artbuilds',    category: 'outfit', name: 'Art Builds Freedom',   desc: 'Long black coat over a black hoodie. Cargo pants, white sneakers.', price: 450, data: { top: { type: 'coat', color: '#141414', inner: '#1c1c1c' }, bottom: { type: 'cargo', color: '#232323' }, shoes: { type: 'sneakers', color: '#f4f4f4' }, train: null, held: null } },
+            'outfit_anavia':       { id: 'outfit_anavia',       category: 'outfit', name: 'Anavia',              desc: 'Periwinkle crop top and long skirt. Gold heels. Pairs with bangles and a headband.', price: 400, data: { top: { type: 'crop_top', color: '#aab0ff' }, bottom: { type: 'long_skirt', color: '#aab0ff' }, shoes: { type: 'heels', color: '#e8c27a' }, train: null, held: null } },
+            'outfit_runner':       { id: 'outfit_runner',       category: 'outfit', name: 'Night Runner',        desc: 'Violet track jacket, leggings, sneakers. Built for the late shift.', price: 300, data: { top: { type: 'track_jacket', color: '#4b2a7a', trim: '#e8c27a' }, bottom: { type: 'leggings', color: '#1a1424' }, shoes: { type: 'sneakers', color: '#f0f0f0' }, train: null, held: null } },
             'outfit_sorcerer':     { id: 'outfit_sorcerer',     category: 'outfit', name: 'Street Sorcerer',     desc: 'Sabrina\'s look. Midnight violet top, black skirt, plum heels.', price: 400, data: { top: { type: 'sports_bra', color: '#1a0a2a' }, bottom: { type: 'skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
+
+            // ── HATS (one at a time, optional) ──
+            'hat_wide_brim':       { id: 'hat_wide_brim',       category: 'hat', name: 'Wine Wide Brim',       desc: 'A wide wine-red brim. Arrives before you do.',         price: 350,  data: { type: 'wide_brim', color: '#590e18', crownColor: '#70121e' } },
+            'hat_beret':           { id: 'hat_beret',           category: 'hat', name: 'Painter\'s Beret',     desc: 'Soft black beret. Art school energy.',                 price: 150,  data: { type: 'beret', color: '#1e1e1e' } },
+            'hat_cap':             { id: 'hat_cap',             category: 'hat', name: 'Violet Cap',           desc: 'Low brim, eyes forward.',                              price: 150,  data: { type: 'cap', color: '#3a2560', trim: '#e8c27a' } },
+            'hat_beanie':          { id: 'hat_beanie',          category: 'hat', name: 'Lavender Beanie',      desc: 'Ribbed knit for cold rooftops.',                       price: 150,  data: { type: 'beanie', color: '#9d8cc8', trim: '#7a68a8' } },
+            'hat_hood':            { id: 'hat_hood',            category: 'hat', name: 'Hood Up',              desc: 'Pull the hood up. Long hair still spills out.',       price: 200,  data: { type: 'hood_up', color: '#1c1c1c' } },
+            'hat_headband':        { id: 'hat_headband',        category: 'hat', name: 'Periwinkle Headband',  desc: 'A thin band of periwinkle silk.',                      price: 150,  data: { type: 'headband', color: '#8f8cf0' } },
+            'hat_tiara':           { id: 'hat_tiara',           category: 'hat', name: 'Silver Queen Tiara',   desc: 'Gold filigree, one violet stone. Royalty of the 949.', price: 500,  data: { type: 'tiara', color: '#e8c27a', trim: '#b89cff' } },
+
+            // ── JEWELRY (wear as many as you like) ──
+            'jew_bangles':         { id: 'jew_bangles',         category: 'jewelry', name: 'Gold Bangles',     desc: 'Stacked gold rings on both wrists.',                   price: 200,  data: { type: 'bangles', color: '#e8c27a' } },
+            'jew_hoops':           { id: 'jew_hoops',           category: 'jewelry', name: 'Gold Hoops',       desc: 'Classic gold hoop earrings.',                          price: 200,  data: { type: 'hoops', color: '#e8c27a' } },
+            'jew_necklace':        { id: 'jew_necklace',        category: 'jewelry', name: 'Silver Pendant',   desc: 'A fine silver chain with a diamond drop.',             price: 250,  data: { type: 'necklace', color: '#d8d8e0' } },
+            'jew_sunglasses':      { id: 'jew_sunglasses',      category: 'jewelry', name: 'Night Shades',     desc: 'Dark lenses. Wear them after sundown anyway.',         price: 250,  data: { type: 'sunglasses', color: '#141414' } },
         };
 
         // ============================================================================
@@ -198,6 +216,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedVocal = null;
                 this.equippedOutfit = null;
                 this.equippedAccessory = null;      // optional slot (null = none)
+                this.equippedHat = null;            // optional slot (null = none)
+                this.equippedJewelry = [];          // any number at once
                 this.accessoryOptions = {};         // per-accessory choices, e.g. { acc_glass: { drink: 'red_wine' } }
                 // Grant defaults
                 this._grantDefaults();
@@ -242,7 +262,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (entry.pairsWith && !this.equippedAccessory && this.isOwned(entry.pairsWith)) this.equippedAccessory = entry.pairsWith;
                 }
                 else if (entry.category === 'accessory') this.equippedAccessory = id;
+                else if (entry.category === 'hat') this.equippedHat = id;
+                else if (entry.category === 'jewelry') { if (!this.equippedJewelry.includes(id)) this.equippedJewelry.push(id); }
                 return true;
+            }
+
+            /** Take off the current hat (hats are optional). */
+            unequipHat() { this.equippedHat = null; }
+
+            /** Take off one piece of jewelry. */
+            unequipJewelry(id) { this.equippedJewelry = this.equippedJewelry.filter(j => j !== id); }
+
+            /** Is this cosmetic currently worn? (works for every category) */
+            isEquipped(id) {
+                const entry = COSMETICS_REGISTRY[id];
+                if (!entry) return false;
+                if (entry.category === 'jewelry') return this.equippedJewelry.includes(id);
+                const slot = { wig: 'equippedWig', skin: 'equippedSkin', vocal: 'equippedVocal', outfit: 'equippedOutfit', accessory: 'equippedAccessory', hat: 'equippedHat' }[entry.category];
+                return !!slot && this[slot] === id;
             }
 
             /** Take off the current accessory (accessories are optional). */
@@ -272,10 +309,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (acc && acc.data.held === 'glass') {
                     held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne' };
                 }
+                const hat = this.equippedHat ? COSMETICS_REGISTRY[this.equippedHat] : null;
+                const jewelry = this.equippedJewelry.map(id => COSMETICS_REGISTRY[id]).filter(Boolean).map(e => e.data);
                 return {
                     hair: wig ? { type: wig.data.type, color: wig.data.color } : { type: 'curls', color: '#0a0505' },
                     skinColor: skin ? skin.data.skinColor : '#c68e63',
                     outfit: outfit ? outfit.data : defaultOutfit,
+                    hat: hat ? hat.data : null,
+                    jewelry,
                     held
                 };
             }
@@ -294,6 +335,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     equippedVocal: this.equippedVocal,
                     equippedOutfit: this.equippedOutfit,
                     equippedAccessory: this.equippedAccessory,
+                    equippedHat: this.equippedHat,
+                    equippedJewelry: [...this.equippedJewelry],
                     accessoryOptions: JSON.parse(JSON.stringify(this.accessoryOptions))
                 };
             }
@@ -306,6 +349,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedVocal = data.equippedVocal || null;
                 this.equippedOutfit = data.equippedOutfit || null;
                 this.accessoryOptions = data.accessoryOptions || {};
+                // Saves from before hats and jewelry simply have none on
+                this.equippedHat = COSMETICS_REGISTRY[data.equippedHat] ? data.equippedHat : null;
+                this.equippedJewelry = (data.equippedJewelry || []).filter(id => COSMETICS_REGISTRY[id]);
                 if (data.equippedAccessory !== undefined) {
                     this.equippedAccessory = data.equippedAccessory || null;
                 } else {
