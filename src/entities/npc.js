@@ -779,6 +779,7 @@
                     skinColor: '#8a0707', // Demon Red
                     gender: 'female',
                     stance: 'idle',
+                    pose: 'dance',
                     hair: { type: 'demon_dancer', color: '#0a0000' }, // <--- The Ported Hair
                     top: { type: 'sports_bra', color: '#111' },
                     bottom: { type: 'skirt', color: '#111' }
@@ -896,6 +897,7 @@
                     // Stance fits the weapon (rifles/snipers two-handed); ability users cast
                     // with an extended hand. Recoil is a real kick from the last shot.
                     stance: inCombat ? stanceForWeapon(weaponId) : 'idle',
+                    pose: this._idlePose || undefined,      // e.g. Yenna's crossed arms at the apartment
                     kick: inCombat ? shotKick(this) : 0,
                     weapon: weaponId ? { id: weaponId, ready: inCombat } : null,
                     top:    app.top    || { type: 'suit', color: '#2a0a3a' },

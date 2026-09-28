@@ -54,6 +54,7 @@
                     train: outfit.train || null,
                     hat: cosmeticConfig.hat,
                     jewelry: cosmeticConfig.jewelry,
+                    pose: typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
                     held: cosmeticConfig.held || outfit.held || null
                 });
                 
