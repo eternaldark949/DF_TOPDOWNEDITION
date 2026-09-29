@@ -24,6 +24,7 @@ const STYLES = [
     'styles/base.css',
     'styles/hud-menus.css',
     'styles/panels-phone.css',
+    'styles/cinematic.css',
     'styles/landscape.css',
 ];
 
@@ -86,6 +87,11 @@ const SCRIPTS = [
     'world/bokeh.js',
     'story/missions.js',
     'story/dialogue-bonding.js',
+    'story/scene-vision.js',
+    'ui/cinematic-dialogue.js',
+    'story/scene-runner.js',
+    'story/scenes/cast.js',
+    'story/scenes/prologue.js',
     'engine/pause-system.js',
     'engine/game-engine.js',
     'engine/events.js',
@@ -104,6 +110,7 @@ const SCRIPTS = [
     'engine/update.js',
     'engine/draw.js',
     'engine/interiors.js',
+    'engine/keeper-art.js',
     'engine/lighting.js',
     'engine/player-draw-input.js',
     'engine/loop.js',

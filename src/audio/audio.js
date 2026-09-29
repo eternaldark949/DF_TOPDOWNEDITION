@@ -235,20 +235,22 @@
                 const map = game.activeMap; if (!map) return;
                 const now = a.ctx.currentTime, w = game.weather, rs = game.roomSystem;
                 const indoorMap = map.type === 'indoor', veranda = !!(rs && rs.active && rs.isPlayerOutdoor());
-                const outside = !indoorMap || veranda, apt = map.id === 'apt_949';
+                const realm = map.id.startsWith('keepers_');                  // the prologue's hill and parlor: no city out there
+                const outside = !indoorMap || veranda || map.id === 'keepers_hill', apt = map.id === 'apt_949';
                 const thresh = (CONFIG.WEATHER && CONFIG.WEATHER.SCHED_RAIN_THRESHOLD) || 0.15;
                 const rain = w && w.intensity > thresh ? Math.min(1, w.intensity) : 0;
                 const wind = w ? Math.min(1, w.wind || 0) : 0;
                 const hour = ((game.worldMinutes || 0) % 1440) / 60, day = Math.max(0, 1 - Math.abs(13 - hour) / 7);
-                const p = game.player, fireD = apt && p ? Math.hypot(p.x - 580, p.y - 432) : 1e9, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
+                const p = game.player, cam = game.camera;
+                const fireD = apt && p ? Math.hypot(p.x - 580, p.y - 432) : map.id === 'keepers_parlor' ? Math.hypot(cam.x - 450, cam.y - 70) * 0.6 : 1e9, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
                 const paused = !!game.paused;
                 const vol = GameSettings.ambienceVolume ?? 0.7;
 
                 this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
-                this._set(this.L.rain, outside ? 0.3 * rain : 0, 0.8);
+                this._set(this.L.rain, outside && !realm ? 0.3 * rain : 0, 0.8);
                 this._set(this.L.rainIn, outside ? 0 : 0.22 * rain, 0.8);
                 this._set(this.L.wind, outside ? 0.04 + 0.12 * wind : 0.015 * wind, 1.2);
-                this._set(this.L.city, !indoorMap ? 0.1 + 0.07 * day : veranda ? 0.09 : apt ? 0.025 : 0.015, 1.0);
+                this._set(this.L.city, realm ? 0 : !indoorMap ? 0.1 + 0.07 * day : veranda ? 0.09 : apt ? 0.025 : 0.015, 1.0);
                 this._set(this.L.room, apt && !veranda ? 0.035 : 0, 1.0);
                 this._set(this.L.fire, 0.22 * fire, 0.5);
                 this._music(game, paused);
@@ -256,8 +258,8 @@
 
                 // Sparse one-shots
                 if (fire > 0.02 && Math.random() < 0.09) this._crackle(0.35 * fire);
-                if (outside && now > this.next.car) { this._carPass(indoorMap ? 0.05 : 0.08); this.next.car = now + 6 + Math.random() * 9; }
-                if (outside && now > this.next.horn) { if (this.next.horn) this._horn(indoorMap ? 0.012 : 0.02); this.next.horn = now + 20 + Math.random() * 30; }
+                if (outside && !realm && now > this.next.car) { this._carPass(indoorMap ? 0.05 : 0.08); this.next.car = now + 6 + Math.random() * 9; }
+                if (outside && !realm && now > this.next.horn) { if (this.next.horn) this._horn(indoorMap ? 0.012 : 0.02); this.next.horn = now + 20 + Math.random() * 30; }
                 if (!outside && rain > 0 && now > this.next.drip) { this._drip(0.02 * rain); this.next.drip = now + 0.6 + Math.random() * 2.4; }
             }
 

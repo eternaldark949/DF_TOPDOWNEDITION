@@ -411,6 +411,7 @@
 
         const messageModal = document.getElementById('message-modal');
         function showMessage(text) {
+            try { if (game && game.scenes && game.scenes.running) return; } catch (e) { /* game not built yet (boot) */ }   // a scene has the screen
             messageModal.textContent = text;
             messageModal.classList.add('show');
             setTimeout(() => { messageModal.classList.remove('show'); }, 2000);

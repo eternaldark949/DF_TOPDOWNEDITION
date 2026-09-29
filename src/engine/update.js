@@ -17,6 +17,7 @@
                 // Pausable systems — must tick before any logic that might
                 // schedule new timers or read playerEmote state.
                 this._tickPausableTimers();
+                if (this.scenes && this.scenes.running) this.scenes._lockInput();   // a scene has the stage: no walking or firing
                 this.tickPlayerEmote();
                 
                 // PERFORMANCE: Use globally cached frame time (set once in loop())
@@ -189,6 +190,7 @@
             
                 this.profiler.start('Logic:Story');
                 this.cutscene.update();
+                if (this.scenes && this.scenes.running) this.scenes.update();                     // story/scene-runner.js
                 if (this._bossIntros && this._bossIntros.length) this.updateBossIntro();          // engine/boss-intro.js
                 this.story.update();
                 this.profiler.stop('Logic:Story');

@@ -677,6 +677,20 @@
                 for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * fw * 0.5, cy + fh * 0.2, fw * 0.28, fh * 0.13, side * 0.15, 0, Math.PI * 2); ctx.fill(); }
             }
 
+            // Age (config.age 0..1): fine lines at the eyes, the brow and round the mouth
+            if (config.age && !A) {
+                const k = Math.min(1, config.age);
+                ctx.strokeStyle = `rgba(${Math.max(0, skinRGB.r - 60)}, ${Math.max(0, skinRGB.g - 55)}, ${Math.max(0, skinRGB.b - 45)}, ${0.35 * k})`;
+                ctx.lineWidth = Math.max(0.6, fw * 0.025); ctx.lineCap = 'round';
+                for (const side of [-1, 1]) {
+                    const ex = cx + side * fw * 0.38, ey = cy - fh * 0.15;
+                    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(ex + side * fw * 0.2, ey + i * fh * 0.04); ctx.lineTo(ex + side * fw * 0.3, ey + i * fh * 0.07); ctx.stroke(); }   // crow's feet
+                    ctx.beginPath(); ctx.moveTo(ex - side * fw * 0.08, ey + fh * 0.09); ctx.quadraticCurveTo(ex, ey + fh * 0.14, ex + side * fw * 0.12, ey + fh * 0.08); ctx.stroke();   // under the eye
+                    ctx.beginPath(); ctx.moveTo(cx + side * fw * 0.2, cy + fh * 0.12); ctx.quadraticCurveTo(cx + side * fw * 0.3, cy + fh * 0.3, cx + side * fw * 0.24, cy + fh * 0.44); ctx.stroke();   // nose to mouth
+                }
+                for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.moveTo(cx - fw * 0.28, cy - fh * (0.46 + i * 0.07)); ctx.quadraticCurveTo(cx, cy - fh * (0.49 + i * 0.07), cx + fw * 0.28, cy - fh * (0.46 + i * 0.07)); ctx.stroke(); }   // the brow
+            }
+
             // Androids get a plated face and visor instead of human features
             let drawBrows = null, browColor = null;
             if (A) drawAndroidPortraitFace(ctx, P, A, X, blink, talk);

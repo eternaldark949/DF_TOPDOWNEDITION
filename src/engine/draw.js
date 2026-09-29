@@ -249,6 +249,7 @@
                 if (this.activeMap.id === 'hotel_lobby') this.drawLobbyInterior(this.ctx);
                 if (this.activeMap.id === 'hotel_suite') this.drawSuiteInterior(this.ctx);
                 if (this.activeMap.id === 'church_boss') this.drawSanctumInterior(this.ctx);
+                if (this.activeMap.id.startsWith('keepers_')) this.drawKeeperInterior(this.ctx);   // the prologue's fireside (engine/keeper-art.js)
                 if (this.activeMap.id === 'moon_city_nightclub') { this.drawClubInterior(this.ctx); this.drawClubFloorLights(this.ctx); }
                 
                 // Indoor V2: Room floors, windows, and doors
@@ -637,6 +638,7 @@
                         if (n.x < cbE.left || n.x > cbE.right || n.y < cbE.top || n.y > cbE.bottom) return;
                         n.draw(this.ctx);
                     });
+                    if (this.scenes && this.scenes.actors.length) this.scenes.drawActors(this.ctx);   // a scene's cast
                     this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
                     this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
                     this.teammates.forEach(tm => {
