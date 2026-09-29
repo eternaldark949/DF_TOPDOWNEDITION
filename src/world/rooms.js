@@ -1040,14 +1040,14 @@
             'hotel_suite': {
                 rooms: {
                     living:   { x: 50,   y: 50,  w: 650, h: 900, type: 'indoor',  label: 'Living Room' },
-                    lounge:   { rects: [{ x: 720, y: 50, w: 380, h: 750 }, { x: 1100, y: 320, w: 250, h: 480 }], type: 'indoor', label: 'Lounge' },
+                    lounge:   { rects: [{ x: 720, y: 50, w: 380, h: 750 }, { x: 1100, y: 320, w: 250, h: 480 }], type: 'indoor', label: 'Master Bedroom' },
                     bathroom: { x: 1120, y: 50,  w: 230, h: 250, type: 'indoor',  label: 'Bathroom' },
                     balcony:  { x: 720,  y: 810, w: 630, h: 190, type: 'outdoor', label: 'Balcony' }
                 },
                 doors: [
                     { x: 700, y: 300, w: 20, h: 200, type: 'arch', orientation: 'V', rooms: ['living', 'lounge'] },
-                    { x: 1255, y: 300, w: 90, h: 20, type: 'hinged', orientation: 'H', rooms: ['lounge', 'bathroom'], color: '#4a3a30', hingeSide: 'left', triggerRadius: 60 },
-                    { x: 1000, y: 800, w: 150, h: 10, type: 'sliding', orientation: 'H', rooms: ['lounge', 'balcony'], color: 'rgba(150, 200, 220, 0.25)', speed: 0.06, triggerRadius: 100 },
+                    { x: 1255, y: 300, w: 90, h: 20, type: 'hinged', orientation: 'H', rooms: ['lounge', 'bathroom'], color: '#2a1a24', hingeSide: 'left', triggerRadius: 60 },   // black lacquer
+                    { x: 1000, y: 800, w: 150, h: 10, type: 'sliding', orientation: 'H', rooms: ['lounge', 'balcony'], color: 'rgba(200, 190, 255, 0.28)', speed: 0.06, triggerRadius: 100 },
                 ],
                 windows: [
                     { x: 720, y: 800, w: 270, h: 10, facing: 'N', projectionLength: 110, tint: '200, 220, 255' },   // glass onto the balcony

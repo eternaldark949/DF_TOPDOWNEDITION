@@ -240,7 +240,7 @@
                                             showMessage("BREACH DETECTED!");
                                             game.triggerShake(25);
                                             // Break the back wall
-                                            const wallIdx = game.activeMap.walls.findIndex(w => w.y === 1000 && w.w === 500);
+                                            const wallIdx = game.activeMap.walls.findIndex(w => w.breach || (w.y === 1000 && w.w === 500));
                                             if (wallIdx !== -1) {
                                                 const w = game.activeMap.walls[wallIdx];
                                                 for (let ex = w.x; ex < w.x + w.w; ex += 40) {
