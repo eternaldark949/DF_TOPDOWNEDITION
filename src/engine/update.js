@@ -114,11 +114,7 @@
                         this.flitState.attunement + this.flitState.rechargeRate,
                         this.flitState.maxAttunement
                     );
-                    // Calculate effective cost for button state
-                    let cost = this.flitState.dashCost;
-                    if (this.augments && this.augments.isEquipped('flit_ext')) cost = Math.floor(cost * 0.7);
-                    cost = Math.floor(this.player.buffSystem.getStat('flitCooldown', cost));
-                    if (this.flitState.attunement >= cost) this.flitBtn.classList.remove('cooldown');
+                    if (this.flitState.attunement >= this.flitCost()) this.flitBtn.classList.remove('cooldown');
                 }
                 if (this.flitState.active) { 
                     this.flitState.duration--; 
@@ -130,8 +126,10 @@
                 // Passive Health Regen (5 HP/sec after 10s no damage)
                 if (this.playerHealth < this.maxPlayerHealth) {
                     this.healthRegenTimer++;
-                    if (this.healthRegenTimer >= 600 && (this.healthRegenTimer - 600) % 60 === 0) {
-                        this.playerHealth = Math.min(this.playerHealth + 5, this.maxPlayerHealth);
+                    const regenDelay = this.resonance.stat('regenDelay', 600);                       // Frame: Idle Mend
+                    if (this.healthRegenTimer >= regenDelay && (this.healthRegenTimer - regenDelay) % 60 === 0) {
+                        const heal = this.resonance.stat('regenAmount', 5) * (this.augments.isEquipped('health_regen') ? 2 : 1);
+                        this.playerHealth = Math.min(this.playerHealth + heal, this.maxPlayerHealth);
                         this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
                     }
                 } else {
@@ -570,6 +568,7 @@
                     }
                     
                     if (enemy.dead) { 
+                        this.awardKill(enemy);                                    // Resonance for the kill (core/resonance.js)
                         audioSys.sfx('explode'); 
                         this.weather.spawnExplosion(enemy.x, enemy.y, '#a469ff'); 
                         this.triggerShake(10); 
@@ -791,6 +790,7 @@
                                 const knockbackStrength = Math.min((p.damage * projSpeed * 0.02) / (targetMass * 0.1), 50);
                                 const kbX = Math.cos(angle) * knockbackStrength;
                                 const kbY = Math.sin(angle) * knockbackStrength;
+                                e.lastHitBy = p.owner; e.lastHitMelee = !!p.melee;       // who gets the Resonance
                                 e.takeDamage(p.damage, kbX, kbY);
                                 
                                 // Spawn sticky DOT orb (Golden Child)
@@ -953,7 +953,13 @@
                 // Loot Collection
                 for(let i=this.loot.length-1; i>=0; i--) {
                     let l = this.loot[i];
-                    const d = Math.hypot(this.player.x - l.x, this.player.y - l.y);
+                    let d = Math.hypot(this.player.x - l.x, this.player.y - l.y);
+                    // Scrap Magnet augment: small pickups drift in from three times the range
+                    if (d >= 35 && d < 105 && this.augments.isEquipped('scrap_magnet') && (l.type === 'pp' || l.type === 'scrap' || l.type === 'stim' || l.type === 'dark_element')) {
+                        const k = Math.min(1, 4 / d);
+                        l.x += (this.player.x - l.x) * k; l.y += (this.player.y - l.y) * k;
+                        d = Math.hypot(this.player.x - l.x, this.player.y - l.y);
+                    }
                     
                     // Check pickup range
                     if (d < 35) {
@@ -975,6 +981,11 @@
                             continue;
                         } 
                         else if (l.type === 'pp') { this.currency += 20; showMessage("+PERSONICS"); } 
+                        else if (l.type === 'dark_element') {
+                            this.darkElement = (this.darkElement || 0) + 1;
+                            showMessage('DARK ELEMENT SHARD — THE CORPORATIONS WOULD WANT THIS BACK');
+                            audioSys.sfx('ui');
+                        }
                         else if (l.type === 'scrap') { 
                             const amount = 2 + Math.floor(Math.random() * 2); // 2-3 scrap
                             this.scrap += amount; 

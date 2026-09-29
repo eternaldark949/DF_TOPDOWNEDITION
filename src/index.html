@@ -47,6 +47,15 @@
     </div>
 
     <!-- COSMETICS SHOP (Neural Systems / Prisma) -->
+    <!-- Dr. Yin: tune Resonance (engine/tuning-ui.js) -->
+    <div id="tuning-overlay" style="display:none;">
+        <div class="tun-wrap">
+            <div class="tun-title">DR. YIN — RESONANCE TUNING</div>
+            <div class="tun-sub">EMPEREAL MEDBAY · SOUTHWEST</div>
+            <div id="tuning-body"></div>
+            <div class="tun-close" onclick="game.closeTuning()">CLOSE</div>
+        </div>
+    </div>
     <div id="cosmetics-shop-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(5,5,20,0.95); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
         <div style="max-width:700px; margin:30px auto; padding:20px;">
             <!-- Header -->
@@ -264,6 +273,7 @@
                 <div id="ui-time">21:00</div>
                 <div id="ui-currency">PP: 0</div>
                 <div id="ui-scrap">Scrap: 0</div>
+                <div id="ui-resonance"></div>
                 <div id="ui-buffs"></div>
             </div>
             
@@ -659,6 +669,9 @@
                 <div id="inventory-list"></div>
             </div>
             <!-- AUGMENTS MANAGEMENT SCREEN (hidden by default) -->
+            <div id="skills-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
+                <div id="skills-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;"></div>
+            </div>
             <div id="augments-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
                 <div id="augments-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
                     <!-- Populated dynamically -->

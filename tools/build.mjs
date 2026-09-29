@@ -31,6 +31,7 @@ const SCRIPTS = [
     '@assets',              // generated from the assets/ folder
     'core/assets.js',
     'core/registries.js',
+    'core/resonance.js',
     'core/utils.js',
     'world/navigation.js',
     'core/draw-helpers.js',
@@ -86,6 +87,7 @@ const SCRIPTS = [
     'engine/events.js',
     'engine/combat-effects.js',
     'engine/combat-fx.js',
+    'engine/tuning-ui.js',
     'engine/shops-menus.js',
     'engine/daytime-flit.js',
     'engine/screens-ui.js',

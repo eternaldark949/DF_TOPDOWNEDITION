@@ -77,6 +77,12 @@
                     this.augments.equipped = [];
                 }
                 
+                // --- RESONANCE & DARK ELEMENT ---
+                if (this.resonance) { this.resonance.reset(); this.applyResonanceStats(); }
+                this.darkElement = 0;
+                if (this.flitState) this.flitState.lastFlitAt = -99;
+                this.lastHurtAt = -99;
+
                 // --- COSMETICS ---
                 if (this.cosmetics) {
                     this.cosmetics = new CosmeticsSystem();

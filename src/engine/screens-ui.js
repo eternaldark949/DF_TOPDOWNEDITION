@@ -28,6 +28,7 @@
                 // Scrap = Secondary resource for upgrades
                 this.uiCurrency.textContent = `PP: ${this.currency}`;
                 this.uiScrap.textContent = `Scrap: ${this.scrap}`;
+                this.updateResonanceHUD();
                 
                 // --- 4. BOOSTER/STIM COUNT ---
                 // Shows remaining healing items on the heal button
@@ -1122,11 +1123,11 @@
                 const baseSpeed = this.player?.speed ?? 5.2;
                 const finalSpeed = this.player?.buffSystem?.getStat('speed', baseSpeed) ?? baseSpeed;
                 const baseFlitDist = 120;
-                const finalFlitDist = this.player?.buffSystem?.getStat('flitDistance', baseFlitDist) ?? baseFlitDist;
+                let finalFlitDist = this.player?.buffSystem?.getStat('flitDistance', baseFlitDist) ?? baseFlitDist;
+                if (this.augments && this.augments.isEquipped('flit_ext')) finalFlitDist *= 1.3;
+                if (this.resonance) finalFlitDist = this.resonance.stat('flitDistance', finalFlitDist);
                 const baseFlitCost = this.flitState?.dashCost ?? 40;
-                let finalFlitCost = baseFlitCost;
-                if (this.augments && this.augments.isEquipped('flit_ext')) finalFlitCost = Math.floor(finalFlitCost * 0.7);
-                finalFlitCost = Math.floor(this.player?.buffSystem?.getStat('flitCooldown', finalFlitCost) ?? finalFlitCost);
+                const finalFlitCost = this.flitCost ? this.flitCost() : baseFlitCost;
                 const baseDetect = 1.0;
                 const finalDetect = this.player?.buffSystem?.getStat('detectionRange', baseDetect) ?? baseDetect;
 

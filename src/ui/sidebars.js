@@ -84,6 +84,7 @@
                         // Helper: hide all sub-screens
                         const hideSubScreens = () => {
                             document.getElementById('augments-screen').style.display = 'none';
+                            document.getElementById('skills-screen').style.display = 'none';
                             document.getElementById('contacts-screen').style.display = 'none';
                             document.getElementById('team-screen').style.display = 'none';
                             document.getElementById('character-screen').style.display = 'none';
@@ -118,6 +119,14 @@
                             document.getElementById('augments-screen').style.display = 'block';
                             document.getElementById('screen-title-text').textContent = 'Augments';
                             game.renderAugmentManagement();
+                        } else if (screen === 'skills') {
+                            // Resonance: level, unsettled, the trees (Dr. Yin is where you spend)
+                            if (this.canvas) { game.ui.toggleMap(false); game.inventory.toggleMenu(); }
+                            document.getElementById('inventory-list-container').style.display = 'none';
+                            hideSubScreens();
+                            document.getElementById('skills-screen').style.display = 'block';
+                            document.getElementById('screen-title-text').textContent = 'Skills';
+                            game.renderSkillsScreen();
                         } else if (screen === 'contacts') {
                             // Show contacts screen
                             if (this.canvas) {

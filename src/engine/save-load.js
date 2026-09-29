@@ -71,6 +71,10 @@
                     
                     // --- AUGMENTS ---
                     augments: this.augments ? this.augments.serialize() : { owned: [], equipped: [] },
+
+                    // --- RESONANCE & DARK ELEMENT ---
+                    resonance: this.resonance ? this.resonance.serialize() : null,
+                    darkElement: this.darkElement || 0,
                     
                     // --- COSMETICS ---
                     cosmetics: this.cosmetics ? this.cosmetics.serialize() : null,
@@ -655,6 +659,10 @@
                         this.augments.deserialize(save.augments);
                         console.log(`[LOAD] Restored ${this.augments.owned.length} augments`);
                     }
+
+                    // 10a. Restore Resonance (older saves have none: level 0) and Dark Element
+                    if (this.resonance) { this.resonance.deserialize(save.resonance || null); this.applyResonanceStats(); }
+                    this.darkElement = save.darkElement || 0;
 
                     // 10b. Restore Cosmetics
                     if (this.cosmetics && save.cosmetics) {

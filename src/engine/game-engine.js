@@ -169,6 +169,9 @@
                 
                 // --- NEW SYSTEMS ---
                 this.augments = new AugmentSystem();
+                this.resonance = new ResonanceSystem();      // 949's progression (core/resonance.js)
+                this.darkElement = 0;                        // premium shards (off-market goods)
+                this.lastHurtAt = -99; this.flitState.lastFlitAt = -99;
                 this.bumperMinigame = new BumperCarMinigame();
                 this.bonding = new BondingSystem();
                 this.dialogueSeq = new DialogueSequence(this);

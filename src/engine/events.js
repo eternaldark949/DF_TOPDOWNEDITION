@@ -347,6 +347,7 @@
                 const toggleHolster = (e) => {
                     e.preventDefault();
                     this.weaponHolstered = !this.weaponHolstered;
+                    if (!this.weaponHolstered) { this._drawnAt = _gameTimeSec; this._drawShotUsed = false; }   // Arms: Quick-Draw
                     this.holsterAnimTarget = this.weaponHolstered ? 0 : 1;
                     if (this.weaponHolstered) {
                         this.holsterBtn.classList.add('holstered');
@@ -509,7 +510,7 @@
                     else if (this.activeInteraction instanceof NPC) {
                         if (this.activeInteraction.name === "Dr. Yin") {
                             this.endDialogue();
-                            this.openAugmentShop();
+                            this.openDrYinMenu();                         // tune Resonance, or augments
                             return;
                         }
                         else if (this.activeInteraction.name === "Torque") {

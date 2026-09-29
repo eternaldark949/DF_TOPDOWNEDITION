@@ -475,9 +475,23 @@
                 if (this._game && this._game.flitState && this._game.flitState.active) {
                     return false;
                 }
+                const g = this._game;
+                let lastStood = false;
+                if (g && g.resonance && !(this.invincibleTimer > 0) && !this.dead) {
+                    amount = g.resonance.stat('damageTaken', amount);                 // Frame: Plating
+                    // Frame: Last Stand — a hit that would kill leaves 1 HP and a moment's grace
+                    if (this.hp - amount <= 0 && g.resonance.tryLastStand(_gameTimeSec)) {
+                        amount = Math.max(0, this.hp - 1);
+                        lastStood = true;
+                        showMessage('LAST STAND');
+                        if (g.weather) g.weather.spawnExplosion(this.x, this.y, 'rgba(196, 86, 110, 1)');
+                    }
+                    g.lastHurtAt = _gameTimeSec;
+                }
                 
                 // Use ActorEntity's damage system
                 const damaged = super.takeDamage(amount, knockbackX, knockbackY);
+                if (lastStood) this.invincibleTimer = 60;                 // a moment's grace after Last Stand
                 
                 if (damaged && this._game) {
                     // Sync with legacy health system
@@ -495,6 +509,11 @@
             die() {
                 if (this._game) {
                     showMessage("CRITICAL FAILURE - RESPONDING TO MEDBAY");
+                    // Half the unsettled Resonance scatters on the way back to Dr. Yin
+                    if (this._game.resonance) {
+                        const lost = this._game.resonance.onDeath();
+                        if (lost > 0) setTimeout(() => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 1800);
+                    }
                     
                     // Clear all active buffs (restores maxHP if Stellar Lemonade was active, etc.)
                     this.buffSystem.clearAll(this._game);
@@ -644,6 +663,7 @@
                 this.active = true;
                 this.markedForDestroy = false;
                 this.penetrating = config.penetrating || false;
+                this.melee = !!config.melee;                              // a punch (Resonance: knockout bonus, Heavy Hands)
                 this.penetrateCount = 0;
                 this.maxPenetrations = config.maxPenetrations || 3;
                 this.hitTargets = new Set();
@@ -712,6 +732,7 @@
                 
                 // Penetration: projectile passes through targets instead of stopping
                 this.penetrating = config.penetrating || false;
+                this.melee = !!config.melee;                              // a punch (Resonance: knockout bonus, Heavy Hands)
                 this.penetrateCount = config.penetrateCount || 0;  // How many things hit so far
                 this.maxPenetrations = config.maxPenetrations || Infinity;  // Limit penetrations
                 this.hitTargets = new Set();  // Track what we've already hit (avoid double-hits)

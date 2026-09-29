@@ -39,6 +39,31 @@
         }
 
         engineMixin({
+            /** Resonance for a kill: base by toughness × style (core/resonance.js), shown as a violet tag. */
+            awardKill(enemy) {
+                if (!this.resonance) return;
+                const by = enemy.lastHitBy;
+                const byPlayer = by === this.player, byTeammate = !!(by && by.role === 'teammate');
+                const { amount, tags } = this.resonance.scoreKill(enemy, {
+                    byPlayer, byTeammate, melee: !!enemy.lastHitMelee, now: _gameTimeSec,
+                    lastFlitAt: this.flitState.lastFlitAt ?? -99, lastHurtAt: this.lastHurtAt ?? -99 });
+                if (amount > 0) this.earnResonance(amount, tags.join(' '), enemy.x, enemy.y - 26);
+                // Dark Element: rare shards from the toughest foes
+                const tough = (typeof GatlingGunner !== 'undefined' && enemy instanceof GatlingGunner) ? 0.25 : (enemy._restrictedZoneId ? 0.04 : 0);
+                if (tough && Math.random() < tough) this.loot.push(new Loot(enemy.x + 12, enemy.y, 'dark_element'));
+            },
+
+            /** Add unsettled Resonance with a violet floating tag (at x,y, or above 949). */
+            earnResonance(amount, label, x, y) {
+                if (!this.resonance || !(amount > 0)) return;
+                this.resonance.earn(amount);
+                const texts = this.floatingTexts || (this.floatingTexts = []);
+                texts.push({ target: null, x: x ?? this.player.x, y: y ?? this.player.y - 30, value: 0, text: `+${Math.round(amount)} ◈${label ? ' ' + label : ''}`,
+                             color: '#c9a6ff', t0: _gameTimeSec, pop: _gameTimeSec, drift: 0, big: true });
+                this._resPulse = _gameTimeSec;
+                if (this.updateUI) this.updateUI();
+            },
+
             /** A hit landed on `actor` (HP already reduced). kbX/kbY = knockback, used as the hit direction. */
             onActorHit(actor, amount, kbX = 0, kbY = 0) {
                 if (!(amount > 0) || !actor) return;
@@ -93,14 +118,15 @@
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
                 for (let i = texts.length - 1; i >= 0; i--) {
                     const t = texts[i], age = now - t.t0;
-                    if (age > 0.85 || age < -1) { texts.splice(i, 1); continue; }
+                    const life = t.big ? 1.6 : 0.85;
+                    if (age > life || age < -1) { texts.splice(i, 1); continue; }
                     if (t.target && !t.target.dead) { t.x = t.target.x; t.y = t.target.y - 16; }
                     const x = t.x + t.drift * age * 14, y = t.y - age * 30;
                     if (!inView(x, y)) continue;
                     const pop = Math.max(0, 1 - (now - t.pop) / 0.12);
-                    ctx.globalAlpha = 1 - Math.pow(age / 0.85, 2);
-                    ctx.font = `bold ${Math.round(11 + pop * 4 + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
-                    const s = String(Math.round(t.value));
+                    ctx.globalAlpha = 1 - Math.pow(age / life, 2);
+                    ctx.font = `bold ${Math.round((t.big ? 10 : 11) + pop * 4 + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
+                    const s = t.text || String(Math.round(t.value));
                     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(s, x, y);
                     ctx.fillStyle = t.color; ctx.fillText(s, x, y);
                 }
