@@ -81,12 +81,21 @@
                     { id: 'suite_elevator', x: 110, y: 450 }        // story step 11 points here
                 ]
             },
+            // The Double Nights penthouse — the Dark Maker's suite, left with a flourish. Furniture:
+            // createMapEntities (ps_*, drawSuiteDecorProp); floors: drawSuiteInterior; glows and the
+            // mirror rift he left through: drawSuiteGlow.
+            //   Living room (elevator, pit, piano, bar, dining for two) | Bedroom (L) | Bath (the rift)
+            //                                                           | Balcony (pool) — the breach wall
             'hotel_suite': {
                 id: 'hotel_suite', width: 1400, height: 1000, type: 'indoor',
-                label: 'Penthouse Suite', floorColor: '#222',
+                label: 'Penthouse Suite', floorColor: '#0c0a0e',
+                ambientDarkness: 0.72,
+                navProps: 'all',
+                wallStyle: { fill: '#0e0c10', stroke: 'rgba(232,194,122,0.5)' },   // black lacquer, gold trim
                 spawn: { x: 200, y: 500 },
-                zones: [ { x: 0, y: 0, w: 700, h: 1000, color: '#2a2020' }, { x: 700, y: 0, w: 700, h: 800, color: '#1a1a25' }, { x: 1100, y: 0, w: 300, h: 300, color: '#ddd' }, { x: 800, y: 800, w: 500, h: 200, color: '#111' } ],
-                walls: [ { x: 0, y: 0, w: 1400, h: 50 }, { x: 0, y: 0, w: 50, h: 1000 }, { x: 1350, y: 0, w: 50, h: 1000 }, { x: 0, y: 950, w: 800, h: 50 }, { x: 1300, y: 950, w: 100, h: 50 }, { x: 700, y: 0, w: 20, h: 300 }, { x: 700, y: 500, w: 20, h: 500 }, { x: 1100, y: 0, w: 20, h: 300 }, { x: 1100, y: 300, w: 150, h: 20 }, { x: 1350, y: 300, w: 50, h: 20 }, { x: 700, y: 800, w: 300, h: 10 }, { x: 1150, y: 800, w: 250, h: 10 }, { x: 800, y: 1000, w: 500, h: 10 } ],
+                zones: [],
+                walls: [ { x: 0, y: 0, w: 1400, h: 50 }, { x: 0, y: 0, w: 50, h: 1000 }, { x: 1350, y: 0, w: 50, h: 1000 }, { x: 0, y: 950, w: 800, h: 50 }, { x: 1300, y: 950, w: 100, h: 50 }, { x: 700, y: 0, w: 20, h: 300 }, { x: 700, y: 500, w: 20, h: 500 }, { x: 1100, y: 0, w: 20, h: 300 }, { x: 1100, y: 300, w: 150, h: 20 }, { x: 1350, y: 300, w: 50, h: 20 }, { x: 700, y: 800, w: 300, h: 10 }, { x: 1150, y: 800, w: 250, h: 10 },
+                         { x: 800, y: 1000, w: 500, h: 10, breach: true } ],   // the balcony edge the drones blow through (story step 13)
                 transitions: [ { x: 50, y: 400, w: 50, h: 200, target: 'hotel_lobby', label: 'Elevator' }, { x: 1120, y: 50, w: 120, h: 200, target: 'church_boss', label: 'Strange Portal' } ],
                 landmarks: [
                     { id: 'suite_elevator', x: 75, y: 500 }, { id: 'suite_portal', x: 1180, y: 150 },

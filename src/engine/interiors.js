@@ -292,6 +292,113 @@
                 ctx.restore();
             },
 
+            /** The penthouse floors, painted once: black marble with gold grout and white inlays, the
+             *  sunburst rug in the pit and the runner from the elevator; herringbone walnut in the
+             *  bedroom; white marble in the bath; teak on the balcony and its glass balustrade. */
+            drawSuiteInterior(ctx) {
+                if (!this._suiteFloor) this._suiteFloor = this._paintSuiteFloor();
+                ctx.drawImage(this._suiteFloor, 0, 0);
+            },
+
+            _paintSuiteFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1400; cv.height = 1010;
+                const c = cv.getContext('2d'), r = seededRandom(1919), GOLD = '#e8c27a';
+                c.fillStyle = '#0c0a0e'; c.fillRect(0, 0, 1400, 1010);
+                const clip = (x, y, w, h, fn) => { c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip(); fn(); c.restore(); };
+                // Living room: black marble slabs, gold grout, a white diamond at each crossing, silver veins
+                clip(50, 50, 650, 900, () => {
+                    for (let y = 50; y < 950; y += 75) for (let x = 50; x < 700; x += 75) { const v = r() * 7 | 0; c.fillStyle = `rgb(${17 + v},${14 + v},${20 + v})`; c.fillRect(x, y, 75, 75); }
+                    c.strokeStyle = 'rgba(232,194,122,0.18)'; c.lineWidth = 1; c.beginPath();
+                    for (let x = 50; x <= 700; x += 75) { c.moveTo(x, 50); c.lineTo(x, 950); } for (let y = 50; y <= 950; y += 75) { c.moveTo(50, y); c.lineTo(700, y); } c.stroke();
+                    c.fillStyle = '#e9e2d8'; for (let y = 125; y < 950; y += 75) for (let x = 125; x < 700; x += 75) { c.beginPath(); c.moveTo(x, y - 6); c.lineTo(x + 6, y); c.lineTo(x, y + 6); c.lineTo(x - 6, y); c.fill(); }
+                    for (let i = 0; i < 26; i++) { let x = 50 + r() * 650, y = 50 + r() * 900; c.strokeStyle = `rgba(223,230,255,${0.05 + r() * 0.07})`; c.lineWidth = 0.5 + r(); c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (r() - 0.3) * 60; y += (r() - 0.5) * 45; c.lineTo(x, y); } c.stroke(); }
+                });
+                // The runner from the elevator to the pit
+                c.fillStyle = '#12090e'; c.fillRect(100, 470, 120, 60); c.fillStyle = GOLD; c.fillRect(100, 472, 120, 1.5); c.fillRect(100, 526.5, 120, 1.5);
+                // The pit's sunburst rug
+                const P = { x: 330, y: 500 };
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.arc(P.x + 3, P.y + 4, 150, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#4a0814'; c.beginPath(); c.arc(P.x, P.y, 150, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = GOLD; c.lineWidth = 2; c.stroke(); c.lineWidth = 1; c.beginPath(); c.arc(P.x, P.y, 140, 0, Math.PI * 2); c.stroke();
+                for (let k = 0; k < 32; k++) { const a = k * Math.PI / 16; c.strokeStyle = k % 2 ? 'rgba(232,194,122,0.45)' : 'rgba(184,32,58,0.8)'; c.lineWidth = k % 2 ? 1.2 : 3; c.beginPath(); c.moveTo(P.x + Math.cos(a) * 28, P.y + Math.sin(a) * 28); c.lineTo(P.x + Math.cos(a) * 136, P.y + Math.sin(a) * 136); c.stroke(); }
+                c.fillStyle = '#2a0610'; c.beginPath(); c.arc(P.x, P.y, 28, 0, Math.PI * 2); c.fill(); c.strokeStyle = GOLD; c.lineWidth = 1.5; c.stroke();
+                // Bedroom (the L): herringbone walnut, a crimson rug at the foot of the bed
+                const herring = (x0, y0, w, h) => clip(x0, y0, w, h, () => {
+                    c.fillStyle = '#20140f'; c.fillRect(x0, y0, w, h);
+                    for (let y = y0 - 40; y < y0 + h + 40; y += 12) for (let x = x0 - 40; x < x0 + w + 40; x += 24) {
+                        const v = r() * 10 | 0, sh = `rgb(${38 + v},${24 + v},${18 + v})`;
+                        c.save(); c.translate(x + ((y / 12) % 2 ? 12 : 0), y); c.rotate(Math.PI / 4); c.fillStyle = sh; c.fillRect(0, 0, 30, 9); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 0.6; c.strokeRect(0, 0, 30, 9); c.restore();
+                    }
+                });
+                herring(720, 50, 380, 750); herring(1100, 320, 250, 480);
+                c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(803, 283, 214, 90); c.fillStyle = '#5a0a18'; c.fillRect(800, 280, 214, 90);
+                c.strokeStyle = GOLD; c.lineWidth = 1.5; c.strokeRect(806, 286, 202, 78); c.lineWidth = 0.7; c.strokeRect(812, 292, 190, 66);
+                // Bath: white marble, grey veins, a gold border
+                clip(1120, 50, 230, 250, () => {
+                    c.fillStyle = '#6e6878'; c.fillRect(1120, 50, 230, 250);   // moonstone marble
+                    for (let i = 0; i < 14; i++) { let x = 1120 + r() * 230, y = 50 + r() * 250; c.strokeStyle = `rgba(60,50,70,${0.2 + r() * 0.2})`; c.lineWidth = 0.6 + r(); c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (r() - 0.5) * 50; y += (r() - 0.3) * 40; c.lineTo(x, y); } c.stroke(); }
+                    c.strokeStyle = 'rgba(168,130,62,0.7)'; c.lineWidth = 2; c.strokeRect(1128, 58, 214, 234);
+                });
+                // Balcony: teak decking, the glass balustrade along the edge
+                clip(720, 810, 630, 190, () => {
+                    for (let y = 810; y < 1000; y += 10) { const v = r() * 10 | 0; c.fillStyle = `rgb(${70 + v},${46 + v},${30 + v})`; c.fillRect(720, y, 630, 10); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(720, y + 9, 630, 1); }
+                    c.fillStyle = 'rgba(0,0,0,0.25)'; for (let x = 740; x < 1350; x += 90) for (let y = 810; y < 1000; y += 20) c.fillRect(x + ((y / 10) % 2) * 45, y, 1, 10);
+                });
+                c.fillStyle = 'rgba(200,220,255,0.28)'; c.fillRect(720, 994, 630, 6); c.fillStyle = 'rgba(223,230,255,0.6)'; for (let x = 730; x < 1350; x += 60) c.fillRect(x, 993, 3, 8);
+                return cv;
+            },
+
+            /** The penthouse after the darkness layer: the fire and the candles, the gold elevator doors, the
+             *  pool's light, the city and the moon beyond the balcony, and the mirror rift in the bath —
+             *  the violet tear the Dark Maker left through. A room she isn't in keeps a little of its glow. */
+            drawSuiteGlow(ctx) {
+                const t = _frameTime / 1000, rs = this.roomSystem;
+                const seen = (x, y) => { const q = rs && rs.active ? rs.getRoomAt(x, y) : null; return q ? 0.25 + 0.75 * q.vis : 1; };
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const flame = (x, y, k = 0) => { const f = 0.75 + 0.25 * Math.sin(t * 11 + x * 0.3 + k); glow(x, y, 14, '255, 190, 120', 0.5 * f * seen(x, y)); ctx.globalAlpha = seen(x, y); ctx.fillStyle = `rgb(255,${200 + 40 * f | 0},130)`; ctx.beginPath(); ctx.arc(x, y - 0.5, 1.5 * f, 0, Math.PI * 2); ctx.fill(); };
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // The fire, still burning low
+                const ff = 0.8 + 0.2 * Math.sin(t * 6.3) * Math.sin(t * 2.1);
+                glow(330, 928, 80, '255, 130, 50', 0.4 * ff * seen(330, 900));
+                // Candles: dinner for two, the desk
+                flame(555, 708, 1); flame(555, 742, 2); flame(1278, 614, 3); flame(1288, 620, 4); flame(1282, 648, 5);
+                // The pool, lit from beneath, light rippling up
+                const ps = seen(905, 907);
+                glow(905, 907, 110, '120, 210, 255', 0.3 * ps);
+                for (let i = 0; i < 6; i++) { const cx = 840 + ((i * 47 + t * 9) % 130), cy = 884 + ((i * 29) % 46); glow(cx, cy + Math.sin(t * 2 + i) * 3, 14, '180, 240, 255', 0.25 * ps); }
+                // The city and the moon beyond the balcony
+                glow(1270, 1060, 90, '220, 225, 255', 0.25); glow(1270, 1060, 18, '255, 255, 255', 0.6);
+                for (let i = 0; i < 40; i++) { const sx = 730 + (i * 157) % 610, sy = 1012 + (i * 37) % 70, tw = 0.5 + 0.5 * Math.sin(t * 1.3 + i * 2.1); ctx.globalAlpha = 0.5 * tw; ctx.fillStyle = i % 3 ? '#ffd9a0' : '#c8b0ff'; ctx.fillRect(sx, sy, 2, 2); }
+                // The mirror rift: a violet tear in the bath mirror, where he left
+                const rift = seen(1180, 150), RX = 1180, RY = 112;
+                glow(RX, RY, 90, '150, 90, 255', (0.28 + 0.08 * Math.sin(t * 1.7)) * rift); glow(RX, RY, 40, '210, 160, 255', 0.35 * rift);
+                ctx.save(); ctx.translate(RX, RY);
+                for (let k = 0; k < 4; k++) {
+                    const sp = (k % 2 ? -1 : 1) * (0.9 + k * 0.35), a0 = (t * sp) % (Math.PI * 2);
+                    ctx.globalAlpha = (0.7 - k * 0.12) * rift; ctx.strokeStyle = k === 2 ? 'rgba(232,194,122,1)' : 'rgba(200,150,255,1)'; ctx.lineWidth = 2;
+                    for (let j = 0; j < 2; j++) { ctx.beginPath(); ctx.ellipse(0, 0, 10 + k * 5, 34 + k * 9, 0, a0 + j * Math.PI, a0 + j * Math.PI + 1.4); ctx.stroke(); }
+                }
+                ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = rift; ctx.fillStyle = 'rgba(20,4,40,0.92)'; ctx.beginPath(); ctx.ellipse(0, 0, 6, 30, 0, 0, Math.PI * 2); ctx.fill();   // the tear itself: a slit of the dark beyond
+                ctx.strokeStyle = 'rgba(255,230,255,0.9)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(0, 0, 6, 30, 0, 0, Math.PI * 2); ctx.stroke();
+                ctx.restore();
+                for (let i = 0; i < 14; i++) { const ph = (t * 0.35 + i / 14) % 1, a = i * 2.4; const sx = RX + Math.cos(a) * (18 + ph * 60), sy = RY + Math.sin(a) * (30 + ph * 50) + ph * 20; ctx.globalAlpha = (1 - ph) * 0.8 * rift; ctx.fillStyle = i % 3 ? '#e0c8ff' : '#fff1c2'; ctx.beginPath(); ctx.arc(sx, sy, 1.3, 0, Math.PI * 2); ctx.fill(); }
+                ctx.restore();
+                // (Solid) the elevator doors in the west wall, its dial, and the cracked mirror round the rift
+                ctx.save();
+                ctx.fillStyle = '#b8914a'; ctx.fillRect(44, 424, 12, 152);
+                ctx.fillStyle = '#e8c27a'; ctx.fillRect(46, 426, 8, 73); ctx.fillRect(46, 501, 8, 73);
+                ctx.strokeStyle = '#6a4f22'; ctx.lineWidth = 1; ctx.strokeRect(46, 426, 8, 73); ctx.strokeRect(46, 501, 8, 73);
+                const nd = Math.PI + (0.5 + 0.5 * Math.sin(t * 0.3)) * Math.PI;
+                ctx.fillStyle = '#1a1216'; ctx.beginPath(); ctx.arc(70, 410, 9, Math.PI, 0); ctx.fill();
+                ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(70, 410, 9, Math.PI, 0); ctx.stroke();
+                ctx.strokeStyle = '#ffb060'; ctx.beginPath(); ctx.moveTo(70, 410); ctx.lineTo(70 + Math.cos(nd) * 7, 410 + Math.sin(nd) * 7); ctx.stroke();
+                ctx.fillStyle = 'rgba(200,210,240,0.35)'; ctx.fillRect(1128, 52, 104, 7); ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1; ctx.strokeRect(1128, 52, 104, 7);
+                ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.7; ctx.beginPath();
+                for (const [dx, dy] of [[-30, 4], [-14, 6], [12, 5], [28, 3], [44, 6]]) { ctx.moveTo(1180, 55); ctx.lineTo(1180 + dx, 52 + dy); }
+                ctx.stroke();
+                ctx.restore();
+            },
+
             /** Moon City's floors, painted once: obsidian veined violet in the hall, the glass dance floor,
              *  the pole plinths, walnut behind the bar, hex tile in the restrooms, plum carpet in the VIP
              *  wing, and the foyer's gold-inlaid crescent. */

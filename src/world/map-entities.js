@@ -166,13 +166,50 @@
                     break;
                 }
 
-                case 'hotel_suite':
-                    e.props = [ new PropEntity({ x: 300, y: 300, width: 100, height: 200, color: '#443' }), new PropEntity({ x: 150, y: 700, width: 120, height: 50, color: '#322' }), new PropEntity({ x: 350, y: 700, width: 120, height: 50, color: '#322' }), new PropEntity({ x: 1100, y: 400, width: 150, height: 200, color: '#335' }),
-                        // Dark Maker's letter — in the debris field after ambush
-                        new PropEntity({ x: 880, y: 850, width: 20, height: 14, color: '#c8a870', interactionType: 'read_note', noteId: 'dark_maker_letter' })
+                case 'hotel_suite': {
+                    // The Double Nights penthouse, the Dark Maker's stay: furniture art in drawSuiteDecorProp
+                    // (ps_*) and the lobby's (dn_*); floors in drawSuiteInterior; embers, candles, the pool,
+                    // the skyline and the mirror rift he left through in drawSuiteGlow.
+                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1216', decorType }, extra));
+                    e.props = [
+                        // Living room: the console by the elevator, the conversation pit, the piano, the fireplace,
+                        // the bar, dinner for two
+                        F(58, 290, 30, 80, 'ps_console'),
+                        F(220, 380, 220, 56, 'ps_pit_sofa', { face: 'S' }), F(220, 566, 220, 56, 'ps_pit_sofa', { face: 'N' }), F(290, 470, 80, 56, 'ps_pit_table'),
+                        F(470, 76, 150, 104, 'ps_piano'),
+                        F(250, 912, 160, 38, 'ps_fireplace'),
+                        F(56, 730, 44, 200, 'ps_bar'),
+                        F(500, 690, 110, 70, 'ps_dining'), F(468, 710, 26, 30, 'ps_chair', { face: 'E' }), F(616, 710, 26, 30, 'ps_chair', { face: 'W' }),
+                        F(640, 64, 34, 34, 'dn_palm'), F(640, 880, 34, 34, 'dn_palm'), F(160, 64, 22, 22, 'dn_lamp'),
+                        // Bedroom: the canopy bed, left unmade; the chaise; the desk (chess, seal, the 10/10 card);
+                        // the wardrobe standing open; the suitcase he left
+                        F(820, 70, 180, 200, 'ps_bed'), F(786, 84, 26, 26, 'apt_nightstand'), F(1008, 84, 26, 26, 'apt_nightstand'),
+                        F(1210, 360, 110, 54, 'ps_chaise'),
+                        F(1150, 600, 160, 62, 'ps_desk'), F(1216, 668, 28, 30, 'ps_chair', { face: 'N' }),
+                        F(726, 540, 40, 150, 'ps_wardrobe'),
+                        F(930, 360, 52, 36, 'ps_suitcase', { interactionType: 'lost_luggage', noteId: 'suite_case', label: 'Monogrammed suitcase', lootMin: 40, lootMax: 110,
+                            lootLines: ['HE TRAVELS HEAVY', 'CUFFLINKS, A SILK TIE… AND PERSONICS', '10 OUT OF 10, WOULD ROB AGAIN'], noNav: true }),
+                        // Bath: the tub, the vanity (the mirror rift is on the north wall, in drawSuiteGlow)
+                        F(1258, 64, 84, 84, 'ps_tub'), F(1320, 170, 24, 80, 'ps_vanity'),
+                        // Balcony: the plunge pool, loungers, a telescope, palms
+                        F(820, 870, 170, 74, 'ps_pool'), F(1120, 846, 36, 88, 'ps_lounger'), F(1172, 846, 36, 88, 'ps_lounger'),
+                        F(1286, 832, 28, 28, 'ps_telescope'), F(734, 826, 34, 34, 'dn_palm'),
+                        // Dark Maker's letter — dropped by the loungers, found in the debris after the ambush
+                        new PropEntity({ x: 1086, y: 952, width: 20, height: 14, mass: 1e7, color: '#c8a870', interactionType: 'read_note', noteId: 'dark_maker_letter' })
                     ];
-                    e.lamps = [ new LampEntity({ x: 100, y: 350, lampType: 3, color: '#ffaa00', lightRadius: 450 }), new LampEntity({ x: 100, y: 650, lampType: 3, color: '#ffaa00', lightRadius: 450 }), new LampEntity({ x: 350, y: 150, lampType: 4, color: '#a469ff', lightRadius: 600 }), new LampEntity({ x: 350, y: 850, lampType: 4, color: '#a469ff', lightRadius: 600 }), new LampEntity({ x: 600, y: 500, lampType: 4, color: '#a469ff', lightRadius: 650 }), new LampEntity({ x: 900, y: 200, lampType: 4, color: '#ff0055', lightRadius: 550 }), new LampEntity({ x: 900, y: 600, lampType: 4, color: '#ff0055', lightRadius: 550 }), new LampEntity({ x: 1250, y: 150, lampType: 3, color: '#00ffaa', lightRadius: 500 }), new LampEntity({ x: 1050, y: 900, lampType: 4, color: '#0055ff', lightRadius: 500 }) ];
+                    // Light fixtures hidden in the ceiling (light only), soft fills per room
+                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
+                    e.lamps = [ L(330, 480, '#ffcf8a', 520), L(330, 860, '#ff9a50', 320), L(900, 300, '#ff8a9a', 460), L(1230, 560, '#ffb0a0', 360), L(1235, 175, '#b8a0ff', 200), L(1040, 900, '#9ab0ff', 420) ];
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    e.softLights = [
+                        A(375, 500, 620, 860, '#ffc890', 0.3), A(910, 425, 360, 730, '#ff9aa8', 0.22), A(1225, 560, 240, 460, '#ff9aa8', 0.2),
+                        A(1235, 175, 220, 240, '#c8b8ff', 0.14), A(1035, 905, 620, 180, '#8aa0ff', 0.28),
+                        S(330, 915, 110, '#ff8a40', 0.8, 5), S(555, 725, 70, '#ffc080', 0.6, 4), S(1230, 625, 70, '#ffc080', 0.6, 4),   // fire, dinner candles, desk candles
+                        S(905, 907, 100, '#7fd8ff', 0.5, 2), S(1180, 150, 90, '#c890ff', 0.4, 3),                                     // the pool, the rift
+                    ];
                     break;
+                }
 
                 case 'medbay_sw': {
                     // Furniture is immovable props (they block bullets like other props) with

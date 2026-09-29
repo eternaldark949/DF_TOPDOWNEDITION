@@ -6666,7 +6666,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                             showMessage("BREACH DETECTED!");
                                             game.triggerShake(25);
                                             // Break the back wall
-                                            const wallIdx = game.activeMap.walls.findIndex(w => w.y === 1000 && w.w === 500);
+                                            const wallIdx = game.activeMap.walls.findIndex(w => w.breach || (w.y === 1000 && w.w === 500));
                                             if (wallIdx !== -1) {
                                                 const w = game.activeMap.walls[wallIdx];
                                                 for (let ex = w.x; ex < w.x + w.w; ex += 40) {
@@ -10558,14 +10558,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'hotel_suite': {
                 rooms: {
                     living:   { x: 50,   y: 50,  w: 650, h: 900, type: 'indoor',  label: 'Living Room' },
-                    lounge:   { rects: [{ x: 720, y: 50, w: 380, h: 750 }, { x: 1100, y: 320, w: 250, h: 480 }], type: 'indoor', label: 'Lounge' },
+                    lounge:   { rects: [{ x: 720, y: 50, w: 380, h: 750 }, { x: 1100, y: 320, w: 250, h: 480 }], type: 'indoor', label: 'Master Bedroom' },
                     bathroom: { x: 1120, y: 50,  w: 230, h: 250, type: 'indoor',  label: 'Bathroom' },
                     balcony:  { x: 720,  y: 810, w: 630, h: 190, type: 'outdoor', label: 'Balcony' }
                 },
                 doors: [
                     { x: 700, y: 300, w: 20, h: 200, type: 'arch', orientation: 'V', rooms: ['living', 'lounge'] },
-                    { x: 1255, y: 300, w: 90, h: 20, type: 'hinged', orientation: 'H', rooms: ['lounge', 'bathroom'], color: '#4a3a30', hingeSide: 'left', triggerRadius: 60 },
-                    { x: 1000, y: 800, w: 150, h: 10, type: 'sliding', orientation: 'H', rooms: ['lounge', 'balcony'], color: 'rgba(150, 200, 220, 0.25)', speed: 0.06, triggerRadius: 100 },
+                    { x: 1255, y: 300, w: 90, h: 20, type: 'hinged', orientation: 'H', rooms: ['lounge', 'bathroom'], color: '#2a1a24', hingeSide: 'left', triggerRadius: 60 },   // black lacquer
+                    { x: 1000, y: 800, w: 150, h: 10, type: 'sliding', orientation: 'H', rooms: ['lounge', 'balcony'], color: 'rgba(200, 190, 255, 0.28)', speed: 0.06, triggerRadius: 100 },
                 ],
                 windows: [
                     { x: 720, y: 800, w: 270, h: 10, facing: 'N', projectionLength: 110, tint: '200, 220, 255' },   // glass onto the balcony
@@ -10815,12 +10815,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { id: 'suite_elevator', x: 110, y: 450 }        // story step 11 points here
                 ]
             },
+            // The Double Nights penthouse — the Dark Maker's suite, left with a flourish. Furniture:
+            // createMapEntities (ps_*, drawSuiteDecorProp); floors: drawSuiteInterior; glows and the
+            // mirror rift he left through: drawSuiteGlow.
+            //   Living room (elevator, pit, piano, bar, dining for two) | Bedroom (L) | Bath (the rift)
+            //                                                           | Balcony (pool) — the breach wall
             'hotel_suite': {
                 id: 'hotel_suite', width: 1400, height: 1000, type: 'indoor',
-                label: 'Penthouse Suite', floorColor: '#222',
+                label: 'Penthouse Suite', floorColor: '#0c0a0e',
+                ambientDarkness: 0.72,
+                navProps: 'all',
+                wallStyle: { fill: '#0e0c10', stroke: 'rgba(232,194,122,0.5)' },   // black lacquer, gold trim
                 spawn: { x: 200, y: 500 },
-                zones: [ { x: 0, y: 0, w: 700, h: 1000, color: '#2a2020' }, { x: 700, y: 0, w: 700, h: 800, color: '#1a1a25' }, { x: 1100, y: 0, w: 300, h: 300, color: '#ddd' }, { x: 800, y: 800, w: 500, h: 200, color: '#111' } ],
-                walls: [ { x: 0, y: 0, w: 1400, h: 50 }, { x: 0, y: 0, w: 50, h: 1000 }, { x: 1350, y: 0, w: 50, h: 1000 }, { x: 0, y: 950, w: 800, h: 50 }, { x: 1300, y: 950, w: 100, h: 50 }, { x: 700, y: 0, w: 20, h: 300 }, { x: 700, y: 500, w: 20, h: 500 }, { x: 1100, y: 0, w: 20, h: 300 }, { x: 1100, y: 300, w: 150, h: 20 }, { x: 1350, y: 300, w: 50, h: 20 }, { x: 700, y: 800, w: 300, h: 10 }, { x: 1150, y: 800, w: 250, h: 10 }, { x: 800, y: 1000, w: 500, h: 10 } ],
+                zones: [],
+                walls: [ { x: 0, y: 0, w: 1400, h: 50 }, { x: 0, y: 0, w: 50, h: 1000 }, { x: 1350, y: 0, w: 50, h: 1000 }, { x: 0, y: 950, w: 800, h: 50 }, { x: 1300, y: 950, w: 100, h: 50 }, { x: 700, y: 0, w: 20, h: 300 }, { x: 700, y: 500, w: 20, h: 500 }, { x: 1100, y: 0, w: 20, h: 300 }, { x: 1100, y: 300, w: 150, h: 20 }, { x: 1350, y: 300, w: 50, h: 20 }, { x: 700, y: 800, w: 300, h: 10 }, { x: 1150, y: 800, w: 250, h: 10 },
+                         { x: 800, y: 1000, w: 500, h: 10, breach: true } ],   // the balcony edge the drones blow through (story step 13)
                 transitions: [ { x: 50, y: 400, w: 50, h: 200, target: 'hotel_lobby', label: 'Elevator' }, { x: 1120, y: 50, w: 120, h: 200, target: 'church_boss', label: 'Strange Portal' } ],
                 landmarks: [
                     { id: 'suite_elevator', x: 75, y: 500 }, { id: 'suite_portal', x: 1180, y: 150 },
@@ -11303,13 +11312,50 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
 
-                case 'hotel_suite':
-                    e.props = [ new PropEntity({ x: 300, y: 300, width: 100, height: 200, color: '#443' }), new PropEntity({ x: 150, y: 700, width: 120, height: 50, color: '#322' }), new PropEntity({ x: 350, y: 700, width: 120, height: 50, color: '#322' }), new PropEntity({ x: 1100, y: 400, width: 150, height: 200, color: '#335' }),
-                        // Dark Maker's letter — in the debris field after ambush
-                        new PropEntity({ x: 880, y: 850, width: 20, height: 14, color: '#c8a870', interactionType: 'read_note', noteId: 'dark_maker_letter' })
+                case 'hotel_suite': {
+                    // The Double Nights penthouse, the Dark Maker's stay: furniture art in drawSuiteDecorProp
+                    // (ps_*) and the lobby's (dn_*); floors in drawSuiteInterior; embers, candles, the pool,
+                    // the skyline and the mirror rift he left through in drawSuiteGlow.
+                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1216', decorType }, extra));
+                    e.props = [
+                        // Living room: the console by the elevator, the conversation pit, the piano, the fireplace,
+                        // the bar, dinner for two
+                        F(58, 290, 30, 80, 'ps_console'),
+                        F(220, 380, 220, 56, 'ps_pit_sofa', { face: 'S' }), F(220, 566, 220, 56, 'ps_pit_sofa', { face: 'N' }), F(290, 470, 80, 56, 'ps_pit_table'),
+                        F(470, 76, 150, 104, 'ps_piano'),
+                        F(250, 912, 160, 38, 'ps_fireplace'),
+                        F(56, 730, 44, 200, 'ps_bar'),
+                        F(500, 690, 110, 70, 'ps_dining'), F(468, 710, 26, 30, 'ps_chair', { face: 'E' }), F(616, 710, 26, 30, 'ps_chair', { face: 'W' }),
+                        F(640, 64, 34, 34, 'dn_palm'), F(640, 880, 34, 34, 'dn_palm'), F(160, 64, 22, 22, 'dn_lamp'),
+                        // Bedroom: the canopy bed, left unmade; the chaise; the desk (chess, seal, the 10/10 card);
+                        // the wardrobe standing open; the suitcase he left
+                        F(820, 70, 180, 200, 'ps_bed'), F(786, 84, 26, 26, 'apt_nightstand'), F(1008, 84, 26, 26, 'apt_nightstand'),
+                        F(1210, 360, 110, 54, 'ps_chaise'),
+                        F(1150, 600, 160, 62, 'ps_desk'), F(1216, 668, 28, 30, 'ps_chair', { face: 'N' }),
+                        F(726, 540, 40, 150, 'ps_wardrobe'),
+                        F(930, 360, 52, 36, 'ps_suitcase', { interactionType: 'lost_luggage', noteId: 'suite_case', label: 'Monogrammed suitcase', lootMin: 40, lootMax: 110,
+                            lootLines: ['HE TRAVELS HEAVY', 'CUFFLINKS, A SILK TIE… AND PERSONICS', '10 OUT OF 10, WOULD ROB AGAIN'], noNav: true }),
+                        // Bath: the tub, the vanity (the mirror rift is on the north wall, in drawSuiteGlow)
+                        F(1258, 64, 84, 84, 'ps_tub'), F(1320, 170, 24, 80, 'ps_vanity'),
+                        // Balcony: the plunge pool, loungers, a telescope, palms
+                        F(820, 870, 170, 74, 'ps_pool'), F(1120, 846, 36, 88, 'ps_lounger'), F(1172, 846, 36, 88, 'ps_lounger'),
+                        F(1286, 832, 28, 28, 'ps_telescope'), F(734, 826, 34, 34, 'dn_palm'),
+                        // Dark Maker's letter — dropped by the loungers, found in the debris after the ambush
+                        new PropEntity({ x: 1086, y: 952, width: 20, height: 14, mass: 1e7, color: '#c8a870', interactionType: 'read_note', noteId: 'dark_maker_letter' })
                     ];
-                    e.lamps = [ new LampEntity({ x: 100, y: 350, lampType: 3, color: '#ffaa00', lightRadius: 450 }), new LampEntity({ x: 100, y: 650, lampType: 3, color: '#ffaa00', lightRadius: 450 }), new LampEntity({ x: 350, y: 150, lampType: 4, color: '#a469ff', lightRadius: 600 }), new LampEntity({ x: 350, y: 850, lampType: 4, color: '#a469ff', lightRadius: 600 }), new LampEntity({ x: 600, y: 500, lampType: 4, color: '#a469ff', lightRadius: 650 }), new LampEntity({ x: 900, y: 200, lampType: 4, color: '#ff0055', lightRadius: 550 }), new LampEntity({ x: 900, y: 600, lampType: 4, color: '#ff0055', lightRadius: 550 }), new LampEntity({ x: 1250, y: 150, lampType: 3, color: '#00ffaa', lightRadius: 500 }), new LampEntity({ x: 1050, y: 900, lampType: 4, color: '#0055ff', lightRadius: 500 }) ];
+                    // Light fixtures hidden in the ceiling (light only), soft fills per room
+                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
+                    e.lamps = [ L(330, 480, '#ffcf8a', 520), L(330, 860, '#ff9a50', 320), L(900, 300, '#ff8a9a', 460), L(1230, 560, '#ffb0a0', 360), L(1235, 175, '#b8a0ff', 200), L(1040, 900, '#9ab0ff', 420) ];
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    e.softLights = [
+                        A(375, 500, 620, 860, '#ffc890', 0.3), A(910, 425, 360, 730, '#ff9aa8', 0.22), A(1225, 560, 240, 460, '#ff9aa8', 0.2),
+                        A(1235, 175, 220, 240, '#c8b8ff', 0.14), A(1035, 905, 620, 180, '#8aa0ff', 0.28),
+                        S(330, 915, 110, '#ff8a40', 0.8, 5), S(555, 725, 70, '#ffc080', 0.6, 4), S(1230, 625, 70, '#ffc080', 0.6, 4),   // fire, dinner candles, desk candles
+                        S(905, 907, 100, '#7fd8ff', 0.5, 2), S(1180, 150, 90, '#c890ff', 0.4, 3),                                     // the pool, the rift
+                    ];
                     break;
+                }
 
                 case 'medbay_sw': {
                     // Furniture is immovable props (they block bullets like other props) with
@@ -14578,8 +14624,198 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return cv;
         }
 
+        /* The Double Nights penthouse (ps_*): the Dark Maker's stay, in the hotel's black marble, gold,
+           silver and crimson. Things are left as he left them: the bed unmade, one glass drunk, the
+           chess game unfinished, the wardrobe open, a card propped on the desk rating his stay. */
+        function drawSuiteDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000, C = DNL, d = p.decor || {};
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const shadow = (r = 5) => rr(x + 3, y + 4, w, h, r, 'rgba(0,0,0,0.34)');
+            const glass = (gx, gy, drunk) => { circ(gx, gy, 3, drunk ? 'rgba(255,240,220,0.35)' : 'rgba(150,20,40,0.85)', C.silver, 0.7); if (!drunk) circ(gx - 0.8, gy - 0.8, 0.8, 'rgba(255,200,210,0.6)'); };
+            const candle = (cx, cy) => { circ(cx, cy, 2.2, C.cream, C.goldDk, 0.5); };
+            switch (p.decorType) {
+                case 'ps_console': {                                       // by the elevator: the visitor book, a crescent seal
+                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1.2);
+                    rr(x + 5, y + 10, w - 10, 22, 1, C.cream, C.goldDk, 0.6); ctx.fillStyle = C.crimson; ctx.fillRect(x + w / 2 - 0.5, y + 10, 1, 22);
+                    ctx.strokeStyle = 'rgba(40,20,30,0.5)'; ctx.lineWidth = 0.5; ctx.beginPath(); for (let i = 0; i < 4; i++) { ctx.moveTo(x + 7, y + 14 + i * 4); ctx.lineTo(x + w / 2 - 2, y + 14 + i * 4); } ctx.stroke();
+                    circ(x + w / 2, y + h - 18, 5, C.crimsonLt, '#5a0a18', 0.8); ctx.save(); circ(x + w / 2, y + h - 18, 2.6, '#ffd0d8'); ctx.globalCompositeOperation = 'destination-out'; circ(x + w / 2 + 1.2, y + h - 18.6, 2.3, '#000'); ctx.restore();
+                    break;
+                }
+                case 'ps_pit_sofa': {                                      // one half of the round crimson pit, curving about the table
+                    const up = d.face === 'N', cx = x + w / 2;
+                    ctx.save(); ctx.translate(3, 4); ctx.fillStyle = 'rgba(0,0,0,0.34)'; ctx.beginPath();
+                    if (up) { ctx.moveTo(x, y); ctx.quadraticCurveTo(cx, y + h * 1.9, x + w, y); ctx.lineTo(x + w - 18, y); ctx.quadraticCurveTo(cx, y + h * 1.1, x + 18, y); }
+                    else { ctx.moveTo(x, y + h); ctx.quadraticCurveTo(cx, y - h * 0.9, x + w, y + h); ctx.lineTo(x + w - 18, y + h); ctx.quadraticCurveTo(cx, y - h * 0.1, x + 18, y + h); }
+                    ctx.fill(); ctx.restore();
+                    const band = (off, col) => { ctx.fillStyle = col; ctx.beginPath();
+                        if (up) { ctx.moveTo(x + off, y); ctx.quadraticCurveTo(cx, y + h * 1.9 - off * 1.6, x + w - off, y); ctx.lineTo(x + w - 18, y); ctx.quadraticCurveTo(cx, y + h * 1.1, x + 18, y); }
+                        else { ctx.moveTo(x + off, y + h); ctx.quadraticCurveTo(cx, y - h * 0.9 + off * 1.6, x + w - off, y + h); ctx.lineTo(x + w - 18, y + h); ctx.quadraticCurveTo(cx, y - h * 0.1, x + 18, y + h); }
+                        ctx.fill(); };
+                    band(0, '#4a0814'); band(6, C.velvet); band(12, C.crimsonLt);
+                    ctx.strokeStyle = C.gold; ctx.lineWidth = 1; ctx.beginPath();
+                    if (up) { ctx.moveTo(x, y); ctx.quadraticCurveTo(cx, y + h * 1.9, x + w, y); } else { ctx.moveTo(x, y + h); ctx.quadraticCurveTo(cx, y - h * 0.9, x + w, y + h); }
+                    ctx.stroke();
+                    ctx.fillStyle = 'rgba(255,200,210,0.35)';
+                    for (let i = 1; i < 6; i++) { const u = i / 6, bx = x + w * u, by = up ? y + (h * 1.9) * 2 * u * (1 - u) * 0.9 - 4 : y + h - (h * 1.9) * 2 * u * (1 - u) * 0.9 + 4; ctx.beginPath(); ctx.arc(bx, by, 1.2, 0, Math.PI * 2); ctx.fill(); }
+                    break;
+                }
+                case 'ps_pit_table': {                                     // black marble oval, a bottle, two glasses (one drunk)
+                    ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 4, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.34)'; ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fillStyle = C.marble; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 1.5; ctx.stroke();
+                    ctx.strokeStyle = 'rgba(223,230,255,0.2)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(x + 12, y + 14); ctx.quadraticCurveTo(x + w / 2, y + h * 0.7, x + w - 10, y + 16); ctx.stroke();
+                    circ(x + w / 2, y + h / 2, 4, '#1e3a24', C.gold, 0.8); glass(x + w / 2 - 14, y + h / 2 + 6, true); glass(x + w / 2 + 15, y + h / 2 - 4, false);
+                    rr(x + w - 22, y + h - 16, 12, 8, 1, C.cream);                                                   // a folded note
+                    break;
+                }
+                case 'ps_piano': {                                         // a silver-lacquered grand, lid up, a page of music left open
+                    const P = new Path2D(); P.moveTo(x, y + 8); P.lineTo(x + w * 0.55, y + 8); P.bezierCurveTo(x + w * 0.9, y + 6, x + w, y + h * 0.45, x + w * 0.8, y + h * 0.75);
+                    P.bezierCurveTo(x + w * 0.6, y + h, x + w * 0.2, y + h, x + 6, y + h - 6); P.closePath();
+                    ctx.save(); ctx.translate(3, 4); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill(P); ctx.restore();
+                    const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#e8ecf6'); g.addColorStop(0.5, '#a8aec0'); g.addColorStop(1, '#6a7082');
+                    ctx.fillStyle = g; ctx.fill(P); ctx.strokeStyle = C.gold; ctx.lineWidth = 1; ctx.stroke(P);
+                    ctx.strokeStyle = 'rgba(20,20,30,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + 10, y + 16); ctx.lineTo(x + w * 0.72, y + h * 0.7); ctx.stroke();   // the lid's prop
+                    rr(x, y, w * 0.5, 10, 1, '#0e0c10'); for (let i = 0; i < 14; i++) ctx.fillStyle = '#f4f2ee', ctx.fillRect(x + 2 + i * (w * 0.5 - 4) / 14, y + 1, (w * 0.5 - 4) / 14 - 0.8, 8);
+                    ctx.fillStyle = '#0e0c10'; for (let i = 0; i < 14; i++) if ([1, 2, 4, 5, 6].includes(i % 7)) ctx.fillRect(x + 2 + i * (w * 0.5 - 4) / 14 - 1.2, y + 1, 2.4, 5);
+                    rr(x + 14, y + 14, 22, 14, 1, C.cream, C.goldDk, 0.5);                                          // the music
+                    ctx.strokeStyle = 'rgba(40,30,40,0.6)'; ctx.lineWidth = 0.4; ctx.beginPath(); for (let i = 0; i < 4; i++) { ctx.moveTo(x + 16, y + 17 + i * 2.6); ctx.lineTo(x + 34, y + 17 + i * 2.6); } ctx.stroke();
+                    rr(x + w * 0.18, y - 12, 34, 10, 4, C.velvet, C.gold, 0.8);                                      // the bench
+                    break;
+                }
+                case 'ps_fireplace': {                                     // black marble surround, gold fender, embers and burnt pages
+                    shadow(3); rr(x, y, w, h, 3, C.marbleLt, C.gold, 1.5);
+                    rr(x + 16, y + 6, w - 32, h - 12, 3, '#0a0608');
+                    for (let i = 0; i < 7; i++) { const f = 0.6 + 0.4 * Math.sin(t * 6 + i * 1.9); circ(x + 26 + i * (w - 52) / 6, y + h / 2 + Math.sin(i) * 3, 3 + f * 1.5, `rgba(255,${90 + 60 * f | 0},40,${0.55 + 0.35 * f})`); }
+                    for (const [px, py, r] of [[x + 38, y + 12, 0.3], [x + w - 52, y + 15, -0.4]]) { ctx.save(); ctx.translate(px, py); ctx.rotate(r); rr(0, 0, 12, 8, 1, '#3a2a20'); ctx.fillStyle = 'rgba(255,120,40,0.6)'; ctx.fillRect(0, 7, 12, 1); ctx.restore(); }
+                    ctx.strokeStyle = C.gold; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + 12, y + h - 3); ctx.lineTo(x + w - 12, y + h - 3); ctx.stroke();
+                    break;
+                }
+                case 'ps_bar': {                                           // black lacquer bar against the west wall, a wine wall behind
+                    shadow(3); rr(x, y, w, h, 3, '#140e14', C.gold, 1.2);
+                    for (let j = 0; j < 12; j++) for (let i = 0; i < 2; i++) circ(x + 8 + i * 9, y + 10 + j * 15, 3, j % 3 ? '#4a0c1c' : '#1e3a24', 'rgba(0,0,0,0.5)', 0.5);
+                    rr(x + w - 14, y + 4, 12, h - 8, 2, C.marble, C.goldDk, 0.6);
+                    glass(x + w - 8, y + 40, false); glass(x + w - 8, y + h - 50, true); circ(x + w - 8, y + h / 2, 3.6, '#e8f0ff', C.silver, 0.8);   // a decanter
+                    break;
+                }
+                case 'ps_dining': {                                        // a marble table for two: candles, the plates, one glass drunk and one not
+                    shadow(8); rr(x, y, w, h, 8, '#ece8ee', C.gold, 2);
+                    ctx.strokeStyle = 'rgba(120,110,130,0.3)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(x + 12, y + 10); ctx.quadraticCurveTo(x + w / 2, y + h * 0.8, x + w - 10, y + 12); ctx.stroke();
+                    rr(x + w / 2 - 6, y + 6, 12, h - 12, 3, C.crimson);                                             // a runner
+                    for (const px of [x + 18, x + w - 18]) { circ(px, y + h / 2, 10, '#fafafa', C.silverDk, 0.8); circ(px, y + h / 2, 6.5, null, C.gold, 0.6); }
+                    circ(x + 22, y + h / 2 + 2, 3.5, 'rgba(120,20,30,0.5)');                                        // his plate: a smear of sauce
+                    glass(x + 30, y + 14, true); glass(x + w - 30, y + h - 14, false);
+                    candle(x + w / 2, y + 18); candle(x + w / 2, y + h - 18);
+                    for (let i = 0; i < 4; i++) { ctx.fillStyle = '#b8203a'; ctx.beginPath(); ctx.ellipse(x + w / 2 - 2 + i * 1.5, y + h / 2 - 6 + i * 4, 2, 1.2, i, 0, Math.PI * 2); ctx.fill(); }   // petals
+                    break;
+                }
+                case 'ps_chair': {                                         // a velvet dining chair, gold frame; faces its table
+                    const f = d.face || 'S';
+                    shadow(5); rr(x, y, w, h, 5, C.velvet, C.gold, 1);
+                    const bk = f === 'E' ? [x, y + 2, 7, h - 4] : f === 'W' ? [x + w - 7, y + 2, 7, h - 4] : f === 'N' ? [x + 2, y + h - 7, w - 4, 7] : [x + 2, y, w - 4, 7];
+                    rr(...bk, 3, '#4a0814'); rr(x + 5, y + 5, w - 10, h - 10, 4, C.crimsonLt);
+                    break;
+                }
+                case 'ps_bed': {                                           // canopy king: black posts, crimson drapes, the covers thrown back
+                    shadow(6); rr(x, y, w, h, 6, '#140e14', C.gold, 1.5);
+                    rr(x + 4, y + 2, w - 8, 18, 5, '#2a0a14', C.goldDk, 0.8);                                         // headboard
+                    rr(x + 10, y + 22, w - 20, h - 30, 6, '#f1ece6');                                                // sheets
+                    rr(x + 18, y + 26, 60, 26, 10, '#fbf8f4', 'rgba(0,0,0,0.12)', 0.6); rr(x + w - 78, y + 26, 60, 26, 10, '#fbf8f4', 'rgba(0,0,0,0.12)', 0.6);
+                    ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.beginPath(); ctx.ellipse(x + w - 60, y + 46, 22, 9, 0.3, 0, Math.PI * 2); ctx.fill();   // one pillow slept on
+                    ctx.fillStyle = C.velvet; ctx.beginPath(); ctx.moveTo(x + 10, y + 96); ctx.bezierCurveTo(x + w * 0.4, y + 80, x + w * 0.6, y + 118, x + w - 10, y + 104);   // the thrown-back cover
+                    ctx.lineTo(x + w - 10, y + h - 8); ctx.lineTo(x + 10, y + h - 8); ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = C.crimsonLt; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 10, y + 96); ctx.bezierCurveTo(x + w * 0.4, y + 80, x + w * 0.6, y + 118, x + w - 10, y + 104); ctx.stroke();
+                    ctx.strokeStyle = C.gold; ctx.lineWidth = 0.8; ctx.strokeRect(x + 16, y + 112, w - 32, h - 126);
+                    for (const [px, py] of [[x + 3, y + 3], [x + w - 3, y + 3], [x + 3, y + h - 3], [x + w - 3, y + h - 3]]) circ(px, py, 5, '#0e0a0e', C.gold, 1.2);   // posts
+                    ctx.fillStyle = 'rgba(138,16,36,0.45)'; for (const [px, dir] of [[x + 3, 1], [x + w - 3, -1]]) { ctx.beginPath(); ctx.moveTo(px, y + 8); ctx.quadraticCurveTo(px + dir * 16, y + h / 2, px, y + h - 8); ctx.lineTo(px + dir * 4, y + h - 8); ctx.quadraticCurveTo(px + dir * 8, y + h / 2, px + dir * 4, y + 8); ctx.fill(); }   // drapes
+                    break;
+                }
+                case 'ps_chaise': {                                        // a velvet chaise under the window
+                    shadow(10); rr(x, y, w, h, 12, '#3a0a1c', C.gold, 1);
+                    rr(x + 4, y + 4, 22, h - 8, 9, C.velvet); rr(x + 28, y + 6, w - 34, h - 12, 7, C.crimsonLt);
+                    rr(x + 40, y + 12, 18, 14, 5, C.gold);                                                          // a cushion
+                    break;
+                }
+                case 'ps_desk': {                                          // his writing desk: chess mid-game, a crescent seal, candle stubs, the 10/10 card
+                    shadow(4); rr(x, y, w, h, 4, '#2a1a1e', C.gold, 1.4);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let gy = y + 8; gy < y + h; gy += 6) { ctx.moveTo(x + 3, gy); ctx.lineTo(x + w - 3, gy); } ctx.stroke();
+                    const bx = x + 10, by = y + 10, sq = 5;                                                          // the chessboard
+                    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { ctx.fillStyle = (i + j) % 2 ? '#1a1418' : '#e8e0d0'; ctx.fillRect(bx + i * sq, by + j * sq, sq, sq); }
+                    ctx.strokeStyle = C.gold; ctx.lineWidth = 0.8; ctx.strokeRect(bx, by, sq * 8, sq * 8);
+                    for (const [i, j, white] of [[1, 6, 1], [2, 6, 1], [4, 4, 1], [5, 7, 1], [3, 1, 0], [4, 2, 0], [6, 1, 0], [2, 3, 0], [6, 5, 1]]) circ(bx + i * sq + sq / 2, by + j * sq + sq / 2, 1.6, white ? '#fff8ec' : '#2a0a14', white ? '#8a7a6a' : C.crimsonLt, 0.5);
+                    circ(bx + sq * 8 + 6, by + 6, 1.8, '#fff8ec', '#8a7a6a', 0.5);                                  // a captured piece
+                    rr(x + 64, y + 12, 34, 24, 1, C.cream, C.goldDk, 0.6);                                          // the card: 10/10
+                    ctx.fillStyle = C.crimson; ctx.font = 'bold 8px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('10/10', x + 81, y + 22);
+                    ctx.fillStyle = C.goldDk; ctx.font = 'italic 4px Georgia, serif'; ctx.fillText('would recommend', x + 81, y + 30);
+                    circ(x + 110, y + 40, 4.5, C.crimsonLt, '#5a0a18', 0.8); ctx.save(); circ(x + 110, y + 40, 2.4, '#ffd0d8'); ctx.globalCompositeOperation = 'destination-out'; circ(x + 111.2, y + 39.4, 2.1, '#000'); ctx.restore();   // wax seal
+                    candle(x + 128, y + 14); candle(x + 138, y + 20); candle(x + 132, y + 48);
+                    rr(x + 104, y + 8, 3, 18, 1, '#1a1a1e'); circ(x + 105.5, y + 8, 1.2, C.gold);                   // a pen
+                    break;
+                }
+                case 'ps_wardrobe': {                                      // standing open, empty hangers on the rail
+                    shadow(3); rr(x, y, w, h, 3, '#140e14', C.gold, 1.2);
+                    rr(x + 4, y + 4, w - 8, h - 8, 2, '#0a070a');
+                    ctx.strokeStyle = C.silverDk; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w / 2, y + 6); ctx.lineTo(x + w / 2, y + h - 6); ctx.stroke();
+                    ctx.strokeStyle = C.gold; ctx.lineWidth = 0.8; for (let i = 0; i < 7; i++) { const hy = y + 14 + i * 19; ctx.beginPath(); ctx.moveTo(x + w / 2 - 9, hy + 3); ctx.lineTo(x + w / 2, hy); ctx.lineTo(x + w / 2 + 9, hy + 3); ctx.stroke(); }
+                    rr(x + w - 2, y + 6, 14, h * 0.45, 2, '#1a1216', C.goldDk, 0.8); rr(x + w - 2, y + h * 0.52, 14, h * 0.45, 2, '#1a1216', C.goldDk, 0.8);   // the doors swung out
+                    break;
+                }
+                case 'ps_suitcase': {                                      // his monogrammed case, left open; rifled once searched today
+                    const rifled = p._searched;
+                    shadow(3); rr(x, y, w, h, 3, '#3a2418', C.gold, 1);
+                    rr(x - 1, y - h * 0.62, w + 2, h * 0.6, 3, '#4a2e1e', C.gold, 1);                                // the open lid
+                    ctx.fillStyle = C.gold; ctx.font = 'bold 7px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('D·M', x + w / 2, y - h * 0.32);
+                    rr(x + 3, y + 3, w - 6, h - 6, 2, '#6a1020');                                                     // crimson lining
+                    if (!rifled) { rr(x + 6, y + 6, 18, 12, 2, '#f4efe8'); rr(x + 26, y + 8, 18, 10, 2, '#1a1a22'); ctx.fillStyle = C.crimsonLt; ctx.beginPath(); ctx.moveTo(x + 10, y + h - 6); ctx.lineTo(x + 40, y + h - 10); ctx.lineTo(x + 40, y + h - 7); ctx.closePath(); ctx.fill(); circ(x + 16, y + h - 12, 1.3, C.gold); circ(x + 20, y + h - 12, 1.3, C.gold); }
+                    else { rr(x + 8, y + h + 2, 20, 8, 2, '#f4efe8', 'rgba(0,0,0,0.3)', 0.5); ctx.fillStyle = C.crimsonLt; ctx.fillRect(x + w - 6, y + h - 2, 14, 2.5); }   // shirts tipped out
+                    break;
+                }
+                case 'ps_tub': {                                           // a round marble tub, rose petals floating
+                    circ(x + w / 2 + 3, y + h / 2 + 4, w / 2, 'rgba(0,0,0,0.3)'); circ(x + w / 2, y + h / 2, w / 2, '#f4f2f6', C.gold, 1.5);
+                    circ(x + w / 2, y + h / 2, w / 2 - 7, '#b8d0e8');
+                    for (let i = 0; i < 8; i++) { const a = i * 0.8 + t * 0.05, r = 10 + (i * 7) % 22; ctx.fillStyle = i % 2 ? '#c42a52' : '#e04a6e'; ctx.beginPath(); ctx.ellipse(x + w / 2 + Math.cos(a) * r, y + h / 2 + Math.sin(a) * r, 2.6, 1.6, a, 0, Math.PI * 2); ctx.fill(); }
+                    rr(x + w / 2 - 4, y - 1, 8, 6, 2, C.gold);                                                        // the spout
+                    break;
+                }
+                case 'ps_vanity': {                                        // a marble vanity along the east wall, a basin, a perfume
+                    shadow(2); rr(x, y, w, h, 2, '#f0ecf2', C.goldDk, 1);
+                    ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, 7, 11, 0, 0, Math.PI * 2); ctx.fillStyle = '#d8dce8'; ctx.fill(); ctx.strokeStyle = C.silverDk; ctx.lineWidth = 0.6; ctx.stroke();
+                    circ(x + w / 2, y + 10, 2.6, '#e8b4c8', C.gold, 0.5); circ(x + w / 2, y + h - 10, 2.2, C.gold);
+                    break;
+                }
+                case 'ps_pool': {                                          // the plunge pool: tiled edge, water with a slow ripple
+                    shadow(10); rr(x, y, w, h, 10, '#d8d0c4', C.gold, 1.2);
+                    const g = ctx.createLinearGradient(x, y, x, y + h); g.addColorStop(0, '#1e5a7a'); g.addColorStop(1, '#0e2a44');
+                    rr(x + 6, y + 6, w - 12, h - 12, 7, g);
+                    ctx.strokeStyle = 'rgba(160,230,255,0.35)'; ctx.lineWidth = 0.8;
+                    for (let k = 0; k < 5; k++) { ctx.beginPath(); for (let i = 0; i <= 20; i++) { const px = x + 10 + i * (w - 20) / 20, py = y + 14 + k * (h - 28) / 4 + Math.sin(i * 0.9 + t * 1.6 + k) * 2; ctx[i ? 'lineTo' : 'moveTo'](px, py); } ctx.stroke(); }
+                    ctx.strokeStyle = C.silver; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + w - 18, y + 3); ctx.lineTo(x + w - 18, y + 14); ctx.moveTo(x + w - 12, y + 3); ctx.lineTo(x + w - 12, y + 14); ctx.stroke();   // the ladder
+                    break;
+                }
+                case 'ps_lounger': {                                       // a white lounger, a folded towel
+                    shadow(6); rr(x, y, w, h, 6, '#e8e4dc', C.goldDk, 1);
+                    rr(x + 3, y + 3, w - 6, 24, 5, '#f8f6f2'); ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let ly = y + 32; ly < y + h - 4; ly += 6) { ctx.moveTo(x + 4, ly); ctx.lineTo(x + w - 4, ly); } ctx.stroke();
+                    rr(x + 6, y + h - 22, w - 12, 14, 2, C.crimsonLt);
+                    break;
+                }
+                case 'ps_telescope': {                                     // brass on a tripod, trained on the sky
+                    ctx.strokeStyle = '#2a2a30'; ctx.lineWidth = 1.5; ctx.beginPath(); for (const a of [0.4, 2.5, 4.6]) { ctx.moveTo(x + w / 2, y + h / 2); ctx.lineTo(x + w / 2 + Math.cos(a) * 13, y + h / 2 + Math.sin(a) * 13); } ctx.stroke();
+                    ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(-2.2); rr(-3, -3, 24, 6, 3, C.gold, C.goldDk, 0.8); rr(18, -4, 6, 8, 2, C.goldDk); ctx.restore();
+                    break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
+            if (p.decorType.startsWith('ps_')) return drawSuiteDecorProp(ctx, p);
             if (p.decorType.startsWith('mc_')) return drawClubDecorProp(ctx, p);
             if (p.decorType.startsWith('gy_')) return drawGraveStone(ctx, p);
             if (p.decorType.startsWith('dn_')) return drawLobbyDecorProp(ctx, p);
@@ -47097,6 +47333,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.activeMap.id === 'apt_949') this.drawApartmentGlow(ctx);
                 if (this.activeMap.id === 'house_of_death') this.drawHouseGlow(ctx);
                 if (this.activeMap.id === 'hotel_lobby') this.drawLobbyGlow(ctx);
+                if (this.activeMap.id === 'hotel_suite') this.drawSuiteGlow(ctx);
                 if (this.activeMap.id === 'moon_city_nightclub') this.drawClubGlow(ctx);
                 if (this.activeMap.id === 'hub_949') this.drawGraveyardGlow(ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
@@ -49646,6 +49883,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 if (this.activeMap.id === 'house_of_death') this.drawHouseInterior(this.ctx);
                 if (this.activeMap.id === 'hotel_lobby') this.drawLobbyInterior(this.ctx);
+                if (this.activeMap.id === 'hotel_suite') this.drawSuiteInterior(this.ctx);
                 if (this.activeMap.id === 'moon_city_nightclub') { this.drawClubInterior(this.ctx); this.drawClubFloorLights(this.ctx); }
                 
                 // Indoor V2: Room floors, windows, and doors
@@ -51006,6 +51244,113 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.textAlign = 'center'; ctx.font = 'italic bold 15px Georgia, serif';
                 ctx.globalAlpha = 0.35 * sh; ctx.fillStyle = '#ffb060'; ctx.fillText('Think excellence, think Double Nights.', 500, 172);
                 ctx.globalAlpha = 0.95 * sh; ctx.fillStyle = '#ffe2a8'; ctx.fillText('Think excellence, think Double Nights.', 500, 171);
+                ctx.restore();
+            },
+
+            /** The penthouse floors, painted once: black marble with gold grout and white inlays, the
+             *  sunburst rug in the pit and the runner from the elevator; herringbone walnut in the
+             *  bedroom; white marble in the bath; teak on the balcony and its glass balustrade. */
+            drawSuiteInterior(ctx) {
+                if (!this._suiteFloor) this._suiteFloor = this._paintSuiteFloor();
+                ctx.drawImage(this._suiteFloor, 0, 0);
+            },
+
+            _paintSuiteFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1400; cv.height = 1010;
+                const c = cv.getContext('2d'), r = seededRandom(1919), GOLD = '#e8c27a';
+                c.fillStyle = '#0c0a0e'; c.fillRect(0, 0, 1400, 1010);
+                const clip = (x, y, w, h, fn) => { c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip(); fn(); c.restore(); };
+                // Living room: black marble slabs, gold grout, a white diamond at each crossing, silver veins
+                clip(50, 50, 650, 900, () => {
+                    for (let y = 50; y < 950; y += 75) for (let x = 50; x < 700; x += 75) { const v = r() * 7 | 0; c.fillStyle = `rgb(${17 + v},${14 + v},${20 + v})`; c.fillRect(x, y, 75, 75); }
+                    c.strokeStyle = 'rgba(232,194,122,0.18)'; c.lineWidth = 1; c.beginPath();
+                    for (let x = 50; x <= 700; x += 75) { c.moveTo(x, 50); c.lineTo(x, 950); } for (let y = 50; y <= 950; y += 75) { c.moveTo(50, y); c.lineTo(700, y); } c.stroke();
+                    c.fillStyle = '#e9e2d8'; for (let y = 125; y < 950; y += 75) for (let x = 125; x < 700; x += 75) { c.beginPath(); c.moveTo(x, y - 6); c.lineTo(x + 6, y); c.lineTo(x, y + 6); c.lineTo(x - 6, y); c.fill(); }
+                    for (let i = 0; i < 26; i++) { let x = 50 + r() * 650, y = 50 + r() * 900; c.strokeStyle = `rgba(223,230,255,${0.05 + r() * 0.07})`; c.lineWidth = 0.5 + r(); c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (r() - 0.3) * 60; y += (r() - 0.5) * 45; c.lineTo(x, y); } c.stroke(); }
+                });
+                // The runner from the elevator to the pit
+                c.fillStyle = '#12090e'; c.fillRect(100, 470, 120, 60); c.fillStyle = GOLD; c.fillRect(100, 472, 120, 1.5); c.fillRect(100, 526.5, 120, 1.5);
+                // The pit's sunburst rug
+                const P = { x: 330, y: 500 };
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.arc(P.x + 3, P.y + 4, 150, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#4a0814'; c.beginPath(); c.arc(P.x, P.y, 150, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = GOLD; c.lineWidth = 2; c.stroke(); c.lineWidth = 1; c.beginPath(); c.arc(P.x, P.y, 140, 0, Math.PI * 2); c.stroke();
+                for (let k = 0; k < 32; k++) { const a = k * Math.PI / 16; c.strokeStyle = k % 2 ? 'rgba(232,194,122,0.45)' : 'rgba(184,32,58,0.8)'; c.lineWidth = k % 2 ? 1.2 : 3; c.beginPath(); c.moveTo(P.x + Math.cos(a) * 28, P.y + Math.sin(a) * 28); c.lineTo(P.x + Math.cos(a) * 136, P.y + Math.sin(a) * 136); c.stroke(); }
+                c.fillStyle = '#2a0610'; c.beginPath(); c.arc(P.x, P.y, 28, 0, Math.PI * 2); c.fill(); c.strokeStyle = GOLD; c.lineWidth = 1.5; c.stroke();
+                // Bedroom (the L): herringbone walnut, a crimson rug at the foot of the bed
+                const herring = (x0, y0, w, h) => clip(x0, y0, w, h, () => {
+                    c.fillStyle = '#20140f'; c.fillRect(x0, y0, w, h);
+                    for (let y = y0 - 40; y < y0 + h + 40; y += 12) for (let x = x0 - 40; x < x0 + w + 40; x += 24) {
+                        const v = r() * 10 | 0, sh = `rgb(${38 + v},${24 + v},${18 + v})`;
+                        c.save(); c.translate(x + ((y / 12) % 2 ? 12 : 0), y); c.rotate(Math.PI / 4); c.fillStyle = sh; c.fillRect(0, 0, 30, 9); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 0.6; c.strokeRect(0, 0, 30, 9); c.restore();
+                    }
+                });
+                herring(720, 50, 380, 750); herring(1100, 320, 250, 480);
+                c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(803, 283, 214, 90); c.fillStyle = '#5a0a18'; c.fillRect(800, 280, 214, 90);
+                c.strokeStyle = GOLD; c.lineWidth = 1.5; c.strokeRect(806, 286, 202, 78); c.lineWidth = 0.7; c.strokeRect(812, 292, 190, 66);
+                // Bath: white marble, grey veins, a gold border
+                clip(1120, 50, 230, 250, () => {
+                    c.fillStyle = '#6e6878'; c.fillRect(1120, 50, 230, 250);   // moonstone marble
+                    for (let i = 0; i < 14; i++) { let x = 1120 + r() * 230, y = 50 + r() * 250; c.strokeStyle = `rgba(60,50,70,${0.2 + r() * 0.2})`; c.lineWidth = 0.6 + r(); c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (r() - 0.5) * 50; y += (r() - 0.3) * 40; c.lineTo(x, y); } c.stroke(); }
+                    c.strokeStyle = 'rgba(168,130,62,0.7)'; c.lineWidth = 2; c.strokeRect(1128, 58, 214, 234);
+                });
+                // Balcony: teak decking, the glass balustrade along the edge
+                clip(720, 810, 630, 190, () => {
+                    for (let y = 810; y < 1000; y += 10) { const v = r() * 10 | 0; c.fillStyle = `rgb(${70 + v},${46 + v},${30 + v})`; c.fillRect(720, y, 630, 10); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(720, y + 9, 630, 1); }
+                    c.fillStyle = 'rgba(0,0,0,0.25)'; for (let x = 740; x < 1350; x += 90) for (let y = 810; y < 1000; y += 20) c.fillRect(x + ((y / 10) % 2) * 45, y, 1, 10);
+                });
+                c.fillStyle = 'rgba(200,220,255,0.28)'; c.fillRect(720, 994, 630, 6); c.fillStyle = 'rgba(223,230,255,0.6)'; for (let x = 730; x < 1350; x += 60) c.fillRect(x, 993, 3, 8);
+                return cv;
+            },
+
+            /** The penthouse after the darkness layer: the fire and the candles, the gold elevator doors, the
+             *  pool's light, the city and the moon beyond the balcony, and the mirror rift in the bath —
+             *  the violet tear the Dark Maker left through. A room she isn't in keeps a little of its glow. */
+            drawSuiteGlow(ctx) {
+                const t = _frameTime / 1000, rs = this.roomSystem;
+                const seen = (x, y) => { const q = rs && rs.active ? rs.getRoomAt(x, y) : null; return q ? 0.25 + 0.75 * q.vis : 1; };
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const flame = (x, y, k = 0) => { const f = 0.75 + 0.25 * Math.sin(t * 11 + x * 0.3 + k); glow(x, y, 14, '255, 190, 120', 0.5 * f * seen(x, y)); ctx.globalAlpha = seen(x, y); ctx.fillStyle = `rgb(255,${200 + 40 * f | 0},130)`; ctx.beginPath(); ctx.arc(x, y - 0.5, 1.5 * f, 0, Math.PI * 2); ctx.fill(); };
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // The fire, still burning low
+                const ff = 0.8 + 0.2 * Math.sin(t * 6.3) * Math.sin(t * 2.1);
+                glow(330, 928, 80, '255, 130, 50', 0.4 * ff * seen(330, 900));
+                // Candles: dinner for two, the desk
+                flame(555, 708, 1); flame(555, 742, 2); flame(1278, 614, 3); flame(1288, 620, 4); flame(1282, 648, 5);
+                // The pool, lit from beneath, light rippling up
+                const ps = seen(905, 907);
+                glow(905, 907, 110, '120, 210, 255', 0.3 * ps);
+                for (let i = 0; i < 6; i++) { const cx = 840 + ((i * 47 + t * 9) % 130), cy = 884 + ((i * 29) % 46); glow(cx, cy + Math.sin(t * 2 + i) * 3, 14, '180, 240, 255', 0.25 * ps); }
+                // The city and the moon beyond the balcony
+                glow(1270, 1060, 90, '220, 225, 255', 0.25); glow(1270, 1060, 18, '255, 255, 255', 0.6);
+                for (let i = 0; i < 40; i++) { const sx = 730 + (i * 157) % 610, sy = 1012 + (i * 37) % 70, tw = 0.5 + 0.5 * Math.sin(t * 1.3 + i * 2.1); ctx.globalAlpha = 0.5 * tw; ctx.fillStyle = i % 3 ? '#ffd9a0' : '#c8b0ff'; ctx.fillRect(sx, sy, 2, 2); }
+                // The mirror rift: a violet tear in the bath mirror, where he left
+                const rift = seen(1180, 150), RX = 1180, RY = 112;
+                glow(RX, RY, 90, '150, 90, 255', (0.28 + 0.08 * Math.sin(t * 1.7)) * rift); glow(RX, RY, 40, '210, 160, 255', 0.35 * rift);
+                ctx.save(); ctx.translate(RX, RY);
+                for (let k = 0; k < 4; k++) {
+                    const sp = (k % 2 ? -1 : 1) * (0.9 + k * 0.35), a0 = (t * sp) % (Math.PI * 2);
+                    ctx.globalAlpha = (0.7 - k * 0.12) * rift; ctx.strokeStyle = k === 2 ? 'rgba(232,194,122,1)' : 'rgba(200,150,255,1)'; ctx.lineWidth = 2;
+                    for (let j = 0; j < 2; j++) { ctx.beginPath(); ctx.ellipse(0, 0, 10 + k * 5, 34 + k * 9, 0, a0 + j * Math.PI, a0 + j * Math.PI + 1.4); ctx.stroke(); }
+                }
+                ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = rift; ctx.fillStyle = 'rgba(20,4,40,0.92)'; ctx.beginPath(); ctx.ellipse(0, 0, 6, 30, 0, 0, Math.PI * 2); ctx.fill();   // the tear itself: a slit of the dark beyond
+                ctx.strokeStyle = 'rgba(255,230,255,0.9)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(0, 0, 6, 30, 0, 0, Math.PI * 2); ctx.stroke();
+                ctx.restore();
+                for (let i = 0; i < 14; i++) { const ph = (t * 0.35 + i / 14) % 1, a = i * 2.4; const sx = RX + Math.cos(a) * (18 + ph * 60), sy = RY + Math.sin(a) * (30 + ph * 50) + ph * 20; ctx.globalAlpha = (1 - ph) * 0.8 * rift; ctx.fillStyle = i % 3 ? '#e0c8ff' : '#fff1c2'; ctx.beginPath(); ctx.arc(sx, sy, 1.3, 0, Math.PI * 2); ctx.fill(); }
+                ctx.restore();
+                // (Solid) the elevator doors in the west wall, its dial, and the cracked mirror round the rift
+                ctx.save();
+                ctx.fillStyle = '#b8914a'; ctx.fillRect(44, 424, 12, 152);
+                ctx.fillStyle = '#e8c27a'; ctx.fillRect(46, 426, 8, 73); ctx.fillRect(46, 501, 8, 73);
+                ctx.strokeStyle = '#6a4f22'; ctx.lineWidth = 1; ctx.strokeRect(46, 426, 8, 73); ctx.strokeRect(46, 501, 8, 73);
+                const nd = Math.PI + (0.5 + 0.5 * Math.sin(t * 0.3)) * Math.PI;
+                ctx.fillStyle = '#1a1216'; ctx.beginPath(); ctx.arc(70, 410, 9, Math.PI, 0); ctx.fill();
+                ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(70, 410, 9, Math.PI, 0); ctx.stroke();
+                ctx.strokeStyle = '#ffb060'; ctx.beginPath(); ctx.moveTo(70, 410); ctx.lineTo(70 + Math.cos(nd) * 7, 410 + Math.sin(nd) * 7); ctx.stroke();
+                ctx.fillStyle = 'rgba(200,210,240,0.35)'; ctx.fillRect(1128, 52, 104, 7); ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1; ctx.strokeRect(1128, 52, 104, 7);
+                ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.7; ctx.beginPath();
+                for (const [dx, dy] of [[-30, 4], [-14, 6], [12, 5], [28, 3], [44, 6]]) { ctx.moveTo(1180, 55); ctx.lineTo(1180 + dx, 52 + dy); }
+                ctx.stroke();
                 ctx.restore();
             },
 
