@@ -2285,11 +2285,11 @@
 
         /* The flit ring round the move stick: fill = flit charge (initJoystick / updateFlitRing) */
         #joystick-ring {
-            position: absolute; left: 50%; top: 50%; width: 172px; height: 172px; transform: translate(-50%, -50%);
+            position: absolute; left: 50%; top: 50%; width: 192px; height: 192px; transform: translate(-50%, -50%);
             border-radius: 50%; pointer-events: none; --fill: 100%;
             background: conic-gradient(rgba(190, 140, 255, 0.9) var(--fill), rgba(255, 255, 255, 0.10) 0);
-            -webkit-mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
-                    mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
+            -webkit-mask: radial-gradient(circle, transparent 87px, #000 88px, #000 94px, transparent 95px);
+                    mask: radial-gradient(circle, transparent 87px, #000 88px, #000 94px, transparent 95px);
             filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6));
             transition: opacity 0.2s;
         }
@@ -2315,12 +2315,12 @@
         #game-ui.aiming #btn-heal, #game-ui.aiming #btn-nv, #game-ui.aiming #btn-flit,
         #game-ui.aiming #btn-holster, #game-ui.aiming #btn-autodrive { opacity: 0.15 !important; pointer-events: none !important; transition: opacity 0.15s; }
 
-        /* …and the fire line itself, a band like the flit ring at the same reach (72 px): past it, she fires */
+        /* …and the fire line itself, a band like the flit ring (62 px): past it, she fires */
         #fire-band {
-            position: absolute; left: 50%; top: 50%; width: 172px; height: 172px; transform: translate(-50%, -50%);
+            position: absolute; left: 50%; top: 50%; width: 152px; height: 152px; transform: translate(-50%, -50%);
             border-radius: 50%; pointer-events: none; background: rgba(232, 194, 122, 0.55);
-            -webkit-mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
-                    mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
+            -webkit-mask: radial-gradient(circle, transparent 67px, #000 68px, #000 74px, transparent 75px);
+                    mask: radial-gradient(circle, transparent 67px, #000 68px, #000 74px, transparent 75px);
             filter: drop-shadow(0 0 5px rgba(232, 194, 122, 0.45)); opacity: 0.55; transition: opacity 0.12s, background 0.12s;
         }
         #fire-band.hot { opacity: 1; background: rgba(255, 214, 140, 0.95); filter: drop-shadow(0 0 12px rgba(255, 190, 90, 0.9)); }
@@ -51707,7 +51707,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                ========================================================= */
             initJoystick() {
                 const inputZone = document.getElementById('input-zone-left'), visualZone = document.getElementById('joystick-zone'), knob = document.getElementById('joystick-knob');
-                const J = this.joystick, WALK = 35, RING_IN = 72, RING_OUT = 55, EDGE = 90;   // ring: flit past 72 px, re-arm inside 55
+                const J = this.joystick, WALK = 35, RING_IN = 82, RING_OUT = 65, EDGE = 100;   // ring: flit past 82 px, re-arm inside 65
                 const gameUI = document.getElementById('game-ui');
                 const canFlit = () => !this.isDriving && !(gameUI && gameUI.classList.contains('emote-active'));   // not at the wheel or holstered
                 const ringFlit = (dx, dy) => {
@@ -51775,7 +51775,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             initFireJoystick() {
                 const fireZone = document.getElementById('btn-fire'), knob = document.getElementById('fire-joystick-knob');
                 const ring = document.getElementById('fire-ring'), band = document.getElementById('fire-band'), gameUI = document.getElementById('game-ui');
-                const F = this.fireJoystick, MEMORY = 0.6, DRAG = 8, DEAD = 6, FIRE_IN = 72, FIRE_OUT = 55;   // the same reach as the flit ring
+                const F = this.fireJoystick, MEMORY = 0.6, DRAG = 8, DEAD = 6, FIRE_IN = 62, FIRE_OUT = 45;   // fire past 62 px, stop inside 45
                 const aimMode = () => GameSettings.aimBeforeFire !== false;
                 const sniperRelease = () => aimMode() && GameSettings.sniperRelease !== false && this.weaponMode === 'sniper';
                 const setKnob = (x, y) => { knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; };
@@ -51814,7 +51814,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         if (F.remembered && Math.hypot(touch.clientX - F.landX, touch.clientY - F.landY) < DRAG) break;   // still on the remembered aim
                         F.remembered = false;
                         const deltaX = touch.clientX - F.originX, deltaY = touch.clientY - F.originY, far = Math.hypot(deltaX, deltaY);
-                        const MAX = aimMode() ? 84 : 35, distance = Math.min(far, MAX), angle = Math.atan2(deltaY, deltaX);
+                        const MAX = aimMode() ? 74 : 35, distance = Math.min(far, MAX), angle = Math.atan2(deltaY, deltaX);
                         setKnob(Math.cos(angle) * distance, Math.sin(angle) * distance);
                         if (aimMode()) {
                             if (far > DEAD) { F.aimed = true; F.dx = Math.cos(angle); F.dy = Math.sin(angle); }   // direction only: she aims wherever the thumb points
