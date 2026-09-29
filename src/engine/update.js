@@ -1278,7 +1278,7 @@
                 let inTransition = false;
                 if (this.activeMap.transitions && !this.isDriving) { 
                     const t = this._transitionGrid.query(this.player.x, this.player.y); 
-                    if (t) { inTransition = true; this.transitionBtn.textContent = t.label; this.transitionBtn.style.display = 'block'; } 
+                    if (t) { inTransition = true; const [v, n] = transitionAction(t.label); setActionPill(this.transitionBtn, v, n, 'F'); this.transitionBtn.style.display = 'flex'; } 
                 }
                 if (!inTransition) this.transitionBtn.style.display = 'none';
             
@@ -1331,46 +1331,46 @@
             
                 // Update Button State
                 if (this.isDriving) { 
-                    this.interactBtn.innerHTML = "Exit<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>"; this.interactBtn.style.display = 'flex'; this.activeInteraction = null; 
+                    this.setInteract('Exit', 'Vehicle'); this.interactBtn.style.display = 'flex'; this.activeInteraction = null; 
                 } 
                 else if (nearInteractable) { 
                     this.interactBtn.style.display = 'flex'; this.activeInteraction = nearInteractable; 
                     if (nearInteractable instanceof PropEntity) {
-                        if (nearInteractable.interactionType === 'medbay_refill') this.interactBtn.innerHTML = "Refill<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
-                        else if (nearInteractable.interactionType === 'lost_luggage') this.interactBtn.innerHTML = "Search<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
-                        if (nearInteractable.interactionType === 'vending_machine') this.interactBtn.innerHTML = "Buy<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
-                        if (nearInteractable.interactionType === 'bed_sleep') this.interactBtn.innerHTML = "Rest<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
-                        if (nearInteractable.interactionType === 'crafting_table') this.interactBtn.innerHTML = "Craft<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
-                        if (nearInteractable.interactionType === 'auto_shop_counter') this.interactBtn.innerHTML = "Shop<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
-                        if (nearInteractable.interactionType === 'armory') this.interactBtn.innerHTML = "Loadout<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
-                        if (nearInteractable.interactionType === 'read_note') this.interactBtn.innerHTML = "Read<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
-                        if (nearInteractable.interactionType === 'light_switch') this.interactBtn.innerHTML = "Lights<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
+                        if (nearInteractable.interactionType === 'medbay_refill') this.setInteract('Refill', 'Health station');
+                        else if (nearInteractable.interactionType === 'lost_luggage') this.setInteract('Search', nearInteractable.label || 'Lost luggage');
+                        if (nearInteractable.interactionType === 'vending_machine') this.setInteract('Buy', 'MiniSpree');
+                        if (nearInteractable.interactionType === 'bed_sleep') this.setInteract('Rest', 'Bed');
+                        if (nearInteractable.interactionType === 'crafting_table') this.setInteract('Craft', 'Workbench');
+                        if (nearInteractable.interactionType === 'auto_shop_counter') this.setInteract('Shop', 'Counter');
+                        if (nearInteractable.interactionType === 'armory') this.setInteract('Loadout', 'Armory');
+                        if (nearInteractable.interactionType === 'read_note') this.setInteract('Read', nearInteractable.label || 'Note');
+                        if (nearInteractable.interactionType === 'light_switch') this.setInteract('Lights', 'Light switch');
                     } else if (nearInteractable.interactionType === 'delivery_pickup') {
-                        this.interactBtn.innerHTML = "Pick Up<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
+                        this.setInteract('Pick Up', 'Delivery');
                     } else if (nearInteractable.interactionType === 'adopt_cat') {
-                        this.interactBtn.innerHTML = "Adopt<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
+                        this.setInteract('Adopt', nearInteractable.name || 'Cat');
                     } else if (nearInteractable.role === 'teammate' && nearInteractable.recruited && this.activeMap && this.activeMap.id === 'apt_949') {
                         if (this.bonding.canBond(nearInteractable)) {
-                            this.interactBtn.innerHTML = "Bond<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
+                            this.setInteract('Bond', nearInteractable.name);
                         } else {
-                            this.interactBtn.innerHTML = "Talk<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
+                            this.setInteract('Talk', nearInteractable.name);
                         }
-                    } else { this.interactBtn.innerHTML = "Talk<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>"; }
+                    } else { this.setInteract('Talk', nearInteractable.name); }
                 }
                 else if (ownedCarDist !== null && ownedCarDist < 80) {
-                    this.interactBtn.innerHTML = "Enter<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>"; this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hijack', target: this.ownedCar };
+                    this.setInteract('Drive', 'Your car'); this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hijack', target: this.ownedCar };
                 }
                 else if (nearDeliveryVehicle) {
-                    this.interactBtn.innerHTML = "Enter<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>"; this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hijack', target: nearDeliveryVehicle };
+                    this.setInteract('Drive', 'Delivery van'); this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hijack', target: nearDeliveryVehicle };
                 }
                 else if (nearTraffic && nearTraffic.isZib) {
-                    this.interactBtn.innerHTML = "Hail<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>"; this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hail_zib', target: nearTraffic };
+                    this.setInteract('Hail', 'Zib cab'); this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hail_zib', target: nearTraffic };
                 }
                 else if (nearTraffic) {
-                    this.interactBtn.innerHTML = "Hijack<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>"; this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hijack', target: nearTraffic };
+                    this.setInteract('Hijack', 'Vehicle'); this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hijack', target: nearTraffic };
                 }
                 else if (carDist < 80 && this.activeMap.type !== 'indoor') { 
-                    this.interactBtn.innerHTML = "Enter<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>"; this.interactBtn.style.display = 'flex'; this.activeInteraction = null; 
+                    this.setInteract('Drive', 'Car'); this.interactBtn.style.display = 'flex'; this.activeInteraction = null; 
                 } 
                 else { 
                     this.interactBtn.style.display = 'none'; this.activeInteraction = null; 

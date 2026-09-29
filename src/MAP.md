@@ -103,6 +103,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `ui/wardrobe.js` | `WARDROBE`: every top, bottom, shoe, hat and piece of jewelry, in the world and in portraits. The character look format is documented at the top |
 | `ui/humanoid-render.js` | Drawing characters: hair, portraits, bodies, held drinks, weapons |
 | `ui/inventory-augments.js` | Items, abilities, inventory, augments |
+| `ui/action-dock.js` | The action dock: context pills (talk, search, enter, exit…) above the right-hand cluster, clear of the fire ring — `setActionPill`, `transitionAction`, the glyphs; `game.setInteract(verb, name)` sets the interact pill |
 | `ui/phone.js` | The phone (contacts, messages, map, apps), NEUME UI, global keys |
 | `ui/sidebars.js` | Inventory and map sidebars |
 | `ui/save-slots-pause-menu.js` | Save slots and the pause/settings menu |
