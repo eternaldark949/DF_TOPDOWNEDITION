@@ -142,9 +142,9 @@
                         new PropEntity({ x: 60, y: 1075, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
                         new PropEntity({ x: 900, y: 1075, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
                         // Lost luggage: someone won't miss it (searchable once a day — events.js)
-                        F(214, 1062, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_palm', noNav: true }),
-                        F(812, 462, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_elevator', noNav: true }),
-                        F(760, 726, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_lounge', noNav: true }),
+                        F(214, 1062, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_palm', label: 'Lost luggage', noNav: true }),
+                        F(812, 462, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_elevator', label: 'Lost luggage', noNav: true }),
+                        F(760, 726, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_lounge', label: 'Lost luggage', noNav: true }),
                     ];
                     e.npcs = [ new NPC(500, 540, "LUVSH4D3", 'robot_crimson'), new NPC(150, 320, "Guard Unit Alpha", 'robot_gold'), new NPC(850, 320, "Guard Unit Beta", 'robot_gold') ];
                     const L = (x, y, color, lightRadius, lampType = 4, angle = 0) => new LampEntity({ x, y, lampType, color, lightRadius, angle });
@@ -217,6 +217,10 @@
                     // the light show (dance floor, beams, mirror ball, neon) in drawClubGlow.
                     const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a0e22', decorType }, extra));
                     const SUITES = [290, 594, 898];
+                    const CLUTCH = ['LIPSTICK, A KEYCARD… AND PERSONICS', "SHE'LL CALL IT A NIGHT'S TIP", 'LEFT WITH THE LAST SONG'];
+                    const COAT = ['CHECK YOUR POCKETS, DARLING', 'FOLDED BILLS IN THE LINING'];
+                    const PURSE = ['WHAT HAPPENS IN THE SUITES…', 'VIP MONEY SPENDS THE SAME', 'A THANK-YOU NOTE AND A THICK ROLL'];
+                    const HANDBAG = ['DROPPED ON THE DANCE FLOOR', 'FINDERS KEEPERS'];
                     e.props = [
                         // The floor: the DJ stage and its stacks, three poles round the dance floor, high-tops, booths
                         F(620, 14, 360, 104, 'mc_stage'), F(730, 52, 140, 40, 'mc_dj'),
@@ -241,6 +245,13 @@
                         F(1380, 22, 190, 64, 'mc_crescent_sofa'), F(1440, 104, 80, 34, 'mc_lowtable'), F(1258, 30, 30, 30, 'mc_orb'),
                         // The suites: a velvet couch, a low table, a private pole
                         ...SUITES.flatMap(y0 => [F(1522, y0 + 45, 56, 200, 'mc_suite_couch'), F(1450, y0 + 115, 44, 60, 'mc_lowtable'), F(1400, y0 + 50, 10, 10, 'mc_pole')]),
+                        // Lost things: searched once a day for personics (searchLostLuggage), refilled the next
+                        ...[['mc_lost_clutch', 150, 34, 20, 12, 'club_powder', 'Sequined clutch', 20, 60, CLUTCH],
+                            ['mc_lost_clutch', 300, 1125, 20, 12, 'club_gents', 'Beaded clutch', 20, 60, CLUTCH],
+                            ['mc_lost_coat', 1030, 1060, 40, 26, 'club_coat', 'Fur-trimmed coat', 30, 90, COAT],
+                            ['mc_lost_handbag', 1148, 158, 20, 16, 'club_floor', 'Chain-strap handbag', 25, 75, HANDBAG],
+                            ...SUITES.map((y0, i) => ['mc_lost_purse', 1532, y0 + 132, 22, 16, 'club_suite' + (i + 1), 'Velvet purse', 40, 120, PURSE])
+                        ].map(([t, x, y, w, h, noteId, label, lootMin, lootMax, lootLines]) => F(x, y, w, h, t, { interactionType: 'lost_luggage', noteId, label, lootMin, lootMax, lootLines, noNav: true })),
                     ];
                     e.npcs = [
                         new NPC(452, 500, "Bartender", 'bartender'), new NPC(1480, 175, "Mirabel"),
