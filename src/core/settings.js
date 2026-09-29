@@ -105,6 +105,14 @@
                 return 0.7;
             })(),
             
+            musicVolume: (() => {           // Music: the apartment's track and the phone radio (0..1); kept outside saves too
+                try {
+                    const v = parseFloat(localStorage.getItem('dfab_music_volume'));
+                    if (!isNaN(v)) return Math.max(0, Math.min(1, v));
+                } catch (e) { /* private mode */ }
+                return 0.7;
+            })(),
+            
             // --- PERFORMANCE ---
             fpsLimit: 0,
             /* Internal render scale, 1.0 = native. The scene is rasterised into a
