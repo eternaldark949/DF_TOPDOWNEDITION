@@ -119,12 +119,14 @@
             syncAmbienceSliders();
         }
 
-        // Ambience volume: one setting, two sliders (main menu + pause panel), kept in step
+        // Ambience and Music volume: each one setting, two sliders (main menu + pause panel), kept in step
         function syncAmbienceSliders() {
-            const v = Math.round((GameSettings.ambienceVolume ?? 0.7) * 100);
-            for (const id of ['main-ambience', 'set-ambience']) { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = v; }
-            const a = document.getElementById('lbl-ambience'); if (a) a.textContent = `Ambience: ${v}`;
-            const b = document.getElementById('set-ambience-val'); if (b) b.textContent = v;
+            for (const [key, name, label] of [['ambienceVolume', 'ambience', 'Ambience'], ['musicVolume', 'music', 'Music']]) {
+                const v = Math.round((GameSettings[key] ?? 0.7) * 100);
+                for (const id of [`main-${name}`, `set-${name}`]) { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = v; }
+                const a = document.getElementById(`lbl-${name}`); if (a) a.textContent = `${label}: ${v}`;
+                const b = document.getElementById(`set-${name}-val`); if (b) b.textContent = v;
+            }
         }
         let _ambPreviewAt = 0;
         function setAmbienceVolume(v) {
@@ -138,6 +140,18 @@
             const el = document.getElementById(id);
             if (!el) continue;
             el.addEventListener('input', () => setAmbienceVolume(el.value / 100));
+            for (const ev of ['click', 'pointerdown', 'touchstart', 'keydown']) el.addEventListener(ev, e => e.stopPropagation());
+        }
+        function setMusicVolume(v) {
+            audioSys.init();
+            audioSys.setMusicVolume(v);
+            try { localStorage.setItem('dfab_music_volume', String(GameSettings.musicVolume)); } catch (e) { /* private mode */ }
+            syncAmbienceSliders();
+        }
+        for (const id of ['main-music', 'set-music']) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            el.addEventListener('input', () => setMusicVolume(el.value / 100));
             for (const ev of ['click', 'pointerdown', 'touchstart', 'keydown']) el.addEventListener(ev, e => e.stopPropagation());
         }
         syncAmbienceSliders();

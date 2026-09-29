@@ -15,7 +15,7 @@
                 this.audioElement = new Audio();
                 this.audioElement.loop = true;
                 this.trackSource = this.audioCtx.createMediaElementSource(this.audioElement);
-                this.trackSource.connect(audioSys.masterGain); // Route through master mute bus
+                this.trackSource.connect(audioSys.musicGain); // Music bus (Music slider) → master mute bus
                 this._currentBlobUrl = null; // Track ObjectURL for cleanup
                 
                 // Stations

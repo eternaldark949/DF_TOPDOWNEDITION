@@ -30,6 +30,18 @@
                 this.masterGain = this.ctx.createGain();
                 this.masterGain.gain.value = GameSettings.audioEnabled ? 1.0 : 0.0;
                 this.masterGain.connect(this.ctx.destination);
+
+                // MUSIC BUS — all music (the apartment's track, the phone radio) goes through
+                // here into the master, so the Music slider sets it apart from sound effects.
+                this.musicGain = this.ctx.createGain();
+                this.musicGain.gain.value = GameSettings.musicVolume ?? 0.7;
+                this.musicGain.connect(this.masterGain);
+            }
+
+            /** Music slider (0..1). */
+            setMusicVolume(v) {
+                GameSettings.musicVolume = Math.max(0, Math.min(1, v));
+                this.musicGain.gain.setTargetAtTime(GameSettings.musicVolume, this.ctx.currentTime, 0.05);
             }
         
             // Must be called after user interaction to unlock audio (browser policy)
@@ -239,6 +251,7 @@
                 this._set(this.L.city, !indoorMap ? 0.1 + 0.07 * day : veranda ? 0.09 : apt ? 0.025 : 0.015, 1.0);
                 this._set(this.L.room, apt && !veranda ? 0.035 : 0, 1.0);
                 this._set(this.L.fire, 0.22 * fire, 0.5);
+                this._music(game, paused);
                 if (paused) return;
 
                 // Sparse one-shots
@@ -249,7 +262,63 @@
             }
 
             /** Map menu / game stop: let everything fade out. */
-            silence() { if (this.ready) this.bus.gain.setTargetAtTime(0, this.audio.ctx.currentTime, 0.3); }
+            silence() {
+                if (!this.ready) return;
+                const now = this.audio.ctx.currentTime;
+                this.bus.gain.setTargetAtTime(0, now, 0.3);
+                if (this._mus) { this._mus.g.gain.setTargetAtTime(0, now, 0.3); this._mus.level = 0; }
+            }
+
+            /**
+             * A map's soundtrack (MAP_MUSIC): loops while you're on that map, fading in and out.
+             * With rooms, it plays from the room its speakers are in: full there, quieter and
+             * muffled elsewhere (as if through a wall, or the glass from a veranda), and an open
+             * door between lets more through. It ducks for the pause menu and stops for the phone radio.
+             */
+            _music(game, paused) {
+                const ctx = this.audio.ctx, now = ctx.currentTime;
+                const spec = game.activeMap && MAP_MUSIC[game.activeMap.id];
+                const M = this._mus || (this._mus = (() => {
+                    const f = ctx.createBiquadFilter(), g = ctx.createGain();
+                    f.type = 'lowpass'; f.frequency.value = 18000; f.Q.value = 0.5; g.gain.value = 0;
+                    f.connect(g); g.connect(this.audio.musicGain);
+                    return { f, g, src: null, name: null, loading: null, level: 0, cut: 18000, quietSince: now };
+                })());
+                // Start the track for this map (decoded once)
+                if (spec && M.name !== spec.track && M.loading !== spec.track) {
+                    M.loading = spec.track;
+                    loadSound(spec.track).then(buf => {
+                        M.loading = null;
+                        if (!buf) return;
+                        const cur = game.activeMap && MAP_MUSIC[game.activeMap.id];
+                        if (!cur || cur.track !== spec.track) return;       // left the map while it decoded
+                        if (M.src) { try { M.src.stop(); } catch (e) { /* already stopped */ } }
+                        const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(M.f); s.start();
+                        M.src = s; M.name = spec.track;
+                    });
+                }
+                // How loud and how bright, from where 949 is
+                let level = 0, cut = 18000;
+                if (spec && M.name === spec.track) {
+                    level = spec.volume ?? 0.5;
+                    const rs = game.roomSystem, room = rs && rs.active ? rs.currentRoom : null;
+                    if (room && spec.room && room.id !== spec.room) {
+                        let open = 0;                                        // an open door straight to the speakers' room
+                        for (const d of rs.doors) if (d.rooms.includes(room.id) && d.rooms.includes(spec.room)) open = Math.max(open, d.openAmount);
+                        if (room.type === 'outdoor') { level *= 0.35 + 0.45 * open; cut = 550 + 5000 * open; }
+                        else { level *= 0.55 + 0.35 * open; cut = 900 + 6000 * open; }
+                    }
+                    if (paused) level *= 0.3;
+                    if (game.musicWidget && game.musicWidget.isPlaying) level = 0;   // the phone radio takes over
+                }
+                if (Math.abs(level - M.level) > 0.002) { M.level = level; M.g.gain.setTargetAtTime(level, now, level > 0 ? 0.6 : 0.8); }
+                if (Math.abs(cut - M.cut) > 20) { M.cut = cut; M.f.frequency.setTargetAtTime(cut, now, 0.35); }
+                // Off this map: once faded out, stop it
+                if (!spec && M.src) {
+                    if (M.level > 0.002) M.quietSince = now;
+                    else if (now - M.quietSince > 4) { try { M.src.stop(); } catch (e) { /* already stopped */ } M.src = null; M.name = null; }
+                } else M.quietSince = now;
+            }
 
             _voice(nodes, dur) {
                 if (this.voices >= 6) return false;
@@ -343,6 +412,12 @@
                 }
             }
         }
+        /* A soundtrack per map: `track` names a file in assets/audio (without the extension),
+           `room` is where its speakers are (it's fullest there), `volume` its level. */
+        const MAP_MUSIC = {
+            apt_949: { track: 'silver queen tst', room: 'main_room', volume: 0.5 },   // the Silver Queen suite
+        };
+
         const ambience = new AmbienceSystem(audioSys);
 
         // Nothing plays in a background tab

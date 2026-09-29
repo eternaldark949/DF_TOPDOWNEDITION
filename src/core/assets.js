@@ -33,16 +33,21 @@
 
         const _assetSounds = {};
         /** Plays an asset sound through the master bus (so the audio toggle mutes it). Resolves to the source node, or null. */
-        function playSound(name, opts = {}) {
+        /** A sound from assets/audio, decoded once: Promise of an AudioBuffer (null if missing or undecodable). */
+        function loadSound(name) {
             const src = ASSETS.audio[name];
             if (!src) { console.warn(`playSound: no sound named "${name}" in assets/audio`); return Promise.resolve(null); }
-            const ctx = audioSys.ctx;
             if (!_assetSounds[name]) {
                 const bin = atob(src.slice(src.indexOf(',') + 1)), bytes = new Uint8Array(bin.length);
                 for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-                _assetSounds[name] = ctx.decodeAudioData(bytes.buffer).catch(e => { console.warn(`playSound: could not decode "${name}"`, e); return null; });
+                _assetSounds[name] = audioSys.ctx.decodeAudioData(bytes.buffer).catch(e => { console.warn(`playSound: could not decode "${name}"`, e); return null; });
             }
-            return _assetSounds[name].then(buffer => {
+            return _assetSounds[name];
+        }
+
+        function playSound(name, opts = {}) {
+            const ctx = audioSys.ctx;
+            return loadSound(name).then(buffer => {
                 if (!buffer) return null;
                 if (ctx.state === 'suspended') ctx.resume();
                 const s = ctx.createBufferSource(), g = ctx.createGain();

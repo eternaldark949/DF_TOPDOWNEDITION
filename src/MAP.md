@@ -16,7 +16,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `core/config.js` | Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…) |
 | *(generated)* | `ASSETS`: your images and audio from `assets/`, built automatically |
-| `core/assets.js` | `getImage`, `drawAsset`, `playSound` for your assets |
+| `core/assets.js` | `getImage`, `drawAsset`, `playSound` / `loadSound` for your assets |
 | `core/registries.js` | Notes, consumables, drinks, cosmetics (wigs, skins, outfits, hats, jewelry…); `CosmeticsSystem`, `BuffSystem` |
 | `core/resonance.js` | `ResonanceSystem`: 949's progression — earning (style-weighted), Dr. Yin's tuning, the Flit / Frame / Arms trees |
 | `core/utils.js` | Maths helpers, humanoid gait/animation helpers, weapon muzzle helpers, `RenderInterp` |
@@ -41,7 +41,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## audio/
 | File | What's in it |
 |---|---|
-| `audio/audio.js` | `AudioSystem` (sound effects, master bus) and `AmbienceSystem` (rain, wind, city, room tone, fireplace, doors) |
+| `audio/audio.js` | `AudioSystem` (sound effects, master bus, music bus for the Music slider), `AmbienceSystem` (rain, wind, city, room tone, fireplace, doors) and `MAP_MUSIC` — each map's soundtrack (the apartment plays the Silver Queen track, fullest in the living room) |
 
 ## physics/
 | File | What's in it |
@@ -94,7 +94,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | File | What's in it |
 |---|---|
 | `ui/ui-system.js` | `UISystem`: HUD, banners, prompts |
-| `ui/music-widget.js` | The radio/music widget |
+| `ui/music-widget.js` | The radio/music widget (through the music bus) |
 | `ui/poses.js` | `POSES`: idle life (breathing, weight shift, looking around) and poses: arms crossed, lean, fidget, typing, phone, dance… |
 | `ui/expressions.js` | `EXPRESSIONS`: faces for portraits (smile, sultry, worried…), mood from dialogue text, blinking |
 | `ui/bodies.js` | `BUILDS` (slim, athletic, curvy, broad, heavy) and height; drawing Double Nights androids (finishes in `core/appearances.js`): plating, visor, emblem, hover |
