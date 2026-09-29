@@ -1113,8 +1113,40 @@
             // lightAt), and any doors they gain later take bullets and block sight.
             'hotel_lobby':         { rooms: { lobby: { x: 0, y: 0, w: 1000, h: 1200, type: 'indoor', label: 'Lobby' } } },
             'medbay_sw':           { rooms: { clinic: { x: 0, y: 0, w: 800, h: 800, type: 'indoor', label: 'Clinic' } } },
-            'moon_city_nightclub': { rooms: { club: { x: 0, y: 0, w: 1200, h: 1000, type: 'indoor', label: 'Club' } } },
             'ollo_interior':       { rooms: { shop: { x: 0, y: 0, w: 800, h: 600, type: 'indoor', label: 'Shop' } } },
+            // Moon City Nightclub: the hall and its bar, powder room and gents off the bar, the foyer,
+            // and the VIP wing (a curtained corridor, three suites, Mirabel's lounge at its head).
+            'moon_city_nightclub': (() => {
+                const LACQUER = '#3a1e4a', VELVET = 'rgba(150, 30, 80, 0.62)';
+                const hinged = (x, y, rooms, hingeSide) => ({ x, y, w: 14, h: 80, type: 'hinged', orientation: 'V', rooms, color: LACQUER, hingeSide, triggerRadius: 60 });
+                const curtain = (y, rooms) => ({ x: 1330, y, w: 14, h: 90, type: 'sliding', orientation: 'V', rooms, color: VELVET, speed: 0.06, triggerRadius: 80 });
+                return {
+                    rooms: {
+                        powder:   { x: 14,   y: 14,   w: 346, h: 546,  type: 'indoor', label: 'Powder Room' },
+                        gents:    { x: 14,   y: 574,  w: 346, h: 612,  type: 'indoor', label: 'Gents' },
+                        hall:     { x: 374,  y: 14,   w: 852, h: 972,  type: 'indoor', label: 'The Floor' },
+                        foyer:    { x: 374,  y: 1000, w: 852, h: 186,  type: 'indoor', label: 'Foyer' },
+                        lounge:   { x: 1240, y: 14,   w: 346, h: 262,  type: 'indoor', label: "Mirabel's Lounge" },
+                        corridor: { x: 1240, y: 290,  w: 90,  h: 896,  type: 'indoor', label: 'VIP' },
+                        suite1:   { x: 1344, y: 290,  w: 242, h: 290,  type: 'indoor', label: 'Suite I' },
+                        suite2:   { x: 1344, y: 594,  w: 242, h: 290,  type: 'indoor', label: 'Suite II' },
+                        suite3:   { x: 1344, y: 898,  w: 242, h: 288,  type: 'indoor', label: 'Suite III' }
+                    },
+                    doors: [
+                        { x: 730, y: 986, w: 140, h: 14, type: 'arch', orientation: 'H', rooms: ['foyer', 'hall'] },
+                        hinged(360, 90, ['powder', 'hall'], 'left'),
+                        hinged(360, 880, ['gents', 'hall'], 'right'),
+                        { x: 1226, y: 560, w: 14, h: 120, type: 'arch', orientation: 'V', rooms: ['hall', 'corridor'] },
+                        { x: 1240, y: 276, w: 90, h: 14, type: 'arch', orientation: 'H', rooms: ['corridor', 'lounge'] },
+                        curtain(390, ['corridor', 'suite1']), curtain(694, ['corridor', 'suite2']), curtain(1000, ['corridor', 'suite3']),
+                    ],
+                    linens: [
+                        // Velvet drapes hung either side of the way into the VIP wing
+                        { x: 1222, y: 546, length: 50, width: 12, anchor: 'right', color: 'rgba(150, 30, 80, 0.2)', lightColor: 'rgba(255, 120, 170, 0.04)', segments: 3 },
+                        { x: 1222, y: 694, length: 50, width: 12, anchor: 'right', color: 'rgba(150, 30, 80, 0.2)', lightColor: 'rgba(255, 120, 170, 0.04)', segments: 3 },
+                    ]
+                };
+            })(),
             // The House of Death (gauntlet). Three loops round the grand hall, so no one gets cornered:
             // foyer–kitchen–dining–hall, foyer–gallery–courtyard–hall, dining–library–chapel–bedroom–courtyard.
             'house_of_death': (() => {

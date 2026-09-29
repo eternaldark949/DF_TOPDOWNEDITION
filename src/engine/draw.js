@@ -247,6 +247,7 @@
                 }
                 if (this.activeMap.id === 'house_of_death') this.drawHouseInterior(this.ctx);
                 if (this.activeMap.id === 'hotel_lobby') this.drawLobbyInterior(this.ctx);
+                if (this.activeMap.id === 'moon_city_nightclub') this.drawClubInterior(this.ctx);
                 
                 // Indoor V2: Room floors, windows, and doors
                 if (this.roomSystem.active) {

@@ -292,6 +292,180 @@
                 ctx.restore();
             },
 
+            /** Moon City's floors, painted once: obsidian veined violet in the hall, the glass dance floor,
+             *  the pole plinths, walnut behind the bar, hex tile in the restrooms, plum carpet in the VIP
+             *  wing, and the foyer's gold-inlaid crescent. */
+            drawClubInterior(ctx) {
+                if (!this._clubFloor) this._clubFloor = this._paintClubFloor();
+                ctx.drawImage(this._clubFloor, 0, 0);
+            },
+
+            _paintClubFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1600; cv.height = 1200;
+                const c = cv.getContext('2d'), r = seededRandom(949), GOLD = '#e8c27a';
+                c.fillStyle = '#08060b'; c.fillRect(0, 0, 1600, 1200);
+                const veins = (x0, y0, w, h, n, rgba) => {
+                    for (let i = 0; i < n; i++) {
+                        let x = x0 + r() * w, y = y0 + r() * h; c.strokeStyle = rgba(0.05 + r() * 0.1); c.lineWidth = 0.5 + r();
+                        c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (r() - 0.4) * 60; y += (r() - 0.5) * 50; c.lineTo(x, y); } c.stroke();
+                    }
+                };
+                const hexes = (x0, y0, w, h, S, a, b) => {                  // a hex-tile floor, every third tile the dark one
+                    c.save(); c.beginPath(); c.rect(x0, y0, w, h); c.clip();
+                    c.fillStyle = a; c.fillRect(x0, y0, w, h);
+                    const dx = S * Math.sqrt(3), dy = S * 1.5;
+                    for (let row = 0, y = y0; y < y0 + h + S; y += dy, row++) for (let col = 0, x = x0 + (row % 2) * dx / 2; x < x0 + w + dx; x += dx, col++) {
+                        c.beginPath(); for (let k = 0; k < 6; k++) { const an = Math.PI / 6 + k * Math.PI / 3; c[k ? 'lineTo' : 'moveTo'](x + Math.cos(an) * (S - 0.8), y + Math.sin(an) * (S - 0.8)); } c.closePath();
+                        c.fillStyle = (col + row * 2) % 3 === 0 ? b : a; c.fill();
+                    }
+                    c.restore();
+                };
+                // The hall: obsidian slabs, lavender grout, violet veins
+                for (let y = 14; y < 986; y += 71) for (let x = 374; x < 1226; x += 71) { const v = r() * 7 | 0; c.fillStyle = `rgb(${14 + v},${10 + v},${20 + v})`; c.fillRect(x, y, 71, 71); }
+                c.strokeStyle = 'rgba(200,168,255,0.08)'; c.lineWidth = 1; c.beginPath();
+                for (let x = 374; x <= 1226; x += 71) { c.moveTo(x, 14); c.lineTo(x, 986); } for (let y = 14; y <= 986; y += 71) { c.moveTo(374, y); c.lineTo(1226, y); } c.stroke();
+                veins(374, 14, 852, 972, 50, a => `rgba(170,120,255,${a})`);
+                // The dance floor: dark glass tiles (the light show is drawClubGlow), a chrome frame
+                c.fillStyle = '#100a18'; c.fillRect(580, 300, 440, 400);
+                c.strokeStyle = 'rgba(255,255,255,0.06)'; c.beginPath();
+                for (let x = 580; x <= 1020; x += 40) { c.moveTo(x, 300); c.lineTo(x, 700); } for (let y = 300; y <= 700; y += 40) { c.moveTo(580, y); c.lineTo(1020, y); } c.stroke();
+                c.strokeStyle = '#8a8ea0'; c.lineWidth = 3; c.strokeRect(578, 298, 444, 404); c.strokeStyle = GOLD; c.lineWidth = 1; c.strokeRect(574, 294, 452, 412);
+                // Pole plinths (the hall's three, one in each suite)
+                for (const [px, py, R] of [[800, 370, 30], [660, 560, 30], [940, 560, 30], [1405, 345, 22], [1405, 649, 22], [1405, 953, 22]]) {
+                    c.fillStyle = 'rgba(0,0,0,0.45)'; c.beginPath(); c.arc(px + 3, py + 4, R, 0, Math.PI * 2); c.fill();
+                    const g = c.createRadialGradient(px - R * 0.3, py - R * 0.3, 2, px, py, R); g.addColorStop(0, '#2e2440'); g.addColorStop(1, '#120c1a');
+                    c.fillStyle = g; c.beginPath(); c.arc(px, py, R, 0, Math.PI * 2); c.fill();
+                    c.strokeStyle = '#c8ccdc'; c.lineWidth = 2; c.stroke(); c.strokeStyle = GOLD; c.lineWidth = 1; c.beginPath(); c.arc(px, py, R - 5, 0, Math.PI * 2); c.stroke();
+                }
+                // Behind the bar: walnut boards
+                c.fillStyle = '#24160f'; c.fillRect(374, 220, 66, 560);
+                c.strokeStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); for (let y = 232; y < 780; y += 12) { c.moveTo(374, y); c.lineTo(440, y); } c.stroke();
+                // The restrooms: hex tile, blush in the powder room, cool in the gents
+                hexes(14, 14, 346, 546, 9, '#8e7a8c', '#221824');
+                hexes(14, 574, 346, 612, 9, '#7e8492', '#15161c');
+                c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(14, 14, 346, 546); c.fillRect(14, 574, 346, 612);
+                // The foyer: black marble, a gold border, the crescent inlaid, the name at the door
+                for (let y = 1000; y < 1186; y += 62) for (let x = 374; x < 1226; x += 71) { const v = r() * 6 | 0; c.fillStyle = `rgb(${16 + v},${13 + v},${20 + v})`; c.fillRect(x, y, 71, 62); }
+                veins(374, 1000, 852, 186, 16, a => `rgba(232,194,122,${a * 0.7})`);
+                c.strokeStyle = GOLD; c.lineWidth = 1.5; c.strokeRect(384, 1010, 832, 166);
+                const M = { x: 800, y: 1093 };
+                c.fillStyle = '#0c0910'; c.beginPath(); c.arc(M.x, M.y, 52, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = GOLD; c.lineWidth = 2; c.stroke(); c.lineWidth = 0.8; c.beginPath(); c.arc(M.x, M.y, 46, 0, Math.PI * 2); c.stroke();
+                const t = document.createElement('canvas'); t.width = t.height = 90; const k = t.getContext('2d');
+                const gg = k.createLinearGradient(0, 0, 90, 90); gg.addColorStop(0, '#fff1c2'); gg.addColorStop(0.5, GOLD); gg.addColorStop(1, '#a8823e');
+                k.fillStyle = gg; k.beginPath(); k.arc(45, 45, 36, 0, Math.PI * 2); k.fill();
+                k.globalCompositeOperation = 'destination-out'; k.beginPath(); k.arc(60, 38, 32, 0, Math.PI * 2); k.fill();
+                c.drawImage(t, M.x - 45, M.y - 45);
+                for (let i = 0; i < 5; i++) { const a = -0.9 + i * 0.45; c.fillStyle = '#e8d8ff'; c.beginPath(); c.arc(M.x + 12 + Math.cos(a) * 22, M.y - 4 + Math.sin(a) * 22, 1.4, 0, Math.PI * 2); c.fill(); }
+                // The VIP wing: plum carpet in a diamond weave, a gold-edged runner down the corridor
+                const carpet = (x, y, w, h) => {
+                    c.fillStyle = '#2a0e24'; c.fillRect(x, y, w, h);
+                    c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
+                    c.strokeStyle = 'rgba(255,120,170,0.07)'; c.lineWidth = 1; c.beginPath();
+                    for (let s = -h; s < w + h; s += 22) { c.moveTo(x + s, y); c.lineTo(x + s + h, y + h); c.moveTo(x + s + h, y); c.lineTo(x + s, y + h); } c.stroke();
+                    c.restore();
+                };
+                carpet(1240, 14, 346, 262); carpet(1240, 290, 90, 896);
+                for (const y0 of [290, 594, 898]) carpet(1344, y0, 242, y0 === 898 ? 288 : 290);
+                c.fillStyle = '#4a0c2c'; c.fillRect(1262, 290, 46, 896); c.fillStyle = GOLD; c.fillRect(1264, 290, 1.5, 896); c.fillRect(1304.5, 290, 1.5, 896);
+                return cv;
+            },
+
+            /** Moon City after the darkness layer, on a 124 BPM clock: the dance floor's tiles, beams
+             *  sweeping from the DJ rig, mirror-ball specks, pole uplights, the bar's backlight, the
+             *  restroom mirrors, the VIP wing's red, the neon at the door. A room she isn't in keeps
+             *  only a little of its glow (its veil eases it). */
+            drawClubGlow(ctx) {
+                const t = _frameTime / 1000, rs = this.roomSystem;
+                const beatN = t * 124 / 60, beat = beatN % 1, bar = Math.floor(beatN / 8), kick = Math.pow(1 - beat, 3);
+                const seen = (x, y) => { const r = rs && rs.active ? rs.getRoomAt(x, y) : null; return r ? 0.2 + 0.8 * r.vis : 1; };
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // The dance floor: one of four patterns per 8-beat bar, colours walking the palette
+                const hall = seen(800, 500), mode = bar % 4;
+                if (hall > 0.01) {
+                    for (let i = 0; i < 11; i++) for (let j = 0; j < 10; j++) {
+                        const cx = 600 + i * 40, cy = 320 + j * 40, dx = (cx - 800) / 40, dy = (cy - 500) / 40;
+                        let v;
+                        if (mode === 0) v = Math.max(0, Math.cos((Math.hypot(dx, dy) - beatN * 1.5) * 1.3));                 // ripples out from the centre
+                        else if (mode === 1) v = Math.max(0, Math.sin((dx + dy) * 0.8 - beatN * Math.PI * 0.5));             // a diagonal wave
+                        else if (mode === 2) v = ((i + j + Math.floor(beatN)) % 2) ? kick : 0.12;                             // checker on the kick
+                        else v = Math.max(0, Math.cos(Math.atan2(dy, dx) * 2 - beatN * 1.6)) * (0.4 + 0.6 * kick);           // a turning pinwheel
+                        const col = PAL[(i + j + bar) % 4 === 0 ? (bar + 2) % 4 : bar % 4 === 3 ? 0 : bar % 4];
+                        ctx.globalAlpha = (0.08 + 0.3 * v) * hall; ctx.fillStyle = `rgb(${col})`; ctx.fillRect(cx - 18, cy - 18, 36, 36);
+                    }
+                    glow(800, 500, 300, PAL[bar % 3], (0.12 + 0.1 * kick) * hall);
+                    // Beams from the rig over the stage, sweeping the floor
+                    for (let b = 0; b < 3; b++) {
+                        const sx = 700 + b * 100, sy = 100, a = Math.PI / 2 + Math.sin(t * (0.5 + b * 0.17) + b * 2) * 0.55, L = 620, spread = 0.07;
+                        const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, L); g.addColorStop(0, `rgba(${PAL[(b + bar) % 4]},0.3)`); g.addColorStop(1, `rgba(${PAL[(b + bar) % 4]},0)`);
+                        ctx.globalAlpha = hall * (0.7 + 0.3 * kick); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(sx, sy);
+                        ctx.lineTo(sx + Math.cos(a - spread) * L, sy + Math.sin(a - spread) * L); ctx.lineTo(sx + Math.cos(a + spread) * L, sy + Math.sin(a + spread) * L); ctx.closePath(); ctx.fill();
+                        glow(sx + Math.cos(a) * 380, sy + Math.sin(a) * 380, 40, PAL[(b + bar) % 4], 0.25 * hall);
+                    }
+                    // The mirror ball's specks drifting round the room
+                    for (let i = 0; i < 48; i++) {
+                        const a = t * 0.25 + i * 2.39996, R = 60 + (i * 97) % 380;
+                        const sx = 800 + Math.cos(a) * R * 1.05, sy = 500 + Math.sin(a) * R * 0.95;
+                        if (sx < 380 || sx > 1220 || sy < 20 || sy > 980) continue;
+                        ctx.globalAlpha = 0.55 * hall * (0.5 + 0.5 * Math.sin(t * 5 + i)); ctx.fillStyle = i % 4 ? '#f0e8ff' : '#ffd8e8';
+                        ctx.beginPath(); ctx.arc(sx, sy, 1.6, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.globalAlpha = hall; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(800, 500, 3, 0, Math.PI * 2); ctx.fill();   // the ball, overhead
+                    glow(800, 500, 20, '240, 230, 255', 0.3 * hall);
+                    // Stage LEDs and the DJ's decks
+                    for (let i = 0; i < 12; i++) glow(632 + i * 30, 114, 16, PAL[(i + Math.floor(beatN)) % 4], (0.25 + 0.35 * kick) * hall);
+                    glow(800, 55, 26, '160, 200, 255', 0.3 * hall); glow(756, 69, 18, '200, 168, 255', 0.3 * hall); glow(844, 69, 18, '200, 168, 255', 0.3 * hall);
+                    // Bar: the bottle wall lit from beneath, gold under the counter's rail
+                    for (let y = 250; y < 770; y += 60) glow(392, y, 24, '255, 190, 120', 0.14 * seen(420, y));
+                    for (let y = 280; y < 760; y += 80) glow(488, y, 16, '232, 194, 122', 0.12 * seen(470, y));
+                }
+                // Pole uplights (hall and suites)
+                for (const p of this.props) {
+                    if (!p.decorType || !p.decorType.startsWith('mc_')) continue;
+                    const cx = p.x + p.width / 2, cy = p.y + p.height / 2, s = seen(cx, cy);
+                    if (p.decorType === 'mc_pole') { glow(cx, cy, 44, cx > 1300 ? '255, 70, 120' : '210, 160, 255', (0.4 + 0.25 * kick) * s); ctx.globalAlpha = s; ctx.fillStyle = '#ffffff'; ctx.fillRect(cx - 0.5, cy - 4, 1, 3); }
+                    else if (p.decorType === 'mc_orb') glow(cx, cy - 3, 26, '220, 200, 255', (0.35 + 0.08 * Math.sin(t * 1.5 + cx)) * s);
+                    else if (p.decorType === 'mc_vanity') { const my = p.decor && p.decor.face === 'N' ? p.y + p.height : p.y - 1; for (let x = p.x + 12; x < p.x + p.width; x += 34) glow(x, my, 20, '255, 225, 200', 0.35 * s); }
+                    else if (p.decorType === 'mc_lowtable') glow(cx, cy, 30, '255, 220, 170', 0.15 * s);
+                    else if (p.decorType === 'mc_dryer') glow(cx, cy, 8, '120, 200, 255', 0.3 * s);
+                    else if (p.decorType === 'mc_coatcheck') glow(p.x + p.width - 27, cy, 20, '200, 168, 255', 0.3 * s);
+                }
+                // The VIP wing: rose sconces down the corridor, a low red in every suite
+                for (let y = 330; y < 1180; y += 110) { const s = seen(1285, y); glow(1244, y, 22, '255, 90, 140', 0.4 * s); glow(1326, y + 55, 22, '255, 90, 140', 0.4 * s); }
+                for (const y0 of [290, 594, 898]) glow(1465, y0 + 145, 150, '255, 60, 110', 0.12 * seen(1465, y0 + 145));
+                glow(1475, 60, 120, '255, 80, 120', 0.14 * seen(1475, 60));
+                ctx.restore();
+                // The neon at the door (solid strokes over a glow): a crescent and the name, a flicker now and then
+                const fs = seen(800, 1093), fl = (t % 7.3) < 0.12 ? 0.35 : 1;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                glow(560, 1016, 40, '200, 150, 255', 0.45 * fs); glow(1060, 1016, 70, '255, 90, 150', 0.35 * fs * fl);
+                ctx.globalAlpha = fs; ctx.strokeStyle = '#e0c8ff'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(560, 1016, 10, Math.PI * 0.3, Math.PI * 1.7); ctx.stroke();
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'italic bold 16px Georgia, serif';
+                ctx.globalAlpha = 0.9 * fs * fl; ctx.fillStyle = '#ffb8d4'; ctx.fillText('Moon City', 1060, 1017);
+                ctx.restore();
+            },
+
+            /** The hub graveyard's candle flames: only when the camera is near it. */
+            drawGraveyardGlow(ctx) {
+                const cam = this.camera, z = cam.zoom || 1, hw = this.canvas.width / 2 / z + 60, hh = this.canvas.height / 2 / z + 60;
+                if (cam.x + hw < 500 || cam.x - hw > 3500 || cam.y + hh < 8800 || cam.y - hh > 10800) return;
+                const t = _frameTime / 1000;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                for (const p of this.props) {
+                    if (p.decorType !== 'gy_stone') continue;
+                    const L = gyStoneLayout(p);
+                    if (L.acc !== 'candle') continue;
+                    const { x, y } = L.candle;
+                    if (Math.abs(x - cam.x) > hw || Math.abs(y - cam.y) > hh) continue;
+                    const f = 0.75 + 0.25 * Math.sin(t * 9 + x) * Math.sin(t * 3.7 + y);
+                    ctx.globalAlpha = 0.5 * f; drawGlow(ctx, x, y - 2, 18, '255, 190, 120', 0);
+                    ctx.globalAlpha = 0.95; ctx.fillStyle = `rgb(255,${200 + 40 * f | 0},130)`; ctx.beginPath(); ctx.arc(x, y - 1.5, 1.3 * f, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.restore();
+            },
+
             /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
             drawApartmentGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;
@@ -326,6 +500,11 @@
                 for (const [x, y] of [[1248, 619], [1256, 612], [1368, 619]]) {
                     const f = 0.75 + 0.25 * Math.sin(t * 9 + x);
                     glow(x, y, 12, '255, 200, 130', 0.5 * f);
+                }
+                // The workbench: the schematic tablet's violet, the soldering iron's ember
+                for (const p of this.props) if (p.decorType === 'apt_craft') {
+                    glow(p.x + p.width * 0.59, p.y + 11 + p.height * 0.21, 22, '180, 130, 255', 0.3 + 0.06 * Math.sin(t * 2.4));
+                    glow(p.x + p.width - 29, p.y + p.height - 14.5, 7, '255, 150, 70', 0.5 + 0.2 * Math.sin(t * 7));
                 }
                 // Festoon string lights swagged along the veranda railing
                 for (let s = 0; s < 8; s++) {
