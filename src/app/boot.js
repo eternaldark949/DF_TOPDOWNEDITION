@@ -112,6 +112,11 @@
                 GameSettings.filmGrain ? '' : '#666');
             lbl('lbl-softshadows', `Soft Shadows: ${GameSettings.softShadows ? 'ON' : 'OFF'}`,
                 GameSettings.softShadows ? '#ffaa00' : '#666');
+            const onOff = k => GameSettings[k] ? 'ON' : 'OFF', onCol = k => GameSettings[k] ? '' : '#666';
+            lbl('lbl-flitring', `Flit Ring: ${onOff('flitRing')}`, onCol('flitRing'));
+            lbl('lbl-flitflick', `Flick to Flit: ${onOff('flitFlick')}`, onCol('flitFlick'));
+            lbl('lbl-flittwo', `Two-Finger Flit: ${onOff('flitTwoFinger')}`, onCol('flitTwoFinger'));
+            lbl('lbl-flitbtn', `Flit Button: ${onOff('flitButton')}`, onCol('flitButton'));
             lbl('lbl-audio', `Master Audio: ${GameSettings.audioEnabled ? 'ON' : 'OFF'}`,
                 GameSettings.audioEnabled ? '' : '#666');
             lbl('lbl-fps', `FPS Limit: ${GameSettings.fpsLimit === 0 ? 'NONE' : GameSettings.fpsLimit}`,
@@ -202,6 +207,15 @@
             GameSettings.softShadows = !GameSettings.softShadows;
             syncMainMenuLabels();
         });
+        
+        // Flit controls (touch): ring, flick, two-finger tap, the ⚡ button
+        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton']]) {
+            document.getElementById(id).addEventListener('click', () => {
+                GameSettings[key] = !GameSettings[key];
+                GameSettings.applyControls();
+                syncMainMenuLabels();
+            });
+        }
         
         // Toggle Master Audio
         document.getElementById('btn-toggle-audio').addEventListener('click', () => {

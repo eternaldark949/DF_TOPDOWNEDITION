@@ -103,6 +103,7 @@
                 this.fireBtn = document.getElementById('btn-fire');
                 this.healBtn = document.getElementById('btn-heal');
                 this.flitBtn = document.getElementById('btn-flit');
+                this.flitRingEl = document.getElementById('joystick-ring');   // the move stick's flit ring (initJoystick)
                 this.autodriveBtn = document.getElementById('btn-autodrive');
                 this.zibSkipBtn = document.getElementById('btn-zib-skip');
                 this.holsterBtn = document.getElementById('btn-holster');

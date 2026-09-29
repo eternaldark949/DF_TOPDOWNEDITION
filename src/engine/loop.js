@@ -7,6 +7,7 @@
                     GameSettings.applyPreset('medium');
                     this.lightingScale = 0.75;
                     GameSettings.applyFilmGrain();
+                    GameSettings.applyControls();
                     this.resize();
                     console.log('[AUTO-DETECT] Mobile device — applied MEDIUM preset');
                 }

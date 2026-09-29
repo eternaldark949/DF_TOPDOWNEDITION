@@ -2282,6 +2282,24 @@
         .ui-pill.expanded .control-node { transform: translateY(-50%) rotate(225deg) scale(1.1); }
         .node-btn { font-family: var(--font-ui); font-size: 0.65rem; font-weight: 600; color: #ccc; background: transparent; border: none; cursor: pointer; text-transform: uppercase; padding: 5px 10px; border-radius: 4px; letter-spacing: 1px; transition: all 0.2s; }
         .node-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+        /* The flit ring round the move stick: fill = flit charge (initJoystick / updateFlitRing) */
+        #joystick-ring {
+            position: absolute; left: 50%; top: 50%; width: 172px; height: 172px; transform: translate(-50%, -50%);
+            border-radius: 50%; pointer-events: none; --fill: 100%;
+            background: conic-gradient(rgba(190, 140, 255, 0.9) var(--fill), rgba(255, 255, 255, 0.10) 0);
+            -webkit-mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
+                    mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
+            filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6));
+            transition: opacity 0.2s;
+        }
+        #joystick-ring.dim { opacity: 0.35; filter: grayscale(0.6); }
+        #joystick-ring.off { display: none; }
+        #joystick-ring.pulse { animation: flitRingPulse 0.45s ease-out; }
+        #joystick-ring.flash { animation: flitRingFlash 0.35s ease-out; }
+        @keyframes flitRingPulse { 0% { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.08); } 100% { transform: translate(-50%, -50%) scale(1); } }
+        @keyframes flitRingFlash { 0% { filter: drop-shadow(0 0 14px rgba(232, 194, 122, 1)) brightness(1.8); } 100% { filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6)); } }
+        #btn-flit.hidden-by-setting { display: none !important; }
     </style>
 </head>
 <body>
@@ -2476,6 +2494,26 @@
                         <div class="row-center"><div class="menu-btn" id="lbl-softshadows">Soft Shadows: OFF</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
+                    <div class="menu-item-row" id="btn-toggle-flitring">
+                        <div class="row-left"><div class="desc-box">Push the move stick into its outer ring to flit.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-flitring">Flit Ring: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-flitflick">
+                        <div class="row-left"><div class="desc-box">A fast flick of the move stick flits.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-flitflick">Flick to Flit: OFF</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-flittwo">
+                        <div class="row-left"><div class="desc-box">While firing, tap another finger on the right to flit.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-flittwo">Two-Finger Flit: OFF</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-flitbtn">
+                        <div class="row-left"><div class="desc-box">Show the ⚡ flit button.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-flitbtn">Flit Button: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
                     <div class="menu-item-row" id="btn-toggle-audio">
                         <div class="row-left"><div class="desc-box">Mute all SFX and music.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-audio">Master Audio: ON</div></div>
@@ -2651,6 +2689,7 @@
 
             <div id="input-zone-left"></div> 
             <div id="joystick-zone">
+                <div id="joystick-ring"></div>
                 <div id="joystick-knob"></div>
             </div>
             
@@ -3155,6 +3194,22 @@
                 <div class="settings-row">
                     <span class="settings-label">Lighting</span>
                     <span class="settings-value val-high" id="set-lighting" data-key="lightingQuality">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Flit Ring</span>
+                    <span class="settings-value val-on" id="set-flitring" data-key="flitRing">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Flick to Flit</span>
+                    <span class="settings-value val-off" id="set-flitflick" data-key="flitFlick">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Two-Finger Flit</span>
+                    <span class="settings-value val-off" id="set-flittwo" data-key="flitTwoFinger">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Flit Button</span>
+                    <span class="settings-value val-on" id="set-flitbtn" data-key="flitButton">ON</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Film Grain</span>
@@ -6003,6 +6058,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                reconstruction. Stage 0: measurement only. See PerfBench. */
             resolutionScale: 1.0,                    // 0 = uncapped, 60, 30
             
+            // --- CONTROLS (touch) — flitting without letting go of the trigger ---
+            // Kept in localStorage (dfab_controls) and in saves. See initJoystick.
+            ...(() => {
+                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true };
+                try { Object.assign(d, JSON.parse(localStorage.getItem('dfab_controls') || '{}')); } catch (e) { /* private mode */ }
+                return d;
+            })(),
+            
             // --- DISPLAY ---
             // Preference, not live state. FullscreenManager syncs it back down
             // when the player leaves fullscreen by Esc or the system back gesture,
@@ -6063,6 +6126,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             getRainConfig()     { return this._densityValues.rain[this.rainDensity]; },
             
             // Apply film grain visibility
+            /** Store the control toggles and show or hide the ⚡ button. */
+            applyControls() {
+                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton })); } catch (e) { /* private mode */ }
+                const b = document.getElementById('btn-flit');
+                if (b) b.classList.toggle('hidden-by-setting', !this.flitButton);
+                const r = document.getElementById('joystick-ring');
+                if (r) r.classList.toggle('off', !this.flitRing);
+            },
+
             applyFilmGrain() {
                 const container = document.getElementById('game-container');
                 if (container) {
@@ -39434,6 +39506,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.fireBtn = document.getElementById('btn-fire');
                 this.healBtn = document.getElementById('btn-heal');
                 this.flitBtn = document.getElementById('btn-flit');
+                this.flitRingEl = document.getElementById('joystick-ring');   // the move stick's flit ring (initJoystick)
                 this.autodriveBtn = document.getElementById('btn-autodrive');
                 this.zibSkipBtn = document.getElementById('btn-zib-skip');
                 this.holsterBtn = document.getElementById('btn-holster');
@@ -41751,13 +41824,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return Math.floor(cost);
             },
 
-            triggerFlit() {
-                if (this.isDriving || this.paused) return;
+            /** Flit. `angleOverride` (radians) comes from the move stick's ring or a flick; otherwise
+             *  the way she's moving (keys, stick) or facing. Returns true if she flitted. */
+            triggerFlit(angleOverride, source) {
+                if (this.isDriving || this.paused) return false;
                 
                 const cost = this.flitCost();
                 
                 // Check attunement pool
-                if (this.flitState.attunement < cost) return;
+                if (this.flitState.attunement < cost) return false;
+                if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }
                 
                 // Spend attunement
                 this.flitState.attunement -= cost;
@@ -41792,6 +41868,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (moveX !== 0 || moveY !== 0) {
                     flitAngle = Math.atan2(moveY, moveX);
                 }
+                if (typeof angleOverride === 'number') flitAngle = angleOverride;
 
                 let targetX = this.player.x + Math.cos(flitAngle) * flitDist; let targetY = this.player.y + Math.sin(flitAngle) * flitDist;
                 let hitWall = false; for(let w of this.activeMap.walls) { if (targetX > w.x && targetX < w.x + w.w && targetY > w.y && targetY < w.y + w.h) { hitWall = true; break; } }
@@ -41864,6 +41941,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Play flit sound
                 audioSys.sfx('flit');
+                return true;
             },
 
             /* =========================================================
@@ -43927,6 +44005,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         colorGrade: GameSettings.colorGrade,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
+                        flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
+                        flitTwoFinger: GameSettings.flitTwoFinger, flitButton: GameSettings.flitButton,
                         ambienceVolume: GameSettings.ambienceVolume,
                         musicVolume: GameSettings.musicVolume,
                         fullscreen: GameSettings.fullscreen,
@@ -44540,6 +44620,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         GameSettings.colorGrade = save.settings.colorGrade || 'none';
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;
+                        GameSettings.flitRing = save.settings.flitRing !== false;
+                        GameSettings.flitFlick = !!save.settings.flitFlick;
+                        GameSettings.flitTwoFinger = !!save.settings.flitTwoFinger;
+                        GameSettings.flitButton = save.settings.flitButton !== false;
+                        GameSettings.applyControls();
                         if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
                         if (typeof save.settings.musicVolume === 'number') audioSys.setMusicVolume(save.settings.musicVolume);
                         if (typeof syncAmbienceSliders === 'function') syncAmbienceSliders();
@@ -46900,6 +46985,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     );
                     if (this.flitState.attunement >= this.flitCost()) this.flitBtn.classList.remove('cooldown');
                 }
+                this.updateFlitRing();
                 if (this.flitState.active) { 
                     this.flitState.duration--; 
                     if (this.flitState.duration <= 0) this.flitState.active = false; 
@@ -51407,22 +51493,132 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             },
             
+            /* =========================================================
+               TOUCH STICKS — the move stick (left) and the fire stick (right).
+               Flitting without letting go of the trigger:
+                 • Flit Ring (setting, on): push the move stick past its walking
+                   radius into the outer ring → flit that way; the ring re-arms
+                   once the thumb comes back inside. The ring shows the flit charge.
+                 • Flick to Flit (setting): a fast flick of the move stick flits.
+                 • Two-Finger Flit (setting): while firing, tap another finger on
+                   the right half of the screen.
+                 • Aim memory: let go of the fire stick and touch it again within
+                   0.6 s — it resumes at the old aim until the thumb drags.
+               ========================================================= */
             initJoystick() {
-                const inputZone = document.getElementById('input-zone-left'); const visualZone = document.getElementById('joystick-zone'); const knob = document.getElementById('joystick-knob');
-                inputZone.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.joystick.active) return; const touch = e.changedTouches[0]; this.joystick.id = touch.identifier; this.joystick.active = true; this.joystick.originX = touch.clientX; this.joystick.originY = touch.clientY; this.joystick.dx = 0; this.joystick.dy = 0; visualZone.style.display = 'block'; visualZone.style.left = (touch.clientX - 50) + 'px'; visualZone.style.top = (touch.clientY - 50) + 'px'; knob.style.transform = `translate(-50%, -50%)`; }, {passive: false});
-                inputZone.addEventListener('touchmove', (e) => { e.preventDefault(); if (!this.joystick.active) return; for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.joystick.id) { const touch = e.changedTouches[i]; const deltaX = touch.clientX - this.joystick.originX; const deltaY = touch.clientY - this.joystick.originY; const maxDist = 35; const distance = Math.min(Math.sqrt(deltaX*deltaX + deltaY*deltaY), maxDist); const angle = Math.atan2(deltaY, deltaX); const moveX = Math.cos(angle) * distance; const moveY = Math.sin(angle) * distance; knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`; this.joystick.dx = moveX / maxDist; this.joystick.dy = moveY / maxDist; break; } } }, {passive: false});
-                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.joystick.id) { this.joystick.active = false; this.joystick.dx = 0; this.joystick.dy = 0; visualZone.style.display = 'none'; break; } } };
+                const inputZone = document.getElementById('input-zone-left'), visualZone = document.getElementById('joystick-zone'), knob = document.getElementById('joystick-knob');
+                const J = this.joystick, WALK = 35, RING_IN = 72, RING_OUT = 55, EDGE = 90;   // ring: flit past 72 px, re-arm inside 55
+                const gameUI = document.getElementById('game-ui');
+                const canFlit = () => !this.isDriving && !(gameUI && gameUI.classList.contains('emote-active'));   // not at the wheel or holstered
+                const ringFlit = (dx, dy) => {
+                    if (!GameSettings.flitRing || !J.armed || !canFlit()) return;
+                    J.armed = false;
+                    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
+                    this.triggerFlit(Math.atan2(dy, dx), 'ring');
+                };
+                inputZone.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); if (J.active) return;
+                    const touch = e.changedTouches[0];
+                    // Keep the whole ring on screen: shift the stick's centre in from the edges
+                    const ox = Math.max(EDGE, Math.min(window.innerWidth - EDGE, touch.clientX)), oy = Math.max(EDGE, Math.min(window.innerHeight - EDGE, touch.clientY));
+                    J.id = touch.identifier; J.active = true; J.originX = ox; J.originY = oy; J.dx = 0; J.dy = 0; J.armed = true;
+                    J.landX = touch.clientX; J.landY = touch.clientY;      // drags count from where the thumb landed
+                    J.trail = [{ x: 0, y: 0, t: performance.now() }];
+                    visualZone.style.display = 'block'; visualZone.style.left = (ox - 40) + 'px'; visualZone.style.top = (oy - 40) + 'px';
+                    knob.style.transform = `translate(-50%, -50%)`;
+                    if (this.flitRingEl) this.flitRingEl.classList.toggle('off', !GameSettings.flitRing || !canFlit());
+                }, { passive: false });
+                inputZone.addEventListener('touchmove', (e) => {
+                    e.preventDefault(); if (!J.active) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const touch = e.changedTouches[i];
+                        if (touch.identifier !== J.id) continue;
+                        const deltaX = touch.clientX - J.landX, deltaY = touch.clientY - J.landY, far = Math.hypot(deltaX, deltaY);
+                        const distance = Math.min(far, WALK), angle = Math.atan2(deltaY, deltaX);
+                        const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
+                        knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
+                        J.dx = moveX / WALK; J.dy = moveY / WALK;
+                        // The ring: past the walking radius → flit; back inside → re-armed
+                        if (far >= RING_IN) ringFlit(deltaX, deltaY);
+                        else if (far <= RING_OUT) J.armed = true;
+                        // A flick: from near the centre to well out, fast
+                        if (GameSettings.flitFlick && J.armed) {
+                            const now = performance.now(); J.trail.push({ x: deltaX, y: deltaY, t: now });
+                            while (J.trail.length > 2 && now - J.trail[0].t > 120) J.trail.shift();
+                            const t0 = J.trail[0];
+                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 120 && canFlit()) { J.armed = false; this.triggerFlit(angle, 'flick'); }
+                        }
+                        break;
+                    }
+                }, { passive: false });
+                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === J.id) { J.active = false; J.dx = 0; J.dy = 0; J.armed = true; visualZone.style.display = 'none'; break; } } };
                 inputZone.addEventListener('touchend', endHandler); inputZone.addEventListener('touchcancel', endHandler);
+                // Two-Finger Flit: while the fire stick is held, a tap on the right half (not on a button)
+                document.addEventListener('touchstart', (e) => {
+                    if (!GameSettings.flitTwoFinger || !this.fireJoystick.active || !this.running || this.paused) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const t = e.changedTouches[i];
+                        if (t.identifier === this.fireJoystick.id || t.clientX < window.innerWidth / 2) continue;
+                        const el = t.target;
+                        if (el && el.closest && el.closest('button, .game-btn, #btn-fire, #btn-heal, #btn-flit, #btn-nv, #btn-holster, #btn-autodrive, #btn-emote, #phone-overlay, #game-ui [id^="btn-"]')) continue;
+                        this.triggerFlit(undefined, 'twofinger');
+                        break;
+                    }
+                }, { passive: true });
             },
 
             initFireJoystick() {
-                const fireZone = document.getElementById('btn-fire'); const knob = document.getElementById('fire-joystick-knob');
-                fireZone.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.fireJoystick.active) return; const touch = e.changedTouches[0]; this.fireJoystick.id = touch.identifier; this.fireJoystick.active = true; const rect = fireZone.getBoundingClientRect(); this.fireJoystick.originX = rect.left + rect.width / 2; this.fireJoystick.originY = rect.top + rect.height / 2; this.fireJoystick.dx = 0; this.fireJoystick.dy = 0; knob.style.transform = `translate(-50%, -50%)`; }, {passive: false});
-                fireZone.addEventListener('touchmove', (e) => { e.preventDefault(); if (!this.fireJoystick.active) return; for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.fireJoystick.id) { const touch = e.changedTouches[i]; const deltaX = touch.clientX - this.fireJoystick.originX; const deltaY = touch.clientY - this.fireJoystick.originY; const maxDist = 35; const distance = Math.min(Math.sqrt(deltaX*deltaX + deltaY*deltaY), maxDist); const angle = Math.atan2(deltaY, deltaX); const moveX = Math.cos(angle) * distance; const moveY = Math.sin(angle) * distance; knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`; this.fireJoystick.dx = moveX / maxDist; this.fireJoystick.dy = moveY / maxDist; break; } } }, {passive: false});
-                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.fireJoystick.id) { this.fireJoystick.active = false; this.fireJoystick.dx = 0; this.fireJoystick.dy = 0; knob.style.transform = `translate(-50%, -50%)`; break; } } };
+                const fireZone = document.getElementById('btn-fire'), knob = document.getElementById('fire-joystick-knob');
+                const F = this.fireJoystick, MAX = 35, MEMORY = 0.6, DRAG = 8;
+                const setKnob = (x, y) => { knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; };
+                fireZone.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); if (F.active) return;
+                    const touch = e.changedTouches[0], rect = fireZone.getBoundingClientRect();
+                    F.id = touch.identifier; F.active = true; F.originX = rect.left + rect.width / 2; F.originY = rect.top + rect.height / 2;
+                    F.dx = 0; F.dy = 0; F.landX = touch.clientX; F.landY = touch.clientY; F.remembered = false;
+                    // Aim memory: back within 0.6 s → resume at the old aim until the thumb drags
+                    const m = this._aimMemory;
+                    if (m && performance.now() / 1000 - m.at <= MEMORY) {
+                        F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true;
+                        setKnob(F.dx * MAX, F.dy * MAX);
+                    } else knob.style.transform = `translate(-50%, -50%)`;
+                }, { passive: false });
+                fireZone.addEventListener('touchmove', (e) => {
+                    e.preventDefault(); if (!F.active) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const touch = e.changedTouches[i];
+                        if (touch.identifier !== F.id) continue;
+                        if (F.remembered && Math.hypot(touch.clientX - F.landX, touch.clientY - F.landY) < DRAG) break;   // still on the remembered aim
+                        F.remembered = false;
+                        const deltaX = touch.clientX - F.originX, deltaY = touch.clientY - F.originY;
+                        const distance = Math.min(Math.hypot(deltaX, deltaY), MAX), angle = Math.atan2(deltaY, deltaX);
+                        const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
+                        setKnob(moveX, moveY); F.dx = moveX / MAX; F.dy = moveY / MAX;
+                        break;
+                    }
+                }, { passive: false });
+                const endHandler = (e) => {
+                    e.preventDefault();
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier !== F.id) continue;
+                        if (Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000 };   // real time, not game time
+                        F.active = false; F.dx = 0; F.dy = 0; F.remembered = false; knob.style.transform = `translate(-50%, -50%)`;
+                        break;
+                    }
+                };
                 fireZone.addEventListener('touchend', endHandler); fireZone.addEventListener('touchcancel', endHandler);
             },
 
+            /** The flit ring's charge (fill, ready pulse, dim when unaffordable) — only touched when it changes. */
+            updateFlitRing() {
+                const el = this.flitRingEl; if (!el) return;
+                const fs = this.flitState, fill = Math.round(100 * fs.attunement / fs.maxAttunement), ready = fs.attunement >= this.flitCost();
+                if (fill !== this._ringFill) { this._ringFill = fill; el.style.setProperty('--fill', fill + '%'); }
+                if (ready !== this._ringReady) {
+                    this._ringReady = ready; el.classList.toggle('dim', !ready);
+                    if (ready) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+                }
+            },
         });
 
         // GameEngine — start / stop / reset and the main loop.
@@ -51434,6 +51630,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     GameSettings.applyPreset('medium');
                     this.lightingScale = 0.75;
                     GameSettings.applyFilmGrain();
+                    GameSettings.applyControls();
                     this.resize();
                     console.log('[AUTO-DETECT] Mobile device — applied MEDIUM preset');
                 }
@@ -54350,6 +54547,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._updateValueEl('set-rain', GameSettings.rainDensity);
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
+                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton']])
+                    this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
                 this._updateValueEl('set-wetreflections', GameSettings.wetReflections ? 'on' : 'off');
@@ -54380,7 +54579,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _cycleSetting(el) {
                 const key = el.dataset.key;
                 
-                if (key === 'filmGrain') {
+                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton') {
+                    GameSettings[key] = !GameSettings[key];
+                    GameSettings.applyControls();
+                    this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
+                    
+                } else if (key === 'filmGrain') {
                     GameSettings.filmGrain = !GameSettings.filmGrain;
                     GameSettings.applyFilmGrain();
                     this._updateValueEl(el.id, GameSettings.filmGrain ? 'on' : 'off');
@@ -54577,6 +54781,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 GameSettings.filmGrain ? '' : '#666');
             lbl('lbl-softshadows', `Soft Shadows: ${GameSettings.softShadows ? 'ON' : 'OFF'}`,
                 GameSettings.softShadows ? '#ffaa00' : '#666');
+            const onOff = k => GameSettings[k] ? 'ON' : 'OFF', onCol = k => GameSettings[k] ? '' : '#666';
+            lbl('lbl-flitring', `Flit Ring: ${onOff('flitRing')}`, onCol('flitRing'));
+            lbl('lbl-flitflick', `Flick to Flit: ${onOff('flitFlick')}`, onCol('flitFlick'));
+            lbl('lbl-flittwo', `Two-Finger Flit: ${onOff('flitTwoFinger')}`, onCol('flitTwoFinger'));
+            lbl('lbl-flitbtn', `Flit Button: ${onOff('flitButton')}`, onCol('flitButton'));
             lbl('lbl-audio', `Master Audio: ${GameSettings.audioEnabled ? 'ON' : 'OFF'}`,
                 GameSettings.audioEnabled ? '' : '#666');
             lbl('lbl-fps', `FPS Limit: ${GameSettings.fpsLimit === 0 ? 'NONE' : GameSettings.fpsLimit}`,
@@ -54667,6 +54876,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             GameSettings.softShadows = !GameSettings.softShadows;
             syncMainMenuLabels();
         });
+        
+        // Flit controls (touch): ring, flick, two-finger tap, the ⚡ button
+        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton']]) {
+            document.getElementById(id).addEventListener('click', () => {
+                GameSettings[key] = !GameSettings[key];
+                GameSettings.applyControls();
+                syncMainMenuLabels();
+            });
+        }
         
         // Toggle Master Audio
         document.getElementById('btn-toggle-audio').addEventListener('click', () => {

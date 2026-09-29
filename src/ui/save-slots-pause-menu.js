@@ -669,6 +669,8 @@
                 this._updateValueEl('set-rain', GameSettings.rainDensity);
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
+                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton']])
+                    this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
                 this._updateValueEl('set-wetreflections', GameSettings.wetReflections ? 'on' : 'off');
@@ -699,7 +701,12 @@
             _cycleSetting(el) {
                 const key = el.dataset.key;
                 
-                if (key === 'filmGrain') {
+                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton') {
+                    GameSettings[key] = !GameSettings[key];
+                    GameSettings.applyControls();
+                    this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
+                    
+                } else if (key === 'filmGrain') {
                     GameSettings.filmGrain = !GameSettings.filmGrain;
                     GameSettings.applyFilmGrain();
                     this._updateValueEl(el.id, GameSettings.filmGrain ? 'on' : 'off');

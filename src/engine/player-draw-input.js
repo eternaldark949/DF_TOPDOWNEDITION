@@ -257,21 +257,131 @@
                 }
             },
             
+            /* =========================================================
+               TOUCH STICKS — the move stick (left) and the fire stick (right).
+               Flitting without letting go of the trigger:
+                 • Flit Ring (setting, on): push the move stick past its walking
+                   radius into the outer ring → flit that way; the ring re-arms
+                   once the thumb comes back inside. The ring shows the flit charge.
+                 • Flick to Flit (setting): a fast flick of the move stick flits.
+                 • Two-Finger Flit (setting): while firing, tap another finger on
+                   the right half of the screen.
+                 • Aim memory: let go of the fire stick and touch it again within
+                   0.6 s — it resumes at the old aim until the thumb drags.
+               ========================================================= */
             initJoystick() {
-                const inputZone = document.getElementById('input-zone-left'); const visualZone = document.getElementById('joystick-zone'); const knob = document.getElementById('joystick-knob');
-                inputZone.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.joystick.active) return; const touch = e.changedTouches[0]; this.joystick.id = touch.identifier; this.joystick.active = true; this.joystick.originX = touch.clientX; this.joystick.originY = touch.clientY; this.joystick.dx = 0; this.joystick.dy = 0; visualZone.style.display = 'block'; visualZone.style.left = (touch.clientX - 50) + 'px'; visualZone.style.top = (touch.clientY - 50) + 'px'; knob.style.transform = `translate(-50%, -50%)`; }, {passive: false});
-                inputZone.addEventListener('touchmove', (e) => { e.preventDefault(); if (!this.joystick.active) return; for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.joystick.id) { const touch = e.changedTouches[i]; const deltaX = touch.clientX - this.joystick.originX; const deltaY = touch.clientY - this.joystick.originY; const maxDist = 35; const distance = Math.min(Math.sqrt(deltaX*deltaX + deltaY*deltaY), maxDist); const angle = Math.atan2(deltaY, deltaX); const moveX = Math.cos(angle) * distance; const moveY = Math.sin(angle) * distance; knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`; this.joystick.dx = moveX / maxDist; this.joystick.dy = moveY / maxDist; break; } } }, {passive: false});
-                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.joystick.id) { this.joystick.active = false; this.joystick.dx = 0; this.joystick.dy = 0; visualZone.style.display = 'none'; break; } } };
+                const inputZone = document.getElementById('input-zone-left'), visualZone = document.getElementById('joystick-zone'), knob = document.getElementById('joystick-knob');
+                const J = this.joystick, WALK = 35, RING_IN = 72, RING_OUT = 55, EDGE = 90;   // ring: flit past 72 px, re-arm inside 55
+                const gameUI = document.getElementById('game-ui');
+                const canFlit = () => !this.isDriving && !(gameUI && gameUI.classList.contains('emote-active'));   // not at the wheel or holstered
+                const ringFlit = (dx, dy) => {
+                    if (!GameSettings.flitRing || !J.armed || !canFlit()) return;
+                    J.armed = false;
+                    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
+                    this.triggerFlit(Math.atan2(dy, dx), 'ring');
+                };
+                inputZone.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); if (J.active) return;
+                    const touch = e.changedTouches[0];
+                    // Keep the whole ring on screen: shift the stick's centre in from the edges
+                    const ox = Math.max(EDGE, Math.min(window.innerWidth - EDGE, touch.clientX)), oy = Math.max(EDGE, Math.min(window.innerHeight - EDGE, touch.clientY));
+                    J.id = touch.identifier; J.active = true; J.originX = ox; J.originY = oy; J.dx = 0; J.dy = 0; J.armed = true;
+                    J.landX = touch.clientX; J.landY = touch.clientY;      // drags count from where the thumb landed
+                    J.trail = [{ x: 0, y: 0, t: performance.now() }];
+                    visualZone.style.display = 'block'; visualZone.style.left = (ox - 40) + 'px'; visualZone.style.top = (oy - 40) + 'px';
+                    knob.style.transform = `translate(-50%, -50%)`;
+                    if (this.flitRingEl) this.flitRingEl.classList.toggle('off', !GameSettings.flitRing || !canFlit());
+                }, { passive: false });
+                inputZone.addEventListener('touchmove', (e) => {
+                    e.preventDefault(); if (!J.active) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const touch = e.changedTouches[i];
+                        if (touch.identifier !== J.id) continue;
+                        const deltaX = touch.clientX - J.landX, deltaY = touch.clientY - J.landY, far = Math.hypot(deltaX, deltaY);
+                        const distance = Math.min(far, WALK), angle = Math.atan2(deltaY, deltaX);
+                        const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
+                        knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
+                        J.dx = moveX / WALK; J.dy = moveY / WALK;
+                        // The ring: past the walking radius → flit; back inside → re-armed
+                        if (far >= RING_IN) ringFlit(deltaX, deltaY);
+                        else if (far <= RING_OUT) J.armed = true;
+                        // A flick: from near the centre to well out, fast
+                        if (GameSettings.flitFlick && J.armed) {
+                            const now = performance.now(); J.trail.push({ x: deltaX, y: deltaY, t: now });
+                            while (J.trail.length > 2 && now - J.trail[0].t > 120) J.trail.shift();
+                            const t0 = J.trail[0];
+                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 120 && canFlit()) { J.armed = false; this.triggerFlit(angle, 'flick'); }
+                        }
+                        break;
+                    }
+                }, { passive: false });
+                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === J.id) { J.active = false; J.dx = 0; J.dy = 0; J.armed = true; visualZone.style.display = 'none'; break; } } };
                 inputZone.addEventListener('touchend', endHandler); inputZone.addEventListener('touchcancel', endHandler);
+                // Two-Finger Flit: while the fire stick is held, a tap on the right half (not on a button)
+                document.addEventListener('touchstart', (e) => {
+                    if (!GameSettings.flitTwoFinger || !this.fireJoystick.active || !this.running || this.paused) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const t = e.changedTouches[i];
+                        if (t.identifier === this.fireJoystick.id || t.clientX < window.innerWidth / 2) continue;
+                        const el = t.target;
+                        if (el && el.closest && el.closest('button, .game-btn, #btn-fire, #btn-heal, #btn-flit, #btn-nv, #btn-holster, #btn-autodrive, #btn-emote, #phone-overlay, #game-ui [id^="btn-"]')) continue;
+                        this.triggerFlit(undefined, 'twofinger');
+                        break;
+                    }
+                }, { passive: true });
             },
 
             initFireJoystick() {
-                const fireZone = document.getElementById('btn-fire'); const knob = document.getElementById('fire-joystick-knob');
-                fireZone.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.fireJoystick.active) return; const touch = e.changedTouches[0]; this.fireJoystick.id = touch.identifier; this.fireJoystick.active = true; const rect = fireZone.getBoundingClientRect(); this.fireJoystick.originX = rect.left + rect.width / 2; this.fireJoystick.originY = rect.top + rect.height / 2; this.fireJoystick.dx = 0; this.fireJoystick.dy = 0; knob.style.transform = `translate(-50%, -50%)`; }, {passive: false});
-                fireZone.addEventListener('touchmove', (e) => { e.preventDefault(); if (!this.fireJoystick.active) return; for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.fireJoystick.id) { const touch = e.changedTouches[i]; const deltaX = touch.clientX - this.fireJoystick.originX; const deltaY = touch.clientY - this.fireJoystick.originY; const maxDist = 35; const distance = Math.min(Math.sqrt(deltaX*deltaX + deltaY*deltaY), maxDist); const angle = Math.atan2(deltaY, deltaX); const moveX = Math.cos(angle) * distance; const moveY = Math.sin(angle) * distance; knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`; this.fireJoystick.dx = moveX / maxDist; this.fireJoystick.dy = moveY / maxDist; break; } } }, {passive: false});
-                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === this.fireJoystick.id) { this.fireJoystick.active = false; this.fireJoystick.dx = 0; this.fireJoystick.dy = 0; knob.style.transform = `translate(-50%, -50%)`; break; } } };
+                const fireZone = document.getElementById('btn-fire'), knob = document.getElementById('fire-joystick-knob');
+                const F = this.fireJoystick, MAX = 35, MEMORY = 0.6, DRAG = 8;
+                const setKnob = (x, y) => { knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; };
+                fireZone.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); if (F.active) return;
+                    const touch = e.changedTouches[0], rect = fireZone.getBoundingClientRect();
+                    F.id = touch.identifier; F.active = true; F.originX = rect.left + rect.width / 2; F.originY = rect.top + rect.height / 2;
+                    F.dx = 0; F.dy = 0; F.landX = touch.clientX; F.landY = touch.clientY; F.remembered = false;
+                    // Aim memory: back within 0.6 s → resume at the old aim until the thumb drags
+                    const m = this._aimMemory;
+                    if (m && performance.now() / 1000 - m.at <= MEMORY) {
+                        F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true;
+                        setKnob(F.dx * MAX, F.dy * MAX);
+                    } else knob.style.transform = `translate(-50%, -50%)`;
+                }, { passive: false });
+                fireZone.addEventListener('touchmove', (e) => {
+                    e.preventDefault(); if (!F.active) return;
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const touch = e.changedTouches[i];
+                        if (touch.identifier !== F.id) continue;
+                        if (F.remembered && Math.hypot(touch.clientX - F.landX, touch.clientY - F.landY) < DRAG) break;   // still on the remembered aim
+                        F.remembered = false;
+                        const deltaX = touch.clientX - F.originX, deltaY = touch.clientY - F.originY;
+                        const distance = Math.min(Math.hypot(deltaX, deltaY), MAX), angle = Math.atan2(deltaY, deltaX);
+                        const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
+                        setKnob(moveX, moveY); F.dx = moveX / MAX; F.dy = moveY / MAX;
+                        break;
+                    }
+                }, { passive: false });
+                const endHandler = (e) => {
+                    e.preventDefault();
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier !== F.id) continue;
+                        if (Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000 };   // real time, not game time
+                        F.active = false; F.dx = 0; F.dy = 0; F.remembered = false; knob.style.transform = `translate(-50%, -50%)`;
+                        break;
+                    }
+                };
                 fireZone.addEventListener('touchend', endHandler); fireZone.addEventListener('touchcancel', endHandler);
             },
 
+            /** The flit ring's charge (fill, ready pulse, dim when unaffordable) — only touched when it changes. */
+            updateFlitRing() {
+                const el = this.flitRingEl; if (!el) return;
+                const fs = this.flitState, fill = Math.round(100 * fs.attunement / fs.maxAttunement), ready = fs.attunement >= this.flitCost();
+                if (fill !== this._ringFill) { this._ringFill = fill; el.style.setProperty('--fill', fill + '%'); }
+                if (ready !== this._ringReady) {
+                    this._ringReady = ready; el.classList.toggle('dim', !ready);
+                    if (ready) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+                }
+            },
         });
 

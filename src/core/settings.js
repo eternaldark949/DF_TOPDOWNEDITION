@@ -121,6 +121,14 @@
                reconstruction. Stage 0: measurement only. See PerfBench. */
             resolutionScale: 1.0,                    // 0 = uncapped, 60, 30
             
+            // --- CONTROLS (touch) — flitting without letting go of the trigger ---
+            // Kept in localStorage (dfab_controls) and in saves. See initJoystick.
+            ...(() => {
+                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true };
+                try { Object.assign(d, JSON.parse(localStorage.getItem('dfab_controls') || '{}')); } catch (e) { /* private mode */ }
+                return d;
+            })(),
+            
             // --- DISPLAY ---
             // Preference, not live state. FullscreenManager syncs it back down
             // when the player leaves fullscreen by Esc or the system back gesture,
@@ -181,6 +189,15 @@
             getRainConfig()     { return this._densityValues.rain[this.rainDensity]; },
             
             // Apply film grain visibility
+            /** Store the control toggles and show or hide the ⚡ button. */
+            applyControls() {
+                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton })); } catch (e) { /* private mode */ }
+                const b = document.getElementById('btn-flit');
+                if (b) b.classList.toggle('hidden-by-setting', !this.flitButton);
+                const r = document.getElementById('joystick-ring');
+                if (r) r.classList.toggle('off', !this.flitRing);
+            },
+
             applyFilmGrain() {
                 const container = document.getElementById('game-container');
                 if (container) {
