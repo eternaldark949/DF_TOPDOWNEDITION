@@ -54,7 +54,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## entities/
 | File | What's in it |
 |---|---|
-| `entities/props-decor.js` | `StaticEntity`, apartment (incl. the crafting workbench, `apt_craft`), clinic, House of Death (`hod_*`), Double Nights lobby (`dn_*`), penthouse suite (`ps_*`) and Moon City Nightclub (`mc_*`) furniture art, the graveyard's carved stones (`gy_stone`, 8 variants, cached sprites), the MiniSpree vending machine and the health station (one design on every map), `PropEntity` |
+| `entities/props-decor.js` | `StaticEntity`, apartment (incl. the crafting workbench, `apt_craft`), clinic, House of Death (`hod_*`), Double Nights lobby (`dn_*`), penthouse suite (`ps_*`), Sanctum (`sc_*`) and Moon City Nightclub (`mc_*`) furniture art, the graveyard's carved stones (`gy_stone`, 8 variants, cached sprites), the MiniSpree vending machine and the health station (one design on every map), `PropEntity` |
 | `entities/vehicles-minigames.js` | `VehicleEntity`, bumper cars, Ferris wheel, bumper-car minigame |
 | `entities/lamps.js` | `LampEntity` (all lamp types) |
 | `entities/actors.js` | `ActorEntity`, `PlayerEntity`, projectiles, triggers |
@@ -62,7 +62,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `entities/street-objects.js` | Neon signs, loot, pavement, foliage |
 | `entities/npc.js` | `NPC` companions and characters, quips and emotes (their looks: `core/appearances.js`) |
 | `entities/pedestrians.js` | Pedestrians and their manager |
-| `entities/enemies.js` | Velvet cat, drones, gunners, gangers, restricted zone, horde gauntlet (`GAUNTLET_MAPS`: its maps — the House of Death, and sealed placeholders — picked from Grum's menu, `openGauntletMenu` in engine/shops-menus.js) |
+| `entities/enemies.js` | Velvet cat, drones, gunners (and the Sanctum's three wardens, `WARDENS`: personas with their own art, twice her size, sight-gated fire), gangers, restricted zone, horde gauntlet (`GAUNTLET_MAPS`: its maps — the House of Death, and sealed placeholders — picked from Grum's menu, `openGauntletMenu` in engine/shops-menus.js) |
 
 ## buildings/
 | File | What's in it |
@@ -118,6 +118,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/scope.js` | Scope view: with a sniper up to her eye, the world darkens to a lit lane along her line of fire (clipped at walls), the camera leans down it, the lane steadies; ambience quiets. Setting: Scope View |
 | `engine/noise.js` | Noise: `emitNoise` — gunshots, flits, punches, struck doors, shattered glass carry (`CONFIG.NOISE`), muffled by walls and shut doors; gangers in earshot hear roughly where and go to look; the ripple she sees |
 | `engine/combat-fx.js` | What a hit looks like: damage numbers, enemy health bars, blood in each character's own colour (`BLOOD_KINDS`), the hit flinch |
+| `engine/boss-intro.js` | Boss intros: `bossIntro` spawns the Sanctum's Triumvirate dormant (kneeling), films their awakening (the camera visits each as its eye ignites, frames all three under the title, pans back; skippable; a short version for replays), grace, then wakes them; `drawBossGlow` |
 | `engine/tuning-ui.js` | Resonance on screen: HUD meter, Dr. Yin's tuning overlay, the SKILLS screen |
 | `engine/shops-menus.js` | Vending, garage, auto shop, Zib, sleep |
 | `engine/daytime-flit.js` | Daytime exposure, flit teleport, graveyard ghosts |
@@ -127,7 +128,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/world-state.js` | Emissive pass, debug views, transitions, vehicles, visibility, time of day (`dayCycle`: darkness, the colour of the dark, daylight, sun, lamps on), darkness |
 | `engine/update.js` | `update()`: the per-tick simulation |
 | `engine/draw.js` | `draw()`: the frame renderer |
-| `engine/interiors.js` | Apartment, clinic, House of Death, Double Nights lobby and penthouse (the mirror rift), and Moon City Nightclub interiors (floors, glows; the club's light show in time with its track), the graveyard's candle flames, the city seen from the veranda |
+| `engine/interiors.js` | Apartment, clinic, House of Death, Double Nights lobby and penthouse (the mirror rift), the Sanctum (rose window, sigil runes), and Moon City Nightclub interiors (floors, glows; the club's light show in time with its track), the graveyard's candle flames, the city seen from the veranda |
 | `engine/lighting.js` | Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, wet reflections, atmosphere |
 | `engine/player-draw-input.js` | Drawing the player, emotes, timers, joysticks — the touch sticks: the move stick's flit ring (and flick / two-finger flit settings), the fire stick's threshold ring (aim inside, fire past it; sniper fire-on-release) and aim memory |
 | `engine/loop.js` | `start`, `stop`, `resetGameState`, the main loop |

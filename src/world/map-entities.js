@@ -317,10 +317,33 @@
                     break;
                 }
 
-                case 'church_boss':
-                    e.props = [ new PropEntity({ x: 500, y: 120, width: 200, height: 100, color: '#3a0a0a' }), new PropEntity({ x: 150, y: 400, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 500, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 600, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 700, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 800, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 900, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 1000, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 1100, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 400, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 500, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 600, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 700, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 800, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 900, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 1000, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 1100, width: 120, height: 40, color: '#2a2a2a' }) ];
-                    e.lamps = [ new LampEntity({ x: 600, y: 150, lampType: 3, color: '#ff0000', lightRadius: 650 }), new LampEntity({ x: 300, y: 300, lampType: 2, color: '#aa0000', lightRadius: 550 }), new LampEntity({ x: 900, y: 300, lampType: 2, color: '#aa0000', lightRadius: 550 }), new LampEntity({ x: 300, y: 1100, lampType: 2, color: '#aa0000', lightRadius: 550 }), new LampEntity({ x: 900, y: 1100, lampType: 2, color: '#aa0000', lightRadius: 550 }) ];
+                case 'church_boss': {
+                    // The Sanctum: the altar and ruined organ on the dais, two colonnades of pillars (cover),
+                    // broken pews, a fallen pillar, candle stands and braziers. Art: drawSanctumDecorProp.
+                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1418', decorType }, extra));
+                    const COLS = [420, 560, 700, 840, 980, 1120];
+                    e.props = [
+                        F(530, 140, 140, 56, 'sc_altar'), F(400, 58, 100, 40, 'sc_organ'), F(700, 58, 100, 40, 'sc_organ'),
+                        ...COLS.flatMap(y => [F(228, y - 22, 44, 44, 'sc_pillar'), F(928, y - 22, 44, 44, 'sc_pillar')]),
+                        F(990, 758, 120, 30, 'sc_fallen'),
+                        F(330, 640, 92, 24, 'sc_pew'), F(778, 640, 92, 24, 'sc_pew'), F(340, 900, 84, 24, 'sc_pew_broken'), F(776, 900, 84, 24, 'sc_pew'),
+                        F(96, 520, 84, 24, 'sc_pew_broken'), F(1020, 1020, 84, 24, 'sc_pew'),
+                        F(470, 240, 18, 18, 'sc_candles'), F(712, 240, 18, 18, 'sc_candles'), F(100, 300, 18, 18, 'sc_candles'), F(1082, 300, 18, 18, 'sc_candles'),
+                        F(180, 1200, 36, 36, 'sc_brazier'), F(984, 1200, 36, 36, 'sc_brazier'), F(150, 230, 36, 36, 'sc_brazier'), F(1014, 230, 36, 36, 'sc_brazier'),
+                    ];
+                    // No red wash any more: a storm-violet ambient; crimson from the rose window and braziers,
+                    // warm from the candles (hidden fixtures, light only)
+                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
+                    e.lamps = [ L(600, 150, '#c060ff', 460), L(198, 1218, '#ff8a40', 320), L(1002, 1218, '#ff8a40', 320), L(600, 720, '#9a70ff', 520) ];
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    e.softLights = [
+                        A(600, 700, 1060, 1280, '#8a78c8', 0.22), A(600, 170, 700, 280, '#ff5a8a', 0.12),
+                        S(168, 248, 110, '#ff8a40', 0.8, 5), S(1032, 248, 110, '#ff8a40', 0.8, 5),
+                        S(479, 249, 70, '#ffc080', 0.6, 4), S(721, 249, 70, '#ffc080', 0.6, 4), S(109, 309, 60, '#ffc080', 0.5, 4), S(1091, 309, 60, '#ffc080', 0.5, 4),
+                    ];
                     break;
+                }
 
                 case 'enni_cole_interior':
                     e.props = [

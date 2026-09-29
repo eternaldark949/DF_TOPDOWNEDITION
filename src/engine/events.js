@@ -624,9 +624,7 @@
                         // Teleport to church_boss and spawn the Triumvirate
                         this.loadMap('church_boss');
                         setTimeout(() => {
-                            this.enemies.push(new GatlingGunner(300, 300, 0));
-                            this.enemies.push(new GatlingGunner(600, 200, 1));
-                            this.enemies.push(new GatlingGunner(900, 300, 2));
+                            if (!this.enemies.some(e => e.persona && !e.dead)) this.bossIntro([new GatlingGunner(360, 330, 0, { persona: 'vesper' }), new GatlingGunner(600, 290, 1, { persona: 'matins' }), new GatlingGunner(840, 330, 2, { persona: 'compline' })], { short: true });
                             showMessage("THE TRIUMVIRATE AWAKENS... (REPLAY)");
                             this.triggerShake(20);
                         }, 500);

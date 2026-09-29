@@ -152,9 +152,16 @@
             'church_boss': {
                 id: 'church_boss', width: 1200, height: 1400, type: 'outdoor',
                 climate: 'tempest',   // Boss arena: effectively never clears
-                label: 'Abandoned Church', floorColor: '#1a1a1a',
+                label: 'Abandoned Church', floorColor: '#0e0c12',
+                // The Sanctum, open to the storm: the apse (dais, altar, rose window, ruined organ) where the
+                // Triumvirate kneel; the nave and its gold sigil (the arena); pillared aisles for cover; the
+                // narthex at the door. Furniture: sc_* (drawSanctumDecorProp); floor: drawSanctumInterior;
+                // glows: drawSanctumGlow and the wardens' eyes (drawBossGlow).
+                navProps: 'all',
+                wallStyle: { fill: '#16121a', stroke: 'rgba(170,120,255,0.35)' },
                 spawn: { x: 600, y: 1250 },
-                walls: [ {x:0,y:0,w:1200,h:50}, {x:0,y:1350,w:550,h:50}, {x:650,y:1350,w:550,h:50}, {x:0,y:0,w:50,h:1400}, {x:1150,y:0,w:50,h:1400}, {x:450,y:100,w:300,h:150} ],
+                zones: [],
+                walls: [ {x:0,y:0,w:1200,h:50}, {x:0,y:1350,w:550,h:50}, {x:650,y:1350,w:550,h:50}, {x:0,y:0,w:50,h:1400}, {x:1150,y:0,w:50,h:1400} ],
                 transitions: [ {x: 550, y: 1320, w: 100, h: 80, target: 'hotel_suite', label: 'Exit Church'} ],
                 landmarks: [
                     { id: 'church_exit', x: 600, y: 1370 }, { id: 'church_altar', x: 600, y: 175 },

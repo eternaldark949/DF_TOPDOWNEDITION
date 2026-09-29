@@ -508,8 +508,17 @@
          * - Squad formation AI (triangle, pincer, circle strafe)
          * - Gatling fire mechanics (burst, spin-up, reload)
          */
+        /* The Sanctum's three (the Triumvirate): the same gatling automaton, each in its own guise.
+           A persona switches on boss mode (dormant until the intro, sight-gated fire, a longer telegraph)
+           and its own art; the gauntlet's gunners have none and keep the plain look. */
+        const WARDENS = {
+            vesper:   { name: 'Vesper, the Censer',     accent: '#c42a3c', trim: '#e8c27a', mantle: '#5a0c1c', eye: '255, 60, 40' },
+            matins:   { name: 'Matins, the Choir',      accent: '#e8c27a', trim: '#fff1c2', mantle: '#1a1216', eye: '255, 190, 80' },
+            compline: { name: 'Compline, the Penitent', accent: '#8a5cff', trim: '#e6ddd0', mantle: '#24163a', eye: '200, 120, 255' }
+        };
+
         class GatlingGunner extends ActorEntity {
-            constructor(x, y, id) {
+            constructor(x, y, id, opts = {}) {
                 // Initialize ActorEntity with circle collision
                 super({
                     x: x,
@@ -546,6 +555,39 @@
                 this.isTelegraphing = false;
                 this._prevPlayerX = 0;
                 this._prevPlayerY = 0;
+
+                // Boss mode (the Sanctum, engine/boss-intro.js): spawned kneeling and dark (dormant), woken
+                // by the intro; then they hunt her anywhere in their arena but only open fire with a clear
+                // line on her (sightGated), after a longer, readable telegraph.
+                this.dormant = false;
+                this.sightGated = false;
+                this._eyeK = 1;           // eyes: 0 dark … 1 burning
+                this._riseK = 1;          // 0 kneeling … 1 standing
+                this._holdFire = 0;       // frames before the first burst may begin
+                this.persona = WARDENS[opts.persona] ? opts.persona : null;
+                if (this.persona) {
+                    this.radius = 30; this.width = this.height = 60;   // twice her size (she's 15)
+                    this.artScale = 1.7;
+                    this.sightGated = true;
+                    this.telegraphThreshold = 30;                 // ~0.5 s: dodgeable on reaction
+                    this.bossName = WARDENS[this.persona].name;
+                }
+                this._heat = 0;           // barrels: 0 cool … 1 glowing
+            }
+
+            /** Sleep until the intro wakes them (kneeling, eyes dark). */
+            makeDormant() { this.dormant = true; this._eyeK = 0; this._riseK = 0; this.burstCooldown = 0; this.burstCount = 0; this.angle = Math.PI / 2; }
+
+            /** Wake: move now, but the first burst waits `hold` frames (and still telegraphs). */
+            awaken(hold = 60) { this.dormant = false; this._eyeK = 1; this._riseK = 1; this._holdFire = hold; }
+
+            /** Has she a clear line from here (walls, props, shut doors)? Checked every few frames. */
+            _hasSight(px, py) {
+                if ((this._sightTick = (this._sightTick || 0) + 1) % 3 === 1 || this._sight === undefined) {
+                    const map = typeof game !== 'undefined' && game ? game.activeMap : null;
+                    this._sight = map ? hasShotLine(this.x, this.y, px, py, map) : true;
+                }
+                return this._sight;
             }
 
             /**
@@ -553,6 +595,13 @@
              */
             update(playerX, playerY, allEnemies, walls) {
                 if (this.dead) return null;
+                if (this.dormant) {                               // kneeling at the altar until the intro wakes them
+                    this._eyeK += ((this._eyeT || 0) - this._eyeK) * 0.15;
+                    this._riseK += ((this._riseT || 0) - this._riseK) * 0.08;
+                    if (this._igniteFlash) this._igniteFlash *= 0.92;
+                    return [];
+                }
+                if (this._igniteFlash) this._igniteFlash *= 0.92;
                 
                 // Decrement invincibility
                 if (this.invincibleTimer > 0) {
@@ -587,7 +636,7 @@
                 const myIndex = squad.indexOf(this);
                 const squadSize = squad.length;
                 
-                const idealRange = 240; 
+                const idealRange = this.persona ? 280 : 240; 
                 let moveX = 0;
                 let moveY = 0;
 
@@ -635,7 +684,7 @@
                 }
 
                 // SEPARATION FORCE (Prevent Overlap)
-                const separationDist = 60;
+                const separationDist = this.persona ? 90 : 60;
                 for (let ally of squad) {
                     if (ally === this) continue;
                     const adx = this.x - ally.x;
@@ -668,6 +717,16 @@
                 
                 // GATLING FIRE LOGIC
                 const shots = [];
+                const firingNow = this.burstCount > 0 && this.burstCooldown === 0;
+                this._heat = Math.max(0, Math.min(1, this._heat + (firingNow ? 0.05 : -0.012)));
+                // Boss mode: no burst begins (or goes on) without a clear line on her, nor in the grace after waking
+                if (this._holdFire > 0) this._holdFire--;
+                if (this.sightGated && (this._holdFire > 0 || !this._hasSight(playerX, playerY))) {
+                    this.isTelegraphing = false;
+                    if (this.burstCount > 0) { this.burstCount = 0; this.burstTimer = 0; }
+                    this.burstCooldown = Math.max(this.burstCooldown, this.telegraphThreshold + 1);   // it'll telegraph again first
+                    return shots;
+                }
                 if (this.burstCooldown > 0) {
                     this.burstCooldown--;
                     // Telegraph before burst starts — track with predictive aim
@@ -683,9 +742,11 @@
                 } else if (this.burstCount < this.maxBurstCount) {
                     this.isTelegraphing = false;
                     this.burstTimer--;
-                    if (this.burstTimer <= 0) {
+                    if (this.burstTimer <= 0 && this.sightGated && !(this._sight = hasShotLine(this.x, this.y, playerX, playerY, game.activeMap))) {
+                        this.burstCount = 0; this.burstTimer = 0; this.burstCooldown = this.telegraphThreshold + 1;   // she slipped behind cover mid-burst
+                    } else if (this.burstTimer <= 0) {
                         const spread = (Math.random() - 0.5) * 0.15;
-                        const muzzleOffset = 35; 
+                        const muzzleOffset = this.persona ? 60 : 35; 
                         const mx = this.x + Math.cos(this.angle) * muzzleOffset;
                         const my = this.y + Math.sin(this.angle) * muzzleOffset;
 
@@ -747,6 +808,7 @@
                 if (this.invincibleTimer > 0 && this.invincibleTimer % 6 < 3) {
                     return;
                 }
+                if (this.persona) return this._drawWarden(ctx);
                 
                 ctx.save();
                 ctx.translate(this.x, this.y);
@@ -809,6 +871,70 @@
                     drawEnemyTelegraph(ctx, this.x, this.y, this.telegraphAngle,
                         this.burstCooldown, this.telegraphThreshold, '#ffaa00', 350);
                 }
+            }
+
+            /** A Sanctum warden: a mantled war automaton in its own guise (WARDENS). Kneeling and dark while
+             *  dormant; the eye slit ignites, the halo / chains / censer smoke come alive, and it rises. */
+            _drawWarden(ctx) {
+                const W = WARDENS[this.persona], t = _frameTime / 1000, rise = this._riseK, kneel = 1 - rise, eye = this._eyeK;
+                const tele = this.isTelegraphing && this.burstCooldown > 0, spinning = this.burstCount > 0 && this.burstCooldown === 0;
+                const big = (this.persona === 'matins' ? 1.12 : 1) * (this.artScale || 1), S = this.artScale || 1;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(3, 8, 26 * big, 18 * big, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.rotate(this.angle);
+                ctx.scale(big * (1 - 0.14 * kneel), big * (1 - 0.14 * kneel));
+                // The mantle: a long cape behind, fluttering; pooled wide on the floor while kneeling
+                const fl = Math.sin(t * 3 + this.id * 2) * 2.5 * rise;
+                ctx.fillStyle = W.mantle; ctx.beginPath();
+                ctx.moveTo(4, -16); ctx.quadraticCurveTo(-18 - 10 * kneel, -26 - 6 * kneel + fl, -34 - 6 * kneel, -10 + fl);
+                ctx.quadraticCurveTo(-40 - 8 * kneel, 0, -34 - 6 * kneel, 10 - fl); ctx.quadraticCurveTo(-18 - 10 * kneel, 26 + 6 * kneel - fl, 4, 16); ctx.closePath(); ctx.fill();
+                ctx.strokeStyle = W.accent; ctx.lineWidth = 1.2; ctx.stroke();
+                // Armoured body: black iron plates, gold filigree
+                ctx.fillStyle = '#16121a'; ctx.beginPath(); ctx.ellipse(0, 0, 16, 18, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = W.trim; ctx.lineWidth = 1; ctx.stroke();
+                for (const sy of [-1, 1]) {                                    // pauldrons
+                    ctx.fillStyle = '#231c28'; ctx.beginPath(); ctx.ellipse(-2, sy * 15, this.persona === 'matins' ? 10 : 8, 6, sy * 0.3, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = W.accent; ctx.lineWidth = 1; ctx.stroke();
+                }
+                ctx.strokeStyle = W.trim; ctx.globalAlpha = 0.5; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(0, 0, 10, -1.2, 1.2); ctx.moveTo(-6, -8); ctx.quadraticCurveTo(-2, 0, -6, 8); ctx.stroke(); ctx.globalAlpha = 1;
+                if (this.persona === 'compline') {                             // chains across the chest
+                    ctx.strokeStyle = W.trim; ctx.lineWidth = 1.4; ctx.setLineDash([2, 1.5]);
+                    ctx.beginPath(); ctx.moveTo(-10, -14); ctx.quadraticCurveTo(0, 0 + Math.sin(t * 2) * rise, -10, 14); ctx.moveTo(-4, -16); ctx.lineTo(8, 10); ctx.stroke(); ctx.setLineDash([]);
+                }
+                // The weapon: rotary barrels on the right arm, lowered while kneeling; they glow as they heat
+                ctx.save(); ctx.rotate(-0.9 * kneel); ctx.translate(4, 9);
+                if (this.persona === 'vesper') { ctx.fillStyle = W.trim; ctx.beginPath(); ctx.arc(10, 0, 7, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#6a4f22'; ctx.lineWidth = 1; ctx.stroke(); }   // the thurible drum
+                const spin = spinning ? _frameTime / 18 : 0, nB = this.persona === 'matins' ? 2 : 6;
+                for (let i = 0; i < nB; i++) {
+                    const off = nB === 2 ? (i ? 3.5 : -3.5) : Math.sin(spin + i * Math.PI / 3) * 4;
+                    ctx.fillStyle = '#2e2a32'; ctx.fillRect(8, off - 1.6, 26, 3.2);
+                    if (this._heat > 0.05) { ctx.fillStyle = `rgba(255,${120 + 80 * (1 - this._heat) | 0},40,${this._heat})`; ctx.fillRect(28, off - 1.6, 6, 3.2); }
+                }
+                if (this.persona === 'compline') { ctx.strokeStyle = W.trim; ctx.lineWidth = 1; ctx.setLineDash([2, 1.5]); ctx.beginPath(); ctx.moveTo(10, -6); ctx.lineTo(26, 6); ctx.moveTo(12, 6); ctx.lineTo(24, -6); ctx.stroke(); ctx.setLineDash([]); }
+                if (spinning && this.burstTimer < 3) { ctx.fillStyle = '#ffcf6a'; ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(36, 0, 6, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; }
+                ctx.restore();
+                // The hood and the eye slit: dark while dormant; flaring white-red when about to fire
+                ctx.fillStyle = '#0e0a10'; ctx.beginPath(); ctx.arc(2 - 3 * kneel, 0, 9, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = W.accent; ctx.lineWidth = 1.2; ctx.stroke();
+                if (eye > 0.02) {
+                    const flare = tele ? 0.6 + 0.4 * Math.sin(_frameTime / 40) : 0, flash = this._igniteFlash || 0;
+                    ctx.shadowColor = `rgb(${W.eye})`; ctx.shadowBlur = 8 * eye + 14 * flash + 10 * flare;
+                    ctx.fillStyle = flare > 0 ? `rgba(255,${200 * flare | 0},${200 * flare | 0},1)` : `rgba(${W.eye},${eye})`;
+                    ctx.fillRect(6 - 3 * kneel, -4.5, 3, 9); ctx.shadowBlur = 0;
+                }
+                ctx.restore();
+                // Matins' halo turns over its crown; Vesper's censer trails incense
+                if (this.persona === 'matins') {
+                    ctx.save(); ctx.translate(this.x, this.y); ctx.globalAlpha = 0.25 + 0.75 * eye;
+                    ctx.scale(S * 1.12, S * 1.12); ctx.strokeStyle = W.trim; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(0, -6 * rise - 2, 16, 6, 0, 0, Math.PI * 2); ctx.stroke();
+                    for (let i = 0; i < 8; i++) { const a = t * 0.8 * rise + i * Math.PI / 4; ctx.fillStyle = W.accent; ctx.beginPath(); ctx.arc(Math.cos(a) * 16, -6 * rise - 2 + Math.sin(a) * 6, 1.4, 0, Math.PI * 2); ctx.fill(); }
+                    ctx.restore();
+                } else if (this.persona === 'vesper' && eye > 0.02) {
+                    for (let i = 0; i < 5; i++) { const ph = (t * 0.6 + i / 5) % 1; ctx.globalAlpha = (1 - ph) * 0.25 * eye; ctx.fillStyle = '#b8a8c8'; ctx.beginPath(); ctx.arc(this.x - Math.cos(this.angle) * (10 + ph * 30) * S + Math.sin(t + i) * 4 * S, this.y - Math.sin(this.angle) * (10 + ph * 30) * S - ph * 10 * S, (3 + ph * 6) * S, 0, Math.PI * 2); ctx.fill(); }
+                    ctx.globalAlpha = 1;
+                }
+                if (tele) drawEnemyTelegraph(ctx, this.x, this.y, this.telegraphAngle, this.burstCooldown, this.telegraphThreshold, `rgb(${W.eye})`, 380);
             }
         }
         

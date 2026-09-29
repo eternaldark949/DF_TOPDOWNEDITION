@@ -189,6 +189,7 @@
             
                 this.profiler.start('Logic:Story');
                 this.cutscene.update();
+                if (this._bossIntros && this._bossIntros.length) this.updateBossIntro();          // engine/boss-intro.js
                 this.story.update();
                 this.profiler.stop('Logic:Story');
                 
