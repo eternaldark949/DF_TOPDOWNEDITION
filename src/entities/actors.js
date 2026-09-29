@@ -99,6 +99,8 @@
                 if (this.dead || this.invincibleTimer > 0) return false;
                 
                 this.hp -= amount;
+                // Damage number, health bar, blood, flinch (engine/combat-fx.js)
+                if (typeof game !== 'undefined' && game && game.onActorHit) game.onActorHit(this, amount, knockbackX, knockbackY);
                 
                 // Apply knockback
                 if (knockbackX || knockbackY) {

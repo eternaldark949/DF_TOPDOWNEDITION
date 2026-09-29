@@ -1363,41 +1363,10 @@
             
                 // 2. COMPUTE SHADOW POLYGON PER LAMP (cached on lamp object)
                 for (let lamp of this.lamps) {
-                    const range = lamp.radius;
-                    const relevantObstacles = allObstacles.filter(o => 
-                        Math.hypot(o.x + o.w/2 - lamp.x, o.y + o.h/2 - lamp.y) < range + Math.max(o.w, o.h)
-                    );
-            
-                    let points = [];
-                    for (let o of relevantObstacles) {
-                        points.push({x: o.x, y: o.y});
-                        points.push({x: o.x + o.w, y: o.y});
-                        points.push({x: o.x + o.w, y: o.y + o.h});
-                        points.push({x: o.x, y: o.y + o.h});
-                    }
-                    // Map corners as boundary points
-                    points.push({x: 0, y: 0}, {x: this.activeMap.width, y: 0}, 
-                                {x: this.activeMap.width, y: this.activeMap.height}, {x: 0, y: this.activeMap.height});
-            
-                    let intersections = [];
-                    for (let p of points) {
-                        const angle = Math.atan2(p.y - lamp.y, p.x - lamp.x);
-                        [-0.0001, 0, 0.0001].forEach(offset => {
-                            const rayAngle = angle + offset;
-                            const dx = Math.cos(rayAngle);
-                            const dy = Math.sin(rayAngle);
-                            let closestDist = range;
-                            for (let o of relevantObstacles) {
-                                const hits = getLineRectIntersections(lamp.x, lamp.y, lamp.x + dx * range, lamp.y + dy * range, o.x, o.y, o.w, o.h);
-                                for (let hit of hits) {
-                                    const dist = Math.hypot(hit.x - lamp.x, hit.y - lamp.y);
-                                    if (dist < closestDist) closestDist = dist;
-                                }
-                            }
-                            intersections.push({ angle: rayAngle, x: lamp.x + dx * closestDist, y: lamp.y + dy * closestDist });
-                        });
-                    }
-                    intersections.sort((a, b) => a.angle - b.angle);
+                    // Visibility polygon (core/draw-helpers.js), bounded by the map's corners
+                    const intersections = computeVisibilityPoly(lamp.x, lamp.y, lamp.radius, allObstacles, {
+                        extraPoints: [{x: 0, y: 0}, {x: this.activeMap.width, y: 0},
+                                      {x: this.activeMap.width, y: this.activeMap.height}, {x: 0, y: this.activeMap.height}] });
             
                     // Cache the shadow polygon on the lamp — NO canvas needed
                     lamp._shadowPoly = intersections;

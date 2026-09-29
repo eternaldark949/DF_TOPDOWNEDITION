@@ -417,13 +417,24 @@
                     }
                     case 'blood': {
                         const size = opts.size || 3;
+                        const color = opts.color || '138, 7, 7';             // "r, g, b" — each character bleeds their own colour
                         this.decals.push({
                             type: 'blood', x, y,
                             radius: size,
                             alpha: 0.4 + Math.random() * 0.4,
-                            color: '138, 7, 7',
+                            color,
                             spawnTime: now
                         });
+                        // A hit sprays along its direction: a few droplets trailing away
+                        if (opts.dir !== undefined) {
+                            const n = 2 + Math.floor(Math.random() * 3);
+                            for (let k = 1; k <= n; k++) {
+                                if (this.decals.length >= this.maxDecals) this.decals.shift();
+                                const d = size * (1.2 + k * 1.1) + Math.random() * 3, a = opts.dir + (Math.random() - 0.5) * 0.6;
+                                this.decals.push({ type: 'blood', x: x + Math.cos(a) * d, y: y + Math.sin(a) * d,
+                                                   radius: Math.max(0.6, size * (0.55 - k * 0.1)), alpha: 0.35 + Math.random() * 0.35, color, spawnTime: now });
+                            }
+                        }
                         // Secondary splatter
                         if (Math.random() < CONFIG.DECALS.BLOOD_SPLATTER_CHANCE) {
                             if (this.decals.length >= this.maxDecals) this.decals.shift();
@@ -433,7 +444,7 @@
                                 y: y + (Math.random() - 0.5) * 12,
                                 radius: size * 0.6,
                                 alpha: 0.3 + Math.random() * 0.3,
-                                color: '138, 7, 7',
+                                color,
                                 spawnTime: now
                             });
                         }
@@ -445,7 +456,7 @@
             // Legacy API compatibility — routes to addDecal
             addSkid(x, y, width, intensity) { this.addDecal('skid', x, y, { width, intensity }); }
             addDebris(x, y, color, count) { this.addDecal('debris', x, y, { color, count }); }
-            addBlood(x, y, size) { this.addDecal('blood', x, y, { size }); }
+            addBlood(x, y, size, color) { this.addDecal('blood', x, y, { size, color }); }
             
             /**
              * Draw only visible decals using cullBounds.

@@ -53,6 +53,62 @@
         /** Get building colliders from a map object (with fallbacks). */
         function getColliders(map) { return map.buildingColliders || map.buildings || []; }
         
+        /** Everything that blocks sight and light on a map: walls plus building footprints (cached per map). */
+        function getOccluders(map) {
+            if (!map) return [];
+            const cols = getColliders(map), walls = map.walls || [];
+            const c = map._occluderCache;
+            if (c && c.walls === walls && c.cols === cols && c.nw === walls.length && c.nc === cols.length) return c.list;
+            const list = walls.concat(cols);
+            map._occluderCache = { walls, cols, nw: walls.length, nc: cols.length, list };
+            return list;
+        }
+
+        /**
+         * Visibility polygon from (ox, oy) out to `range`, blocked by rect obstacles ({x,y,w,h}).
+         * Returns points sorted by angle ({angle, x, y}); fan them from the origin to fill.
+         *   opts.extraPoints  more corner points to aim rays at (the lamp bake adds the map corners)
+         *   opts.aMin/aMax    only this angle window (radians, aMin → aMax counter-clockwise), with
+         *                     its edges and an arc of rays every opts.arcStep (default 0.12) so the far
+         *                     edge stays round — used by vision cones and headlight beams
+         *   opts.minDist      ignore walls nearer than this (a beam cast from behind the bumper)
+         * Rays go to every nearby obstacle corner (±0.0001 rad) and stop at the first wall they hit.
+         */
+        function computeVisibilityPoly(ox, oy, range, obstacles, opts = {}) {
+            const relevant = obstacles.filter(o => Math.hypot(o.x + o.w / 2 - ox, o.y + o.h / 2 - oy) < range + Math.max(o.w, o.h));
+            const minDist = opts.minDist || 0;                                // ignore hits nearer than this
+            const windowed = opts.aMin !== undefined;
+            const TAU = Math.PI * 2, span = windowed ? (((opts.aMax - opts.aMin) % TAU + TAU) % TAU || TAU) : 0;
+            const rel = a => ((a - opts.aMin) % TAU + TAU) % TAU;
+            const angles = [], points = [];
+            for (const o of relevant) points.push({ x: o.x, y: o.y }, { x: o.x + o.w, y: o.y }, { x: o.x + o.w, y: o.y + o.h }, { x: o.x, y: o.y + o.h });
+            if (opts.extraPoints) points.push(...opts.extraPoints);
+            for (const p of points) {
+                const angle = Math.atan2(p.y - oy, p.x - ox);
+                for (const off of [-0.0001, 0, 0.0001]) {
+                    if (windowed && rel(angle + off) > span) continue;
+                    angles.push(angle + off);
+                }
+            }
+            if (windowed) {
+                const step = opts.arcStep || 0.12, n = Math.max(1, Math.ceil(span / step));
+                for (let i = 0; i <= n; i++) angles.push(opts.aMin + span * i / n);
+            }
+            const out = [];
+            for (const a of angles) {
+                const dx = Math.cos(a), dy = Math.sin(a);
+                let closest = range;
+                for (const o of relevant) {
+                    const hits = getLineRectIntersections(ox, oy, ox + dx * range, oy + dy * range, o.x, o.y, o.w, o.h);
+                    for (const h of hits) { const d = Math.hypot(h.x - ox, h.y - oy); if (d < closest && d >= minDist) closest = d; }
+                }
+                out.push({ angle: a, x: ox + dx * closest, y: oy + dy * closest });
+            }
+            if (windowed) out.sort((p, q) => rel(p.angle) - rel(q.angle));
+            else out.sort((p, q) => p.angle - q.angle);
+            return out;
+        }
+
         /** Draw an HP bar at the given position. */
         function drawHPBar(ctx, x, y, w, h, percent) {
             ctx.fillStyle = '#333';
