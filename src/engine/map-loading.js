@@ -696,12 +696,17 @@
                                 // Skip ~20% for gaps and paths
                                 if (rng(si++) < 0.2) continue;
                                 
+                                // The carving (drawGraveStone): mostly headstones and arches, now and then
+                                // a cross, an obelisk, an angel, a ledger, a broken stone, a family stone.
+                                // Its own hash, so the layout (the si sequence) is unchanged.
+                                const variant = [0, 0, 0, 1, 1, 1, 2, 2, 3, 4, 5, 6, 7][Math.floor(rng(si * 7 + 5003) * 13)];
                                 mapData.props.push(new PropEntity({
                                     x: col + ox, y: row + oy,
                                     width: 30 + rng(si++) * 15,
                                     height: 45 + rng(si++) * 20,
                                     color: '#555',
-                                    mass: 50000 // Immovable
+                                    mass: 50000, // Immovable
+                                    decorType: 'gy_stone', variant
                                 }));
                             }
                         }
@@ -768,7 +773,8 @@
                             const hubPropCount = this._hubCache_hubPropCount;
                             return mapData.props.slice(hubPropCount).map(p => ({
                                 x: p.x, y: p.y, width: p.width, height: p.height,
-                                color: p.color, mass: p.mass
+                                color: p.color, mass: p.mass,
+                                decorType: p.decorType, variant: p.decor ? p.decor.variant : 0
                             }));
                         })()
                     };
@@ -1307,7 +1313,7 @@
                 for (let tm of this.teammates) {
                     if (!tm.recruited) {
                         // Unrecruited logic
-                        if (map.id === 'moon_city_nightclub') { tm.x = 1100; tm.y = 150; }
+                        if (map.id === 'moon_city_nightclub') { tm.x = 1300; tm.y = 180; }   // with Mirabel in her lounge
                         else { tm.x = -5000; tm.y = -5000; }
                         continue;
                     }

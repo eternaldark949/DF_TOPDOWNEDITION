@@ -54,7 +54,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## entities/
 | File | What's in it |
 |---|---|
-| `entities/props-decor.js` | `StaticEntity`, apartment, clinic, House of Death (`hod_*`) and Double Nights lobby (`dn_*`) furniture art, the MiniSpree vending machine and the health station (one design on every map), `PropEntity` |
+| `entities/props-decor.js` | `StaticEntity`, apartment (incl. the crafting workbench, `apt_craft`), clinic, House of Death (`hod_*`), Double Nights lobby (`dn_*`) and Moon City Nightclub (`mc_*`) furniture art, the graveyard's carved stones (`gy_stone`, 8 variants, cached sprites), the MiniSpree vending machine and the health station (one design on every map), `PropEntity` |
 | `entities/vehicles-minigames.js` | `VehicleEntity`, bumper cars, Ferris wheel, bumper-car minigame |
 | `entities/lamps.js` | `LampEntity` (all lamp types) |
 | `entities/actors.js` | `ActorEntity`, `PlayerEntity`, projectiles, triggers |
@@ -126,7 +126,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/world-state.js` | Emissive pass, debug views, transitions, vehicles, visibility, time of day (`dayCycle`: darkness, the colour of the dark, daylight, sun, lamps on), darkness |
 | `engine/update.js` | `update()`: the per-tick simulation |
 | `engine/draw.js` | `draw()`: the frame renderer |
-| `engine/interiors.js` | Apartment, clinic, House of Death and Double Nights lobby interiors (floors, glows), the city seen from the veranda |
+| `engine/interiors.js` | Apartment, clinic, House of Death, Double Nights lobby and Moon City Nightclub interiors (floors, glows; the club's light show on a 124 BPM clock), the graveyard's candle flames, the city seen from the veranda |
 | `engine/lighting.js` | Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, wet reflections, atmosphere |
 | `engine/player-draw-input.js` | Drawing the player, emotes, timers, joysticks — the touch sticks: the move stick's flit ring (and flick / two-finger flit settings), the fire stick's threshold ring (aim inside, fire past it; sniper fire-on-release) and aim memory |
 | `engine/loop.js` | `start`, `stop`, `resetGameState`, the main loop |

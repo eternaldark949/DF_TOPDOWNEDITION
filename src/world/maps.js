@@ -108,17 +108,36 @@
                     { id: 'clinic_respawn', x: 212, y: 328 }, { id: 'clinic_scanner', x: 400, y: 480 }
                 ]
             },
+            // Moon City Nightclub. Furniture: createMapEntities (mc_*, drawClubDecorProp); floors:
+            // drawClubInterior; the light show: drawClubGlow.
+            //   Powder room |            Hall (DJ stage, dance floor, poles)          | Mirabel's lounge
+            //               | Bar (west side)                                        | VIP corridor | Suites 1-3
+            //   Gents       |                        Foyer                           |
             'moon_city_nightclub': {
-                id: 'moon_city_nightclub', width: 1200, height: 1000, type: 'indoor',
-                label: 'Moon City Nightclub', floorColor: '#0a0a0a',
-                spawn: { x: 600, y: 900 },
-                zones: [ { x: 100, y: 100, w: 1000, h: 750, color: '#1a0a1a' } ],
-                walls: [ {x:0,y:0,w:1200,h:50}, {x:0,y:950,w:550,h:50}, {x:650,y:950,w:550,h:50}, {x:0,y:0,w:50,h:1000}, {x:1150,y:0,w:50,h:1000}, {x:500,y:100,w:200,h:50} ],
-                transitions: [ {x: 550, y: 920, w: 100, h: 80, target: 'hub_949', label: 'Exit Nightclub'} ],
+                id: 'moon_city_nightclub', width: 1600, height: 1200, type: 'indoor',
+                label: 'Moon City Nightclub', floorColor: '#08060b',
+                ambientDarkness: 0.72,
+                navProps: 'all',
+                wallStyle: { fill: '#0b0810', stroke: 'rgba(190,140,255,0.55)' },   // black lacquer, violet neon trim
+                spawn: { x: 800, y: 1130 },
+                zones: [],
+                walls: [
+                    // Outer shell, the door in the middle of the south wall
+                    { x: 0, y: 0, w: 1600, h: 14 }, { x: 0, y: 0, w: 14, h: 1200 }, { x: 1586, y: 0, w: 14, h: 1200 },
+                    { x: 0, y: 1186, w: 740, h: 14 }, { x: 860, y: 1186, w: 740, h: 14 },
+                    // Interior (doors are cut through these by ROOM_DEFS)
+                    { x: 360, y: 14, w: 14, h: 1172 }, { x: 1226, y: 14, w: 14, h: 1172 },    // west and east spines
+                    { x: 14, y: 560, w: 346, h: 14 },                                        // powder room | gents
+                    { x: 374, y: 986, w: 852, h: 14 },                                       // hall | foyer
+                    { x: 1240, y: 276, w: 346, h: 14 },                                      // lounge | VIP
+                    { x: 1330, y: 290, w: 14, h: 896 },                                      // corridor | suites
+                    { x: 1344, y: 580, w: 242, h: 14 }, { x: 1344, y: 884, w: 242, h: 14 },  // suite walls
+                ],
+                transitions: [ {x: 740, y: 1170, w: 120, h: 30, target: 'hub_949', label: 'Exit Nightclub'} ],
                 landmarks: [
-                    { id: 'club_exit', x: 600, y: 960 }, { id: 'mirabel_booth', x: 1050, y: 200 },
-                    { id: 'club_bar', x: 600, y: 125 }, { id: 'club_dancefloor', x: 600, y: 500 },
-                    { id: 'club_dj_booth', x: 600, y: 150 }
+                    { id: 'club_exit', x: 800, y: 1165 }, { id: 'mirabel_booth', x: 1470, y: 200 },
+                    { id: 'club_bar', x: 530, y: 500 }, { id: 'club_dancefloor', x: 800, y: 500 },
+                    { id: 'club_dj_booth', x: 800, y: 150 }
                 ]
             },
             'church_boss': {

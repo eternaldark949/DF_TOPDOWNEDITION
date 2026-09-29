@@ -47,7 +47,7 @@
                         new PropEntity({ x: 1111, y: 226, width: 18, height: 14, color: '#3a4a6a', interactionType: 'read_note', noteId: 'larissa_briefing_darklands' }),
                         new PropEntity({ x: 30, y: 730, width: 40, height: 60, mass: 1e7, color: '#0f0', interactionType: 'medbay_refill' }),
                         new PropEntity({ x: 1010, y: 216, width: 90, height: 110, color: '#334466', interactionType: 'bed_sleep', decorType: 'apt_bed', mass: 1e7 }),
-                        new PropEntity({ x: 750, y: 750, width: 60, height: 35, color: '#2a2a3a', interactionType: 'crafting_table' }),
+                        new PropEntity({ x: 750, y: 750, width: 60, height: 35, mass: 1e7, color: '#2a2a3a', interactionType: 'crafting_table', decorType: 'apt_craft' }),
                         // Living room: lounge
                         F(438, 452, 64, 30, 'apt_coffee'), F(600, 505, 40, 40, 'apt_chair'),
                         F(300, 212, 180, 20, 'apt_bookshelf'), F(640, 212, 140, 22, 'apt_console'),
@@ -212,29 +212,62 @@
                     break;
                 }
 
-                case 'moon_city_nightclub':
+                case 'moon_city_nightclub': {
+                    // Moon City: furniture art in drawClubDecorProp (mc_*), floors in drawClubInterior,
+                    // the light show (dance floor, beams, mirror ball, neon) in drawClubGlow.
+                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a0e22', decorType }, extra));
+                    const SUITES = [290, 594, 898];
                     e.props = [
-                        new PropEntity({ x: 550, y: 130, width: 100, height: 20, color: '#333' }),
-                        new PropEntity({ x: 300, y: 400, width: 40, height: 40, color: '#222' }), new PropEntity({ x: 400, y: 400, width: 40, height: 40, color: '#222' }), new PropEntity({ x: 500, y: 400, width: 40, height: 40, color: '#222' }), new PropEntity({ x: 600, y: 400, width: 40, height: 40, color: '#222' }),
-                        new PropEntity({ x: 300, y: 500, width: 40, height: 40, color: '#222' }), new PropEntity({ x: 400, y: 500, width: 40, height: 40, color: '#222' }), new PropEntity({ x: 500, y: 500, width: 40, height: 40, color: '#222' }), new PropEntity({ x: 600, y: 500, width: 40, height: 40, color: '#222' }),
-                        new PropEntity({ x: 300, y: 600, width: 40, height: 40, color: '#222' }), new PropEntity({ x: 400, y: 600, width: 40, height: 40, color: '#222' }), new PropEntity({ x: 500, y: 600, width: 40, height: 40, color: '#222' }), new PropEntity({ x: 600, y: 600, width: 40, height: 40, color: '#222' }),
-                        new PropEntity({ x: 100, y: 200, width: 80, height: 60, color: '#440044' }), new PropEntity({ x: 100, y: 300, width: 80, height: 60, color: '#440044' }), new PropEntity({ x: 100, y: 400, width: 80, height: 60, color: '#440044' }),
-                        new PropEntity({ x: 100, y: 500, width: 80, height: 60, color: '#440044' }), new PropEntity({ x: 100, y: 600, width: 80, height: 60, color: '#440044' }), new PropEntity({ x: 100, y: 700, width: 80, height: 60, color: '#440044' }),
-                        new PropEntity({ x: 1020, y: 200, width: 80, height: 60, color: '#440044' }), new PropEntity({ x: 1020, y: 300, width: 80, height: 60, color: '#440044' }), new PropEntity({ x: 1020, y: 400, width: 80, height: 60, color: '#440044' }),
-                        new PropEntity({ x: 1020, y: 500, width: 80, height: 60, color: '#440044' }), new PropEntity({ x: 1020, y: 600, width: 80, height: 60, color: '#440044' }), new PropEntity({ x: 1020, y: 700, width: 80, height: 60, color: '#440044' }),
-                        new PropEntity({ x: 350, y: 450, width: 10, height: 10, color: '#ffd700' }), new PropEntity({ x: 550, y: 450, width: 10, height: 10, color: '#ffd700' }),
-                        new PropEntity({ x: 250, y: 550, width: 10, height: 10, color: '#ffd700' }), new PropEntity({ x: 650, y: 550, width: 10, height: 10, color: '#ffd700' }),
-                        new PropEntity({ x: 350, y: 650, width: 10, height: 10, color: '#ffd700' }), new PropEntity({ x: 550, y: 650, width: 10, height: 10, color: '#ffd700' })
+                        // The floor: the DJ stage and its stacks, three poles round the dance floor, high-tops, booths
+                        F(620, 14, 360, 104, 'mc_stage'), F(730, 52, 140, 40, 'mc_dj'),
+                        F(566, 22, 48, 72, 'mc_speaker'), F(986, 22, 48, 72, 'mc_speaker'),
+                        F(795, 365, 10, 10, 'mc_pole'), F(655, 555, 10, 10, 'mc_pole'), F(935, 555, 10, 10, 'mc_pole'),
+                        F(540, 140, 30, 30, 'mc_hightop'), F(1110, 150, 30, 30, 'mc_hightop'), F(1110, 820, 30, 30, 'mc_hightop'),
+                        F(470, 890, 130, 70, 'mc_booth'), F(1060, 890, 130, 70, 'mc_booth'),
+                        // The bar: back shelves of lit bottles, a curved marble counter, stools
+                        // (the bartender serves from the gap in the middle, within reach from the floor)
+                        F(378, 230, 24, 540, 'mc_backbar'), F(440, 240, 44, 225, 'mc_bar'), F(440, 535, 44, 225, 'mc_bar'),
+                        ...[270, 333, 396, 585, 648, 711].map(y => F(500, y, 20, 20, 'mc_stool')),
+                        // Foyer: coat check, velvet ropes along the way in, a bench, moon orbs
+                        F(390, 1020, 150, 40, 'mc_coatcheck'), F(690, 1040, 10, 110, 'mc_rope'), F(900, 1040, 10, 110, 'mc_rope'),
+                        F(990, 1020, 120, 36, 'mc_bench'), F(1160, 1030, 30, 30, 'mc_orb'), F(420, 1130, 30, 30, 'mc_orb'), F(1160, 1130, 30, 30, 'mc_orb'),
+                        // Powder room: lit vanity, stalls, a tufted settee, the dryer
+                        F(30, 20, 230, 40, 'mc_vanity'), ...[150, 240, 330, 420].map(y => F(20, y, 80, 84, 'mc_stall')),
+                        F(230, 300, 44, 120, 'mc_settee'), F(290, 544, 44, 14, 'mc_dryer'),
+                        // Gents: urinals, stalls, the sinks along the south wall, the dryer
+                        ...[40, 90, 140, 190, 240].map(x => F(x, 580, 26, 20, 'mc_urinal')), ...[680, 772, 864, 956].map(y => F(20, y, 80, 84, 'mc_stall')),
+                        F(140, 1140, 200, 40, 'mc_vanity', { face: 'N' }), F(342, 700, 14, 44, 'mc_dryer', { vertical: true }),
+                        // Mirabel's lounge: the crescent sofa, champagne, a moon orb
+                        F(1380, 22, 190, 64, 'mc_crescent_sofa'), F(1440, 104, 80, 34, 'mc_lowtable'), F(1258, 30, 30, 30, 'mc_orb'),
+                        // The suites: a velvet couch, a low table, a private pole
+                        ...SUITES.flatMap(y0 => [F(1522, y0 + 45, 56, 200, 'mc_suite_couch'), F(1450, y0 + 115, 44, 60, 'mc_lowtable'), F(1400, y0 + 50, 10, 10, 'mc_pole')]),
                     ];
                     e.npcs = [
-                        new NPC(600, 130, "Bartender", 'bartender'), new NPC(1050, 150, "Mirabel"),
-                        new NPC(350, 440, "Scarlet", 'red_demon_dancer'), new NPC(550, 440, "Crimson", 'red_demon_dancer'), new NPC(450, 500, "Ruby", 'red_demon_dancer'),
-                        new NPC(250, 540, "Male Dancer 1", 'dancer'), new NPC(650, 540, "Male Dancer 2", 'dancer'),
-                        new NPC(350, 640, "Male Dancer 3", 'dancer'), new NPC(550, 640, "Male Dancer 4", 'dancer'),
-                        new NPC(300, 350, "Male Dancer 5", 'dancer'), new NPC(900, 350, "Male Dancer 6", 'dancer')
+                        new NPC(452, 500, "Bartender", 'bartender'), new NPC(1480, 175, "Mirabel"),
+                        new NPC(800, 392, "Scarlet", 'red_demon_dancer'), new NPC(660, 582, "Crimson", 'red_demon_dancer'), new NPC(940, 582, "Ruby", 'red_demon_dancer'),
+                        new NPC(720, 470, "Male Dancer 1", 'dancer'), new NPC(880, 470, "Male Dancer 2", 'dancer'),
+                        new NPC(620, 680, "Male Dancer 3", 'dancer'), new NPC(980, 680, "Male Dancer 4", 'dancer'),
+                        new NPC(760, 690, "Male Dancer 5", 'dancer'), new NPC(840, 690, "Male Dancer 6", 'dancer')
                     ];
-                    e.lamps = [ new LampEntity({ x: 200, y: 150, lampType: 4, color: '#ff1493' }), new LampEntity({ x: 400, y: 150, lampType: 4, color: '#ff1493' }), new LampEntity({ x: 800, y: 150, lampType: 4, color: '#ff1493' }), new LampEntity({ x: 1000, y: 150, lampType: 4, color: '#ff1493' }), new LampEntity({ x: 300, y: 300, lampType: 4, color: '#00ff00' }), new LampEntity({ x: 600, y: 300, lampType: 4, color: '#00ff00' }), new LampEntity({ x: 900, y: 300, lampType: 4, color: '#00ff00' }), new LampEntity({ x: 200, y: 700, lampType: 4, color: '#ffd700' }), new LampEntity({ x: 500, y: 700, lampType: 4, color: '#ffd700' }), new LampEntity({ x: 800, y: 700, lampType: 4, color: '#ffd700' }), new LampEntity({ x: 1000, y: 700, lampType: 4, color: '#ffd700' }), new LampEntity({ x: 500, y: 930, lampType: 3, color: '#ff00aa', lightRadius: 250 }), new LampEntity({ x: 700, y: 930, lampType: 3, color: '#a469ff', lightRadius: 250 }) ];
+                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });   // hidden in the ceiling: light only
+                    e.lamps = [
+                        L(800, 500, '#b48cff', 560), L(430, 500, '#ffb870', 300), L(800, 1090, '#ffc890', 360),
+                        L(187, 300, '#ffc8e0', 360), L(187, 880, '#cfdcff', 380),
+                        L(1413, 150, '#ff5a7a', 300), L(1285, 740, '#c080ff', 300),
+                        ...SUITES.map(y0 => L(1465, y0 + 145, '#ff4a70', 260)),
+                    ];
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    e.softLights = [
+                        A(800, 500, 820, 940, '#9a6cff', 0.22), A(800, 500, 460, 420, '#d890ff', 0.16),     // the floor's violet, brighter over the dancing
+                        A(800, 70, 340, 100, '#e0b0ff', 0.35), A(430, 500, 110, 560, '#ffb070', 0.22),     // the stage, the bar
+                        A(187, 287, 330, 530, '#ffc8e0', 0.22), A(187, 880, 330, 600, '#cfdcff', 0.2),     // powder room, gents
+                        A(800, 1093, 840, 176, '#ffc890', 0.35), A(1285, 738, 86, 890, '#c080ff', 0.3),    // foyer, VIP corridor
+                        A(1413, 145, 340, 256, '#ff5a7a', 0.35), ...SUITES.map(y0 => A(1465, y0 + 145, 236, 280, '#ff4a70', 0.32)),
+                        S(655 + 5, 560, 70, '#e0a0ff', 0.6, 2), S(935 + 5, 560, 70, '#e0a0ff', 0.6, 2), S(800, 370, 70, '#e0a0ff', 0.6, 2),   // pole uplights
+                    ];
                     break;
+                }
 
                 case 'church_boss':
                     e.props = [ new PropEntity({ x: 500, y: 120, width: 200, height: 100, color: '#3a0a0a' }), new PropEntity({ x: 150, y: 400, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 500, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 600, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 700, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 800, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 900, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 1000, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 1100, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 400, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 500, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 600, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 700, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 800, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 900, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 1000, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 1100, width: 120, height: 40, color: '#2a2a2a' }) ];
