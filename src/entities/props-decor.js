@@ -1329,8 +1329,89 @@
             }
         }
 
+        /* The Sanctum (sc_*): weathered stone, black iron, crimson cloth, candle wax. Rain-dark and
+           mossed; the colonnade's pillars are the cover the Triumvirate's sight-gated fire respects. */
+        function drawSanctumDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const moss = (mx, my, n, R) => { for (let i = 0; i < n; i++) { const a = i * 2.4 + mx, r = R * (0.3 + ((i * 37) % 10) / 14); ctx.fillStyle = `rgba(${60 + (i * 13) % 30},${90 + (i * 17) % 30},${60},0.5)`; ctx.beginPath(); ctx.arc(mx + Math.cos(a) * r, my + Math.sin(a) * r, 1.4 + (i % 3) * 0.6, 0, Math.PI * 2); ctx.fill(); } };
+            const flame = (fx, fy, k = 0) => { const f = 0.75 + 0.25 * Math.sin(t * 11 + fx * 0.3 + k); circ(fx, fy, 1.8, '#e6ddd0'); circ(fx, fy - 0.5, 1.4 * f, `rgba(255,${190 + 40 * f | 0},110,0.95)`); };
+            switch (p.decorType) {
+                case 'sc_pillar': {                                        // a round stone column seen from above: capital, fluting, moss
+                    const cx = x + w / 2, cy = y + h / 2, R = w / 2;
+                    circ(cx + 4, cy + 5, R, 'rgba(0,0,0,0.4)');
+                    const g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, 2, cx, cy, R); g.addColorStop(0, '#8a8290'); g.addColorStop(0.7, '#4a4452'); g.addColorStop(1, '#2a2630');
+                    circ(cx, cy, R, g, '#1a161e', 1.2);
+                    ctx.strokeStyle = 'rgba(20,16,24,0.45)'; ctx.lineWidth = 0.8;
+                    for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R * 0.55, cy + Math.sin(a) * R * 0.55); ctx.lineTo(cx + Math.cos(a) * R * 0.95, cy + Math.sin(a) * R * 0.95); ctx.stroke(); }
+                    circ(cx, cy, R * 0.5, '#6a6272', 'rgba(200,180,255,0.18)', 1);
+                    moss(cx + R * 0.3, cy + R * 0.4, 7, R * 0.5);
+                    break;
+                }
+                case 'sc_fallen': {                                        // a toppled column in pieces across the aisle
+                    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 4, y + 6, w, h);
+                    const seg = (sx, sw, tilt) => { ctx.save(); ctx.translate(sx + sw / 2, y + h / 2); ctx.rotate(tilt); const g = ctx.createLinearGradient(0, -h / 2, 0, h / 2); g.addColorStop(0, '#7a7282'); g.addColorStop(0.5, '#5a5262'); g.addColorStop(1, '#2e2a34'); rr(-sw / 2, -h / 2, sw, h, 6, g, '#1a161e', 1); ctx.strokeStyle = 'rgba(20,16,24,0.4)'; ctx.lineWidth = 0.7; for (let k = -sw / 2 + 6; k < sw / 2; k += 7) { ctx.beginPath(); ctx.moveTo(k, -h / 2 + 3); ctx.lineTo(k, h / 2 - 3); ctx.stroke(); } ctx.restore(); };
+                    seg(x, w * 0.45, -0.06); seg(x + w * 0.5, w * 0.5, 0.08);
+                    for (let i = 0; i < 6; i++) circ(x + w * 0.47 + (i % 3) * 3 - 3, y + h + 3 + (i / 3 | 0) * 3, 2, '#4a4452');   // rubble
+                    moss(x + w * 0.2, y + h * 0.4, 6, 8);
+                    break;
+                }
+                case 'sc_pew': case 'sc_pew_broken': {                     // a dark wooden pew; the broken ones snapped and splintered
+                    const broken = p.decorType === 'sc_pew_broken';
+                    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 3, y + 4, w, h);
+                    const wood = (X, W) => { rr(X, y, W, h, 2, '#2e1e1a', '#140c0a', 1); rr(X + 2, y + 2, W - 4, 7, 1.5, '#3e2822'); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let k = y + 12; k < y + h - 2; k += 4) { ctx.moveTo(X + 2, k); ctx.lineTo(X + W - 2, k); } ctx.stroke(); };
+                    if (!broken) wood(x, w);
+                    else { wood(x, w * 0.45); ctx.save(); ctx.translate(x + w * 0.72, y + h / 2); ctx.rotate(0.35); wood(-w * 0.25, w * 0.45); ctx.restore(); ctx.strokeStyle = '#6a4a3a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w * 0.45, y + 2); ctx.lineTo(x + w * 0.5, y + 6); ctx.lineTo(x + w * 0.45, y + 10); ctx.stroke(); }
+                    break;
+                }
+                case 'sc_altar': {                                         // black stone, a crimson cloth, a gold chalice, candles guttering
+                    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x + 4, y + 6, w, h);
+                    rr(x, y, w, h, 3, '#1c1822', '#8a6a3a', 1.5);
+                    rr(x + w * 0.2, y - 2, w * 0.6, h + 4, 2, '#6a0c1c'); ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w * 0.2, y + h - 3, w * 0.6, 1.5); ctx.fillRect(x + w * 0.2, y - 2, w * 0.6, 1.5);
+                    ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.globalAlpha = 0.7; ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1;   // the three rings, stitched
+                    for (let k = 0; k < 3; k++) { const a = -Math.PI / 2 + k * Math.PI * 2 / 3; ctx.beginPath(); ctx.arc(Math.cos(a) * 5, Math.sin(a) * 5, 6, 0, Math.PI * 2); ctx.stroke(); }
+                    ctx.restore();
+                    circ(x + 20, y + h / 2, 5, '#e8c27a', '#8a6a3a', 1); circ(x + 20, y + h / 2, 2.4, '#5a0a18');   // chalice
+                    for (const [cx, cy, k] of [[x + w - 16, y + 12, 0], [x + w - 24, y + 20, 1], [x + w - 12, y + h - 12, 2], [x + 10, y + 10, 3], [x + 12, y + h - 10, 4]]) flame(cx, cy, k);
+                    break;
+                }
+                case 'sc_organ': {                                         // a ruined pipe organ: a rank of pipes, some fallen
+                    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 3, y + 5, w, h);
+                    rr(x, y + h * 0.55, w, h * 0.45, 2, '#241c1a', '#8a6a3a', 1);
+                    for (let i = 0; i < 11; i++) { const px = x + 5 + i * (w - 10) / 10, r = 3.2 - Math.abs(i - 5) * 0.18, bentOff = (i === 3 || i === 8) ? 1 : 0; const g = ctx.createRadialGradient(px - 1, y + 10 - 1, 0.5, px, y + 10, r); g.addColorStop(0, '#d8d0c0'); g.addColorStop(1, '#6a5a3a'); if (!bentOff) circ(px, y + 10 + Math.abs(i - 5) * 1.2, r, g, '#3a2e1e', 0.6); }
+                    ctx.save(); ctx.translate(x + w * 0.35, y + h * 0.3); ctx.rotate(1.1); rr(-2, 0, 4, 22, 2, '#8a7a5a', '#3a2e1e', 0.6); ctx.restore();   // a fallen pipe
+                    break;
+                }
+                case 'sc_candles': {                                       // an iron stand of pillar candles, wax spilled
+                    circ(x + w / 2 + 2, y + h / 2 + 3, w / 2 + 2, 'rgba(0,0,0,0.4)');
+                    circ(x + w / 2, y + h / 2, w / 2 + 1, '#1a161a', '#4a4452', 1);
+                    ctx.fillStyle = 'rgba(230,221,208,0.5)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 5, 6, 3, 0.4, 0, Math.PI * 2); ctx.fill();
+                    for (const [dx, dy, k] of [[-4, -3, 0], [4, -2, 1], [0, 4, 2]]) flame(x + w / 2 + dx, y + h / 2 + dy, k);
+                    break;
+                }
+                case 'sc_brazier': {                                       // an iron bowl of coals on three legs, burning
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 3, cy + 4, w / 2, 'rgba(0,0,0,0.4)');
+                    ctx.strokeStyle = '#2a2630'; ctx.lineWidth = 2; ctx.beginPath(); for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3 + 0.5; ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * (w / 2 + 3), cy + Math.sin(a) * (w / 2 + 3)); } ctx.stroke();
+                    circ(cx, cy, w / 2 - 2, '#1a161a', '#6a5a4a', 1.5);
+                    for (let i = 0; i < 9; i++) { const a = i * 2.4, r = (i % 3) * 3.5 + 2, f = 0.6 + 0.4 * Math.sin(t * 7 + i * 1.9); circ(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 2.6 + f, `rgba(255,${80 + 90 * f | 0},30,${0.6 + 0.35 * f})`); }
+                    break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
+            if (p.decorType.startsWith('sc_')) return drawSanctumDecorProp(ctx, p);
             if (p.decorType.startsWith('ps_')) return drawSuiteDecorProp(ctx, p);
             if (p.decorType.startsWith('mc_')) return drawClubDecorProp(ctx, p);
             if (p.decorType.startsWith('gy_')) return drawGraveStone(ctx, p);

@@ -2363,6 +2363,22 @@
         #game-ui.aiming #action-dock .action-pill { pointer-events: none; }
         @keyframes ap-sheen { 0%, 62% { left: -40%; } 100% { left: 130%; } }
         @keyframes ap-arrive { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
+        /* The boss title (engine/boss-intro.js): gothic red over the letterbox, the names beneath */
+        #boss-title {
+            position: fixed; left: 0; right: 0; bottom: 16%; z-index: 9000; text-align: center; pointer-events: none;
+            opacity: 0; transform: translateY(8px); transition: opacity 0.6s ease, transform 0.8s ease;
+        }
+        #boss-title.show { opacity: 1; transform: none; }
+        #boss-title .bt-main {
+            font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: clamp(1.5rem, 7vw, 2.6rem);
+            letter-spacing: 0.35em; margin-left: 0.35em; color: #ff3a30;
+            text-shadow: 0 0 18px rgba(255, 40, 30, 0.8), 0 0 42px rgba(160, 0, 20, 0.7), 0 2px 0 #1a0000;
+        }
+        #boss-title .bt-names {
+            margin-top: 8px; font-family: Georgia, serif; font-style: italic; font-size: clamp(0.62rem, 2.8vw, 0.9rem);
+            color: #e8c9b8; letter-spacing: 0.08em; text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+        }
     </style>
 </head>
 <body>
@@ -4032,6 +4048,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // ─── O.U.T.F.I.T.s (full clothing config) ───
             'outfit_casual':       { id: 'outfit_casual',       category: 'outfit', name: 'Street Casual',       desc: 'Black sports bra, white slacks, white sneakers.',     price: 0,    data: { top: { type: 'sports_bra', color: '#111' }, bottom: { type: 'pants', color: '#e0e0e0' }, shoes: { type: 'sneakers', color: '#fff' }, train: null, held: null }, default: true },
             'outfit_suited':       { id: 'outfit_suited',       category: 'outfit', name: 'Periwinkle Silk',     desc: 'Silk periwinkle top and skirt. Gold heels. Pairs with a Crystal Glass.', price: 0, data: { top: { type: 'sports_bra', color: '#CCCCFF' }, bottom: { type: 'skirt', color: '#CCCCFF' }, shoes: { type: 'heels', color: '#FFD700' }, train: null, held: null }, default: true, pairsWith: 'acc_glass' },
+            'outfit_suited_long':  { id: 'outfit_suited_long',  category: 'outfit', name: 'Periwinkle Silk (Long Sleeve)', desc: 'Silk periwinkle top with long sleeves, fitted pencil skirt. Gold heels. Pairs with a Crystal Glass.', price: 150, data: { top: { type: 'sleeved_crop', color: '#CCCCFF' }, bottom: { type: 'pencil_skirt', color: '#CCCCFF' }, shoes: { type: 'heels', color: '#FFD700' }, train: null, held: null }, pairsWith: 'acc_glass' },
             'outfit_stealth':      { id: 'outfit_stealth',      category: 'outfit', name: 'Blackout',            desc: 'All-black tactical. Invisible in the dark.',          price: 300,  data: { top: { type: 'sports_bra', color: '#0a0a0a' }, bottom: { type: 'pants', color: '#111' }, shoes: { type: 'sneakers', color: '#0a0a0a' }, train: null, held: null } },
             'outfit_crimson':      { id: 'outfit_crimson',      category: 'outfit', name: 'Crimson Flame',       desc: 'Deep red dress. Danger on arrival.',                   price: 350,  data: { top: { type: 'sports_bra', color: '#dc143c' }, bottom: { type: 'skirt', color: '#8b0000' }, shoes: { type: 'heels', color: '#dc143c' }, train: null, held: null } },
             'outfit_gold':         { id: 'outfit_gold',         category: 'outfit', name: 'Gold Standard',       desc: 'Full gold tracksuit. Unmissable.',                     price: 400,  data: { top: { type: 'track_jacket', color: '#daa520', trim: '#fff4c9' }, bottom: { type: 'joggers', color: '#b8860b', trim: '#fff4c9' }, shoes: { type: 'sneakers', color: '#ffd700' }, train: null, held: null } },
@@ -4043,6 +4060,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'outfit_anavia':       { id: 'outfit_anavia',       category: 'outfit', name: 'Anavia',              desc: 'Periwinkle crop top and long skirt. Gold heels. Pairs with bangles and a headband.', price: 400, data: { top: { type: 'crop_top', color: '#aab0ff' }, bottom: { type: 'long_skirt', color: '#aab0ff' }, shoes: { type: 'heels', color: '#e8c27a' }, train: null, held: null } },
             'outfit_runner':       { id: 'outfit_runner',       category: 'outfit', name: 'Night Runner',        desc: 'Violet track jacket, leggings, sneakers. Built for the late shift.', price: 300, data: { top: { type: 'track_jacket', color: '#4b2a7a', trim: '#e8c27a' }, bottom: { type: 'leggings', color: '#1a1424' }, shoes: { type: 'sneakers', color: '#f0f0f0' }, train: null, held: null } },
             'outfit_sorcerer':     { id: 'outfit_sorcerer',     category: 'outfit', name: 'Street Sorcerer',     desc: 'Sabrina\'s look. Midnight violet top, black skirt, plum heels.', price: 400, data: { top: { type: 'sports_bra', color: '#1a0a2a' }, bottom: { type: 'skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
+            'outfit_sorcerer_long': { id: 'outfit_sorcerer_long', category: 'outfit', name: 'Street Sorcerer (Long Sleeve)', desc: 'Sabrina\'s look, sleeved. Midnight violet long-sleeve top, fitted black pencil skirt, plum heels.', price: 400, data: { top: { type: 'sleeved_crop', color: '#1a0a2a' }, bottom: { type: 'pencil_skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
+            'outfit_academy':      { id: 'outfit_academy',      category: 'outfit', name: 'Moonlit Academy',     desc: 'A crisp white blouse and a pleated midnight-violet circle skirt with a frilled hem. Black loafers.', price: 350, data: { top: { type: 'tshirt', color: '#f4f0f8' }, bottom: { type: 'pleated_skirt', color: '#3a2a6a', trim: '#f4eee6' }, shoes: { type: 'loafers', color: '#141018' }, train: null, held: null } },
 
             // ── HATS (one at a time, optional) ──
             'hat_wide_brim':       { id: 'hat_wide_brim',       category: 'hat', name: 'Wine Wide Brim',       desc: 'A wide wine-red brim. Arrives before you do.',         price: 350,  data: { type: 'wide_brim', color: '#590e18', crownColor: '#70121e' } },
@@ -6737,11 +6756,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                                 condition: "CHURCH_BOSS_DEFEATED",
                                                 onStart: (game) => {
                                                     if (!game.questState.churchBossDefeated) {
-                                                        game.enemies.push(new GatlingGunner(300, 300, 0));
-                                                        game.enemies.push(new GatlingGunner(600, 200, 1));
-                                                        game.enemies.push(new GatlingGunner(900, 300, 2));
-                                                        showMessage("THE TRIUMVIRATE AWAKENS...");
-                                                        game.triggerShake(20);
+                                                        // They kneel at the altar until the intro wakes them (engine/boss-intro.js)
+                                                        game.bossIntro([new GatlingGunner(360, 330, 0, { persona: 'vesper' }), new GatlingGunner(600, 290, 1, { persona: 'matins' }), new GatlingGunner(840, 330, 2, { persona: 'compline' })]);
                                                     }
                                                 }
                                             },
@@ -10886,9 +10902,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'church_boss': {
                 id: 'church_boss', width: 1200, height: 1400, type: 'outdoor',
                 climate: 'tempest',   // Boss arena: effectively never clears
-                label: 'Abandoned Church', floorColor: '#1a1a1a',
+                label: 'Abandoned Church', floorColor: '#0e0c12',
+                // The Sanctum, open to the storm: the apse (dais, altar, rose window, ruined organ) where the
+                // Triumvirate kneel; the nave and its gold sigil (the arena); pillared aisles for cover; the
+                // narthex at the door. Furniture: sc_* (drawSanctumDecorProp); floor: drawSanctumInterior;
+                // glows: drawSanctumGlow and the wardens' eyes (drawBossGlow).
+                navProps: 'all',
+                wallStyle: { fill: '#16121a', stroke: 'rgba(170,120,255,0.35)' },
                 spawn: { x: 600, y: 1250 },
-                walls: [ {x:0,y:0,w:1200,h:50}, {x:0,y:1350,w:550,h:50}, {x:650,y:1350,w:550,h:50}, {x:0,y:0,w:50,h:1400}, {x:1150,y:0,w:50,h:1400}, {x:450,y:100,w:300,h:150} ],
+                zones: [],
+                walls: [ {x:0,y:0,w:1200,h:50}, {x:0,y:1350,w:550,h:50}, {x:650,y:1350,w:550,h:50}, {x:0,y:0,w:50,h:1400}, {x:1150,y:0,w:50,h:1400} ],
                 transitions: [ {x: 550, y: 1320, w: 100, h: 80, target: 'hotel_suite', label: 'Exit Church'} ],
                 landmarks: [
                     { id: 'church_exit', x: 600, y: 1370 }, { id: 'church_altar', x: 600, y: 175 },
@@ -11463,10 +11486,33 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
 
-                case 'church_boss':
-                    e.props = [ new PropEntity({ x: 500, y: 120, width: 200, height: 100, color: '#3a0a0a' }), new PropEntity({ x: 150, y: 400, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 500, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 600, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 700, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 800, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 900, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 1000, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 150, y: 1100, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 400, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 500, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 600, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 700, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 800, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 900, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 1000, width: 120, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 930, y: 1100, width: 120, height: 40, color: '#2a2a2a' }) ];
-                    e.lamps = [ new LampEntity({ x: 600, y: 150, lampType: 3, color: '#ff0000', lightRadius: 650 }), new LampEntity({ x: 300, y: 300, lampType: 2, color: '#aa0000', lightRadius: 550 }), new LampEntity({ x: 900, y: 300, lampType: 2, color: '#aa0000', lightRadius: 550 }), new LampEntity({ x: 300, y: 1100, lampType: 2, color: '#aa0000', lightRadius: 550 }), new LampEntity({ x: 900, y: 1100, lampType: 2, color: '#aa0000', lightRadius: 550 }) ];
+                case 'church_boss': {
+                    // The Sanctum: the altar and ruined organ on the dais, two colonnades of pillars (cover),
+                    // broken pews, a fallen pillar, candle stands and braziers. Art: drawSanctumDecorProp.
+                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1418', decorType }, extra));
+                    const COLS = [420, 560, 700, 840, 980, 1120];
+                    e.props = [
+                        F(530, 140, 140, 56, 'sc_altar'), F(400, 58, 100, 40, 'sc_organ'), F(700, 58, 100, 40, 'sc_organ'),
+                        ...COLS.flatMap(y => [F(228, y - 22, 44, 44, 'sc_pillar'), F(928, y - 22, 44, 44, 'sc_pillar')]),
+                        F(990, 758, 120, 30, 'sc_fallen'),
+                        F(330, 640, 92, 24, 'sc_pew'), F(778, 640, 92, 24, 'sc_pew'), F(340, 900, 84, 24, 'sc_pew_broken'), F(776, 900, 84, 24, 'sc_pew'),
+                        F(96, 520, 84, 24, 'sc_pew_broken'), F(1020, 1020, 84, 24, 'sc_pew'),
+                        F(470, 240, 18, 18, 'sc_candles'), F(712, 240, 18, 18, 'sc_candles'), F(100, 300, 18, 18, 'sc_candles'), F(1082, 300, 18, 18, 'sc_candles'),
+                        F(180, 1200, 36, 36, 'sc_brazier'), F(984, 1200, 36, 36, 'sc_brazier'), F(150, 230, 36, 36, 'sc_brazier'), F(1014, 230, 36, 36, 'sc_brazier'),
+                    ];
+                    // No red wash any more: a storm-violet ambient; crimson from the rose window and braziers,
+                    // warm from the candles (hidden fixtures, light only)
+                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
+                    e.lamps = [ L(600, 150, '#c060ff', 460), L(198, 1218, '#ff8a40', 320), L(1002, 1218, '#ff8a40', 320), L(600, 720, '#9a70ff', 520) ];
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    e.softLights = [
+                        A(600, 700, 1060, 1280, '#8a78c8', 0.22), A(600, 170, 700, 280, '#ff5a8a', 0.12),
+                        S(168, 248, 110, '#ff8a40', 0.8, 5), S(1032, 248, 110, '#ff8a40', 0.8, 5),
+                        S(479, 249, 70, '#ffc080', 0.6, 4), S(721, 249, 70, '#ffc080', 0.6, 4), S(109, 309, 60, '#ffc080', 0.5, 4), S(1091, 309, 60, '#ffc080', 0.5, 4),
+                    ];
                     break;
+                }
 
                 case 'enni_cole_interior':
                     e.props = [
@@ -14813,8 +14859,89 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        /* The Sanctum (sc_*): weathered stone, black iron, crimson cloth, candle wax. Rain-dark and
+           mossed; the colonnade's pillars are the cover the Triumvirate's sight-gated fire respects. */
+        function drawSanctumDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const moss = (mx, my, n, R) => { for (let i = 0; i < n; i++) { const a = i * 2.4 + mx, r = R * (0.3 + ((i * 37) % 10) / 14); ctx.fillStyle = `rgba(${60 + (i * 13) % 30},${90 + (i * 17) % 30},${60},0.5)`; ctx.beginPath(); ctx.arc(mx + Math.cos(a) * r, my + Math.sin(a) * r, 1.4 + (i % 3) * 0.6, 0, Math.PI * 2); ctx.fill(); } };
+            const flame = (fx, fy, k = 0) => { const f = 0.75 + 0.25 * Math.sin(t * 11 + fx * 0.3 + k); circ(fx, fy, 1.8, '#e6ddd0'); circ(fx, fy - 0.5, 1.4 * f, `rgba(255,${190 + 40 * f | 0},110,0.95)`); };
+            switch (p.decorType) {
+                case 'sc_pillar': {                                        // a round stone column seen from above: capital, fluting, moss
+                    const cx = x + w / 2, cy = y + h / 2, R = w / 2;
+                    circ(cx + 4, cy + 5, R, 'rgba(0,0,0,0.4)');
+                    const g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, 2, cx, cy, R); g.addColorStop(0, '#8a8290'); g.addColorStop(0.7, '#4a4452'); g.addColorStop(1, '#2a2630');
+                    circ(cx, cy, R, g, '#1a161e', 1.2);
+                    ctx.strokeStyle = 'rgba(20,16,24,0.45)'; ctx.lineWidth = 0.8;
+                    for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R * 0.55, cy + Math.sin(a) * R * 0.55); ctx.lineTo(cx + Math.cos(a) * R * 0.95, cy + Math.sin(a) * R * 0.95); ctx.stroke(); }
+                    circ(cx, cy, R * 0.5, '#6a6272', 'rgba(200,180,255,0.18)', 1);
+                    moss(cx + R * 0.3, cy + R * 0.4, 7, R * 0.5);
+                    break;
+                }
+                case 'sc_fallen': {                                        // a toppled column in pieces across the aisle
+                    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 4, y + 6, w, h);
+                    const seg = (sx, sw, tilt) => { ctx.save(); ctx.translate(sx + sw / 2, y + h / 2); ctx.rotate(tilt); const g = ctx.createLinearGradient(0, -h / 2, 0, h / 2); g.addColorStop(0, '#7a7282'); g.addColorStop(0.5, '#5a5262'); g.addColorStop(1, '#2e2a34'); rr(-sw / 2, -h / 2, sw, h, 6, g, '#1a161e', 1); ctx.strokeStyle = 'rgba(20,16,24,0.4)'; ctx.lineWidth = 0.7; for (let k = -sw / 2 + 6; k < sw / 2; k += 7) { ctx.beginPath(); ctx.moveTo(k, -h / 2 + 3); ctx.lineTo(k, h / 2 - 3); ctx.stroke(); } ctx.restore(); };
+                    seg(x, w * 0.45, -0.06); seg(x + w * 0.5, w * 0.5, 0.08);
+                    for (let i = 0; i < 6; i++) circ(x + w * 0.47 + (i % 3) * 3 - 3, y + h + 3 + (i / 3 | 0) * 3, 2, '#4a4452');   // rubble
+                    moss(x + w * 0.2, y + h * 0.4, 6, 8);
+                    break;
+                }
+                case 'sc_pew': case 'sc_pew_broken': {                     // a dark wooden pew; the broken ones snapped and splintered
+                    const broken = p.decorType === 'sc_pew_broken';
+                    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 3, y + 4, w, h);
+                    const wood = (X, W) => { rr(X, y, W, h, 2, '#2e1e1a', '#140c0a', 1); rr(X + 2, y + 2, W - 4, 7, 1.5, '#3e2822'); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let k = y + 12; k < y + h - 2; k += 4) { ctx.moveTo(X + 2, k); ctx.lineTo(X + W - 2, k); } ctx.stroke(); };
+                    if (!broken) wood(x, w);
+                    else { wood(x, w * 0.45); ctx.save(); ctx.translate(x + w * 0.72, y + h / 2); ctx.rotate(0.35); wood(-w * 0.25, w * 0.45); ctx.restore(); ctx.strokeStyle = '#6a4a3a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w * 0.45, y + 2); ctx.lineTo(x + w * 0.5, y + 6); ctx.lineTo(x + w * 0.45, y + 10); ctx.stroke(); }
+                    break;
+                }
+                case 'sc_altar': {                                         // black stone, a crimson cloth, a gold chalice, candles guttering
+                    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x + 4, y + 6, w, h);
+                    rr(x, y, w, h, 3, '#1c1822', '#8a6a3a', 1.5);
+                    rr(x + w * 0.2, y - 2, w * 0.6, h + 4, 2, '#6a0c1c'); ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w * 0.2, y + h - 3, w * 0.6, 1.5); ctx.fillRect(x + w * 0.2, y - 2, w * 0.6, 1.5);
+                    ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.globalAlpha = 0.7; ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1;   // the three rings, stitched
+                    for (let k = 0; k < 3; k++) { const a = -Math.PI / 2 + k * Math.PI * 2 / 3; ctx.beginPath(); ctx.arc(Math.cos(a) * 5, Math.sin(a) * 5, 6, 0, Math.PI * 2); ctx.stroke(); }
+                    ctx.restore();
+                    circ(x + 20, y + h / 2, 5, '#e8c27a', '#8a6a3a', 1); circ(x + 20, y + h / 2, 2.4, '#5a0a18');   // chalice
+                    for (const [cx, cy, k] of [[x + w - 16, y + 12, 0], [x + w - 24, y + 20, 1], [x + w - 12, y + h - 12, 2], [x + 10, y + 10, 3], [x + 12, y + h - 10, 4]]) flame(cx, cy, k);
+                    break;
+                }
+                case 'sc_organ': {                                         // a ruined pipe organ: a rank of pipes, some fallen
+                    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 3, y + 5, w, h);
+                    rr(x, y + h * 0.55, w, h * 0.45, 2, '#241c1a', '#8a6a3a', 1);
+                    for (let i = 0; i < 11; i++) { const px = x + 5 + i * (w - 10) / 10, r = 3.2 - Math.abs(i - 5) * 0.18, bentOff = (i === 3 || i === 8) ? 1 : 0; const g = ctx.createRadialGradient(px - 1, y + 10 - 1, 0.5, px, y + 10, r); g.addColorStop(0, '#d8d0c0'); g.addColorStop(1, '#6a5a3a'); if (!bentOff) circ(px, y + 10 + Math.abs(i - 5) * 1.2, r, g, '#3a2e1e', 0.6); }
+                    ctx.save(); ctx.translate(x + w * 0.35, y + h * 0.3); ctx.rotate(1.1); rr(-2, 0, 4, 22, 2, '#8a7a5a', '#3a2e1e', 0.6); ctx.restore();   // a fallen pipe
+                    break;
+                }
+                case 'sc_candles': {                                       // an iron stand of pillar candles, wax spilled
+                    circ(x + w / 2 + 2, y + h / 2 + 3, w / 2 + 2, 'rgba(0,0,0,0.4)');
+                    circ(x + w / 2, y + h / 2, w / 2 + 1, '#1a161a', '#4a4452', 1);
+                    ctx.fillStyle = 'rgba(230,221,208,0.5)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 5, 6, 3, 0.4, 0, Math.PI * 2); ctx.fill();
+                    for (const [dx, dy, k] of [[-4, -3, 0], [4, -2, 1], [0, 4, 2]]) flame(x + w / 2 + dx, y + h / 2 + dy, k);
+                    break;
+                }
+                case 'sc_brazier': {                                       // an iron bowl of coals on three legs, burning
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 3, cy + 4, w / 2, 'rgba(0,0,0,0.4)');
+                    ctx.strokeStyle = '#2a2630'; ctx.lineWidth = 2; ctx.beginPath(); for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3 + 0.5; ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * (w / 2 + 3), cy + Math.sin(a) * (w / 2 + 3)); } ctx.stroke();
+                    circ(cx, cy, w / 2 - 2, '#1a161a', '#6a5a4a', 1.5);
+                    for (let i = 0; i < 9; i++) { const a = i * 2.4, r = (i % 3) * 3.5 + 2, f = 0.6 + 0.4 * Math.sin(t * 7 + i * 1.9); circ(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 2.6 + f, `rgba(255,${80 + 90 * f | 0},30,${0.6 + 0.35 * f})`); }
+                    break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
+            if (p.decorType.startsWith('sc_')) return drawSanctumDecorProp(ctx, p);
             if (p.decorType.startsWith('ps_')) return drawSuiteDecorProp(ctx, p);
             if (p.decorType.startsWith('mc_')) return drawClubDecorProp(ctx, p);
             if (p.decorType.startsWith('gy_')) return drawGraveStone(ctx, p);
@@ -21339,8 +21466,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * - Squad formation AI (triangle, pincer, circle strafe)
          * - Gatling fire mechanics (burst, spin-up, reload)
          */
+        /* The Sanctum's three (the Triumvirate): the same gatling automaton, each in its own guise.
+           A persona switches on boss mode (dormant until the intro, sight-gated fire, a longer telegraph)
+           and its own art; the gauntlet's gunners have none and keep the plain look. */
+        const WARDENS = {
+            vesper:   { name: 'Vesper, the Censer',     accent: '#c42a3c', trim: '#e8c27a', mantle: '#5a0c1c', eye: '255, 60, 40' },
+            matins:   { name: 'Matins, the Choir',      accent: '#e8c27a', trim: '#fff1c2', mantle: '#1a1216', eye: '255, 190, 80' },
+            compline: { name: 'Compline, the Penitent', accent: '#8a5cff', trim: '#e6ddd0', mantle: '#24163a', eye: '200, 120, 255' }
+        };
+
         class GatlingGunner extends ActorEntity {
-            constructor(x, y, id) {
+            constructor(x, y, id, opts = {}) {
                 // Initialize ActorEntity with circle collision
                 super({
                     x: x,
@@ -21377,6 +21513,39 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.isTelegraphing = false;
                 this._prevPlayerX = 0;
                 this._prevPlayerY = 0;
+
+                // Boss mode (the Sanctum, engine/boss-intro.js): spawned kneeling and dark (dormant), woken
+                // by the intro; then they hunt her anywhere in their arena but only open fire with a clear
+                // line on her (sightGated), after a longer, readable telegraph.
+                this.dormant = false;
+                this.sightGated = false;
+                this._eyeK = 1;           // eyes: 0 dark … 1 burning
+                this._riseK = 1;          // 0 kneeling … 1 standing
+                this._holdFire = 0;       // frames before the first burst may begin
+                this.persona = WARDENS[opts.persona] ? opts.persona : null;
+                if (this.persona) {
+                    this.radius = 30; this.width = this.height = 60;   // twice her size (she's 15)
+                    this.artScale = 1.7;
+                    this.sightGated = true;
+                    this.telegraphThreshold = 30;                 // ~0.5 s: dodgeable on reaction
+                    this.bossName = WARDENS[this.persona].name;
+                }
+                this._heat = 0;           // barrels: 0 cool … 1 glowing
+            }
+
+            /** Sleep until the intro wakes them (kneeling, eyes dark). */
+            makeDormant() { this.dormant = true; this._eyeK = 0; this._riseK = 0; this.burstCooldown = 0; this.burstCount = 0; this.angle = Math.PI / 2; }
+
+            /** Wake: move now, but the first burst waits `hold` frames (and still telegraphs). */
+            awaken(hold = 60) { this.dormant = false; this._eyeK = 1; this._riseK = 1; this._holdFire = hold; }
+
+            /** Has she a clear line from here (walls, props, shut doors)? Checked every few frames. */
+            _hasSight(px, py) {
+                if ((this._sightTick = (this._sightTick || 0) + 1) % 3 === 1 || this._sight === undefined) {
+                    const map = typeof game !== 'undefined' && game ? game.activeMap : null;
+                    this._sight = map ? hasShotLine(this.x, this.y, px, py, map) : true;
+                }
+                return this._sight;
             }
 
             /**
@@ -21384,6 +21553,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             update(playerX, playerY, allEnemies, walls) {
                 if (this.dead) return null;
+                if (this.dormant) {                               // kneeling at the altar until the intro wakes them
+                    this._eyeK += ((this._eyeT || 0) - this._eyeK) * 0.15;
+                    this._riseK += ((this._riseT || 0) - this._riseK) * 0.08;
+                    if (this._igniteFlash) this._igniteFlash *= 0.92;
+                    return [];
+                }
+                if (this._igniteFlash) this._igniteFlash *= 0.92;
                 
                 // Decrement invincibility
                 if (this.invincibleTimer > 0) {
@@ -21418,7 +21594,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const myIndex = squad.indexOf(this);
                 const squadSize = squad.length;
                 
-                const idealRange = 240; 
+                const idealRange = this.persona ? 280 : 240; 
                 let moveX = 0;
                 let moveY = 0;
 
@@ -21466,7 +21642,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
 
                 // SEPARATION FORCE (Prevent Overlap)
-                const separationDist = 60;
+                const separationDist = this.persona ? 90 : 60;
                 for (let ally of squad) {
                     if (ally === this) continue;
                     const adx = this.x - ally.x;
@@ -21499,6 +21675,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // GATLING FIRE LOGIC
                 const shots = [];
+                const firingNow = this.burstCount > 0 && this.burstCooldown === 0;
+                this._heat = Math.max(0, Math.min(1, this._heat + (firingNow ? 0.05 : -0.012)));
+                // Boss mode: no burst begins (or goes on) without a clear line on her, nor in the grace after waking
+                if (this._holdFire > 0) this._holdFire--;
+                if (this.sightGated && (this._holdFire > 0 || !this._hasSight(playerX, playerY))) {
+                    this.isTelegraphing = false;
+                    if (this.burstCount > 0) { this.burstCount = 0; this.burstTimer = 0; }
+                    this.burstCooldown = Math.max(this.burstCooldown, this.telegraphThreshold + 1);   // it'll telegraph again first
+                    return shots;
+                }
                 if (this.burstCooldown > 0) {
                     this.burstCooldown--;
                     // Telegraph before burst starts — track with predictive aim
@@ -21514,9 +21700,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 } else if (this.burstCount < this.maxBurstCount) {
                     this.isTelegraphing = false;
                     this.burstTimer--;
-                    if (this.burstTimer <= 0) {
+                    if (this.burstTimer <= 0 && this.sightGated && !(this._sight = hasShotLine(this.x, this.y, playerX, playerY, game.activeMap))) {
+                        this.burstCount = 0; this.burstTimer = 0; this.burstCooldown = this.telegraphThreshold + 1;   // she slipped behind cover mid-burst
+                    } else if (this.burstTimer <= 0) {
                         const spread = (Math.random() - 0.5) * 0.15;
-                        const muzzleOffset = 35; 
+                        const muzzleOffset = this.persona ? 60 : 35; 
                         const mx = this.x + Math.cos(this.angle) * muzzleOffset;
                         const my = this.y + Math.sin(this.angle) * muzzleOffset;
 
@@ -21578,6 +21766,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.invincibleTimer > 0 && this.invincibleTimer % 6 < 3) {
                     return;
                 }
+                if (this.persona) return this._drawWarden(ctx);
                 
                 ctx.save();
                 ctx.translate(this.x, this.y);
@@ -21640,6 +21829,70 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     drawEnemyTelegraph(ctx, this.x, this.y, this.telegraphAngle,
                         this.burstCooldown, this.telegraphThreshold, '#ffaa00', 350);
                 }
+            }
+
+            /** A Sanctum warden: a mantled war automaton in its own guise (WARDENS). Kneeling and dark while
+             *  dormant; the eye slit ignites, the halo / chains / censer smoke come alive, and it rises. */
+            _drawWarden(ctx) {
+                const W = WARDENS[this.persona], t = _frameTime / 1000, rise = this._riseK, kneel = 1 - rise, eye = this._eyeK;
+                const tele = this.isTelegraphing && this.burstCooldown > 0, spinning = this.burstCount > 0 && this.burstCooldown === 0;
+                const big = (this.persona === 'matins' ? 1.12 : 1) * (this.artScale || 1), S = this.artScale || 1;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(3, 8, 26 * big, 18 * big, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.rotate(this.angle);
+                ctx.scale(big * (1 - 0.14 * kneel), big * (1 - 0.14 * kneel));
+                // The mantle: a long cape behind, fluttering; pooled wide on the floor while kneeling
+                const fl = Math.sin(t * 3 + this.id * 2) * 2.5 * rise;
+                ctx.fillStyle = W.mantle; ctx.beginPath();
+                ctx.moveTo(4, -16); ctx.quadraticCurveTo(-18 - 10 * kneel, -26 - 6 * kneel + fl, -34 - 6 * kneel, -10 + fl);
+                ctx.quadraticCurveTo(-40 - 8 * kneel, 0, -34 - 6 * kneel, 10 - fl); ctx.quadraticCurveTo(-18 - 10 * kneel, 26 + 6 * kneel - fl, 4, 16); ctx.closePath(); ctx.fill();
+                ctx.strokeStyle = W.accent; ctx.lineWidth = 1.2; ctx.stroke();
+                // Armoured body: black iron plates, gold filigree
+                ctx.fillStyle = '#16121a'; ctx.beginPath(); ctx.ellipse(0, 0, 16, 18, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = W.trim; ctx.lineWidth = 1; ctx.stroke();
+                for (const sy of [-1, 1]) {                                    // pauldrons
+                    ctx.fillStyle = '#231c28'; ctx.beginPath(); ctx.ellipse(-2, sy * 15, this.persona === 'matins' ? 10 : 8, 6, sy * 0.3, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = W.accent; ctx.lineWidth = 1; ctx.stroke();
+                }
+                ctx.strokeStyle = W.trim; ctx.globalAlpha = 0.5; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(0, 0, 10, -1.2, 1.2); ctx.moveTo(-6, -8); ctx.quadraticCurveTo(-2, 0, -6, 8); ctx.stroke(); ctx.globalAlpha = 1;
+                if (this.persona === 'compline') {                             // chains across the chest
+                    ctx.strokeStyle = W.trim; ctx.lineWidth = 1.4; ctx.setLineDash([2, 1.5]);
+                    ctx.beginPath(); ctx.moveTo(-10, -14); ctx.quadraticCurveTo(0, 0 + Math.sin(t * 2) * rise, -10, 14); ctx.moveTo(-4, -16); ctx.lineTo(8, 10); ctx.stroke(); ctx.setLineDash([]);
+                }
+                // The weapon: rotary barrels on the right arm, lowered while kneeling; they glow as they heat
+                ctx.save(); ctx.rotate(-0.9 * kneel); ctx.translate(4, 9);
+                if (this.persona === 'vesper') { ctx.fillStyle = W.trim; ctx.beginPath(); ctx.arc(10, 0, 7, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#6a4f22'; ctx.lineWidth = 1; ctx.stroke(); }   // the thurible drum
+                const spin = spinning ? _frameTime / 18 : 0, nB = this.persona === 'matins' ? 2 : 6;
+                for (let i = 0; i < nB; i++) {
+                    const off = nB === 2 ? (i ? 3.5 : -3.5) : Math.sin(spin + i * Math.PI / 3) * 4;
+                    ctx.fillStyle = '#2e2a32'; ctx.fillRect(8, off - 1.6, 26, 3.2);
+                    if (this._heat > 0.05) { ctx.fillStyle = `rgba(255,${120 + 80 * (1 - this._heat) | 0},40,${this._heat})`; ctx.fillRect(28, off - 1.6, 6, 3.2); }
+                }
+                if (this.persona === 'compline') { ctx.strokeStyle = W.trim; ctx.lineWidth = 1; ctx.setLineDash([2, 1.5]); ctx.beginPath(); ctx.moveTo(10, -6); ctx.lineTo(26, 6); ctx.moveTo(12, 6); ctx.lineTo(24, -6); ctx.stroke(); ctx.setLineDash([]); }
+                if (spinning && this.burstTimer < 3) { ctx.fillStyle = '#ffcf6a'; ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(36, 0, 6, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; }
+                ctx.restore();
+                // The hood and the eye slit: dark while dormant; flaring white-red when about to fire
+                ctx.fillStyle = '#0e0a10'; ctx.beginPath(); ctx.arc(2 - 3 * kneel, 0, 9, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = W.accent; ctx.lineWidth = 1.2; ctx.stroke();
+                if (eye > 0.02) {
+                    const flare = tele ? 0.6 + 0.4 * Math.sin(_frameTime / 40) : 0, flash = this._igniteFlash || 0;
+                    ctx.shadowColor = `rgb(${W.eye})`; ctx.shadowBlur = 8 * eye + 14 * flash + 10 * flare;
+                    ctx.fillStyle = flare > 0 ? `rgba(255,${200 * flare | 0},${200 * flare | 0},1)` : `rgba(${W.eye},${eye})`;
+                    ctx.fillRect(6 - 3 * kneel, -4.5, 3, 9); ctx.shadowBlur = 0;
+                }
+                ctx.restore();
+                // Matins' halo turns over its crown; Vesper's censer trails incense
+                if (this.persona === 'matins') {
+                    ctx.save(); ctx.translate(this.x, this.y); ctx.globalAlpha = 0.25 + 0.75 * eye;
+                    ctx.scale(S * 1.12, S * 1.12); ctx.strokeStyle = W.trim; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(0, -6 * rise - 2, 16, 6, 0, 0, Math.PI * 2); ctx.stroke();
+                    for (let i = 0; i < 8; i++) { const a = t * 0.8 * rise + i * Math.PI / 4; ctx.fillStyle = W.accent; ctx.beginPath(); ctx.arc(Math.cos(a) * 16, -6 * rise - 2 + Math.sin(a) * 6, 1.4, 0, Math.PI * 2); ctx.fill(); }
+                    ctx.restore();
+                } else if (this.persona === 'vesper' && eye > 0.02) {
+                    for (let i = 0; i < 5; i++) { const ph = (t * 0.6 + i / 5) % 1; ctx.globalAlpha = (1 - ph) * 0.25 * eye; ctx.fillStyle = '#b8a8c8'; ctx.beginPath(); ctx.arc(this.x - Math.cos(this.angle) * (10 + ph * 30) * S + Math.sin(t + i) * 4 * S, this.y - Math.sin(this.angle) * (10 + ph * 30) * S - ph * 10 * S, (3 + ph * 6) * S, 0, Math.PI * 2); ctx.fill(); }
+                    ctx.globalAlpha = 1;
+                }
+                if (tele) drawEnemyTelegraph(ctx, this.x, this.y, this.telegraphAngle, this.burstCooldown, this.telegraphThreshold, `rgb(${W.eye})`, 380);
             }
         }
         
@@ -35308,6 +35561,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     },
                     portrait(ctx, P, c, skinShadow) { pShoulders(ctx, P, skinShadow); const { cx, cy, fw, fh } = P; ctx.fillStyle = c.color; ctx.beginPath(); ctx.ellipse(cx, cy + fh * 2.55, fw * 1.6, fh * 0.55, 0, Math.PI, 0); ctx.fill(); ctx.strokeStyle = c.color; ctx.lineWidth = fw * 0.12; ctx.beginPath(); for (const s of [-1, 1]) { ctx.moveTo(cx + s * fw * 0.9, cy + fh * 2.1); ctx.lineTo(cx + s * fw * 0.75, cy + fh * 1.5); } ctx.stroke(); }
                 },
+                // The sports bra's fitted crop, with long sleeves to the wrist; a scooped neck in the portrait
+                sleeved_crop: {
+                    sleeve: 'long',
+                    draw(ctx, g, c) { tops.sports_bra.draw(ctx, g, c); shoulderSeams(ctx, g, c); },
+                    portrait(ctx, P, c, skinShadow) {
+                        pShoulders(ctx, P, c.color); pNeckline(ctx, P, skinShadow, 0.55, 0.62);
+                        const { cx, cy, fw, fh } = P; ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(cx - fw * 1.6, cy + fh * 2.6, fw * 3.2, fh * 0.08);   // the crop's hem
+                    }
+                },
                 tshirt: {
                     sleeve: 'short',
                     draw(ctx, g, c) { body(ctx, g, c); shoulderSeams(ctx, g, c); bust(ctx, g, c, 0.16, 3); },
@@ -35515,6 +35777,50 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         { a: { x: x, y: 4 }, t: { x: x - 3, y: 4.5 } },         { a: { x: x + 1, y: 10 }, t: { x: x - 1.5, y: 12 } } ] }),
                         g.darken(c.color, 0.26));
                     rr(ctx, g.hip.x, -11, g.hip.w, 23, [8, 3, 3, 8], g.darken(c.color, 0.2));
+                } },
+                // Form-fitting: no cloth, it moves with her. Hugs the hips and the tops of the thighs; a back slit
+                pencil_skirt: { legs: 'bare', hips(ctx, g, c) {
+                    const col = g.darken(c.color, 0.18);
+                    ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.lineWidth = 6.5;
+                    for (let i = 0; i < 2; i++) { const [hx, hy] = g.hipPt[i], [kx, ky] = g.knees[i]; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + (kx - hx) * 0.55, hy + (ky - hy) * 0.55); ctx.stroke(); }
+                    ctx.lineCap = 'butt';
+                    rr(ctx, g.hip.x - 0.5, -11, g.hip.w + 0.5, 22, [7, 3, 3, 7], col);
+                    ctx.strokeStyle = g.darken(c.color, 0.34); ctx.lineWidth = 0.6; ctx.beginPath();
+                    ctx.moveTo(g.hip.x + 0.5, -2); ctx.lineTo(g.hip.x - 1.5, 0); ctx.lineTo(g.hip.x + 0.5, 2);   // the slit at the back
+                    ctx.moveTo(g.hip.x + g.hip.w - 1, -10); ctx.lineTo(g.hip.x + g.hip.w - 1, 10);                  // the waist seam
+                    ctx.stroke();
+                } },
+                // A full circle of pleats all the way round, simulated as cloth: it swirls out as she turns and
+                // bells behind her as she runs. Alternating pleat shades, a trim band, a frilled hem of scallops.
+                pleated_skirt: { legs: 'bare', hips(ctx, g, c) {
+                    const cx = g.hip.x + g.hip.w / 2, N = 16, chains = [];
+                    for (let i = 0; i < N; i++) {
+                        const a = i / N * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+                        chains.push({ a: { x: cx + ca * 7, y: sa * 10.5 }, t: { x: cx + ca * 14.5, y: sa * 17.5 } });
+                    }
+                    const ch = g.cloth('pleated_skirt', { segs: 2, stiffness: 0.16, damping: 0.85, keepOut: 7, chains });
+                    const tip = k => ch[k % N][ch[k % N].length - 1], root = k => ch[k % N][0];
+                    const base = g.darken(c.color, 0.12), deep = g.darken(c.color, 0.34), trim = c.trim || '#f4eee6';
+                    // Pleats: alternating wedges from the waist to the hem
+                    for (let i = 0; i < N; i++) {
+                        const a0 = root(i), a1 = root(i + 1), t0 = tip(i), t1 = tip(i + 1);
+                        ctx.fillStyle = i % 2 ? deep : base; ctx.beginPath();
+                        ctx.moveTo(a0.x, a0.y); ctx.lineTo(t0.x, t0.y); ctx.lineTo(t1.x, t1.y); ctx.lineTo(a1.x, a1.y); ctx.closePath(); ctx.fill();
+                    }
+                    // A trim band near the hem, then the frill: two scallops per pleat
+                    ctx.strokeStyle = trim; ctx.lineWidth = 0.9; ctx.beginPath();
+                    for (let i = 0; i <= N; i++) { const t = tip(i), a = root(i), p = { x: a.x + (t.x - a.x) * 0.8, y: a.y + (t.y - a.y) * 0.8 }; ctx[i ? 'lineTo' : 'moveTo'](p.x, p.y); }
+                    ctx.stroke();
+                    ctx.fillStyle = trim;
+                    for (let i = 0; i < N; i++) {
+                        const t0 = tip(i), t1 = tip(i + 1);
+                        for (const f of [0.25, 0.75]) { const x = t0.x + (t1.x - t0.x) * f, y = t0.y + (t1.y - t0.y) * f; ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill(); }
+                    }
+                    ctx.strokeStyle = g.darken(c.color, 0.45); ctx.lineWidth = 0.5; ctx.beginPath();
+                    for (let i = 0; i <= N; i++) { const t = tip(i); ctx[i ? 'lineTo' : 'moveTo'](t.x, t.y); }
+                    ctx.stroke();
+                    // The waistband
+                    ctx.fillStyle = deep; ctx.beginPath(); ctx.ellipse(cx, 0, 7.5, 11, 0, 0, Math.PI * 2); ctx.fill();
                 } },
                 long_skirt: { legs: 'full', shade: 0.25, hips(ctx, g, c) {
                     // The hem swings around the legs: a ring of chains from one front side, round the back, to the other
@@ -41395,9 +41701,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Teleport to church_boss and spawn the Triumvirate
                         this.loadMap('church_boss');
                         setTimeout(() => {
-                            this.enemies.push(new GatlingGunner(300, 300, 0));
-                            this.enemies.push(new GatlingGunner(600, 200, 1));
-                            this.enemies.push(new GatlingGunner(900, 300, 2));
+                            if (!this.enemies.some(e => e.persona && !e.dead)) this.bossIntro([new GatlingGunner(360, 330, 0, { persona: 'vesper' }), new GatlingGunner(600, 290, 1, { persona: 'matins' }), new GatlingGunner(840, 330, 2, { persona: 'compline' })], { short: true });
                             showMessage("THE TRIUMVIRATE AWAKENS... (REPLAY)");
                             this.triggerShake(20);
                         }, 500);
@@ -41978,7 +42282,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const age = now - e._hpShowT;
                     if (age > 3) continue;
                     ctx.globalAlpha = age < 2.4 ? 1 : (3 - age) / 0.6;
-                    drawHPBar(ctx, e.x - 14, e.y - 30, 28, 3.5, Math.max(0, e.hp / e.maxHp));
+                    if (e.bossName) {                                      // a named boss: a wider bar and its name
+                        const top = e.y - (e.radius || 20) - 26; drawHPBar(ctx, e.x - 28, top, 56, 4.5, Math.max(0, e.hp / e.maxHp));
+                        ctx.font = 'italic 9px Georgia, serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillText(e.bossName, e.x + 0.5, top - 4.5);
+                        ctx.fillStyle = '#ffd8c8'; ctx.fillText(e.bossName, e.x, top - 5);
+                    } else drawHPBar(ctx, e.x - 14, e.y - 30, 28, 3.5, Math.max(0, e.hp / e.maxHp));
                 }
                 ctx.globalAlpha = 1;
                 // Numbers: rise, drift, fade over 0.85 s; a merged hit pops a little bigger
@@ -42002,6 +42310,116 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 ctx.restore();
             },
+        });
+        // GameEngine — boss intros: the Sanctum's Triumvirate awakens.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        //
+        // The bosses spawn dormant (kneeling, eyes dark). The first time: the letterbox comes down, the
+        // camera goes to them, their eyes ignite one by one under a title, they rise, the camera comes
+        // back to 949, and after a breath of grace they wake one by one — and their first burst still
+        // telegraphs. Replays (or once seen) get the short version: no pan, eyes and rising in place.
+        // A tap or a key skips to the pan back. Runs on frames (updateBossIntro, from update.js).
+        engineMixin({
+            bossIntro(bosses, opts = {}) {
+                const qs = this.questState || {};
+                let short = !!(opts.short || qs.sanctumIntroSeen || qs.churchBossDefeated);
+                for (const b of bosses) {
+                    b.makeDormant();
+                    b.navMap = this.activeMap;                    // no clear line: route round the pews for one
+                    this.enemies.push(b);
+                }
+                qs.sanctumIntroSeen = true;
+                const names = bosses.map(b => b.bossName).filter(Boolean);
+                if (this._bossIntro) short = true;                  // one already running: this set just wakes in place
+                (this._bossIntros || (this._bossIntros = [])).push(this._bossIntro = { bosses, short, f: 0, title: opts.title || 'THE TRIUMVIRATE', names, skipped: false,
+                                    zoom: this.camera.zoom || 1, woke: 0 });
+                if (!short) {
+                    this.cutscene.start();
+                    const cx = bosses.reduce((s, b) => s + b.x, 0) / bosses.length, cy = bosses.reduce((s, b) => s + b.y, 0) / bosses.length;
+                    // Frame all of them, whatever the screen's shape (a portrait phone is narrow)
+                    const xs = bosses.map(b => b.x), ys = bosses.map(b => b.y), cw = this.canvas.clientWidth || this.canvas.width, ch = this.canvas.clientHeight || this.canvas.height;
+                    const fit = Math.min(cw / (Math.max(...xs) - Math.min(...xs) + 220), ch / (Math.max(...ys) - Math.min(...ys) + 320));
+                    this._bossIntro.fit = { x: cx, y: cy + 30, zoom: Math.max(0.45, Math.min(1.35, fit)) };
+                    this.cutscene.camTargetX = bosses[0].x; this.cutscene.camTargetY = bosses[0].y; this.cutscene.camZoomTarget = 1.15;   // to the first of them
+                    const me = this._bossIntro, skip = () => { if (me.f > 20) me.skipped = true; };
+                    this._bossIntroSkip = skip;
+                    window.addEventListener('pointerdown', skip); window.addEventListener('keydown', skip);
+                }
+            },
+
+            /** After the darkness: the wardens' eyes, halo and heat glow through the Sanctum's red gloom. */
+            drawBossGlow(ctx) {
+                const list = this.enemies && this.enemies.filter(e => e.persona && !e.dead);
+                if (!list || !list.length) return;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                for (const e of list) {
+                    const W = WARDENS[e.persona], eye = e._eyeK, kneel = 1 - e._riseK, S = e.artScale || 1;
+                    const ex = e.x + Math.cos(e.angle) * (7 - 3 * kneel) * S, ey = e.y + Math.sin(e.angle) * (7 - 3 * kneel) * S;
+                    const tele = e.isTelegraphing && e.burstCooldown > 0 ? 0.5 : 0;
+                    if (eye > 0.02) { ctx.globalAlpha = Math.min(1, 0.4 * eye + 0.5 * (e._igniteFlash || 0) + tele); drawGlow(ctx, ex, ey, (22 + 26 * (e._igniteFlash || 0)) * S, W.eye, 0.3); }
+                    ctx.globalAlpha = 0.07 + 0.06 * eye; drawGlow(ctx, e.x, e.y, 30 * S, W.eye, 0);          // their accent, faint, so the three read apart
+                    if (e.persona === 'matins' && eye > 0.02) { ctx.globalAlpha = 0.35 * eye; ctx.strokeStyle = W.trim; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(e.x, e.y + (-6 * e._riseK - 2) * S * 1.12, 16 * S * 1.12, 6 * S * 1.12, 0, 0, Math.PI * 2); ctx.stroke(); }
+                    if (e._heat > 0.05) { ctx.globalAlpha = 0.5 * e._heat; drawGlow(ctx, e.x + Math.cos(e.angle) * 34 * S, e.y + Math.sin(e.angle) * 34 * S, 16 * S, '255, 150, 60', 0.3); }
+                }
+                ctx.restore();
+            },
+
+            _bossTitle(show) {
+                let el = document.getElementById('boss-title');
+                if (!el) {
+                    el = document.createElement('div'); el.id = 'boss-title';
+                    el.innerHTML = '<div class="bt-main"></div><div class="bt-names"></div>';
+                    document.body.appendChild(el);
+                }
+                const I = this._bossIntro;
+                if (show && I) { el.querySelector('.bt-main').textContent = I.title; el.querySelector('.bt-names').textContent = I.names.join('  ·  '); }
+                el.classList.toggle('show', !!show);
+            },
+
+            /** One frame of every running intro (60 per second). */
+            updateBossIntro() {
+                const list = this._bossIntros || [];
+                for (const I of list.slice()) this._stepBossIntro(I);
+                this._bossIntros = list.filter(I => !I.done);
+                this._bossIntro = this._bossIntros[0] || null;
+            },
+
+            _stepBossIntro(I) {
+                const f = ++I.f, B = I.bosses;
+                const ignite = (b) => { b._eyeT = 1; b._igniteFlash = 1; if (this.weather) this.weather.triggerLightning && this.weather.triggerLightning(); this.triggerShake(5); audioSys.sfx('explode'); };
+                const wakeAll = (from) => B.forEach((b, i) => { b._wakeAt = from + i * 18; });
+                if (I.short) {
+                    // Short: eyes ignite in place, they rise, then wake after the grace
+                    B.forEach((b, i) => { if (f === 12 + i * 18) ignite(b); });
+                    if (f === 20) this._bossTitle(true);
+                    if (f === 60) B.forEach(b => { b._riseT = 1; });
+                    if (f === 100) { this._bossTitle(false); wakeAll(110); }
+                } else {
+                    if (I.skipped && !I.skipAt) { I.skipAt = f; B.forEach(b => { b._eyeT = 1; b._riseT = 1; }); if (!I.backAt) I.backAt = f; }
+                    // The camera visits each as its eye ignites, then pulls back to frame all three under the title
+                    B.forEach((b, i) => {
+                        if (I.skipAt) return;
+                        if (f === 20 + i * 40) { this.cutscene.camTargetX = b.x; this.cutscene.camTargetY = b.y; }
+                        if (f === 48 + i * 40) ignite(b);
+                    });
+                    const allLit = 48 + (B.length - 1) * 40;
+                    if (!I.skipAt && f === allLit + 16) { this.cutscene.camTargetX = I.fit.x; this.cutscene.camTargetY = I.fit.y; this.cutscene.camZoomTarget = I.fit.zoom; this._bossTitle(true); }
+                    if (!I.skipAt && f === allLit + 60) B.forEach(b => { b._riseT = 1; });
+                    if (!I.backAt && f === allLit + 110) I.backAt = f;
+                    if (I.backAt && f === I.backAt) {                   // the camera comes back to her
+                        this._bossTitle(false);
+                        this.cutscene.camTargetX = this.player.x; this.cutscene.camTargetY = this.player.y; this.cutscene.camZoomTarget = I.zoom;
+                    }
+                    if (I.backAt && f === I.backAt + 42) {             // control back; grace; then they wake
+                        this.cutscene.end(); this.camera.zoom = I.zoom;
+                        window.removeEventListener('pointerdown', this._bossIntroSkip); window.removeEventListener('keydown', this._bossIntroSkip);
+                        wakeAll(f + 60);
+                    }
+                }
+                // Wake each at its time (the first burst still waits a full telegraph)
+                for (const b of B) if (b.dormant && b._wakeAt && f >= b._wakeAt) { b.awaken(b.telegraphThreshold); I.woke++; }
+                if (I.woke >= B.length || B.every(b => b.dead)) I.done = true;
+            }
         });
         // GameEngine — Noise: sounds that give 949 (and fights) away. Methods are added to
         // GameEngine.prototype (see engineMixin in game-engine.js). Enemies hear by sound and
@@ -47334,6 +47752,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.activeMap.id === 'house_of_death') this.drawHouseGlow(ctx);
                 if (this.activeMap.id === 'hotel_lobby') this.drawLobbyGlow(ctx);
                 if (this.activeMap.id === 'hotel_suite') this.drawSuiteGlow(ctx);
+                if (this.activeMap.id === 'church_boss') { this.drawSanctumGlow(ctx); this.drawBossGlow(ctx); }   // the Sanctum, then the Triumvirate's eyes
                 if (this.activeMap.id === 'moon_city_nightclub') this.drawClubGlow(ctx);
                 if (this.activeMap.id === 'hub_949') this.drawGraveyardGlow(ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
@@ -48297,6 +48716,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
                 this.profiler.start('Logic:Story');
                 this.cutscene.update();
+                if (this._bossIntros && this._bossIntros.length) this.updateBossIntro();          // engine/boss-intro.js
                 this.story.update();
                 this.profiler.stop('Logic:Story');
                 
@@ -49884,6 +50304,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.activeMap.id === 'house_of_death') this.drawHouseInterior(this.ctx);
                 if (this.activeMap.id === 'hotel_lobby') this.drawLobbyInterior(this.ctx);
                 if (this.activeMap.id === 'hotel_suite') this.drawSuiteInterior(this.ctx);
+                if (this.activeMap.id === 'church_boss') this.drawSanctumInterior(this.ctx);
                 if (this.activeMap.id === 'moon_city_nightclub') { this.drawClubInterior(this.ctx); this.drawClubFloorLights(this.ctx); }
                 
                 // Indoor V2: Room floors, windows, and doors
@@ -51244,6 +51665,91 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.textAlign = 'center'; ctx.font = 'italic bold 15px Georgia, serif';
                 ctx.globalAlpha = 0.35 * sh; ctx.fillStyle = '#ffb060'; ctx.fillText('Think excellence, think Double Nights.', 500, 172);
                 ctx.globalAlpha = 0.95 * sh; ctx.fillStyle = '#ffe2a8'; ctx.fillText('Think excellence, think Double Nights.', 500, 171);
+                ctx.restore();
+            },
+
+            /** The Sanctum's floor, painted once: cracked flagstones, rain stains and moss; the three-step
+             *  dais of the apse; the crimson runner up the nave; the Triumvirate's sigil inlaid in gold. */
+            drawSanctumInterior(ctx) {
+                if (!this._sanctumFloor) this._sanctumFloor = this._paintSanctumFloor();
+                ctx.drawImage(this._sanctumFloor, 0, 0);
+            },
+
+            _paintSanctumFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 1400;
+                const c = cv.getContext('2d'), r = seededRandom(333), GOLD = '#c9a46a';
+                c.fillStyle = '#16121a'; c.fillRect(0, 0, 1200, 1400);
+                // Flagstones, staggered and uneven, each a touch different
+                for (let row = 0, y = 50; y < 1350; y += 44, row++) for (let x = 50 - (row % 2) * 34; x < 1150; x += 68) {
+                    const v = r() * 12 | 0; c.fillStyle = `rgb(${34 + v},${30 + v},${40 + v})`; c.fillRect(x + 1, y + 1, 66, 42);
+                }
+                c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1.5;
+                for (let row = 0, y = 50; y < 1350; y += 44, row++) { c.beginPath(); c.moveTo(50, y); c.lineTo(1150, y); c.stroke(); for (let x = 50 - (row % 2) * 34; x < 1150; x += 68) { c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + 44); c.stroke(); } }
+                for (let i = 0; i < 40; i++) { let x = 60 + r() * 1080, y = 60 + r() * 1280; c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (r() - 0.5) * 40; y += (r() - 0.5) * 40; c.lineTo(x, y); } c.stroke(); }   // cracks
+                for (let i = 0; i < 90; i++) { const x = 60 + r() * 1080, y = 60 + r() * 1280; c.fillStyle = `rgba(${50 + r() * 30 | 0},${80 + r() * 40 | 0},${50},${0.2 + r() * 0.3})`; c.beginPath(); c.arc(x, y, 1 + r() * 3, 0, Math.PI * 2); c.fill(); }   // moss
+                for (let i = 0; i < 14; i++) { const x = 90 + r() * 1020, y = 400 + r() * 920; c.fillStyle = 'rgba(10,8,20,0.45)'; c.beginPath(); c.ellipse(x, y, 20 + r() * 40, 8 + r() * 16, r() * 3, 0, Math.PI * 2); c.fill(); }   // rain-dark puddles
+                // The apse: a dais of three steps across the north end
+                for (let k = 0; k < 3; k++) { const y0 = 50 + k * 0; c.fillStyle = `rgba(${40 + k * 8},${34 + k * 6},${48 + k * 8},0.9)`; c.fillRect(120 + k * 30, y0, 960 - k * 60, 250 - k * 30); c.fillStyle = 'rgba(200,180,255,0.12)'; c.fillRect(120 + k * 30, y0 + 250 - k * 30 - 2, 960 - k * 60, 2); c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(120 + k * 30, y0 + 250 - k * 30, 960 - k * 60, 4); }
+                // The crimson runner up the nave, gold-edged
+                c.fillStyle = '#3a0a14'; c.fillRect(560, 250, 80, 1100); c.fillStyle = GOLD; c.fillRect(562, 250, 1.5, 1100); c.fillRect(636.5, 250, 1.5, 1100);
+                c.fillStyle = 'rgba(0,0,0,0.3)'; for (let i = 0; i < 8; i++) c.fillRect(560, 300 + r() * 1000, 80, 3 + r() * 6);   // worn, rain-stained
+                // The sigil: a great gold circle and three interlocking rings, one for each of them
+                const X = 600, Y = 720;
+                c.strokeStyle = GOLD; c.lineWidth = 3; c.beginPath(); c.arc(X, Y, 250, 0, Math.PI * 2); c.stroke();
+                c.lineWidth = 1; c.beginPath(); c.arc(X, Y, 240, 0, Math.PI * 2); c.stroke();
+                for (let k = 0; k < 3; k++) { const a = -Math.PI / 2 + k * Math.PI * 2 / 3; c.lineWidth = 2.5; c.beginPath(); c.arc(X + Math.cos(a) * 95, Y + Math.sin(a) * 95, 130, 0, Math.PI * 2); c.stroke(); }
+                c.fillStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.arc(X, Y, 250, 0, Math.PI * 2); c.fill();
+                // The narthex: a worn threshold at the door
+                c.fillStyle = 'rgba(90,80,100,0.35)'; c.fillRect(520, 1300, 160, 50);
+                return cv;
+            },
+
+            /** The Sanctum after the darkness layer: the shattered rose window and its light on the dais, the
+             *  braziers and candles, and the sigil's runes — one ring per warden, going dark as each falls. */
+            drawSanctumGlow(ctx) {
+                const t = _frameTime / 1000;
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const W = (this.enemies || []).filter(e => e.persona);
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // The rose window's light pooled on the dais
+                glow(600, 110, 240, '170, 80, 255', 0.1 + 0.03 * Math.sin(t * 0.7)); glow(600, 70, 110, '255, 70, 110', 0.12);
+                // Braziers and candles
+                for (const p of this.props) {
+                    if (p.decorType === 'sc_brazier') { const f = 0.8 + 0.2 * Math.sin(t * 6.1 + p.x) * Math.sin(t * 2.3); glow(p.x + p.width / 2, p.y + p.height / 2, 70, '255, 120, 40', 0.45 * f); }
+                    else if (p.decorType === 'sc_candles') glow(p.x + p.width / 2, p.y + p.height / 2, 26, '255, 190, 120', 0.45 * (0.8 + 0.2 * Math.sin(t * 9 + p.x)));
+                    else if (p.decorType === 'sc_altar') { glow(p.x + p.width - 18, p.y + 16, 22, '255, 190, 120', 0.4); glow(p.x + 11, p.y + p.height / 2, 18, '255, 190, 120', 0.35); }
+                }
+                // The sigil: each ring's runes burn while its warden lives
+                const X = 600, Y = 720;
+                for (let k = 0; k < 3; k++) {
+                    const a = -Math.PI / 2 + k * Math.PI * 2 / 3, cx = X + Math.cos(a) * 95, cy = Y + Math.sin(a) * 95;
+                    const w = W.find(e => e.id === k), alive = w && !w.dead ? (w.dormant ? 0.35 + 0.65 * w._eyeK : 1) : 0.06;
+                    const rgb = w ? { vesper: '255, 70, 60', matins: '255, 200, 110', compline: '190, 130, 255' }[w.persona] : '200, 180, 255';
+                    for (let i = 0; i < 12; i++) {
+                        const ra = i * Math.PI / 6 + t * 0.05 * (k % 2 ? -1 : 1), rx = cx + Math.cos(ra) * 130, ry = cy + Math.sin(ra) * 130;
+                        const pulse = 0.6 + 0.4 * Math.sin(t * 2 + i + k * 2);
+                        glow(rx, ry, 10, rgb, 0.5 * alive * pulse);
+                        ctx.globalAlpha = 0.8 * alive * pulse; ctx.fillStyle = `rgb(${rgb})`; ctx.fillRect(rx - 1.5, ry - 1.5, 3, 3);
+                    }
+                }
+                ctx.restore();
+                // (Solid) the rose window in the north wall: stained glass in a stone wheel, some panes broken out
+                ctx.save();
+                ctx.beginPath(); ctx.rect(430, 0, 340, 60); ctx.clip();
+                ctx.translate(600, 44);
+                ctx.fillStyle = '#2a2430'; ctx.beginPath(); ctx.arc(0, 0, 84, 0, Math.PI * 2); ctx.fill();
+                const panes = ['#7a2cff', '#c42a52', '#e8c27a', '#4a2aa0', '#ff5a8a', '#8a5cff'];
+                for (let i = 0; i < 16; i++) {
+                    const a0 = i * Math.PI / 8, a1 = a0 + Math.PI / 8;
+                    if (i === 5 || i === 11 || i === 12) continue;                   // broken out: the storm shows through
+                    const f = 0.75 + 0.25 * Math.sin(t * 0.9 + i);
+                    ctx.globalAlpha = f; ctx.fillStyle = panes[i % panes.length];
+                    ctx.beginPath(); ctx.moveTo(Math.cos(a0) * 26, Math.sin(a0) * 26); ctx.arc(0, 0, 76, a0 + 0.03, a1 - 0.03); ctx.lineTo(Math.cos(a1) * 26, Math.sin(a1) * 26); ctx.closePath(); ctx.fill();
+                }
+                ctx.globalAlpha = 1; ctx.strokeStyle = '#1a161e'; ctx.lineWidth = 3;
+                for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 26, Math.sin(a) * 26); ctx.lineTo(Math.cos(a) * 80, Math.sin(a) * 80); ctx.stroke(); }
+                ctx.beginPath(); ctx.arc(0, 0, 26, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, 80, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = '#e8c27a'; ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
                 ctx.restore();
             },
 

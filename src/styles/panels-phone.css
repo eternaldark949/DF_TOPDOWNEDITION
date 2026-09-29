@@ -1051,3 +1051,19 @@
         #game-ui.aiming #action-dock .action-pill { pointer-events: none; }
         @keyframes ap-sheen { 0%, 62% { left: -40%; } 100% { left: 130%; } }
         @keyframes ap-arrive { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
+        /* The boss title (engine/boss-intro.js): gothic red over the letterbox, the names beneath */
+        #boss-title {
+            position: fixed; left: 0; right: 0; bottom: 16%; z-index: 9000; text-align: center; pointer-events: none;
+            opacity: 0; transform: translateY(8px); transition: opacity 0.6s ease, transform 0.8s ease;
+        }
+        #boss-title.show { opacity: 1; transform: none; }
+        #boss-title .bt-main {
+            font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: clamp(1.5rem, 7vw, 2.6rem);
+            letter-spacing: 0.35em; margin-left: 0.35em; color: #ff3a30;
+            text-shadow: 0 0 18px rgba(255, 40, 30, 0.8), 0 0 42px rgba(160, 0, 20, 0.7), 0 2px 0 #1a0000;
+        }
+        #boss-title .bt-names {
+            margin-top: 8px; font-family: Georgia, serif; font-style: italic; font-size: clamp(0.62rem, 2.8vw, 0.9rem);
+            color: #e8c9b8; letter-spacing: 0.08em; text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+        }

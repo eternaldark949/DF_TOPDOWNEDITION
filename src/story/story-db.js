@@ -311,11 +311,8 @@
                                                 condition: "CHURCH_BOSS_DEFEATED",
                                                 onStart: (game) => {
                                                     if (!game.questState.churchBossDefeated) {
-                                                        game.enemies.push(new GatlingGunner(300, 300, 0));
-                                                        game.enemies.push(new GatlingGunner(600, 200, 1));
-                                                        game.enemies.push(new GatlingGunner(900, 300, 2));
-                                                        showMessage("THE TRIUMVIRATE AWAKENS...");
-                                                        game.triggerShake(20);
+                                                        // They kneel at the altar until the intro wakes them (engine/boss-intro.js)
+                                                        game.bossIntro([new GatlingGunner(360, 330, 0, { persona: 'vesper' }), new GatlingGunner(600, 290, 1, { persona: 'matins' }), new GatlingGunner(840, 330, 2, { persona: 'compline' })]);
                                                     }
                                                 }
                                             },

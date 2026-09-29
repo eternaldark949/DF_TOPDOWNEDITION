@@ -292,6 +292,91 @@
                 ctx.restore();
             },
 
+            /** The Sanctum's floor, painted once: cracked flagstones, rain stains and moss; the three-step
+             *  dais of the apse; the crimson runner up the nave; the Triumvirate's sigil inlaid in gold. */
+            drawSanctumInterior(ctx) {
+                if (!this._sanctumFloor) this._sanctumFloor = this._paintSanctumFloor();
+                ctx.drawImage(this._sanctumFloor, 0, 0);
+            },
+
+            _paintSanctumFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 1400;
+                const c = cv.getContext('2d'), r = seededRandom(333), GOLD = '#c9a46a';
+                c.fillStyle = '#16121a'; c.fillRect(0, 0, 1200, 1400);
+                // Flagstones, staggered and uneven, each a touch different
+                for (let row = 0, y = 50; y < 1350; y += 44, row++) for (let x = 50 - (row % 2) * 34; x < 1150; x += 68) {
+                    const v = r() * 12 | 0; c.fillStyle = `rgb(${34 + v},${30 + v},${40 + v})`; c.fillRect(x + 1, y + 1, 66, 42);
+                }
+                c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1.5;
+                for (let row = 0, y = 50; y < 1350; y += 44, row++) { c.beginPath(); c.moveTo(50, y); c.lineTo(1150, y); c.stroke(); for (let x = 50 - (row % 2) * 34; x < 1150; x += 68) { c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + 44); c.stroke(); } }
+                for (let i = 0; i < 40; i++) { let x = 60 + r() * 1080, y = 60 + r() * 1280; c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (r() - 0.5) * 40; y += (r() - 0.5) * 40; c.lineTo(x, y); } c.stroke(); }   // cracks
+                for (let i = 0; i < 90; i++) { const x = 60 + r() * 1080, y = 60 + r() * 1280; c.fillStyle = `rgba(${50 + r() * 30 | 0},${80 + r() * 40 | 0},${50},${0.2 + r() * 0.3})`; c.beginPath(); c.arc(x, y, 1 + r() * 3, 0, Math.PI * 2); c.fill(); }   // moss
+                for (let i = 0; i < 14; i++) { const x = 90 + r() * 1020, y = 400 + r() * 920; c.fillStyle = 'rgba(10,8,20,0.45)'; c.beginPath(); c.ellipse(x, y, 20 + r() * 40, 8 + r() * 16, r() * 3, 0, Math.PI * 2); c.fill(); }   // rain-dark puddles
+                // The apse: a dais of three steps across the north end
+                for (let k = 0; k < 3; k++) { const y0 = 50 + k * 0; c.fillStyle = `rgba(${40 + k * 8},${34 + k * 6},${48 + k * 8},0.9)`; c.fillRect(120 + k * 30, y0, 960 - k * 60, 250 - k * 30); c.fillStyle = 'rgba(200,180,255,0.12)'; c.fillRect(120 + k * 30, y0 + 250 - k * 30 - 2, 960 - k * 60, 2); c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(120 + k * 30, y0 + 250 - k * 30, 960 - k * 60, 4); }
+                // The crimson runner up the nave, gold-edged
+                c.fillStyle = '#3a0a14'; c.fillRect(560, 250, 80, 1100); c.fillStyle = GOLD; c.fillRect(562, 250, 1.5, 1100); c.fillRect(636.5, 250, 1.5, 1100);
+                c.fillStyle = 'rgba(0,0,0,0.3)'; for (let i = 0; i < 8; i++) c.fillRect(560, 300 + r() * 1000, 80, 3 + r() * 6);   // worn, rain-stained
+                // The sigil: a great gold circle and three interlocking rings, one for each of them
+                const X = 600, Y = 720;
+                c.strokeStyle = GOLD; c.lineWidth = 3; c.beginPath(); c.arc(X, Y, 250, 0, Math.PI * 2); c.stroke();
+                c.lineWidth = 1; c.beginPath(); c.arc(X, Y, 240, 0, Math.PI * 2); c.stroke();
+                for (let k = 0; k < 3; k++) { const a = -Math.PI / 2 + k * Math.PI * 2 / 3; c.lineWidth = 2.5; c.beginPath(); c.arc(X + Math.cos(a) * 95, Y + Math.sin(a) * 95, 130, 0, Math.PI * 2); c.stroke(); }
+                c.fillStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.arc(X, Y, 250, 0, Math.PI * 2); c.fill();
+                // The narthex: a worn threshold at the door
+                c.fillStyle = 'rgba(90,80,100,0.35)'; c.fillRect(520, 1300, 160, 50);
+                return cv;
+            },
+
+            /** The Sanctum after the darkness layer: the shattered rose window and its light on the dais, the
+             *  braziers and candles, and the sigil's runes — one ring per warden, going dark as each falls. */
+            drawSanctumGlow(ctx) {
+                const t = _frameTime / 1000;
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const W = (this.enemies || []).filter(e => e.persona);
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // The rose window's light pooled on the dais
+                glow(600, 110, 240, '170, 80, 255', 0.1 + 0.03 * Math.sin(t * 0.7)); glow(600, 70, 110, '255, 70, 110', 0.12);
+                // Braziers and candles
+                for (const p of this.props) {
+                    if (p.decorType === 'sc_brazier') { const f = 0.8 + 0.2 * Math.sin(t * 6.1 + p.x) * Math.sin(t * 2.3); glow(p.x + p.width / 2, p.y + p.height / 2, 70, '255, 120, 40', 0.45 * f); }
+                    else if (p.decorType === 'sc_candles') glow(p.x + p.width / 2, p.y + p.height / 2, 26, '255, 190, 120', 0.45 * (0.8 + 0.2 * Math.sin(t * 9 + p.x)));
+                    else if (p.decorType === 'sc_altar') { glow(p.x + p.width - 18, p.y + 16, 22, '255, 190, 120', 0.4); glow(p.x + 11, p.y + p.height / 2, 18, '255, 190, 120', 0.35); }
+                }
+                // The sigil: each ring's runes burn while its warden lives
+                const X = 600, Y = 720;
+                for (let k = 0; k < 3; k++) {
+                    const a = -Math.PI / 2 + k * Math.PI * 2 / 3, cx = X + Math.cos(a) * 95, cy = Y + Math.sin(a) * 95;
+                    const w = W.find(e => e.id === k), alive = w && !w.dead ? (w.dormant ? 0.35 + 0.65 * w._eyeK : 1) : 0.06;
+                    const rgb = w ? { vesper: '255, 70, 60', matins: '255, 200, 110', compline: '190, 130, 255' }[w.persona] : '200, 180, 255';
+                    for (let i = 0; i < 12; i++) {
+                        const ra = i * Math.PI / 6 + t * 0.05 * (k % 2 ? -1 : 1), rx = cx + Math.cos(ra) * 130, ry = cy + Math.sin(ra) * 130;
+                        const pulse = 0.6 + 0.4 * Math.sin(t * 2 + i + k * 2);
+                        glow(rx, ry, 10, rgb, 0.5 * alive * pulse);
+                        ctx.globalAlpha = 0.8 * alive * pulse; ctx.fillStyle = `rgb(${rgb})`; ctx.fillRect(rx - 1.5, ry - 1.5, 3, 3);
+                    }
+                }
+                ctx.restore();
+                // (Solid) the rose window in the north wall: stained glass in a stone wheel, some panes broken out
+                ctx.save();
+                ctx.beginPath(); ctx.rect(430, 0, 340, 60); ctx.clip();
+                ctx.translate(600, 44);
+                ctx.fillStyle = '#2a2430'; ctx.beginPath(); ctx.arc(0, 0, 84, 0, Math.PI * 2); ctx.fill();
+                const panes = ['#7a2cff', '#c42a52', '#e8c27a', '#4a2aa0', '#ff5a8a', '#8a5cff'];
+                for (let i = 0; i < 16; i++) {
+                    const a0 = i * Math.PI / 8, a1 = a0 + Math.PI / 8;
+                    if (i === 5 || i === 11 || i === 12) continue;                   // broken out: the storm shows through
+                    const f = 0.75 + 0.25 * Math.sin(t * 0.9 + i);
+                    ctx.globalAlpha = f; ctx.fillStyle = panes[i % panes.length];
+                    ctx.beginPath(); ctx.moveTo(Math.cos(a0) * 26, Math.sin(a0) * 26); ctx.arc(0, 0, 76, a0 + 0.03, a1 - 0.03); ctx.lineTo(Math.cos(a1) * 26, Math.sin(a1) * 26); ctx.closePath(); ctx.fill();
+                }
+                ctx.globalAlpha = 1; ctx.strokeStyle = '#1a161e'; ctx.lineWidth = 3;
+                for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 26, Math.sin(a) * 26); ctx.lineTo(Math.cos(a) * 80, Math.sin(a) * 80); ctx.stroke(); }
+                ctx.beginPath(); ctx.arc(0, 0, 26, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, 80, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = '#e8c27a'; ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            },
+
             /** The penthouse floors, painted once: black marble with gold grout and white inlays, the
              *  sunburst rug in the pit and the runner from the elevator; herringbone walnut in the
              *  bedroom; white marble in the bath; teak on the balcony and its glass balustrade. */

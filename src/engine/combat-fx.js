@@ -107,7 +107,11 @@
                     const age = now - e._hpShowT;
                     if (age > 3) continue;
                     ctx.globalAlpha = age < 2.4 ? 1 : (3 - age) / 0.6;
-                    drawHPBar(ctx, e.x - 14, e.y - 30, 28, 3.5, Math.max(0, e.hp / e.maxHp));
+                    if (e.bossName) {                                      // a named boss: a wider bar and its name
+                        const top = e.y - (e.radius || 20) - 26; drawHPBar(ctx, e.x - 28, top, 56, 4.5, Math.max(0, e.hp / e.maxHp));
+                        ctx.font = 'italic 9px Georgia, serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillText(e.bossName, e.x + 0.5, top - 4.5);
+                        ctx.fillStyle = '#ffd8c8'; ctx.fillText(e.bossName, e.x, top - 5);
+                    } else drawHPBar(ctx, e.x - 14, e.y - 30, 28, 3.5, Math.max(0, e.hp / e.maxHp));
                 }
                 ctx.globalAlpha = 1;
                 // Numbers: rise, drift, fade over 0.85 s; a merged hit pops a little bigger

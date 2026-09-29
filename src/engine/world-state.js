@@ -35,6 +35,7 @@
                 if (this.activeMap.id === 'house_of_death') this.drawHouseGlow(ctx);
                 if (this.activeMap.id === 'hotel_lobby') this.drawLobbyGlow(ctx);
                 if (this.activeMap.id === 'hotel_suite') this.drawSuiteGlow(ctx);
+                if (this.activeMap.id === 'church_boss') { this.drawSanctumGlow(ctx); this.drawBossGlow(ctx); }   // the Sanctum, then the Triumvirate's eyes
                 if (this.activeMap.id === 'moon_city_nightclub') this.drawClubGlow(ctx);
                 if (this.activeMap.id === 'hub_949') this.drawGraveyardGlow(ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
