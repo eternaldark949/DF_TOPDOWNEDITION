@@ -30,7 +30,7 @@
                     'auto_shop': 'Torque Auto',
                     'neural_sys_interior': 'Neural Systems',
                     'biggs_arena': 'Biggs Park',
-                    'grum_arena': "Grum's Gauntlet",
+                    'house_of_death': 'The House of Death',
                 };
                 
                 this._migrateV1Save();

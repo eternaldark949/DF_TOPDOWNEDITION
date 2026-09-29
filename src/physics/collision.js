@@ -313,7 +313,15 @@
                 }
 
                 // Actor vs hinged doors (they swing when pushed)
-                if (game && game.roomSystem && game.roomSystem.active) game.roomSystem.stepDoorPhysics(actors);
+                // (every live enemy too, on screen or not, so no one ghosts through a closed door)
+                if (game && game.roomSystem && game.roomSystem.active) {
+                    let doorActors = actors;
+                    if (game.enemies && game.enemies.length) {
+                        const seen = new Set(actors);
+                        doorActors = actors.concat(game.enemies.filter(e => e && !e.dead && e.active !== false && !seen.has(e)));
+                    }
+                    game.roomSystem.stepDoorPhysics(doorActors);
+                }
 
                 // Actor vs Dynamic (circle vs OBB)
                 for (let actor of actors) {

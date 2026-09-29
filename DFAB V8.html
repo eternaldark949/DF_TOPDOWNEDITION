@@ -2366,6 +2366,16 @@
         </div>
     </div>
 
+    <!-- GAUNTLET MAP PICKER (Grum North) — filled from GAUNTLET_MAPS by openGauntletMenu -->
+    <div id="gauntlet-menu" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(14,4,18,0.95); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
+        <div style="max-width:500px; margin:40px auto; padding:20px 16px;">
+            <div style="font-family:Orbitron,sans-serif; font-size:1.1rem; letter-spacing:4px; color:#e8c27a; text-shadow:0 0 14px rgba(232,194,122,0.45); margin-bottom:2px;">THE GAUNTLET</div>
+            <div style="font-size:0.55rem; color:#8a7a92; letter-spacing:2px; margin-bottom:16px;">GRUM NORTH — PICK YOUR KILLING GROUND</div>
+            <div id="gauntlet-maps"></div>
+            <button id="gauntlet-close" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.12); color:#888; cursor:pointer; width:100%; margin-top:14px;">LEAVE</button>
+        </div>
+    </div>
+
     <!-- NOTE READING OVERLAY -->
     <div id="note-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:350; pointer-events:auto;">
         <!-- Darkened blurred background -->
@@ -3414,7 +3424,7 @@
             NAV: {
                 CELL: 20,                   // Grid cell size (px)
                 AGENT_RADIUS: 16,           // Obstacles are inflated by this (teammate radius 14 + margin)
-                MAX_EXPANSIONS: 6000,       // Search cap per path / flood
+                MAX_EXPANSIONS: 12000,       // Search cap per path / flood
                 WAYPOINT_REACHED: 10,       // px — advance to the next waypoint inside this
                 REPATH_TICKS: 20,           // Re-plan a followed path this often
                 // --- Eyeline positioning ---
@@ -4813,7 +4823,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         class NavGrid {
             static for(map) {
                 if (!map) return null;
-                const sig = (map.walls ? map.walls.length : 0) + ':' + getColliders(map).length + ':' + map.width + 'x' + map.height;
+                const sig = (map.walls ? map.walls.length : 0) + ':' + getColliders(map).length + ':' + (map.navObstacles ? map.navObstacles.length : 0) + ':' + map.width + 'x' + map.height;
                 if (!NavGrid._cache || NavGrid._cache.map !== map || NavGrid._cache.sig !== sig) {
                     NavGrid._cache = { map, sig, grid: new NavGrid(map) };
                 }
@@ -4854,7 +4864,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const W = cols * c, H = rows * c;
                 mark(-c, -c, W + c, r); mark(-c, (map.height || H) - r, W + c, H + c);       // map edges
                 mark(-c, -c, r, H + c); mark((map.width || W) - r, -c, W + c, H + c);
-                const obstacles = [...(map.walls || []), ...getColliders(map)];
+                const obstacles = [...(map.walls || []), ...getColliders(map), ...(map.navObstacles || [])];
                 for (const o of obstacles) {
                     if (!o || !(o.w > 0) || !(o.h > 0)) continue;
                     mark(o.x - r, o.y - r, o.x + o.w + r, o.y + o.h + r);
@@ -5043,6 +5053,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          *  Lamps are light sources with no collision, so they never block. */
         function hasShotLine(x1, y1, x2, y2, map) {
             if (isLineBlocked(x1, y1, x2, y2, map.walls, getColliders(map))) return false;
+            if (typeof game !== 'undefined' && game.activeMap === map && game.roomSystem.doorBlocks(x1, y1, x2, y2)) return false;   // a shut door
             const props = (typeof game !== 'undefined' && game.activeMap === map) ? game.props : null;
             if (props && props.length) {
                 const minX = Math.min(x1, x2), maxX = Math.max(x1, x2), minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
@@ -5524,6 +5535,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * a moment every several seconds. Returns a light multiplier (1 = steady).
          */
         function lampFlicker(l) {
+            if (l.candle) {                                           // candle flames breathe (the House's candelabras)
+                const t = _frameTime / 1000, o = l.animOffset || 0;
+                return 0.86 + 0.08 * Math.sin(t * 9 + o) + 0.06 * Math.sin(t * 23 + o * 1.7);
+            }
             if (l._flick === undefined) {
                 const h = Math.abs(Math.sin(l.x * 12.9898 + l.y * 78.233) * 43758.5453) % 1;
                 l._flick = h < 0.1 ? h * 10 : -1;
@@ -7470,6 +7485,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     o.frequency.setValueAtTime(140, now); o.frequency.exponentialRampToValueAtTime(70, now + 0.07);
                     o.connect(g); g.connect(this.bus); g.gain.setValueAtTime(0.09 * near, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
                     o.start(now); o.stop(now + 0.09);
+                } else if (kind === 'thud') {                                 // a round into a wooden leaf
+                    if (!this._voice(null, 0.12)) return;
+                    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520;
+                    this._burst(this.pink, 0.06, f, 0.22 * near, (gg, t, amp) => { gg.setValueAtTime(amp, t); gg.exponentialRampToValueAtTime(0.0001, t + 0.06); });
+                    const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.frequency.setValueAtTime(120, now); o.frequency.exponentialRampToValueAtTime(60, now + 0.1);
+                    o.connect(g); g.connect(this.bus); g.gain.setValueAtTime(0.12 * near, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+                    o.start(now); o.stop(now + 0.12);
+                } else if (kind === 'tink') {                                 // a round glancing off glass
+                    if (!this._voice(null, 0.3)) return;
+                    const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.type = 'sine'; o.frequency.setValueAtTime(2600 + Math.random() * 500, now);
+                    o.connect(g); g.connect(this.bus); g.gain.setValueAtTime(0.06 * near, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+                    o.start(now); o.stop(now + 0.3);
+                    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 4000;
+                    this._burst(this.pink, 0.03, f, 0.12 * near, (gg, t, amp) => { gg.setValueAtTime(amp, t); gg.exponentialRampToValueAtTime(0.0001, t + 0.03); });
                 } else if (kind === 'whoosh') {
                     if (!this._voice(null, 0.4)) return;
                     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 0.8;
@@ -9276,10 +9307,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         //
         //  Giving an indoor map rooms — add an entry to ROOM_DEFS below:
         //    rooms    { id: { x, y, w, h, type: 'indoor'|'outdoor', label } } — cover
-        //             every walkable area; outdoor rooms get sky light and weather
-        //    doors    { x, y, w, h, type: 'sliding'|'hinged', orientation: 'H'|'V',
+        //             every walkable area; outdoor rooms get sky light and weather.
+        //             An L-shaped or odd room: { rects: [{x,y,w,h}, ...], type, label }
+        //    doors    { x, y, w, h, type: 'sliding'|'hinged'|'arch', orientation: 'H'|'V',
         //               rooms: [a, b] } — the two rooms it joins (light spills
-        //             through it); walls are cut for doors automatically
+        //             through it); walls are cut for doors automatically. An arch is
+        //             an open doorway: always open, no leaf. Make doors ≥ 70 px wide so
+        //             enemies path through them. Bullets strike hinged and sliding
+        //             doors (hitDoors) and push them by their force.
         //    windows  { x, y, w, h, facing: 'N'|'S'|'E'|'W' } — daylight projections
         //    linens   decorative cloth
         //  and give light switches (map-entities.js) the `roomId` they control.
@@ -9289,7 +9324,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             AWAY_VIS: 0.55,        // rooms 949 isn't in
             GLASS_VIS: 0.35,       // indoor rooms seen from outside
             DOOR_SPILL: 0.85,      // how far an open door lifts the room beyond it
-            VEIL_MAX: 0.82,        // veil strength at vis 0
+            VEIL_MAX: 1.0,         // veil strength at vis 0 (away rooms ≈ 0.45, from outdoors ≈ 0.65)
             VEIL_RGB: '16, 8, 34', // violet-indigo, the night's own colour
             FEATHER: 12,           // world px per veil texel (edge softness)
             VIS_RATE: 5, LIGHT_RATE: 9, OUTDOOR_RATE: 4   // easing, per second
@@ -9492,15 +9527,70 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.hx = this.x + this.w / 2; this.hy = this.hingeSide === 'left' ? this.y : this.y + this.h;
                     this.baseAngle = this.hingeSide === 'left' ? Math.PI / 2 : -Math.PI / 2; this.length = this.h;
                 }
+                // Sliding glass: a bullet knocks the panels in their track (a small spring)
+                this.jolt = 0; this.joltV = 0;
+                this._actorNear = false;                             // someone besides 949 at the door
+                // An arch is an open doorway: nothing to draw open or shut, light always passes
+                if (this.type === 'arch') { this.openAmount = 1; this.targetOpen = 1; }
+            }
+
+            /** The solid parts of the door right now, as segments [x0, y0, x1, y1] (with a half-thickness). */
+            leaves() {
+                if (this.type === 'hinged') {
+                    const a = this.baseAngle + this.angle;
+                    return [[this.hx, this.hy, this.hx + Math.cos(a) * this.length, this.hy + Math.sin(a) * this.length]];
+                }
+                if (this.type !== 'sliding') return [];
+                // The two panels, clipped to the doorway (the parts slid into the wall are behind the wall)
+                const out = [], off = this.openAmount * ((this.orientation === 'H' ? this.w : this.h) / 2 + 4);
+                const clip = (a, b, lo, hi, add) => { a = Math.max(a, lo); b = Math.min(b, hi); if (b - a > 2) add(a, b); };
+                if (this.orientation === 'H') {
+                    const cy = this.y + this.h / 2, mid = this.x + this.w / 2, add = (a, b) => out.push([a, cy, b, cy]);
+                    clip(this.x - off, mid - 2 - off, this.x, this.x + this.w, add);
+                    clip(mid + 2 + off, this.x + this.w + off, this.x, this.x + this.w, add);
+                } else {
+                    const cx = this.x + this.w / 2, mid = this.y + this.h / 2, add = (a, b) => out.push([cx, a, cx, b]);
+                    clip(this.y - off, mid - 2 - off, this.y, this.y + this.h, add);
+                    clip(mid + 2 + off, this.y + this.h + off, this.y, this.y + this.h, add);
+                }
+                return out;
+            }
+
+            /** Half the leaf's thickness, for hit tests. */
+            get halfThick() { return this.type === 'hinged' ? this.thickness / 2 : Math.min(this.w, this.h) / 2; }
+
+            /**
+             * A bullet strikes the door at (ix, iy): its force (damage × speed, the same force
+             * that knocks people back) swings a hinged leaf about its hinge, or knocks a glass
+             * panel in its track. A punch pushes gently.
+             */
+            strike(p, ix, iy) {
+                const spd = Math.hypot(p.vx, p.vy) || 1, dx = p.vx / spd, dy = p.vy / spd;
+                const F = Math.min(3000, (p.damage || 10) * spd) * (p.melee ? 0.5 : 1);
+                if (this.type === 'hinged') {
+                    const L = this.length, a = this.baseAngle + this.angle, ux = Math.cos(a), uy = Math.sin(a);
+                    const s = Math.max(0, Math.min(L, (ix - this.hx) * ux + (iy - this.hy) * uy));
+                    this.angVel += s * (ux * dy - uy * dx) * F * 0.005 / (L * L / 3);
+                    this.angVel = Math.max(-0.5, Math.min(0.5, this.angVel));
+                } else if (this.type === 'sliding') {
+                    const n = this.orientation === 'H' ? dy : dx;              // across the track
+                    this.joltV += Math.sign(n || 1) * Math.min(2.5, F * 0.0012);
+                }
             }
 
             update(playerX, playerY) {
-                if (this.type === 'hinged') return;                 // hinged doors move in stepPhysics
+                if (this.type !== 'sliding') return;                // hinged doors move in stepPhysics; arches don't move
                 const cx = this.x + this.w / 2;
                 const cy = this.y + this.h / 2;
                 const dist = Math.hypot(playerX - cx, playerY - cy);
                 const wasOpen = this.targetOpen;
-                this.targetOpen = dist < this.triggerRadius ? 1 : 0;
+                this.targetOpen = dist < this.triggerRadius || this._actorNear ? 1 : 0;
+                // Knocked panels ring back into place
+                if (this.jolt || this.joltV) {
+                    this.joltV += -0.3 * this.jolt; this.joltV *= 0.72; this.jolt += this.joltV;
+                    this.jolt = Math.max(-4, Math.min(4, this.jolt));
+                    if (Math.abs(this.jolt) < 0.02 && Math.abs(this.joltV) < 0.02) this.jolt = this.joltV = 0;
+                }
                 if (this.targetOpen && !wasOpen && typeof ambience !== 'undefined') ambience.doorEvent('whoosh', this);
                 this.openAmount += (this.targetOpen - this.openAmount) * this.speed;
                 if (this.openAmount < 0.01) this.openAmount = 0;
@@ -9509,8 +9599,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** One tick of hinge physics: actors (circles) push the leaf, it pushes back, a spring closes it. */
             stepPhysics(actors) {
+                if (this.type === 'sliding') {                              // glass doors open for anyone who comes up to them
+                    const cx = this.x + this.w / 2, cy = this.y + this.h / 2, R = this.triggerRadius * 0.85;
+                    this._actorNear = false;
+                    for (const act of actors) if (act !== (typeof game !== 'undefined' && game.player) && (act.x - cx) ** 2 + (act.y - cy) ** 2 < R * R) { this._actorNear = true; break; }
+                    return;
+                }
                 if (this.type !== 'hinged') return;
-                const L = this.length, half = this.thickness / 2, MAX = Math.PI / 2 - 0.05;
+                // A leaf folds right back to the wall beside its hinge (not a 90° stop), so no one
+                // is ever pinned behind a door flung wide
+                const L = this.length, half = this.thickness / 2, MAX = Math.PI - 0.25;
                 const a = this.baseAngle + this.angle, ux = Math.cos(a), uy = Math.sin(a);
                 for (const act of actors) {
                     const r = act.radius || 12;
@@ -9544,18 +9642,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (Math.abs(this.angVel) > 0.02 && Math.abs(this.angle) > Math.abs(prev) && t - (this._creakAt || -9) > 0.6) { this._creakAt = t; ambience.doorEvent('creak', this); }
                     if (prev !== 0 && Math.abs(this.angle) < 0.03 && Math.abs(prev) >= 0.03 && this._maxOpen > 0.3) { this._maxOpen = 0; ambience.doorEvent('latch', this); }
                 }
-                this.openAmount = Math.abs(this.angle) / (Math.PI / 2);
+                this.openAmount = Math.min(1, Math.abs(this.angle) / (Math.PI / 2));
             }
             
             draw(ctx) {
                 ctx.save();
                 if (this.type === 'sliding') this.drawSliding(ctx);
+                else if (this.type === 'arch') this.drawArch(ctx);
                 else this.drawHinged(ctx);
                 ctx.restore();
             }
             
             drawSliding(ctx) {
-                const slideOffset = this.openAmount * (this.w / 2 + 4);
+                const slideOffset = this.openAmount * ((this.orientation === 'H' ? this.w : this.h) / 2 + 4);
+                if (this.jolt) ctx.translate(this.orientation === 'H' ? 0 : this.jolt, this.orientation === 'H' ? this.jolt : 0);
                 
                 if (this.orientation === 'H') {
                     const midX = this.x + this.w / 2;
@@ -9576,6 +9676,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
+            /** An open doorway: two stone jambs, a threshold, a gold keystone mark. */
+            drawArch(ctx) {
+                const H = this.orientation === 'H', len = H ? this.w : this.h, th = H ? this.h : this.w;
+                ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+                if (!H) ctx.rotate(Math.PI / 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(-len / 2, -th / 2, len, th);          // threshold
+                ctx.fillStyle = 'rgba(201,164,106,0.35)'; ctx.fillRect(-len / 2 + 4, -0.5, len - 8, 1);  // brass inlay
+                for (const sx of [-1, 1]) {                                                           // jambs
+                    ctx.fillStyle = '#2a2230'; ctx.fillRect(sx * len / 2 - 5, -th / 2 - 3, 10, th + 6);
+                    ctx.fillStyle = 'rgba(255,230,200,0.10)'; ctx.fillRect(sx * len / 2 - 5, -th / 2 - 3, 10, 1.5);
+                }
+                ctx.fillStyle = '#c9a46a'; ctx.beginPath();                                            // keystone
+                ctx.moveTo(0, -th / 2 - 4); ctx.lineTo(3, -th / 2); ctx.lineTo(0, -th / 2 + 2); ctx.lineTo(-3, -th / 2); ctx.closePath(); ctx.fill();
+            }
+
             drawHinged(ctx) {
                 const L = this.length, t = this.thickness;
                 ctx.translate(this.hx, this.hy);
@@ -9684,6 +9799,27 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
         
+        /** Where along a moving circle's path (a→b, radius R) it first touches segment c–d: t in 0…1, or null. */
+        function sweepSegment(ax, ay, bx, by, cx, cy, dx, dy, R) {
+            if (segmentsCross(ax, ay, bx, by, cx, cy, dx, dy)) {
+                const rx = bx - ax, ry = by - ay, sx = dx - cx, sy = dy - cy, den = rx * sy - ry * sx;
+                return den ? Math.max(0, Math.min(1, ((cx - ax) * sy - (cy - ay) * sx) / den)) : 0;
+            }
+            const R2 = R * R;                                    // grazing: the circle touches the leaf at an end of the step
+            if (CollisionSystem.distToSegmentSquared(ax, ay, cx, cy, dx, dy) < R2) return 0;
+            if (CollisionSystem.distToSegmentSquared(bx, by, cx, cy, dx, dy) < R2) return 1;
+            if (CollisionSystem.distToSegmentSquared(cx, cy, ax, ay, bx, by) < R2 || CollisionSystem.distToSegmentSquared(dx, dy, ax, ay, bx, by) < R2) return 0.5;
+            return null;
+        }
+
+        /** Do segments a–b and c–d cross? */
+        function segmentsCross(ax, ay, bx, by, cx, cy, dx, dy) {
+            const o = (px, py, qx, qy, rx, ry) => (qx - px) * (ry - py) - (qy - py) * (rx - px);
+            const d1 = o(cx, cy, dx, dy, ax, ay), d2 = o(cx, cy, dx, dy, bx, by);
+            const d3 = o(ax, ay, bx, by, cx, cy), d4 = o(ax, ay, bx, by, dx, dy);
+            return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+        }
+
         /**
          * RoomSystem — Manages rooms, doors, windows, and linens for indoor maps.
          * Built once per map load. Tracks which room the player is in.
@@ -9714,12 +9850,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Build rooms
                 for (const [id, roomDef] of Object.entries(def.rooms || {})) {
+                    // One rect, or several (an L-shaped hall); x/y/w/h is then their bounding box
+                    const rects = roomDef.rects || [{ x: roomDef.x, y: roomDef.y, w: roomDef.w, h: roomDef.h }];
+                    const x0 = Math.min(...rects.map(r => r.x)), y0 = Math.min(...rects.map(r => r.y));
+                    const x1 = Math.max(...rects.map(r => r.x + r.w)), y1 = Math.max(...rects.map(r => r.y + r.h));
                     this.rooms[id] = {
                         id,
-                        x: roomDef.x,
-                        y: roomDef.y,
-                        w: roomDef.w,
-                        h: roomDef.h,
+                        x: x0,
+                        y: y0,
+                        w: x1 - x0,
+                        h: y1 - y0,
+                        rects,
                         type: roomDef.type || 'indoor',  // 'indoor' | 'outdoor'
                         label: roomDef.label || id,
                         floorColor: roomDef.floorColor || null,
@@ -9768,14 +9909,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             getRoomAt(px, py) {
                 const last = this._lastHit;                      // most queries land in the same room
-                if (last && px >= last.x && px <= last.x + last.w && py >= last.y && py <= last.y + last.h) return last;
+                if (last && RoomSystem.contains(last, px, py)) return last;
                 for (const id in this.rooms) {
                     const r = this.rooms[id];
-                    if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) {
-                        return (this._lastHit = r);
-                    }
+                    if (RoomSystem.contains(r, px, py)) return (this._lastHit = r);
                 }
                 return null;
+            }
+
+            /** Is (px, py) inside room r (any of its rects)? */
+            static contains(r, px, py) {
+                if (px < r.x || px > r.x + r.w || py < r.y || py > r.y + r.h) return false;
+                const R = r.rects;
+                if (R.length === 1) return true;
+                for (let i = 0; i < R.length; i++) { const q = R[i]; if (px >= q.x && px <= q.x + q.w && py >= q.y && py <= q.y + q.h) return true; }
+                return false;
             }
             
             /**
@@ -9846,7 +9994,43 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** Hinged-door physics, run from the actor collision pass so doors block and get pushed. */
             stepDoorPhysics(actors) {
                 if (!this.active) return;
-                for (const door of this.doors) if (door.type === 'hinged') door.stepPhysics(actors);
+                for (const door of this.doors) if (door.type !== 'arch') door.stepPhysics(actors);
+            }
+
+            /**
+             * Does a bullet's path this tick (lastX,lastY → x,y) strike a door? Returns
+             * { door, x, y } for the first door hit (and pushes it), else null. Swept, so
+             * a sniper round can't skip through a 6 px leaf.
+             */
+            hitDoors(p) {
+                if (!this.active || !this.doors.length) return null;
+                const x0 = p.lastX ?? p.x - p.vx, y0 = p.lastY ?? p.y - p.vy, x1 = p.x, y1 = p.y, r = p.radius || 5;
+                const mnx = Math.min(x0, x1), mxx = Math.max(x0, x1), mny = Math.min(y0, y1), mxy = Math.max(y0, y1);
+                let best = null, bestT = Infinity;
+                for (const d of this.doors) {
+                    if (d.type === 'arch' || (p._doorHits && p._doorHits.has(d))) continue;
+                    const reach = (d.type === 'hinged' ? d.length : 0) + r + 8;
+                    if (mxx < d.x - reach || mnx > d.x + d.w + reach || mxy < d.y - reach || mny > d.y + d.h + reach) continue;
+                    for (const L of d.leaves()) {
+                        const t = sweepSegment(x0, y0, x1, y1, L[0], L[1], L[2], L[3], r + d.halfThick);
+                        if (t !== null && t < bestT) { bestT = t; best = d; }
+                    }
+                }
+                if (!best) return null;
+                const ix = x0 + (x1 - x0) * bestT, iy = y0 + (y1 - y0) * bestT;
+                best.strike(p, ix, iy);
+                (p._doorHits || (p._doorHits = new Set())).add(best);
+                return { door: best, x: ix, y: iy };
+            }
+
+            /** Does a closed door stand across this line of sight? (Doors that are mostly open don't.) */
+            doorBlocks(x1, y1, x2, y2) {
+                if (!this.active) return false;
+                for (const d of this.doors) {
+                    if (d.type === 'arch' || d.openAmount >= 0.3) continue;
+                    for (const L of d.leaves()) if (segmentsCross(x1, y1, x2, y2, L[0], L[1], L[2], L[3])) return true;
+                }
+                return false;
             }
             
             /**
@@ -9865,13 +10049,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * Get room ID for a world position. Returns null if not in any room.
              */
             getRoomIdAt(x, y) {
-                for (const id in this.rooms) {
-                    const r = this.rooms[id];
-                    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
-                        return id;
-                    }
-                }
-                return null;
+                const r = this.getRoomAt(x, y);
+                return r ? r.id : null;
             }
             
             /**
@@ -10005,10 +10184,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 c.clearRect(0, 0, V.cv.width, V.cv.height);
                 let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;   // only the veiled part is stamped
                 for (const id in this.rooms) {
-                    const r = this.rooms[id], a = (1 - r.vis) * L.VEIL_MAX;
+                    const r = this.rooms[id], a = Math.min(1, (1 - r.vis) * L.VEIL_MAX);
                     if (a < 0.004) continue;
                     c.fillStyle = `rgba(${L.VEIL_RGB}, ${a.toFixed(3)})`;
-                    c.fillRect((r.x - V.x0) * s, (r.y - V.y0) * s, r.w * s, r.h * s);
+                    for (const q of r.rects) c.fillRect((q.x - V.x0) * s, (q.y - V.y0) * s, q.w * s, q.h * s);
                     bx0 = Math.min(bx0, r.x); by0 = Math.min(by0, r.y); bx1 = Math.max(bx1, r.x + r.w); by1 = Math.max(by1, r.y + r.h);
                 }
                 if (bx0 === Infinity) return;
@@ -10036,7 +10215,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 lightCtx.save();
                 lightCtx.globalCompositeOperation = 'destination-out';
                 lightCtx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
-                for (const id in this.rooms) { const r = this.rooms[id]; if (r.type === 'outdoor') lightCtx.fillRect(r.x, r.y, r.w, r.h); }
+                for (const id in this.rooms) { const r = this.rooms[id]; if (r.type === 'outdoor') for (const q of r.rects) lightCtx.fillRect(q.x, q.y, q.w, q.h); }
                 lightCtx.restore();
             }
             
@@ -10051,7 +10230,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const r = this.rooms[id];
                     if (!r.floorColor) continue;
                     ctx.fillStyle = r.floorColor;
-                    ctx.fillRect(r.x, r.y, r.w, r.h);
+                    for (const q of r.rects) ctx.fillRect(q.x, q.y, q.w, q.h);
                 }
             }
             
@@ -10145,7 +10324,72 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Bedroom drape near window
                     { x: 1388, y: 340, length: 75, width: 12, anchor: 'top', color: 'rgba(220, 200, 230, 0.08)', lightColor: 'rgba(200, 180, 220, 0.03)', segments: 3 }
                 ]
-            }
+            },
+            // The House of Death (gauntlet). Three loops round the grand hall, so no one gets cornered:
+            // foyer–kitchen–dining–hall, foyer–gallery–courtyard–hall, dining–library–chapel–bedroom–courtyard.
+            'house_of_death': (() => {
+                const WOOD = '#6b3a45', GLASS = 'rgba(170, 150, 230, 0.32)';   // oxblood leaves (light enough to read), violet glass
+                const hinged = (x, y, o, rooms, hingeSide = 'left') => ({ x, y, w: o === 'V' ? 14 : 80, h: o === 'V' ? 80 : 14, type: 'hinged', orientation: o, rooms, color: WOOD, hingeSide, triggerRadius: 60 });
+                const slide = (x, y, o, rooms) => ({ x, y, w: o === 'V' ? 14 : 120, h: o === 'V' ? 120 : 14, type: 'sliding', orientation: o, rooms, color: GLASS, speed: 0.07, triggerRadius: 90 });
+                const STAINED_V = '190, 130, 255', STAINED_R = '255, 120, 170';
+                return {
+                    rooms: {
+                        library:   { x: 14,   y: 14,   w: 546, h: 416, type: 'indoor',  label: 'Library' },
+                        chapel:    { x: 574,  y: 14,   w: 652, h: 416, type: 'indoor',  label: 'Chapel' },
+                        bedroom:   { x: 1240, y: 14,   w: 320, h: 416, type: 'indoor',  label: 'Master Bedroom' },
+                        bath:      { x: 1574, y: 14,   w: 212, h: 416, type: 'indoor',  label: 'Bath' },
+                        dining:    { x: 14,   y: 444,  w: 546, h: 556, type: 'indoor',  label: 'Dining Room' },
+                        hall:      { x: 574,  y: 444,  w: 652, h: 556, type: 'indoor',  label: 'Grand Hall' },
+                        courtyard: { x: 1240, y: 444,  w: 546, h: 556, type: 'outdoor', label: 'Rain Courtyard' },
+                        kitchen:   { x: 14,   y: 1014, w: 546, h: 472, type: 'indoor',  label: 'Kitchen' },
+                        foyer:     { x: 574,  y: 1014, w: 652, h: 486, type: 'indoor',  label: 'Foyer' },
+                        gallery:   { rects: [{ x: 1240, y: 1014, w: 546, h: 150 }, { x: 1636, y: 1164, w: 150, h: 322 }], type: 'indoor', label: 'Gallery' },
+                        reliquary: { x: 1240, y: 1178, w: 382, h: 308, type: 'indoor',  label: 'Reliquary' }
+                    },
+                    doors: [
+                        { x: 820, y: 1000, w: 160, h: 14, type: 'arch', orientation: 'H', rooms: ['foyer', 'hall'] },
+                        hinged(560, 1210, 'V', ['foyer', 'kitchen']),
+                        hinged(1226, 1060, 'V', ['foyer', 'gallery'], 'right'),
+                        hinged(1226, 1340, 'V', ['foyer', 'reliquary']),
+                        hinged(1622, 1300, 'V', ['reliquary', 'gallery'], 'right'),
+                        { x: 180, y: 1000, w: 150, h: 14, type: 'arch', orientation: 'H', rooms: ['kitchen', 'dining'] },
+                        hinged(560, 680, 'V', ['dining', 'hall']),
+                        hinged(240, 430, 'H', ['dining', 'library']),
+                        hinged(560, 200, 'V', ['library', 'chapel'], 'right'),
+                        // The chapel's double doors onto the grand hall
+                        { ...hinged(830, 430, 'H', ['chapel', 'hall'], 'left'), w: 70 },
+                        { ...hinged(900, 430, 'H', ['chapel', 'hall'], 'right'), w: 70 },
+                        hinged(1226, 200, 'V', ['chapel', 'bedroom']),
+                        { ...hinged(1560, 250, 'V', ['bedroom', 'bath']), h: 70 },
+                        slide(1340, 430, 'H', ['bedroom', 'courtyard']),
+                        slide(1226, 660, 'V', ['hall', 'courtyard']),
+                        slide(1450, 1000, 'H', ['courtyard', 'gallery']),
+                    ],
+                    windows: [
+                        // Lancet windows of stained glass: violet and rose (facing = the way the light falls)
+                        { x: 640, y: 0, w: 60, h: 14, facing: 'S', projectionLength: 150, tint: STAINED_V },
+                        { x: 870, y: 0, w: 60, h: 14, facing: 'S', projectionLength: 170, tint: STAINED_R },
+                        { x: 1100, y: 0, w: 60, h: 14, facing: 'S', projectionLength: 150, tint: STAINED_V },
+                        { x: 0, y: 150, w: 14, h: 60, facing: 'E', projectionLength: 120, tint: STAINED_R },
+                        { x: 0, y: 650, w: 14, h: 60, facing: 'E', projectionLength: 120, tint: STAINED_V },
+                        { x: 1330, y: 0, w: 70, h: 14, facing: 'S', projectionLength: 120, tint: STAINED_R },
+                        { x: 1786, y: 150, w: 14, h: 70, facing: 'W', projectionLength: 110, tint: '220, 230, 255' },
+                        // Glass walls onto the courtyard
+                        { x: 1260, y: 430, w: 70, h: 14, facing: 'N', projectionLength: 90, tint: '200, 210, 255' },
+                        { x: 1226, y: 480, w: 14, h: 160, facing: 'W', projectionLength: 110, tint: '200, 210, 255' },
+                        { x: 1226, y: 800, w: 14, h: 170, facing: 'W', projectionLength: 110, tint: '200, 210, 255' },
+                        { x: 1260, y: 1000, w: 170, h: 14, facing: 'S', projectionLength: 90, tint: '200, 210, 255' },
+                        { x: 1786, y: 1260, w: 14, h: 80, facing: 'W', projectionLength: 110, tint: STAINED_V },
+                    ],
+                    linens: [
+                        // Velvet drapes by the chapel lancets and the hall's glass wall
+                        { x: 632, y: 16, length: 70, width: 14, anchor: 'top', color: 'rgba(120, 40, 90, 0.16)', lightColor: 'rgba(190, 120, 255, 0.03)', segments: 4 },
+                        { x: 1168, y: 16, length: 70, width: 14, anchor: 'top', color: 'rgba(120, 40, 90, 0.16)', lightColor: 'rgba(190, 120, 255, 0.03)', segments: 4 },
+                        { x: 1222, y: 470, length: 60, width: 12, anchor: 'right', color: 'rgba(90, 30, 70, 0.16)', lightColor: 'rgba(255, 120, 170, 0.03)', segments: 3 },
+                        { x: 1222, y: 950, length: 60, width: 12, anchor: 'right', color: 'rgba(90, 30, 70, 0.16)', lightColor: 'rgba(255, 120, 170, 0.03)', segments: 3 },
+                    ]
+                };
+            })()
         };
 
         // ============================================================================
@@ -10429,53 +10673,45 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { id: 'biggs_center', x: 450, y: 450 }
                 ]
             },
-            'grum_arena': {
-                id: 'grum_arena', width: 1400, height: 1400, type: 'indoor',
-                label: "Grum's Gauntlet", floorColor: '#0a0606',
-                ambientDarkness: 0.82,
-                spawn: { x: 700, y: 1300 },
+            // The House of Death — the gauntlet's first map (GAUNTLET_MAPS, entities/enemies.js).
+            // A modern glass-and-steel villa inside a gothic shell. Rooms and doors: ROOM_DEFS;
+            // furniture: createMapEntities; floor art: drawHouseInterior; glows: drawHouseGlow.
+            //   Library | Chapel      | Bedroom | Bath
+            //   Dining  | Grand hall  | Courtyard (open to the sky)
+            //   Kitchen | Foyer       | Gallery (L) / Reliquary
+            'house_of_death': {
+                id: 'house_of_death', width: 1800, height: 1500, type: 'indoor',
+                label: 'The House of Death', floorColor: '#0d0a10',
+                ambientDarkness: 0.9,
+                navProps: true,                                   // big furniture is routed around, not walked into
+                wallStyle: { fill: '#16111b', stroke: 'rgba(201,164,106,0.4)' },   // black marble, gold trim
+                spawn: { x: 900, y: 1420 },
                 zones: [
-                    // Main kill floor — dark iron
-                    { x: 100, y: 100, w: 1200, h: 1100, color: '#0e0808' },
-                    // Center pit — darker recessed area
-                    { x: 450, y: 400, w: 500, h: 500, color: '#060303' },
-                    // Blood-stained corners
-                    { x: 100, y: 100, w: 180, h: 180, color: '#140505' },
-                    { x: 1120, y: 100, w: 180, h: 180, color: '#140505' },
-                    { x: 100, y: 1020, w: 180, h: 180, color: '#140505' },
-                    { x: 1120, y: 1020, w: 180, h: 180, color: '#140505' },
-                    // Entry corridor
-                    { x: 550, y: 1200, w: 300, h: 200, color: '#0c0404' },
-                    // Side trenches (tactical channels)
-                    { x: 100, y: 450, w: 80, h: 400, color: '#080404' },
-                    { x: 1220, y: 450, w: 80, h: 400, color: '#080404' }
+                    { x: 14, y: 14, w: 546, h: 416, color: '#241812' },       // library: walnut
+                    { x: 574, y: 14, w: 652, h: 416, color: '#16131a' },      // chapel: dark flags
+                    { x: 1240, y: 14, w: 320, h: 416, color: '#23152a' },     // bedroom: plum
+                    { x: 1574, y: 14, w: 212, h: 416, color: '#d9d4d8' },     // bath: white marble
+                    { x: 14, y: 444, w: 546, h: 556, color: '#221610' },      // dining: parquet
+                    { x: 574, y: 444, w: 652, h: 556, color: '#141018' },     // grand hall: black marble
+                    { x: 1240, y: 444, w: 546, h: 556, color: '#1c211f' },    // courtyard: wet stone
+                    { x: 14, y: 1014, w: 546, h: 472, color: '#2a2a30' },     // kitchen: concrete
+                    { x: 574, y: 1014, w: 652, h: 472, color: '#1a1620' },    // foyer: marble checker
+                    { x: 1240, y: 1014, w: 546, h: 472, color: '#1a1216' },   // gallery
                 ],
                 walls: [
-                    // Outer perimeter
-                    { x: 0, y: 0, w: 1400, h: 80 },
-                    { x: 0, y: 0, w: 80, h: 1400 },
-                    { x: 1320, y: 0, w: 80, h: 1400 },
-                    { x: 0, y: 1320, w: 550, h: 80 },
-                    { x: 850, y: 1320, w: 550, h: 80 },
-                    // Cover pillars — asymmetric layout for tactical play
-                    { x: 350, y: 300, w: 50, h: 50 },      // NW pillar
-                    { x: 1000, y: 300, w: 50, h: 50 },     // NE pillar
-                    { x: 350, y: 900, w: 50, h: 50 },      // SW pillar
-                    { x: 1000, y: 900, w: 50, h: 50 },     // SE pillar
-                    // Center barricade — L-shaped cover
-                    { x: 650, y: 550, w: 100, h: 30 },     // horizontal bar
-                    { x: 650, y: 550, w: 30, h: 120 },     // vertical bar
-                    // Offset barricade — opposite corner
-                    { x: 750, y: 750, w: 30, h: 120 },
-                    { x: 680, y: 840, w: 100, h: 30 },
-                    // Side crate clusters
-                    { x: 180, y: 600, w: 40, h: 60 },
-                    { x: 1180, y: 600, w: 40, h: 60 }
+                    // Outer shell (the front door in the middle of the south wall)
+                    { x: 0, y: 0, w: 1800, h: 14 }, { x: 0, y: 0, w: 14, h: 1500 }, { x: 1786, y: 0, w: 14, h: 1500 },
+                    { x: 0, y: 1486, w: 830, h: 14 }, { x: 970, y: 1486, w: 830, h: 14 },
+                    // Interior (doors are cut through these by ROOM_DEFS)
+                    { x: 560, y: 14, w: 14, h: 1472 }, { x: 1226, y: 14, w: 14, h: 1472 },   // west and east spines
+                    { x: 14, y: 430, w: 1772, h: 14 }, { x: 14, y: 1000, w: 1772, h: 14 },   // north and south cross walls
+                    { x: 1560, y: 14, w: 14, h: 416 },                                     // bedroom | bath
+                    { x: 1240, y: 1164, w: 396, h: 14 }, { x: 1622, y: 1178, w: 14, h: 308 }, // the reliquary inside the gallery's L
                 ],
-                transitions: [ { x: 550, y: 1320, w: 300, h: 80, target: 'hub_949', label: 'Exit Arena' } ],
+                transitions: [ { x: 830, y: 1470, w: 140, h: 30, target: 'hub_949', label: 'Leave the House' } ],
                 landmarks: [
-                    { id: 'grum_arena_center', x: 700, y: 700 },
-                    { id: 'grum_arena_entrance', x: 700, y: 1350 }
+                    { id: 'house_foyer', x: 900, y: 1300 }, { id: 'house_hall', x: 900, y: 720 },
+                    { id: 'house_chapel', x: 900, y: 200 }, { id: 'house_courtyard', x: 1510, y: 720 }
                 ]
             },
             'ollo_test': {
@@ -10907,40 +11143,94 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ];
                     break;
 
-                case 'grum_arena':
+                case 'house_of_death': {
+                    // The gauntlet's house: furniture art in drawHouseDecorProp (hod_*) and the
+                    // apartment's pieces (apt_*); floor art in drawHouseInterior, glows in drawHouseGlow.
+                    // Big pieces are cover, and enemies path round them (navProps on the map).
+                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#2a1a22', decorType }, extra));
+                    const candelabra = (x, y) => F(x, y, 22, 22, 'hod_candelabra');
+                    const pews = (x0) => [170, 240, 310].map(y => F(x0, y, 170, 22, 'hod_pew'));
+                    const chairs = [];
+                    for (const x of [175, 235, 295, 355]) chairs.push(F(x, 574, 24, 22, 'hod_chair', { face: 'S' }), F(x, 676, 24, 22, 'hod_chair', { face: 'N' }));
                     e.props = [
-                        // Scattered scrap/crate props for atmosphere
-                        new PropEntity({ x: 250, y: 250, width: 30, height: 30, color: '#2a1515' }),
-                        new PropEntity({ x: 1150, y: 250, width: 30, height: 30, color: '#2a1515' }),
-                        new PropEntity({ x: 250, y: 1050, width: 30, height: 30, color: '#2a1515' }),
-                        new PropEntity({ x: 1150, y: 1050, width: 30, height: 30, color: '#2a1515' }),
-                        // Center arena debris
-                        new PropEntity({ x: 580, y: 680, width: 20, height: 20, color: '#1a0808' }),
-                        new PropEntity({ x: 820, y: 650, width: 20, height: 20, color: '#1a0808' }),
+                        // Library
+                        F(30, 22, 220, 24, 'hod_bookcase'), F(300, 22, 220, 24, 'hod_bookcase'), F(22, 250, 24, 150, 'hod_bookcase', { vertical: true }),
+                        F(200, 190, 140, 60, 'hod_table'), F(150, 300, 40, 40, 'apt_chair'), F(380, 110, 40, 40, 'apt_chair'),
+                        F(460, 300, 36, 36, 'hod_console'), candelabra(90, 110), candelabra(470, 80),
+                        // Chapel: the organ, the altar, pews either side of the aisle
+                        F(820, 20, 160, 40, 'hod_organ'), F(840, 86, 120, 40, 'hod_altar'),
+                        ...pews(640), ...pews(990), candelabra(800, 96), candelabra(978, 96),
+                        // Master bedroom
+                        F(1350, 30, 100, 120, 'apt_bed'), F(1318, 34, 26, 26, 'apt_nightstand'), F(1456, 34, 26, 26, 'apt_nightstand'),
+                        F(1516, 60, 36, 110, 'apt_wardrobe'), F(1260, 330, 30, 60, 'hod_portrait', { vertical: true, noNav: true }), F(1480, 330, 44, 64, 'apt_vanity'),
+                        // Bath
+                        F(1640, 30, 128, 64, 'apt_tub'), F(1610, 380, 150, 34, 'apt_bath_vanity'), F(1690, 250, 90, 100, 'apt_shower'),
+                        // Dining: a long table, high-backed chairs
+                        F(150, 600, 260, 70, 'hod_table', { candles: true }), ...chairs,
+                        F(118, 623, 22, 24, 'hod_chair', { face: 'E' }), F(420, 623, 22, 24, 'hod_chair', { face: 'W' }),
+                        F(360, 452, 160, 28, 'apt_console'), candelabra(40, 460), candelabra(40, 960), candelabra(500, 960),
+                        F(80, 452, 60, 8, 'hod_portrait', { noNav: true }),
+                        // Grand hall: four columns, the piano, a sofa facing the chandelier
+                        F(690, 560, 30, 30, 'hod_column'), F(1080, 560, 30, 30, 'hod_column'), F(690, 860, 30, 30, 'hod_column'), F(1080, 860, 30, 30, 'hod_column'),
+                        F(1060, 470, 120, 80, 'hod_piano'), F(840, 800, 120, 60, 'apt_sofa'), F(870, 740, 60, 28, 'apt_coffee'),
+                        F(600, 930, 40, 40, 'hod_console'), F(592, 470, 30, 30, 'apt_plant'),
+                        // Rain courtyard: a fountain, four angels, planters
+                        F(1450, 660, 120, 120, 'hod_fountain'),
+                        F(1300, 500, 34, 34, 'hod_statue'), F(1720, 500, 34, 34, 'hod_statue'), F(1300, 930, 34, 34, 'hod_statue'), F(1720, 930, 34, 34, 'hod_statue'),
+                        F(1580, 460, 60, 22, 'apt_planter'), F(1260, 700, 22, 60, 'apt_planter'),
+                        // Kitchen: steel and quartz along the south wall, an island
+                        F(30, 1430, 44, 50, 'apt_fridge'), F(74, 1444, 110, 36, 'apt_sink'), F(184, 1444, 84, 36, 'apt_gas_range'),
+                        F(268, 1444, 64, 36, 'apt_induction'), F(332, 1444, 150, 36, 'apt_counter'),
+                        F(150, 1230, 260, 34, 'apt_island'), ...[190, 250, 310, 370].map(x => F(x, 1200, 18, 18, 'apt_stool')),
+                        // Foyer: a holo reception, two busts, a bench
+                        F(640, 1100, 60, 40, 'hod_console'), F(720, 1380, 30, 30, 'hod_bust'), F(1050, 1380, 30, 30, 'hod_bust'),
+                        F(1030, 1180, 120, 22, 'hod_pew'), F(590, 1030, 30, 30, 'apt_plant'), F(1180, 1030, 30, 30, 'apt_plant'),
+                        // Gallery: portraits down the L, busts at the turns
+                        ...[1270, 1340, 1600, 1690].map(x => F(x, 1016, 60, 8, 'hod_portrait', { noNav: true })),
+                        F(1776, 1180, 8, 60, 'hod_portrait', { vertical: true, noNav: true }), F(1776, 1390, 8, 60, 'hod_portrait', { vertical: true, noNav: true }),
+                        F(1660, 1120, 28, 28, 'hod_bust'), F(1740, 1450, 28, 28, 'hod_bust'),
+                        // Reliquary: a display coffin among four glass cases
+                        F(1380, 1290, 110, 50, 'hod_coffin'),
+                        F(1300, 1196, 36, 36, 'hod_reliquary'), F(1540, 1196, 36, 36, 'hod_reliquary'), F(1300, 1440, 36, 36, 'hod_reliquary'), F(1540, 1440, 36, 36, 'hod_reliquary'),
                     ];
                     e.npcs = [];
+                    const L = (x, y, color, lightRadius, lampType = 4, extra = {}) => Object.assign(new LampEntity({ x, y, lampType, color, lightRadius, ...extra }), extra);
+                    const candle = (x, y, r = 280) => L(x, y, '#ffb46a', r, 4, { candle: true });
                     e.lamps = [
-                        // ── CRIMSON PERIMETER (low, menacing glow) ──
-                        new LampEntity({ x: 150, y: 150, lampType: 3, color: '#cc2200', lightRadius: 400 }),
-                        new LampEntity({ x: 1250, y: 150, lampType: 3, color: '#cc2200', lightRadius: 400 }),
-                        new LampEntity({ x: 150, y: 1100, lampType: 3, color: '#cc2200', lightRadius: 400 }),
-                        new LampEntity({ x: 1250, y: 1100, lampType: 3, color: '#cc2200', lightRadius: 400 }),
-                        // ── AMBER CENTER FLOODS (the killing floor) ──
-                        new LampEntity({ x: 500, y: 400, lampType: 4, color: '#ff8833', lightRadius: 500 }),
-                        new LampEntity({ x: 900, y: 400, lampType: 4, color: '#ff8833', lightRadius: 500 }),
-                        new LampEntity({ x: 500, y: 800, lampType: 4, color: '#ff7722', lightRadius: 500 }),
-                        new LampEntity({ x: 900, y: 800, lampType: 4, color: '#ff7722', lightRadius: 500 }),
-                        new LampEntity({ x: 700, y: 600, lampType: 4, color: '#ffaa44', lightRadius: 550 }),
-                        // ── SIDE TRENCH LIGHTS (dim violet — tactical channels) ──
-                        new LampEntity({ x: 120, y: 550, lampType: 3, color: '#6622aa', lightRadius: 280 }),
-                        new LampEntity({ x: 120, y: 750, lampType: 3, color: '#6622aa', lightRadius: 280 }),
-                        new LampEntity({ x: 1280, y: 550, lampType: 3, color: '#6622aa', lightRadius: 280 }),
-                        new LampEntity({ x: 1280, y: 750, lampType: 3, color: '#6622aa', lightRadius: 280 }),
-                        // ── ENTRANCE GLOW ──
-                        new LampEntity({ x: 700, y: 1280, lampType: 3, color: '#ff6622', lightRadius: 350 }),
+                        // Candelabras (they breathe)
+                        candle(101, 121), candle(481, 91), candle(811, 107), candle(989, 107),
+                        candle(51, 471), candle(51, 971), candle(511, 971), candle(280, 635, 330),
+                        // Library, chapel
+                        L(280, 20, '#ffc890', 360, 5, { angle: Math.PI / 2 }), L(900, 150, '#b98cff', 420), L(700, 20, '#9a6bff', 300, 5, { angle: Math.PI / 2 }), L(1100, 20, '#9a6bff', 300, 5, { angle: Math.PI / 2 }),
+                        // Bedroom, bath
+                        L(1400, 250, '#ff8fb8', 380), L(1680, 200, '#f0e8f4', 320),
+                        // Grand hall: the chandelier, and violet holo strips on the walls
+                        L(900, 720, '#ffcf8a', 620), L(580, 820, '#8a5cff', 300, 5, { angle: 0 }), L(1220, 900, '#8a5cff', 280, 5, { angle: Math.PI }),
+                        // Courtyard: cool lanterns by the angels
+                        L(1340, 540, '#a8c0ff', 260), L(1690, 540, '#a8c0ff', 260), L(1340, 900, '#a8c0ff', 260), L(1690, 900, '#a8c0ff', 260),
+                        // Kitchen: cold white strips
+                        L(280, 1420, '#e8f0ff', 380, 5, { angle: -Math.PI / 2 }), L(280, 1100, '#e8f0ff', 360),
+                        // Foyer
+                        L(900, 1200, '#ffd29a', 460), L(900, 1480, '#ff9a6a', 260, 5, { angle: -Math.PI / 2 }), L(670, 1120, '#7fe0ff', 200),
+                        // Gallery: picture lights; the reliquary burns crimson
+                        L(1400, 1020, '#ffd9a0', 300, 5, { angle: Math.PI / 2 }), L(1710, 1300, '#ffd9a0', 300, 5, { angle: Math.PI }),
+                        L(1435, 1315, '#ff3355', 340), candle(1318, 1214, 180), candle(1558, 1458, 180),
+                    ];
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    e.softLights = [
+                        S(101, 121, 70, '#ffb46a', 0.8, 10), S(481, 91, 70, '#ffb46a', 0.8, 10), S(811, 107, 70, '#ffb46a', 0.8, 10), S(989, 107, 70, '#ffb46a', 0.8, 10),
+                        S(51, 471, 70, '#ffb46a', 0.8, 10), S(51, 971, 70, '#ffb46a', 0.8, 10), S(511, 971, 70, '#ffb46a', 0.8, 10),
+                        S(215, 635, 60, '#ffc080', 0.7, 12), S(345, 635, 60, '#ffc080', 0.7, 12),                 // table candles
+                        S(900, 106, 110, '#b070ff', 0.8, 4),                                                        // the altar's crystal
+                        { x: 900, y: 720, w: 420, h: 360, round: 180, soft: true, color: '#ffcf8a', intensity: 0.55 },   // under the chandelier
+                        S(1510, 720, 120, '#9fc8ff', 0.6, 3),                                                       // the fountain
+                        S(1435, 1315, 110, '#b070ff', 0.8, 5),                                                      // the coffin's glass
+                        S(670, 1120, 70, '#7fe0ff', 0.6), S(478, 318, 60, '#7fe0ff', 0.6), S(620, 950, 60, '#7fe0ff', 0.6),   // holo consoles
+                        S(1318, 1214, 50, '#ff8a6a', 0.7, 10), S(1558, 1214, 50, '#b070ff', 0.7), S(1318, 1458, 50, '#b070ff', 0.7), S(1558, 1458, 50, '#ff8a6a', 0.7, 10),   // relic cases
                     ];
                     break;
-                    
+                }
+
                 case 'ollo_interior':
                     e.props = [];
                     e.npcs = [];
@@ -12070,7 +12360,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
 
                 // Actor vs hinged doors (they swing when pushed)
-                if (game && game.roomSystem && game.roomSystem.active) game.roomSystem.stepDoorPhysics(actors);
+                // (every live enemy too, on screen or not, so no one ghosts through a closed door)
+                if (game && game.roomSystem && game.roomSystem.active) {
+                    let doorActors = actors;
+                    if (game.enemies && game.enemies.length) {
+                        const seen = new Set(actors);
+                        doorActors = actors.concat(game.enemies.filter(e => e && !e.dead && e.active !== false && !seen.has(e)));
+                    }
+                    game.roomSystem.stepDoorPhysics(doorActors);
+                }
 
                 // Actor vs Dynamic (circle vs OBB)
                 for (let actor of actors) {
@@ -12983,8 +13281,193 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        // The House of Death (gauntlet): black marble, oxblood wood, gold, violet glass, cyan holograms.
+        const HOD = {
+            ink: '#0e0b12', marble: '#1d1824', marbleLt: '#2e2738', gold: '#c9a46a', goldLt: '#ecd09a',
+            wine: '#4a1624', crimson: '#8a1f35', violet: '#7a4dd8', violetLt: '#b48cff', bone: '#e6ddd0',
+            steel: '#3a3d48', steelLt: '#6a7080', wood: '#3a2226', woodLt: '#5a3438', holo: '#7fe0ff'
+        };
+
+        function drawHouseDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000, C = HOD, d = p.decor || {};
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const shadow = (r = 4) => rr(x + 3, y + 3, w, h, r, 'rgba(0,0,0,0.32)');
+            const flame = (fx, fy, s = 1, k = 0) => {                     // a candle: wax, then a breathing flame
+                circ(fx, fy, 2.2 * s, C.bone);
+                const f = 0.75 + 0.25 * Math.sin(t * 11 + fx * 0.3 + k);
+                circ(fx, fy - 0.5, 1.6 * s * f, `rgba(255,${190 + 40 * f | 0},110,0.95)`);
+            };
+            switch (p.decorType) {
+                case 'hod_candelabra': {                                  // wrought iron, five candles
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 2, cy + 2, w / 2, 'rgba(0,0,0,0.3)');
+                    circ(cx, cy, w / 2 - 1, null, C.gold, 1.4);
+                    ctx.strokeStyle = C.gold; ctx.lineWidth = 1.2; ctx.beginPath();
+                    ctx.moveTo(cx - w / 2 + 3, cy); ctx.lineTo(cx + w / 2 - 3, cy); ctx.moveTo(cx, cy - h / 2 + 3); ctx.lineTo(cx, cy + h / 2 - 3); ctx.stroke();
+                    flame(cx, cy, 1.1); flame(cx - w / 2 + 3, cy, 0.9, 1); flame(cx + w / 2 - 3, cy, 0.9, 2); flame(cx, cy - h / 2 + 3, 0.9, 3); flame(cx, cy + h / 2 - 3, 0.9, 4);
+                    break;
+                }
+                case 'hod_table': {                                       // oxblood table, gold inlay; a runner and candles when laid
+                    shadow(5); rr(x, y, w, h, 5, C.wood, C.woodLt, 1.2);
+                    rr(x + 4, y + 4, w - 8, h - 8, 3, null, 'rgba(201,164,106,0.45)', 0.8);
+                    if (d.candles) {
+                        rr(x + 12, y + h / 2 - 8, w - 24, 16, 2, C.crimson);
+                        ctx.fillStyle = 'rgba(236,208,154,0.5)'; ctx.fillRect(x + 12, y + h / 2 - 8, w - 24, 1); ctx.fillRect(x + 12, y + h / 2 + 7, w - 24, 1);
+                        for (let i = 0; i < 6; i++) { const px = x + 30 + i * (w - 60) / 5; circ(px, y + 13, 5, C.bone, 'rgba(0,0,0,0.3)'); circ(px, y + h - 13, 5, C.bone, 'rgba(0,0,0,0.3)'); }
+                        flame(x + w * 0.25, y + h / 2, 1.1); flame(x + w * 0.75, y + h / 2, 1.1, 2);
+                        circ(x + w / 2, y + h / 2, 7, C.violet); circ(x + w / 2, y + h / 2, 3.5, C.violetLt);   // a dark bloom
+                    } else {
+                        rr(x + 14, y + 10, 26, 18, 1, C.bone); rr(x + 18, y + 13, 26, 18, 1, C.crimson);        // open books
+                        circ(x + w - 22, y + h / 2, 8, null, C.gold, 1.2); circ(x + w - 22, y + h / 2, 3, C.goldLt);   // an astrolabe
+                    }
+                    break;
+                }
+                case 'hod_chair': {                                       // gothic high back, pointed crest (back on the far side from `face`)
+                    shadow(3); rr(x, y, w, h, 3, C.crimson, C.wine, 1);
+                    const f = d.face || 'S';
+                    ctx.fillStyle = C.wood;
+                    if (f === 'S') ctx.fillRect(x - 1, y - 4, w + 2, 6); else if (f === 'N') ctx.fillRect(x - 1, y + h - 2, w + 2, 6);
+                    else if (f === 'E') ctx.fillRect(x - 4, y - 1, 6, h + 2); else ctx.fillRect(x + w - 2, y - 1, 6, h + 2);
+                    ctx.fillStyle = C.gold; const cx = x + w / 2, cy = y + h / 2;
+                    if (f === 'S') ctx.fillRect(cx - 1.5, y - 7, 3, 3); else if (f === 'N') ctx.fillRect(cx - 1.5, y + h + 4, 3, 3);
+                    else if (f === 'E') ctx.fillRect(x - 7, cy - 1.5, 3, 3); else ctx.fillRect(x + w + 4, cy - 1.5, 3, 3);
+                    break;
+                }
+                case 'hod_pew': {
+                    shadow(3); rr(x, y, w, h, 3, C.wood, C.woodLt, 1);
+                    ctx.fillStyle = C.woodLt; ctx.fillRect(x + 2, y + h - 5, w - 4, 4);            // backrest
+                    ctx.fillStyle = 'rgba(0,0,0,0.25)'; for (let i = 1; i < 4; i++) ctx.fillRect(x + i * w / 4, y + 2, 1, h - 7);
+                    ctx.fillStyle = C.gold; ctx.fillRect(x - 1, y + 2, 2, h - 4); ctx.fillRect(x + w - 1, y + 2, 2, h - 4);
+                    break;
+                }
+                case 'hod_organ': {                                       // gold pipes over a black console
+                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1);
+                    const n = 15;
+                    for (let i = 0; i < n; i++) {
+                        const px = x + 6 + i * (w - 12) / (n - 1), tall = 0.45 + 0.55 * Math.abs(Math.sin(i * 0.55 + 0.4));
+                        circ(px, y + 6 + (1 - tall) * 12, 3.2, C.gold, C.goldLt, 0.6);
+                    }
+                    rr(x + 20, y + h - 12, w - 40, 9, 1, C.bone);                                      // keys
+                    ctx.fillStyle = C.ink; for (let i = 0; i < 18; i++) ctx.fillRect(x + 24 + i * (w - 48) / 18, y + h - 12, 1.5, 5);
+                    break;
+                }
+                case 'hod_altar': {                                       // black stone, a violet cloth, a Dark Element crystal glowing
+                    shadow(4); rr(x, y, w, h, 3, C.marble, C.marbleLt, 1.5);
+                    rr(x + w * 0.3, y - 2, w * 0.4, h + 4, 1, '#3b1f6a');
+                    ctx.fillStyle = C.gold; ctx.fillRect(x + w * 0.3, y + h + 1, w * 0.4, 1.5);
+                    const pulse = 0.75 + 0.25 * Math.sin(t * 2.2);
+                    ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(t * 0.4);
+                    ctx.fillStyle = `rgba(180,120,255,${0.35 * pulse})`; ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#6a3cc8'; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(5, 0); ctx.lineTo(0, 8); ctx.lineTo(-5, 0); ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = C.violetLt; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(2, 0); ctx.lineTo(0, 3); ctx.lineTo(-2, 0); ctx.closePath(); ctx.fill();
+                    ctx.restore();
+                    flame(x + 10, y + 10); flame(x + w - 10, y + 10, 1, 1); flame(x + 10, y + h - 10, 1, 2); flame(x + w - 10, y + h - 10, 1, 3);
+                    break;
+                }
+                case 'hod_bookcase': {                                    // dark shelves of spines, gold-edged
+                    shadow(2); rr(x, y, w, h, 2, C.ink, C.gold, 0.8);
+                    const cols = ['#5a1a2a', '#2c2248', '#1f3a33', '#4a3a28', '#6a4a8a', '#3a1a1a'];
+                    const along = d.vertical ? h : w, across = d.vertical ? w : h;
+                    for (let i = 0, k = 0; i < along - 6; k++) {
+                        const bw = 4 + ((k * 7) % 5);
+                        ctx.fillStyle = cols[k % cols.length];
+                        if (d.vertical) ctx.fillRect(x + 3, y + 3 + i, across - 6, Math.min(bw, along - 6 - i)); else ctx.fillRect(x + 3 + i, y + 3, Math.min(bw, along - 6 - i), across - 6);
+                        i += bw + 0.6;
+                    }
+                    break;
+                }
+                case 'hod_console': {                                     // a steel plinth with a turning hologram
+                    shadow(4); rr(x, y, w, h, 5, C.steel, C.steelLt, 1);
+                    const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) * 0.32;
+                    ctx.save(); ctx.globalAlpha = 0.75 + 0.2 * Math.sin(t * 3);
+                    circ(cx, cy, r, 'rgba(127,224,255,0.18)', C.holo, 1);
+                    ctx.strokeStyle = 'rgba(180,140,255,0.8)'; ctx.lineWidth = 1; ctx.beginPath();
+                    ctx.ellipse(cx, cy, r, r * Math.abs(Math.cos(t * 1.3)), t * 0.7, 0, Math.PI * 2); ctx.stroke();
+                    circ(cx, cy, 2, '#dff8ff');
+                    ctx.restore();
+                    break;
+                }
+                case 'hod_piano': {                                       // a black grand, lid open, gold strings
+                    ctx.save(); ctx.translate(3, 3); ctx.fillStyle = 'rgba(0,0,0,0.32)';
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * 0.55, y); ctx.bezierCurveTo(x + w, y, x + w, y + h * 0.4, x + w * 0.8, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill(); ctx.restore();
+                    ctx.fillStyle = '#0b0a0e'; ctx.strokeStyle = C.gold; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * 0.55, y); ctx.bezierCurveTo(x + w, y, x + w, y + h * 0.4, x + w * 0.8, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill(); ctx.stroke();
+                    ctx.strokeStyle = 'rgba(236,208,154,0.35)'; ctx.beginPath();
+                    for (let i = 0; i < 9; i++) { ctx.moveTo(x + 18, y + 8 + i * (h - 16) / 8); ctx.lineTo(x + w * 0.62 + i * 3, y + 10 + i * (h - 20) / 8); }
+                    ctx.stroke();
+                    rr(x + 2, y + 6, 12, h - 12, 1, C.bone); ctx.fillStyle = '#0b0a0e'; for (let i = 0; i < 12; i++) ctx.fillRect(x + 8, y + 9 + i * (h - 18) / 12, 6, 2);
+                    break;
+                }
+                case 'hod_column': {                                      // a black marble column, gold capital ring
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 3, cy + 3, w / 2, 'rgba(0,0,0,0.35)');
+                    circ(cx, cy, w / 2, C.marble, C.gold, 1.5); circ(cx, cy, w / 2 - 5, C.marbleLt);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, w / 2 - 8, -2.4, -0.8); ctx.stroke();
+                    break;
+                }
+                case 'hod_fountain': {                                    // a round basin, rain rippling, an obsidian spire
+                    const cx = x + w / 2, cy = y + h / 2, R = w / 2;
+                    circ(cx + 3, cy + 3, R, 'rgba(0,0,0,0.3)');
+                    circ(cx, cy, R, '#3a3a44', C.gold, 1.2); circ(cx, cy, R - 7, '#1a2a3a');
+                    ctx.strokeStyle = 'rgba(170,200,255,0.3)'; ctx.lineWidth = 1;
+                    for (let i = 0; i < 3; i++) { const ph = (t * 0.5 + i / 3) % 1; ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.arc(cx, cy, 12 + ph * (R - 20), 0, Math.PI * 2); ctx.stroke(); }
+                    ctx.globalAlpha = 1;
+                    circ(cx, cy, 11, C.ink, C.violetLt, 1); circ(cx, cy, 4, C.violet);
+                    break;
+                }
+                case 'hod_statue': {                                      // a weeping angel on a plinth: wings spread
+                    const cx = x + w / 2, cy = y + h / 2;
+                    rr(x, y, w, h, 3, '#4a4a52', '#6a6a72', 1);
+                    ctx.fillStyle = '#9a98a4';
+                    ctx.beginPath(); ctx.ellipse(cx - 8, cy, 9, 4, -0.5, 0, Math.PI * 2); ctx.ellipse(cx + 8, cy, 9, 4, 0.5, 0, Math.PI * 2); ctx.fill();
+                    circ(cx, cy + 1, 5, '#b4b2bc'); circ(cx, cy - 4, 3, '#c4c2cc');
+                    break;
+                }
+                case 'hod_portrait': {                                    // a gilt frame on the wall, a dim figure within
+                    rr(x, y, w, h, 1, C.gold, C.goldLt, 0.6);
+                    rr(x + 1.5, y + 1.5, w - 3, h - 3, 1, C.wine);
+                    ctx.fillStyle = 'rgba(230,221,208,0.35)';
+                    if (d.vertical) ctx.fillRect(x + 2.5, y + h * 0.3, w - 5, h * 0.4); else ctx.fillRect(x + w * 0.3, y + 2.5, w * 0.4, h - 5);
+                    break;
+                }
+                case 'hod_bust': {                                        // a marble head on a black plinth
+                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1);
+                    circ(x + w / 2, y + h / 2 + 2, w * 0.3, '#cfc8c0'); circ(x + w / 2, y + h / 2 - 2, w * 0.2, C.bone);
+                    break;
+                }
+                case 'hod_coffin': {                                      // a hexagonal coffin under violet glass, gold cross-bands
+                    const pts = [[0, 0.5], [0.18, 0], [0.8, 0.1], [1, 0.5], [0.8, 0.9], [0.18, 1]];
+                    const path = (dx = 0, dy = 0) => { ctx.beginPath(); pts.forEach(([u, v], i) => ctx[i ? 'lineTo' : 'moveTo'](x + dx + u * w, y + dy + v * h)); ctx.closePath(); };
+                    path(3, 3); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+                    path(); ctx.fillStyle = '#120a14'; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 1.5; ctx.stroke();
+                    const pulse = 0.6 + 0.4 * Math.sin(t * 1.7);
+                    ctx.save(); ctx.globalAlpha = 0.35 + 0.25 * pulse; ctx.fillStyle = C.violet;
+                    ctx.beginPath(); ctx.ellipse(x + w * 0.52, y + h / 2, w * 0.3, h * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                    ctx.fillStyle = C.gold; ctx.fillRect(x + w * 0.35, y + 4, 2, h - 8); ctx.fillRect(x + w * 0.2, y + h / 2 - 1, w * 0.6, 2);
+                    break;
+                }
+                case 'hod_reliquary': {                                   // a glass case on a gold stand, a relic floating inside
+                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1.2);
+                    rr(x + 4, y + 4, w - 8, h - 8, 2, 'rgba(180,150,255,0.14)', 'rgba(220,200,255,0.5)', 0.8);
+                    const bob = Math.sin(t * 2 + x) * 1.5;
+                    circ(x + w / 2, y + h / 2 + bob, 4, (x + y) % 2 ? '#ff8a6a' : C.violetLt);
+                    break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
+            if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
@@ -13107,6 +13590,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.decorType = config.decorType || null;       // custom furniture art (clinic)
                 this.light = config.light || null;               // soft light that follows the prop: { radius, color, intensity, dx, dy }
                 this.headSide = config.headSide || null;
+                this.decor = { face: config.face, vertical: !!config.vertical, candles: !!config.candles };   // House pieces: facing, wall run, lit
+                this.noNav = !!config.noNav;                     // thin wall pieces paths needn't route round
                 this.patient = !!config.patient;
                 this.noteId = config.noteId || null;
                 this.roomId = config.roomId || null;  // For light switches: which room this controls
@@ -19472,6 +19957,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (Math.random() < 0.01) this.strafeDirection *= -1;
                 }
 
+                // Indoors (the gauntlet house) the formation can't see through walls: with no clear
+                // line on her, route round to her instead
+                if (this.navMap && (this._losTick = (this._losTick || 0) + 1) % 10 === 1) this._clearLine = hasShotLine(this.x, this.y, playerX, playerY, this.navMap);
+                if (this.navMap && !this._clearLine) {
+                    const st = actorSteer(this, playerX, playerY, 2, this.navMap);
+                    moveX = st.x; moveY = st.y;
+                }
+
                 // SEPARATION FORCE (Prevent Overlap)
                 const separationDist = 60;
                 for (let ally of squad) {
@@ -19834,6 +20327,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 if (Math.abs(angleDiff) > this.visionFov / 2) return false;
 
+                if (typeof game !== 'undefined' && game.roomSystem.doorBlocks(this.x, this.y, tx, ty)) return false;   // not through a shut door
                 return !isLineBlocked(this.x, this.y, tx, ty, walls, buildings); 
             }
 
@@ -20026,12 +20520,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                         if (distToTarget > 40) {
                             if (navMap) {
-                                const s = actorSteer(this, T.x, T.y, 1.5, navMap);
+                                const s = actorSteer(this, T.x, T.y, this.huntSpeed || 1.5, navMap);
                                 moveX = s.x;
                                 moveY = s.y;
                             } else {
-                                moveX = Math.cos(this.angle) * 1.5;
-                                moveY = Math.sin(this.angle) * 1.5;
+                                moveX = Math.cos(this.angle) * (this.huntSpeed || 1.5);
+                                moveY = Math.sin(this.angle) * (this.huntSpeed || 1.5);
                             }
                         } else {
                             markers.forEach(m => m.dismiss());
@@ -20356,20 +20850,55 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         // ═══════════════════════════════════════════════════════════
-        //  HORDE GAUNTLET — Wave-based arena combat in Grum's Arena
+        //  HORDE GAUNTLET — wave combat on a choice of maps (Grum's GAUNTLET menu)
         // ═══════════════════════════════════════════════════════════
+        /* The gauntlet's maps. A playable one names its map, where enemies come in (spawns —
+           walkable spots in every room, kept ≥ SPAWN_MIN_DIST from 949) and where the heavy
+           gunners stand (gunnerSpawns — the big rooms). Sealed entries are placeholders for
+           maps to come: shown in the menu, greyed out. */
+        const GAUNTLET_MAPS = [
+            {
+                id: 'house_of_death', label: 'The House of Death', mapId: 'house_of_death',
+                blurb: 'A gothic villa of glass and black marble. Doors swing under fire, rooms sink into shadow — hold the house, wave after wave.',
+                spawns: [
+                    [120, 380], [440, 390], [280, 110],                     // library
+                    [900, 300], [610, 100], [1195, 380],                    // chapel
+                    [1300, 300], [1450, 250], [1620, 200],                  // bedroom, bath
+                    [80, 800], [480, 850], [300, 520],                      // dining
+                    [650, 500], [1150, 950], [760, 960], [1150, 700],       // grand hall
+                    [1350, 600], [1700, 700], [1400, 880], [1650, 580],     // courtyard
+                    [100, 1100], [450, 1350], [300, 1120],                  // kitchen
+                    [650, 1300], [1150, 1100],                              // foyer
+                    [1300, 1090], [1710, 1250], [1560, 1090],               // gallery
+                    [1300, 1320], [1560, 1330]                              // reliquary
+                ],
+                gunnerSpawns: [[760, 700], [1380, 560], [280, 820], [700, 380]]
+            },
+            { id: 'sealed_1', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
+            { id: 'sealed_2', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
+            { id: 'sealed_3', label: 'Sealed', locked: true, blurb: 'Coming soon.' }
+        ];
+        const GAUNTLET_SPAWN_MIN_DIST = 350;
+        const GAUNTLET_HUNT_TICKS = 180;         // every 3 s, the living are told where 949 is
+
         class HordeGauntlet {
             constructor() {
                 this.active = false;
                 this.wave = 0;
-                this.highestWave = 0;
+                this.highestWaves = {};          // best wave per gauntlet map
                 this.hostiles = [];
                 this.waveDelay = 0;
                 this.totalKills = 0;
-                this.mapId = 'grum_arena';
-                // Arena combat bounds (inside the walls)
-                this.bounds = { x: 100, y: 100, w: 1200, h: 1100 };
+                this.entry = GAUNTLET_MAPS[0];
+                this.mapId = this.entry.mapId;
             }
+
+            /** Best wave on any map (old saves kept a single number). */
+            get highestWave() { return Math.max(0, ...Object.values(this.highestWaves)); }
+            set highestWave(v) { if (v > 0) this.highestWaves[GAUNTLET_MAPS[0].id] = Math.max(this.highestWaves[GAUNTLET_MAPS[0].id] || 0, v); }
+
+            /** Is this map one of the gauntlet's? */
+            static isGauntletMap(mapId) { return GAUNTLET_MAPS.some(g => g.mapId === mapId); }
 
             getWaveConfig(wave) {
                 const gangerCount = Math.min(5 + wave, 14);
@@ -20382,57 +20911,79 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return { gangerCount, gunnerCount, weaponId, hp, speed };
             }
 
-            start(game) {
+            start(game, gauntletId = GAUNTLET_MAPS[0].id) {
+                const entry = GAUNTLET_MAPS.find(g => g.id === gauntletId);
+                if (!entry || entry.locked) return false;
+                this.entry = entry;
+                this.mapId = entry.mapId;
                 this.active = true;
                 this.wave = 0;
                 this.totalKills = 0;
                 this.hostiles = [];
-                // Save return position
+                this._huntTimer = 0;
+                // Where to put her back when she walks out
                 this._returnX = game.player.x;
                 this._returnY = game.player.y;
                 this._returnMap = game.activeMap.id;
-                // Teleport to arena
                 game.loadMap(this.mapId);
                 // Start first wave after a brief pause
                 this.waveDelay = 90; // 1.5 second before first wave
+                return true;
+            }
+
+            /** Walkable spawn points far enough from 949, shuffled; reused (jittered) when a wave outnumbers them. */
+            _spawnPoints(game, list, n) {
+                const nav = NavGrid.for(game.activeMap), px = game.player.x, py = game.player.y;
+                let pts = list.map(([x, y]) => ({ x, y }))
+                    .filter(p => (!nav || nav.walkable(p.x, p.y)) && Math.hypot(p.x - px, p.y - py) >= GAUNTLET_SPAWN_MIN_DIST);
+                if (!pts.length) pts = list.map(([x, y]) => ({ x, y }));
+                for (let i = pts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pts[i], pts[j]] = [pts[j], pts[i]]; }
+                const out = [];
+                for (let i = 0; i < n; i++) {
+                    const p = pts[i % pts.length];
+                    if (i < pts.length) { out.push({ x: p.x, y: p.y }); continue; }
+                    let q = { x: p.x + (Math.random() - 0.5) * 40, y: p.y + (Math.random() - 0.5) * 40 };
+                    if (nav && !nav.walkable(q.x, q.y)) q = { x: p.x, y: p.y };
+                    out.push(q);
+                }
+                return out;
+            }
+
+            /** Tell a hostile where 949 is: it comes hunting through the house (and swings the doors). */
+            _hunt(h, game) {
+                const p = game.player;
+                if (h instanceof Ganger) {
+                    if (h.state === 'ALERT' || h.state === 'SUPPRESSING') return;
+                    h.investigateTarget = { x: p.x + (Math.random() - 0.5) * 60, y: p.y + (Math.random() - 0.5) * 60 };
+                    h.state = 'SEARCHING';
+                    h.suspicion = Math.max(h.suspicion, 60);
+                }
             }
 
             spawnWave(game) {
                 this.wave++;
-                if (this.wave > this.highestWave) this.highestWave = this.wave;
+                const id = this.entry.id;
+                if (this.wave > (this.highestWaves[id] || 0)) this.highestWaves[id] = this.wave;
                 this.hostiles = [];
                 const cfg = this.getWaveConfig(this.wave);
-                const b = this.bounds;
-                const margin = 40;
-                const playerX = game.player.x;
-                const playerY = game.player.y;
+                const nav = game.activeMap;
 
-                for (let i = 0; i < cfg.gangerCount; i++) {
-                    let ex, ey, attempts = 0;
-                    do {
-                        ex = b.x + margin + Math.random() * (b.w - margin * 2);
-                        ey = b.y + margin + Math.random() * (b.h - margin * 2);
-                        attempts++;
-                    } while (Math.hypot(ex - playerX, ey - playerY) < 200 && attempts < 15);
-                    const ganger = new Ganger(ex, ey, {
+                for (const pt of this._spawnPoints(game, this.entry.spawns, cfg.gangerCount)) {
+                    const ganger = new Ganger(pt.x, pt.y, {
                         hp: cfg.hp, speed: cfg.speed, visionRange: 450, weaponId: cfg.weaponId
                     });
                     ganger._gauntletWave = this.wave;
+                    ganger.huntSpeed = Math.min(2.6, cfg.speed * 0.8);
+                    this._hunt(ganger, game);
                     this.hostiles.push(ganger);
                     game.enemies.push(ganger);
                 }
 
+                const gSpots = this._spawnPoints(game, this.entry.gunnerSpawns, cfg.gunnerCount);
                 for (let i = 0; i < cfg.gunnerCount; i++) {
-                    // Gunners spawn in far corners/edges
-                    const corners = [
-                        { x: b.x + 120, y: b.y + 120 },
-                        { x: b.x + b.w - 120, y: b.y + 120 },
-                        { x: b.x + 120, y: b.y + b.h - 200 },
-                        { x: b.x + b.w - 120, y: b.y + b.h - 200 }
-                    ];
-                    const corner = corners[i % corners.length];
-                    const gunner = new GatlingGunner(corner.x, corner.y, i);
+                    const gunner = new GatlingGunner(gSpots[i].x, gSpots[i].y, i);
                     gunner._gauntletWave = this.wave;
+                    gunner.navMap = nav;                     // indoors: routes round walls to find a line on her
                     gunner.hp = 150 + this.wave * 15;
                     gunner.maxHp = gunner.hp;
                     this.hostiles.push(gunner);
@@ -20466,6 +21017,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.hostiles = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));
                 this.totalKills += (before - this.hostiles.length);
 
+                // The living keep hunting her through the house
+                if (++this._huntTimer >= GAUNTLET_HUNT_TICKS) {
+                    this._huntTimer = 0;
+                    for (const h of this.hostiles) this._hunt(h, game);
+                }
+
                 // Wave cleared
                 if (this.hostiles.length === 0 && this.wave > 0) {
                     const reward = 40 + this.wave * 20;
@@ -20491,6 +21048,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 this.hostiles = [];
+                // Walked out the front door: back to where she met Grum
+                if (game.activeMap && game.activeMap.id === this._returnMap && this._returnX !== undefined && game.player) {
+                    game.player.x = this._returnX; game.player.y = this._returnY + 40;
+                    if (game.camera) { game.camera.x = game.player.x; game.camera.y = game.player.y; }
+                }
                 if (this.wave > 0) {
                     showMessage(`GAUNTLET OVER — WAVE ${this.wave} — ${this.totalKills} KILLS`);
                 }
@@ -39109,12 +39671,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             return;
                         }
                         else if (this.activeInteraction.name === "Grum North") {
-                            // GAUNTLET button pressed — start horde arena
+                            // GAUNTLET button pressed — choose a map
                             if (this._grumCancelBtn) this._grumCancelBtn.style.display = 'none';
                             this.endDialogue();
-                            if (this.hordeGauntlet) {
-                                this.hordeGauntlet.start(this);
-                            }
+                            if (this.hordeGauntlet) this.openGauntletMenu();
                             return;
                         } 
                         else if (this.activeInteraction.name === "Barista Ren") {
@@ -40512,6 +41072,40 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // Wire close
                 document.getElementById('zib-close').onclick = () => this.closeZibMenu();
+            },
+
+            // =========================================================
+            //  GAUNTLET MAP PICKER (Grum North) — one card per GAUNTLET_MAPS entry;
+            //  sealed ones are placeholders for maps to come
+            // =========================================================
+            openGauntletMenu() {
+                this.pauseSystem.acquire('gauntlet_menu');
+                const menu = document.getElementById('gauntlet-menu');
+                menu.style.display = 'block';
+                const hg = this.hordeGauntlet, container = document.getElementById('gauntlet-maps');
+                let html = '';
+                for (const g of GAUNTLET_MAPS) {
+                    const best = hg && hg.highestWaves[g.id];
+                    const on = !g.locked;
+                    html += `<button class="gauntlet-map-btn" data-id="${g.id}" ${on ? '' : 'disabled'} style="display:block; width:100%; padding:12px 14px; margin-bottom:7px; text-align:left; border-radius:5px; font-family:Montserrat,sans-serif; cursor:${on ? 'pointer' : 'default'}; background:${on ? 'linear-gradient(90deg, rgba(122,77,216,0.16), rgba(138,31,53,0.14))' : 'rgba(255,255,255,0.02)'}; border:1px solid ${on ? 'rgba(232,194,122,0.35)' : 'rgba(255,255,255,0.06)'}; color:${on ? '#eee' : '#555'};">`;
+                    html += `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">`;
+                    html += `<div style="font-family:Orbitron,sans-serif; font-size:0.78rem; letter-spacing:1.5px; color:${on ? '#e8c27a' : '#555'};">${on ? '' : '🔒 '}${g.label.toUpperCase()}</div>`;
+                    html += on ? `<div style="font-size:0.55rem; color:#b48cff; letter-spacing:1px; white-space:nowrap;">${best ? 'BEST: WAVE ' + best : 'UNPLAYED'}</div>` : '';
+                    html += `</div><div style="font-size:0.62rem; color:${on ? '#a99ab4' : '#444'}; margin-top:4px; line-height:1.35;">${g.blurb}</div></button>`;
+                }
+                container.innerHTML = html;
+                container.querySelectorAll('.gauntlet-map-btn:not([disabled])').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        this.closeGauntletMenu();
+                        if (this.hordeGauntlet) this.hordeGauntlet.start(this, btn.dataset.id);
+                    });
+                });
+                document.getElementById('gauntlet-close').onclick = () => this.closeGauntletMenu();
+            },
+
+            closeGauntletMenu() {
+                document.getElementById('gauntlet-menu').style.display = 'none';
+                this.pauseSystem.release('gauntlet_menu');
             },
 
             closeZibMenu() {
@@ -42802,7 +43396,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     // --- HORDE GAUNTLET ---
                     hordeGauntlet: this.hordeGauntlet ? {
-                        highestWave: this.hordeGauntlet.highestWave || 0
+                        highestWave: this.hordeGauntlet.highestWave || 0,       // best on any map (older builds read this)
+                        highestWaves: { ...this.hordeGauntlet.highestWaves }
                     } : null,
                     
                     // --- SETTINGS ---
@@ -43173,10 +43768,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (worldData.weather) this.weather.deserialize(worldData.weather);
                     
                     // 3. Load Map & Player Position
-                    const mapId = worldData.mapId ?? rawSave.mapId ?? defaults.world.mapId;
+                    let mapId = worldData.mapId ?? rawSave.mapId ?? defaults.world.mapId;
                     const playerX = playerData.x ?? rawSave.player?.x ?? defaults.player.x;
                     const playerY = playerData.y ?? rawSave.player?.y ?? defaults.player.y;
-                    this.loadMap(mapId, { x: playerX, y: playerY });
+                    // Saved in Grum's old arena: it's the House of Death now — start at its door
+                    if (mapId === 'grum_arena') { mapId = 'house_of_death'; this.loadMap(mapId); }
+                    else this.loadMap(mapId, { x: playerX, y: playerY });
         
                     // 4. Restore Teammates (unified — permanent + contract)
                     const savedTeammates = save.teammates || rawSave.teammates || [];
@@ -43410,7 +44007,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                     // 11d. Restore Horde Gauntlet
                     if (this.hordeGauntlet && save.hordeGauntlet) {
-                        this.hordeGauntlet.highestWave = save.hordeGauntlet.highestWave || 0;
+                        // Per map; an old save's single number becomes the House of Death's
+                        this.hordeGauntlet.highestWaves = { ...(save.hordeGauntlet.highestWaves || {}) };
+                        if (!save.hordeGauntlet.highestWaves) this.hordeGauntlet.highestWave = save.hordeGauntlet.highestWave || 0;
                         console.log(`[LOAD] Restored horde gauntlet highestWave: ${this.hordeGauntlet.highestWave}`);
                     }
 
@@ -44436,6 +45035,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.npcs = this.activeMap.npcs || [];
                 this.lamps = this.activeMap.lamps || [];
                 this.enemies = []; this.loot = []; 
+                // Maps that ask for it (the House) route paths around their big furniture too
+                if (this.activeMap.navProps) this.activeMap.navObstacles = this.props
+                    .filter(p => (p.mass || 0) >= 1e6 && p.width * p.height >= 600 && !p.noNav)
+                    .map(p => ({ x: p.x, y: p.y, w: p.width, h: p.height }));
                 
                 // Auto-tag lamps with their containing room ID for per-room light control
                 if (this.roomSystem.active) {
@@ -44871,6 +45474,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             drawEmissivePass(ctx) {
                 const dark = this.getAmbientDarkness();
                 if (this.activeMap.id === 'apt_949') this.drawApartmentGlow(ctx);
+                if (this.activeMap.id === 'house_of_death') this.drawHouseGlow(ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const z = this.camera.zoom || 1;
                     const hw = this.canvas.width / 2 / z + 200, hh = this.canvas.height / 2 / z + 200;
@@ -44987,7 +45591,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         'auto_shop': "TORQUE AUTO",
                         'neural_sys_interior': "NEURAL SYSTEMS",
                         'biggs_arena': "BIGGS AMUSEMENT PARK",
-                        'grum_arena': "GRUM'S GAUNTLET"
+                        'house_of_death': 'THE HOUSE OF DEATH'
                     };
             
                     const locName = displayNames[t.target] || "UNKNOWN LOCATION";
@@ -46385,6 +46989,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                 break;
                             }
                         }
+                        // Doors take bullets: the leaf swings (or the glass jolts) with the round's force
+                        const dh = this.roomSystem.hitDoors(p);
+                        if (dh) {
+                            const glass = dh.door.type === 'sliding';
+                            this.weather.spawnSparks(dh.x, dh.y, glass ? 6 : 4);
+                            if (!glass && this.createImpactDust) this.createImpactDust(dh.x, dh.y);
+                            if (typeof ambience !== 'undefined') ambience.doorEvent(glass ? 'tink' : 'thud', dh.door);
+                            if (p.penetrating && !p.melee) p.damage *= 0.5;          // a sniper round punches through, spent
+                            else { p.destroy(); this.projectiles.splice(i, 1); continue; }
+                        }
                     }
                     
                     // Check Player (Enemy Projectiles Only) - uses PlayerEntity
@@ -47397,6 +48011,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.activeMap.id === 'medbay_sw') {
                     this.drawClinicInterior(this.ctx);
                 }
+                if (this.activeMap.id === 'house_of_death') this.drawHouseInterior(this.ctx);
                 
                 // Indoor V2: Room floors, windows, and doors
                 if (this.roomSystem.active) {
@@ -47679,10 +48294,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 {
                     const visibleWalls = this._renderGridWalls.query(cullBounds.world);
+                    const ws = this.activeMap.wallStyle;                 // a map may dress its walls (the House: black marble, gold)
                     for (const w of visibleWalls) {
-                        this.ctx.fillStyle = '#222'; 
+                        this.ctx.fillStyle = ws ? ws.fill : '#222'; 
                         this.ctx.fillRect(w.x, w.y, w.w, w.h); 
-                        this.ctx.strokeStyle = 'rgba(0, 243, 255, 0.3)'; 
+                        this.ctx.strokeStyle = ws ? ws.stroke : 'rgba(0, 243, 255, 0.3)'; 
                         this.ctx.strokeRect(w.x, w.y, w.w, w.h); 
                     }
                 }
@@ -48496,6 +49112,117 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 rug(975, 270, 160, 130, '#8a5560', APT.blushLt, null);                                   // bedroom rug under the bed foot
                 lines(908, 556, 1392, 892, 32, true, 'rgba(0,0,0,0.09)'); lines(908, 556, 1392, 892, 32, false, 'rgba(0,0,0,0.09)');   // bathroom tiles
                 ctx.fillStyle = APT.blushLt; ctx.beginPath(); ctx.roundRect(1270, 672, 76, 30, 8); ctx.fill();   // bath mat
+                ctx.restore();
+            },
+
+            /** The House of Death's floors, painted once into a cached canvas: checkered marble, parquet,
+             *  flagstones, runners and rugs, the reliquary's gold ring. */
+            drawHouseInterior(ctx) {
+                if (!this._houseFloor) this._houseFloor = this._paintHouseFloor();
+                ctx.drawImage(this._houseFloor, 0, 0);
+            },
+
+            _paintHouseFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1800; cv.height = 1500;
+                const c = cv.getContext('2d');
+                const fill = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+                const grid = (x0, y0, x1, y1, sx, sy, col, stagger = 0) => {
+                    c.strokeStyle = col; c.lineWidth = 1; c.beginPath();
+                    for (let y = y0; y <= y1; y += sy) { c.moveTo(x0, y); c.lineTo(x1, y); }
+                    for (let row = 0, y = y0; y < y1; y += sy, row++) for (let x = x0 + (row % 2) * stagger; x <= x1; x += sx) { c.moveTo(x, y); c.lineTo(x, Math.min(y1, y + sy)); }
+                    c.stroke();
+                };
+                const rug = (x, y, w, h, base, border) => {
+                    c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.roundRect(x + 3, y + 3, w, h, 6); c.fill();
+                    c.fillStyle = base; c.beginPath(); c.roundRect(x, y, w, h, 6); c.fill();
+                    c.strokeStyle = border; c.lineWidth = 2.5; c.beginPath(); c.roundRect(x + 8, y + 8, w - 16, h - 16, 4); c.stroke();
+                    c.lineWidth = 1; c.beginPath(); c.roundRect(x + 14, y + 14, w - 28, h - 28, 3); c.stroke();
+                };
+                const runner = (x, y, w, h) => { fill(x, y, w, h, '#4a1624'); fill(x + 4, y, 2, h, 'rgba(201,164,106,0.55)'); fill(x + w - 6, y, 2, h, 'rgba(201,164,106,0.55)'); };
+                const veins = (x0, y0, w, h, n, col, seed) => {
+                    const r = seededRandom(seed); c.strokeStyle = col; c.lineWidth = 1;
+                    for (let i = 0; i < n; i++) {
+                        let x = x0 + r() * w, y = y0 + r() * h; c.beginPath(); c.moveTo(x, y);
+                        for (let k = 0; k < 4; k++) { x += (r() - 0.3) * 60; y += (r() - 0.5) * 40; c.lineTo(Math.max(x0, Math.min(x0 + w, x)), Math.max(y0, Math.min(y0 + h, y))); }
+                        c.stroke();
+                    }
+                };
+                fill(0, 0, 1800, 1500, '#0d0a10');
+                // Foyer: checkered marble, a gold rosette, the red carpet from the door to the hall
+                for (let y = 1014, j = 0; y < 1500; y += 40, j++) for (let x = 574, i = 0; x < 1226; x += 40, i++) fill(x, y, 40, 40, (i + j) % 2 ? '#241e2c' : '#141018');
+                veins(574, 1014, 652, 486, 14, 'rgba(255,255,255,0.05)', 11);
+                runner(840, 1014, 120, 486);
+                c.save(); c.translate(900, 1260); c.strokeStyle = 'rgba(201,164,106,0.7)'; c.lineWidth = 2;
+                c.beginPath(); c.arc(0, 0, 54, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.arc(0, 0, 40, 0, Math.PI * 2); c.stroke();
+                c.fillStyle = 'rgba(201,164,106,0.55)'; c.beginPath();
+                for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, r = i % 2 ? 14 : 38; c[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); }
+                c.closePath(); c.fill(); c.restore();
+                // Grand hall: big black-marble tiles, veined; a round rug beneath the chandelier
+                fill(574, 444, 652, 556, '#141018'); grid(574, 444, 1226, 1000, 80, 80, 'rgba(201,164,106,0.10)');
+                veins(574, 444, 652, 556, 18, 'rgba(255,255,255,0.05)', 7);
+                c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.arc(903, 723, 150, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#3a1226'; c.beginPath(); c.arc(900, 720, 150, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = 'rgba(201,164,106,0.6)'; c.lineWidth = 3; c.beginPath(); c.arc(900, 720, 136, 0, Math.PI * 2); c.stroke();
+                c.strokeStyle = 'rgba(180,140,255,0.35)'; c.lineWidth = 1.5; c.beginPath(); c.arc(900, 720, 110, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; c.moveTo(900 + Math.cos(a) * 40, 720 + Math.sin(a) * 40); c.lineTo(900 + Math.cos(a) * 108, 720 + Math.sin(a) * 108); } c.stroke();
+                // Chapel: staggered flagstones and the aisle to the altar
+                grid(574, 14, 1226, 430, 60, 40, 'rgba(0,0,0,0.35)', 30);
+                runner(840, 130, 120, 300);
+                // Library and dining: parquet; rugs
+                for (const [x0, y0, x1, y1] of [[14, 14, 560, 430], [14, 444, 560, 1000]]) grid(x0, y0, x1, y1, 22, 66, 'rgba(0,0,0,0.25)', 11);
+                rug(160, 160, 220, 120, '#2c2248', 'rgba(201,164,106,0.55)');
+                rug(110, 555, 340, 160, '#4a1624', 'rgba(201,164,106,0.55)');
+                // Kitchen: poured concrete, a cyan line along the counters
+                grid(14, 1014, 560, 1486, 60, 60, 'rgba(255,255,255,0.05)');
+                fill(20, 1426, 470, 2, 'rgba(127,224,255,0.45)');
+                // Bedroom: plum carpet with a faint lattice; bath: white marble
+                grid(1240, 14, 1560, 430, 24, 24, 'rgba(255,160,220,0.04)');
+                rug(1320, 150, 160, 110, '#5a2a4a', 'rgba(236,208,154,0.45)');
+                grid(1574, 14, 1786, 430, 40, 40, 'rgba(0,0,0,0.12)'); veins(1574, 14, 212, 416, 8, 'rgba(120,110,130,0.25)', 3);
+                // Courtyard: flagstones with moss joints, a path cross to the fountain
+                const r = seededRandom(5);
+                for (let y = 444; y < 1000; y += 46) for (let x = 1240 + (((y - 444) / 46) % 2) * 23; x < 1786; x += 46) {
+                    const v = r() * 10 | 0;                                // slate, faintly violet, moss in the joints
+                    c.fillStyle = `rgb(${24 + v},${24 + v},${32 + v})`; c.fillRect(x + 2, y + 2, 42, 42);
+                    if (r() < 0.3) { c.fillStyle = 'rgba(60,90,60,0.35)'; c.fillRect(x + (r() < 0.5 ? 0 : 42), y + 2, 2, 42); }
+                }
+                fill(1490, 444, 40, 556, 'rgba(120,110,140,0.22)'); fill(1240, 700, 546, 40, 'rgba(120,110,140,0.22)');
+                // Gallery: dark boards, a runner round the L; reliquary: dark stone and a gold ritual ring
+                grid(1240, 1014, 1786, 1164, 22, 150, 'rgba(0,0,0,0.3)'); grid(1636, 1164, 1786, 1486, 150, 22, 'rgba(0,0,0,0.3)');
+                fill(1250, 1064, 480, 50, '#3a1226'); fill(1686, 1064, 50, 412, '#3a1226');
+                grid(1240, 1178, 1622, 1486, 50, 50, 'rgba(0,0,0,0.35)', 25);
+                c.strokeStyle = 'rgba(201,164,106,0.55)'; c.lineWidth = 2; c.beginPath(); c.arc(1435, 1315, 112, 0, Math.PI * 2); c.stroke();
+                c.lineWidth = 1; c.beginPath(); c.arc(1435, 1315, 98, 0, Math.PI * 2); c.stroke();
+                c.fillStyle = 'rgba(201,164,106,0.5)'; for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; c.fillRect(1435 + Math.cos(a) * 105 - 2, 1315 + Math.sin(a) * 105 - 2, 4, 4); }
+                return cv;
+            },
+
+            /** The House's glows, after the darkness layer: candle flames, the chandelier, the altar's
+             *  crystal, the coffin, holograms, stained glass. Room switches and the veil don't dim them. */
+            drawHouseGlow(ctx) {
+                const t = _frameTime / 1000;
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                for (const p of this.props) {
+                    if (!p.decorType || !p.decorType.startsWith('hod_')) continue;
+                    const cx = p.x + p.width / 2, cy = p.y + p.height / 2, f = 0.8 + 0.2 * Math.sin(t * 9 + cx);
+                    if (p.decorType === 'hod_candelabra') glow(cx, cy, 34, '255, 180, 110', 0.45 * f);
+                    else if (p.decorType === 'hod_altar') glow(cx, cy, 46, '170, 110, 255', 0.45 + 0.15 * Math.sin(t * 2.2));
+                    else if (p.decorType === 'hod_coffin') glow(cx, cy, 60, '150, 90, 255', 0.3 + 0.15 * Math.sin(t * 1.7));
+                    else if (p.decorType === 'hod_console') glow(cx, cy, 28, '127, 224, 255', 0.35);
+                    else if (p.decorType === 'hod_reliquary') glow(cx, cy, 20, '200, 150, 255', 0.35);
+                    else if (p.decorType === 'hod_fountain') glow(cx, cy, 26, '170, 120, 255', 0.4);
+                    else if (p.decorType === 'hod_table' && p.decor && p.decor.candles) { glow(p.x + p.width * 0.25, cy, 22, '255, 190, 120', 0.5 * f); glow(p.x + p.width * 0.75, cy, 22, '255, 190, 120', 0.5 * f); }
+                }
+                // The chandelier: a ring of flames over the hall
+                for (let i = 0; i < 10; i++) {
+                    const a = i * Math.PI / 5 + 0.2, x = 900 + Math.cos(a) * 46, y = 720 + Math.sin(a) * 46;
+                    glow(x, y, 16, '255, 200, 140', 0.5 * (0.8 + 0.2 * Math.sin(t * 10 + i)));
+                    ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(255,236,200,0.9)'; ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
+                }
+                glow(900, 720, 90, '255, 190, 120', 0.18);
+                // Stained glass on the chapel's north wall, lit from within
+                for (const [x, rgb] of [[670, '190, 130, 255'], [900, '255, 120, 170'], [1130, '190, 130, 255']]) glow(x, 16, 40, rgb, 0.35);
                 ctx.restore();
             },
 
@@ -52310,7 +53037,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     'auto_shop': 'Torque Auto',
                     'neural_sys_interior': 'Neural Systems',
                     'biggs_arena': 'Biggs Park',
-                    'grum_arena': "Grum's Gauntlet",
+                    'house_of_death': 'The House of Death',
                 };
                 
                 this._migrateV1Save();

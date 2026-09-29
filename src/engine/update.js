@@ -742,6 +742,16 @@
                                 break;
                             }
                         }
+                        // Doors take bullets: the leaf swings (or the glass jolts) with the round's force
+                        const dh = this.roomSystem.hitDoors(p);
+                        if (dh) {
+                            const glass = dh.door.type === 'sliding';
+                            this.weather.spawnSparks(dh.x, dh.y, glass ? 6 : 4);
+                            if (!glass && this.createImpactDust) this.createImpactDust(dh.x, dh.y);
+                            if (typeof ambience !== 'undefined') ambience.doorEvent(glass ? 'tink' : 'thud', dh.door);
+                            if (p.penetrating && !p.melee) p.damage *= 0.5;          // a sniper round punches through, spent
+                            else { p.destroy(); this.projectiles.splice(i, 1); continue; }
+                        }
                     }
                     
                     // Check Player (Enemy Projectiles Only) - uses PlayerEntity

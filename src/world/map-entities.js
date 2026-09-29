@@ -376,40 +376,94 @@
                     ];
                     break;
 
-                case 'grum_arena':
+                case 'house_of_death': {
+                    // The gauntlet's house: furniture art in drawHouseDecorProp (hod_*) and the
+                    // apartment's pieces (apt_*); floor art in drawHouseInterior, glows in drawHouseGlow.
+                    // Big pieces are cover, and enemies path round them (navProps on the map).
+                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#2a1a22', decorType }, extra));
+                    const candelabra = (x, y) => F(x, y, 22, 22, 'hod_candelabra');
+                    const pews = (x0) => [170, 240, 310].map(y => F(x0, y, 170, 22, 'hod_pew'));
+                    const chairs = [];
+                    for (const x of [175, 235, 295, 355]) chairs.push(F(x, 574, 24, 22, 'hod_chair', { face: 'S' }), F(x, 676, 24, 22, 'hod_chair', { face: 'N' }));
                     e.props = [
-                        // Scattered scrap/crate props for atmosphere
-                        new PropEntity({ x: 250, y: 250, width: 30, height: 30, color: '#2a1515' }),
-                        new PropEntity({ x: 1150, y: 250, width: 30, height: 30, color: '#2a1515' }),
-                        new PropEntity({ x: 250, y: 1050, width: 30, height: 30, color: '#2a1515' }),
-                        new PropEntity({ x: 1150, y: 1050, width: 30, height: 30, color: '#2a1515' }),
-                        // Center arena debris
-                        new PropEntity({ x: 580, y: 680, width: 20, height: 20, color: '#1a0808' }),
-                        new PropEntity({ x: 820, y: 650, width: 20, height: 20, color: '#1a0808' }),
+                        // Library
+                        F(30, 22, 220, 24, 'hod_bookcase'), F(300, 22, 220, 24, 'hod_bookcase'), F(22, 250, 24, 150, 'hod_bookcase', { vertical: true }),
+                        F(200, 190, 140, 60, 'hod_table'), F(150, 300, 40, 40, 'apt_chair'), F(380, 110, 40, 40, 'apt_chair'),
+                        F(460, 300, 36, 36, 'hod_console'), candelabra(90, 110), candelabra(470, 80),
+                        // Chapel: the organ, the altar, pews either side of the aisle
+                        F(820, 20, 160, 40, 'hod_organ'), F(840, 86, 120, 40, 'hod_altar'),
+                        ...pews(640), ...pews(990), candelabra(800, 96), candelabra(978, 96),
+                        // Master bedroom
+                        F(1350, 30, 100, 120, 'apt_bed'), F(1318, 34, 26, 26, 'apt_nightstand'), F(1456, 34, 26, 26, 'apt_nightstand'),
+                        F(1516, 60, 36, 110, 'apt_wardrobe'), F(1260, 330, 30, 60, 'hod_portrait', { vertical: true, noNav: true }), F(1480, 330, 44, 64, 'apt_vanity'),
+                        // Bath
+                        F(1640, 30, 128, 64, 'apt_tub'), F(1610, 380, 150, 34, 'apt_bath_vanity'), F(1690, 250, 90, 100, 'apt_shower'),
+                        // Dining: a long table, high-backed chairs
+                        F(150, 600, 260, 70, 'hod_table', { candles: true }), ...chairs,
+                        F(118, 623, 22, 24, 'hod_chair', { face: 'E' }), F(420, 623, 22, 24, 'hod_chair', { face: 'W' }),
+                        F(360, 452, 160, 28, 'apt_console'), candelabra(40, 460), candelabra(40, 960), candelabra(500, 960),
+                        F(80, 452, 60, 8, 'hod_portrait', { noNav: true }),
+                        // Grand hall: four columns, the piano, a sofa facing the chandelier
+                        F(690, 560, 30, 30, 'hod_column'), F(1080, 560, 30, 30, 'hod_column'), F(690, 860, 30, 30, 'hod_column'), F(1080, 860, 30, 30, 'hod_column'),
+                        F(1060, 470, 120, 80, 'hod_piano'), F(840, 800, 120, 60, 'apt_sofa'), F(870, 740, 60, 28, 'apt_coffee'),
+                        F(600, 930, 40, 40, 'hod_console'), F(592, 470, 30, 30, 'apt_plant'),
+                        // Rain courtyard: a fountain, four angels, planters
+                        F(1450, 660, 120, 120, 'hod_fountain'),
+                        F(1300, 500, 34, 34, 'hod_statue'), F(1720, 500, 34, 34, 'hod_statue'), F(1300, 930, 34, 34, 'hod_statue'), F(1720, 930, 34, 34, 'hod_statue'),
+                        F(1580, 460, 60, 22, 'apt_planter'), F(1260, 700, 22, 60, 'apt_planter'),
+                        // Kitchen: steel and quartz along the south wall, an island
+                        F(30, 1430, 44, 50, 'apt_fridge'), F(74, 1444, 110, 36, 'apt_sink'), F(184, 1444, 84, 36, 'apt_gas_range'),
+                        F(268, 1444, 64, 36, 'apt_induction'), F(332, 1444, 150, 36, 'apt_counter'),
+                        F(150, 1230, 260, 34, 'apt_island'), ...[190, 250, 310, 370].map(x => F(x, 1200, 18, 18, 'apt_stool')),
+                        // Foyer: a holo reception, two busts, a bench
+                        F(640, 1100, 60, 40, 'hod_console'), F(720, 1380, 30, 30, 'hod_bust'), F(1050, 1380, 30, 30, 'hod_bust'),
+                        F(1030, 1180, 120, 22, 'hod_pew'), F(590, 1030, 30, 30, 'apt_plant'), F(1180, 1030, 30, 30, 'apt_plant'),
+                        // Gallery: portraits down the L, busts at the turns
+                        ...[1270, 1340, 1600, 1690].map(x => F(x, 1016, 60, 8, 'hod_portrait', { noNav: true })),
+                        F(1776, 1180, 8, 60, 'hod_portrait', { vertical: true, noNav: true }), F(1776, 1390, 8, 60, 'hod_portrait', { vertical: true, noNav: true }),
+                        F(1660, 1120, 28, 28, 'hod_bust'), F(1740, 1450, 28, 28, 'hod_bust'),
+                        // Reliquary: a display coffin among four glass cases
+                        F(1380, 1290, 110, 50, 'hod_coffin'),
+                        F(1300, 1196, 36, 36, 'hod_reliquary'), F(1540, 1196, 36, 36, 'hod_reliquary'), F(1300, 1440, 36, 36, 'hod_reliquary'), F(1540, 1440, 36, 36, 'hod_reliquary'),
                     ];
                     e.npcs = [];
+                    const L = (x, y, color, lightRadius, lampType = 4, extra = {}) => Object.assign(new LampEntity({ x, y, lampType, color, lightRadius, ...extra }), extra);
+                    const candle = (x, y, r = 280) => L(x, y, '#ffb46a', r, 4, { candle: true });
                     e.lamps = [
-                        // ── CRIMSON PERIMETER (low, menacing glow) ──
-                        new LampEntity({ x: 150, y: 150, lampType: 3, color: '#cc2200', lightRadius: 400 }),
-                        new LampEntity({ x: 1250, y: 150, lampType: 3, color: '#cc2200', lightRadius: 400 }),
-                        new LampEntity({ x: 150, y: 1100, lampType: 3, color: '#cc2200', lightRadius: 400 }),
-                        new LampEntity({ x: 1250, y: 1100, lampType: 3, color: '#cc2200', lightRadius: 400 }),
-                        // ── AMBER CENTER FLOODS (the killing floor) ──
-                        new LampEntity({ x: 500, y: 400, lampType: 4, color: '#ff8833', lightRadius: 500 }),
-                        new LampEntity({ x: 900, y: 400, lampType: 4, color: '#ff8833', lightRadius: 500 }),
-                        new LampEntity({ x: 500, y: 800, lampType: 4, color: '#ff7722', lightRadius: 500 }),
-                        new LampEntity({ x: 900, y: 800, lampType: 4, color: '#ff7722', lightRadius: 500 }),
-                        new LampEntity({ x: 700, y: 600, lampType: 4, color: '#ffaa44', lightRadius: 550 }),
-                        // ── SIDE TRENCH LIGHTS (dim violet — tactical channels) ──
-                        new LampEntity({ x: 120, y: 550, lampType: 3, color: '#6622aa', lightRadius: 280 }),
-                        new LampEntity({ x: 120, y: 750, lampType: 3, color: '#6622aa', lightRadius: 280 }),
-                        new LampEntity({ x: 1280, y: 550, lampType: 3, color: '#6622aa', lightRadius: 280 }),
-                        new LampEntity({ x: 1280, y: 750, lampType: 3, color: '#6622aa', lightRadius: 280 }),
-                        // ── ENTRANCE GLOW ──
-                        new LampEntity({ x: 700, y: 1280, lampType: 3, color: '#ff6622', lightRadius: 350 }),
+                        // Candelabras (they breathe)
+                        candle(101, 121), candle(481, 91), candle(811, 107), candle(989, 107),
+                        candle(51, 471), candle(51, 971), candle(511, 971), candle(280, 635, 330),
+                        // Library, chapel
+                        L(280, 20, '#ffc890', 360, 5, { angle: Math.PI / 2 }), L(900, 150, '#b98cff', 420), L(700, 20, '#9a6bff', 300, 5, { angle: Math.PI / 2 }), L(1100, 20, '#9a6bff', 300, 5, { angle: Math.PI / 2 }),
+                        // Bedroom, bath
+                        L(1400, 250, '#ff8fb8', 380), L(1680, 200, '#f0e8f4', 320),
+                        // Grand hall: the chandelier, and violet holo strips on the walls
+                        L(900, 720, '#ffcf8a', 620), L(580, 820, '#8a5cff', 300, 5, { angle: 0 }), L(1220, 900, '#8a5cff', 280, 5, { angle: Math.PI }),
+                        // Courtyard: cool lanterns by the angels
+                        L(1340, 540, '#a8c0ff', 260), L(1690, 540, '#a8c0ff', 260), L(1340, 900, '#a8c0ff', 260), L(1690, 900, '#a8c0ff', 260),
+                        // Kitchen: cold white strips
+                        L(280, 1420, '#e8f0ff', 380, 5, { angle: -Math.PI / 2 }), L(280, 1100, '#e8f0ff', 360),
+                        // Foyer
+                        L(900, 1200, '#ffd29a', 460), L(900, 1480, '#ff9a6a', 260, 5, { angle: -Math.PI / 2 }), L(670, 1120, '#7fe0ff', 200),
+                        // Gallery: picture lights; the reliquary burns crimson
+                        L(1400, 1020, '#ffd9a0', 300, 5, { angle: Math.PI / 2 }), L(1710, 1300, '#ffd9a0', 300, 5, { angle: Math.PI }),
+                        L(1435, 1315, '#ff3355', 340), candle(1318, 1214, 180), candle(1558, 1458, 180),
+                    ];
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    e.softLights = [
+                        S(101, 121, 70, '#ffb46a', 0.8, 10), S(481, 91, 70, '#ffb46a', 0.8, 10), S(811, 107, 70, '#ffb46a', 0.8, 10), S(989, 107, 70, '#ffb46a', 0.8, 10),
+                        S(51, 471, 70, '#ffb46a', 0.8, 10), S(51, 971, 70, '#ffb46a', 0.8, 10), S(511, 971, 70, '#ffb46a', 0.8, 10),
+                        S(215, 635, 60, '#ffc080', 0.7, 12), S(345, 635, 60, '#ffc080', 0.7, 12),                 // table candles
+                        S(900, 106, 110, '#b070ff', 0.8, 4),                                                        // the altar's crystal
+                        { x: 900, y: 720, w: 420, h: 360, round: 180, soft: true, color: '#ffcf8a', intensity: 0.55 },   // under the chandelier
+                        S(1510, 720, 120, '#9fc8ff', 0.6, 3),                                                       // the fountain
+                        S(1435, 1315, 110, '#b070ff', 0.8, 5),                                                      // the coffin's glass
+                        S(670, 1120, 70, '#7fe0ff', 0.6), S(478, 318, 60, '#7fe0ff', 0.6), S(620, 950, 60, '#7fe0ff', 0.6),   // holo consoles
+                        S(1318, 1214, 50, '#ff8a6a', 0.7, 10), S(1558, 1214, 50, '#b070ff', 0.7), S(1318, 1458, 50, '#b070ff', 0.7), S(1558, 1458, 50, '#ff8a6a', 0.7, 10),   // relic cases
                     ];
                     break;
-                    
+                }
+
                 case 'ollo_interior':
                     e.props = [];
                     e.npcs = [];

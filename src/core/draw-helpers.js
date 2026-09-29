@@ -222,6 +222,10 @@
          * a moment every several seconds. Returns a light multiplier (1 = steady).
          */
         function lampFlicker(l) {
+            if (l.candle) {                                           // candle flames breathe (the House's candelabras)
+                const t = _frameTime / 1000, o = l.animOffset || 0;
+                return 0.86 + 0.08 * Math.sin(t * 9 + o) + 0.06 * Math.sin(t * 23 + o * 1.7);
+            }
             if (l._flick === undefined) {
                 const h = Math.abs(Math.sin(l.x * 12.9898 + l.y * 78.233) * 43758.5453) % 1;
                 l._flick = h < 0.1 ? h * 10 : -1;

@@ -29,6 +29,7 @@
             drawEmissivePass(ctx) {
                 const dark = this.getAmbientDarkness();
                 if (this.activeMap.id === 'apt_949') this.drawApartmentGlow(ctx);
+                if (this.activeMap.id === 'house_of_death') this.drawHouseGlow(ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const z = this.camera.zoom || 1;
                     const hw = this.canvas.width / 2 / z + 200, hh = this.canvas.height / 2 / z + 200;
@@ -145,7 +146,7 @@
                         'auto_shop': "TORQUE AUTO",
                         'neural_sys_interior': "NEURAL SYSTEMS",
                         'biggs_arena': "BIGGS AMUSEMENT PARK",
-                        'grum_arena': "GRUM'S GAUNTLET"
+                        'house_of_death': 'THE HOUSE OF DEATH'
                     };
             
                     const locName = displayNames[t.target] || "UNKNOWN LOCATION";

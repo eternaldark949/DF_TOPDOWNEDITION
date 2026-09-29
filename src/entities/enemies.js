@@ -626,6 +626,14 @@
                     if (Math.random() < 0.01) this.strafeDirection *= -1;
                 }
 
+                // Indoors (the gauntlet house) the formation can't see through walls: with no clear
+                // line on her, route round to her instead
+                if (this.navMap && (this._losTick = (this._losTick || 0) + 1) % 10 === 1) this._clearLine = hasShotLine(this.x, this.y, playerX, playerY, this.navMap);
+                if (this.navMap && !this._clearLine) {
+                    const st = actorSteer(this, playerX, playerY, 2, this.navMap);
+                    moveX = st.x; moveY = st.y;
+                }
+
                 // SEPARATION FORCE (Prevent Overlap)
                 const separationDist = 60;
                 for (let ally of squad) {
@@ -988,6 +996,7 @@
 
                 if (Math.abs(angleDiff) > this.visionFov / 2) return false;
 
+                if (typeof game !== 'undefined' && game.roomSystem.doorBlocks(this.x, this.y, tx, ty)) return false;   // not through a shut door
                 return !isLineBlocked(this.x, this.y, tx, ty, walls, buildings); 
             }
 
@@ -1180,12 +1189,12 @@
 
                         if (distToTarget > 40) {
                             if (navMap) {
-                                const s = actorSteer(this, T.x, T.y, 1.5, navMap);
+                                const s = actorSteer(this, T.x, T.y, this.huntSpeed || 1.5, navMap);
                                 moveX = s.x;
                                 moveY = s.y;
                             } else {
-                                moveX = Math.cos(this.angle) * 1.5;
-                                moveY = Math.sin(this.angle) * 1.5;
+                                moveX = Math.cos(this.angle) * (this.huntSpeed || 1.5);
+                                moveY = Math.sin(this.angle) * (this.huntSpeed || 1.5);
                             }
                         } else {
                             markers.forEach(m => m.dismiss());
@@ -1510,20 +1519,55 @@
         }
 
         // ═══════════════════════════════════════════════════════════
-        //  HORDE GAUNTLET — Wave-based arena combat in Grum's Arena
+        //  HORDE GAUNTLET — wave combat on a choice of maps (Grum's GAUNTLET menu)
         // ═══════════════════════════════════════════════════════════
+        /* The gauntlet's maps. A playable one names its map, where enemies come in (spawns —
+           walkable spots in every room, kept ≥ SPAWN_MIN_DIST from 949) and where the heavy
+           gunners stand (gunnerSpawns — the big rooms). Sealed entries are placeholders for
+           maps to come: shown in the menu, greyed out. */
+        const GAUNTLET_MAPS = [
+            {
+                id: 'house_of_death', label: 'The House of Death', mapId: 'house_of_death',
+                blurb: 'A gothic villa of glass and black marble. Doors swing under fire, rooms sink into shadow — hold the house, wave after wave.',
+                spawns: [
+                    [120, 380], [440, 390], [280, 110],                     // library
+                    [900, 300], [610, 100], [1195, 380],                    // chapel
+                    [1300, 300], [1450, 250], [1620, 200],                  // bedroom, bath
+                    [80, 800], [480, 850], [300, 520],                      // dining
+                    [650, 500], [1150, 950], [760, 960], [1150, 700],       // grand hall
+                    [1350, 600], [1700, 700], [1400, 880], [1650, 580],     // courtyard
+                    [100, 1100], [450, 1350], [300, 1120],                  // kitchen
+                    [650, 1300], [1150, 1100],                              // foyer
+                    [1300, 1090], [1710, 1250], [1560, 1090],               // gallery
+                    [1300, 1320], [1560, 1330]                              // reliquary
+                ],
+                gunnerSpawns: [[760, 700], [1380, 560], [280, 820], [700, 380]]
+            },
+            { id: 'sealed_1', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
+            { id: 'sealed_2', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
+            { id: 'sealed_3', label: 'Sealed', locked: true, blurb: 'Coming soon.' }
+        ];
+        const GAUNTLET_SPAWN_MIN_DIST = 350;
+        const GAUNTLET_HUNT_TICKS = 180;         // every 3 s, the living are told where 949 is
+
         class HordeGauntlet {
             constructor() {
                 this.active = false;
                 this.wave = 0;
-                this.highestWave = 0;
+                this.highestWaves = {};          // best wave per gauntlet map
                 this.hostiles = [];
                 this.waveDelay = 0;
                 this.totalKills = 0;
-                this.mapId = 'grum_arena';
-                // Arena combat bounds (inside the walls)
-                this.bounds = { x: 100, y: 100, w: 1200, h: 1100 };
+                this.entry = GAUNTLET_MAPS[0];
+                this.mapId = this.entry.mapId;
             }
+
+            /** Best wave on any map (old saves kept a single number). */
+            get highestWave() { return Math.max(0, ...Object.values(this.highestWaves)); }
+            set highestWave(v) { if (v > 0) this.highestWaves[GAUNTLET_MAPS[0].id] = Math.max(this.highestWaves[GAUNTLET_MAPS[0].id] || 0, v); }
+
+            /** Is this map one of the gauntlet's? */
+            static isGauntletMap(mapId) { return GAUNTLET_MAPS.some(g => g.mapId === mapId); }
 
             getWaveConfig(wave) {
                 const gangerCount = Math.min(5 + wave, 14);
@@ -1536,57 +1580,79 @@
                 return { gangerCount, gunnerCount, weaponId, hp, speed };
             }
 
-            start(game) {
+            start(game, gauntletId = GAUNTLET_MAPS[0].id) {
+                const entry = GAUNTLET_MAPS.find(g => g.id === gauntletId);
+                if (!entry || entry.locked) return false;
+                this.entry = entry;
+                this.mapId = entry.mapId;
                 this.active = true;
                 this.wave = 0;
                 this.totalKills = 0;
                 this.hostiles = [];
-                // Save return position
+                this._huntTimer = 0;
+                // Where to put her back when she walks out
                 this._returnX = game.player.x;
                 this._returnY = game.player.y;
                 this._returnMap = game.activeMap.id;
-                // Teleport to arena
                 game.loadMap(this.mapId);
                 // Start first wave after a brief pause
                 this.waveDelay = 90; // 1.5 second before first wave
+                return true;
+            }
+
+            /** Walkable spawn points far enough from 949, shuffled; reused (jittered) when a wave outnumbers them. */
+            _spawnPoints(game, list, n) {
+                const nav = NavGrid.for(game.activeMap), px = game.player.x, py = game.player.y;
+                let pts = list.map(([x, y]) => ({ x, y }))
+                    .filter(p => (!nav || nav.walkable(p.x, p.y)) && Math.hypot(p.x - px, p.y - py) >= GAUNTLET_SPAWN_MIN_DIST);
+                if (!pts.length) pts = list.map(([x, y]) => ({ x, y }));
+                for (let i = pts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pts[i], pts[j]] = [pts[j], pts[i]]; }
+                const out = [];
+                for (let i = 0; i < n; i++) {
+                    const p = pts[i % pts.length];
+                    if (i < pts.length) { out.push({ x: p.x, y: p.y }); continue; }
+                    let q = { x: p.x + (Math.random() - 0.5) * 40, y: p.y + (Math.random() - 0.5) * 40 };
+                    if (nav && !nav.walkable(q.x, q.y)) q = { x: p.x, y: p.y };
+                    out.push(q);
+                }
+                return out;
+            }
+
+            /** Tell a hostile where 949 is: it comes hunting through the house (and swings the doors). */
+            _hunt(h, game) {
+                const p = game.player;
+                if (h instanceof Ganger) {
+                    if (h.state === 'ALERT' || h.state === 'SUPPRESSING') return;
+                    h.investigateTarget = { x: p.x + (Math.random() - 0.5) * 60, y: p.y + (Math.random() - 0.5) * 60 };
+                    h.state = 'SEARCHING';
+                    h.suspicion = Math.max(h.suspicion, 60);
+                }
             }
 
             spawnWave(game) {
                 this.wave++;
-                if (this.wave > this.highestWave) this.highestWave = this.wave;
+                const id = this.entry.id;
+                if (this.wave > (this.highestWaves[id] || 0)) this.highestWaves[id] = this.wave;
                 this.hostiles = [];
                 const cfg = this.getWaveConfig(this.wave);
-                const b = this.bounds;
-                const margin = 40;
-                const playerX = game.player.x;
-                const playerY = game.player.y;
+                const nav = game.activeMap;
 
-                for (let i = 0; i < cfg.gangerCount; i++) {
-                    let ex, ey, attempts = 0;
-                    do {
-                        ex = b.x + margin + Math.random() * (b.w - margin * 2);
-                        ey = b.y + margin + Math.random() * (b.h - margin * 2);
-                        attempts++;
-                    } while (Math.hypot(ex - playerX, ey - playerY) < 200 && attempts < 15);
-                    const ganger = new Ganger(ex, ey, {
+                for (const pt of this._spawnPoints(game, this.entry.spawns, cfg.gangerCount)) {
+                    const ganger = new Ganger(pt.x, pt.y, {
                         hp: cfg.hp, speed: cfg.speed, visionRange: 450, weaponId: cfg.weaponId
                     });
                     ganger._gauntletWave = this.wave;
+                    ganger.huntSpeed = Math.min(2.6, cfg.speed * 0.8);
+                    this._hunt(ganger, game);
                     this.hostiles.push(ganger);
                     game.enemies.push(ganger);
                 }
 
+                const gSpots = this._spawnPoints(game, this.entry.gunnerSpawns, cfg.gunnerCount);
                 for (let i = 0; i < cfg.gunnerCount; i++) {
-                    // Gunners spawn in far corners/edges
-                    const corners = [
-                        { x: b.x + 120, y: b.y + 120 },
-                        { x: b.x + b.w - 120, y: b.y + 120 },
-                        { x: b.x + 120, y: b.y + b.h - 200 },
-                        { x: b.x + b.w - 120, y: b.y + b.h - 200 }
-                    ];
-                    const corner = corners[i % corners.length];
-                    const gunner = new GatlingGunner(corner.x, corner.y, i);
+                    const gunner = new GatlingGunner(gSpots[i].x, gSpots[i].y, i);
                     gunner._gauntletWave = this.wave;
+                    gunner.navMap = nav;                     // indoors: routes round walls to find a line on her
                     gunner.hp = 150 + this.wave * 15;
                     gunner.maxHp = gunner.hp;
                     this.hostiles.push(gunner);
@@ -1620,6 +1686,12 @@
                 this.hostiles = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));
                 this.totalKills += (before - this.hostiles.length);
 
+                // The living keep hunting her through the house
+                if (++this._huntTimer >= GAUNTLET_HUNT_TICKS) {
+                    this._huntTimer = 0;
+                    for (const h of this.hostiles) this._hunt(h, game);
+                }
+
                 // Wave cleared
                 if (this.hostiles.length === 0 && this.wave > 0) {
                     const reward = 40 + this.wave * 20;
@@ -1645,6 +1717,11 @@
                     }
                 }
                 this.hostiles = [];
+                // Walked out the front door: back to where she met Grum
+                if (game.activeMap && game.activeMap.id === this._returnMap && this._returnX !== undefined && game.player) {
+                    game.player.x = this._returnX; game.player.y = this._returnY + 40;
+                    if (game.camera) { game.camera.x = game.player.x; game.camera.y = game.player.y; }
+                }
                 if (this.wave > 0) {
                     showMessage(`GAUNTLET OVER — WAVE ${this.wave} — ${this.totalKills} KILLS`);
                 }

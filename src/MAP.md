@@ -31,8 +31,8 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `world/weather.js` | Weather conditions, climates, `WeatherSystem` (rain, wind, lightning, forecast) |
 | `world/weather-response.js` | How weather reaches a character: `weatherAt` (wind on hair and cloth, rain, storm), lightning flinches, umbrellas |
 | `world/particles-decals.js` | Leaf particles, decals |
-| `world/rooms.js` | Room System, the standard for indoor maps: per-room visibility (soft violet veil, gentle reveal, light spilling through open doors, dim-through-glass from outside), fading room lights, `outdoorness`, sky light on outdoor rooms; windows, doors (hinged doors with swing physics), silk linens, `RoomSystem`, `ROOM_DEFS` (the checklist for giving a map rooms is in its header) |
-| `world/maps.js` | `MAP_DATA`: every map's size, floor zones, walls, transitions, landmarks |
+| `world/rooms.js` | Room System, the standard for indoor maps: per-room visibility (soft violet veil, gentle reveal, light spilling through open doors, dim-through-glass from outside), fading room lights, `outdoorness`, sky light on outdoor rooms; windows, doors (hinged doors with swing physics, sliding glass, open arches; bullets strike and push them — `hitDoors`; shut doors block sight — `doorBlocks`), rooms of several rects, silk linens, `RoomSystem`, `ROOM_DEFS` (the checklist for giving a map rooms is in its header) |
+| `world/maps.js` | `MAP_DATA`: every map's size, floor zones, walls, transitions, landmarks (optional `wallStyle`, and `navProps` to route paths round big furniture) |
 | `world/map-entities.js` | `createMapEntities`: props, NPCs and lamps per map (the apartment suite's furniture is here) |
 | `world/billboards.js` | `BILLBOARDS`: your artwork on tilted panels around the city. Add one by copying a line |
 | `world/city-layout.js` | `CityLayout`: blocks, roads and building placement for the city |
@@ -53,7 +53,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## entities/
 | File | What's in it |
 |---|---|
-| `entities/props-decor.js` | `StaticEntity`, apartment and clinic furniture art, `PropEntity` |
+| `entities/props-decor.js` | `StaticEntity`, apartment, clinic and House of Death furniture art (`hod_*`), `PropEntity` |
 | `entities/vehicles-minigames.js` | `VehicleEntity`, bumper cars, Ferris wheel, bumper-car minigame |
 | `entities/lamps.js` | `LampEntity` (all lamp types) |
 | `entities/actors.js` | `ActorEntity`, `PlayerEntity`, projectiles, triggers |
@@ -61,7 +61,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `entities/street-objects.js` | Neon signs, loot, pavement, foliage |
 | `entities/npc.js` | `NPC` companions and characters, quips and emotes (their looks: `core/appearances.js`) |
 | `entities/pedestrians.js` | Pedestrians and their manager |
-| `entities/enemies.js` | Velvet cat, drones, gunners, gangers, restricted zone, horde gauntlet |
+| `entities/enemies.js` | Velvet cat, drones, gunners, gangers, restricted zone, horde gauntlet (`GAUNTLET_MAPS`: its maps — the House of Death, and sealed placeholders — picked from Grum's menu, `openGauntletMenu` in engine/shops-menus.js) |
 
 ## buildings/
 | File | What's in it |
@@ -123,7 +123,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/world-state.js` | Emissive pass, debug views, transitions, vehicles, visibility, time of day (`dayCycle`: darkness, the colour of the dark, daylight, sun, lamps on), darkness |
 | `engine/update.js` | `update()`: the per-tick simulation |
 | `engine/draw.js` | `draw()`: the frame renderer |
-| `engine/interiors.js` | Apartment and clinic interiors, the city seen from the veranda |
+| `engine/interiors.js` | Apartment, clinic and House of Death interiors (floors, glows), the city seen from the veranda |
 | `engine/lighting.js` | Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, wet reflections, atmosphere |
 | `engine/player-draw-input.js` | Drawing the player, emotes, timers, joysticks |
 | `engine/loop.js` | `start`, `stop`, `resetGameState`, the main loop |

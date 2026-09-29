@@ -293,8 +293,193 @@
             }
         }
 
+        // The House of Death (gauntlet): black marble, oxblood wood, gold, violet glass, cyan holograms.
+        const HOD = {
+            ink: '#0e0b12', marble: '#1d1824', marbleLt: '#2e2738', gold: '#c9a46a', goldLt: '#ecd09a',
+            wine: '#4a1624', crimson: '#8a1f35', violet: '#7a4dd8', violetLt: '#b48cff', bone: '#e6ddd0',
+            steel: '#3a3d48', steelLt: '#6a7080', wood: '#3a2226', woodLt: '#5a3438', holo: '#7fe0ff'
+        };
+
+        function drawHouseDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000, C = HOD, d = p.decor || {};
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const shadow = (r = 4) => rr(x + 3, y + 3, w, h, r, 'rgba(0,0,0,0.32)');
+            const flame = (fx, fy, s = 1, k = 0) => {                     // a candle: wax, then a breathing flame
+                circ(fx, fy, 2.2 * s, C.bone);
+                const f = 0.75 + 0.25 * Math.sin(t * 11 + fx * 0.3 + k);
+                circ(fx, fy - 0.5, 1.6 * s * f, `rgba(255,${190 + 40 * f | 0},110,0.95)`);
+            };
+            switch (p.decorType) {
+                case 'hod_candelabra': {                                  // wrought iron, five candles
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 2, cy + 2, w / 2, 'rgba(0,0,0,0.3)');
+                    circ(cx, cy, w / 2 - 1, null, C.gold, 1.4);
+                    ctx.strokeStyle = C.gold; ctx.lineWidth = 1.2; ctx.beginPath();
+                    ctx.moveTo(cx - w / 2 + 3, cy); ctx.lineTo(cx + w / 2 - 3, cy); ctx.moveTo(cx, cy - h / 2 + 3); ctx.lineTo(cx, cy + h / 2 - 3); ctx.stroke();
+                    flame(cx, cy, 1.1); flame(cx - w / 2 + 3, cy, 0.9, 1); flame(cx + w / 2 - 3, cy, 0.9, 2); flame(cx, cy - h / 2 + 3, 0.9, 3); flame(cx, cy + h / 2 - 3, 0.9, 4);
+                    break;
+                }
+                case 'hod_table': {                                       // oxblood table, gold inlay; a runner and candles when laid
+                    shadow(5); rr(x, y, w, h, 5, C.wood, C.woodLt, 1.2);
+                    rr(x + 4, y + 4, w - 8, h - 8, 3, null, 'rgba(201,164,106,0.45)', 0.8);
+                    if (d.candles) {
+                        rr(x + 12, y + h / 2 - 8, w - 24, 16, 2, C.crimson);
+                        ctx.fillStyle = 'rgba(236,208,154,0.5)'; ctx.fillRect(x + 12, y + h / 2 - 8, w - 24, 1); ctx.fillRect(x + 12, y + h / 2 + 7, w - 24, 1);
+                        for (let i = 0; i < 6; i++) { const px = x + 30 + i * (w - 60) / 5; circ(px, y + 13, 5, C.bone, 'rgba(0,0,0,0.3)'); circ(px, y + h - 13, 5, C.bone, 'rgba(0,0,0,0.3)'); }
+                        flame(x + w * 0.25, y + h / 2, 1.1); flame(x + w * 0.75, y + h / 2, 1.1, 2);
+                        circ(x + w / 2, y + h / 2, 7, C.violet); circ(x + w / 2, y + h / 2, 3.5, C.violetLt);   // a dark bloom
+                    } else {
+                        rr(x + 14, y + 10, 26, 18, 1, C.bone); rr(x + 18, y + 13, 26, 18, 1, C.crimson);        // open books
+                        circ(x + w - 22, y + h / 2, 8, null, C.gold, 1.2); circ(x + w - 22, y + h / 2, 3, C.goldLt);   // an astrolabe
+                    }
+                    break;
+                }
+                case 'hod_chair': {                                       // gothic high back, pointed crest (back on the far side from `face`)
+                    shadow(3); rr(x, y, w, h, 3, C.crimson, C.wine, 1);
+                    const f = d.face || 'S';
+                    ctx.fillStyle = C.wood;
+                    if (f === 'S') ctx.fillRect(x - 1, y - 4, w + 2, 6); else if (f === 'N') ctx.fillRect(x - 1, y + h - 2, w + 2, 6);
+                    else if (f === 'E') ctx.fillRect(x - 4, y - 1, 6, h + 2); else ctx.fillRect(x + w - 2, y - 1, 6, h + 2);
+                    ctx.fillStyle = C.gold; const cx = x + w / 2, cy = y + h / 2;
+                    if (f === 'S') ctx.fillRect(cx - 1.5, y - 7, 3, 3); else if (f === 'N') ctx.fillRect(cx - 1.5, y + h + 4, 3, 3);
+                    else if (f === 'E') ctx.fillRect(x - 7, cy - 1.5, 3, 3); else ctx.fillRect(x + w + 4, cy - 1.5, 3, 3);
+                    break;
+                }
+                case 'hod_pew': {
+                    shadow(3); rr(x, y, w, h, 3, C.wood, C.woodLt, 1);
+                    ctx.fillStyle = C.woodLt; ctx.fillRect(x + 2, y + h - 5, w - 4, 4);            // backrest
+                    ctx.fillStyle = 'rgba(0,0,0,0.25)'; for (let i = 1; i < 4; i++) ctx.fillRect(x + i * w / 4, y + 2, 1, h - 7);
+                    ctx.fillStyle = C.gold; ctx.fillRect(x - 1, y + 2, 2, h - 4); ctx.fillRect(x + w - 1, y + 2, 2, h - 4);
+                    break;
+                }
+                case 'hod_organ': {                                       // gold pipes over a black console
+                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1);
+                    const n = 15;
+                    for (let i = 0; i < n; i++) {
+                        const px = x + 6 + i * (w - 12) / (n - 1), tall = 0.45 + 0.55 * Math.abs(Math.sin(i * 0.55 + 0.4));
+                        circ(px, y + 6 + (1 - tall) * 12, 3.2, C.gold, C.goldLt, 0.6);
+                    }
+                    rr(x + 20, y + h - 12, w - 40, 9, 1, C.bone);                                      // keys
+                    ctx.fillStyle = C.ink; for (let i = 0; i < 18; i++) ctx.fillRect(x + 24 + i * (w - 48) / 18, y + h - 12, 1.5, 5);
+                    break;
+                }
+                case 'hod_altar': {                                       // black stone, a violet cloth, a Dark Element crystal glowing
+                    shadow(4); rr(x, y, w, h, 3, C.marble, C.marbleLt, 1.5);
+                    rr(x + w * 0.3, y - 2, w * 0.4, h + 4, 1, '#3b1f6a');
+                    ctx.fillStyle = C.gold; ctx.fillRect(x + w * 0.3, y + h + 1, w * 0.4, 1.5);
+                    const pulse = 0.75 + 0.25 * Math.sin(t * 2.2);
+                    ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(t * 0.4);
+                    ctx.fillStyle = `rgba(180,120,255,${0.35 * pulse})`; ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#6a3cc8'; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(5, 0); ctx.lineTo(0, 8); ctx.lineTo(-5, 0); ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = C.violetLt; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(2, 0); ctx.lineTo(0, 3); ctx.lineTo(-2, 0); ctx.closePath(); ctx.fill();
+                    ctx.restore();
+                    flame(x + 10, y + 10); flame(x + w - 10, y + 10, 1, 1); flame(x + 10, y + h - 10, 1, 2); flame(x + w - 10, y + h - 10, 1, 3);
+                    break;
+                }
+                case 'hod_bookcase': {                                    // dark shelves of spines, gold-edged
+                    shadow(2); rr(x, y, w, h, 2, C.ink, C.gold, 0.8);
+                    const cols = ['#5a1a2a', '#2c2248', '#1f3a33', '#4a3a28', '#6a4a8a', '#3a1a1a'];
+                    const along = d.vertical ? h : w, across = d.vertical ? w : h;
+                    for (let i = 0, k = 0; i < along - 6; k++) {
+                        const bw = 4 + ((k * 7) % 5);
+                        ctx.fillStyle = cols[k % cols.length];
+                        if (d.vertical) ctx.fillRect(x + 3, y + 3 + i, across - 6, Math.min(bw, along - 6 - i)); else ctx.fillRect(x + 3 + i, y + 3, Math.min(bw, along - 6 - i), across - 6);
+                        i += bw + 0.6;
+                    }
+                    break;
+                }
+                case 'hod_console': {                                     // a steel plinth with a turning hologram
+                    shadow(4); rr(x, y, w, h, 5, C.steel, C.steelLt, 1);
+                    const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) * 0.32;
+                    ctx.save(); ctx.globalAlpha = 0.75 + 0.2 * Math.sin(t * 3);
+                    circ(cx, cy, r, 'rgba(127,224,255,0.18)', C.holo, 1);
+                    ctx.strokeStyle = 'rgba(180,140,255,0.8)'; ctx.lineWidth = 1; ctx.beginPath();
+                    ctx.ellipse(cx, cy, r, r * Math.abs(Math.cos(t * 1.3)), t * 0.7, 0, Math.PI * 2); ctx.stroke();
+                    circ(cx, cy, 2, '#dff8ff');
+                    ctx.restore();
+                    break;
+                }
+                case 'hod_piano': {                                       // a black grand, lid open, gold strings
+                    ctx.save(); ctx.translate(3, 3); ctx.fillStyle = 'rgba(0,0,0,0.32)';
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * 0.55, y); ctx.bezierCurveTo(x + w, y, x + w, y + h * 0.4, x + w * 0.8, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill(); ctx.restore();
+                    ctx.fillStyle = '#0b0a0e'; ctx.strokeStyle = C.gold; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * 0.55, y); ctx.bezierCurveTo(x + w, y, x + w, y + h * 0.4, x + w * 0.8, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill(); ctx.stroke();
+                    ctx.strokeStyle = 'rgba(236,208,154,0.35)'; ctx.beginPath();
+                    for (let i = 0; i < 9; i++) { ctx.moveTo(x + 18, y + 8 + i * (h - 16) / 8); ctx.lineTo(x + w * 0.62 + i * 3, y + 10 + i * (h - 20) / 8); }
+                    ctx.stroke();
+                    rr(x + 2, y + 6, 12, h - 12, 1, C.bone); ctx.fillStyle = '#0b0a0e'; for (let i = 0; i < 12; i++) ctx.fillRect(x + 8, y + 9 + i * (h - 18) / 12, 6, 2);
+                    break;
+                }
+                case 'hod_column': {                                      // a black marble column, gold capital ring
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 3, cy + 3, w / 2, 'rgba(0,0,0,0.35)');
+                    circ(cx, cy, w / 2, C.marble, C.gold, 1.5); circ(cx, cy, w / 2 - 5, C.marbleLt);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, w / 2 - 8, -2.4, -0.8); ctx.stroke();
+                    break;
+                }
+                case 'hod_fountain': {                                    // a round basin, rain rippling, an obsidian spire
+                    const cx = x + w / 2, cy = y + h / 2, R = w / 2;
+                    circ(cx + 3, cy + 3, R, 'rgba(0,0,0,0.3)');
+                    circ(cx, cy, R, '#3a3a44', C.gold, 1.2); circ(cx, cy, R - 7, '#1a2a3a');
+                    ctx.strokeStyle = 'rgba(170,200,255,0.3)'; ctx.lineWidth = 1;
+                    for (let i = 0; i < 3; i++) { const ph = (t * 0.5 + i / 3) % 1; ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.arc(cx, cy, 12 + ph * (R - 20), 0, Math.PI * 2); ctx.stroke(); }
+                    ctx.globalAlpha = 1;
+                    circ(cx, cy, 11, C.ink, C.violetLt, 1); circ(cx, cy, 4, C.violet);
+                    break;
+                }
+                case 'hod_statue': {                                      // a weeping angel on a plinth: wings spread
+                    const cx = x + w / 2, cy = y + h / 2;
+                    rr(x, y, w, h, 3, '#4a4a52', '#6a6a72', 1);
+                    ctx.fillStyle = '#9a98a4';
+                    ctx.beginPath(); ctx.ellipse(cx - 8, cy, 9, 4, -0.5, 0, Math.PI * 2); ctx.ellipse(cx + 8, cy, 9, 4, 0.5, 0, Math.PI * 2); ctx.fill();
+                    circ(cx, cy + 1, 5, '#b4b2bc'); circ(cx, cy - 4, 3, '#c4c2cc');
+                    break;
+                }
+                case 'hod_portrait': {                                    // a gilt frame on the wall, a dim figure within
+                    rr(x, y, w, h, 1, C.gold, C.goldLt, 0.6);
+                    rr(x + 1.5, y + 1.5, w - 3, h - 3, 1, C.wine);
+                    ctx.fillStyle = 'rgba(230,221,208,0.35)';
+                    if (d.vertical) ctx.fillRect(x + 2.5, y + h * 0.3, w - 5, h * 0.4); else ctx.fillRect(x + w * 0.3, y + 2.5, w * 0.4, h - 5);
+                    break;
+                }
+                case 'hod_bust': {                                        // a marble head on a black plinth
+                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1);
+                    circ(x + w / 2, y + h / 2 + 2, w * 0.3, '#cfc8c0'); circ(x + w / 2, y + h / 2 - 2, w * 0.2, C.bone);
+                    break;
+                }
+                case 'hod_coffin': {                                      // a hexagonal coffin under violet glass, gold cross-bands
+                    const pts = [[0, 0.5], [0.18, 0], [0.8, 0.1], [1, 0.5], [0.8, 0.9], [0.18, 1]];
+                    const path = (dx = 0, dy = 0) => { ctx.beginPath(); pts.forEach(([u, v], i) => ctx[i ? 'lineTo' : 'moveTo'](x + dx + u * w, y + dy + v * h)); ctx.closePath(); };
+                    path(3, 3); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+                    path(); ctx.fillStyle = '#120a14'; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 1.5; ctx.stroke();
+                    const pulse = 0.6 + 0.4 * Math.sin(t * 1.7);
+                    ctx.save(); ctx.globalAlpha = 0.35 + 0.25 * pulse; ctx.fillStyle = C.violet;
+                    ctx.beginPath(); ctx.ellipse(x + w * 0.52, y + h / 2, w * 0.3, h * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                    ctx.fillStyle = C.gold; ctx.fillRect(x + w * 0.35, y + 4, 2, h - 8); ctx.fillRect(x + w * 0.2, y + h / 2 - 1, w * 0.6, 2);
+                    break;
+                }
+                case 'hod_reliquary': {                                   // a glass case on a gold stand, a relic floating inside
+                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1.2);
+                    rr(x + 4, y + 4, w - 8, h - 8, 2, 'rgba(180,150,255,0.14)', 'rgba(220,200,255,0.5)', 0.8);
+                    const bob = Math.sin(t * 2 + x) * 1.5;
+                    circ(x + w / 2, y + h / 2 + bob, 4, (x + y) % 2 ? '#ff8a6a' : C.violetLt);
+                    break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
+            if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
@@ -417,6 +602,8 @@
                 this.decorType = config.decorType || null;       // custom furniture art (clinic)
                 this.light = config.light || null;               // soft light that follows the prop: { radius, color, intensity, dx, dy }
                 this.headSide = config.headSide || null;
+                this.decor = { face: config.face, vertical: !!config.vertical, candles: !!config.candles };   // House pieces: facing, wall run, lit
+                this.noNav = !!config.noNav;                     // thin wall pieces paths needn't route round
                 this.patient = !!config.patient;
                 this.noteId = config.noteId || null;
                 this.roomId = config.roomId || null;  // For light switches: which room this controls

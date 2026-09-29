@@ -529,12 +529,10 @@
                             return;
                         }
                         else if (this.activeInteraction.name === "Grum North") {
-                            // GAUNTLET button pressed — start horde arena
+                            // GAUNTLET button pressed — choose a map
                             if (this._grumCancelBtn) this._grumCancelBtn.style.display = 'none';
                             this.endDialogue();
-                            if (this.hordeGauntlet) {
-                                this.hordeGauntlet.start(this);
-                            }
+                            if (this.hordeGauntlet) this.openGauntletMenu();
                             return;
                         } 
                         else if (this.activeInteraction.name === "Barista Ren") {
