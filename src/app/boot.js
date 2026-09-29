@@ -117,6 +117,8 @@
             lbl('lbl-flitflick', `Flick to Flit: ${onOff('flitFlick')}`, onCol('flitFlick'));
             lbl('lbl-flittwo', `Two-Finger Flit: ${onOff('flitTwoFinger')}`, onCol('flitTwoFinger'));
             lbl('lbl-flitbtn', `Flit Button: ${onOff('flitButton')}`, onCol('flitButton'));
+            lbl('lbl-aimfire', `Aim Before Firing: ${onOff('aimBeforeFire')}`, onCol('aimBeforeFire'));
+            lbl('lbl-sniperrelease', `Sniper Fire on Release: ${onOff('sniperRelease')}`, onCol('sniperRelease'));
             lbl('lbl-audio', `Master Audio: ${GameSettings.audioEnabled ? 'ON' : 'OFF'}`,
                 GameSettings.audioEnabled ? '' : '#666');
             lbl('lbl-fps', `FPS Limit: ${GameSettings.fpsLimit === 0 ? 'NONE' : GameSettings.fpsLimit}`,
@@ -209,7 +211,7 @@
         });
         
         // Flit controls (touch): ring, flick, two-finger tap, the ⚡ button
-        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton']]) {
+        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton'], ['btn-toggle-aimfire', 'aimBeforeFire'], ['btn-toggle-sniperrelease', 'sniperRelease']]) {
             document.getElementById(id).addEventListener('click', () => {
                 GameSettings[key] = !GameSettings[key];
                 GameSettings.applyControls();

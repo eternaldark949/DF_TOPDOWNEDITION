@@ -127,7 +127,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/draw.js` | `draw()`: the frame renderer |
 | `engine/interiors.js` | Apartment, clinic, House of Death and Double Nights lobby interiors (floors, glows), the city seen from the veranda |
 | `engine/lighting.js` | Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, wet reflections, atmosphere |
-| `engine/player-draw-input.js` | Drawing the player, emotes, timers, joysticks — the touch sticks: the move stick's flit ring (and flick / two-finger flit settings), the fire stick's aim memory |
+| `engine/player-draw-input.js` | Drawing the player, emotes, timers, joysticks — the touch sticks: the move stick's flit ring (and flick / two-finger flit settings), the fire stick's threshold ring (aim inside, fire past it; sniper fire-on-release) and aim memory |
 | `engine/loop.js` | `start`, `stop`, `resetGameState`, the main loop |
 
 ## app/ (loaded last)

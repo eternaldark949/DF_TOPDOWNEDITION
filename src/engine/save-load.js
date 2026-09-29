@@ -122,6 +122,7 @@
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
                         flitTwoFinger: GameSettings.flitTwoFinger, flitButton: GameSettings.flitButton,
+                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease,
                         ambienceVolume: GameSettings.ambienceVolume,
                         musicVolume: GameSettings.musicVolume,
                         fullscreen: GameSettings.fullscreen,
@@ -739,6 +740,8 @@
                         GameSettings.flitFlick = !!save.settings.flitFlick;
                         GameSettings.flitTwoFinger = !!save.settings.flitTwoFinger;
                         GameSettings.flitButton = save.settings.flitButton !== false;
+                        GameSettings.aimBeforeFire = save.settings.aimBeforeFire !== false;
+                        GameSettings.sniperRelease = save.settings.sniperRelease !== false;
                         GameSettings.applyControls();
                         if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
                         if (typeof save.settings.musicVolume === 'number') audioSys.setMusicVolume(save.settings.musicVolume);

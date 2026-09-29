@@ -988,3 +988,17 @@
         @keyframes flitRingPulse { 0% { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.08); } 100% { transform: translate(-50%, -50%) scale(1); } }
         @keyframes flitRingFlash { 0% { filter: drop-shadow(0 0 14px rgba(232, 194, 122, 1)) brightness(1.8); } 100% { filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6)); } }
         #btn-flit.hidden-by-setting { display: none !important; }
+
+        /* The fire stick's threshold ring (Aim Before Firing): aim inside, fire past it (initFireJoystick) */
+        #fire-ring {
+            position: absolute; left: 50%; top: 50%; width: 84px; height: 84px; transform: translate(-50%, -50%);
+            border-radius: 50%; pointer-events: none; border: 1.5px solid rgba(232, 194, 122, 0.35);
+            box-shadow: 0 0 6px rgba(232, 194, 122, 0.15); transition: border-color 0.12s, box-shadow 0.12s, opacity 0.2s;
+        }
+        #fire-ring.hot { border-color: rgba(255, 214, 140, 0.95); box-shadow: 0 0 14px rgba(255, 190, 90, 0.75), inset 0 0 8px rgba(255, 190, 90, 0.35); }
+        #fire-ring.armed { border-color: rgba(200, 170, 255, 0.95); box-shadow: 0 0 14px rgba(170, 130, 255, 0.8); animation: fireRingArmed 0.8s ease-in-out infinite; }
+        #fire-ring.off { display: none; }
+        @keyframes fireRingArmed { 50% { box-shadow: 0 0 22px rgba(170, 130, 255, 1); } }
+        /* While the fire stick is held, the other buttons step back */
+        #game-ui.aiming #btn-heal, #game-ui.aiming #btn-nv, #game-ui.aiming #btn-flit,
+        #game-ui.aiming #btn-holster, #game-ui.aiming #btn-autodrive { opacity: 0.15 !important; pointer-events: none !important; transition: opacity 0.15s; }

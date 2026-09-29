@@ -224,6 +224,16 @@
                         <div class="row-center"><div class="menu-btn" id="lbl-flitbtn">Flit Button: ON</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
+                    <div class="menu-item-row" id="btn-toggle-aimfire">
+                        <div class="row-left"><div class="desc-box">Aim inside the fire stick's ring, fire past it.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-aimfire">Aim Before Firing: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-sniperrelease">
+                        <div class="row-left"><div class="desc-box">Snipers: drag past the ring to arm, lift to fire.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-sniperrelease">Sniper Fire on Release: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
                     <div class="menu-item-row" id="btn-toggle-audio">
                         <div class="row-left"><div class="desc-box">Mute all SFX and music.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-audio">Master Audio: ON</div></div>
@@ -383,6 +393,7 @@
             <button class="game-btn" id="btn-transition">Enter Building<br><span style="font-size:0.6rem;opacity:0.7">(F)</span></button>
             
             <div id="btn-fire">
+                <div id="fire-ring"></div>
                 <div id="fire-joystick-knob"></div>
             </div>
             <div id="btn-emote"><div id="emote-joystick-knob">😊</div></div>
@@ -920,6 +931,14 @@
                 <div class="settings-row">
                     <span class="settings-label">Flit Button</span>
                     <span class="settings-value val-on" id="set-flitbtn" data-key="flitButton">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Aim Before Firing</span>
+                    <span class="settings-value val-on" id="set-aimfire" data-key="aimBeforeFire">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Sniper Fire on Release</span>
+                    <span class="settings-value val-on" id="set-sniperrelease" data-key="sniperRelease">ON</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Film Grain</span>
