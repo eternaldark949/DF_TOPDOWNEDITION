@@ -197,8 +197,9 @@
                     { x: 0, y: 0, w: 50, h: 1000 }, { x: 1350, y: 0, w: 50, h: 1000 },
                     // Divider wall: bay vs showroom (with gap for walkthrough)
                     { x: 880, y: 50, w: 20, h: 280 }, { x: 880, y: 430, w: 20, h: 220 },
-                    // Backroom wall
-                    { x: 880, y: 690, w: 470, h: 20 }
+                    // Backroom wall, and its west wall onto the bay (a door is cut through it: ROOM_DEFS)
+                    { x: 880, y: 690, w: 470, h: 20 },
+                    { x: 880, y: 650, w: 20, h: 40 }, { x: 880, y: 710, w: 20, h: 240 }
                 ],
                 transitions: [ { x: 600, y: 920, w: 200, h: 80, target: 'hub_949', label: 'Exit to City' } ],
                 landmarks: [
@@ -227,6 +228,8 @@
                     { x: 400, y: 550, w: 15, h: 80 }, { x: 400, y: 700, w: 15, h: 50 },
                     // Divider: server room wall (with gap)
                     { x: 585, y: 550, w: 15, h: 80 }, { x: 585, y: 700, w: 15, h: 50 },
+                    // Alcove ceilings-to-walls: the consultation and server rooms are rooms now
+                    { x: 50, y: 550, w: 365, h: 15 }, { x: 585, y: 550, w: 365, h: 15 },
                     // Back wall accent strip
                     { x: 200, y: 50, w: 600, h: 8 }
                 ],
