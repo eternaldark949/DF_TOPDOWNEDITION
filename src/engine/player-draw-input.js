@@ -338,13 +338,13 @@
                lifting the thumb takes it. The other buttons fade while the stick is held. */
             initFireJoystick() {
                 const fireZone = document.getElementById('btn-fire'), knob = document.getElementById('fire-joystick-knob');
-                const ring = document.getElementById('fire-ring'), gameUI = document.getElementById('game-ui');
-                const F = this.fireJoystick, MEMORY = 0.6, DRAG = 8, DEAD = 6, FIRE_IN = 40, FIRE_OUT = 32;
+                const ring = document.getElementById('fire-ring'), band = document.getElementById('fire-band'), gameUI = document.getElementById('game-ui');
+                const F = this.fireJoystick, MEMORY = 0.6, DRAG = 8, DEAD = 6, FIRE_IN = 72, FIRE_OUT = 55;   // the same reach as the flit ring
                 const aimMode = () => GameSettings.aimBeforeFire !== false;
                 const sniperRelease = () => aimMode() && GameSettings.sniperRelease !== false && this.weaponMode === 'sniper';
                 const setKnob = (x, y) => { knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; };
                 const buzz = () => { try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) { /* no haptics */ } };
-                const showRing = () => { if (!ring) return; ring.classList.toggle('off', !aimMode()); ring.classList.toggle('hot', !!F.firing); ring.classList.toggle('armed', !!F.armed); };
+                const showRing = () => { for (const el of [ring, band]) { if (!el) continue; el.classList.toggle('off', !aimMode()); el.classList.toggle('hot', !!F.firing); el.classList.toggle('armed', !!F.armed); } };
                 // Past the ring → fire (or arm, for a sniper on release); back inside → stop
                 const setFiring = (far) => {
                     if (!aimMode()) { F.firing = true; return; }
@@ -378,7 +378,7 @@
                         if (F.remembered && Math.hypot(touch.clientX - F.landX, touch.clientY - F.landY) < DRAG) break;   // still on the remembered aim
                         F.remembered = false;
                         const deltaX = touch.clientX - F.originX, deltaY = touch.clientY - F.originY, far = Math.hypot(deltaX, deltaY);
-                        const MAX = aimMode() ? 55 : 35, distance = Math.min(far, MAX), angle = Math.atan2(deltaY, deltaX);
+                        const MAX = aimMode() ? 84 : 35, distance = Math.min(far, MAX), angle = Math.atan2(deltaY, deltaX);
                         setKnob(Math.cos(angle) * distance, Math.sin(angle) * distance);
                         if (aimMode()) {
                             if (far > DEAD) { F.aimed = true; F.dx = Math.cos(angle); F.dy = Math.sin(angle); }   // direction only: she aims wherever the thumb points

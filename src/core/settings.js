@@ -198,6 +198,8 @@
                 if (r) r.classList.toggle('off', !this.flitRing);
                 const fr = document.getElementById('fire-ring');
                 if (fr) fr.classList.toggle('off', !this.aimBeforeFire);
+                const fb = document.getElementById('fire-band');
+                if (fb) fb.classList.toggle('off', !this.aimBeforeFire);
             },
 
             applyFilmGrain() {

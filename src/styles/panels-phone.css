@@ -1002,3 +1002,15 @@
         /* While the fire stick is held, the other buttons step back */
         #game-ui.aiming #btn-heal, #game-ui.aiming #btn-nv, #game-ui.aiming #btn-flit,
         #game-ui.aiming #btn-holster, #game-ui.aiming #btn-autodrive { opacity: 0.15 !important; pointer-events: none !important; transition: opacity 0.15s; }
+
+        /* …and the fire line itself, a band like the flit ring at the same reach (72 px): past it, she fires */
+        #fire-band {
+            position: absolute; left: 50%; top: 50%; width: 172px; height: 172px; transform: translate(-50%, -50%);
+            border-radius: 50%; pointer-events: none; background: rgba(232, 194, 122, 0.55);
+            -webkit-mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
+                    mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
+            filter: drop-shadow(0 0 5px rgba(232, 194, 122, 0.45)); opacity: 0.55; transition: opacity 0.12s, background 0.12s;
+        }
+        #fire-band.hot { opacity: 1; background: rgba(255, 214, 140, 0.95); filter: drop-shadow(0 0 12px rgba(255, 190, 90, 0.9)); }
+        #fire-band.armed { opacity: 1; background: rgba(190, 150, 255, 0.95); filter: drop-shadow(0 0 12px rgba(170, 130, 255, 0.9)); }
+        #fire-band.off { display: none; }
