@@ -1557,6 +1557,8 @@
                         game.refillStims();
                     } else if (game.activeInteraction.interactionType === 'vending_machine') {
                         game.buyBubbleTea();
+                    } else if (game.activeInteraction.interactionType === 'lost_luggage') {
+                        game.searchLostLuggage(game.activeInteraction);
                     } else if (game.activeInteraction.interactionType === 'bed_sleep') {
                         game.openSleepMenu();
                     } else if (game.activeInteraction.interactionType === 'crafting_table') {

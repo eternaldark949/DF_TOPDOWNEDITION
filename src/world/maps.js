@@ -60,17 +60,25 @@
                     { id: 'apt_armory', x: 52, y: 365 }
                 ]
             },
+            // Double Nights Hotel — "Think excellence, think Double Nights." A grand interdimensional
+            // hotel: black marble and gold, a rift fountain, a chandelier over the twin crescents,
+            // guests and AI staff coming and going (world/lobby-life.js). Floor: drawLobbyInterior;
+            // glows, the motto and the elevator doors: drawLobbyGlow; furniture: dn_* (props-decor.js).
             'hotel_lobby': {
                 id: 'hotel_lobby', width: 1000, height: 1200, type: 'indoor',
-                label: 'Double Nights Hotel | Lobby', floorColor: '#151515',
+                label: 'Double Nights Hotel | Lobby', floorColor: '#0c0a0c',
+                ambientDarkness: 0.62,                              // warm and lit, not a dark room
+                navProps: 'all',                                    // the crowd walks round the furniture (lamps and palms too)
+                wallStyle: { fill: '#0e0c10', stroke: 'rgba(232,194,122,0.55)' },   // black lacquer, gold trim
                 spawn: { x: 500, y: 1100 },
-                zones: [ { x: 425, y: 200, w: 150, h: 950, color: '#800020' }, { x: 300, y: 150, w: 400, h: 50, color: '#333' } ],
+                zones: [],
                 walls: [ { x: 0, y: 0, w: 1000, h: 50 }, { x: 0, y: 1150, w: 400, h: 50 }, { x: 600, y: 1150, w: 400, h: 50 }, { x: 0, y: 0, w: 50, h: 1200 }, { x: 950, y: 0, w: 50, h: 1200 }, { x: 350, y: 100, w: 300, h: 50 }, { x: 0, y: 300, w: 80, h: 100 }, { x: 0, y: 500, w: 80, h: 100 }, { x: 0, y: 700, w: 80, h: 100 }, { x: 920, y: 300, w: 80, h: 100 }, { x: 920, y: 500, w: 80, h: 100 }, { x: 920, y: 700, w: 80, h: 100 } ],
-                transitions: [ { x: 400, y: 1150, w: 200, h: 50, target: 'hub_949', label: 'Exit Hotel' }, { x: 50, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator' }, { x: 850, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator' } ],
+                transitions: [ { x: 400, y: 1150, w: 200, h: 50, target: 'hub_949', label: 'Exit Hotel' }, { x: 50, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true }, { x: 850, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true } ],
                 landmarks: [
                     { id: 'hotel_exit', x: 500, y: 1175 }, { id: 'hotel_desk', x: 500, y: 125 },
                     { id: 'hotel_elevator_left', x: 100, y: 500 }, { id: 'hotel_elevator_right', x: 900, y: 500 },
-                    { id: 'luvshade', x: 500, y: 540 }
+                    { id: 'luvshade', x: 500, y: 540 },
+                    { id: 'suite_elevator', x: 110, y: 450 }        // story step 11 points here
                 ]
             },
             'hotel_suite': {

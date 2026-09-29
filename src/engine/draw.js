@@ -245,6 +245,7 @@
                     this.drawClinicInterior(this.ctx);
                 }
                 if (this.activeMap.id === 'house_of_death') this.drawHouseInterior(this.ctx);
+                if (this.activeMap.id === 'hotel_lobby') this.drawLobbyInterior(this.ctx);
                 
                 // Indoor V2: Room floors, windows, and doors
                 if (this.roomSystem.active) {
@@ -308,6 +309,7 @@
                     const pulse = (Math.sin(_frameTime / 200) + 1) / 2;
                     this.ctx.save();
                     this.activeMap.transitions.forEach(t => {
+                        if (t.quiet) return;                           // marked by the map's own art (the lobby's gilded lifts)
                         if (t.x + t.w < cbW.left || t.x > cbW.right || t.y + t.h < cbW.top || t.y > cbW.bottom) return;
                         
                         const cx = t.x + t.w / 2;
@@ -631,6 +633,7 @@
                         n.draw(this.ctx);
                     });
                     this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
+                    this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
                     this.teammates.forEach(tm => {
                         if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) return;
                         tm.draw(this.ctx, this.player);
@@ -919,7 +922,8 @@
                     // Room light switches fade the lamp (and a faulty one flickers)
                     l._lightK = rsys.lampLight(l) * lampFlicker(l);
                     l._forcedOff = l._lightK < 0.02;
-                    const outdoorRoom = rsys.active && l._roomId && rsys.rooms[l._roomId].type === 'outdoor';
+                    const lr = rsys.active && l._roomId ? rsys.rooms[l._roomId] : null;
+                    const outdoorRoom = !!lr && lr.type === 'outdoor';
                     l.draw(this.ctx, outdoorRoom ? skyLampDay : daylight);
                 }); 
             

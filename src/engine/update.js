@@ -244,6 +244,10 @@
                     }
                 }
             
+                // The Double Nights lobby: guests and staff come and go; searched cases refill daily
+                this.lobbyLife.update(this);
+                if (this.activeMap.id === 'hotel_lobby' && _simTick % 60 === 0) this.refreshLostLuggage();
+
                 // Graveyard Humanoid Ghosts (Cemetery: x 500-3500, y 8800-10800)
                 const inGraveyard = this.activeMap.id === 'hub_949' && 
                     this.player.x > 400 && this.player.x < 3600 && 
@@ -1318,6 +1322,7 @@
                     this.interactBtn.style.display = 'flex'; this.activeInteraction = nearInteractable; 
                     if (nearInteractable instanceof PropEntity) {
                         if (nearInteractable.interactionType === 'medbay_refill') this.interactBtn.innerHTML = "Refill<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
+                        else if (nearInteractable.interactionType === 'lost_luggage') this.interactBtn.innerHTML = "Search<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
                         if (nearInteractable.interactionType === 'vending_machine') this.interactBtn.innerHTML = "Buy<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
                         if (nearInteractable.interactionType === 'bed_sleep') this.interactBtn.innerHTML = "Rest<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
                         if (nearInteractable.interactionType === 'crafting_table') this.interactBtn.innerHTML = "Craft<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";

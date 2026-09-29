@@ -150,6 +150,148 @@
                 ctx.restore();
             },
 
+            /** The Double Nights lobby floor, painted once: black marble veined silver, a checker border,
+             *  the crimson runner, the twin gold crescents under the chandelier, the motto at the door. */
+            drawLobbyInterior(ctx) {
+                if (!this._lobbyFloor) this._lobbyFloor = this._paintLobbyFloor();
+                ctx.drawImage(this._lobbyFloor, 0, 0);
+            },
+
+            _paintLobbyFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1000; cv.height = 1200;
+                const c = cv.getContext('2d'), r = seededRandom(949), GOLD = '#e8c27a', SILVER = '#dfe6ff';
+                c.fillStyle = '#0c0a0c'; c.fillRect(0, 0, 1000, 1200);
+                // Black marble slabs, each a touch different, veined in silver
+                for (let y = 50; y < 1150; y += 100) for (let x = 50; x < 950; x += 100) {
+                    const v = r() * 8 | 0; c.fillStyle = `rgb(${18 + v},${15 + v},${20 + v})`; c.fillRect(x, y, 100, 100);
+                }
+                c.strokeStyle = 'rgba(232,194,122,0.16)'; c.lineWidth = 1; c.beginPath();
+                for (let x = 150; x < 950; x += 100) { c.moveTo(x, 50); c.lineTo(x, 1150); }
+                for (let y = 150; y < 1150; y += 100) { c.moveTo(50, y); c.lineTo(950, y); }
+                c.stroke();
+                for (let i = 0; i < 46; i++) {
+                    let x = 50 + r() * 900, y = 50 + r() * 1100; c.strokeStyle = `rgba(223,230,255,${0.05 + r() * 0.08})`; c.lineWidth = 0.5 + r();
+                    c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (r() - 0.3) * 70; y += (r() - 0.5) * 50; c.lineTo(x, y); } c.stroke();
+                }
+                // Checker border in ivory and gold
+                const sq = 15;
+                for (let x = 50, i = 0; x < 950; x += sq, i++) for (const [y, j] of [[50, 0], [1135, 1]]) { c.fillStyle = (i + j) % 2 ? '#e9e2d2' : '#b8914a'; c.fillRect(x, y, sq, sq); }
+                for (let y = 65, i = 0; y < 1135; y += sq, i++) for (const [x, j] of [[80, 0], [905, 1]]) { c.fillStyle = (i + j) % 2 ? '#e9e2d2' : '#b8914a'; c.fillRect(x, y, sq, sq); }
+                // Gilt sunbursts before each elevator bay
+                for (const [bx, dir] of [[80, 1], [920, -1]]) for (const by of [450, 650]) {
+                    c.save(); c.translate(bx, by); c.globalAlpha = 0.55;
+                    for (let k = 0; k < 13; k++) { const a = -Math.PI / 2 + k * Math.PI / 12; c.strokeStyle = k % 2 ? GOLD : '#a8823e'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 0); c.lineTo(dir * Math.cos(a) * 60, Math.sin(a) * 60); c.stroke(); }
+                    c.restore();
+                }
+                // Around the fountain, a gold ring
+                c.strokeStyle = GOLD; c.lineWidth = 2; c.beginPath(); c.arc(500, 320, 92, 0, Math.PI * 2); c.stroke();
+                c.strokeStyle = 'rgba(223,230,255,0.4)'; c.lineWidth = 1; c.beginPath(); c.arc(500, 320, 100, 0, Math.PI * 2); c.stroke();
+                // The crimson runner, door to desk, gold-bordered with a diamond stitch
+                c.fillStyle = '#5a0a18'; c.fillRect(440, 612, 120, 538);
+                c.fillStyle = GOLD; c.fillRect(444, 612, 2, 538); c.fillRect(554, 612, 2, 538);
+                c.fillStyle = 'rgba(232,194,122,0.35)';
+                for (let y = 630; y < 1140; y += 26) { c.beginPath(); c.moveTo(500, y - 5); c.lineTo(505, y); c.lineTo(500, y + 5); c.lineTo(495, y); c.closePath(); c.fill(); }
+                // The medallion: silver and gold rings, and the twin crescents overlapping at its heart
+                const M = { x: 500, y: 850 };
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.arc(M.x + 3, M.y + 4, 150, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#100c12'; c.beginPath(); c.arc(M.x, M.y, 150, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = SILVER; c.lineWidth = 3; c.beginPath(); c.arc(M.x, M.y, 148, 0, Math.PI * 2); c.stroke();
+                c.strokeStyle = GOLD; c.lineWidth = 2; c.beginPath(); c.arc(M.x, M.y, 136, 0, Math.PI * 2); c.stroke();
+                c.lineWidth = 1; c.beginPath(); c.arc(M.x, M.y, 128, 0, Math.PI * 2); c.stroke();
+                for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12; c.fillStyle = k % 2 ? SILVER : GOLD; c.beginPath(); c.arc(M.x + Math.cos(a) * 142, M.y + Math.sin(a) * 142, 2, 0, Math.PI * 2); c.fill(); }
+                const crescent = (cx, cy, R, off, color) => {                 // a disc less an offset disc
+                    const t = document.createElement('canvas'); t.width = t.height = R * 2 + 8; const k = t.getContext('2d');
+                    const g = k.createLinearGradient(0, 0, t.width, t.height); g.addColorStop(0, '#fff1c2'); g.addColorStop(0.5, color); g.addColorStop(1, '#a8823e');
+                    k.fillStyle = g; k.beginPath(); k.arc(R + 4, R + 4, R, 0, Math.PI * 2); k.fill();
+                    k.globalCompositeOperation = 'destination-out'; k.beginPath(); k.arc(R + 4 + off, R + 4, R * 0.82, 0, Math.PI * 2); k.fill();
+                    c.drawImage(t, cx - R - 4, cy - R - 4);
+                };
+                crescent(M.x - 26, M.y, 78, 30, GOLD);                         // ☾ opening right…
+                crescent(M.x + 26, M.y, 78, -30, GOLD);                        // …☽ opening left, the two overlapping
+                c.fillStyle = '#fff1c2'; c.beginPath(); c.arc(M.x, M.y, 5, 0, Math.PI * 2); c.fill();
+                // The motto, set in gold at the door
+                c.save(); c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 17px Georgia, serif';
+                c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillText('THINK EXCELLENCE  ✦  THINK DOUBLE NIGHTS', 501, 1107);
+                c.fillStyle = GOLD; c.fillText('THINK EXCELLENCE  ✦  THINK DOUBLE NIGHTS', 500, 1106);
+                c.restore();
+                return cv;
+            },
+
+            /** The lobby after the darkness layer: the chandelier, the rift, the portals, sconces, gold
+             *  light strips, the elevator doors, the departures board, the motto banner, drifting stars. */
+            drawLobbyGlow(ctx) {
+                const t = _frameTime / 1000;
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // The chandelier: three tiers of warm lights and crystal glints
+                glow(500, 850, 170, '255, 200, 130', 0.12);
+                for (const [R, n, a0] of [[74, 16, 0], [50, 12, 0.2], [26, 8, 0.4]]) for (let i = 0; i < n; i++) {
+                    const a = a0 + i * Math.PI * 2 / n, x = 500 + Math.cos(a) * R, y = 850 + Math.sin(a) * R;
+                    const tw = 0.7 + 0.3 * Math.sin(t * 4 + i * 1.7 + R);
+                    glow(x, y, 9, '255, 214, 150', 0.3 * tw);
+                    ctx.globalAlpha = tw; ctx.fillStyle = '#fff6e0'; ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
+                }
+                for (let i = 0; i < 6; i++) {                                         // glints flashing across the crystals
+                    const ph = (t * 0.7 + i / 6) % 1, a = i * 1.05 + t * 0.1, R = 20 + (i * 13) % 55;
+                    if (ph < 0.12) { const k = 1 - ph / 0.12, x = 500 + Math.cos(a) * R, y = 850 + Math.sin(a) * R; ctx.globalAlpha = k; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 6 * k, y); ctx.lineTo(x + 6 * k, y); ctx.moveTo(x, y - 6 * k); ctx.lineTo(x, y + 6 * k); ctx.stroke(); }
+                }
+                // The rift fountain
+                glow(500, 320, 70, '190, 130, 255', 0.16 + 0.05 * Math.sin(t * 1.3));
+                // Portals: rings of spinning arcs in gold and violet (angles wrapped: huge ones break arc())
+                for (const [px, py] of LOBBY_PORTALS) {
+                    glow(px, py, 60, '200, 150, 255', 0.2);
+                    ctx.lineWidth = 2;
+                    for (let k = 0; k < 3; k++) {
+                        const R = 22 + k * 8, sp = (k % 2 ? -1 : 1) * (0.8 + k * 0.3);
+                        ctx.globalAlpha = 0.75 - k * 0.15; ctx.strokeStyle = k === 1 ? 'rgba(232,194,122,1)' : 'rgba(190,140,255,1)';
+                        for (let j = 0; j < 3; j++) { const a = ((t * sp) % (Math.PI * 2)) + j * Math.PI * 2 / 3; ctx.beginPath(); ctx.arc(px, py, R, a, a + 1.3); ctx.stroke(); }
+                    }
+                    glow(px, py, 16, '255, 230, 255', 0.15 + 0.08 * Math.sin(t * 5 + px));
+                }
+                // Sconces, desk under-glow, gold strips along the marble edges
+                for (const y of [350, 550, 750]) { glow(86, y, 26, '255, 196, 110', 0.5); glow(914, y, 26, '255, 196, 110', 0.5); }
+                glow(500, 600, 120, '255, 170, 90', 0.18);
+                ctx.globalAlpha = 0.35 + 0.08 * Math.sin(t * 1.2); ctx.fillStyle = '#ffcf8a';
+                ctx.fillRect(95, 66, 1.5, 1068); ctx.fillRect(903.5, 66, 1.5, 1068); ctx.fillRect(96, 66, 808, 1.5);
+                // Stars drifting through the air
+                for (let i = 0; i < 26; i++) {
+                    const sx = 80 + ((i * 337) % 840) + Math.sin(t * 0.2 + i) * 20, sy = 1120 - ((t * (6 + i % 5) + i * 97) % 1060);
+                    const tw = 0.5 + 0.5 * Math.sin(t * 3 + i * 2.1);
+                    ctx.globalAlpha = 0.5 * tw; ctx.fillStyle = i % 3 ? '#fff1c2' : '#e8d8ff'; ctx.beginPath(); ctx.arc(sx, sy, 1.1, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.restore();
+                // (Solid, not glowing) the elevator doors, the departures board and the motto banner
+                ctx.save();
+                for (const [wx, dir] of [[50, 1], [950, -1]]) for (const by of [400, 600]) {
+                    const x0 = dir > 0 ? wx - 4 : wx - 8;
+                    ctx.fillStyle = '#b8914a'; ctx.fillRect(x0, by + 6, 12, 88);
+                    ctx.fillStyle = '#e8c27a'; ctx.fillRect(x0 + 2, by + 8, 8, 41); ctx.fillRect(x0 + 2, by + 51, 8, 41);
+                    ctx.strokeStyle = '#6a4f22'; ctx.lineWidth = 1; ctx.strokeRect(x0 + 2, by + 8, 8, 41); ctx.strokeRect(x0 + 2, by + 51, 8, 41);
+                    // the dial on the pillar face above, its needle drifting between floors
+                    const dx = dir > 0 ? 80 : 920, dy = by - 12, nd = Math.PI + (0.5 + 0.5 * Math.sin(t * 0.3 + by + wx)) * Math.PI;
+                    ctx.fillStyle = '#1a1216'; ctx.beginPath(); ctx.arc(dx, dy, 10, Math.PI, 0); ctx.fill();
+                    ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(dx, dy, 10, Math.PI, 0); ctx.stroke();
+                    ctx.strokeStyle = '#ffb060'; ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(dx + Math.cos(nd) * 8, dy + Math.sin(nd) * 8); ctx.stroke();
+                }
+                // The departures board on the check-in wall: other dimensions, letters flipping
+                ctx.fillStyle = '#07060a'; ctx.fillRect(360, 104, 280, 42);
+                ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1.5; ctx.strokeRect(360, 104, 280, 42);
+                ctx.font = 'bold 8px monospace'; ctx.textBaseline = 'middle';
+                const rows = LOBBY_DEPARTURES, step = Math.floor(t / 6);
+                for (let i = 0; i < 3; i++) {
+                    const row = rows[(step + i) % rows.length], flip = (t % 6) < 0.35 && i === 0;
+                    const scram = s => flip ? s.replace(/[A-Z]/g, () => String.fromCharCode(65 + Math.random() * 26 | 0)) : s;
+                    ctx.fillStyle = '#ffcf8a'; ctx.textAlign = 'left'; ctx.fillText(scram(row[0]), 368, 114 + i * 11);
+                    ctx.fillStyle = row[1] === 'DELAYED' ? '#ff7a8a' : row[1] === 'BOARDING' ? '#bfe6ff' : '#9fe0a0'; ctx.textAlign = 'right'; ctx.fillText(scram(row[1]), 632, 114 + i * 11);
+                }
+                // The motto, a warm hologram floating before the wall
+                const sh = 0.82 + 0.1 * Math.sin(t * 2.3);
+                ctx.textAlign = 'center'; ctx.font = 'italic bold 15px Georgia, serif';
+                ctx.globalAlpha = 0.35 * sh; ctx.fillStyle = '#ffb060'; ctx.fillText('Think excellence, think Double Nights.', 500, 172);
+                ctx.globalAlpha = 0.95 * sh; ctx.fillStyle = '#ffe2a8'; ctx.fillText('Think excellence, think Double Nights.', 500, 171);
+                ctx.restore();
+            },
+
             /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
             drawApartmentGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;

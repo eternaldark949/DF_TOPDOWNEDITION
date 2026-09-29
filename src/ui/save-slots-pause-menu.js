@@ -20,7 +20,7 @@
                     'road_test': 'Outskirts',
                     'ethereal_plane': 'Ethereal Plane',
                     'apt_949': '949\'s Apartment',
-                    'hotel_lobby': 'Crescent Hotel',
+                    'hotel_lobby': 'Double Nights Hotel',
                     'hotel_suite': 'Hotel Suite',
                     'medbay_sw': 'Medbay SW',
                     'moon_city_nightclub': 'Nightclub',

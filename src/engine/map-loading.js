@@ -35,6 +35,25 @@
                 }, 400);
             },
             
+            /**
+             * Where to stand on entering an interior by its door: just inside, clear of the door's
+             * trigger, on the side facing the room (a door on the south wall → step north).
+             */
+            _stepInFromGate(g) {
+                const M = this.activeMap, cx = g.x + g.w / 2, cy = g.y + g.h / 2;
+                const nav = NavGrid.for(M), inGate = (x, y) => (M.transitions || []).some(t => x >= t.x - 4 && x <= t.x + t.w + 4 && y >= t.y - 4 && y <= t.y + t.h + 4);
+                // The wall the door is on: whichever map edge it's nearest
+                const d = { S: M.height - (g.y + g.h), N: g.y, W: g.x, E: M.width - (g.x + g.w) };
+                const side = Object.keys(d).reduce((a, b) => d[a] <= d[b] ? a : b);
+                const dir = { S: [0, -1], N: [0, 1], W: [1, 0], E: [-1, 0] }[side];
+                for (let step = 20; step <= 200; step += 10) {
+                    const x = side === 'S' || side === 'N' ? cx : (dir[0] > 0 ? g.x + g.w : g.x) + dir[0] * step;
+                    const y = side === 'W' || side === 'E' ? cy : (dir[1] > 0 ? g.y + g.h : g.y) + dir[1] * step;
+                    if (!inGate(x, y) && (!nav || nav.walkable(x, y))) return { x, y, angle: Math.atan2(dir[1], dir[0]) };
+                }
+                return { x: M.spawn.x, y: M.spawn.y, angle: -Math.PI / 2 };   // nothing clear: the map's own spawn
+            },
+
             _doLoadMap(mapId, spawnAt) {
                 // =========================================================
                 //  PHASE 1: CLEANUP
@@ -980,7 +999,7 @@
                 this.enemies = []; this.loot = []; 
                 // Maps that ask for it (the House) route paths around their big furniture too
                 if (this.activeMap.navProps) this.activeMap.navObstacles = this.props
-                    .filter(p => (p.mass || 0) >= 1e6 && p.width * p.height >= 600 && !p.noNav)
+                    .filter(p => (p.mass || 0) >= 1e6 && p.width * p.height >= (this.activeMap.navProps === 'all' ? 200 : 600) && !p.noNav)
                     .map(p => ({ x: p.x, y: p.y, w: p.width, h: p.height }));
                 
                 // Auto-tag lamps with their containing room ID for per-room light control
@@ -1098,7 +1117,11 @@
                     // Example: If loading 'hub_949' coming from 'apt_949', find the Hub door that points to 'apt_949'
                     const returnGate = this._transitionGrid.findByTarget(spawnAt.linkFrom);
                     
-                    if (returnGate) {
+                    if (returnGate && this.activeMap.type === 'indoor') {
+                        // Indoors the door is in an outer wall: step in off it, toward the room
+                        const p = this._stepInFromGate(returnGate);
+                        this.player.x = p.x; this.player.y = p.y; this.player.angle = p.angle;
+                    } else if (returnGate) {
                         // Spawn at the center of the gate
                         this.player.x = returnGate.x + returnGate.w / 2;
                         

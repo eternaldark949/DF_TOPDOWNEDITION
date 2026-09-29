@@ -57,6 +57,7 @@ const SCRIPTS = [
     'entities/street-objects.js',
     'entities/npc.js',
     'entities/pedestrians.js',
+    'world/lobby-life.js',
     'entities/enemies.js',
     'buildings/building-v1.js',
     'buildings/building-v2.js',
