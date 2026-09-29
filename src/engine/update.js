@@ -207,9 +207,10 @@
                 // happens in the walking/driving code in step 7, after this tick's aim
                 // angle is set. Only fire here for input those branches don't handle
                 // (bumper minigame, or a mouse press before the mouse has moved).
-                if (this.shootCooldown <= 0 && !this.paused && (this.mouseDown || this.fireJoystick.active)) {
+                const stickFiring = this.fireJoystick.active && this.fireJoystick.firing;   // past the fire stick's threshold ring
+                if (this.shootCooldown <= 0 && !this.paused && (this.mouseDown || stickFiring)) {
                     const aimedBelow = !(this.bumperMinigame && this.bumperMinigame.active)
-                        && (this.fireJoystick.active || (this.mouseDown && this.mouseX));
+                        && (stickFiring || (this.mouseDown && this.mouseX));
                     if (!aimedBelow) this.fireWeapon();
                 }
             
@@ -1119,7 +1120,7 @@
                     this.player.x = driverSeatPos.x; this.player.y = driverSeatPos.y;
             
                     // Drive-By Shooting Logic
-                    const isShooting = this.fireJoystick.active || (this.mouseDown && this.mouseX);
+                    const isShooting = (this.fireJoystick.active && this.fireJoystick.firing) || (this.mouseDown && this.mouseX);
                     this.isShootingFromCar = isShooting; // Store for drawing
                     
                     if (isShooting) {
@@ -1169,11 +1170,19 @@
                     if (walkInputMag > 1) { inputX /= walkInputMag; inputY /= walkInputMag; }
                     this.player.velX = inputX; this.player.velY = inputY; 
                     
-                    if (this.fireJoystick.active || !this.mouseDown) this.player._aimPoint = null;   // stick / facing: fire straight
-                    if (this.fireJoystick.active) {
-                        this.player.angle = Math.atan2(this.fireJoystick.dy, this.fireJoystick.dx);
-                        // Cooldown already counted down once this tick (step 1); fire at the weapon's own rate
-                        if (this.shootCooldown <= 0) { this.fireWeapon(); }
+                    const F = this.fireJoystick;
+                    if (F.active || !this.mouseDown) this.player._aimPoint = null;   // stick / facing: fire straight
+                    if (this._releaseShot !== null && this._releaseShot !== undefined) {
+                        // Sniper fire-on-release: the thumb lifted with the shot armed — take it (waits out the cooldown briefly)
+                        this.player.angle = this._releaseShot;
+                        if (this.shootCooldown <= 0) { this.fireWeapon(); this._releaseShot = null; }
+                        else if (++this._releaseWait > 30) this._releaseShot = null;
+                        if (this._releaseShot === null) this._releaseWait = 0;
+                    } else if (F.active && F.aimed) {
+                        this.player.angle = Math.atan2(F.dy, F.dx);
+                        // Fire only past the threshold ring (Aim Before Firing), at the weapon's own rate;
+                        // cooldown already counted down once this tick (step 1)
+                        if (F.firing && this.shootCooldown <= 0) { this.fireWeapon(); }
                     } else if (this.mouseDown && this.mouseX) {
                         const worldX = this.player.x + (this.mouseX - this.canvas.width/2) / this.camera.zoom;
                         const worldY = this.player.y + (this.mouseY - this.canvas.height/2) / this.camera.zoom;

@@ -271,7 +271,7 @@
                ========================================================= */
             initJoystick() {
                 const inputZone = document.getElementById('input-zone-left'), visualZone = document.getElementById('joystick-zone'), knob = document.getElementById('joystick-knob');
-                const J = this.joystick, WALK = 35, RING_IN = 72, RING_OUT = 55, EDGE = 90;   // ring: flit past 72 px, re-arm inside 55
+                const J = this.joystick, WALK = 35, RING_IN = 82, RING_OUT = 65, EDGE = 100;   // ring: flit past 82 px, re-arm inside 65
                 const gameUI = document.getElementById('game-ui');
                 const canFlit = () => !this.isDriving && !(gameUI && gameUI.classList.contains('emote-active'));   // not at the wheel or holstered
                 const ringFlit = (dx, dy) => {
@@ -308,9 +308,9 @@
                         // A flick: from near the centre to well out, fast
                         if (GameSettings.flitFlick && J.armed) {
                             const now = performance.now(); J.trail.push({ x: deltaX, y: deltaY, t: now });
-                            while (J.trail.length > 2 && now - J.trail[0].t > 120) J.trail.shift();
+                            while (J.trail.length > 2 && now - J.trail[0].t > 150) J.trail.shift();
                             const t0 = J.trail[0];
-                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 120 && canFlit()) { J.armed = false; this.triggerFlit(angle, 'flick'); }
+                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; this.triggerFlit(angle, 'flick'); }
                         }
                         break;
                     }
@@ -331,21 +331,44 @@
                 }, { passive: true });
             },
 
+            /* The fire stick. With Aim Before Firing (on by default) aiming and firing are two
+               intentions: inside the gold threshold ring she only aims (the laser shows the line,
+               nothing is heard); past it she fires; back inside, she holds the line in silence.
+               With a sniper and Sniper Fire on Release, crossing the ring arms the shot and
+               lifting the thumb takes it. The other buttons fade while the stick is held. */
             initFireJoystick() {
                 const fireZone = document.getElementById('btn-fire'), knob = document.getElementById('fire-joystick-knob');
-                const F = this.fireJoystick, MAX = 35, MEMORY = 0.6, DRAG = 8;
+                const ring = document.getElementById('fire-ring'), band = document.getElementById('fire-band'), gameUI = document.getElementById('game-ui');
+                const F = this.fireJoystick, MEMORY = 0.6, DRAG = 8, DEAD = 6, FIRE_IN = 62, FIRE_OUT = 45;   // fire past 62 px, stop inside 45
+                const aimMode = () => GameSettings.aimBeforeFire !== false;
+                const sniperRelease = () => aimMode() && GameSettings.sniperRelease !== false && this.weaponMode === 'sniper';
                 const setKnob = (x, y) => { knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; };
+                const buzz = () => { try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) { /* no haptics */ } };
+                const showRing = () => { for (const el of [ring, band]) { if (!el) continue; el.classList.toggle('off', !aimMode()); el.classList.toggle('hot', !!F.firing); el.classList.toggle('armed', !!F.armed); } };
+                // Past the ring → fire (or arm, for a sniper on release); back inside → stop
+                const setFiring = (far) => {
+                    if (!aimMode()) { F.firing = true; return; }
+                    const out = far >= FIRE_IN || ((F.firing || F.armed) && far > FIRE_OUT);
+                    if (sniperRelease()) { if (out && !F.armed) buzz(); F.armed = out; F.firing = false; }
+                    else { if (out && !F.firing) buzz(); F.firing = out; F.armed = false; }
+                    showRing();
+                };
                 fireZone.addEventListener('touchstart', (e) => {
                     e.preventDefault(); if (F.active) return;
                     const touch = e.changedTouches[0], rect = fireZone.getBoundingClientRect();
                     F.id = touch.identifier; F.active = true; F.originX = rect.left + rect.width / 2; F.originY = rect.top + rect.height / 2;
                     F.dx = 0; F.dy = 0; F.landX = touch.clientX; F.landY = touch.clientY; F.remembered = false;
-                    // Aim memory: back within 0.6 s → resume at the old aim until the thumb drags
+                    F.aimed = !aimMode(); F.firing = !aimMode(); F.armed = false;
+                    if (gameUI) gameUI.classList.add('aiming');
+                    // Aim memory: back within 0.6 s → the old aim (and fire again only if she was firing)
                     const m = this._aimMemory;
                     if (m && performance.now() / 1000 - m.at <= MEMORY) {
-                        F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true;
-                        setKnob(F.dx * MAX, F.dy * MAX);
+                        F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true; F.aimed = true;
+                        if (aimMode()) { F.firing = !!m.firing && !sniperRelease(); F.armed = !!m.firing && sniperRelease(); }
+                        const r = aimMode() && (F.firing || F.armed) ? FIRE_IN + 5 : 30;
+                        setKnob(F.dx * r, F.dy * r);
                     } else knob.style.transform = `translate(-50%, -50%)`;
+                    showRing();
                 }, { passive: false });
                 fireZone.addEventListener('touchmove', (e) => {
                     e.preventDefault(); if (!F.active) return;
@@ -354,10 +377,13 @@
                         if (touch.identifier !== F.id) continue;
                         if (F.remembered && Math.hypot(touch.clientX - F.landX, touch.clientY - F.landY) < DRAG) break;   // still on the remembered aim
                         F.remembered = false;
-                        const deltaX = touch.clientX - F.originX, deltaY = touch.clientY - F.originY;
-                        const distance = Math.min(Math.hypot(deltaX, deltaY), MAX), angle = Math.atan2(deltaY, deltaX);
-                        const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
-                        setKnob(moveX, moveY); F.dx = moveX / MAX; F.dy = moveY / MAX;
+                        const deltaX = touch.clientX - F.originX, deltaY = touch.clientY - F.originY, far = Math.hypot(deltaX, deltaY);
+                        const MAX = aimMode() ? 74 : 35, distance = Math.min(far, MAX), angle = Math.atan2(deltaY, deltaX);
+                        setKnob(Math.cos(angle) * distance, Math.sin(angle) * distance);
+                        if (aimMode()) {
+                            if (far > DEAD) { F.aimed = true; F.dx = Math.cos(angle); F.dy = Math.sin(angle); }   // direction only: she aims wherever the thumb points
+                            setFiring(far);
+                        } else { F.dx = Math.cos(angle) * distance / MAX; F.dy = Math.sin(angle) * distance / MAX; }
                         break;
                     }
                 }, { passive: false });
@@ -365,8 +391,12 @@
                     e.preventDefault();
                     for (let i = 0; i < e.changedTouches.length; i++) {
                         if (e.changedTouches[i].identifier !== F.id) continue;
-                        if (Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000 };   // real time, not game time
-                        F.active = false; F.dx = 0; F.dy = 0; F.remembered = false; knob.style.transform = `translate(-50%, -50%)`;
+                        if (F.armed && F.aimed) this._releaseShot = Math.atan2(F.dy, F.dx);   // sniper: lifting the thumb takes the shot (update.js)
+                        if (F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
+                        F.active = false; F.dx = 0; F.dy = 0; F.remembered = false; F.aimed = false; F.firing = false; F.armed = false;
+                        knob.style.transform = `translate(-50%, -50%)`;
+                        if (gameUI) gameUI.classList.remove('aiming');
+                        showRing();
                         break;
                     }
                 };

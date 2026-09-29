@@ -2285,11 +2285,11 @@
 
         /* The flit ring round the move stick: fill = flit charge (initJoystick / updateFlitRing) */
         #joystick-ring {
-            position: absolute; left: 50%; top: 50%; width: 172px; height: 172px; transform: translate(-50%, -50%);
+            position: absolute; left: 50%; top: 50%; width: 192px; height: 192px; transform: translate(-50%, -50%);
             border-radius: 50%; pointer-events: none; --fill: 100%;
             background: conic-gradient(rgba(190, 140, 255, 0.9) var(--fill), rgba(255, 255, 255, 0.10) 0);
-            -webkit-mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
-                    mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
+            -webkit-mask: radial-gradient(circle, transparent 87px, #000 88px, #000 94px, transparent 95px);
+                    mask: radial-gradient(circle, transparent 87px, #000 88px, #000 94px, transparent 95px);
             filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6));
             transition: opacity 0.2s;
         }
@@ -2300,6 +2300,32 @@
         @keyframes flitRingPulse { 0% { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.08); } 100% { transform: translate(-50%, -50%) scale(1); } }
         @keyframes flitRingFlash { 0% { filter: drop-shadow(0 0 14px rgba(232, 194, 122, 1)) brightness(1.8); } 100% { filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6)); } }
         #btn-flit.hidden-by-setting { display: none !important; }
+
+        /* The fire stick's threshold ring (Aim Before Firing): aim inside, fire past it (initFireJoystick) */
+        #fire-ring {
+            position: absolute; left: 50%; top: 50%; width: 84px; height: 84px; transform: translate(-50%, -50%);
+            border-radius: 50%; pointer-events: none; border: 1.5px solid rgba(232, 194, 122, 0.35);
+            box-shadow: 0 0 6px rgba(232, 194, 122, 0.15); transition: border-color 0.12s, box-shadow 0.12s, opacity 0.2s;
+        }
+        #fire-ring.hot { border-color: rgba(255, 214, 140, 0.95); box-shadow: 0 0 14px rgba(255, 190, 90, 0.75), inset 0 0 8px rgba(255, 190, 90, 0.35); }
+        #fire-ring.armed { border-color: rgba(200, 170, 255, 0.95); box-shadow: 0 0 14px rgba(170, 130, 255, 0.8); animation: fireRingArmed 0.8s ease-in-out infinite; }
+        #fire-ring.off { display: none; }
+        @keyframes fireRingArmed { 50% { box-shadow: 0 0 22px rgba(170, 130, 255, 1); } }
+        /* While the fire stick is held, the other buttons step back */
+        #game-ui.aiming #btn-heal, #game-ui.aiming #btn-nv, #game-ui.aiming #btn-flit,
+        #game-ui.aiming #btn-holster, #game-ui.aiming #btn-autodrive { opacity: 0.15 !important; pointer-events: none !important; transition: opacity 0.15s; }
+
+        /* …and the fire line itself, a band like the flit ring (62 px): past it, she fires */
+        #fire-band {
+            position: absolute; left: 50%; top: 50%; width: 152px; height: 152px; transform: translate(-50%, -50%);
+            border-radius: 50%; pointer-events: none; background: rgba(232, 194, 122, 0.55);
+            -webkit-mask: radial-gradient(circle, transparent 67px, #000 68px, #000 74px, transparent 75px);
+                    mask: radial-gradient(circle, transparent 67px, #000 68px, #000 74px, transparent 75px);
+            filter: drop-shadow(0 0 5px rgba(232, 194, 122, 0.45)); opacity: 0.55; transition: opacity 0.12s, background 0.12s;
+        }
+        #fire-band.hot { opacity: 1; background: rgba(255, 214, 140, 0.95); filter: drop-shadow(0 0 12px rgba(255, 190, 90, 0.9)); }
+        #fire-band.armed { opacity: 1; background: rgba(190, 150, 255, 0.95); filter: drop-shadow(0 0 12px rgba(170, 130, 255, 0.9)); }
+        #fire-band.off { display: none; }
     </style>
 </head>
 <body>
@@ -2514,6 +2540,16 @@
                         <div class="row-center"><div class="menu-btn" id="lbl-flitbtn">Flit Button: ON</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
+                    <div class="menu-item-row" id="btn-toggle-aimfire">
+                        <div class="row-left"><div class="desc-box">Aim inside the fire stick's ring, fire past it.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-aimfire">Aim Before Firing: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-sniperrelease">
+                        <div class="row-left"><div class="desc-box">Snipers: drag past the ring to arm, lift to fire.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-sniperrelease">Sniper Fire on Release: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
                     <div class="menu-item-row" id="btn-toggle-audio">
                         <div class="row-left"><div class="desc-box">Mute all SFX and music.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-audio">Master Audio: ON</div></div>
@@ -2673,6 +2709,8 @@
             <button class="game-btn" id="btn-transition">Enter Building<br><span style="font-size:0.6rem;opacity:0.7">(F)</span></button>
             
             <div id="btn-fire">
+                <div id="fire-ring"></div>
+                <div id="fire-band"></div>
                 <div id="fire-joystick-knob"></div>
             </div>
             <div id="btn-emote"><div id="emote-joystick-knob">😊</div></div>
@@ -3210,6 +3248,14 @@
                 <div class="settings-row">
                     <span class="settings-label">Flit Button</span>
                     <span class="settings-value val-on" id="set-flitbtn" data-key="flitButton">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Aim Before Firing</span>
+                    <span class="settings-value val-on" id="set-aimfire" data-key="aimBeforeFire">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Sniper Fire on Release</span>
+                    <span class="settings-value val-on" id="set-sniperrelease" data-key="sniperRelease">ON</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Film Grain</span>
@@ -6071,7 +6117,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // --- CONTROLS (touch) — flitting without letting go of the trigger ---
             // Kept in localStorage (dfab_controls) and in saves. See initJoystick.
             ...(() => {
-                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true };
+                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true };
                 try { Object.assign(d, JSON.parse(localStorage.getItem('dfab_controls') || '{}')); } catch (e) { /* private mode */ }
                 return d;
             })(),
@@ -6138,11 +6184,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Apply film grain visibility
             /** Store the control toggles and show or hide the ⚡ button. */
             applyControls() {
-                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton })); } catch (e) { /* private mode */ }
+                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease })); } catch (e) { /* private mode */ }
                 const b = document.getElementById('btn-flit');
                 if (b) b.classList.toggle('hidden-by-setting', !this.flitButton);
                 const r = document.getElementById('joystick-ring');
                 if (r) r.classList.toggle('off', !this.flitRing);
+                const fr = document.getElementById('fire-ring');
+                if (fr) fr.classList.toggle('off', !this.aimBeforeFire);
+                const fb = document.getElementById('fire-band');
+                if (fb) fb.classList.toggle('off', !this.aimBeforeFire);
             },
 
             applyFilmGrain() {
@@ -39535,7 +39585,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.roomSystem = new RoomSystem(); // Indoor V2 room system
                 this.keys = {};
                 this.joystick = { active: false, dx: 0, dy: 0, originX: 0, originY: 0, id: null };
-                this.fireJoystick = { active: false, dx: 0, dy: 0, originX: 0, originY: 0, id: null };
+                this.fireJoystick = { active: false, dx: 0, dy: 0, originX: 0, originY: 0, id: null, aimed: false, firing: false, armed: false };
+                this._releaseShot = null; this._releaseWait = 0;   // sniper fire-on-release (initFireJoystick)
                 
                 this.questState = { 
                     hasKeycard: false, 
@@ -44139,6 +44190,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
                         flitTwoFinger: GameSettings.flitTwoFinger, flitButton: GameSettings.flitButton,
+                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease,
                         ambienceVolume: GameSettings.ambienceVolume,
                         musicVolume: GameSettings.musicVolume,
                         fullscreen: GameSettings.fullscreen,
@@ -44756,6 +44808,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         GameSettings.flitFlick = !!save.settings.flitFlick;
                         GameSettings.flitTwoFinger = !!save.settings.flitTwoFinger;
                         GameSettings.flitButton = save.settings.flitButton !== false;
+                        GameSettings.aimBeforeFire = save.settings.aimBeforeFire !== false;
+                        GameSettings.sniperRelease = save.settings.sniperRelease !== false;
                         GameSettings.applyControls();
                         if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
                         if (typeof save.settings.musicVolume === 'number') audioSys.setMusicVolume(save.settings.musicVolume);
@@ -47207,9 +47261,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // happens in the walking/driving code in step 7, after this tick's aim
                 // angle is set. Only fire here for input those branches don't handle
                 // (bumper minigame, or a mouse press before the mouse has moved).
-                if (this.shootCooldown <= 0 && !this.paused && (this.mouseDown || this.fireJoystick.active)) {
+                const stickFiring = this.fireJoystick.active && this.fireJoystick.firing;   // past the fire stick's threshold ring
+                if (this.shootCooldown <= 0 && !this.paused && (this.mouseDown || stickFiring)) {
                     const aimedBelow = !(this.bumperMinigame && this.bumperMinigame.active)
-                        && (this.fireJoystick.active || (this.mouseDown && this.mouseX));
+                        && (stickFiring || (this.mouseDown && this.mouseX));
                     if (!aimedBelow) this.fireWeapon();
                 }
             
@@ -48119,7 +48174,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.player.x = driverSeatPos.x; this.player.y = driverSeatPos.y;
             
                     // Drive-By Shooting Logic
-                    const isShooting = this.fireJoystick.active || (this.mouseDown && this.mouseX);
+                    const isShooting = (this.fireJoystick.active && this.fireJoystick.firing) || (this.mouseDown && this.mouseX);
                     this.isShootingFromCar = isShooting; // Store for drawing
                     
                     if (isShooting) {
@@ -48169,11 +48224,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (walkInputMag > 1) { inputX /= walkInputMag; inputY /= walkInputMag; }
                     this.player.velX = inputX; this.player.velY = inputY; 
                     
-                    if (this.fireJoystick.active || !this.mouseDown) this.player._aimPoint = null;   // stick / facing: fire straight
-                    if (this.fireJoystick.active) {
-                        this.player.angle = Math.atan2(this.fireJoystick.dy, this.fireJoystick.dx);
-                        // Cooldown already counted down once this tick (step 1); fire at the weapon's own rate
-                        if (this.shootCooldown <= 0) { this.fireWeapon(); }
+                    const F = this.fireJoystick;
+                    if (F.active || !this.mouseDown) this.player._aimPoint = null;   // stick / facing: fire straight
+                    if (this._releaseShot !== null && this._releaseShot !== undefined) {
+                        // Sniper fire-on-release: the thumb lifted with the shot armed — take it (waits out the cooldown briefly)
+                        this.player.angle = this._releaseShot;
+                        if (this.shootCooldown <= 0) { this.fireWeapon(); this._releaseShot = null; }
+                        else if (++this._releaseWait > 30) this._releaseShot = null;
+                        if (this._releaseShot === null) this._releaseWait = 0;
+                    } else if (F.active && F.aimed) {
+                        this.player.angle = Math.atan2(F.dy, F.dx);
+                        // Fire only past the threshold ring (Aim Before Firing), at the weapon's own rate;
+                        // cooldown already counted down once this tick (step 1)
+                        if (F.firing && this.shootCooldown <= 0) { this.fireWeapon(); }
                     } else if (this.mouseDown && this.mouseX) {
                         const worldX = this.player.x + (this.mouseX - this.canvas.width/2) / this.camera.zoom;
                         const worldY = this.player.y + (this.mouseY - this.canvas.height/2) / this.camera.zoom;
@@ -51644,7 +51707,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                ========================================================= */
             initJoystick() {
                 const inputZone = document.getElementById('input-zone-left'), visualZone = document.getElementById('joystick-zone'), knob = document.getElementById('joystick-knob');
-                const J = this.joystick, WALK = 35, RING_IN = 72, RING_OUT = 55, EDGE = 90;   // ring: flit past 72 px, re-arm inside 55
+                const J = this.joystick, WALK = 35, RING_IN = 82, RING_OUT = 65, EDGE = 100;   // ring: flit past 82 px, re-arm inside 65
                 const gameUI = document.getElementById('game-ui');
                 const canFlit = () => !this.isDriving && !(gameUI && gameUI.classList.contains('emote-active'));   // not at the wheel or holstered
                 const ringFlit = (dx, dy) => {
@@ -51681,9 +51744,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // A flick: from near the centre to well out, fast
                         if (GameSettings.flitFlick && J.armed) {
                             const now = performance.now(); J.trail.push({ x: deltaX, y: deltaY, t: now });
-                            while (J.trail.length > 2 && now - J.trail[0].t > 120) J.trail.shift();
+                            while (J.trail.length > 2 && now - J.trail[0].t > 150) J.trail.shift();
                             const t0 = J.trail[0];
-                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 120 && canFlit()) { J.armed = false; this.triggerFlit(angle, 'flick'); }
+                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; this.triggerFlit(angle, 'flick'); }
                         }
                         break;
                     }
@@ -51704,21 +51767,44 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }, { passive: true });
             },
 
+            /* The fire stick. With Aim Before Firing (on by default) aiming and firing are two
+               intentions: inside the gold threshold ring she only aims (the laser shows the line,
+               nothing is heard); past it she fires; back inside, she holds the line in silence.
+               With a sniper and Sniper Fire on Release, crossing the ring arms the shot and
+               lifting the thumb takes it. The other buttons fade while the stick is held. */
             initFireJoystick() {
                 const fireZone = document.getElementById('btn-fire'), knob = document.getElementById('fire-joystick-knob');
-                const F = this.fireJoystick, MAX = 35, MEMORY = 0.6, DRAG = 8;
+                const ring = document.getElementById('fire-ring'), band = document.getElementById('fire-band'), gameUI = document.getElementById('game-ui');
+                const F = this.fireJoystick, MEMORY = 0.6, DRAG = 8, DEAD = 6, FIRE_IN = 62, FIRE_OUT = 45;   // fire past 62 px, stop inside 45
+                const aimMode = () => GameSettings.aimBeforeFire !== false;
+                const sniperRelease = () => aimMode() && GameSettings.sniperRelease !== false && this.weaponMode === 'sniper';
                 const setKnob = (x, y) => { knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; };
+                const buzz = () => { try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) { /* no haptics */ } };
+                const showRing = () => { for (const el of [ring, band]) { if (!el) continue; el.classList.toggle('off', !aimMode()); el.classList.toggle('hot', !!F.firing); el.classList.toggle('armed', !!F.armed); } };
+                // Past the ring → fire (or arm, for a sniper on release); back inside → stop
+                const setFiring = (far) => {
+                    if (!aimMode()) { F.firing = true; return; }
+                    const out = far >= FIRE_IN || ((F.firing || F.armed) && far > FIRE_OUT);
+                    if (sniperRelease()) { if (out && !F.armed) buzz(); F.armed = out; F.firing = false; }
+                    else { if (out && !F.firing) buzz(); F.firing = out; F.armed = false; }
+                    showRing();
+                };
                 fireZone.addEventListener('touchstart', (e) => {
                     e.preventDefault(); if (F.active) return;
                     const touch = e.changedTouches[0], rect = fireZone.getBoundingClientRect();
                     F.id = touch.identifier; F.active = true; F.originX = rect.left + rect.width / 2; F.originY = rect.top + rect.height / 2;
                     F.dx = 0; F.dy = 0; F.landX = touch.clientX; F.landY = touch.clientY; F.remembered = false;
-                    // Aim memory: back within 0.6 s → resume at the old aim until the thumb drags
+                    F.aimed = !aimMode(); F.firing = !aimMode(); F.armed = false;
+                    if (gameUI) gameUI.classList.add('aiming');
+                    // Aim memory: back within 0.6 s → the old aim (and fire again only if she was firing)
                     const m = this._aimMemory;
                     if (m && performance.now() / 1000 - m.at <= MEMORY) {
-                        F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true;
-                        setKnob(F.dx * MAX, F.dy * MAX);
+                        F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true; F.aimed = true;
+                        if (aimMode()) { F.firing = !!m.firing && !sniperRelease(); F.armed = !!m.firing && sniperRelease(); }
+                        const r = aimMode() && (F.firing || F.armed) ? FIRE_IN + 5 : 30;
+                        setKnob(F.dx * r, F.dy * r);
                     } else knob.style.transform = `translate(-50%, -50%)`;
+                    showRing();
                 }, { passive: false });
                 fireZone.addEventListener('touchmove', (e) => {
                     e.preventDefault(); if (!F.active) return;
@@ -51727,10 +51813,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         if (touch.identifier !== F.id) continue;
                         if (F.remembered && Math.hypot(touch.clientX - F.landX, touch.clientY - F.landY) < DRAG) break;   // still on the remembered aim
                         F.remembered = false;
-                        const deltaX = touch.clientX - F.originX, deltaY = touch.clientY - F.originY;
-                        const distance = Math.min(Math.hypot(deltaX, deltaY), MAX), angle = Math.atan2(deltaY, deltaX);
-                        const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
-                        setKnob(moveX, moveY); F.dx = moveX / MAX; F.dy = moveY / MAX;
+                        const deltaX = touch.clientX - F.originX, deltaY = touch.clientY - F.originY, far = Math.hypot(deltaX, deltaY);
+                        const MAX = aimMode() ? 74 : 35, distance = Math.min(far, MAX), angle = Math.atan2(deltaY, deltaX);
+                        setKnob(Math.cos(angle) * distance, Math.sin(angle) * distance);
+                        if (aimMode()) {
+                            if (far > DEAD) { F.aimed = true; F.dx = Math.cos(angle); F.dy = Math.sin(angle); }   // direction only: she aims wherever the thumb points
+                            setFiring(far);
+                        } else { F.dx = Math.cos(angle) * distance / MAX; F.dy = Math.sin(angle) * distance / MAX; }
                         break;
                     }
                 }, { passive: false });
@@ -51738,8 +51827,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     e.preventDefault();
                     for (let i = 0; i < e.changedTouches.length; i++) {
                         if (e.changedTouches[i].identifier !== F.id) continue;
-                        if (Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000 };   // real time, not game time
-                        F.active = false; F.dx = 0; F.dy = 0; F.remembered = false; knob.style.transform = `translate(-50%, -50%)`;
+                        if (F.armed && F.aimed) this._releaseShot = Math.atan2(F.dy, F.dx);   // sniper: lifting the thumb takes the shot (update.js)
+                        if (F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
+                        F.active = false; F.dx = 0; F.dy = 0; F.remembered = false; F.aimed = false; F.firing = false; F.armed = false;
+                        knob.style.transform = `translate(-50%, -50%)`;
+                        if (gameUI) gameUI.classList.remove('aiming');
+                        showRing();
                         break;
                     }
                 };
@@ -54684,7 +54777,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._updateValueEl('set-rain', GameSettings.rainDensity);
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
-                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton']])
+                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease']])
                     this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
@@ -54716,7 +54809,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _cycleSetting(el) {
                 const key = el.dataset.key;
                 
-                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton') {
+                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'aimBeforeFire' || key === 'sniperRelease') {
                     GameSettings[key] = !GameSettings[key];
                     GameSettings.applyControls();
                     this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
@@ -54923,6 +55016,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             lbl('lbl-flitflick', `Flick to Flit: ${onOff('flitFlick')}`, onCol('flitFlick'));
             lbl('lbl-flittwo', `Two-Finger Flit: ${onOff('flitTwoFinger')}`, onCol('flitTwoFinger'));
             lbl('lbl-flitbtn', `Flit Button: ${onOff('flitButton')}`, onCol('flitButton'));
+            lbl('lbl-aimfire', `Aim Before Firing: ${onOff('aimBeforeFire')}`, onCol('aimBeforeFire'));
+            lbl('lbl-sniperrelease', `Sniper Fire on Release: ${onOff('sniperRelease')}`, onCol('sniperRelease'));
             lbl('lbl-audio', `Master Audio: ${GameSettings.audioEnabled ? 'ON' : 'OFF'}`,
                 GameSettings.audioEnabled ? '' : '#666');
             lbl('lbl-fps', `FPS Limit: ${GameSettings.fpsLimit === 0 ? 'NONE' : GameSettings.fpsLimit}`,
@@ -55015,7 +55110,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         });
         
         // Flit controls (touch): ring, flick, two-finger tap, the ⚡ button
-        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton']]) {
+        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton'], ['btn-toggle-aimfire', 'aimBeforeFire'], ['btn-toggle-sniperrelease', 'sniperRelease']]) {
             document.getElementById(id).addEventListener('click', () => {
                 GameSettings[key] = !GameSettings[key];
                 GameSettings.applyControls();
