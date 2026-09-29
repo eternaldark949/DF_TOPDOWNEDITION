@@ -244,7 +244,7 @@
                 const paused = !!game.paused;
                 const vol = GameSettings.ambienceVolume ?? 0.7;
 
-                this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1), now, 0.4);   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
+                this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
                 this._set(this.L.rain, outside ? 0.3 * rain : 0, 0.8);
                 this._set(this.L.rainIn, outside ? 0 : 0.22 * rain, 0.8);
                 this._set(this.L.wind, outside ? 0.04 + 0.12 * wind : 0.015 * wind, 1.2);

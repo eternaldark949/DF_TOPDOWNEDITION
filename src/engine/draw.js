@@ -37,8 +37,9 @@
                     camX = this.camera.x;
                     camY = this.camera.y;
                 } else {
-                    camX = this.player.x;
-                    camY = this.player.y;
+                    // Scoped with a sniper, the camera leans down her line (engine/scope.js)
+                    camX = this.player.x + (this.scopeLeanX || 0);
+                    camY = this.player.y + (this.scopeLeanY || 0);
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
@@ -732,7 +733,7 @@
                 
                 // Laser Sight beam (drawn after player, in world space) — from the gun's muzzle
                 // along the exact line the next shot takes (see getLaserSight / fireWeapon)
-                const laser = this.getLaserSight();
+                const laser = (this.scopeK || 0) < 0.5 ? this.getLaserSight() : null;   // scoped, the hairline in the lane takes over
                 if (laser) {
                     const muzzleX = laser.x0, muzzleY = laser.y0, hitX = laser.x1, hitY = laser.y1;
                     
@@ -1020,6 +1021,8 @@
                 this.drawLightingSystem(this.ctx);
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
                 this.drawEmissivePass(this.ctx);
+                // Looking down a sniper's sight: the world narrows to her line
+                this.drawScopeView(this.ctx);
                 // Health bars and damage numbers, above the darkness so they read at night
                 this.drawCombatOverlays(this.ctx, cullBounds.entities);
                 
