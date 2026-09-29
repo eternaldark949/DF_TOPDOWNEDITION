@@ -36,12 +36,6 @@
             return b ? b.w * (b.shoulder || 1) : 1;
         }
 
-        const ANDROID_FINISHES = {
-            silver:    { plate: '#c9ccd8', trim: '#7d8196', sheen: '#f4f6ff', glow: '#bfe6ff' },
-            gold:      { plate: '#d9b45a', trim: '#8c6a24', sheen: '#fff1c2', glow: '#00ffff' },
-            bloodmoon: { plate: '#b3203c', trim: '#5e0c1e', sheen: '#ff9fb2', glow: '#ff7aa8' },
-        };
-
         /** Colours for an android body config, or null for a human. */
         function androidLook(body) {
             if (!body || body.kind !== 'android') return null;
@@ -122,10 +116,3 @@
             ctx.stroke(); ctx.globalAlpha = 1;
         }
 
-        /** A small deterministic random generator from a string or number (same seed → same look). */
-        function seededRandom(seed) {
-            let h = 2166136261;
-            for (const ch of String(seed)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
-            return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-        }
-        const pickFrom = (rng, list) => list[Math.floor(rng() * list.length) % list.length];

@@ -304,7 +304,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const wig = COSMETICS_REGISTRY[this.equippedWig];
                 const skin = COSMETICS_REGISTRY[this.equippedSkin];
                 const outfit = COSMETICS_REGISTRY[this.equippedOutfit];
-                const defaultOutfit = { top: { type: 'sports_bra', color: '#111' }, bottom: { type: 'pants', color: '#e0e0e0' }, shoes: { type: 'sneakers', color: '#fff' }, train: null, held: null };
                 const acc = this.equippedAccessory ? COSMETICS_REGISTRY[this.equippedAccessory] : null;
                 let held = null;
                 if (acc && acc.data.held === 'glass') {
@@ -315,9 +314,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const hat = this.equippedHat ? COSMETICS_REGISTRY[this.equippedHat] : null;
                 const jewelry = this.equippedJewelry.map(id => COSMETICS_REGISTRY[id]).filter(Boolean).map(e => e.data);
                 return {
-                    hair: wig ? { type: wig.data.type, color: wig.data.color } : { type: 'curls', color: '#0a0505' },
-                    skinColor: skin ? skin.data.skinColor : '#c68e63',
-                    outfit: outfit ? outfit.data : defaultOutfit,
+                    // Without a cosmetic, she's herself (APPEARANCES['949'], core/appearances.js) in Street Casual
+                    hair: wig ? { type: wig.data.type, color: wig.data.color } : APPEARANCES['949'].hair,
+                    skinColor: skin ? skin.data.skinColor : APPEARANCES['949'].skinColor,
+                    outfit: outfit ? outfit.data : COSMETICS_REGISTRY.outfit_casual.data,
                     hat: hat ? hat.data : null,
                     jewelry,
                     held

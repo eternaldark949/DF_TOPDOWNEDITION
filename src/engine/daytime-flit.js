@@ -317,17 +317,11 @@
                             walkPhase: 0, animState: 'idle',
                             velocityX: 0, velocityY: 0, speed: 0
                         }, {
-                            skinColor: '#c8a0ff', // Violet-tinted skin
-                            hair: vfx.cosmeticConfig.hair ? {
-                                ...vfx.cosmeticConfig.hair,
-                                color: '#d8c0ff' // Light violet hair
-                            } : null,
-                            gender: 'female',
+                            // Her own cut, in violet light
+                            ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
+                                { skin: '#c8a0ff', hair: '#d8c0ff', top: '#b88aee', bottom: '#9a70d4', shoes: '#8060b8' }),
                             stance: vfx.stance,
-                            isDriving: false,
-                            top: '#b88aee',    // Violet outfit tint
-                            bottom: '#9a70d4',
-                            shoes: '#8060b8'
+                            isDriving: false
                         });
 
                         ctx.restore();
@@ -369,17 +363,11 @@
                             walkPhase: 0, animState: 'idle',
                             velocityX: 0, velocityY: 0, speed: 0
                         }, {
-                            skinColor: '#e0d0ff', // Brighter white-violet tint
-                            hair: vfx.cosmeticConfig.hair ? {
-                                ...vfx.cosmeticConfig.hair,
-                                color: '#f0e8ff'
-                            } : null,
-                            gender: 'female',
+                            // Her own cut, in violet light
+                            ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
+                                { skin: '#e0d0ff', hair: '#f0e8ff', top: '#d4c0f8', bottom: '#c0aaee', shoes: '#b098e0' }),
                             stance: vfx.stance,
-                            isDriving: false,
-                            top: '#d4c0f8',
-                            bottom: '#c0aaee',
-                            shoes: '#b098e0'
+                            isDriving: false
                         });
                         ctx.restore();
                     }
@@ -429,16 +417,7 @@
 
                     // Pass the ghost itself so the shared gait controller can track it
                     // (the old throwaway object used velocityX/Y, which the renderer never read)
-                    drawProceduralHumanoid(ctx, g, {
-                        skinColor: g.skinColor,
-                        hair: g.hair,
-                        gender: g.gender,
-                        stance: 'idle',
-                        isDriving: false,
-                        top: g.topColor,
-                        bottom: g.bottomColor,
-                        shoes: g.shoeColor
-                    });
+                    drawProceduralHumanoid(ctx, g, { ...g.look, stance: 'idle' });
 
                     ctx.restore();
                     ctx.restore();

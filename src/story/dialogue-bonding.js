@@ -232,64 +232,7 @@
             'Mirabel': '#c4566e',
         };
 
-        const NPC_PORTRAIT_CONFIGS = {
-            'Biggs':       { skinColor: '#c68642', gender: 'male', hair: { type: 'afro', color: '#ff6600' }, top: { type: 'tshirt', color: '#ff8800' } },
-            'Dr. Yin':     { ...STAFF_LOOKS['Dr. Yin'], eyeColor: '#3a2a1a' },
-            'Prisma':      { skinColor: '#d4a8e0', gender: 'female', hair: { type: 'long', color: '#9900ff' }, top: { type: 'tshirt', color: '#2a1a3a' } },
-            'Barista Ren': STAFF_LOOKS['Barista Ren'],
-            'Torque':      { skinColor: '#8d5524', gender: 'male', hair: { type: 'short', color: '#111' }, top: { type: 'tshirt', color: '#444' } },
-            'Bartender':   STAFF_LOOKS['Bartender'],
-            'LUVSH4D3':    STAFF_LOOKS['LUVSH4D3'],                        // Blood Moon android (Double Nights)
-            'Guard Unit Alpha': STAFF_LOOKS['Guard Unit Alpha'],
-            'Guard Unit Beta':  STAFF_LOOKS['Guard Unit Beta'],
-            'Concierge Lux':    STAFF_LOOKS['Concierge Lux'],
-            'Ms. Jean':    { skinColor: '#c68e63', gender: 'female', hair: { type: 'curls', color: '#888' }, top: { type: 'suit', color: '#2a2a1a' } },
-            'Contractor':  { skinColor: '#c9a87c', gender: 'male', hair: { type: 'short', color: '#111' }, top: { type: 'suit', color: '#222' } },
-            'Anavia':      { skinColor: '#8B4513', gender: 'female', hair: { type: 'braids', color: '#1a0a00' }, top: { type: 'tshirt', color: '#1a3a2a' } },
-            'Grum North':  { skinColor: '#8a7565', gender: 'male', hair: { type: 'short', color: '#7a7a7a' }, top: { type: 'suit', color: '#2a1a1a' } },
-            'Mirabel':     { skinColor: '#dcc6ac', gender: 'female', hair: { type: 'long', color: '#1a0505' }, top: { type: 'suit', color: '#4a0a10' } },
-            // "dripped with professionalism in a white suit" — the only physical
-            // detail the draft gives her, so the portrait leans entirely on it.
-            'Larissa':     { skinColor: '#c8a882', gender: 'female', hair: { type: 'ponytail', color: '#2b2118' }, top: { type: 'suit', color: '#ece8e0' } },
-        };
-
-        // ============================================================================
-        //  ROLE_PORTRAIT_CONFIGS — Fallback portraits keyed by NPC.role, checked after
-        //  NPC_PORTRAIT_CONFIGS and before the grey silhouette. Covers the cast that
-        //  exists in numbers and doesn't warrant per-name entries (dancers, spirits),
-        //  so any future NPC sharing a role is drawn correctly with no new data.
-        //  Palettes mirror the in-world renderers (drawFemaleDancer) so the dialogue
-        //  bust matches the body on screen. (Male dancers, medics and staff use
-        //  their own look — NPC._staffLook — before these.)
-        //  `byGender` lets one role serve both variants — NPC.gender is derived from
-        //  the name in the constructor, so "Male Dancer 3" resolves to the male entry.
-        // ============================================================================
-        const ROLE_PORTRAIT_CONFIGS = {
-            'red_demon_dancer': {
-                skinColor: '#8a0707', gender: 'female',
-                hair: { type: 'demon_dancer', color: '#0a0000' },
-                top: { type: 'sports_bra', color: '#111' }
-            },
-            'dancer': {
-                byGender: {
-                    female: {
-                        skinColor: '#8a0707', gender: 'female',
-                        hair: { type: 'demon_dancer', color: '#0a0000' },
-                        top: { type: 'sports_bra', color: '#111' }
-                    },
-                    male: {
-                        skinColor: '#8d5524', gender: 'male',
-                        hair: { type: 'short', color: '#0a0a0a' },
-                        top: { type: 'tshirt', color: '#111' }
-                    }
-                }
-            },
-            'spirit': {
-                skinColor: '#9fb8d0', gender: 'female',
-                hair: { type: 'long', color: '#4a5a70' },
-                top: { type: 'tshirt', color: '#2a3345' }
-            },
-        };
+        // (Portraits are drawn from each character's look: APPEARANCES / lookFor / portraitOf in core/appearances.js.)
 
         // ─── DIALOGUE SEQUENCE ────────────────────────────────────────────────
         //  General-purpose multi-line dialogue player.

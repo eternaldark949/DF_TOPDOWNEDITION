@@ -37,7 +37,7 @@
                 drawProceduralHumanoid(this.ctx, this.player, {
                     skinColor: cosmeticConfig.skinColor,
                     hair: cosmeticConfig.hair,
-                    gender: 'female',
+                    gender: APPEARANCES['949'].gender,
                     stance: currentStance,
                     isDriving: this.isDriving,
                     isShootingFromCar: this.isDriving && this.isShootingFromCar,

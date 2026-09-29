@@ -250,11 +250,7 @@
                 if (inGraveyard) {
                     // Spawn new ghosts periodically (max 5 at once)
                     if (this.graveyardGhosts.length < 15 && Math.random() < 0.02) {
-                        const GHOST_HAIR = ['long', 'short', 'afro', 'curls', 'braids', 'dreadlocks', 'ponytail'];
-                        const GHOST_SKINS = ['#8ec8d8', '#7ab0c8', '#9dd4e0', '#a0d0e8', '#6ea8c0'];
-                        const hairType = GHOST_HAIR[Math.floor(Math.random() * GHOST_HAIR.length)];
-                        const skinColor = GHOST_SKINS[Math.floor(Math.random() * GHOST_SKINS.length)];
-                        const gender = Math.random() < 0.5 ? 'male' : 'female';
+                        const look = ROLE_LOOKS.ghost(Math.random);   // pale and icy (core/appearances.js)
                         const gx = 600 + Math.random() * 2800;
                         const gy = 8900 + Math.random() * 1800;
                         // Pick a random wander target inside graveyard
@@ -271,13 +267,7 @@
                             phase: 'in',    // 'in', 'wander', 'out'
                             fadeSpeed: 0.005 + Math.random() * 0.005,
                             wanderTimer: 300 + Math.floor(Math.random() * 400), // frames to wander
-                            // Appearance
-                            skinColor,
-                            hair: { type: hairType, color: '#c0e8ff' },
-                            gender,
-                            topColor: '#90c0d8',
-                            bottomColor: '#7aaccc',
-                            shoeColor: '#6898b8'
+                            look
                         });
                     }
 

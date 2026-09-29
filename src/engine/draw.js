@@ -765,18 +765,9 @@
                         const drawX = seatPos.x;
                         const drawY = seatPos.y;
                         
-                        // Resolve appearance — teammates have it, dancers need defaults
+                        // Their look is the same as on foot (core/appearances.js), minus any dance
                         const isShooting = occ.cooldown !== undefined && occ.cooldown > 0;
-                        const app = occ.appearance || {};
-                        const isDemon = occ.role === 'red_demon_dancer';
-                        const isDancer = occ.role === 'dancer' || isDemon;
-                        
-                        // Build appearance config with fallbacks for dancers
-                        const skinColor = app.skinColor || (isDemon ? '#8b2500' : '#c68642');
-                        const topColor = app.top || (isDemon ? { type: 'sports_bra', color: '#440000' } : { type: 'sports_bra', color: '#ff55aa' });
-                        const bottomColor = app.bottom || (isDemon ? { type: 'skirt', color: '#220000' } : { type: 'skirt', color: '#ff88cc' });
-                        const shoesColor = app.shoes || { type: 'heels', color: isDemon ? '#660000' : '#ff69b4' };
-                        const hairConfig = app.hair || (isDemon ? { type: 'long', color: '#330000' } : { type: 'curls', color: '#111' });
+                        const { pose, idleAngle, ...look } = lookFor(occ) || {};
                         
                         // Set up canvas context — translate to seat position, rotate
                         // In combat: face target. Otherwise: face car forward.
@@ -788,18 +779,14 @@
                         this.ctx.rotate(occAngle);
                         
                         drawProceduralHumanoid(this.ctx, occ, {
-                            skinColor: skinColor,
-                            gender: occ.gender || 'female',
+                            ...look,
+                            gender: look.gender || occ.gender || 'female',
                             isDriving: true,
                             isShootingFromCar: isShooting,
                             carAngle: this.car.angle,
                             recoil: isShooting ? 0.5 : 0,
                             stance: isShooting ? 'pistol' : 'idle',
-                            top: topColor,
-                            bottom: bottomColor,
-                            shoes: shoesColor,
-                            hair: hairConfig,
-                            hat: app.hat || null
+                            held: null
                         });
                         
                         this.ctx.restore();

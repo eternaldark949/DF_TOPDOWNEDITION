@@ -9,7 +9,7 @@
          * - Circle collision via ActorEntity (radius: 15)
          * - Automatic wall collision via CollisionSystem
          * - Hire system for dancers/companions
-         * - Multiple visual renderers (Ms. Jean, Dancers, LUVSH4D3, etc.)
+         * - One procedural humanoid for everyone, dressed by their look (core/appearances.js)
          * - Smart pathfinding with obstacle avoidance
          * 
          * Migration Notes:
@@ -17,57 +17,6 @@
          * - Wall collision handled automatically by CollisionSystem
          * - Preserves all existing visual rendering exactly
          */
-        /* ---------------------------------------------------------------------
-           STAFF_LOOKS — how the staff and androids look, in the world and in
-           their portraits (NPC_PORTRAIT_CONFIGS reads these too). Double Nights'
-           AI staff come in moon silver, sun-on-moon gold, or Blood Moon rose red.
-           --------------------------------------------------------------------- */
-        const _DN_GUARD = { gender: 'male', build: 'broad', body: { kind: 'android', finish: 'gold', glow: '#00ffff' },
-            top: { type: 'dn_uniform', color: '#2a2418', trim: '#e8c27a' }, bottom: { type: 'pants', color: '#1a1614' },
-            shoes: { type: 'boots', color: '#111111' }, pose: 'hands_on_hips' };
-        const STAFF_LOOKS = {
-            'Guard Unit Alpha': _DN_GUARD,
-            'Guard Unit Beta':  _DN_GUARD,
-            'Concierge Lux':    { gender: 'androgynous', build: 'slim', body: { kind: 'android', finish: 'gold' },
-                                  top: { type: 'dn_uniform', color: '#2a2418', trim: '#e8c27a' }, bottom: { type: 'pants', color: '#1a1a1a' },
-                                  shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge' },
-            'LUVSH4D3':         { gender: 'female', build: 'curvy', body: { kind: 'android', finish: 'bloodmoon', hover: true },
-                                  hair: { type: 'long', color: '#ff88cc' } },
-            'Bartender':        { skinColor: '#c9a87c', gender: 'male', hair: { type: 'short', color: '#1a1a1a' },
-                                  top: { type: 'vest', color: '#1a0020', inner: '#f2f2f2', trim: '#8b0000' }, bottom: { type: 'pants', color: '#111111' },
-                                  shoes: { type: 'loafers', color: '#111111' }, pose: 'polish' },
-            'Barista Ren':      { skinColor: '#a0724a', gender: 'female', hair: { type: 'ponytail', color: '#2a1500' },
-                                  top: { type: 'tshirt', color: '#654321' }, bottom: { type: 'apron', color: '#3a2a1a', under: '#222222' },
-                                  shoes: { type: 'sneakers', color: '#eeeeee' }, pose: 'polish' },
-            // The Empereal Lord's scientist and medic; she keeps Stella and 747 running
-            'Dr. Yin':          { skinColor: '#e8d0b8', gender: 'female', build: 'slim', hair: { type: 'short', color: '#222222' },
-                                  top: { type: 'lab_coat', inner: '#1a3a4a' }, bottom: { type: 'pants', color: '#1a3a4a' },
-                                  shoes: { type: 'loafers', color: '#222222' }, pose: 'arms_crossed' },
-        };
-
-        const _SKIN_TONES = ['#3d2b1f', '#6b3a2a', '#8d5524', '#a0522d', '#c68642', '#c68e63', '#dcc6ac', '#e8d0b8', '#f5deb3'];
-        const _HAIR_COLORS = ['#0a0505', '#1a1a1a', '#2a1500', '#4a3728', '#8b4513', '#654321', '#c0c0c0'];
-
-        /** A stable look for NPCs without a named look: medics and the club's male dancers. */
-        function seededNpcLook(npc) {
-            const r = seededRandom(npc.name + '|' + npc.role + '|' + Math.round(npc.spawnX || npc.x) + ',' + Math.round(npc.spawnY || npc.y));
-            const skinColor = pickFrom(r, _SKIN_TONES);
-            if (npc.role === 'medic') {
-                const gender = r() < 0.5 ? 'female' : 'male';
-                return { skinColor, gender, build: pickFrom(r, [undefined, 'slim', 'athletic', 'curvy', 'heavy']),
-                         hair: { type: pickFrom(r, ['short', 'ponytail', 'braids', 'curls', 'afro']), color: pickFrom(r, _HAIR_COLORS) },
-                         top: { type: 'scrubs', color: pickFrom(r, ['#3aa6a0', '#4a7fb5', '#e8ecef']) },
-                         bottom: { type: 'pants', color: '#3a6f80' }, shoes: { type: 'sneakers', color: '#ffffff' } };
-            }
-            // Male dancer: bare chest or an open jacket, black trousers, and a dance of his own
-            const jacket = r() < 0.5;
-            return { skinColor, gender: 'male', build: pickFrom(r, ['athletic', 'athletic', 'slim', 'broad']), height: 0.97 + r() * 0.08,
-                     hair: { type: pickFrom(r, ['short', 'dreadlocks', 'braids', 'afro', 'curls', 'ponytail']), color: pickFrom(r, ['#0a0505', '#1a1a1a', '#8a0707', '#c0c0c0']) },
-                     top: jacket ? { type: 'jacket', color: pickFrom(r, ['#111111', '#2a0a3a', '#590e18']), inner: skinColor } : null,
-                     bottom: { type: 'pants', color: '#111111' }, shoes: { type: 'loafers', color: '#111111' },
-                     jewelry: r() < 0.5 ? [{ type: 'necklace', color: '#e8c27a' }] : null, pose: 'dance' };
-        }
-
         class NPC extends ActorEntity {
             /**
              * Unified NPC class — handles civilians, quest givers, dancers, AND teammates.
@@ -163,7 +112,7 @@
                     this.shotsLeftInBurst = this.burstSize;
                     
                     // Appearance config for drawProceduralHumanoid
-                    this.appearance = combatConfig.appearance || null;
+                    this.appearance = combatConfig.appearance || APPEARANCES[name] || null;   // core/appearances.js
                     
                     // ── HEALING SYSTEM ──
                     this.teammateStims = 3;        // Self-heal charges
@@ -629,7 +578,7 @@
                 // Every NPC is a procedural humanoid now, which faces Right (0 radians).
                 // (The −PI/2 correction was for the old sprites that were drawn facing Down.)
                 const usesRawAngle = true;
-                const staffLook = this._staffLook();
+                const look = lookFor(this);                                   // core/appearances.js
                 
                 if (this.combatTargetTimer > 0 && this.combatTargetAngle !== undefined) {
                     // In combat: face target
@@ -645,28 +594,17 @@
                     // IDLE & HIRED/RECRUITED: Face Player
                     const angle = Math.atan2(player.y - this.y, player.x - this.x);
                     ctx.rotate(usesRawAngle ? angle : angle - Math.PI/2);
-                } else if (staffLook && staffLook.idleAngle !== undefined) {
-                    ctx.rotate(staffLook.idleAngle);                          // staff face the room when idle
+                } else if (look && look.idleAngle !== undefined) {
+                    ctx.rotate(look.idleAngle);                               // staff face the room when idle
                 } else {
                     // Default Idle
                     if (!usesRawAngle) ctx.rotate(0);
                 }
 
-                // --- RENDERERS ---
-                if (this.name === 'Anavia') {
-                    this.drawAnavia(ctx); 
-                } 
-                else if (staffLook) this.drawStaff(ctx, staffLook);
-                else if (this.role === 'red_demon_dancer' || this.role === 'dancer') this.drawFemaleDancer(ctx, this.walkPhase, speed);
-                
-                else if (this.name === 'Ms. Jean' || this.role === 'ms_jean') this.drawMsJean(ctx);
-                else if (this.name === 'Mirabel') this.drawMirabell(ctx);
-                else if (this.name === 'Prisma') this.drawPrisma(ctx);
-                else if (this.name === 'Torque') this.drawTorque(ctx);
-                else if (this.name === 'Biggs') this.drawBiggs(ctx);
-                else if (this.name === 'Grum North') this.drawGrumNorth(ctx);
-                else if (this.role === 'teammate') this.drawTeammate(ctx);
-                else this.drawGeneric(ctx);
+                // --- RENDERER --- (every look lives in core/appearances.js)
+                if (this.role === 'teammate') this.drawTeammate(ctx, look);
+                else drawProceduralHumanoid(ctx, this, { stance: 'idle', ...look });
+                if (this.name === 'Prisma') this.drawPrismaShimmer(ctx);
 
                 ctx.restore();
                 
@@ -755,134 +693,8 @@
                 ctx.restore();
             }
             
-            // ANAVIA (The VIP)
-            drawAnavia(ctx) {
-                // Ensure velocity/phase exist
-                if (this.walkPhase === undefined) this.walkPhase = 0;
-                
-                // Radiant Caramel Skin (Custom Hex)
-                const caramelSkin = '#c68e63'; 
-                const periwinkle = '#CCCCFF';
-                
-                // Subtle VIP Glow
-                
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: caramelSkin,
-                    gender: 'female',   // Wide hips
-                    stance: 'idle',     
-                    
-                    // THE LOOK: Periwinkle Silk & Gold
-                    top: { type: 'sports_bra', color: periwinkle }, // Simulating a silk top
-                    bottom: { type: 'skirt', color: periwinkle },   
-                    train: { type: 'silk_flow', color: periwinkle }, 
-                    shoes: { type: 'heels', color: '#FFD700' }, // Gold heels
-                    
-                    // SIGNATURE HAIR
-                    hair: { type: 'curls', color: '#0a0505' }, // Darkest brown/black
-
-                    // PROP: A glass of wine — Bellafore
-                    held: { type: 'glass', drink: 'red_wine', hand: 'right' }
-                });
-                
-            }
-
-            // --- VISUALS ---
-
-            // 2. MS. JEAN (Wider Hair, Static Pose, Smooth Sip)
-            drawMsJean(ctx) {
-                // Ensure velocity/phase exist for the procedural renderer
-                if (this.walkPhase === undefined) this.walkPhase = 0;
-                if (this.velX === undefined) this.velX = 0;
-                if (this.velY === undefined) this.velY = 0;
-
-                // Call the procedural renderer
-                // Note: ctx is already translated/rotated by the parent draw() function
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#8d5524',
-                    gender: 'female',   // Triggers wide hips (-8 offset, 12 width)
-                    stance: 'idle',     // One hand holds glass, other swings naturally
-                    
-                    // THE RED DRESS LOOK
-                    // We simulate a dress by matching the top and bottom colors
-                    top: { type: 'sports_bra', color: '#aa0000' }, 
-                    bottom: { type: 'skirt', color: '#aa0000' },   
-                    train: { type: 'dress_train', color: '#880000' }, 
-                    shoes: { type: 'heels', color: '#440000' },
-                    
-                    // HAIR
-                    hair: { type: 'long', color: '#111' },
-
-                    // PROP: her own brand — Ms. Jean Cream Soda
-                    held: { type: 'glass', drink: 'cream_soda', hand: 'right' }
-                });
-            }
-            
-            /**
-             * The look for staff, androids, medics and male dancers (STAFF_LOOKS or a
-             * seeded one), or null for NPCs with their own draw method. Cached.
-             */
-            _staffLook() {
-                if (this._look !== undefined) return this._look;
-                let look = STAFF_LOOKS[this.name] || null;
-                if (!look && (this.role === 'medic' || ((this.role === 'dancer' || this.role === 'red_demon_dancer') && this.gender === 'male')))
-                    look = seededNpcLook(this);
-                if (!look && this.role && this.role.includes('robot'))       // unnamed Double Nights staff: silver
-                    look = { gender: 'androgynous', body: { kind: 'android', finish: 'silver' }, top: { type: 'dn_uniform', color: '#1c2030', trim: '#dfe6ff' },
-                             bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge' };
-                if (look && look.pose !== 'dance') look = { idleAngle: Math.PI / 2, ...look };
-                return (this._look = look);
-            }
-
-            drawStaff(ctx, look) {
-                drawProceduralHumanoid(ctx, this, { stance: 'idle', ...look });
-            }
-
-            drawFemaleDancer(ctx, phase, speed) {
-                
-                if (this.walkPhase === undefined) this.walkPhase = 0;
-                if (this.velX === undefined) this.velX = 0;
-                if (this.velY === undefined) this.velY = 0;
-                
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#8a0707', // Demon Red
-                    gender: 'female',
-                    stance: 'idle',
-                    pose: 'dance',
-                    hair: { type: 'demon_dancer', color: '#0a0000' }, // <--- The Ported Hair
-                    top: { type: 'sports_bra', color: '#111' },
-                    bottom: { type: 'skirt', color: '#111' }
-                });
-            }
-            
-            
-
-            drawMirabell(ctx) {
-                if (this.walkPhase === undefined) this.walkPhase = 0;
-                if (this.velX === undefined) this.velX = 0;
-                if (this.velY === undefined) this.velY = 0;
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#dcc6ac',
-                    gender: 'female',
-                    stance: 'idle',
-                    top:    { type: 'suit', color: '#4a0a10' },
-                    bottom: { type: 'skirt', color: '#4a0a10' },
-                    shoes:  { type: 'heels', color: '#2a0508' },
-                    hair:   { type: 'long', color: '#1a0505' },
-                    hat:    { type: 'wide_brim', color: '#590e18', crownColor: '#70121e', stroke: '#1a0505' }
-                });
-            }
-
-            drawPrisma(ctx) {
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#c8b8d0',
-                    gender: 'female',
-                    stance: 'idle',
-                    isDriving: false,
-                    hair: { type: 'braids', color: '#e0e8ff' },
-                    top: { type: 'sports_bra', color: '#aaccff' },
-                    bottom: { type: 'skirt', color: '#8888cc' },
-                    shoes: { type: 'heels', color: '#ddeeff' },
-                });
+            /** Prisma is crystalline: faceted highlights play over her. */
+            drawPrismaShimmer(ctx) {
                 // Crystalline shimmer overlay — small faceted highlights
                 const t = (typeof _frameTime !== 'undefined' ? _frameTime : Date.now()) * 0.003;
                 ctx.save();
@@ -904,63 +716,28 @@
                 ctx.restore();
             }
 
-            /** Torque — Auto Shop mechanic. Burly, short-haired, coveralls. */
-            drawTorque(ctx) {
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#6b3a2a',
-                    gender: 'male',
-                    stance: 'idle',
-                    hair: { type: 'short', color: '#1a1a1a' },
-                    top: { type: 'tshirt', color: '#ff6600' },
-                    bottom: { type: 'pants', color: '#2a2a2a' },
-                    shoes: { type: 'shoes', color: '#333' },
-                });
-            }
+            /** The look for this NPC (core/appearances.js); kept for callers that ask by this name. */
+            _staffLook() { return lookFor(this); }
 
-            drawBiggs(ctx) {
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#c9a87c',
-                    gender: 'male',
-                    stance: 'idle',
-                    hair: { type: 'afro', color: '#ff8800' },
-                    top: { type: 'suit', color: '#2a0a30' },
-                    bottom: { type: 'pants', color: '#1a0820' },
-                    shoes: { type: 'boots', color: '#ff8800' },
-                });
-            }
-
-            drawGrumNorth(ctx) {
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#8a7565',       // Grayish brown
-                    gender: 'male',
-                    stance: 'idle',
-                    hair: { type: 'short', color: '#7a7a7a' },  // Graying hair
-                    top: { type: 'suit', color: '#2a1a1a' },    // Dark crimson-black coat
-                    bottom: { type: 'pants', color: '#1a1a1a' },
-                    shoes: { type: 'boots', color: '#3a2020' },
-                });
-            }
-
-            
             /**
              * Teammate renderer — uses config-driven appearance via drawProceduralHumanoid.
              * Gun color pulled from equipped weapon's projectileColor.
              */
-            drawTeammate(ctx) {
-                // Resolve appearance from combatConfig or use defaults
-                const app = this.appearance || {};
+            drawTeammate(ctx, look) {
+                const app = look || this.appearance || {};
                 
                 // Determine stance from combat state (only active when recruited)
                 const inCombat = this.recruited && (this.cooldown > 0 || (this.shotsLeftInBurst < this.burstSize));
                 const weaponId = this.recruited ? this.equippedWeaponId : null;
                 
                 drawProceduralHumanoid(ctx, this, {
+                    ...app,
                     skinColor: app.skinColor || '#c68642',
                     gender: app.gender || 'female',
                     // Stance fits the weapon (rifles/snipers two-handed); ability users cast
                     // with an extended hand. Recoil is a real kick from the last shot.
                     stance: inCombat ? stanceForWeapon(weaponId) : 'idle',
-                    pose: this._idlePose || undefined,      // e.g. Yenna's crossed arms at the apartment
+                    pose: this._idlePose || app.pose || undefined,   // e.g. Yenna's crossed arms at the apartment
                     kick: inCombat ? shotKick(this) : 0,
                     weapon: weaponId ? { id: weaponId, ready: inCombat } : null,
                     top:    app.top    || { type: 'suit', color: '#2a0a3a' },
@@ -971,37 +748,6 @@
                 });
                 
                 // (The weapon is drawn by drawProceduralHumanoid, in hand.)
-            }
-            
-            drawGeneric(ctx) { 
-                // Seed a stable random appearance from the NPC's name
-                if (!this._genericSeed) {
-                    let hash = 0;
-                    const n = this.name || 'NPC';
-                    for (let i = 0; i < n.length; i++) hash = ((hash << 5) - hash) + n.charCodeAt(i);
-                    const h = Math.abs(hash);
-                    const skins = ['#f5d0a9', '#c68e63', '#8d5524', '#6b3a2a', '#d4a574', '#e8c4a0'];
-                    const tops = ['#335', '#533', '#353', '#445', '#554', '#345', '#543', '#455'];
-                    const bottoms = ['#222', '#333', '#2a2a3a', '#1a1a2a', '#3a2a1a', '#252530'];
-                    const hairs = ['#111', '#2a1a0a', '#0a0a0a', '#3a2a1a', '#555', '#1a0a00'];
-                    this._genericSeed = {
-                        skin: skins[h % skins.length],
-                        top: tops[(h >> 3) % tops.length],
-                        bottom: bottoms[(h >> 6) % bottoms.length],
-                        hair: hairs[(h >> 9) % hairs.length],
-                        gender: (h >> 12) % 2 === 0 ? 'male' : 'female',
-                    };
-                }
-                const s = this._genericSeed;
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: s.skin,
-                    gender: s.gender,
-                    stance: 'idle',
-                    top: { type: 'tshirt', color: s.top },
-                    bottom: { type: s.gender === 'female' ? 'skirt' : 'pants', color: s.bottom },
-                    shoes: { type: 'shoes', color: '#222' },
-                    hair: { type: s.gender === 'female' ? 'long' : 'short', color: s.hair },
-                });
             }
         }
 
