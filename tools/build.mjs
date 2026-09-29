@@ -81,6 +81,7 @@ const SCRIPTS = [
     'world/city-layout.js',
     'world/billboards.js',
     'ui/inventory-augments.js',
+    'ui/action-dock.js',
     'world/bokeh.js',
     'story/missions.js',
     'story/dialogue-bonding.js',

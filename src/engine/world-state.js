@@ -1,6 +1,9 @@
         // GameEngine — Emissive pass, debug views, transitions, vehicles, visibility, time of day, darkness, landmarks.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /** The interact pill (ui/action-dock.js): a verb and what it's for (E on desktop). */
+            setInteract(verb, name) { setActionPill(this.interactBtn, verb, name, 'E'); },
+
             /**
              * Laser sight geometry for this frame: from the drawn muzzle along the line the
              * next shot will fly (same aimFromMuzzle call as fireWeapon), clipped at the
@@ -187,7 +190,7 @@
                 // Zib passenger exit — charge partial fare and exit cleanly
                 if (this.isDriving && this.zibSystem && this.zibSystem.isPassenger) {
                     this.zibSystem.exitEarly(this);
-                    this.interactBtn.innerHTML = "Enter<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
+                    this.setInteract('Drive', 'Car');
                     return;
                 }
                 
@@ -283,7 +286,7 @@
                     resetHumanoidAnim(this.player);
                     this.teammates.forEach(t => { if (!t.inCar) resetHumanoidAnim(t); });
                     
-                    this.interactBtn.innerHTML = "Enter<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
+                    this.setInteract('Drive', 'Car');
                 } else {
                     // --- ENTERING VEHICLE ---
                     this.isDriving = true; 
@@ -308,7 +311,7 @@
                     this.holsterBtn.style.display = 'none';
                     this.fireBtn.style.display = 'flex';
                     this.emoteBtn.style.display = 'none';
-                    this.interactBtn.innerHTML = "Exit<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
+                    this.setInteract('Exit', 'Vehicle');
                     
                     // --- SEATING LOGIC (seat assignment system) ---
                     // Driver = seat 0 (player)

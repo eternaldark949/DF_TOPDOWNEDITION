@@ -367,21 +367,6 @@
             box-shadow: inset 2px 2px 3px rgba(255, 255, 255, 1.0), inset -2px -2px 4px rgba(100, 80, 60, 0.4), 0 5px 10px rgba(0, 0, 0, 0.5);
         }
 
-        /* 5. Interact Button */
-        #btn-interact {
-            position: absolute; bottom: 320px; right: 30px; 
-            width: 70px; height: 70px; 
-            border-radius: 50%; 
-            background: rgba(20, 0, 10, 0.4); 
-            border: 1px solid rgba(255,255,255,0.1); 
-            display: none; 
-            animation: pulse 1.5s infinite; 
-            justify-content: center; align-items: center; 
-            font-size: 0.7rem; text-align: center; line-height: 1; 
-            z-index: 30; pointer-events: auto; cursor: pointer; 
-            color: white; text-transform: uppercase; font-family: var(--font-ui);
-            backdrop-filter: blur(4px);
-        }
 
 
         /* --- MENUS --- */
@@ -493,11 +478,8 @@
         #message-modal.show { opacity: 1; }
 
         /* Buttons & Dock */
-        #btn-interact { position: absolute; bottom: 320px; right: 30px; width: 80px; height: 80px; border-radius: 50%; background: rgba(164, 105, 255, 0.2); border: 2px solid #fff; display: none; animation: pulse 1.5s infinite; justify-content: center; align-items: center; font-size: 0.7rem; text-align: center; line-height: 1; z-index: 30; pointer-events: auto; cursor: pointer; color: white; text-transform: uppercase; font-family: var(--font-ui); }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(164, 105, 255, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(164, 105, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(164, 105, 255, 0); } }
         
-        #btn-transition { position: absolute; bottom: 80px; right: 50px; background: rgba(0, 243, 255, 0.2); border: 1px solid #00f3ff; color: #fff; display: none; box-shadow: 0 0 20px #00f3ff; padding: 12px 24px; font-family: var(--font-ui); text-transform: uppercase; font-size: 0.9rem; font-weight: 800; border-radius: 8px; z-index: 35; pointer-events: auto; cursor: pointer; text-align: center; white-space: nowrap; }
-        #btn-transition:active { background: #00f3ff; color: #000; transform: scale(0.95); }
 
         #utility-dock { position: absolute; top: 210px; right: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; z-index: 35; pointer-events: auto; }
         #dock-toggle { width: 36px; height: 36px; border-radius: 8px; background: rgba(0, 0, 0, 0.7); border: 1px solid #666; color: #aaa; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.3s; }
@@ -1014,3 +996,58 @@
         #fire-band.hot { opacity: 1; background: rgba(255, 214, 140, 0.95); filter: drop-shadow(0 0 12px rgba(255, 190, 90, 0.9)); }
         #fire-band.armed { opacity: 1; background: rgba(190, 150, 255, 0.95); filter: drop-shadow(0 0 12px rgba(170, 130, 255, 0.9)); }
         #fire-band.off { display: none; }
+
+
+        /* --- THE ACTION DOCK (ui/action-dock.js) ---
+           Context pills above the right-hand cluster, clear of the fire ring: the interact pill
+           (talk, search, buy…) nearest the thumb, the door pill (enter, exit, elevator) above it.
+           Violet glass, a gold hairline, a medallion glyph, the verb and what it's for. */
+        #action-dock {
+            position: absolute; right: 14px; bottom: 300px; z-index: 35;
+            display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+            pointer-events: none; transition: opacity 0.15s;
+        }
+        #action-dock .action-pill {
+            position: relative; overflow: hidden; display: none; align-items: center; gap: 10px;
+            height: 46px; min-width: 128px; max-width: 62vw; padding: 0 16px 0 5px; margin: 0;
+            border-radius: 23px; border: 1px solid rgba(232, 194, 122, 0.55);
+            background: linear-gradient(180deg, rgba(34, 18, 48, 0.78), rgba(14, 8, 22, 0.78));
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 241, 194, 0.12);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+            color: #f3e6c8; font-family: var(--font-ui); text-transform: none; white-space: nowrap;
+            pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent;
+            transition: transform 0.12s ease, border-color 0.2s;
+        }
+        #action-dock .action-pill::after {                        /* a slow gold sheen crossing the glass */
+            content: ''; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%;
+            background: linear-gradient(100deg, transparent, rgba(255, 236, 190, 0.16), transparent);
+            animation: ap-sheen 4.2s ease-in-out infinite; pointer-events: none;
+        }
+        #action-dock .action-pill:active { transform: scale(0.96); background: linear-gradient(180deg, rgba(52, 28, 72, 0.85), rgba(22, 12, 34, 0.85)); }
+        #action-dock .action-pill:active .ap-medal { box-shadow: 0 0 18px rgba(255, 214, 150, 0.9), inset 0 0 8px rgba(255, 241, 194, 0.6); }
+        #action-dock .ap-arrive { animation: ap-arrive 0.18s ease-out; }
+        .ap-medal {
+            flex: none; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            color: #ffe2a8; border: 1px solid rgba(232, 194, 122, 0.7);
+            background: radial-gradient(circle at 35% 30%, rgba(190, 140, 255, 0.55), rgba(70, 30, 110, 0.9) 70%);
+            box-shadow: 0 0 12px rgba(176, 120, 255, 0.55), inset 0 0 6px rgba(255, 241, 194, 0.2);
+            transition: box-shadow 0.12s;
+        }
+        .ap-medal svg { width: 20px; height: 20px; }
+        .ap-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; min-width: 0; }
+        .ap-verb { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #fff1c2; }
+        .ap-name { font-size: 0.66rem; color: #cdb8ff; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.02em; }
+        .ap-key { display: none; }
+        @media (hover: hover) and (pointer: fine) {                /* desktop: the key to press */
+            .ap-key { display: inline-flex; align-items: center; justify-content: center; margin-left: 4px; width: 18px; height: 18px; border-radius: 4px;
+                      border: 1px solid rgba(232, 194, 122, 0.6); color: #e8c27a; font-size: 0.6rem; font-weight: 700; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.4); }
+        }
+        @media screen and (max-width: 360px) {
+            #action-dock { right: 10px; bottom: 292px; }
+            #action-dock .action-pill { height: 42px; min-width: 112px; }
+            .ap-medal { width: 32px; height: 32px; }
+        }
+        #game-ui.aiming #action-dock { opacity: 0.15; }
+        #game-ui.aiming #action-dock .action-pill { pointer-events: none; }
+        @keyframes ap-sheen { 0%, 62% { left: -40%; } 100% { left: 130%; } }
+        @keyframes ap-arrive { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
