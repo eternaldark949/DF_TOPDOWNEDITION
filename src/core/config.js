@@ -192,6 +192,16 @@
             /* NAV — walkability grid + pathfinding for companions (see NavGrid), and
                eyeline positioning: teammates whose shots can't go through walls walk
                to a spot with a clear shot instead of firing into cover. */
+            /* NOISE — how far sounds carry (px) before walls muffle them (engine/noise.js).
+               Gangers in earshot learn roughly where a sound came from — less exactly the
+               further off they are — and go to look. A wall between halves the reach;
+               a shut door takes a little more. */
+            NOISE: {
+                pistol: 700, rifle: 800, sniper: 950, punch: 90,
+                flit: 160, door: 220, glass: 360, enemyShot: 800,
+                WALL: 0.5, DOOR: 0.6,           // reach kept through a wall / a shut door
+                ERR_NEAR: 20, ERR_FAR: 150      // how far off their guess is, close up / at the edge of hearing
+            },
             NAV: {
                 CELL: 20,                   // Grid cell size (px)
                 AGENT_RADIUS: 16,           // Obstacles are inflated by this (teammate radius 14 + margin)

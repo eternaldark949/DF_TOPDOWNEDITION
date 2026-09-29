@@ -300,7 +300,7 @@
                 id: 'house_of_death', width: 1800, height: 1500, type: 'indoor',
                 label: 'The House of Death', floorColor: '#0d0a10',
                 ambientDarkness: 0.9,
-                navProps: true,                                   // big furniture is routed around, not walked into
+                navProps: 'all',                                  // furniture is routed around, not walked into (stools and chairs too)
                 wallStyle: { fill: '#16111b', stroke: 'rgba(201,164,106,0.4)' },   // black marble, gold trim
                 spawn: { x: 900, y: 1420 },
                 zones: [

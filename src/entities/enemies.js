@@ -1043,6 +1043,8 @@
                 if (canSee) {
                     markers.forEach(m => m.dismiss());
                     this.investigateTarget = {x: player.x, y: player.y};
+                    this.sweep = null;
+                    if (typeof game !== 'undefined') game._lastContactAt = _gameTimeSec;   // the gauntlet's stall breaker
                 }
                 
                 if (!canSee && this.state !== 'SUPPRESSING') {
@@ -1187,6 +1189,14 @@
                         while (diff > Math.PI) diff -= Math.PI * 2;
                         this.angle += diff * (navMap ? 0.2 : 0.1);
 
+                        // No headway for 5 s (a jam at a doorway): give up on this spot, try the next
+                        if (T !== this._searchT) { this._searchT = T; this._searchBest = distToTarget; this._searchSince = _simTick; }
+                        else if (distToTarget < this._searchBest - 4) { this._searchBest = distToTarget; this._searchSince = _simTick; }
+                        else if (distToTarget > 40 && _simTick - this._searchSince > 300) {
+                            if (this.sweep && this.sweep.length) this.investigateTarget = this.sweep.shift();
+                            else { this.state = 'IDLE'; this.sweep = null; this._sweepRooms = null; }
+                        }
+
                         if (distToTarget > 40) {
                             if (navMap) {
                                 const s = actorSteer(this, T.x, T.y, this.huntSpeed || 1.5, navMap);
@@ -1198,9 +1208,15 @@
                             }
                         } else {
                             markers.forEach(m => m.dismiss());
-                            this.angle += 0.05;
-                            this.suspicion -= 1.0; 
-                            if (this.suspicion <= 0) this.state = 'IDLE';
+                            // Nothing here: look around a moment, then sweep the rooms beyond
+                            if (this.sweep === null || this.sweep === undefined) { this.sweep = this._buildSweep(T, navMap); this._lookTimer = 45; }
+                            if (this._lookTimer > 0) { this._lookTimer--; this.angle += 0.06; }
+                            else if (this.sweep.length) { this.investigateTarget = this.sweep.shift(); this._lookTimer = 40; this.suspicion = Math.max(this.suspicion, 30); }
+                            else {
+                                this.angle += 0.05;
+                                this.suspicion -= 1.0; 
+                                if (this.suspicion <= 0) { this.state = 'IDLE'; this.sweep = null; this._sweepRooms = null; }
+                            }
                         }
                     } else {
                         this.state = 'IDLE';
@@ -1304,6 +1320,50 @@
                 }
             }
             
+            /**
+             * A sound (engine/noise.js): unless already fighting her, turn toward roughly where it
+             * came from (`err` px off) and go to look. `strength` 0…1 — louder or closer is
+             * more alarming. Returns true if it caught this ganger's attention.
+             */
+            hearNoise(nx, ny, strength, err) {
+                if (this.dead || this.state === 'ALERT' || this.state === 'SUPPRESSING') return false;
+                const a = Math.random() * Math.PI * 2, r = Math.random() * err;
+                this.investigateTarget = { x: nx + Math.cos(a) * r, y: ny + Math.sin(a) * r };
+                this.sweep = null; this._lookTimer = 0;
+                this.suspicion = Math.min(99, Math.max(this.suspicion, 45) + 35 * strength);
+                this.suspicionDrainDelay = 180;
+                this.state = 'SEARCHING';
+                this.angle = Math.atan2(ny - this.y, nx - this.x);
+                return true;
+            }
+
+            /**
+             * Where to look once the trail goes cold: the room the lead points into, then the rooms
+             * joined to it by doors, nearest first — skipping rooms two others are already
+             * searching. A couple of spots per room. [] off maps without rooms.
+             */
+            _buildSweep(T, map) {
+                const rs = typeof game !== 'undefined' ? game.roomSystem : null;
+                if (!rs || !rs.active) return [];
+                const start = rs.getRoomAt(T.x, T.y);
+                if (!start) return [];
+                const ids = [start.id];
+                for (const d of rs.doors) if (d.rooms.includes(start.id)) { const o = d.rooms[0] === start.id ? d.rooms[1] : d.rooms[0]; if (rs.rooms[o] && !ids.includes(o)) ids.push(o); }
+                const centre = id => { const q = rs.rooms[id].rects[0]; return { x: q.x + q.w / 2, y: q.y + q.h / 2 }; };
+                const claims = {};
+                for (const e of game.enemies) if (e !== this && e._sweepRooms) for (const id of e._sweepRooms) claims[id] = (claims[id] || 0) + 1;
+                const pick = [ids[0], ...ids.slice(1).sort((a, b) => Math.hypot(centre(a).x - T.x, centre(a).y - T.y) - Math.hypot(centre(b).x - T.x, centre(b).y - T.y))]
+                    .filter(id => (claims[id] || 0) < 2).slice(0, 3);
+                this._sweepRooms = pick;
+                const nav = map ? NavGrid.for(map) : null, snap = (x, y) => { const f = nav && nav.nearestFree(x, y, 6); return f !== null && f !== undefined ? { x: nav.cx(f), y: nav.cy(f) } : { x, y }; };
+                const pts = [];
+                for (const id of pick) {
+                    const q = rs.rooms[id].rects[0], c = centre(id);
+                    pts.push(snap(c.x, c.y), snap(q.x + q.w * (0.2 + Math.random() * 0.6), q.y + q.h * (0.2 + Math.random() * 0.6)));
+                }
+                return pts;
+            }
+
             onProjectileHit(projectile, game) {
                 if (projectile.isEnemy) return;
                 this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
@@ -1548,7 +1608,9 @@
             { id: 'sealed_3', label: 'Sealed', locked: true, blurb: 'Coming soon.' }
         ];
         const GAUNTLET_SPAWN_MIN_DIST = 350;
-        const GAUNTLET_HUNT_TICKS = 180;         // every 3 s, the living are told where 949 is
+        const GAUNTLET_LEAD_ERR = 300;           // a wave arrives knowing only her rough area (px off)
+        const GAUNTLET_STALL_SECS = 20;          // no one has seen or heard her this long → a vague lead…
+        const GAUNTLET_STALL_ERR = 220;          // …this far off: enough to sweep the right rooms
 
         class HordeGauntlet {
             constructor() {
@@ -1589,7 +1651,6 @@
                 this.wave = 0;
                 this.totalKills = 0;
                 this.hostiles = [];
-                this._huntTimer = 0;
                 // Where to put her back when she walks out
                 this._returnX = game.player.x;
                 this._returnY = game.player.y;
@@ -1618,15 +1679,17 @@
                 return out;
             }
 
-            /** Tell a hostile where 949 is: it comes hunting through the house (and swings the doors). */
-            _hunt(h, game) {
-                const p = game.player;
-                if (h instanceof Ganger) {
-                    if (h.state === 'ALERT' || h.state === 'SUPPRESSING') return;
-                    h.investigateTarget = { x: p.x + (Math.random() - 0.5) * 60, y: p.y + (Math.random() - 0.5) * 60 };
-                    h.state = 'SEARCHING';
-                    h.suspicion = Math.max(h.suspicion, 60);
-                }
+            /**
+             * Give a hostile a rough lead on 949 — `err` px off, snapped to walkable ground — and
+             * it comes to sweep that part of the house. No radar: they only ever learn where
+             * she is by seeing her, hearing her, or (a wave's start, a long silence) a vague lead.
+             */
+            _lead(h, game, err) {
+                if (!(h instanceof Ganger) || h.state === 'ALERT' || h.state === 'SUPPRESSING') return;
+                const p = game.player, a = Math.random() * Math.PI * 2, r = err * (0.5 + Math.random() * 0.5);
+                const nav = NavGrid.for(game.activeMap), f = nav && nav.nearestFree(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, 8);
+                h.investigateTarget = f !== null && f !== undefined ? { x: nav.cx(f), y: nav.cy(f) } : { x: p.x, y: p.y };
+                h.sweep = null; h.state = 'SEARCHING'; h.suspicion = Math.max(h.suspicion, 60);
             }
 
             spawnWave(game) {
@@ -1636,6 +1699,7 @@
                 this.hostiles = [];
                 const cfg = this.getWaveConfig(this.wave);
                 const nav = game.activeMap;
+                this._waveStartedAt = _gameTimeSec;
 
                 for (const pt of this._spawnPoints(game, this.entry.spawns, cfg.gangerCount)) {
                     const ganger = new Ganger(pt.x, pt.y, {
@@ -1643,7 +1707,7 @@
                     });
                     ganger._gauntletWave = this.wave;
                     ganger.huntSpeed = Math.min(2.6, cfg.speed * 0.8);
-                    this._hunt(ganger, game);
+                    this._lead(ganger, game, GAUNTLET_LEAD_ERR);
                     this.hostiles.push(ganger);
                     game.enemies.push(ganger);
                 }
@@ -1686,10 +1750,11 @@
                 this.hostiles = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));
                 this.totalKills += (before - this.hostiles.length);
 
-                // The living keep hunting her through the house
-                if (++this._huntTimer >= GAUNTLET_HUNT_TICKS) {
-                    this._huntTimer = 0;
-                    for (const h of this.hostiles) this._hunt(h, game);
+                // Stall breaker: nobody has seen or heard her in a while → the idle get a vague lead
+                if (game._lastContactAt === undefined || game._lastContactAt < this._waveStartedAt) game._lastContactAt = this._waveStartedAt;
+                if (_gameTimeSec - game._lastContactAt > GAUNTLET_STALL_SECS) {
+                    for (const h of this.hostiles) if (h.state === 'IDLE' || h.state === 'SUSPICIOUS') this._lead(h, game, GAUNTLET_STALL_ERR);
+                    game._lastContactAt = _gameTimeSec - GAUNTLET_STALL_SECS * 0.4;   // again in ~15 s if still silent
                 }
 
                 // Wave cleared

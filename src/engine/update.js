@@ -118,6 +118,7 @@
                     if (this.flitState.attunement >= this.flitCost()) this.flitBtn.classList.remove('cooldown');
                 }
                 this.updateFlitRing();
+                this.updateNoiseRipples();
                 if (this.flitState.active) { 
                     this.flitState.duration--; 
                     if (this.flitState.duration <= 0) this.flitState.active = false; 
@@ -540,6 +541,7 @@
                     // Unified projectile collection — handles single shots, arrays, or null
                     if (result) {
                         const shots = Array.isArray(result) ? result : [result];
+                        if (shots.some(s => s instanceof ProjectileEntity)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false);   // their gunfire draws their friends
                         for (const shot of shots) {
                             if (shot instanceof ProjectileEntity) {
                                 this.projectiles.push(shot);
@@ -729,6 +731,7 @@
                             if (win.tryShatter(p.x, p.y, 6)) {
                                 this.weather.spawnSparks(p.x, p.y, 8);
                                 audioSys.sfx('explode');
+                                this.emitNoise(p.x, p.y, CONFIG.NOISE.glass, 'glass', !p.isEnemy);
                                 break;
                             }
                         }
@@ -739,6 +742,7 @@
                             this.weather.spawnSparks(dh.x, dh.y, glass ? 6 : 4);
                             if (!glass && this.createImpactDust) this.createImpactDust(dh.x, dh.y);
                             if (typeof ambience !== 'undefined') ambience.doorEvent(glass ? 'tink' : 'thud', dh.door);
+                            this.emitNoise(dh.x, dh.y, CONFIG.NOISE.door, 'door', !p.isEnemy);
                             if (p.penetrating && !p.melee) p.damage *= 0.5;          // a sniper round punches through, spent
                             else { p.destroy(); this.projectiles.splice(i, 1); continue; }
                         }

@@ -330,8 +330,9 @@
                     const jammed = Math.abs(this.angle) >= MAX - 0.01 && Math.sign(ux * -ny - uy * -nx) === Math.sign(this.angle);
                     const give = jammed || s < 4 ? 1 : 0.7;                         // near the hinge or at the stop it can't yield
                     act.x += nx * depth * give; act.y += ny * depth * give;
-                    // Torque from the actor pushing along -n at distance s from the hinge
-                    const torque = s * (ux * -ny - uy * -nx) * depth;
+                    // Torque from the actor pushing along -n; a push near the hinge still swings the
+                    // door (people push a door's middle), so no one gets stuck at the jamb
+                    const torque = Math.max(s, L * 0.5) * (ux * -ny - uy * -nx) * depth;
                     this.angVel += torque * 0.9 / (L * L / 3);
                 }
                 const prev = this.angle;
