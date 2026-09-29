@@ -716,37 +716,44 @@
                 }
             },
             
+            /**
+             * The day, in one place — everything that changes with the hour reads this:
+             *   darkness  outdoor sky darkness 0…0.6 (clouds and rain dim the day a little)
+             *   tint      colour of the dark: violet-indigo night, gold dusk, rose dawn
+             *   daylight  0…1 sun through windows (peaks at noon)
+             *   sun       0…1 daytime exposure (06:00–18:00)
+             *   lampsOn   street lamps burn from late afternoon to just after dawn
+             */
+            dayCycle() {
+                const w = this.weather, wet = w ? Math.min(1, Math.max(0, w.intensity || 0)) : 0;
+                const key = this.worldMinutes + ':' + wet.toFixed(2);
+                if (this._dayCycle && this._dayCycle.key === key) return this._dayCycle;
+                const h = (this.worldMinutes % 1440) / 60, MAX = 0.6;
+                let dark = h >= 5 && h < 6 ? MAX * (1 - (h - 5))            // dawn
+                         : h >= 6 && h < 18 ? 0                               // day
+                         : h >= 18 && h < 20 ? MAX * (h - 18) / 2              // dusk
+                         : MAX;                                                // night
+                dark += (MAX - dark) * 0.2 * wet;                              // overcast and rain
+                // The colour of the dark
+                const NIGHT = [30, 13, 68], DUSK = [84, 40, 16], DAWN = [70, 26, 58];
+                const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * Math.max(0, Math.min(1, t))));
+                const tint = h >= 17 && h < 21 ? mix(DUSK, NIGHT, (h - 18.6) / 1.4)
+                           : h >= 4 && h < 7 ? mix(NIGHT, DAWN, (h - 4.4) / 0.8)
+                           : NIGHT;
+                return (this._dayCycle = {
+                    key, hour: h, darkness: dark, tint, tintRGB: tint.join(', '),
+                    daylight: Math.max(0, 1 - Math.abs(12 - h) / 6),
+                    sun: h > 6 && h < 18 ? Math.sin(Math.PI * (h - 6) / 12) : 0,
+                    lampsOn: h >= 17.5 || h < 6.25
+                });
+            },
+
             getAmbientDarkness() {
                 // Per-map override (e.g. well-lit interiors like arenas)
                 if (this.activeMap.ambientDarkness !== undefined) return this.activeMap.ambientDarkness;
-                // CHANGE: If indoor, return high darkness (0.95) instead of 0
-                if (this.activeMap.type === 'indoor') return 0.95; 
-                
-                // --- Existing Outdoor Logic ---
-                // worldMinutes is monotonic (counts up forever) — derive
-                // hour-of-day with % 1440 so day 2+ still cycles correctly.
-                const time = (this.worldMinutes % 1440) / 60;
-                const maxDarkness = 0.6; 
-            
-                // DAWN (5:00 to 6:00)
-                if (time >= 5 && time < 6) {
-                    const progress = time - 5; 
-                    return maxDarkness - (progress * maxDarkness);
-                }
-            
-                // DAY (6:00 to 18:00)
-                if (time >= 6 && time < 18) {
-                    return 0;
-                }
-            
-                // DUSK (18:00 to 20:00)
-                if (time >= 18 && time < 20) {
-                    const progress = (time - 18) / 2; 
-                    return progress * maxDarkness;
-                }
-            
-                // NIGHT (20:00 to 5:00)
-                return maxDarkness;
+                // Indoors is lamp-lit (outdoor rooms carve the sky's light back in: RoomSystem.carveSkyLight)
+                if (this.activeMap.type === 'indoor') return 0.95;
+                return this.dayCycle().darkness;
             },
             
             /* --- ADD TO GameEngine CLASS --- */

@@ -20,7 +20,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `core/registries.js` | Notes, consumables, drinks, cosmetics (wigs, skins, outfits, hats, jewelry…); `CosmeticsSystem`, `BuffSystem` |
 | `core/resonance.js` | `ResonanceSystem`: 949's progression — earning (style-weighted), Dr. Yin's tuning, the Flit / Frame / Arms trees |
 | `core/utils.js` | Maths helpers, humanoid gait/animation helpers, weapon muzzle helpers, `RenderInterp` |
-| `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs |
+| `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs, glow sprites (`glowSprite`, `drawGlow`), `lampFlicker` |
 | `core/appearances.js` | **Every character's look in one place**: `APPEARANCES` (949, the crew, staff, the city's cast), `ROLE_LOOKS` (medics, dancers, androids, pedestrians, gangers, spirits, ghosts), `PALETTE`, `ANDROID_FINISHES`; `lookFor(entity)`, `portraitOf(look)` |
 | `core/settings.js` | `FullscreenManager`, `GameSettings`, object pools, perf utilities, `showMessage` |
 
@@ -31,7 +31,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `world/weather.js` | Weather conditions, climates, `WeatherSystem` (rain, wind, lightning, forecast) |
 | `world/weather-response.js` | How weather reaches a character: `weatherAt` (wind on hair and cloth, rain, storm), lightning flinches, umbrellas |
 | `world/particles-decals.js` | Leaf particles, decals |
-| `world/rooms.js` | Room System: windows, doors (hinged doors with swing physics), silk linens, `RoomSystem`, `ROOM_DEFS` |
+| `world/rooms.js` | Room System, the standard for indoor maps: per-room visibility (soft violet veil, gentle reveal, light spilling through open doors, dim-through-glass from outside), fading room lights, `outdoorness`, sky light on outdoor rooms; windows, doors (hinged doors with swing physics), silk linens, `RoomSystem`, `ROOM_DEFS` (the checklist for giving a map rooms is in its header) |
 | `world/maps.js` | `MAP_DATA`: every map's size, floor zones, walls, transitions, landmarks |
 | `world/map-entities.js` | `createMapEntities`: props, NPCs and lamps per map (the apartment suite's furniture is here) |
 | `world/billboards.js` | `BILLBOARDS`: your artwork on tilted panels around the city. Add one by copying a line |
@@ -120,11 +120,11 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/screens-ui.js` | HUD update, dialogue and portraits, character/team/story/collection screens, notes, crafting |
 | `engine/save-load.js` | Saving, loading, migrations |
 | `engine/map-loading.js` | `loadMap`: building each map when you enter it; baked lighting |
-| `engine/world-state.js` | Emissive pass, debug views, transitions, vehicles, visibility, time of day, darkness |
+| `engine/world-state.js` | Emissive pass, debug views, transitions, vehicles, visibility, time of day (`dayCycle`: darkness, the colour of the dark, daylight, sun, lamps on), darkness |
 | `engine/update.js` | `update()`: the per-tick simulation |
 | `engine/draw.js` | `draw()`: the frame renderer |
 | `engine/interiors.js` | Apartment and clinic interiors, the city seen from the veranda |
-| `engine/lighting.js` | Lighting, bloom, wet reflections, atmosphere, colour grade |
+| `engine/lighting.js` | Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, wet reflections, atmosphere |
 | `engine/player-draw-input.js` | Drawing the player, emotes, timers, joysticks |
 | `engine/loop.js` | `start`, `stop`, `resetGameState`, the main loop |
 

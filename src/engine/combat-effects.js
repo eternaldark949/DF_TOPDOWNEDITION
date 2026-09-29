@@ -145,6 +145,7 @@
                 // Apply Fidelity Scale — lightingScale composes with the render
                 // scale rather than multiplying against it, so 'low' lighting at
                 // 0.5 render scale doesn't end up at quarter resolution.
+                // (drawLightingSystem also halves it for soft shadows, and keeps it in step)
                 this.lightCanvas.width = Math.max(1, Math.round(bufW * this.lightingScale)); 
                 this.lightCanvas.height = Math.max(1, Math.round(bufH * this.lightingScale));
                 
@@ -153,10 +154,7 @@
                 // the wrong place the moment scale ≠ 1.
                 this.weather.resize(bufW, bufH);
                 
-                // If map is active, we might need to re-bake static lighting if resolution changed
-                if(this.activeMap) {
-                    this.bakeStaticLighting(); 
-                }
+                // (Lamp shadow shapes are in world space: no rebake needed on resize.)
             },
 
             fireWeapon() {

@@ -33,6 +33,9 @@
             }
             
             update() { }
+
+            /** This lamp's glow sprite (core/draw-helpers.js). */
+            _glow() { return this._glowCv || (this._glowCv = glowSprite(/^#[0-9a-f]{6}$/i.test(this.color) ? this.color : '#ffeebb', 0.3)); }
             
             draw(ctx, daylight = 0) {
                 if (!this.visible) return;
@@ -65,12 +68,14 @@
                      ctx.fillStyle = '#1a1a1a';
                      ctx.fillRect(-3, -12, 6, 24);
                      // Warm glow strip
-                     if (daylight < 0.2) {
+                     if (isOn) {
+                         const k = this._lightK ?? 1;
+                         ctx.globalAlpha = 0.7 * k;
+                         ctx.drawImage(this._glow(), -12, -22, 24, 44);
+                         ctx.globalAlpha = k;
                          ctx.fillStyle = this.color;
-                         ctx.shadowColor = this.color;
-                         ctx.shadowBlur = 12;
                          ctx.fillRect(-2, -10, 4, 20);
-                         ctx.shadowBlur = 0;
+                         ctx.globalAlpha = 1;
                      } else {
                          ctx.fillStyle = '#333';
                          ctx.fillRect(-2, -10, 4, 20);
@@ -92,21 +97,24 @@
                     ctx.fillRect(-4, -24, 8, 48);
                 }
         
-                // 2. DRAW BULBS
+                // 2. DRAW BULBS — a glow sprite behind each (faded with the room's light)
+                const k = this._lightK ?? 1, big = this.lampType === 4;
                 for (let b of bulbs) {
+                    const r = big ? 12 : 8;
                     if (isOn) {
-                        ctx.fillStyle = this.color; 
-                        ctx.shadowColor = this.color; 
-                        ctx.shadowBlur = (this.lampType === 4) ? 25 : 15;
+                        const gr = big ? 34 : 24;
+                        ctx.globalAlpha = 0.85 * k;
+                        ctx.drawImage(this._glow(), b.x - gr, b.y - gr, gr * 2, gr * 2);
+                        ctx.globalAlpha = 1;
+                        if (k < 1) { ctx.fillStyle = '#444444'; ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = k; }
+                        ctx.fillStyle = this.color;
                     } else {
-                        ctx.fillStyle = '#444444'; 
-                        ctx.shadowBlur = 0;
+                        ctx.fillStyle = '#444444';
                     }
-                    
                     ctx.beginPath(); 
-                    ctx.arc(b.x, b.y, (this.lampType === 4 ? 12 : 8), 0, Math.PI*2); 
+                    ctx.arc(b.x, b.y, r, 0, Math.PI*2); 
                     ctx.fill();
-                    ctx.shadowBlur = 0;
+                    ctx.globalAlpha = 1;
                 }
         
                 // 3. DRAW PARTICLES (skip when zoomed out — invisible at distance)

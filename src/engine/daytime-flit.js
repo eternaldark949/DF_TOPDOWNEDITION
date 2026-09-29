@@ -5,24 +5,18 @@
                 const overlay = document.getElementById('daytime-filter');
                 if (!overlay) return;
         
-                // Current time in minutes (0 - 1440)
-                const time = this.worldMinutes % 1440;
-                
-                // Define Day Cycle
-                const sunrise = 6 * 60;   // 06:00
-                const sunset = 19 * 60;   // 19:00
-                
-                // 1. NIGHT CHECK: If it's night, remove filter entirely
-                if (time <= sunrise || time >= sunset || this.activeMap.type === 'indoor') {
+                // The sun (dayCycle), felt outdoors — and out on a veranda as she steps onto it
+                const rs = this.roomSystem;
+                const out = this.activeMap.type === 'indoor' ? (rs && rs.active ? rs.outdoorness : 0) : 1;
+                const intensity = this.dayCycle().sun * out;
+                if (intensity <= 0.001) {
+                    if (this._exposureOff) return;
                     overlay.style.backdropFilter = 'none';
                     overlay.style.webkitBackdropFilter = 'none';
+                    this._exposureOff = true;
                     return;
                 }
-        
-                // 2. DAY CALCULATION
-                const dayLength = sunset - sunrise;
-                const progress = (time - sunrise) / dayLength;
-                const intensity = Math.sin(progress * Math.PI);
+                this._exposureOff = false;
         
                 // Brightness: 100% -> 130%
                 const brightness = 100 + (intensity * 60);

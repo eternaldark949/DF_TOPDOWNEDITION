@@ -42,8 +42,10 @@
             /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
             drawApartmentGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;
-                const dark = (x, y) => { const r = rs && rs.active ? rs.getRoomAt(x, y) : null; return !!(r && r.lightsOff); };
-                const glow = (x, y, r, c0, c1) => { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c0); g.addColorStop(1, c1); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+                const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these
+                // A glow sprite (core/draw-helpers.js) of colour `rgb`, alpha `a`
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const dot = (x, y, r, rgba) => { ctx.globalAlpha = 1; ctx.fillStyle = rgba; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // Lamp shades and bar pendants (they follow the room switches)
                 const shades = [[991, 232, 28], [1115, 232, 28], [307, 439, 34], [700, 700, 34], [109, 463, 34], [231, 759, 22], [350, 759, 22], [469, 759, 22]];
@@ -51,24 +53,26 @@
                     const c = p.getCenter(); shades.push([c.x - 2, c.y - 1, 30]);
                 }
                 for (const [x, y, r] of shades) {
-                    if (dark(x, y)) continue;
-                    glow(x, y, r, 'rgba(255,210,160,0.26)', 'rgba(255,190,140,0)');
-                    ctx.fillStyle = 'rgba(255,236,210,0.8)'; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+                    const k = lightAt(x, y);
+                    if (k < 0.01) continue;
+                    glow(x, y, r, '255, 210, 160', 0.26 * k);
+                    dot(x, y, 2.5, `rgba(255,236,210,${0.8 * k})`);
                 }
                 // Fireplace
                 const ff = 0.8 + 0.2 * Math.sin(t * 6.3) * Math.sin(t * 2.1);
-                glow(580, 432, 60, `rgba(255,140,60,${0.35 * ff})`, 'rgba(255,120,40,0)');
+                glow(580, 432, 60, '255, 140, 60', 0.35 * ff);
                 // Induction zones (warm red) and two gas burners (blue flame)
-                for (const [x, y] of [[433, 864], [460, 877]]) glow(x, y, 12, 'rgba(255,70,40,0.55)', 'rgba(255,60,30,0)');
+                for (const [x, y] of [[433, 864], [460, 877]]) glow(x, y, 12, '255, 70, 40', 0.55);
                 for (const [x, y, r] of [[312, 859, 7], [329, 873, 5.5]]) {
+                    ctx.globalAlpha = 1;
                     ctx.strokeStyle = `rgba(90,160,255,${0.6 + 0.3 * Math.sin(t * 14 + x)})`; ctx.lineWidth = 1.5;
                     ctx.beginPath(); ctx.arc(x, y, r - 1, 0, Math.PI * 2); ctx.stroke();
-                    glow(x, y, r + 6, 'rgba(90,150,255,0.25)', 'rgba(90,150,255,0)');
+                    glow(x, y, r + 6, '90, 150, 255', 0.25);
                 }
                 // Candles on the tub rim
                 for (const [x, y] of [[1248, 619], [1256, 612], [1368, 619]]) {
                     const f = 0.75 + 0.25 * Math.sin(t * 9 + x);
-                    glow(x, y, 12, `rgba(255,200,130,${0.5 * f})`, 'rgba(255,180,110,0)');
+                    glow(x, y, 12, '255, 200, 130', 0.5 * f);
                 }
                 // Festoon string lights swagged along the veranda railing
                 for (let s = 0; s < 8; s++) {
@@ -76,8 +80,8 @@
                     for (let i = 0; i <= 8; i++) {
                         const u = i / 8, x = x0 + (x1 - x0) * u, y = 14 + Math.sin(u * Math.PI) * 12;
                         const f = 0.7 + 0.3 * Math.sin(t * 1.3 + s * 3 + i * 1.7);
-                        glow(x, y, 9, `rgba(255,214,160,${0.45 * f})`, 'rgba(255,200,140,0)');
-                        ctx.fillStyle = `rgba(255,240,215,${0.9 * f})`; ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
+                        glow(x, y, 9, '255, 214, 160', 0.45 * f);
+                        dot(x, y, 1.6, `rgba(255,240,215,${0.9 * f})`);
                     }
                 }
                 ctx.restore();

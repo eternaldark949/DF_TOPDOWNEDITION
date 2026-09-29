@@ -952,6 +952,7 @@
                             this.activeMap.walls,
                             ROOM_DEFS[mapId].doors || []
                         );
+                        this._renderGridWalls.build(this.activeMap.walls);   // draw the cut walls, the same ones that collide
                     }
                 } else {
                     this.roomSystem.clear();
