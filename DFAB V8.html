@@ -2550,6 +2550,11 @@
                         <div class="row-center"><div class="menu-btn" id="lbl-sniperrelease">Sniper Fire on Release: ON</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
+                    <div class="menu-item-row" id="btn-toggle-scopeview">
+                        <div class="row-left"><div class="desc-box">Snipers: the world narrows to your line of sight.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-scopeview">Scope View: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
                     <div class="menu-item-row" id="btn-toggle-audio">
                         <div class="row-left"><div class="desc-box">Mute all SFX and music.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-audio">Master Audio: ON</div></div>
@@ -3256,6 +3261,10 @@
                 <div class="settings-row">
                     <span class="settings-label">Sniper Fire on Release</span>
                     <span class="settings-value val-on" id="set-sniperrelease" data-key="sniperRelease">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Scope View</span>
+                    <span class="settings-value val-on" id="set-scopeview" data-key="scopeView">ON</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Film Grain</span>
@@ -6117,7 +6126,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // --- CONTROLS (touch) — flitting without letting go of the trigger ---
             // Kept in localStorage (dfab_controls) and in saves. See initJoystick.
             ...(() => {
-                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true };
+                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, scopeView: true };
                 try { Object.assign(d, JSON.parse(localStorage.getItem('dfab_controls') || '{}')); } catch (e) { /* private mode */ }
                 return d;
             })(),
@@ -6184,7 +6193,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Apply film grain visibility
             /** Store the control toggles and show or hide the ⚡ button. */
             applyControls() {
-                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease })); } catch (e) { /* private mode */ }
+                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, scopeView: this.scopeView })); } catch (e) { /* private mode */ }
                 const b = document.getElementById('btn-flit');
                 if (b) b.classList.toggle('hidden-by-setting', !this.flitButton);
                 const r = document.getElementById('joystick-ring');
@@ -7467,7 +7476,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const paused = !!game.paused;
                 const vol = GameSettings.ambienceVolume ?? 0.7;
 
-                this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1), now, 0.4);   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
+                this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
                 this._set(this.L.rain, outside ? 0.3 * rain : 0, 0.8);
                 this._set(this.L.rainIn, outside ? 0 : 0.22 * rain, 0.8);
                 this._set(this.L.wind, outside ? 0.04 + 0.12 * wind : 0.015 * wind, 1.2);
@@ -35822,7 +35831,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 rFistX = 6 + bounce - bodyRecoil - (recoil * 6);
                 rFistY = 14;
                 const gunLineY = stance === 'sniper' ? rFistY + 0.5 : rFistY - 0.5;   // centerline of the drawn model
-                lFistX = rFistX + (stance === 'sniper' ? 18 : 14);                   // on the handguard / fore-end
+                lFistX = rFistX + (stance === 'sniper' ? 18 : 14) + (config.scopeK || 0) * 4;   // on the handguard / fore-end (further out, scoped)
                 lFistY = gunLineY;
             } else if (stance === 'punch' && punchStrike !== null) {
                 // --- PUNCH: guard pose only. The strike (reach, cross, off-hand pull,
@@ -36375,8 +36384,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // 10. Head & Hair
             // In strong wind the head dips into it (toward where it's blowing from)
             const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W ? W.strong * 1.3 : 0;
-            const headX = 0 + bounce - bodyRecoil + pf('head', 0) - Math.cos(windLocal) * dip;
-            const headY = pf('head', 1) - Math.sin(windLocal) * dip, headTurn = pose ? (pose.turn || 0) * poseW : 0;   // looking around
+            // Scoped (engine/scope.js): cheek down to the stock, head tipped toward the sight
+            const scopeK = config.scopeK || 0;
+            const headX = 0 + bounce - bodyRecoil + pf('head', 0) - Math.cos(windLocal) * dip + scopeK * 3.5;
+            const headY = pf('head', 1) - Math.sin(windLocal) * dip + scopeK * 3, headTurn = (pose ? (pose.turn || 0) * poseW : 0) + scopeK * 0.18;   // looking around
             // 1.0 at the player's base walk speed — keeps the old player hair tuning, now shared by everyone
             const hairMove = gaitSpeed / 5.2;
             // Hair motion comes from the strand physics (hairGeometry): the owner's head
@@ -41112,6 +41123,101 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             },
         });
+        // GameEngine — Scope view: with a sniper up to her eye, the world darkens and only a soft
+        // lane about her width stays lit along her line of fire, out to where the shot would
+        // land. Eases in and out; the lane sways a little, then steadies (the cue to take the
+        // shot). The camera leans down the line. Setting: GameSettings.scopeView.
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        const SCOPE = {
+            IN: 7, OUT: 9,                // easing rates (per second) — about 0.25 s in, 0.2 s out
+            VEIL: 0.55,                   // darkness at full scope
+            VEIL_RGB: '10, 6, 20',        // the violet-black of the night
+            WIDTH: 30,                    // the lane's width (world px) — about her own
+            RANGE: 950,                   // how far she can look (world px), clipped at walls
+            LEAN: 0.3,                    // camera lean down the line, as a share of the half-view
+            SWAY: 0.014, STEADY: 0.6      // radians of breathing sway; seconds to settle
+        };
+
+        engineMixin({
+            /** Is she looking down a sniper's sight right now? */
+            isScoping() {
+                if (GameSettings.scopeView === false || this.weaponMode !== 'sniper' || this.weaponHolstered || this.isDriving || this.paused) return false;
+                const F = this.fireJoystick;
+                return !!((F.active && (F.aimed || F.armed)) || (this.mouseDown && this.mouseX));
+            },
+
+            /** Ease the scope in or out; track how long she's held it (for the sway to settle). */
+            updateScope() {
+                const on = this.isScoping(), dt = 1 / 60;
+                const k = this.scopeK || 0, target = on ? 1 : 0;
+                this.scopeK = k + (target - k) * (1 - Math.exp(-(on ? SCOPE.IN : SCOPE.OUT) * dt));
+                if (this.scopeK < 0.002) this.scopeK = 0;
+                this._scopeHeld = on ? (this._scopeHeld || 0) + dt : 0;
+                // Camera lean down the line (eased with the scope)
+                const a = this.player.angle, half = Math.min(this.canvas.width, this.canvas.height) / 2 / (this.camera.zoom || 1);
+                this.scopeLeanX = Math.cos(a) * half * SCOPE.LEAN * this.scopeK;
+                this.scopeLeanY = Math.sin(a) * half * SCOPE.LEAN * this.scopeK;
+            },
+
+            /** A soft lane sprite: bright along its middle, feathered at the sides, fading at the far end. */
+            _scopeLaneSprite() {
+                if (this._scopeLane) return this._scopeLane;
+                const W = 256, H = 32, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+                const c = cv.getContext('2d'), img = c.createImageData(W, H);
+                for (let y = 0; y < H; y++) {
+                    const across = 1 - Math.pow(Math.abs(y - (H - 1) / 2) / (H / 2), 2);           // soft sides
+                    for (let x = 0; x < W; x++) {
+                        const u = x / (W - 1), along = u < 0.06 ? u / 0.06 : u > 0.72 ? Math.max(0, (1 - u) / 0.28) : 1;
+                        const i = (y * W + x) * 4; img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+                        img.data[i + 3] = Math.round(255 * Math.max(0, across) * along);
+                    }
+                }
+                c.putImageData(img, 0, 0);
+                return (this._scopeLane = cv);
+            },
+
+            /** Drawn after the lighting and glows, in world space (the camera transform is on ctx). */
+            drawScopeView(ctx) {
+                const k = this.scopeK || 0;
+                if (k <= 0) return;
+                const p = this.player, t = _gameTimeSec;
+                const steady = Math.min(1, (this._scopeHeld || 0) / SCOPE.STEADY);
+                const a = p.angle + (Math.sin(t * 1.7) * 0.7 + Math.sin(t * 3.1) * 0.3) * SCOPE.SWAY * (1 - steady);
+                const ex = p.x + Math.cos(a) * 6, ey = p.y + Math.sin(a) * 6;              // her eye at the sight
+                const far = raycastNearest(ex, ey, ex + Math.cos(a) * SCOPE.RANGE, ey + Math.sin(a) * SCOPE.RANGE,
+                    [...(this.activeMap.walls || []), ...getColliders(this.activeMap)], SCOPE.RANGE);
+                // The veil on its own half-resolution layer (it's all soft), with the lane cut out of it
+                const R = 0.5, W = Math.ceil(this.canvas.width * R), H = Math.ceil(this.canvas.height * R);
+                const v = this._scopeVeil || (this._scopeVeil = document.createElement('canvas'));
+                if (v.width !== W || v.height !== H) { v.width = W; v.height = H; }
+                const vc = v.getContext('2d');
+                vc.setTransform(1, 0, 0, 1, 0, 0);
+                vc.clearRect(0, 0, W, H);
+                vc.globalCompositeOperation = 'source-over';
+                vc.fillStyle = `rgba(${SCOPE.VEIL_RGB}, ${(SCOPE.VEIL * k).toFixed(3)})`;
+                vc.fillRect(0, 0, W, H);
+                const m = ctx.getTransform();                                                 // same world → screen as the scene, at half size
+                vc.setTransform(m.a * R, m.b * R, m.c * R, m.d * R, m.e * R, m.f * R);
+                vc.globalCompositeOperation = 'destination-out';
+                vc.translate(ex, ey); vc.rotate(a);
+                vc.drawImage(this._scopeLaneSprite(), 0, -SCOPE.WIDTH / 2, far + 40, SCOPE.WIDTH);
+                vc.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.imageSmoothingEnabled = true;
+                ctx.drawImage(v, 0, 0, this.canvas.width, this.canvas.height);
+                ctx.restore();
+                // Inside the lane: a hairline down the sight, and the faintest cool glass tint
+                ctx.save();
+                ctx.translate(ex, ey); ctx.rotate(a);
+                ctx.globalAlpha = 0.10 * k; ctx.globalCompositeOperation = 'lighter';
+                ctx.drawImage(this._scopeLaneSprite(), 0, -SCOPE.WIDTH / 2, far + 40, SCOPE.WIDTH);
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = (0.35 + 0.35 * steady) * k; ctx.strokeStyle = steady >= 1 ? '#ffd9a0' : '#ff6a7a'; ctx.lineWidth = 0.8;
+                ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(far, 0); ctx.stroke();
+                ctx.restore();
+            },
+        });
         // GameEngine — Resonance on screen: the HUD meter, Dr. Yin's tuning overlay, the
         // SKILLS screen, and applying installed ranks to 949's stats (see core/resonance.js).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
@@ -44190,7 +44296,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
                         flitTwoFinger: GameSettings.flitTwoFinger, flitButton: GameSettings.flitButton,
-                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease,
+                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, scopeView: GameSettings.scopeView,
                         ambienceVolume: GameSettings.ambienceVolume,
                         musicVolume: GameSettings.musicVolume,
                         fullscreen: GameSettings.fullscreen,
@@ -44810,6 +44916,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         GameSettings.flitButton = save.settings.flitButton !== false;
                         GameSettings.aimBeforeFire = save.settings.aimBeforeFire !== false;
                         GameSettings.sniperRelease = save.settings.sniperRelease !== false;
+                        GameSettings.scopeView = save.settings.scopeView !== false;
                         GameSettings.applyControls();
                         if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
                         if (typeof save.settings.musicVolume === 'number') audioSys.setMusicVolume(save.settings.musicVolume);
@@ -47173,6 +47280,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 this.updateFlitRing();
                 this.updateNoiseRipples();
+                this.updateScope();
                 if (this.flitState.active) { 
                     this.flitState.duration--; 
                     if (this.flitState.duration <= 0) this.flitState.active = false; 
@@ -48615,8 +48723,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     camX = this.camera.x;
                     camY = this.camera.y;
                 } else {
-                    camX = this.player.x;
-                    camY = this.player.y;
+                    // Scoped with a sniper, the camera leans down her line (engine/scope.js)
+                    camX = this.player.x + (this.scopeLeanX || 0);
+                    camY = this.player.y + (this.scopeLeanY || 0);
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
@@ -49310,7 +49419,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Laser Sight beam (drawn after player, in world space) — from the gun's muzzle
                 // along the exact line the next shot takes (see getLaserSight / fireWeapon)
-                const laser = this.getLaserSight();
+                const laser = (this.scopeK || 0) < 0.5 ? this.getLaserSight() : null;   // scoped, the hairline in the lane takes over
                 if (laser) {
                     const muzzleX = laser.x0, muzzleY = laser.y0, hitX = laser.x1, hitY = laser.y1;
                     
@@ -49598,6 +49707,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.drawLightingSystem(this.ctx);
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
                 this.drawEmissivePass(this.ctx);
+                // Looking down a sniper's sight: the world narrows to her line
+                this.drawScopeView(this.ctx);
                 // Health bars and damage numbers, above the darkness so they read at night
                 this.drawCombatOverlays(this.ctx, cullBounds.entities);
                 
@@ -51475,6 +51586,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     hair: cosmeticConfig.hair,
                     gender: APPEARANCES['949'].gender,
                     stance: currentStance,
+                    scopeK: currentStance === 'sniper' ? (this.scopeK || 0) : 0,   // eye to the sight (engine/scope.js)
                     isDriving: this.isDriving,
                     isShootingFromCar: this.isDriving && this.isShootingFromCar,
                     carAngle: this.car ? this.car.angle : 0,
@@ -54777,7 +54889,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._updateValueEl('set-rain', GameSettings.rainDensity);
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
-                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease']])
+                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease'], ['set-scopeview', 'scopeView']])
                     this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
@@ -54809,7 +54921,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _cycleSetting(el) {
                 const key = el.dataset.key;
                 
-                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'aimBeforeFire' || key === 'sniperRelease') {
+                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'aimBeforeFire' || key === 'sniperRelease' || key === 'scopeView') {
                     GameSettings[key] = !GameSettings[key];
                     GameSettings.applyControls();
                     this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
@@ -55018,6 +55130,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             lbl('lbl-flitbtn', `Flit Button: ${onOff('flitButton')}`, onCol('flitButton'));
             lbl('lbl-aimfire', `Aim Before Firing: ${onOff('aimBeforeFire')}`, onCol('aimBeforeFire'));
             lbl('lbl-sniperrelease', `Sniper Fire on Release: ${onOff('sniperRelease')}`, onCol('sniperRelease'));
+            lbl('lbl-scopeview', `Scope View: ${onOff('scopeView')}`, onCol('scopeView'));
             lbl('lbl-audio', `Master Audio: ${GameSettings.audioEnabled ? 'ON' : 'OFF'}`,
                 GameSettings.audioEnabled ? '' : '#666');
             lbl('lbl-fps', `FPS Limit: ${GameSettings.fpsLimit === 0 ? 'NONE' : GameSettings.fpsLimit}`,
@@ -55110,7 +55223,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         });
         
         // Flit controls (touch): ring, flick, two-finger tap, the ⚡ button
-        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton'], ['btn-toggle-aimfire', 'aimBeforeFire'], ['btn-toggle-sniperrelease', 'sniperRelease']]) {
+        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton'], ['btn-toggle-aimfire', 'aimBeforeFire'], ['btn-toggle-sniperrelease', 'sniperRelease'], ['btn-toggle-scopeview', 'scopeView']]) {
             document.getElementById(id).addEventListener('click', () => {
                 GameSettings[key] = !GameSettings[key];
                 GameSettings.applyControls();

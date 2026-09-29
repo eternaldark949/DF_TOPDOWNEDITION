@@ -90,6 +90,7 @@ const SCRIPTS = [
     'engine/combat-effects.js',
     'engine/combat-fx.js',
     'engine/noise.js',
+    'engine/scope.js',
     'engine/tuning-ui.js',
     'engine/shops-menus.js',
     'engine/daytime-flit.js',

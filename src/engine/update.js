@@ -119,6 +119,7 @@
                 }
                 this.updateFlitRing();
                 this.updateNoiseRipples();
+                this.updateScope();
                 if (this.flitState.active) { 
                     this.flitState.duration--; 
                     if (this.flitState.duration <= 0) this.flitState.active = false; 

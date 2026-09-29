@@ -39,6 +39,7 @@
                     hair: cosmeticConfig.hair,
                     gender: APPEARANCES['949'].gender,
                     stance: currentStance,
+                    scopeK: currentStance === 'sniper' ? (this.scopeK || 0) : 0,   // eye to the sight (engine/scope.js)
                     isDriving: this.isDriving,
                     isShootingFromCar: this.isDriving && this.isShootingFromCar,
                     carAngle: this.car ? this.car.angle : 0,

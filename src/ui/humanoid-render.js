@@ -1090,7 +1090,7 @@
                 rFistX = 6 + bounce - bodyRecoil - (recoil * 6);
                 rFistY = 14;
                 const gunLineY = stance === 'sniper' ? rFistY + 0.5 : rFistY - 0.5;   // centerline of the drawn model
-                lFistX = rFistX + (stance === 'sniper' ? 18 : 14);                   // on the handguard / fore-end
+                lFistX = rFistX + (stance === 'sniper' ? 18 : 14) + (config.scopeK || 0) * 4;   // on the handguard / fore-end (further out, scoped)
                 lFistY = gunLineY;
             } else if (stance === 'punch' && punchStrike !== null) {
                 // --- PUNCH: guard pose only. The strike (reach, cross, off-hand pull,
@@ -1643,8 +1643,10 @@
             // 10. Head & Hair
             // In strong wind the head dips into it (toward where it's blowing from)
             const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W ? W.strong * 1.3 : 0;
-            const headX = 0 + bounce - bodyRecoil + pf('head', 0) - Math.cos(windLocal) * dip;
-            const headY = pf('head', 1) - Math.sin(windLocal) * dip, headTurn = pose ? (pose.turn || 0) * poseW : 0;   // looking around
+            // Scoped (engine/scope.js): cheek down to the stock, head tipped toward the sight
+            const scopeK = config.scopeK || 0;
+            const headX = 0 + bounce - bodyRecoil + pf('head', 0) - Math.cos(windLocal) * dip + scopeK * 3.5;
+            const headY = pf('head', 1) - Math.sin(windLocal) * dip + scopeK * 3, headTurn = (pose ? (pose.turn || 0) * poseW : 0) + scopeK * 0.18;   // looking around
             // 1.0 at the player's base walk speed — keeps the old player hair tuning, now shared by everyone
             const hairMove = gaitSpeed / 5.2;
             // Hair motion comes from the strand physics (hairGeometry): the owner's head
