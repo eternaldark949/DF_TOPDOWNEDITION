@@ -3986,7 +3986,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const wig = COSMETICS_REGISTRY[this.equippedWig];
                 const skin = COSMETICS_REGISTRY[this.equippedSkin];
                 const outfit = COSMETICS_REGISTRY[this.equippedOutfit];
-                const defaultOutfit = { top: { type: 'sports_bra', color: '#111' }, bottom: { type: 'pants', color: '#e0e0e0' }, shoes: { type: 'sneakers', color: '#fff' }, train: null, held: null };
                 const acc = this.equippedAccessory ? COSMETICS_REGISTRY[this.equippedAccessory] : null;
                 let held = null;
                 if (acc && acc.data.held === 'glass') {
@@ -3997,9 +3996,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const hat = this.equippedHat ? COSMETICS_REGISTRY[this.equippedHat] : null;
                 const jewelry = this.equippedJewelry.map(id => COSMETICS_REGISTRY[id]).filter(Boolean).map(e => e.data);
                 return {
-                    hair: wig ? { type: wig.data.type, color: wig.data.color } : { type: 'curls', color: '#0a0505' },
-                    skinColor: skin ? skin.data.skinColor : '#c68e63',
-                    outfit: outfit ? outfit.data : defaultOutfit,
+                    // Without a cosmetic, she's herself (APPEARANCES['949'], core/appearances.js) in Street Casual
+                    hair: wig ? { type: wig.data.type, color: wig.data.color } : APPEARANCES['949'].hair,
+                    skinColor: skin ? skin.data.skinColor : APPEARANCES['949'].skinColor,
+                    outfit: outfit ? outfit.data : COSMETICS_REGISTRY.outfit_casual.data,
                     hat: hat ? hat.data : null,
                     jewelry,
                     held
@@ -4790,6 +4790,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         };
 
+        /** A small deterministic random generator from a string or number (same seed → same look). */
+        function seededRandom(seed) {
+            let h = 2166136261;
+            for (const ch of String(seed)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+            return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+        }
+        const pickFrom = (rng, list) => list[Math.floor(rng() * list.length) % list.length];
         // =====================================================================
         //  NAV GRID — walkability grid + A* / Dijkstra for companions
         // =====================================================================
@@ -5479,6 +5486,328 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.restore();
         }
 
+        /* =====================================================================
+           APPEARANCES — how every character looks, in one place
+           ---------------------------------------------------------------------
+           To restyle someone, edit their entry below; the world, their dialogue
+           portrait, the phone, and the seat beside you in the car all read it.
+
+             APPEARANCES   named characters: 949, the crew, staff, the city's cast
+             ROLE_LOOKS    crowds made from a seed: medics, dancers, androids,
+                           pedestrians, gangers, spirits, ghosts, everyone else
+             PALETTE       colours that several looks share (house gold, ganger pink…)
+             ANDROID_FINISHES  Double Nights plating: moon silver, sun-on-moon gold,
+                           Blood Moon rose
+
+           A look is the humanoid config (see ui/wardrobe.js), with a few extras:
+             eyeColor   iris colour in portraits
+             accent     the character's signature colour (car paint, the crew dot)
+             blood      a BLOOD_KINDS name or '#hex' (engine/combat-fx.js)
+             faceRoom   staff: face the room when idle
+           lookFor(entity) finds anyone's look; portraitOf(look) makes their bust.
+           ===================================================================== */
+        const PALETTE = {
+            houseGold: '#e8c27a',
+            gangerPink: '#ff0055', gangerMaroon: '#550022',
+            stellaSkin: '#c68e63', stellaCurls: '#0a0505', stellaEyes: '#daa520',
+            dnGold:   { color: '#2a2418', trim: '#e8c27a' },           // Double Nights uniform, gold staff
+            dnSilver: { color: '#1c2030', trim: '#dfe6ff' },           // … and the silver ones
+            ember: '#ff5a1a',                                          // demoness eyes
+            eyeDefault: '#3a2a1a',
+            // Crowd pools
+            skins: ['#3d2b1f', '#6b3a2a', '#8d5524', '#a0522d', '#c68642', '#c68e63', '#dcc6ac', '#e8d0b8', '#f5deb3'],
+            hairs: ['#0a0505', '#1a1a1a', '#2a1500', '#4a3728', '#8b4513', '#654321', '#c0c0c0'],
+            eyes:  ['#3a2a1a', '#2a1a0a', '#5a3a1a', '#4a5a3a', '#3a4a5a', '#6a4a2a', '#2a3a4a'],
+            genericSkins: ['#f5d0a9', '#c68e63', '#8d5524', '#6b3a2a', '#d4a574', '#e8c4a0'],
+            genericTops: ['#335', '#533', '#353', '#445', '#554', '#345', '#543', '#455'],
+            genericBottoms: ['#222', '#333', '#2a2a3a', '#1a1a2a', '#3a2a1a', '#252530'],
+            genericHairs: ['#111', '#2a1a0a', '#0a0a0a', '#3a2a1a', '#555', '#1a0a00'],
+            ghostSkins: ['#8ec8d8', '#7ab0c8', '#9dd4e0', '#a0d0e8', '#6ea8c0'],
+        };
+
+        const ANDROID_FINISHES = {
+            silver:    { plate: '#c9ccd8', trim: '#7d8196', sheen: '#f4f6ff', glow: '#bfe6ff', coolant: '170, 220, 255' },
+            gold:      { plate: '#d9b45a', trim: '#8c6a24', sheen: '#fff1c2', glow: '#00ffff', coolant: '255, 196, 96' },
+            bloodmoon: { plate: '#b3203c', trim: '#5e0c1e', sheen: '#ff9fb2', glow: '#ff7aa8', coolant: '255, 110, 150' },
+        };
+
+        const _DN_GUARD = { gender: 'male', build: 'broad', body: { kind: 'android', finish: 'gold', glow: '#00ffff' },
+            top: { type: 'dn_uniform', ...PALETTE.dnGold }, bottom: { type: 'pants', color: '#1a1614' },
+            shoes: { type: 'boots', color: '#111111' }, pose: 'hands_on_hips', faceRoom: true };
+
+        const APPEARANCES = {
+            // ── Stella (949). Her cosmetics replace these; this is who she is without them ──
+            '949': { skinColor: PALETTE.stellaSkin, gender: 'female', hair: { type: 'curls', color: PALETTE.stellaCurls },
+                     eyeColor: PALETTE.stellaEyes, accent: PALETTE.stellaEyes, blood: 'wine' },
+
+            // ── The crew ──
+            'Victoria': { skinColor: '#c68642', gender: 'female', eyeColor: '#b0707f', accent: '#ff69b4',
+                          top: { type: 'suit', color: '#2a0a3a' }, bottom: { type: 'pants', color: '#1a0820' },
+                          shoes: { type: 'boots', color: '#c0c0c0' }, hair: { type: 'afro', color: '#ff69b4' } },
+            'Yenna':    { skinColor: '#8B4513', gender: 'female', eyeColor: '#4f6b3a', accent: '#5a8a5a',
+                          top: { type: 'tshirt', color: '#2a3a2a' }, bottom: { type: 'pants', color: '#1a1a1a' },
+                          shoes: { type: 'boots', color: '#333' }, hair: { type: 'dreadlocks', color: '#1a0a00' } },
+            'Sabrina':  { skinColor: '#e8d0c0', gender: 'female', eyeColor: '#8a4fd6', accent: '#a855f7',
+                          top: { type: 'sports_bra', color: '#1a0a2a' }, bottom: { type: 'skirt', color: '#0a0a1a' },
+                          shoes: { type: 'heels', color: '#2a1a3a' }, hair: { type: 'ponytail', color: '#0a0008' } },
+            'Max':      { skinColor: '#c9a87c', gender: 'male', eyeColor: '#3aa0ff', accent: '#3b82f6',
+                          top: { type: 'tshirt', color: '#1a2a4a' }, bottom: { type: 'pants', color: '#222' },
+                          shoes: { type: 'sneakers', color: '#333' }, hair: { type: 'short', color: '#0088ff' } },
+            'Josh':     { skinColor: '#e8d5c4', gender: 'male', eyeColor: '#6b7a8a', accent: '#94a3b8',
+                          top: { type: 'tshirt', color: '#333' }, bottom: { type: 'pants', color: '#2a2a2a' },
+                          shoes: { type: 'shoes', color: '#1a1a1a' }, hair: { type: 'short', color: '#3a2a1a' } },
+
+            // ── Double Nights: AI staff in moon silver, sun-on-moon gold, or Blood Moon rose ──
+            'Guard Unit Alpha': _DN_GUARD,
+            'Guard Unit Beta':  _DN_GUARD,
+            'Concierge Lux':    { gender: 'androgynous', build: 'slim', body: { kind: 'android', finish: 'gold' },
+                                  top: { type: 'dn_uniform', ...PALETTE.dnGold }, bottom: { type: 'pants', color: '#1a1a1a' },
+                                  shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge', faceRoom: true },
+            'LUVSH4D3':         { gender: 'female', build: 'curvy', body: { kind: 'android', finish: 'bloodmoon', hover: true },
+                                  hair: { type: 'long', color: '#ff88cc' }, accent: '#ff44bb', faceRoom: true },
+            'Bartender':        { skinColor: '#c9a87c', gender: 'male', hair: { type: 'short', color: '#1a1a1a' }, eyeColor: '#3a2a1a',
+                                  top: { type: 'vest', color: '#1a0020', inner: '#f2f2f2', trim: '#8b0000' }, bottom: { type: 'pants', color: '#111111' },
+                                  shoes: { type: 'loafers', color: '#111111' }, pose: 'polish', faceRoom: true },
+            'Barista Ren':      { skinColor: '#a0724a', gender: 'female', hair: { type: 'ponytail', color: '#2a1500' }, eyeColor: '#5a3a1a',
+                                  top: { type: 'tshirt', color: '#654321' }, bottom: { type: 'apron', color: '#3a2a1a', under: '#222222' },
+                                  shoes: { type: 'sneakers', color: '#eeeeee' }, pose: 'polish', faceRoom: true },
+
+            // The Empereal Lord's scientist and medic; she keeps Stella and 747 running
+            'Dr. Yin': { skinColor: '#e8d0b8', gender: 'female', build: 'slim', hair: { type: 'short', color: '#222222' }, eyeColor: '#7a7394',
+                         top: { type: 'lab_coat', inner: '#1a3a4a' }, bottom: { type: 'pants', color: '#1a3a4a' },
+                         shoes: { type: 'loafers', color: '#222222' }, pose: 'arms_crossed', faceRoom: true },
+
+            // ── The city's cast ──
+            // The VIP: periwinkle silk and gold, a glass of Bellafore red
+            'Anavia':     { skinColor: '#c68e63', gender: 'female', eyeColor: '#b07a3a', accent: '#66ccaa',
+                            top: { type: 'sports_bra', color: '#CCCCFF' }, bottom: { type: 'skirt', color: '#CCCCFF' },
+                            train: { type: 'silk_flow', color: '#CCCCFF' }, shoes: { type: 'heels', color: '#FFD700' },
+                            hair: { type: 'curls', color: '#0a0505' }, held: { type: 'glass', drink: 'red_wine', hand: 'right' } },
+            // The red dress, and her own brand in hand — Ms. Jean Cream Soda
+            'Ms. Jean':   { skinColor: '#8d5524', gender: 'female', eyeColor: '#7a4a20', accent: '#ffd700',
+                            top: { type: 'sports_bra', color: '#aa0000' }, bottom: { type: 'skirt', color: '#aa0000' },
+                            train: { type: 'dress_train', color: '#880000' }, shoes: { type: 'heels', color: '#440000' },
+                            hair: { type: 'long', color: '#111' }, held: { type: 'glass', drink: 'cream_soda', hand: 'right' } },
+            'Mirabel':    { skinColor: '#dcc6ac', gender: 'female', eyeColor: '#8a1a2a', accent: '#c4566e',
+                            top: { type: 'suit', color: '#4a0a10' }, bottom: { type: 'skirt', color: '#4a0a10' },
+                            shoes: { type: 'heels', color: '#2a0508' }, hair: { type: 'long', color: '#1a0505' },
+                            hat: { type: 'wide_brim', color: '#590e18', crownColor: '#70121e', stroke: '#1a0505' } },
+            // Crystalline — a shimmer plays over her (NPC.draw)
+            'Prisma':     { skinColor: '#c8b8d0', gender: 'female', eyeColor: '#bfe8ff', accent: '#b06aff',
+                            hair: { type: 'braids', color: '#e0e8ff' }, top: { type: 'sports_bra', color: '#aaccff' },
+                            bottom: { type: 'skirt', color: '#8888cc' }, shoes: { type: 'heels', color: '#ddeeff' } },
+            // Auto Shop mechanic
+            'Torque':     { skinColor: '#6b3a2a', gender: 'male', eyeColor: '#3a2414', accent: '#e8972a',
+                            hair: { type: 'short', color: '#1a1a1a' }, top: { type: 'tshirt', color: '#ff6600' },
+                            bottom: { type: 'pants', color: '#2a2a2a' }, shoes: { type: 'shoes', color: '#333' } },
+            'Biggs':      { skinColor: '#c9a87c', gender: 'male', eyeColor: '#ff9a30', accent: '#ff8800',
+                            hair: { type: 'afro', color: '#ff8800' }, top: { type: 'suit', color: '#2a0a30' },
+                            bottom: { type: 'pants', color: '#1a0820' }, shoes: { type: 'boots', color: '#ff8800' } },
+            // Greying, in a crimson-black coat
+            'Grum North': { skinColor: '#8a7565', gender: 'male', eyeColor: '#8a8a7a', accent: '#aa5533',
+                            hair: { type: 'short', color: '#7a7a7a' }, top: { type: 'suit', color: '#2a1a1a' },
+                            bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'boots', color: '#3a2020' } },
+            // Voices on the line (no body in the world yet)
+            'Contractor': { skinColor: '#c9a87c', gender: 'male', eyeColor: '#2a2a2a', accent: '#cc4444',
+                            hair: { type: 'short', color: '#111' }, top: { type: 'suit', color: '#222' } },
+            // "dripped with professionalism in a white suit"
+            'Larissa':    { skinColor: '#c8a882', gender: 'female', eyeColor: '#4a5a6a', accent: '#8888cc',
+                            hair: { type: 'ponytail', color: '#2b2118' }, top: { type: 'suit', color: '#ece8e0' } },
+        };
+
+        /* Crowds: (entity or archetype, rand) → look. `rand` comes from seededRandom, so the
+           same person always looks the same. */
+        const ROLE_LOOKS = {
+            medic(npc, r) {
+                const skinColor = pickFrom(r, PALETTE.skins);
+                const gender = r() < 0.5 ? 'female' : 'male';
+                return { skinColor, gender, build: pickFrom(r, [undefined, 'slim', 'athletic', 'curvy', 'heavy']),
+                         hair: { type: pickFrom(r, ['short', 'ponytail', 'braids', 'curls', 'afro']), color: pickFrom(r, PALETTE.hairs) },
+                         top: { type: 'scrubs', color: pickFrom(r, ['#3aa6a0', '#4a7fb5', '#e8ecef']) },
+                         bottom: { type: 'pants', color: '#3a6f80' }, shoes: { type: 'sneakers', color: '#ffffff' }, faceRoom: true };
+            },
+            // The club's male dancers: bare chest or an open jacket, black trousers, a dance of his own
+            male_dancer(npc, r) {
+                const skinColor = pickFrom(r, PALETTE.skins);
+                const jacket = r() < 0.5;
+                return { skinColor, gender: 'male', build: pickFrom(r, ['athletic', 'athletic', 'slim', 'broad']), height: 0.97 + r() * 0.08,
+                         hair: { type: pickFrom(r, ['short', 'dreadlocks', 'braids', 'afro', 'curls', 'ponytail']), color: pickFrom(r, ['#0a0505', '#1a1a1a', '#8a0707', '#c0c0c0']) },
+                         top: jacket ? { type: 'jacket', color: pickFrom(r, ['#111111', '#2a0a3a', '#590e18']), inner: skinColor } : null,
+                         bottom: { type: 'pants', color: '#111111' }, shoes: { type: 'loafers', color: '#111111' },
+                         jewelry: r() < 0.5 ? [{ type: 'necklace', color: PALETTE.houseGold }] : null, pose: 'dance' };
+            },
+            // The club's demonesses (red demon dancers and the models): they bleed ink
+            demon_dancer() {
+                return { skinColor: '#8a0707', gender: 'female', pose: 'dance', eyeColor: PALETTE.ember, blood: 'ink',
+                         hair: { type: 'demon_dancer', color: '#0a0000' },
+                         top: { type: 'sports_bra', color: '#111' }, bottom: { type: 'skirt', color: '#111' } };
+            },
+            // Unnamed Double Nights staff: silver
+            robot() {
+                return { gender: 'androgynous', body: { kind: 'android', finish: 'silver' }, top: { type: 'dn_uniform', ...PALETTE.dnSilver },
+                         bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge', faceRoom: true };
+            },
+            // The Ethereal plane's wanderers
+            spirit() {
+                return { skinColor: '#9fb8d0', gender: 'female', eyeColor: '#dff2ff', hair: { type: 'long', color: '#4a5a70' },
+                         top: { type: 'tshirt', color: '#2a3345' }, bottom: { type: 'long_skirt', color: '#222a38' }, shoes: { type: 'shoes', color: '#1a2230' } };
+            },
+            /** Anyone else: a stable look hashed from their name. */
+            generic(npc) {
+                let hash = 0;
+                const n = npc.name || 'NPC';
+                for (let i = 0; i < n.length; i++) hash = ((hash << 5) - hash) + n.charCodeAt(i);
+                const h = Math.abs(hash), P = PALETTE;
+                const gender = (h >> 12) % 2 === 0 ? 'male' : 'female';
+                return { skinColor: P.genericSkins[h % P.genericSkins.length], gender, eyeColor: P.eyes[(h >> 4) % P.eyes.length],
+                         top: { type: 'tshirt', color: P.genericTops[(h >> 3) % P.genericTops.length] },
+                         bottom: { type: gender === 'female' ? 'skirt' : 'pants', color: P.genericBottoms[(h >> 6) % P.genericBottoms.length] },
+                         shoes: { type: 'shoes', color: '#222' },
+                         hair: { type: gender === 'female' ? 'long' : 'short', color: P.genericHairs[(h >> 9) % P.genericHairs.length] } };
+            },
+            /** Graveyard ghosts: pale and icy. */
+            ghost(r) {
+                const gender = r() < 0.5 ? 'male' : 'female';
+                return { skinColor: pickFrom(r, PALETTE.ghostSkins), gender,
+                         hair: { type: pickFrom(r, ['long', 'short', 'afro', 'curls', 'braids', 'dreadlocks', 'ponytail']), color: '#c0e8ff' },
+                         top: { type: 'tshirt', color: '#90c0d8' }, bottom: { type: gender === 'female' ? 'long_skirt' : 'pants', color: '#7aaccc' },
+                         shoes: { type: 'shoes', color: '#6898b8' } };
+            },
+            /**
+             * A pedestrian built from an archetype (Pedestrian.APPEARANCES): gender, build, height,
+             * skin, hair and an outfit in the archetype's signature colour (bodyColor), so the crowd
+             * is varied but workers still read as workers, tourists as tourists.
+             */
+            pedestrian(ap, r) {
+                const pick = list => pickFrom(r, list);
+                const c = ap.bodyColor;
+                const gender = ap.name.endsWith('_male') ? 'male' : ap.name.endsWith('_female') ? 'female' : pick(['female', 'male', 'androgynous']);
+                const hairTypes = gender === 'female' ? ['long', 'ponytail', 'braids', 'curls', 'afro', 'short', 'dreadlocks']
+                                : gender === 'male' ? ['short', 'short', 'afro', 'dreadlocks', 'curls', 'braids'] : ['short', 'curls', 'ponytail', 'afro'];
+                const look = {
+                    gender, skinColor: pick(PALETTE.skins),
+                    build: pick([undefined, undefined, 'slim', 'athletic', 'curvy', 'broad', 'heavy']),
+                    height: 0.93 + r() * 0.14,
+                    hair: { type: pick(hairTypes), color: r() < 0.6 ? ap.hairColor : pick(PALETTE.hairs) },
+                    shoes: { type: 'sneakers', color: '#e8e8e8' }
+                };
+                // Rain kit: some carry an umbrella; some hoodie wearers put the hood up
+                if (r() < 0.4) look.umbrella = pick(['#1a1a1a', '#5a0f1e', '#9d8cc8', '#c9d6e8', '#d9b45a', '#2b3a55']);
+                look.rainHood = r() < 0.35;
+                look.hurry = 1.2 + r() * 0.15;
+                const skirtOr = alt => gender === 'female' && r() < 0.5 ? { type: pick(['skirt', 'long_skirt']), color: '#1c1c24' } : alt;
+                switch (ap.name) {
+                    case 'suit_male': case 'suit_female': case 'corporate':
+                        look.top = { type: pick(['suit', 'suit', 'jacket']), color: c, inner: '#e8e8e8' };
+                        look.bottom = skirtOr({ type: 'pants', color: '#1e1e26' });
+                        look.shoes = { type: gender === 'female' && r() < 0.5 ? 'heels' : 'loafers', color: '#111111' };
+                        if (r() < 0.2) look.jewelry = [{ type: 'sunglasses', color: '#141414' }];
+                        break;
+                    case 'casual_male': case 'casual_female':
+                        look.top = { type: pick(gender === 'female' ? ['tshirt', 'crop_top', 'tank', 'turtleneck'] : ['tshirt', 'tank', 'hoodie']), color: c, trim: '#f2f2f2' };
+                        look.bottom = skirtOr({ type: pick(['pants', 'shorts', 'joggers']), color: pick(['#34495e', '#2b2b2b', '#6b5b45']) });
+                        if (gender === 'female' && r() < 0.4) look.jewelry = [{ type: 'hoops', color: PALETTE.houseGold }];
+                        break;
+                    case 'worker':
+                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'cargo', color: '#4a4a3a' };
+                        look.shoes = { type: 'boots', color: '#3a2a1a' }; look.hat = { type: 'cap', color: ap.hatColor, trim: '#222222' };
+                        break;
+                    case 'hipster':
+                        look.top = { type: 'jacket', color: c, inner: '#d8d2c0' }; look.bottom = { type: pick(['pants', 'joggers']), color: '#2b2b2b' };
+                        look.hat = { type: 'beanie', color: ap.hatColor, trim: '#555555' };
+                        break;
+                    case 'punk':
+                        look.top = { type: pick(['tank', 'track_jacket', 'crop_top']), color: c, trim: '#111111' };
+                        look.bottom = { type: 'leggings', color: '#111111' }; look.shoes = { type: 'boots', color: '#111111' };
+                        look.hair = { type: pick(['short', 'afro', 'braids', 'dreadlocks']), color: ap.hairColor };
+                        look.jewelry = [{ type: 'hoops', color: '#c0c0c0' }];
+                        break;
+                    case 'tourist':
+                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'shorts', color: '#c2b280' };
+                        look.hat = { type: 'cap', color: ap.hatColor, trim: '#48cae4' }; look.jewelry = [{ type: 'sunglasses', color: '#141414' }];
+                        break;
+                    case 'delivery':
+                        look.top = { type: 'hoodie', color: c, trim: '#f2f2f2' }; look.bottom = { type: 'joggers', color: '#1e2a2a' };
+                        look.hat = { type: 'cap', color: ap.hatColor, trim: '#ffffff' };
+                        break;
+                    default:
+                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'pants', color: '#222222' };
+                }
+                return look;
+            },
+            /**
+             * THE GANGER LOOK: always a hot pink top over dark maroon — that's the gang,
+             * readable at a glance from above. Everything else varies per ganger: the (sleeved) cut,
+             * hair (often pink-dyed), skin, build, and the odd pink cap, shades or hoops.
+             */
+            ganger(r) {
+                const pick = list => pickFrom(r, list);
+                const pink = PALETTE.gangerPink;
+                const gender = r() < 0.5 ? 'female' : 'male';
+                // Sleeved cuts only: from above, the pink sleeves are what you see most
+                const cut = pick(['suit', 'jacket', 'track_jacket', 'hoodie', 'tshirt', 'turtleneck']);
+                const look = {
+                    gender, skinColor: pick(PALETTE.skins),
+                    build: pick([undefined, 'athletic', 'broad', 'slim', 'heavy', gender === 'female' ? 'curvy' : 'athletic']),
+                    height: 0.94 + r() * 0.12,
+                    top: { type: cut, color: pink, inner: '#111111', trim: '#111111' },
+                    bottom: { type: pick(['pants', 'cargo', 'joggers']), color: PALETTE.gangerMaroon, trim: pink },
+                    shoes: { type: pick(['boots', 'sneakers']), color: '#111111' },
+                    hair: r() < 0.15 ? null : { type: pick(['short', 'afro', 'braids', 'dreadlocks', 'ponytail', 'curls', gender === 'female' ? 'long' : 'short']),
+                                                color: pick(['#0a0a0a', '#1a1a1a', pink, pink, '#3a0a1a']) },
+                    hat: r() < 0.25 ? { type: pick(['cap', 'beanie']), color: pink, trim: '#111111' } : null,
+                    jewelry: []
+                };
+                if (r() < 0.25) look.jewelry.push({ type: 'sunglasses', color: '#141414' });
+                if (r() < 0.25) look.jewelry.push({ type: pick(['hoops', 'necklace']), color: PALETTE.houseGold });
+                return look;
+            },
+        };
+
+        /** Which crowd a nameless NPC belongs to (null = generic). */
+        function _roleLookKind(npc) {
+            const role = npc.role || '';
+            if (role === 'medic') return 'medic';
+            if (role === 'dancer' || role === 'red_demon_dancer') return npc.gender === 'male' ? 'male_dancer' : 'demon_dancer';
+            if (role.includes('robot')) return 'robot';
+            if (role === 'spirit') return 'spirit';
+            return null;
+        }
+
+        /**
+         * Anyone's look: their APPEARANCES entry, else their crowd's (seeded by name, role and
+         * spawn point), else a generic one from their name. Cached on the entity.
+         */
+        function lookFor(entity) {
+            if (!entity) return null;
+            if (entity._look !== undefined) return entity._look;
+            let look = APPEARANCES[entity.name] || (entity.role === 'ms_jean' ? APPEARANCES['Ms. Jean'] : null);
+            if (!look) {
+                const kind = _roleLookKind(entity);
+                const seed = entity.name + '|' + entity.role + '|' + Math.round(entity.spawnX || entity.x) + ',' + Math.round(entity.spawnY || entity.y);
+                look = kind ? ROLE_LOOKS[kind](entity, seededRandom(seed)) : ROLE_LOOKS.generic(entity);
+                if (!look.eyeColor && !look.body) look.eyeColor = pickFrom(seededRandom(seed + '|eyes'), PALETTE.eyes);
+            }
+            if (look.faceRoom && look.pose !== 'dance') look = { idleAngle: Math.PI / 2, ...look };
+            return (entity._look = look);
+        }
+
+        /** A dialogue portrait from a look. Androids' eyes glow in their finish. */
+        function portraitOf(look, extra) {
+            const A = look.body && look.body.kind === 'android' ? (ANDROID_FINISHES[look.body.finish] || ANDROID_FINISHES.silver) : null;
+            const cfg = { skinColor: look.skinColor, hair: look.hair || null, gender: look.gender || 'androgynous',
+                          eyeColor: look.eyeColor || (A ? (look.body.glow || A.glow) : PALETTE.eyeDefault) };
+            for (const k of ['top', 'hat', 'jewelry', 'build', 'body', 'expression']) if (look[k]) cfg[k] = look[k];
+            return extra ? { ...cfg, ...extra } : cfg;
+        }
+
+        /** The same cut in other colours — spirits of a look (flit afterimages). */
+        function tintLook(look, t) {
+            const p = (piece, c) => piece ? { ...piece, color: c, trim: c, inner: c, under: c, crownColor: c, stroke: c } : null;
+            return { ...look, skinColor: t.skin, hair: look.hair ? { ...look.hair, color: t.hair } : null,
+                     top: p(look.top, t.top), bottom: p(look.bottom, t.bottom), shoes: p(look.shoes, t.shoes),
+                     train: p(look.train, t.bottom), hat: p(look.hat, t.hair), jewelry: null, held: null };
+        }
         // ============================================================================
         // GAME SETTINGS — Mutable runtime settings (controlled by Settings UI)
         // These override CONFIG values where applicable. Systems read from here.
@@ -13714,14 +14043,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Gather recruited teammates
                 const recruitedTeammates = (game.teammates || []).filter(t => t.recruited && !t.downed);
                 
-                // Teammate car colors (pulled from their appearance)
-                const teammateColors = {
-                    'Victoria': '#ff69b4',
-                    'Yenna': '#2a3a2a',
-                    'Sabrina': '#6a1a8a',
-                    'Max': '#1a2a4a',
-                    'Josh': '#4a2a1a'
-                };
+
                 
                 // AI filler colors for remaining slots
                 const fillerColors = [
@@ -13754,7 +14076,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const tm of recruitedTeammates) {
                     if (slotIndex >= spawnPoints.length) break;
                     const sp = spawnPoints[slotIndex];
-                    const color = teammateColors[tm.name] || '#888';
+                    const color = (APPEARANCES[tm.name] || {}).accent || '#888';   // their signature colour (core/appearances.js)
                     const initial = tm.name.charAt(0).toUpperCase();
                     
                     const car = new BumperCar({
@@ -16281,7 +16603,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * - Circle collision via ActorEntity (radius: 15)
          * - Automatic wall collision via CollisionSystem
          * - Hire system for dancers/companions
-         * - Multiple visual renderers (Ms. Jean, Dancers, LUVSH4D3, etc.)
+         * - One procedural humanoid for everyone, dressed by their look (core/appearances.js)
          * - Smart pathfinding with obstacle avoidance
          * 
          * Migration Notes:
@@ -16289,57 +16611,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * - Wall collision handled automatically by CollisionSystem
          * - Preserves all existing visual rendering exactly
          */
-        /* ---------------------------------------------------------------------
-           STAFF_LOOKS — how the staff and androids look, in the world and in
-           their portraits (NPC_PORTRAIT_CONFIGS reads these too). Double Nights'
-           AI staff come in moon silver, sun-on-moon gold, or Blood Moon rose red.
-           --------------------------------------------------------------------- */
-        const _DN_GUARD = { gender: 'male', build: 'broad', body: { kind: 'android', finish: 'gold', glow: '#00ffff' },
-            top: { type: 'dn_uniform', color: '#2a2418', trim: '#e8c27a' }, bottom: { type: 'pants', color: '#1a1614' },
-            shoes: { type: 'boots', color: '#111111' }, pose: 'hands_on_hips' };
-        const STAFF_LOOKS = {
-            'Guard Unit Alpha': _DN_GUARD,
-            'Guard Unit Beta':  _DN_GUARD,
-            'Concierge Lux':    { gender: 'androgynous', build: 'slim', body: { kind: 'android', finish: 'gold' },
-                                  top: { type: 'dn_uniform', color: '#2a2418', trim: '#e8c27a' }, bottom: { type: 'pants', color: '#1a1a1a' },
-                                  shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge' },
-            'LUVSH4D3':         { gender: 'female', build: 'curvy', body: { kind: 'android', finish: 'bloodmoon', hover: true },
-                                  hair: { type: 'long', color: '#ff88cc' } },
-            'Bartender':        { skinColor: '#c9a87c', gender: 'male', hair: { type: 'short', color: '#1a1a1a' },
-                                  top: { type: 'vest', color: '#1a0020', inner: '#f2f2f2', trim: '#8b0000' }, bottom: { type: 'pants', color: '#111111' },
-                                  shoes: { type: 'loafers', color: '#111111' }, pose: 'polish' },
-            'Barista Ren':      { skinColor: '#a0724a', gender: 'female', hair: { type: 'ponytail', color: '#2a1500' },
-                                  top: { type: 'tshirt', color: '#654321' }, bottom: { type: 'apron', color: '#3a2a1a', under: '#222222' },
-                                  shoes: { type: 'sneakers', color: '#eeeeee' }, pose: 'polish' },
-            // The Empereal Lord's scientist and medic; she keeps Stella and 747 running
-            'Dr. Yin':          { skinColor: '#e8d0b8', gender: 'female', build: 'slim', hair: { type: 'short', color: '#222222' },
-                                  top: { type: 'lab_coat', inner: '#1a3a4a' }, bottom: { type: 'pants', color: '#1a3a4a' },
-                                  shoes: { type: 'loafers', color: '#222222' }, pose: 'arms_crossed' },
-        };
-
-        const _SKIN_TONES = ['#3d2b1f', '#6b3a2a', '#8d5524', '#a0522d', '#c68642', '#c68e63', '#dcc6ac', '#e8d0b8', '#f5deb3'];
-        const _HAIR_COLORS = ['#0a0505', '#1a1a1a', '#2a1500', '#4a3728', '#8b4513', '#654321', '#c0c0c0'];
-
-        /** A stable look for NPCs without a named look: medics and the club's male dancers. */
-        function seededNpcLook(npc) {
-            const r = seededRandom(npc.name + '|' + npc.role + '|' + Math.round(npc.spawnX || npc.x) + ',' + Math.round(npc.spawnY || npc.y));
-            const skinColor = pickFrom(r, _SKIN_TONES);
-            if (npc.role === 'medic') {
-                const gender = r() < 0.5 ? 'female' : 'male';
-                return { skinColor, gender, build: pickFrom(r, [undefined, 'slim', 'athletic', 'curvy', 'heavy']),
-                         hair: { type: pickFrom(r, ['short', 'ponytail', 'braids', 'curls', 'afro']), color: pickFrom(r, _HAIR_COLORS) },
-                         top: { type: 'scrubs', color: pickFrom(r, ['#3aa6a0', '#4a7fb5', '#e8ecef']) },
-                         bottom: { type: 'pants', color: '#3a6f80' }, shoes: { type: 'sneakers', color: '#ffffff' } };
-            }
-            // Male dancer: bare chest or an open jacket, black trousers, and a dance of his own
-            const jacket = r() < 0.5;
-            return { skinColor, gender: 'male', build: pickFrom(r, ['athletic', 'athletic', 'slim', 'broad']), height: 0.97 + r() * 0.08,
-                     hair: { type: pickFrom(r, ['short', 'dreadlocks', 'braids', 'afro', 'curls', 'ponytail']), color: pickFrom(r, ['#0a0505', '#1a1a1a', '#8a0707', '#c0c0c0']) },
-                     top: jacket ? { type: 'jacket', color: pickFrom(r, ['#111111', '#2a0a3a', '#590e18']), inner: skinColor } : null,
-                     bottom: { type: 'pants', color: '#111111' }, shoes: { type: 'loafers', color: '#111111' },
-                     jewelry: r() < 0.5 ? [{ type: 'necklace', color: '#e8c27a' }] : null, pose: 'dance' };
-        }
-
         class NPC extends ActorEntity {
             /**
              * Unified NPC class — handles civilians, quest givers, dancers, AND teammates.
@@ -16435,7 +16706,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.shotsLeftInBurst = this.burstSize;
                     
                     // Appearance config for drawProceduralHumanoid
-                    this.appearance = combatConfig.appearance || null;
+                    this.appearance = combatConfig.appearance || APPEARANCES[name] || null;   // core/appearances.js
                     
                     // ── HEALING SYSTEM ──
                     this.teammateStims = 3;        // Self-heal charges
@@ -16901,7 +17172,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Every NPC is a procedural humanoid now, which faces Right (0 radians).
                 // (The −PI/2 correction was for the old sprites that were drawn facing Down.)
                 const usesRawAngle = true;
-                const staffLook = this._staffLook();
+                const look = lookFor(this);                                   // core/appearances.js
                 
                 if (this.combatTargetTimer > 0 && this.combatTargetAngle !== undefined) {
                     // In combat: face target
@@ -16917,28 +17188,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // IDLE & HIRED/RECRUITED: Face Player
                     const angle = Math.atan2(player.y - this.y, player.x - this.x);
                     ctx.rotate(usesRawAngle ? angle : angle - Math.PI/2);
-                } else if (staffLook && staffLook.idleAngle !== undefined) {
-                    ctx.rotate(staffLook.idleAngle);                          // staff face the room when idle
+                } else if (look && look.idleAngle !== undefined) {
+                    ctx.rotate(look.idleAngle);                               // staff face the room when idle
                 } else {
                     // Default Idle
                     if (!usesRawAngle) ctx.rotate(0);
                 }
 
-                // --- RENDERERS ---
-                if (this.name === 'Anavia') {
-                    this.drawAnavia(ctx); 
-                } 
-                else if (staffLook) this.drawStaff(ctx, staffLook);
-                else if (this.role === 'red_demon_dancer' || this.role === 'dancer') this.drawFemaleDancer(ctx, this.walkPhase, speed);
-                
-                else if (this.name === 'Ms. Jean' || this.role === 'ms_jean') this.drawMsJean(ctx);
-                else if (this.name === 'Mirabel') this.drawMirabell(ctx);
-                else if (this.name === 'Prisma') this.drawPrisma(ctx);
-                else if (this.name === 'Torque') this.drawTorque(ctx);
-                else if (this.name === 'Biggs') this.drawBiggs(ctx);
-                else if (this.name === 'Grum North') this.drawGrumNorth(ctx);
-                else if (this.role === 'teammate') this.drawTeammate(ctx);
-                else this.drawGeneric(ctx);
+                // --- RENDERER --- (every look lives in core/appearances.js)
+                if (this.role === 'teammate') this.drawTeammate(ctx, look);
+                else drawProceduralHumanoid(ctx, this, { stance: 'idle', ...look });
+                if (this.name === 'Prisma') this.drawPrismaShimmer(ctx);
 
                 ctx.restore();
                 
@@ -17027,134 +17287,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             }
             
-            // ANAVIA (The VIP)
-            drawAnavia(ctx) {
-                // Ensure velocity/phase exist
-                if (this.walkPhase === undefined) this.walkPhase = 0;
-                
-                // Radiant Caramel Skin (Custom Hex)
-                const caramelSkin = '#c68e63'; 
-                const periwinkle = '#CCCCFF';
-                
-                // Subtle VIP Glow
-                
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: caramelSkin,
-                    gender: 'female',   // Wide hips
-                    stance: 'idle',     
-                    
-                    // THE LOOK: Periwinkle Silk & Gold
-                    top: { type: 'sports_bra', color: periwinkle }, // Simulating a silk top
-                    bottom: { type: 'skirt', color: periwinkle },   
-                    train: { type: 'silk_flow', color: periwinkle }, 
-                    shoes: { type: 'heels', color: '#FFD700' }, // Gold heels
-                    
-                    // SIGNATURE HAIR
-                    hair: { type: 'curls', color: '#0a0505' }, // Darkest brown/black
-
-                    // PROP: A glass of wine — Bellafore
-                    held: { type: 'glass', drink: 'red_wine', hand: 'right' }
-                });
-                
-            }
-
-            // --- VISUALS ---
-
-            // 2. MS. JEAN (Wider Hair, Static Pose, Smooth Sip)
-            drawMsJean(ctx) {
-                // Ensure velocity/phase exist for the procedural renderer
-                if (this.walkPhase === undefined) this.walkPhase = 0;
-                if (this.velX === undefined) this.velX = 0;
-                if (this.velY === undefined) this.velY = 0;
-
-                // Call the procedural renderer
-                // Note: ctx is already translated/rotated by the parent draw() function
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#8d5524',
-                    gender: 'female',   // Triggers wide hips (-8 offset, 12 width)
-                    stance: 'idle',     // One hand holds glass, other swings naturally
-                    
-                    // THE RED DRESS LOOK
-                    // We simulate a dress by matching the top and bottom colors
-                    top: { type: 'sports_bra', color: '#aa0000' }, 
-                    bottom: { type: 'skirt', color: '#aa0000' },   
-                    train: { type: 'dress_train', color: '#880000' }, 
-                    shoes: { type: 'heels', color: '#440000' },
-                    
-                    // HAIR
-                    hair: { type: 'long', color: '#111' },
-
-                    // PROP: her own brand — Ms. Jean Cream Soda
-                    held: { type: 'glass', drink: 'cream_soda', hand: 'right' }
-                });
-            }
-            
-            /**
-             * The look for staff, androids, medics and male dancers (STAFF_LOOKS or a
-             * seeded one), or null for NPCs with their own draw method. Cached.
-             */
-            _staffLook() {
-                if (this._look !== undefined) return this._look;
-                let look = STAFF_LOOKS[this.name] || null;
-                if (!look && (this.role === 'medic' || ((this.role === 'dancer' || this.role === 'red_demon_dancer') && this.gender === 'male')))
-                    look = seededNpcLook(this);
-                if (!look && this.role && this.role.includes('robot'))       // unnamed Double Nights staff: silver
-                    look = { gender: 'androgynous', body: { kind: 'android', finish: 'silver' }, top: { type: 'dn_uniform', color: '#1c2030', trim: '#dfe6ff' },
-                             bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge' };
-                if (look && look.pose !== 'dance') look = { idleAngle: Math.PI / 2, ...look };
-                return (this._look = look);
-            }
-
-            drawStaff(ctx, look) {
-                drawProceduralHumanoid(ctx, this, { stance: 'idle', ...look });
-            }
-
-            drawFemaleDancer(ctx, phase, speed) {
-                
-                if (this.walkPhase === undefined) this.walkPhase = 0;
-                if (this.velX === undefined) this.velX = 0;
-                if (this.velY === undefined) this.velY = 0;
-                
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#8a0707', // Demon Red
-                    gender: 'female',
-                    stance: 'idle',
-                    pose: 'dance',
-                    hair: { type: 'demon_dancer', color: '#0a0000' }, // <--- The Ported Hair
-                    top: { type: 'sports_bra', color: '#111' },
-                    bottom: { type: 'skirt', color: '#111' }
-                });
-            }
-            
-            
-
-            drawMirabell(ctx) {
-                if (this.walkPhase === undefined) this.walkPhase = 0;
-                if (this.velX === undefined) this.velX = 0;
-                if (this.velY === undefined) this.velY = 0;
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#dcc6ac',
-                    gender: 'female',
-                    stance: 'idle',
-                    top:    { type: 'suit', color: '#4a0a10' },
-                    bottom: { type: 'skirt', color: '#4a0a10' },
-                    shoes:  { type: 'heels', color: '#2a0508' },
-                    hair:   { type: 'long', color: '#1a0505' },
-                    hat:    { type: 'wide_brim', color: '#590e18', crownColor: '#70121e', stroke: '#1a0505' }
-                });
-            }
-
-            drawPrisma(ctx) {
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#c8b8d0',
-                    gender: 'female',
-                    stance: 'idle',
-                    isDriving: false,
-                    hair: { type: 'braids', color: '#e0e8ff' },
-                    top: { type: 'sports_bra', color: '#aaccff' },
-                    bottom: { type: 'skirt', color: '#8888cc' },
-                    shoes: { type: 'heels', color: '#ddeeff' },
-                });
+            /** Prisma is crystalline: faceted highlights play over her. */
+            drawPrismaShimmer(ctx) {
                 // Crystalline shimmer overlay — small faceted highlights
                 const t = (typeof _frameTime !== 'undefined' ? _frameTime : Date.now()) * 0.003;
                 ctx.save();
@@ -17176,63 +17310,28 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             }
 
-            /** Torque — Auto Shop mechanic. Burly, short-haired, coveralls. */
-            drawTorque(ctx) {
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#6b3a2a',
-                    gender: 'male',
-                    stance: 'idle',
-                    hair: { type: 'short', color: '#1a1a1a' },
-                    top: { type: 'tshirt', color: '#ff6600' },
-                    bottom: { type: 'pants', color: '#2a2a2a' },
-                    shoes: { type: 'shoes', color: '#333' },
-                });
-            }
+            /** The look for this NPC (core/appearances.js); kept for callers that ask by this name. */
+            _staffLook() { return lookFor(this); }
 
-            drawBiggs(ctx) {
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#c9a87c',
-                    gender: 'male',
-                    stance: 'idle',
-                    hair: { type: 'afro', color: '#ff8800' },
-                    top: { type: 'suit', color: '#2a0a30' },
-                    bottom: { type: 'pants', color: '#1a0820' },
-                    shoes: { type: 'boots', color: '#ff8800' },
-                });
-            }
-
-            drawGrumNorth(ctx) {
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: '#8a7565',       // Grayish brown
-                    gender: 'male',
-                    stance: 'idle',
-                    hair: { type: 'short', color: '#7a7a7a' },  // Graying hair
-                    top: { type: 'suit', color: '#2a1a1a' },    // Dark crimson-black coat
-                    bottom: { type: 'pants', color: '#1a1a1a' },
-                    shoes: { type: 'boots', color: '#3a2020' },
-                });
-            }
-
-            
             /**
              * Teammate renderer — uses config-driven appearance via drawProceduralHumanoid.
              * Gun color pulled from equipped weapon's projectileColor.
              */
-            drawTeammate(ctx) {
-                // Resolve appearance from combatConfig or use defaults
-                const app = this.appearance || {};
+            drawTeammate(ctx, look) {
+                const app = look || this.appearance || {};
                 
                 // Determine stance from combat state (only active when recruited)
                 const inCombat = this.recruited && (this.cooldown > 0 || (this.shotsLeftInBurst < this.burstSize));
                 const weaponId = this.recruited ? this.equippedWeaponId : null;
                 
                 drawProceduralHumanoid(ctx, this, {
+                    ...app,
                     skinColor: app.skinColor || '#c68642',
                     gender: app.gender || 'female',
                     // Stance fits the weapon (rifles/snipers two-handed); ability users cast
                     // with an extended hand. Recoil is a real kick from the last shot.
                     stance: inCombat ? stanceForWeapon(weaponId) : 'idle',
-                    pose: this._idlePose || undefined,      // e.g. Yenna's crossed arms at the apartment
+                    pose: this._idlePose || app.pose || undefined,   // e.g. Yenna's crossed arms at the apartment
                     kick: inCombat ? shotKick(this) : 0,
                     weapon: weaponId ? { id: weaponId, ready: inCombat } : null,
                     top:    app.top    || { type: 'suit', color: '#2a0a3a' },
@@ -17243,37 +17342,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 });
                 
                 // (The weapon is drawn by drawProceduralHumanoid, in hand.)
-            }
-            
-            drawGeneric(ctx) { 
-                // Seed a stable random appearance from the NPC's name
-                if (!this._genericSeed) {
-                    let hash = 0;
-                    const n = this.name || 'NPC';
-                    for (let i = 0; i < n.length; i++) hash = ((hash << 5) - hash) + n.charCodeAt(i);
-                    const h = Math.abs(hash);
-                    const skins = ['#f5d0a9', '#c68e63', '#8d5524', '#6b3a2a', '#d4a574', '#e8c4a0'];
-                    const tops = ['#335', '#533', '#353', '#445', '#554', '#345', '#543', '#455'];
-                    const bottoms = ['#222', '#333', '#2a2a3a', '#1a1a2a', '#3a2a1a', '#252530'];
-                    const hairs = ['#111', '#2a1a0a', '#0a0a0a', '#3a2a1a', '#555', '#1a0a00'];
-                    this._genericSeed = {
-                        skin: skins[h % skins.length],
-                        top: tops[(h >> 3) % tops.length],
-                        bottom: bottoms[(h >> 6) % bottoms.length],
-                        hair: hairs[(h >> 9) % hairs.length],
-                        gender: (h >> 12) % 2 === 0 ? 'male' : 'female',
-                    };
-                }
-                const s = this._genericSeed;
-                drawProceduralHumanoid(ctx, this, {
-                    skinColor: s.skin,
-                    gender: s.gender,
-                    stance: 'idle',
-                    top: { type: 'tshirt', color: s.top },
-                    bottom: { type: s.gender === 'female' ? 'skirt' : 'pants', color: s.bottom },
-                    shoes: { type: 'shoes', color: '#222' },
-                    hair: { type: s.gender === 'female' ? 'long' : 'short', color: s.hair },
-                });
             }
         }
 
@@ -17595,73 +17663,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 { name: 'delivery', bodyColor: '#2ec4b6', headColor: '#dcc6ac', hairColor: '#1a1a1a', hasHat: true, hatColor: '#2ec4b6' }
             ];
 
-            /**
-             * A person built from an archetype: their gender, build, height, skin, hair and
-             * an outfit in the archetype's signature colour (bodyColor), so the crowd is
-             * varied but workers still read as workers, tourists as tourists.
-             */
             /** Is it raining where this pedestrian is? */
             _raining() {
                 return typeof game !== 'undefined' && game.weather && game.weather.isRaining && game.activeMap && game.activeMap.type !== 'indoor';
             }
 
-            static makeLook(ap, r) {
-                const pick = list => pickFrom(r, list);
-                const c = ap.bodyColor;
-                const gender = ap.name.endsWith('_male') ? 'male' : ap.name.endsWith('_female') ? 'female' : pick(['female', 'male', 'androgynous']);
-                const hairTypes = gender === 'female' ? ['long', 'ponytail', 'braids', 'curls', 'afro', 'short', 'dreadlocks']
-                                : gender === 'male' ? ['short', 'short', 'afro', 'dreadlocks', 'curls', 'braids'] : ['short', 'curls', 'ponytail', 'afro'];
-                const look = {
-                    gender, skinColor: pick(_SKIN_TONES),
-                    build: pick([undefined, undefined, 'slim', 'athletic', 'curvy', 'broad', 'heavy']),
-                    height: 0.93 + r() * 0.14,
-                    hair: { type: pick(hairTypes), color: r() < 0.6 ? ap.hairColor : pick(_HAIR_COLORS) },
-                    shoes: { type: 'sneakers', color: '#e8e8e8' }
-                };
-                // Rain kit: some carry an umbrella; some hoodie wearers put the hood up
-                if (r() < 0.4) look.umbrella = pick(['#1a1a1a', '#5a0f1e', '#9d8cc8', '#c9d6e8', '#d9b45a', '#2b3a55']);
-                look.rainHood = r() < 0.35;
-                look.hurry = 1.2 + r() * 0.15;
-                const skirtOr = alt => gender === 'female' && r() < 0.5 ? { type: pick(['skirt', 'long_skirt']), color: '#1c1c24' } : alt;
-                switch (ap.name) {
-                    case 'suit_male': case 'suit_female': case 'corporate':
-                        look.top = { type: pick(['suit', 'suit', 'jacket']), color: c, inner: '#e8e8e8' };
-                        look.bottom = skirtOr({ type: 'pants', color: '#1e1e26' });
-                        look.shoes = { type: gender === 'female' && r() < 0.5 ? 'heels' : 'loafers', color: '#111111' };
-                        if (r() < 0.2) look.jewelry = [{ type: 'sunglasses', color: '#141414' }];
-                        break;
-                    case 'casual_male': case 'casual_female':
-                        look.top = { type: pick(gender === 'female' ? ['tshirt', 'crop_top', 'tank', 'turtleneck'] : ['tshirt', 'tank', 'hoodie']), color: c, trim: '#f2f2f2' };
-                        look.bottom = skirtOr({ type: pick(['pants', 'shorts', 'joggers']), color: pick(['#34495e', '#2b2b2b', '#6b5b45']) });
-                        if (gender === 'female' && r() < 0.4) look.jewelry = [{ type: 'hoops', color: '#e8c27a' }];
-                        break;
-                    case 'worker':
-                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'cargo', color: '#4a4a3a' };
-                        look.shoes = { type: 'boots', color: '#3a2a1a' }; look.hat = { type: 'cap', color: ap.hatColor, trim: '#222222' };
-                        break;
-                    case 'hipster':
-                        look.top = { type: 'jacket', color: c, inner: '#d8d2c0' }; look.bottom = { type: pick(['pants', 'joggers']), color: '#2b2b2b' };
-                        look.hat = { type: 'beanie', color: ap.hatColor, trim: '#555555' };
-                        break;
-                    case 'punk':
-                        look.top = { type: pick(['tank', 'track_jacket', 'crop_top']), color: c, trim: '#111111' };
-                        look.bottom = { type: 'leggings', color: '#111111' }; look.shoes = { type: 'boots', color: '#111111' };
-                        look.hair = { type: pick(['short', 'afro', 'braids', 'dreadlocks']), color: ap.hairColor };
-                        look.jewelry = [{ type: 'hoops', color: '#c0c0c0' }];
-                        break;
-                    case 'tourist':
-                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'shorts', color: '#c2b280' };
-                        look.hat = { type: 'cap', color: ap.hatColor, trim: '#48cae4' }; look.jewelry = [{ type: 'sunglasses', color: '#141414' }];
-                        break;
-                    case 'delivery':
-                        look.top = { type: 'hoodie', color: c, trim: '#f2f2f2' }; look.bottom = { type: 'joggers', color: '#1e2a2a' };
-                        look.hat = { type: 'cap', color: ap.hatColor, trim: '#ffffff' };
-                        break;
-                    default:
-                        look.top = { type: 'tshirt', color: c }; look.bottom = { type: 'pants', color: '#222222' };
-                }
-                return look;
-            }
+            /** A person built from an archetype (their look: ROLE_LOOKS.pedestrian, core/appearances.js). */
+            static makeLook(ap, r) { return ROLE_LOOKS.pedestrian(ap, r); }
             
             constructor(x, y, network) {
                 super({
@@ -19471,32 +19479,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            - Will suppress (shoot at) last known position
            ===================================================================== */
         class Ganger extends ActorEntity {
-            /**
-             * THE GANGER LOOK: always a hot pink top over dark maroon — that's the gang,
-             * readable at a glance from above. Everything else varies per ganger: the (sleeved) cut,
-             * hair (often pink-dyed), skin, build, and the odd pink cap, shades or hoops.
-             */
-            static makeLook(r) {
-                const pick = list => pickFrom(r, list);
-                const gender = r() < 0.5 ? 'female' : 'male';
-                // Sleeved cuts only: from above, the pink sleeves are what you see most
-                const cut = pick(['suit', 'jacket', 'track_jacket', 'hoodie', 'tshirt', 'turtleneck']);
-                const look = {
-                    gender, skinColor: pick(_SKIN_TONES),
-                    build: pick([undefined, 'athletic', 'broad', 'slim', 'heavy', gender === 'female' ? 'curvy' : 'athletic']),
-                    height: 0.94 + r() * 0.12,
-                    top: { type: cut, color: '#ff0055', inner: '#111111', trim: '#111111' },
-                    bottom: { type: pick(['pants', 'cargo', 'joggers']), color: '#550022', trim: '#ff0055' },
-                    shoes: { type: pick(['boots', 'sneakers']), color: '#111111' },
-                    hair: r() < 0.15 ? null : { type: pick(['short', 'afro', 'braids', 'dreadlocks', 'ponytail', 'curls', gender === 'female' ? 'long' : 'short']),
-                                                color: pick(['#0a0a0a', '#1a1a1a', '#ff0055', '#ff0055', '#3a0a1a']) },
-                    hat: r() < 0.25 ? { type: pick(['cap', 'beanie']), color: '#ff0055', trim: '#111111' } : null,
-                    jewelry: []
-                };
-                if (r() < 0.25) look.jewelry.push({ type: 'sunglasses', color: '#141414' });
-                if (r() < 0.25) look.jewelry.push({ type: pick(['hoops', 'necklace']), color: '#e8c27a' });
-                return look;
-            }
+            /** Hot pink over dark maroon, readable at a glance (ROLE_LOOKS.ganger, core/appearances.js). */
+            static makeLook(r) { return ROLE_LOOKS.ganger(r); }
 
             constructor(x, y, config) {
                 const cfg = config || {};
@@ -32581,12 +32565,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return b ? b.w * (b.shoulder || 1) : 1;
         }
 
-        const ANDROID_FINISHES = {
-            silver:    { plate: '#c9ccd8', trim: '#7d8196', sheen: '#f4f6ff', glow: '#bfe6ff' },
-            gold:      { plate: '#d9b45a', trim: '#8c6a24', sheen: '#fff1c2', glow: '#00ffff' },
-            bloodmoon: { plate: '#b3203c', trim: '#5e0c1e', sheen: '#ff9fb2', glow: '#ff7aa8' },
-        };
-
         /** Colours for an android body config, or null for a human. */
         function androidLook(body) {
             if (!body || body.kind !== 'android') return null;
@@ -32667,13 +32645,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.stroke(); ctx.globalAlpha = 1;
         }
 
-        /** A small deterministic random generator from a string or number (same seed → same look). */
-        function seededRandom(seed) {
-            let h = 2166136261;
-            for (const ch of String(seed)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
-            return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-        }
-        const pickFrom = (rng, list) => list[Math.floor(rng() * list.length) % list.length];
         /* =====================================================================
            CLOTH — swinging coat hems, skirts and trains
            ---------------------------------------------------------------------
@@ -33807,10 +33778,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         function drawCharacterPortrait(ctx, w, h, config) {
             const A = androidLook(config.body);                              // Double Nights android (ui/bodies.js)
-            const skinColor = A ? A.plate : (config.skinColor || '#c68e63');
-            const hair = A ? (config.hair || null) : (config.hair || { type: 'curls', color: '#0a0505' });
-            const eyeColor = config.eyeColor || '#daa520'; // Default golden for Stella
-            const gender = config.gender || 'female';
+            const me = APPEARANCES['949'];                                   // unset parts default to Stella's
+            const skinColor = A ? A.plate : (config.skinColor || me.skinColor);
+            const hair = A ? (config.hair || null) : (config.hair || me.hair);
+            const eyeColor = config.eyeColor || me.eyeColor;
+            const gender = config.gender || me.gender;
             const top = config.top || null;
             // Expression (ui/expressions.js): every number is 0 for the neutral face
             const X = resolveExpression(config.expression);
@@ -37649,64 +37621,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'Mirabel': '#c4566e',
         };
 
-        const NPC_PORTRAIT_CONFIGS = {
-            'Biggs':       { skinColor: '#c68642', gender: 'male', hair: { type: 'afro', color: '#ff6600' }, top: { type: 'tshirt', color: '#ff8800' } },
-            'Dr. Yin':     { ...STAFF_LOOKS['Dr. Yin'], eyeColor: '#3a2a1a' },
-            'Prisma':      { skinColor: '#d4a8e0', gender: 'female', hair: { type: 'long', color: '#9900ff' }, top: { type: 'tshirt', color: '#2a1a3a' } },
-            'Barista Ren': STAFF_LOOKS['Barista Ren'],
-            'Torque':      { skinColor: '#8d5524', gender: 'male', hair: { type: 'short', color: '#111' }, top: { type: 'tshirt', color: '#444' } },
-            'Bartender':   STAFF_LOOKS['Bartender'],
-            'LUVSH4D3':    STAFF_LOOKS['LUVSH4D3'],                        // Blood Moon android (Double Nights)
-            'Guard Unit Alpha': STAFF_LOOKS['Guard Unit Alpha'],
-            'Guard Unit Beta':  STAFF_LOOKS['Guard Unit Beta'],
-            'Concierge Lux':    STAFF_LOOKS['Concierge Lux'],
-            'Ms. Jean':    { skinColor: '#c68e63', gender: 'female', hair: { type: 'curls', color: '#888' }, top: { type: 'suit', color: '#2a2a1a' } },
-            'Contractor':  { skinColor: '#c9a87c', gender: 'male', hair: { type: 'short', color: '#111' }, top: { type: 'suit', color: '#222' } },
-            'Anavia':      { skinColor: '#8B4513', gender: 'female', hair: { type: 'braids', color: '#1a0a00' }, top: { type: 'tshirt', color: '#1a3a2a' } },
-            'Grum North':  { skinColor: '#8a7565', gender: 'male', hair: { type: 'short', color: '#7a7a7a' }, top: { type: 'suit', color: '#2a1a1a' } },
-            'Mirabel':     { skinColor: '#dcc6ac', gender: 'female', hair: { type: 'long', color: '#1a0505' }, top: { type: 'suit', color: '#4a0a10' } },
-            // "dripped with professionalism in a white suit" — the only physical
-            // detail the draft gives her, so the portrait leans entirely on it.
-            'Larissa':     { skinColor: '#c8a882', gender: 'female', hair: { type: 'ponytail', color: '#2b2118' }, top: { type: 'suit', color: '#ece8e0' } },
-        };
-
-        // ============================================================================
-        //  ROLE_PORTRAIT_CONFIGS — Fallback portraits keyed by NPC.role, checked after
-        //  NPC_PORTRAIT_CONFIGS and before the grey silhouette. Covers the cast that
-        //  exists in numbers and doesn't warrant per-name entries (dancers, spirits),
-        //  so any future NPC sharing a role is drawn correctly with no new data.
-        //  Palettes mirror the in-world renderers (drawFemaleDancer) so the dialogue
-        //  bust matches the body on screen. (Male dancers, medics and staff use
-        //  their own look — NPC._staffLook — before these.)
-        //  `byGender` lets one role serve both variants — NPC.gender is derived from
-        //  the name in the constructor, so "Male Dancer 3" resolves to the male entry.
-        // ============================================================================
-        const ROLE_PORTRAIT_CONFIGS = {
-            'red_demon_dancer': {
-                skinColor: '#8a0707', gender: 'female',
-                hair: { type: 'demon_dancer', color: '#0a0000' },
-                top: { type: 'sports_bra', color: '#111' }
-            },
-            'dancer': {
-                byGender: {
-                    female: {
-                        skinColor: '#8a0707', gender: 'female',
-                        hair: { type: 'demon_dancer', color: '#0a0000' },
-                        top: { type: 'sports_bra', color: '#111' }
-                    },
-                    male: {
-                        skinColor: '#8d5524', gender: 'male',
-                        hair: { type: 'short', color: '#0a0a0a' },
-                        top: { type: 'tshirt', color: '#111' }
-                    }
-                }
-            },
-            'spirit': {
-                skinColor: '#9fb8d0', gender: 'female',
-                hair: { type: 'long', color: '#4a5a70' },
-                top: { type: 'tshirt', color: '#2a3345' }
-            },
-        };
+        // (Portraits are drawn from each character's look: APPEARANCES / lookFor / portraitOf in core/appearances.js.)
 
         // ─── DIALOGUE SEQUENCE ────────────────────────────────────────────────
         //  General-purpose multi-line dialogue player.
@@ -38306,6 +38221,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Inside GameEngine constructor:
                 
                 // INSIDE constructor()
+                // (Their looks are in core/appearances.js)
                 this.teammates = [ 
                     // Victoria Nils — SMG suppression, pink afro, silver boots
                     new NPC(1100, 150, "Victoria", "teammate", {
@@ -38314,15 +38230,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         burstDelay: 5,
                         accuracyMod: 0.8,
                         bio: 'Ex-corpo marksman turned freelancer. Loyal, lethal, and always watching your six.',
-                        relationship: 0,
-                        appearance: {
-                            skinColor: '#c68642',
-                            gender: 'female',
-                            top:    { type: 'suit', color: '#2a0a3a' },
-                            bottom: { type: 'pants', color: '#1a0820' },
-                            shoes:  { type: 'boots', color: '#c0c0c0' },
-                            hair:   { type: 'afro', color: '#ff69b4' }
-                        }
+                        relationship: 0
                     }),
                     // Yenna Stone — Sniper, composed, deadly precise
                     new NPC(1150, 150, "Yenna", "teammate", {
@@ -38331,15 +38239,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         burstDelay: 0,
                         accuracyMod: 0.95,
                         bio: 'Former military sharpshooter. Quiet, patient, sees everything. SR-86 is an extension of her arm.',
-                        relationship: 0,
-                        appearance: {
-                            skinColor: '#8B4513',
-                            gender: 'female',
-                            top:    { type: 'tshirt', color: '#2a3a2a' },
-                            bottom: { type: 'pants', color: '#1a1a1a' },
-                            shoes:  { type: 'boots', color: '#333' },
-                            hair:   { type: 'dreadlocks', color: '#1a0a00' }
-                        }
+                        relationship: 0
                     }),
                     // Sabrina Darkmancer — Sarcastic, dark energy, close-range
                     new NPC(1200, 150, "Sabrina", "teammate", {
@@ -38348,15 +38248,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         burstDelay: 8,
                         accuracyMod: 0.85,
                         bio: 'Street sorcerer with a mean trigger finger. Sarcasm is her second language, violence is her first.',
-                        relationship: 0,
-                        appearance: {
-                            skinColor: '#e8d0c0',
-                            gender: 'female',
-                            top:    { type: 'sports_bra', color: '#1a0a2a' },
-                            bottom: { type: 'skirt', color: '#0a0a1a' },
-                            shoes:  { type: 'heels', color: '#2a1a3a' },
-                            hair:   { type: 'ponytail', color: '#0a0008' }
-                        }
+                        relationship: 0
                     }),
                     // Max Moon — Hotheaded, sparks, electric energy
                     new NPC(1250, 150, "Max", "teammate", {
@@ -38365,15 +38257,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         burstDelay: 6,
                         accuracyMod: 0.75,
                         bio: 'Short fuse, big firepower. Snaps blue sparks from his fingertips when he\'s irritated — which is always.',
-                        relationship: 0,
-                        appearance: {
-                            skinColor: '#c9a87c',
-                            gender: 'male',
-                            top:    { type: 'tshirt', color: '#1a2a4a' },
-                            bottom: { type: 'pants', color: '#222' },
-                            shoes:  { type: 'sneakers', color: '#333' },
-                            hair:   { type: 'short', color: '#0088ff' }
-                        }
+                        relationship: 0
                     }),
                     // Josh Burke — Flat, matter-of-fact, efficient
                     new NPC(1300, 150, "Josh", "teammate", {
@@ -38382,15 +38266,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         burstDelay: 0,
                         accuracyMod: 0.9,
                         bio: 'Intel specialist. States facts. Throws shrapnel when angry. Carries YourGirlSara like it owes him money.',
-                        relationship: 0,
-                        appearance: {
-                            skinColor: '#e8d5c4',
-                            gender: 'male',
-                            top:    { type: 'tshirt', color: '#333' },
-                            bottom: { type: 'pants', color: '#2a2a2a' },
-                            shoes:  { type: 'shoes', color: '#1a1a1a' },
-                            hair:   { type: 'short', color: '#3a2a1a' }
-                        }
+                        relationship: 0
                     })
                 ];
                 this.activeInteraction = null;
@@ -39547,12 +39423,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // the target's health bar, blood in the character's own colour, and a flinch.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
 
-        /* Blood kinds. A character can name one (or a '#hex') as `blood` on the entity or
-           in its look; otherwise it's worked out from what they are:
+        /* Blood kinds. A character names one (or a '#hex') as `blood` in their look
+           (core/appearances.js) or on the entity; otherwise it's worked out from what they are:
              red      people
-             ink      the club's demonesses (the red demon dancers) — near-black, violet sheen
+             ink      the club's demonesses (their look names it) — near-black, violet sheen
              coolant  androids: sparks and a pale glowing fluid in their finish's tint
-             oil      drones and gunner rigs: dark sparks, no blood */
+             oil      drones and gunner rigs: dark sparks, no blood
+             wine     Stella */
         const BLOOD_KINDS = {
             red:  { drop: '150, 10, 14', decal: '110, 6, 8' },
             ink:  { drop: '40, 18, 58',  decal: '11, 6, 16', sheen: '120, 70, 170' },
@@ -39560,11 +39437,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Stella (949): deep wine — Dr. Yin keeps her running, and she isn't quite human
             wine: { drop: '112, 16, 38', decal: '70, 10, 26', sheen: '150, 40, 70' },
         };
-        const COOLANT_TINTS = { silver: '170, 220, 255', gold: '255, 196, 96', bloodmoon: '255, 110, 150' };
 
         /** Blood for an actor: { drop, decal, sheen?, sparks? } in "r, g, b", or null for none. */
         function bloodOf(a) {
-            const look = (a._staffLook ? a._staffLook() : a._look) || a.look || null;   // staff looks resolve on first use
+            const look = (a instanceof NPC ? lookFor(a) : a._look) || a.look || null;   // core/appearances.js
             const named = a.blood || (look && look.blood);
             if (named === 'none') return null;
             if (typeof named === 'string' && named[0] === '#') {
@@ -39572,13 +39448,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return { drop: rgb, decal: darkenHex(named, 40).match(/\d+/g).join(', ') };
             }
             if (named === 'coolant' || (look && look.body && look.body.kind === 'android')) {
-                const t = COOLANT_TINTS[(look && look.body && look.body.finish)] || COOLANT_TINTS.silver;
+                const t = (ANDROID_FINISHES[look && look.body && look.body.finish] || ANDROID_FINISHES.silver).coolant;
                 return { drop: t, decal: t, sparks: true, glow: true };
             }
             if (BLOOD_KINDS[named]) return BLOOD_KINDS[named];
-            if (typeof PlayerEntity !== 'undefined' && a instanceof PlayerEntity) return BLOOD_KINDS.wine;
+            if (typeof PlayerEntity !== 'undefined' && a instanceof PlayerEntity) return BLOOD_KINDS[APPEARANCES['949'].blood] || BLOOD_KINDS.wine;
             if ((typeof Drone !== 'undefined' && a instanceof Drone) || (typeof GatlingGunner !== 'undefined' && a instanceof GatlingGunner)) return BLOOD_KINDS.oil;
-            if (a.role === 'red_demon_dancer' || (a.role === 'dancer' && a.gender !== 'male')) return BLOOD_KINDS.ink;
             return BLOOD_KINDS.red;
         }
 
@@ -40790,17 +40665,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             walkPhase: 0, animState: 'idle',
                             velocityX: 0, velocityY: 0, speed: 0
                         }, {
-                            skinColor: '#c8a0ff', // Violet-tinted skin
-                            hair: vfx.cosmeticConfig.hair ? {
-                                ...vfx.cosmeticConfig.hair,
-                                color: '#d8c0ff' // Light violet hair
-                            } : null,
-                            gender: 'female',
+                            // Her own cut, in violet light
+                            ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
+                                { skin: '#c8a0ff', hair: '#d8c0ff', top: '#b88aee', bottom: '#9a70d4', shoes: '#8060b8' }),
                             stance: vfx.stance,
-                            isDriving: false,
-                            top: '#b88aee',    // Violet outfit tint
-                            bottom: '#9a70d4',
-                            shoes: '#8060b8'
+                            isDriving: false
                         });
 
                         ctx.restore();
@@ -40842,17 +40711,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             walkPhase: 0, animState: 'idle',
                             velocityX: 0, velocityY: 0, speed: 0
                         }, {
-                            skinColor: '#e0d0ff', // Brighter white-violet tint
-                            hair: vfx.cosmeticConfig.hair ? {
-                                ...vfx.cosmeticConfig.hair,
-                                color: '#f0e8ff'
-                            } : null,
-                            gender: 'female',
+                            // Her own cut, in violet light
+                            ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
+                                { skin: '#e0d0ff', hair: '#f0e8ff', top: '#d4c0f8', bottom: '#c0aaee', shoes: '#b098e0' }),
                             stance: vfx.stance,
-                            isDriving: false,
-                            top: '#d4c0f8',
-                            bottom: '#c0aaee',
-                            shoes: '#b098e0'
+                            isDriving: false
                         });
                         ctx.restore();
                     }
@@ -40902,16 +40765,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                     // Pass the ghost itself so the shared gait controller can track it
                     // (the old throwaway object used velocityX/Y, which the renderer never read)
-                    drawProceduralHumanoid(ctx, g, {
-                        skinColor: g.skinColor,
-                        hair: g.hair,
-                        gender: g.gender,
-                        stance: 'idle',
-                        isDriving: false,
-                        top: g.topColor,
-                        bottom: g.bottomColor,
-                        shoes: g.shoeColor
-                    });
+                    drawProceduralHumanoid(ctx, g, { ...g.look, stance: 'idle' });
 
                     ctx.restore();
                     ctx.restore();
@@ -41180,13 +41034,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              *
              * Tier order:
              *   1. Player (949 / Stella) — live cosmetics, falls back to defaults
-             *   2. Recruited teammates — their own `appearance` block
-             *   3. NPC_PORTRAIT_CONFIGS — per-name authored configs
-             *   4. ROLE_PORTRAIT_CONFIGS — per-role, gender-split (dancers, spirits)
-             *   5. Grey silhouette
+             *   2. Everyone else — portraitOf(their look), the same look as their body
+             *      in the world (core/appearances.js): a live teammate or NPC by name,
+             *      else their APPEARANCES entry
+             *   3. Grey silhouette
              *
              * Always returns a usable config, never null. The returned object carries
-             * `isFallback: true` when it landed on tier 5, so a caller that would
+             * `isFallback: true` when it landed on tier 3, so a caller that would
              * rather show something else than a grey silhouette (e.g. keeping a
              * contact's emoji avatar) can check before drawing.
              *
@@ -41204,38 +41058,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (this.cosmetics) {
                         const c = this.cosmetics.getRenderConfig();
                         const face = this.playerExpression ? { expression: this.playerExpression } : {};
-                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: '#daa520', gender: 'female', top: c.outfit.top, hat: c.hat, jewelry: c.jewelry, ...face };
+                        const me = APPEARANCES['949'];
+                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: me.eyeColor, gender: me.gender, top: c.outfit.top, hat: c.hat, jewelry: c.jewelry, ...face };
                     }
-                    return { skinColor: '#c68e63', hair: { type: 'curls', color: '#0a0505' }, eyeColor: '#daa520', gender: 'female' };
+                    return portraitOf(APPEARANCES['949']);
                 }
 
-                // 2. Teammates
-                const tm = (this.teammates || []).find(t => t.name === speakerName);
-                if (tm && tm.appearance) {
-                    return { skinColor: tm.appearance.skinColor, hair: tm.appearance.hair, eyeColor: '#332211', gender: tm.appearance.gender || 'female', top: tm.appearance.top };
-                }
+                // 2. Everyone else: their look (core/appearances.js) — a live NPC or teammate by name
+                //    (so crowds resolve by role), else their named entry
+                const who = (this.teammates || []).find(t => t.name === speakerName) || (this.npcs || []).find(n => n.name === speakerName);
+                const look = who ? lookFor(who) : APPEARANCES[speakerName];
+                if (look) return portraitOf(look);
 
-                // 3. Per-name NPC configs
-                if (NPC_PORTRAIT_CONFIGS[speakerName]) {
-                    return { ...NPC_PORTRAIT_CONFIGS[speakerName], eyeColor: '#332211' };
-                }
-
-                // 4. Per-role configs — looks the speaker up among the live NPCs to
-                // read their role and gender, so numerous cast members (dancers,
-                // spirits) get a correct bust without per-name entries.
-                const npc = (this.npcs || []).find(n => n.name === speakerName);
-                // Staff, androids, medics and male dancers: the same look as their body in the world
-                const staff = npc && npc._staffLook ? npc._staffLook() : null;
-                if (staff) return { ...staff, eyeColor: '#332211' };
-                const roleCfg = npc && ROLE_PORTRAIT_CONFIGS[npc.role];
-                if (roleCfg) {
-                    const resolved = roleCfg.byGender
-                        ? (roleCfg.byGender[npc.gender] || roleCfg.byGender.female)
-                        : roleCfg;
-                    if (resolved) return { ...resolved, eyeColor: '#332211' };
-                }
-
-                // 5. Silhouette
+                // 3. Silhouette
                 return { skinColor: '#555', hair: { type: 'short', color: '#333' }, eyeColor: '#222', gender: 'male', isFallback: true };
             },
 
@@ -41801,7 +41636,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         else if (relPercent >= 20) relRank = 'ACQUAINTANCE';
 
                         // Appearance color for portrait dot
-                        const portraitColor = tm.appearance?.hair?.color || tm.appearance?.top?.color || '#00f3ff';
+                        const portraitColor = tm.appearance?.accent || tm.appearance?.hair?.color || '#00f3ff';
 
                         html += `<div style="background: rgba(0,243,255,0.03); border: 1px solid rgba(0,243,255,${isRecruited ? '0.15' : '0.06'}); border-radius: 4px; padding: 12px; margin-bottom: 8px;">`;
 
@@ -45799,11 +45634,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (inGraveyard) {
                     // Spawn new ghosts periodically (max 5 at once)
                     if (this.graveyardGhosts.length < 15 && Math.random() < 0.02) {
-                        const GHOST_HAIR = ['long', 'short', 'afro', 'curls', 'braids', 'dreadlocks', 'ponytail'];
-                        const GHOST_SKINS = ['#8ec8d8', '#7ab0c8', '#9dd4e0', '#a0d0e8', '#6ea8c0'];
-                        const hairType = GHOST_HAIR[Math.floor(Math.random() * GHOST_HAIR.length)];
-                        const skinColor = GHOST_SKINS[Math.floor(Math.random() * GHOST_SKINS.length)];
-                        const gender = Math.random() < 0.5 ? 'male' : 'female';
+                        const look = ROLE_LOOKS.ghost(Math.random);   // pale and icy (core/appearances.js)
                         const gx = 600 + Math.random() * 2800;
                         const gy = 8900 + Math.random() * 1800;
                         // Pick a random wander target inside graveyard
@@ -45820,13 +45651,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             phase: 'in',    // 'in', 'wander', 'out'
                             fadeSpeed: 0.005 + Math.random() * 0.005,
                             wanderTimer: 300 + Math.floor(Math.random() * 400), // frames to wander
-                            // Appearance
-                            skinColor,
-                            hair: { type: hairType, color: '#c0e8ff' },
-                            gender,
-                            topColor: '#90c0d8',
-                            bottomColor: '#7aaccc',
-                            shoeColor: '#6898b8'
+                            look
                         });
                     }
 
@@ -47833,18 +47658,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const drawX = seatPos.x;
                         const drawY = seatPos.y;
                         
-                        // Resolve appearance — teammates have it, dancers need defaults
+                        // Their look is the same as on foot (core/appearances.js), minus any dance
                         const isShooting = occ.cooldown !== undefined && occ.cooldown > 0;
-                        const app = occ.appearance || {};
-                        const isDemon = occ.role === 'red_demon_dancer';
-                        const isDancer = occ.role === 'dancer' || isDemon;
-                        
-                        // Build appearance config with fallbacks for dancers
-                        const skinColor = app.skinColor || (isDemon ? '#8b2500' : '#c68642');
-                        const topColor = app.top || (isDemon ? { type: 'sports_bra', color: '#440000' } : { type: 'sports_bra', color: '#ff55aa' });
-                        const bottomColor = app.bottom || (isDemon ? { type: 'skirt', color: '#220000' } : { type: 'skirt', color: '#ff88cc' });
-                        const shoesColor = app.shoes || { type: 'heels', color: isDemon ? '#660000' : '#ff69b4' };
-                        const hairConfig = app.hair || (isDemon ? { type: 'long', color: '#330000' } : { type: 'curls', color: '#111' });
+                        const { pose, idleAngle, ...look } = lookFor(occ) || {};
                         
                         // Set up canvas context — translate to seat position, rotate
                         // In combat: face target. Otherwise: face car forward.
@@ -47856,18 +47672,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.ctx.rotate(occAngle);
                         
                         drawProceduralHumanoid(this.ctx, occ, {
-                            skinColor: skinColor,
-                            gender: occ.gender || 'female',
+                            ...look,
+                            gender: look.gender || occ.gender || 'female',
                             isDriving: true,
                             isShootingFromCar: isShooting,
                             carAngle: this.car.angle,
                             recoil: isShooting ? 0.5 : 0,
                             stance: isShooting ? 'pistol' : 'idle',
-                            top: topColor,
-                            bottom: bottomColor,
-                            shoes: shoesColor,
-                            hair: hairConfig,
-                            hat: app.hat || null
+                            held: null
                         });
                         
                         this.ctx.restore();
@@ -50007,7 +49819,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 drawProceduralHumanoid(this.ctx, this.player, {
                     skinColor: cosmeticConfig.skinColor,
                     hair: cosmeticConfig.hair,
-                    gender: 'female',
+                    gender: APPEARANCES['949'].gender,
                     stance: currentStance,
                     isDriving: this.isDriving,
                     isShootingFromCar: this.isDriving && this.isShootingFromCar,

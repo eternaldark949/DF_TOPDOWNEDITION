@@ -258,13 +258,13 @@
              *
              * Tier order:
              *   1. Player (949 / Stella) — live cosmetics, falls back to defaults
-             *   2. Recruited teammates — their own `appearance` block
-             *   3. NPC_PORTRAIT_CONFIGS — per-name authored configs
-             *   4. ROLE_PORTRAIT_CONFIGS — per-role, gender-split (dancers, spirits)
-             *   5. Grey silhouette
+             *   2. Everyone else — portraitOf(their look), the same look as their body
+             *      in the world (core/appearances.js): a live teammate or NPC by name,
+             *      else their APPEARANCES entry
+             *   3. Grey silhouette
              *
              * Always returns a usable config, never null. The returned object carries
-             * `isFallback: true` when it landed on tier 5, so a caller that would
+             * `isFallback: true` when it landed on tier 3, so a caller that would
              * rather show something else than a grey silhouette (e.g. keeping a
              * contact's emoji avatar) can check before drawing.
              *
@@ -282,38 +282,19 @@
                     if (this.cosmetics) {
                         const c = this.cosmetics.getRenderConfig();
                         const face = this.playerExpression ? { expression: this.playerExpression } : {};
-                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: '#daa520', gender: 'female', top: c.outfit.top, hat: c.hat, jewelry: c.jewelry, ...face };
+                        const me = APPEARANCES['949'];
+                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: me.eyeColor, gender: me.gender, top: c.outfit.top, hat: c.hat, jewelry: c.jewelry, ...face };
                     }
-                    return { skinColor: '#c68e63', hair: { type: 'curls', color: '#0a0505' }, eyeColor: '#daa520', gender: 'female' };
+                    return portraitOf(APPEARANCES['949']);
                 }
 
-                // 2. Teammates
-                const tm = (this.teammates || []).find(t => t.name === speakerName);
-                if (tm && tm.appearance) {
-                    return { skinColor: tm.appearance.skinColor, hair: tm.appearance.hair, eyeColor: '#332211', gender: tm.appearance.gender || 'female', top: tm.appearance.top };
-                }
+                // 2. Everyone else: their look (core/appearances.js) — a live NPC or teammate by name
+                //    (so crowds resolve by role), else their named entry
+                const who = (this.teammates || []).find(t => t.name === speakerName) || (this.npcs || []).find(n => n.name === speakerName);
+                const look = who ? lookFor(who) : APPEARANCES[speakerName];
+                if (look) return portraitOf(look);
 
-                // 3. Per-name NPC configs
-                if (NPC_PORTRAIT_CONFIGS[speakerName]) {
-                    return { ...NPC_PORTRAIT_CONFIGS[speakerName], eyeColor: '#332211' };
-                }
-
-                // 4. Per-role configs — looks the speaker up among the live NPCs to
-                // read their role and gender, so numerous cast members (dancers,
-                // spirits) get a correct bust without per-name entries.
-                const npc = (this.npcs || []).find(n => n.name === speakerName);
-                // Staff, androids, medics and male dancers: the same look as their body in the world
-                const staff = npc && npc._staffLook ? npc._staffLook() : null;
-                if (staff) return { ...staff, eyeColor: '#332211' };
-                const roleCfg = npc && ROLE_PORTRAIT_CONFIGS[npc.role];
-                if (roleCfg) {
-                    const resolved = roleCfg.byGender
-                        ? (roleCfg.byGender[npc.gender] || roleCfg.byGender.female)
-                        : roleCfg;
-                    if (resolved) return { ...resolved, eyeColor: '#332211' };
-                }
-
-                // 5. Silhouette
+                // 3. Silhouette
                 return { skinColor: '#555', hair: { type: 'short', color: '#333' }, eyeColor: '#222', gender: 'male', isFallback: true };
             },
 
@@ -879,7 +860,7 @@
                         else if (relPercent >= 20) relRank = 'ACQUAINTANCE';
 
                         // Appearance color for portrait dot
-                        const portraitColor = tm.appearance?.hair?.color || tm.appearance?.top?.color || '#00f3ff';
+                        const portraitColor = tm.appearance?.accent || tm.appearance?.hair?.color || '#00f3ff';
 
                         html += `<div style="background: rgba(0,243,255,0.03); border: 1px solid rgba(0,243,255,${isRecruited ? '0.15' : '0.06'}); border-radius: 4px; padding: 12px; margin-bottom: 8px;">`;
 

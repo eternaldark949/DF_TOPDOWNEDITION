@@ -3,12 +3,13 @@
         // the target's health bar, blood in the character's own colour, and a flinch.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
 
-        /* Blood kinds. A character can name one (or a '#hex') as `blood` on the entity or
-           in its look; otherwise it's worked out from what they are:
+        /* Blood kinds. A character names one (or a '#hex') as `blood` in their look
+           (core/appearances.js) or on the entity; otherwise it's worked out from what they are:
              red      people
-             ink      the club's demonesses (the red demon dancers) — near-black, violet sheen
+             ink      the club's demonesses (their look names it) — near-black, violet sheen
              coolant  androids: sparks and a pale glowing fluid in their finish's tint
-             oil      drones and gunner rigs: dark sparks, no blood */
+             oil      drones and gunner rigs: dark sparks, no blood
+             wine     Stella */
         const BLOOD_KINDS = {
             red:  { drop: '150, 10, 14', decal: '110, 6, 8' },
             ink:  { drop: '40, 18, 58',  decal: '11, 6, 16', sheen: '120, 70, 170' },
@@ -16,11 +17,10 @@
             // Stella (949): deep wine — Dr. Yin keeps her running, and she isn't quite human
             wine: { drop: '112, 16, 38', decal: '70, 10, 26', sheen: '150, 40, 70' },
         };
-        const COOLANT_TINTS = { silver: '170, 220, 255', gold: '255, 196, 96', bloodmoon: '255, 110, 150' };
 
         /** Blood for an actor: { drop, decal, sheen?, sparks? } in "r, g, b", or null for none. */
         function bloodOf(a) {
-            const look = (a._staffLook ? a._staffLook() : a._look) || a.look || null;   // staff looks resolve on first use
+            const look = (a instanceof NPC ? lookFor(a) : a._look) || a.look || null;   // core/appearances.js
             const named = a.blood || (look && look.blood);
             if (named === 'none') return null;
             if (typeof named === 'string' && named[0] === '#') {
@@ -28,13 +28,12 @@
                 return { drop: rgb, decal: darkenHex(named, 40).match(/\d+/g).join(', ') };
             }
             if (named === 'coolant' || (look && look.body && look.body.kind === 'android')) {
-                const t = COOLANT_TINTS[(look && look.body && look.body.finish)] || COOLANT_TINTS.silver;
+                const t = (ANDROID_FINISHES[look && look.body && look.body.finish] || ANDROID_FINISHES.silver).coolant;
                 return { drop: t, decal: t, sparks: true, glow: true };
             }
             if (BLOOD_KINDS[named]) return BLOOD_KINDS[named];
-            if (typeof PlayerEntity !== 'undefined' && a instanceof PlayerEntity) return BLOOD_KINDS.wine;
+            if (typeof PlayerEntity !== 'undefined' && a instanceof PlayerEntity) return BLOOD_KINDS[APPEARANCES['949'].blood] || BLOOD_KINDS.wine;
             if ((typeof Drone !== 'undefined' && a instanceof Drone) || (typeof GatlingGunner !== 'undefined' && a instanceof GatlingGunner)) return BLOOD_KINDS.oil;
-            if (a.role === 'red_demon_dancer' || (a.role === 'dancer' && a.gender !== 'male')) return BLOOD_KINDS.ink;
             return BLOOD_KINDS.red;
         }
 

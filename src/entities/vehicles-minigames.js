@@ -789,14 +789,7 @@
                 // Gather recruited teammates
                 const recruitedTeammates = (game.teammates || []).filter(t => t.recruited && !t.downed);
                 
-                // Teammate car colors (pulled from their appearance)
-                const teammateColors = {
-                    'Victoria': '#ff69b4',
-                    'Yenna': '#2a3a2a',
-                    'Sabrina': '#6a1a8a',
-                    'Max': '#1a2a4a',
-                    'Josh': '#4a2a1a'
-                };
+
                 
                 // AI filler colors for remaining slots
                 const fillerColors = [
@@ -829,7 +822,7 @@
                 for (const tm of recruitedTeammates) {
                     if (slotIndex >= spawnPoints.length) break;
                     const sp = spawnPoints[slotIndex];
-                    const color = teammateColors[tm.name] || '#888';
+                    const color = (APPEARANCES[tm.name] || {}).accent || '#888';   // their signature colour (core/appearances.js)
                     const initial = tm.name.charAt(0).toUpperCase();
                     
                     const car = new BumperCar({

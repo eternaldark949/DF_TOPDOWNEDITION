@@ -21,6 +21,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `core/resonance.js` | `ResonanceSystem`: 949's progression — earning (style-weighted), Dr. Yin's tuning, the Flit / Frame / Arms trees |
 | `core/utils.js` | Maths helpers, humanoid gait/animation helpers, weapon muzzle helpers, `RenderInterp` |
 | `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs |
+| `core/appearances.js` | **Every character's look in one place**: `APPEARANCES` (949, the crew, staff, the city's cast), `ROLE_LOOKS` (medics, dancers, androids, pedestrians, gangers, spirits, ghosts), `PALETTE`, `ANDROID_FINISHES`; `lookFor(entity)`, `portraitOf(look)` |
 | `core/settings.js` | `FullscreenManager`, `GameSettings`, object pools, perf utilities, `showMessage` |
 
 ## world/
@@ -58,7 +59,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `entities/actors.js` | `ActorEntity`, `PlayerEntity`, projectiles, triggers |
 | `entities/static-builders-profiler.js` | Turning walls/buildings into colliders, perf bench, profiler |
 | `entities/street-objects.js` | Neon signs, loot, pavement, foliage |
-| `entities/npc.js` | `NPC` companions and characters, quips and emotes; `STAFF_LOOKS` (bartenders, Dr. Yin, Double Nights androids) |
+| `entities/npc.js` | `NPC` companions and characters, quips and emotes (their looks: `core/appearances.js`) |
 | `entities/pedestrians.js` | Pedestrians and their manager |
 | `entities/enemies.js` | Velvet cat, drones, gunners, gangers, restricted zone, horde gauntlet |
 
@@ -87,7 +88,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `story/captions.js` | Caption/subtitle system |
 | `story/narrative-cutscenes.js` | Cutscene manager, narrative state machine, `StoryManager` |
 | `story/missions.js` | Mission types, `MissionSystem`, crafting schematics |
-| `story/dialogue-bonding.js` | Bonding dialogues, companion idle spots, speaker colours, portraits, dialogue transcript/sequence, `BondingSystem` |
+| `story/dialogue-bonding.js` | Bonding dialogues, companion idle spots, speaker colours, dialogue transcript/sequence, `BondingSystem` |
 
 ## ui/
 | File | What's in it |
@@ -96,7 +97,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `ui/music-widget.js` | The radio/music widget |
 | `ui/poses.js` | `POSES`: idle life (breathing, weight shift, looking around) and poses: arms crossed, lean, fidget, typing, phone, dance… |
 | `ui/expressions.js` | `EXPRESSIONS`: faces for portraits (smile, sultry, worried…), mood from dialogue text, blinking |
-| `ui/bodies.js` | `BUILDS` (slim, athletic, curvy, broad, heavy) and height; Double Nights androids (silver, gold, Blood Moon): plating, visor, emblem, hover |
+| `ui/bodies.js` | `BUILDS` (slim, athletic, curvy, broad, heavy) and height; drawing Double Nights androids (finishes in `core/appearances.js`): plating, visor, emblem, hover |
 | `ui/cloth.js` | Cloth physics: coat hems, skirts and trains swing, trail and settle (same method as the hair) |
 | `ui/wardrobe.js` | `WARDROBE`: every top, bottom, shoe, hat and piece of jewelry, in the world and in portraits. The character look format is documented at the top |
 | `ui/humanoid-render.js` | Drawing characters: hair, portraits, bodies, held drinks, weapons |

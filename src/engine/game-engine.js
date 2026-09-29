@@ -196,6 +196,7 @@
                 // Inside GameEngine constructor:
                 
                 // INSIDE constructor()
+                // (Their looks are in core/appearances.js)
                 this.teammates = [ 
                     // Victoria Nils — SMG suppression, pink afro, silver boots
                     new NPC(1100, 150, "Victoria", "teammate", {
@@ -204,15 +205,7 @@
                         burstDelay: 5,
                         accuracyMod: 0.8,
                         bio: 'Ex-corpo marksman turned freelancer. Loyal, lethal, and always watching your six.',
-                        relationship: 0,
-                        appearance: {
-                            skinColor: '#c68642',
-                            gender: 'female',
-                            top:    { type: 'suit', color: '#2a0a3a' },
-                            bottom: { type: 'pants', color: '#1a0820' },
-                            shoes:  { type: 'boots', color: '#c0c0c0' },
-                            hair:   { type: 'afro', color: '#ff69b4' }
-                        }
+                        relationship: 0
                     }),
                     // Yenna Stone — Sniper, composed, deadly precise
                     new NPC(1150, 150, "Yenna", "teammate", {
@@ -221,15 +214,7 @@
                         burstDelay: 0,
                         accuracyMod: 0.95,
                         bio: 'Former military sharpshooter. Quiet, patient, sees everything. SR-86 is an extension of her arm.',
-                        relationship: 0,
-                        appearance: {
-                            skinColor: '#8B4513',
-                            gender: 'female',
-                            top:    { type: 'tshirt', color: '#2a3a2a' },
-                            bottom: { type: 'pants', color: '#1a1a1a' },
-                            shoes:  { type: 'boots', color: '#333' },
-                            hair:   { type: 'dreadlocks', color: '#1a0a00' }
-                        }
+                        relationship: 0
                     }),
                     // Sabrina Darkmancer — Sarcastic, dark energy, close-range
                     new NPC(1200, 150, "Sabrina", "teammate", {
@@ -238,15 +223,7 @@
                         burstDelay: 8,
                         accuracyMod: 0.85,
                         bio: 'Street sorcerer with a mean trigger finger. Sarcasm is her second language, violence is her first.',
-                        relationship: 0,
-                        appearance: {
-                            skinColor: '#e8d0c0',
-                            gender: 'female',
-                            top:    { type: 'sports_bra', color: '#1a0a2a' },
-                            bottom: { type: 'skirt', color: '#0a0a1a' },
-                            shoes:  { type: 'heels', color: '#2a1a3a' },
-                            hair:   { type: 'ponytail', color: '#0a0008' }
-                        }
+                        relationship: 0
                     }),
                     // Max Moon — Hotheaded, sparks, electric energy
                     new NPC(1250, 150, "Max", "teammate", {
@@ -255,15 +232,7 @@
                         burstDelay: 6,
                         accuracyMod: 0.75,
                         bio: 'Short fuse, big firepower. Snaps blue sparks from his fingertips when he\'s irritated — which is always.',
-                        relationship: 0,
-                        appearance: {
-                            skinColor: '#c9a87c',
-                            gender: 'male',
-                            top:    { type: 'tshirt', color: '#1a2a4a' },
-                            bottom: { type: 'pants', color: '#222' },
-                            shoes:  { type: 'sneakers', color: '#333' },
-                            hair:   { type: 'short', color: '#0088ff' }
-                        }
+                        relationship: 0
                     }),
                     // Josh Burke — Flat, matter-of-fact, efficient
                     new NPC(1300, 150, "Josh", "teammate", {
@@ -272,15 +241,7 @@
                         burstDelay: 0,
                         accuracyMod: 0.9,
                         bio: 'Intel specialist. States facts. Throws shrapnel when angry. Carries YourGirlSara like it owes him money.',
-                        relationship: 0,
-                        appearance: {
-                            skinColor: '#e8d5c4',
-                            gender: 'male',
-                            top:    { type: 'tshirt', color: '#333' },
-                            bottom: { type: 'pants', color: '#2a2a2a' },
-                            shoes:  { type: 'shoes', color: '#1a1a1a' },
-                            hair:   { type: 'short', color: '#3a2a1a' }
-                        }
+                        relationship: 0
                     })
                 ];
                 this.activeInteraction = null;

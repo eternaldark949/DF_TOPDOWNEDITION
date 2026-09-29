@@ -550,10 +550,11 @@
 
         function drawCharacterPortrait(ctx, w, h, config) {
             const A = androidLook(config.body);                              // Double Nights android (ui/bodies.js)
-            const skinColor = A ? A.plate : (config.skinColor || '#c68e63');
-            const hair = A ? (config.hair || null) : (config.hair || { type: 'curls', color: '#0a0505' });
-            const eyeColor = config.eyeColor || '#daa520'; // Default golden for Stella
-            const gender = config.gender || 'female';
+            const me = APPEARANCES['949'];                                   // unset parts default to Stella's
+            const skinColor = A ? A.plate : (config.skinColor || me.skinColor);
+            const hair = A ? (config.hair || null) : (config.hair || me.hair);
+            const eyeColor = config.eyeColor || me.eyeColor;
+            const gender = config.gender || me.gender;
             const top = config.top || null;
             // Expression (ui/expressions.js): every number is 0 for the neutral face
             const X = resolveExpression(config.expression);
