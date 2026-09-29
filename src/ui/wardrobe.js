@@ -312,6 +312,50 @@
                         g.darken(c.color, 0.26));
                     rr(ctx, g.hip.x, -11, g.hip.w, 23, [8, 3, 3, 8], g.darken(c.color, 0.2));
                 } },
+                // Form-fitting: no cloth, it moves with her. Hugs the hips and the tops of the thighs; a back slit
+                pencil_skirt: { legs: 'bare', hips(ctx, g, c) {
+                    const col = g.darken(c.color, 0.18);
+                    ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.lineWidth = 6.5;
+                    for (let i = 0; i < 2; i++) { const [hx, hy] = g.hipPt[i], [kx, ky] = g.knees[i]; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + (kx - hx) * 0.55, hy + (ky - hy) * 0.55); ctx.stroke(); }
+                    ctx.lineCap = 'butt';
+                    rr(ctx, g.hip.x - 0.5, -11, g.hip.w + 0.5, 22, [7, 3, 3, 7], col);
+                    ctx.strokeStyle = g.darken(c.color, 0.34); ctx.lineWidth = 0.6; ctx.beginPath();
+                    ctx.moveTo(g.hip.x + 0.5, -2); ctx.lineTo(g.hip.x - 1.5, 0); ctx.lineTo(g.hip.x + 0.5, 2);   // the slit at the back
+                    ctx.moveTo(g.hip.x + g.hip.w - 1, -10); ctx.lineTo(g.hip.x + g.hip.w - 1, 10);                  // the waist seam
+                    ctx.stroke();
+                } },
+                // A full circle of pleats all the way round, simulated as cloth: it swirls out as she turns and
+                // bells behind her as she runs. Alternating pleat shades, a trim band, a frilled hem of scallops.
+                pleated_skirt: { legs: 'bare', hips(ctx, g, c) {
+                    const cx = g.hip.x + g.hip.w / 2, N = 16, chains = [];
+                    for (let i = 0; i < N; i++) {
+                        const a = i / N * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+                        chains.push({ a: { x: cx + ca * 7, y: sa * 10.5 }, t: { x: cx + ca * 14.5, y: sa * 17.5 } });
+                    }
+                    const ch = g.cloth('pleated_skirt', { segs: 2, stiffness: 0.16, damping: 0.85, keepOut: 7, chains });
+                    const tip = k => ch[k % N][ch[k % N].length - 1], root = k => ch[k % N][0];
+                    const base = g.darken(c.color, 0.12), deep = g.darken(c.color, 0.34), trim = c.trim || '#f4eee6';
+                    // Pleats: alternating wedges from the waist to the hem
+                    for (let i = 0; i < N; i++) {
+                        const a0 = root(i), a1 = root(i + 1), t0 = tip(i), t1 = tip(i + 1);
+                        ctx.fillStyle = i % 2 ? deep : base; ctx.beginPath();
+                        ctx.moveTo(a0.x, a0.y); ctx.lineTo(t0.x, t0.y); ctx.lineTo(t1.x, t1.y); ctx.lineTo(a1.x, a1.y); ctx.closePath(); ctx.fill();
+                    }
+                    // A trim band near the hem, then the frill: two scallops per pleat
+                    ctx.strokeStyle = trim; ctx.lineWidth = 0.9; ctx.beginPath();
+                    for (let i = 0; i <= N; i++) { const t = tip(i), a = root(i), p = { x: a.x + (t.x - a.x) * 0.8, y: a.y + (t.y - a.y) * 0.8 }; ctx[i ? 'lineTo' : 'moveTo'](p.x, p.y); }
+                    ctx.stroke();
+                    ctx.fillStyle = trim;
+                    for (let i = 0; i < N; i++) {
+                        const t0 = tip(i), t1 = tip(i + 1);
+                        for (const f of [0.25, 0.75]) { const x = t0.x + (t1.x - t0.x) * f, y = t0.y + (t1.y - t0.y) * f; ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill(); }
+                    }
+                    ctx.strokeStyle = g.darken(c.color, 0.45); ctx.lineWidth = 0.5; ctx.beginPath();
+                    for (let i = 0; i <= N; i++) { const t = tip(i); ctx[i ? 'lineTo' : 'moveTo'](t.x, t.y); }
+                    ctx.stroke();
+                    // The waistband
+                    ctx.fillStyle = deep; ctx.beginPath(); ctx.ellipse(cx, 0, 7.5, 11, 0, 0, Math.PI * 2); ctx.fill();
+                } },
                 long_skirt: { legs: 'full', shade: 0.25, hips(ctx, g, c) {
                     // The hem swings around the legs: a ring of chains from one front side, round the back, to the other
                     const x0 = g.hip.x + g.hip.w - 2, xb = g.hip.x - 2, mid = (x0 + xb) / 2;
