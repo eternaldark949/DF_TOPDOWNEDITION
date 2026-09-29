@@ -4048,6 +4048,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // ─── O.U.T.F.I.T.s (full clothing config) ───
             'outfit_casual':       { id: 'outfit_casual',       category: 'outfit', name: 'Street Casual',       desc: 'Black sports bra, white slacks, white sneakers.',     price: 0,    data: { top: { type: 'sports_bra', color: '#111' }, bottom: { type: 'pants', color: '#e0e0e0' }, shoes: { type: 'sneakers', color: '#fff' }, train: null, held: null }, default: true },
             'outfit_suited':       { id: 'outfit_suited',       category: 'outfit', name: 'Periwinkle Silk',     desc: 'Silk periwinkle top and skirt. Gold heels. Pairs with a Crystal Glass.', price: 0, data: { top: { type: 'sports_bra', color: '#CCCCFF' }, bottom: { type: 'skirt', color: '#CCCCFF' }, shoes: { type: 'heels', color: '#FFD700' }, train: null, held: null }, default: true, pairsWith: 'acc_glass' },
+            'outfit_suited_long':  { id: 'outfit_suited_long',  category: 'outfit', name: 'Periwinkle Silk (Long Sleeve)', desc: 'Silk periwinkle top with long sleeves, and skirt. Gold heels. Pairs with a Crystal Glass.', price: 150, data: { top: { type: 'sleeved_crop', color: '#CCCCFF' }, bottom: { type: 'skirt', color: '#CCCCFF' }, shoes: { type: 'heels', color: '#FFD700' }, train: null, held: null }, pairsWith: 'acc_glass' },
             'outfit_stealth':      { id: 'outfit_stealth',      category: 'outfit', name: 'Blackout',            desc: 'All-black tactical. Invisible in the dark.',          price: 300,  data: { top: { type: 'sports_bra', color: '#0a0a0a' }, bottom: { type: 'pants', color: '#111' }, shoes: { type: 'sneakers', color: '#0a0a0a' }, train: null, held: null } },
             'outfit_crimson':      { id: 'outfit_crimson',      category: 'outfit', name: 'Crimson Flame',       desc: 'Deep red dress. Danger on arrival.',                   price: 350,  data: { top: { type: 'sports_bra', color: '#dc143c' }, bottom: { type: 'skirt', color: '#8b0000' }, shoes: { type: 'heels', color: '#dc143c' }, train: null, held: null } },
             'outfit_gold':         { id: 'outfit_gold',         category: 'outfit', name: 'Gold Standard',       desc: 'Full gold tracksuit. Unmissable.',                     price: 400,  data: { top: { type: 'track_jacket', color: '#daa520', trim: '#fff4c9' }, bottom: { type: 'joggers', color: '#b8860b', trim: '#fff4c9' }, shoes: { type: 'sneakers', color: '#ffd700' }, train: null, held: null } },
@@ -4059,6 +4060,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'outfit_anavia':       { id: 'outfit_anavia',       category: 'outfit', name: 'Anavia',              desc: 'Periwinkle crop top and long skirt. Gold heels. Pairs with bangles and a headband.', price: 400, data: { top: { type: 'crop_top', color: '#aab0ff' }, bottom: { type: 'long_skirt', color: '#aab0ff' }, shoes: { type: 'heels', color: '#e8c27a' }, train: null, held: null } },
             'outfit_runner':       { id: 'outfit_runner',       category: 'outfit', name: 'Night Runner',        desc: 'Violet track jacket, leggings, sneakers. Built for the late shift.', price: 300, data: { top: { type: 'track_jacket', color: '#4b2a7a', trim: '#e8c27a' }, bottom: { type: 'leggings', color: '#1a1424' }, shoes: { type: 'sneakers', color: '#f0f0f0' }, train: null, held: null } },
             'outfit_sorcerer':     { id: 'outfit_sorcerer',     category: 'outfit', name: 'Street Sorcerer',     desc: 'Sabrina\'s look. Midnight violet top, black skirt, plum heels.', price: 400, data: { top: { type: 'sports_bra', color: '#1a0a2a' }, bottom: { type: 'skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
+            'outfit_sorcerer_long': { id: 'outfit_sorcerer_long', category: 'outfit', name: 'Street Sorcerer (Long Sleeve)', desc: 'Sabrina\'s look, sleeved. Midnight violet long-sleeve top, black skirt, plum heels.', price: 400, data: { top: { type: 'sleeved_crop', color: '#1a0a2a' }, bottom: { type: 'skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
 
             // ── HATS (one at a time, optional) ──
             'hat_wide_brim':       { id: 'hat_wide_brim',       category: 'hat', name: 'Wine Wide Brim',       desc: 'A wide wine-red brim. Arrives before you do.',         price: 350,  data: { type: 'wide_brim', color: '#590e18', crownColor: '#70121e' } },
@@ -35557,6 +35559,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.beginPath(); ctx.moveTo(x + 2, -10); ctx.lineTo(x + w / 2, -2); ctx.lineTo(x + w / 2, 2); ctx.lineTo(x + 2, 10); ctx.lineTo(x, 10); ctx.lineTo(x, -10); ctx.fill();
                     },
                     portrait(ctx, P, c, skinShadow) { pShoulders(ctx, P, skinShadow); const { cx, cy, fw, fh } = P; ctx.fillStyle = c.color; ctx.beginPath(); ctx.ellipse(cx, cy + fh * 2.55, fw * 1.6, fh * 0.55, 0, Math.PI, 0); ctx.fill(); ctx.strokeStyle = c.color; ctx.lineWidth = fw * 0.12; ctx.beginPath(); for (const s of [-1, 1]) { ctx.moveTo(cx + s * fw * 0.9, cy + fh * 2.1); ctx.lineTo(cx + s * fw * 0.75, cy + fh * 1.5); } ctx.stroke(); }
+                },
+                // The sports bra's fitted crop, with long sleeves to the wrist; a scooped neck in the portrait
+                sleeved_crop: {
+                    sleeve: 'long',
+                    draw(ctx, g, c) { tops.sports_bra.draw(ctx, g, c); shoulderSeams(ctx, g, c); },
+                    portrait(ctx, P, c, skinShadow) {
+                        pShoulders(ctx, P, c.color); pNeckline(ctx, P, skinShadow, 0.55, 0.62);
+                        const { cx, cy, fw, fh } = P; ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(cx - fw * 1.6, cy + fh * 2.6, fw * 3.2, fh * 0.08);   // the crop's hem
+                    }
                 },
                 tshirt: {
                     sleeve: 'short',

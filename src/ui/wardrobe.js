@@ -95,6 +95,15 @@
                     },
                     portrait(ctx, P, c, skinShadow) { pShoulders(ctx, P, skinShadow); const { cx, cy, fw, fh } = P; ctx.fillStyle = c.color; ctx.beginPath(); ctx.ellipse(cx, cy + fh * 2.55, fw * 1.6, fh * 0.55, 0, Math.PI, 0); ctx.fill(); ctx.strokeStyle = c.color; ctx.lineWidth = fw * 0.12; ctx.beginPath(); for (const s of [-1, 1]) { ctx.moveTo(cx + s * fw * 0.9, cy + fh * 2.1); ctx.lineTo(cx + s * fw * 0.75, cy + fh * 1.5); } ctx.stroke(); }
                 },
+                // The sports bra's fitted crop, with long sleeves to the wrist; a scooped neck in the portrait
+                sleeved_crop: {
+                    sleeve: 'long',
+                    draw(ctx, g, c) { tops.sports_bra.draw(ctx, g, c); shoulderSeams(ctx, g, c); },
+                    portrait(ctx, P, c, skinShadow) {
+                        pShoulders(ctx, P, c.color); pNeckline(ctx, P, skinShadow, 0.55, 0.62);
+                        const { cx, cy, fw, fh } = P; ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(cx - fw * 1.6, cy + fh * 2.6, fw * 3.2, fh * 0.08);   // the crop's hem
+                    }
+                },
                 tshirt: {
                     sleeve: 'short',
                     draw(ctx, g, c) { body(ctx, g, c); shoulderSeams(ctx, g, c); bust(ctx, g, c, 0.16, 3); },
