@@ -8,7 +8,7 @@
         class NavGrid {
             static for(map) {
                 if (!map) return null;
-                const sig = (map.walls ? map.walls.length : 0) + ':' + getColliders(map).length + ':' + map.width + 'x' + map.height;
+                const sig = (map.walls ? map.walls.length : 0) + ':' + getColliders(map).length + ':' + (map.navObstacles ? map.navObstacles.length : 0) + ':' + map.width + 'x' + map.height;
                 if (!NavGrid._cache || NavGrid._cache.map !== map || NavGrid._cache.sig !== sig) {
                     NavGrid._cache = { map, sig, grid: new NavGrid(map) };
                 }
@@ -49,7 +49,7 @@
                 const W = cols * c, H = rows * c;
                 mark(-c, -c, W + c, r); mark(-c, (map.height || H) - r, W + c, H + c);       // map edges
                 mark(-c, -c, r, H + c); mark((map.width || W) - r, -c, W + c, H + c);
-                const obstacles = [...(map.walls || []), ...getColliders(map)];
+                const obstacles = [...(map.walls || []), ...getColliders(map), ...(map.navObstacles || [])];
                 for (const o of obstacles) {
                     if (!o || !(o.w > 0) || !(o.h > 0)) continue;
                     mark(o.x - r, o.y - r, o.x + o.w + r, o.y + o.h + r);
@@ -238,6 +238,7 @@
          *  Lamps are light sources with no collision, so they never block. */
         function hasShotLine(x1, y1, x2, y2, map) {
             if (isLineBlocked(x1, y1, x2, y2, map.walls, getColliders(map))) return false;
+            if (typeof game !== 'undefined' && game.activeMap === map && game.roomSystem.doorBlocks(x1, y1, x2, y2)) return false;   // a shut door
             const props = (typeof game !== 'undefined' && game.activeMap === map) ? game.props : null;
             if (props && props.length) {
                 const minX = Math.min(x1, x2), maxX = Math.max(x1, x2), minY = Math.min(y1, y2), maxY = Math.max(y1, y2);

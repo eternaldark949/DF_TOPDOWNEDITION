@@ -279,53 +279,45 @@
                     { id: 'biggs_center', x: 450, y: 450 }
                 ]
             },
-            'grum_arena': {
-                id: 'grum_arena', width: 1400, height: 1400, type: 'indoor',
-                label: "Grum's Gauntlet", floorColor: '#0a0606',
-                ambientDarkness: 0.82,
-                spawn: { x: 700, y: 1300 },
+            // The House of Death — the gauntlet's first map (GAUNTLET_MAPS, entities/enemies.js).
+            // A modern glass-and-steel villa inside a gothic shell. Rooms and doors: ROOM_DEFS;
+            // furniture: createMapEntities; floor art: drawHouseInterior; glows: drawHouseGlow.
+            //   Library | Chapel      | Bedroom | Bath
+            //   Dining  | Grand hall  | Courtyard (open to the sky)
+            //   Kitchen | Foyer       | Gallery (L) / Reliquary
+            'house_of_death': {
+                id: 'house_of_death', width: 1800, height: 1500, type: 'indoor',
+                label: 'The House of Death', floorColor: '#0d0a10',
+                ambientDarkness: 0.9,
+                navProps: true,                                   // big furniture is routed around, not walked into
+                wallStyle: { fill: '#16111b', stroke: 'rgba(201,164,106,0.4)' },   // black marble, gold trim
+                spawn: { x: 900, y: 1420 },
                 zones: [
-                    // Main kill floor — dark iron
-                    { x: 100, y: 100, w: 1200, h: 1100, color: '#0e0808' },
-                    // Center pit — darker recessed area
-                    { x: 450, y: 400, w: 500, h: 500, color: '#060303' },
-                    // Blood-stained corners
-                    { x: 100, y: 100, w: 180, h: 180, color: '#140505' },
-                    { x: 1120, y: 100, w: 180, h: 180, color: '#140505' },
-                    { x: 100, y: 1020, w: 180, h: 180, color: '#140505' },
-                    { x: 1120, y: 1020, w: 180, h: 180, color: '#140505' },
-                    // Entry corridor
-                    { x: 550, y: 1200, w: 300, h: 200, color: '#0c0404' },
-                    // Side trenches (tactical channels)
-                    { x: 100, y: 450, w: 80, h: 400, color: '#080404' },
-                    { x: 1220, y: 450, w: 80, h: 400, color: '#080404' }
+                    { x: 14, y: 14, w: 546, h: 416, color: '#241812' },       // library: walnut
+                    { x: 574, y: 14, w: 652, h: 416, color: '#16131a' },      // chapel: dark flags
+                    { x: 1240, y: 14, w: 320, h: 416, color: '#23152a' },     // bedroom: plum
+                    { x: 1574, y: 14, w: 212, h: 416, color: '#d9d4d8' },     // bath: white marble
+                    { x: 14, y: 444, w: 546, h: 556, color: '#221610' },      // dining: parquet
+                    { x: 574, y: 444, w: 652, h: 556, color: '#141018' },     // grand hall: black marble
+                    { x: 1240, y: 444, w: 546, h: 556, color: '#1c211f' },    // courtyard: wet stone
+                    { x: 14, y: 1014, w: 546, h: 472, color: '#2a2a30' },     // kitchen: concrete
+                    { x: 574, y: 1014, w: 652, h: 472, color: '#1a1620' },    // foyer: marble checker
+                    { x: 1240, y: 1014, w: 546, h: 472, color: '#1a1216' },   // gallery
                 ],
                 walls: [
-                    // Outer perimeter
-                    { x: 0, y: 0, w: 1400, h: 80 },
-                    { x: 0, y: 0, w: 80, h: 1400 },
-                    { x: 1320, y: 0, w: 80, h: 1400 },
-                    { x: 0, y: 1320, w: 550, h: 80 },
-                    { x: 850, y: 1320, w: 550, h: 80 },
-                    // Cover pillars — asymmetric layout for tactical play
-                    { x: 350, y: 300, w: 50, h: 50 },      // NW pillar
-                    { x: 1000, y: 300, w: 50, h: 50 },     // NE pillar
-                    { x: 350, y: 900, w: 50, h: 50 },      // SW pillar
-                    { x: 1000, y: 900, w: 50, h: 50 },     // SE pillar
-                    // Center barricade — L-shaped cover
-                    { x: 650, y: 550, w: 100, h: 30 },     // horizontal bar
-                    { x: 650, y: 550, w: 30, h: 120 },     // vertical bar
-                    // Offset barricade — opposite corner
-                    { x: 750, y: 750, w: 30, h: 120 },
-                    { x: 680, y: 840, w: 100, h: 30 },
-                    // Side crate clusters
-                    { x: 180, y: 600, w: 40, h: 60 },
-                    { x: 1180, y: 600, w: 40, h: 60 }
+                    // Outer shell (the front door in the middle of the south wall)
+                    { x: 0, y: 0, w: 1800, h: 14 }, { x: 0, y: 0, w: 14, h: 1500 }, { x: 1786, y: 0, w: 14, h: 1500 },
+                    { x: 0, y: 1486, w: 830, h: 14 }, { x: 970, y: 1486, w: 830, h: 14 },
+                    // Interior (doors are cut through these by ROOM_DEFS)
+                    { x: 560, y: 14, w: 14, h: 1472 }, { x: 1226, y: 14, w: 14, h: 1472 },   // west and east spines
+                    { x: 14, y: 430, w: 1772, h: 14 }, { x: 14, y: 1000, w: 1772, h: 14 },   // north and south cross walls
+                    { x: 1560, y: 14, w: 14, h: 416 },                                     // bedroom | bath
+                    { x: 1240, y: 1164, w: 396, h: 14 }, { x: 1622, y: 1178, w: 14, h: 308 }, // the reliquary inside the gallery's L
                 ],
-                transitions: [ { x: 550, y: 1320, w: 300, h: 80, target: 'hub_949', label: 'Exit Arena' } ],
+                transitions: [ { x: 830, y: 1470, w: 140, h: 30, target: 'hub_949', label: 'Leave the House' } ],
                 landmarks: [
-                    { id: 'grum_arena_center', x: 700, y: 700 },
-                    { id: 'grum_arena_entrance', x: 700, y: 1350 }
+                    { id: 'house_foyer', x: 900, y: 1300 }, { id: 'house_hall', x: 900, y: 720 },
+                    { id: 'house_chapel', x: 900, y: 200 }, { id: 'house_courtyard', x: 1510, y: 720 }
                 ]
             },
             'ollo_test': {

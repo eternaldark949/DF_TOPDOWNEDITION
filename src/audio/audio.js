@@ -404,6 +404,22 @@
                     o.frequency.setValueAtTime(140, now); o.frequency.exponentialRampToValueAtTime(70, now + 0.07);
                     o.connect(g); g.connect(this.bus); g.gain.setValueAtTime(0.09 * near, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
                     o.start(now); o.stop(now + 0.09);
+                } else if (kind === 'thud') {                                 // a round into a wooden leaf
+                    if (!this._voice(null, 0.12)) return;
+                    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520;
+                    this._burst(this.pink, 0.06, f, 0.22 * near, (gg, t, amp) => { gg.setValueAtTime(amp, t); gg.exponentialRampToValueAtTime(0.0001, t + 0.06); });
+                    const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.frequency.setValueAtTime(120, now); o.frequency.exponentialRampToValueAtTime(60, now + 0.1);
+                    o.connect(g); g.connect(this.bus); g.gain.setValueAtTime(0.12 * near, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+                    o.start(now); o.stop(now + 0.12);
+                } else if (kind === 'tink') {                                 // a round glancing off glass
+                    if (!this._voice(null, 0.3)) return;
+                    const o = ctx.createOscillator(), g = ctx.createGain();
+                    o.type = 'sine'; o.frequency.setValueAtTime(2600 + Math.random() * 500, now);
+                    o.connect(g); g.connect(this.bus); g.gain.setValueAtTime(0.06 * near, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+                    o.start(now); o.stop(now + 0.3);
+                    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 4000;
+                    this._burst(this.pink, 0.03, f, 0.12 * near, (gg, t, amp) => { gg.setValueAtTime(amp, t); gg.exponentialRampToValueAtTime(0.0001, t + 0.03); });
                 } else if (kind === 'whoosh') {
                     if (!this._voice(null, 0.4)) return;
                     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 0.8;

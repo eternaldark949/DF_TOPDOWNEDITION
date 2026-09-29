@@ -195,7 +195,7 @@
             NAV: {
                 CELL: 20,                   // Grid cell size (px)
                 AGENT_RADIUS: 16,           // Obstacles are inflated by this (teammate radius 14 + margin)
-                MAX_EXPANSIONS: 6000,       // Search cap per path / flood
+                MAX_EXPANSIONS: 12000,       // Search cap per path / flood
                 WAYPOINT_REACHED: 10,       // px — advance to the next waypoint inside this
                 REPATH_TICKS: 20,           // Re-plan a followed path this often
                 // --- Eyeline positioning ---

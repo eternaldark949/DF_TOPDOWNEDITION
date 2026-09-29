@@ -244,6 +244,7 @@
                 if (this.activeMap.id === 'medbay_sw') {
                     this.drawClinicInterior(this.ctx);
                 }
+                if (this.activeMap.id === 'house_of_death') this.drawHouseInterior(this.ctx);
                 
                 // Indoor V2: Room floors, windows, and doors
                 if (this.roomSystem.active) {
@@ -526,10 +527,11 @@
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 {
                     const visibleWalls = this._renderGridWalls.query(cullBounds.world);
+                    const ws = this.activeMap.wallStyle;                 // a map may dress its walls (the House: black marble, gold)
                     for (const w of visibleWalls) {
-                        this.ctx.fillStyle = '#222'; 
+                        this.ctx.fillStyle = ws ? ws.fill : '#222'; 
                         this.ctx.fillRect(w.x, w.y, w.w, w.h); 
-                        this.ctx.strokeStyle = 'rgba(0, 243, 255, 0.3)'; 
+                        this.ctx.strokeStyle = ws ? ws.stroke : 'rgba(0, 243, 255, 0.3)'; 
                         this.ctx.strokeRect(w.x, w.y, w.w, w.h); 
                     }
                 }

@@ -39,6 +39,117 @@
                 ctx.restore();
             },
 
+            /** The House of Death's floors, painted once into a cached canvas: checkered marble, parquet,
+             *  flagstones, runners and rugs, the reliquary's gold ring. */
+            drawHouseInterior(ctx) {
+                if (!this._houseFloor) this._houseFloor = this._paintHouseFloor();
+                ctx.drawImage(this._houseFloor, 0, 0);
+            },
+
+            _paintHouseFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1800; cv.height = 1500;
+                const c = cv.getContext('2d');
+                const fill = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+                const grid = (x0, y0, x1, y1, sx, sy, col, stagger = 0) => {
+                    c.strokeStyle = col; c.lineWidth = 1; c.beginPath();
+                    for (let y = y0; y <= y1; y += sy) { c.moveTo(x0, y); c.lineTo(x1, y); }
+                    for (let row = 0, y = y0; y < y1; y += sy, row++) for (let x = x0 + (row % 2) * stagger; x <= x1; x += sx) { c.moveTo(x, y); c.lineTo(x, Math.min(y1, y + sy)); }
+                    c.stroke();
+                };
+                const rug = (x, y, w, h, base, border) => {
+                    c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.roundRect(x + 3, y + 3, w, h, 6); c.fill();
+                    c.fillStyle = base; c.beginPath(); c.roundRect(x, y, w, h, 6); c.fill();
+                    c.strokeStyle = border; c.lineWidth = 2.5; c.beginPath(); c.roundRect(x + 8, y + 8, w - 16, h - 16, 4); c.stroke();
+                    c.lineWidth = 1; c.beginPath(); c.roundRect(x + 14, y + 14, w - 28, h - 28, 3); c.stroke();
+                };
+                const runner = (x, y, w, h) => { fill(x, y, w, h, '#4a1624'); fill(x + 4, y, 2, h, 'rgba(201,164,106,0.55)'); fill(x + w - 6, y, 2, h, 'rgba(201,164,106,0.55)'); };
+                const veins = (x0, y0, w, h, n, col, seed) => {
+                    const r = seededRandom(seed); c.strokeStyle = col; c.lineWidth = 1;
+                    for (let i = 0; i < n; i++) {
+                        let x = x0 + r() * w, y = y0 + r() * h; c.beginPath(); c.moveTo(x, y);
+                        for (let k = 0; k < 4; k++) { x += (r() - 0.3) * 60; y += (r() - 0.5) * 40; c.lineTo(Math.max(x0, Math.min(x0 + w, x)), Math.max(y0, Math.min(y0 + h, y))); }
+                        c.stroke();
+                    }
+                };
+                fill(0, 0, 1800, 1500, '#0d0a10');
+                // Foyer: checkered marble, a gold rosette, the red carpet from the door to the hall
+                for (let y = 1014, j = 0; y < 1500; y += 40, j++) for (let x = 574, i = 0; x < 1226; x += 40, i++) fill(x, y, 40, 40, (i + j) % 2 ? '#241e2c' : '#141018');
+                veins(574, 1014, 652, 486, 14, 'rgba(255,255,255,0.05)', 11);
+                runner(840, 1014, 120, 486);
+                c.save(); c.translate(900, 1260); c.strokeStyle = 'rgba(201,164,106,0.7)'; c.lineWidth = 2;
+                c.beginPath(); c.arc(0, 0, 54, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.arc(0, 0, 40, 0, Math.PI * 2); c.stroke();
+                c.fillStyle = 'rgba(201,164,106,0.55)'; c.beginPath();
+                for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, r = i % 2 ? 14 : 38; c[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); }
+                c.closePath(); c.fill(); c.restore();
+                // Grand hall: big black-marble tiles, veined; a round rug beneath the chandelier
+                fill(574, 444, 652, 556, '#141018'); grid(574, 444, 1226, 1000, 80, 80, 'rgba(201,164,106,0.10)');
+                veins(574, 444, 652, 556, 18, 'rgba(255,255,255,0.05)', 7);
+                c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.arc(903, 723, 150, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#3a1226'; c.beginPath(); c.arc(900, 720, 150, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = 'rgba(201,164,106,0.6)'; c.lineWidth = 3; c.beginPath(); c.arc(900, 720, 136, 0, Math.PI * 2); c.stroke();
+                c.strokeStyle = 'rgba(180,140,255,0.35)'; c.lineWidth = 1.5; c.beginPath(); c.arc(900, 720, 110, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; c.moveTo(900 + Math.cos(a) * 40, 720 + Math.sin(a) * 40); c.lineTo(900 + Math.cos(a) * 108, 720 + Math.sin(a) * 108); } c.stroke();
+                // Chapel: staggered flagstones and the aisle to the altar
+                grid(574, 14, 1226, 430, 60, 40, 'rgba(0,0,0,0.35)', 30);
+                runner(840, 130, 120, 300);
+                // Library and dining: parquet; rugs
+                for (const [x0, y0, x1, y1] of [[14, 14, 560, 430], [14, 444, 560, 1000]]) grid(x0, y0, x1, y1, 22, 66, 'rgba(0,0,0,0.25)', 11);
+                rug(160, 160, 220, 120, '#2c2248', 'rgba(201,164,106,0.55)');
+                rug(110, 555, 340, 160, '#4a1624', 'rgba(201,164,106,0.55)');
+                // Kitchen: poured concrete, a cyan line along the counters
+                grid(14, 1014, 560, 1486, 60, 60, 'rgba(255,255,255,0.05)');
+                fill(20, 1426, 470, 2, 'rgba(127,224,255,0.45)');
+                // Bedroom: plum carpet with a faint lattice; bath: white marble
+                grid(1240, 14, 1560, 430, 24, 24, 'rgba(255,160,220,0.04)');
+                rug(1320, 150, 160, 110, '#5a2a4a', 'rgba(236,208,154,0.45)');
+                grid(1574, 14, 1786, 430, 40, 40, 'rgba(0,0,0,0.12)'); veins(1574, 14, 212, 416, 8, 'rgba(120,110,130,0.25)', 3);
+                // Courtyard: flagstones with moss joints, a path cross to the fountain
+                const r = seededRandom(5);
+                for (let y = 444; y < 1000; y += 46) for (let x = 1240 + (((y - 444) / 46) % 2) * 23; x < 1786; x += 46) {
+                    const v = r() * 10 | 0;                                // slate, faintly violet, moss in the joints
+                    c.fillStyle = `rgb(${24 + v},${24 + v},${32 + v})`; c.fillRect(x + 2, y + 2, 42, 42);
+                    if (r() < 0.3) { c.fillStyle = 'rgba(60,90,60,0.35)'; c.fillRect(x + (r() < 0.5 ? 0 : 42), y + 2, 2, 42); }
+                }
+                fill(1490, 444, 40, 556, 'rgba(120,110,140,0.22)'); fill(1240, 700, 546, 40, 'rgba(120,110,140,0.22)');
+                // Gallery: dark boards, a runner round the L; reliquary: dark stone and a gold ritual ring
+                grid(1240, 1014, 1786, 1164, 22, 150, 'rgba(0,0,0,0.3)'); grid(1636, 1164, 1786, 1486, 150, 22, 'rgba(0,0,0,0.3)');
+                fill(1250, 1064, 480, 50, '#3a1226'); fill(1686, 1064, 50, 412, '#3a1226');
+                grid(1240, 1178, 1622, 1486, 50, 50, 'rgba(0,0,0,0.35)', 25);
+                c.strokeStyle = 'rgba(201,164,106,0.55)'; c.lineWidth = 2; c.beginPath(); c.arc(1435, 1315, 112, 0, Math.PI * 2); c.stroke();
+                c.lineWidth = 1; c.beginPath(); c.arc(1435, 1315, 98, 0, Math.PI * 2); c.stroke();
+                c.fillStyle = 'rgba(201,164,106,0.5)'; for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; c.fillRect(1435 + Math.cos(a) * 105 - 2, 1315 + Math.sin(a) * 105 - 2, 4, 4); }
+                return cv;
+            },
+
+            /** The House's glows, after the darkness layer: candle flames, the chandelier, the altar's
+             *  crystal, the coffin, holograms, stained glass. Room switches and the veil don't dim them. */
+            drawHouseGlow(ctx) {
+                const t = _frameTime / 1000;
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                for (const p of this.props) {
+                    if (!p.decorType || !p.decorType.startsWith('hod_')) continue;
+                    const cx = p.x + p.width / 2, cy = p.y + p.height / 2, f = 0.8 + 0.2 * Math.sin(t * 9 + cx);
+                    if (p.decorType === 'hod_candelabra') glow(cx, cy, 34, '255, 180, 110', 0.45 * f);
+                    else if (p.decorType === 'hod_altar') glow(cx, cy, 46, '170, 110, 255', 0.45 + 0.15 * Math.sin(t * 2.2));
+                    else if (p.decorType === 'hod_coffin') glow(cx, cy, 60, '150, 90, 255', 0.3 + 0.15 * Math.sin(t * 1.7));
+                    else if (p.decorType === 'hod_console') glow(cx, cy, 28, '127, 224, 255', 0.35);
+                    else if (p.decorType === 'hod_reliquary') glow(cx, cy, 20, '200, 150, 255', 0.35);
+                    else if (p.decorType === 'hod_fountain') glow(cx, cy, 26, '170, 120, 255', 0.4);
+                    else if (p.decorType === 'hod_table' && p.decor && p.decor.candles) { glow(p.x + p.width * 0.25, cy, 22, '255, 190, 120', 0.5 * f); glow(p.x + p.width * 0.75, cy, 22, '255, 190, 120', 0.5 * f); }
+                }
+                // The chandelier: a ring of flames over the hall
+                for (let i = 0; i < 10; i++) {
+                    const a = i * Math.PI / 5 + 0.2, x = 900 + Math.cos(a) * 46, y = 720 + Math.sin(a) * 46;
+                    glow(x, y, 16, '255, 200, 140', 0.5 * (0.8 + 0.2 * Math.sin(t * 10 + i)));
+                    ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(255,236,200,0.9)'; ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
+                }
+                glow(900, 720, 90, '255, 190, 120', 0.18);
+                // Stained glass on the chapel's north wall, lit from within
+                for (const [x, rgb] of [[670, '190, 130, 255'], [900, '255, 120, 170'], [1130, '190, 130, 255']]) glow(x, 16, 40, rgb, 0.35);
+                ctx.restore();
+            },
+
             /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
             drawApartmentGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;

@@ -585,6 +585,40 @@
                 document.getElementById('zib-close').onclick = () => this.closeZibMenu();
             },
 
+            // =========================================================
+            //  GAUNTLET MAP PICKER (Grum North) — one card per GAUNTLET_MAPS entry;
+            //  sealed ones are placeholders for maps to come
+            // =========================================================
+            openGauntletMenu() {
+                this.pauseSystem.acquire('gauntlet_menu');
+                const menu = document.getElementById('gauntlet-menu');
+                menu.style.display = 'block';
+                const hg = this.hordeGauntlet, container = document.getElementById('gauntlet-maps');
+                let html = '';
+                for (const g of GAUNTLET_MAPS) {
+                    const best = hg && hg.highestWaves[g.id];
+                    const on = !g.locked;
+                    html += `<button class="gauntlet-map-btn" data-id="${g.id}" ${on ? '' : 'disabled'} style="display:block; width:100%; padding:12px 14px; margin-bottom:7px; text-align:left; border-radius:5px; font-family:Montserrat,sans-serif; cursor:${on ? 'pointer' : 'default'}; background:${on ? 'linear-gradient(90deg, rgba(122,77,216,0.16), rgba(138,31,53,0.14))' : 'rgba(255,255,255,0.02)'}; border:1px solid ${on ? 'rgba(232,194,122,0.35)' : 'rgba(255,255,255,0.06)'}; color:${on ? '#eee' : '#555'};">`;
+                    html += `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">`;
+                    html += `<div style="font-family:Orbitron,sans-serif; font-size:0.78rem; letter-spacing:1.5px; color:${on ? '#e8c27a' : '#555'};">${on ? '' : '🔒 '}${g.label.toUpperCase()}</div>`;
+                    html += on ? `<div style="font-size:0.55rem; color:#b48cff; letter-spacing:1px; white-space:nowrap;">${best ? 'BEST: WAVE ' + best : 'UNPLAYED'}</div>` : '';
+                    html += `</div><div style="font-size:0.62rem; color:${on ? '#a99ab4' : '#444'}; margin-top:4px; line-height:1.35;">${g.blurb}</div></button>`;
+                }
+                container.innerHTML = html;
+                container.querySelectorAll('.gauntlet-map-btn:not([disabled])').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        this.closeGauntletMenu();
+                        if (this.hordeGauntlet) this.hordeGauntlet.start(this, btn.dataset.id);
+                    });
+                });
+                document.getElementById('gauntlet-close').onclick = () => this.closeGauntletMenu();
+            },
+
+            closeGauntletMenu() {
+                document.getElementById('gauntlet-menu').style.display = 'none';
+                this.pauseSystem.release('gauntlet_menu');
+            },
+
             closeZibMenu() {
                 document.getElementById('zib-menu').style.display = 'none';
                 this._pendingZib = null;

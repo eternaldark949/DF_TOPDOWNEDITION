@@ -13,10 +13,14 @@
         //
         //  Giving an indoor map rooms — add an entry to ROOM_DEFS below:
         //    rooms    { id: { x, y, w, h, type: 'indoor'|'outdoor', label } } — cover
-        //             every walkable area; outdoor rooms get sky light and weather
-        //    doors    { x, y, w, h, type: 'sliding'|'hinged', orientation: 'H'|'V',
+        //             every walkable area; outdoor rooms get sky light and weather.
+        //             An L-shaped or odd room: { rects: [{x,y,w,h}, ...], type, label }
+        //    doors    { x, y, w, h, type: 'sliding'|'hinged'|'arch', orientation: 'H'|'V',
         //               rooms: [a, b] } — the two rooms it joins (light spills
-        //             through it); walls are cut for doors automatically
+        //             through it); walls are cut for doors automatically. An arch is
+        //             an open doorway: always open, no leaf. Make doors ≥ 70 px wide so
+        //             enemies path through them. Bullets strike hinged and sliding
+        //             doors (hitDoors) and push them by their force.
         //    windows  { x, y, w, h, facing: 'N'|'S'|'E'|'W' } — daylight projections
         //    linens   decorative cloth
         //  and give light switches (map-entities.js) the `roomId` they control.
@@ -26,7 +30,7 @@
             AWAY_VIS: 0.55,        // rooms 949 isn't in
             GLASS_VIS: 0.35,       // indoor rooms seen from outside
             DOOR_SPILL: 0.85,      // how far an open door lifts the room beyond it
-            VEIL_MAX: 0.82,        // veil strength at vis 0
+            VEIL_MAX: 1.0,         // veil strength at vis 0 (away rooms ≈ 0.45, from outdoors ≈ 0.65)
             VEIL_RGB: '16, 8, 34', // violet-indigo, the night's own colour
             FEATHER: 12,           // world px per veil texel (edge softness)
             VIS_RATE: 5, LIGHT_RATE: 9, OUTDOOR_RATE: 4   // easing, per second
@@ -229,15 +233,70 @@
                     this.hx = this.x + this.w / 2; this.hy = this.hingeSide === 'left' ? this.y : this.y + this.h;
                     this.baseAngle = this.hingeSide === 'left' ? Math.PI / 2 : -Math.PI / 2; this.length = this.h;
                 }
+                // Sliding glass: a bullet knocks the panels in their track (a small spring)
+                this.jolt = 0; this.joltV = 0;
+                this._actorNear = false;                             // someone besides 949 at the door
+                // An arch is an open doorway: nothing to draw open or shut, light always passes
+                if (this.type === 'arch') { this.openAmount = 1; this.targetOpen = 1; }
+            }
+
+            /** The solid parts of the door right now, as segments [x0, y0, x1, y1] (with a half-thickness). */
+            leaves() {
+                if (this.type === 'hinged') {
+                    const a = this.baseAngle + this.angle;
+                    return [[this.hx, this.hy, this.hx + Math.cos(a) * this.length, this.hy + Math.sin(a) * this.length]];
+                }
+                if (this.type !== 'sliding') return [];
+                // The two panels, clipped to the doorway (the parts slid into the wall are behind the wall)
+                const out = [], off = this.openAmount * ((this.orientation === 'H' ? this.w : this.h) / 2 + 4);
+                const clip = (a, b, lo, hi, add) => { a = Math.max(a, lo); b = Math.min(b, hi); if (b - a > 2) add(a, b); };
+                if (this.orientation === 'H') {
+                    const cy = this.y + this.h / 2, mid = this.x + this.w / 2, add = (a, b) => out.push([a, cy, b, cy]);
+                    clip(this.x - off, mid - 2 - off, this.x, this.x + this.w, add);
+                    clip(mid + 2 + off, this.x + this.w + off, this.x, this.x + this.w, add);
+                } else {
+                    const cx = this.x + this.w / 2, mid = this.y + this.h / 2, add = (a, b) => out.push([cx, a, cx, b]);
+                    clip(this.y - off, mid - 2 - off, this.y, this.y + this.h, add);
+                    clip(mid + 2 + off, this.y + this.h + off, this.y, this.y + this.h, add);
+                }
+                return out;
+            }
+
+            /** Half the leaf's thickness, for hit tests. */
+            get halfThick() { return this.type === 'hinged' ? this.thickness / 2 : Math.min(this.w, this.h) / 2; }
+
+            /**
+             * A bullet strikes the door at (ix, iy): its force (damage × speed, the same force
+             * that knocks people back) swings a hinged leaf about its hinge, or knocks a glass
+             * panel in its track. A punch pushes gently.
+             */
+            strike(p, ix, iy) {
+                const spd = Math.hypot(p.vx, p.vy) || 1, dx = p.vx / spd, dy = p.vy / spd;
+                const F = Math.min(3000, (p.damage || 10) * spd) * (p.melee ? 0.5 : 1);
+                if (this.type === 'hinged') {
+                    const L = this.length, a = this.baseAngle + this.angle, ux = Math.cos(a), uy = Math.sin(a);
+                    const s = Math.max(0, Math.min(L, (ix - this.hx) * ux + (iy - this.hy) * uy));
+                    this.angVel += s * (ux * dy - uy * dx) * F * 0.005 / (L * L / 3);
+                    this.angVel = Math.max(-0.5, Math.min(0.5, this.angVel));
+                } else if (this.type === 'sliding') {
+                    const n = this.orientation === 'H' ? dy : dx;              // across the track
+                    this.joltV += Math.sign(n || 1) * Math.min(2.5, F * 0.0012);
+                }
             }
 
             update(playerX, playerY) {
-                if (this.type === 'hinged') return;                 // hinged doors move in stepPhysics
+                if (this.type !== 'sliding') return;                // hinged doors move in stepPhysics; arches don't move
                 const cx = this.x + this.w / 2;
                 const cy = this.y + this.h / 2;
                 const dist = Math.hypot(playerX - cx, playerY - cy);
                 const wasOpen = this.targetOpen;
-                this.targetOpen = dist < this.triggerRadius ? 1 : 0;
+                this.targetOpen = dist < this.triggerRadius || this._actorNear ? 1 : 0;
+                // Knocked panels ring back into place
+                if (this.jolt || this.joltV) {
+                    this.joltV += -0.3 * this.jolt; this.joltV *= 0.72; this.jolt += this.joltV;
+                    this.jolt = Math.max(-4, Math.min(4, this.jolt));
+                    if (Math.abs(this.jolt) < 0.02 && Math.abs(this.joltV) < 0.02) this.jolt = this.joltV = 0;
+                }
                 if (this.targetOpen && !wasOpen && typeof ambience !== 'undefined') ambience.doorEvent('whoosh', this);
                 this.openAmount += (this.targetOpen - this.openAmount) * this.speed;
                 if (this.openAmount < 0.01) this.openAmount = 0;
@@ -246,8 +305,16 @@
 
             /** One tick of hinge physics: actors (circles) push the leaf, it pushes back, a spring closes it. */
             stepPhysics(actors) {
+                if (this.type === 'sliding') {                              // glass doors open for anyone who comes up to them
+                    const cx = this.x + this.w / 2, cy = this.y + this.h / 2, R = this.triggerRadius * 0.85;
+                    this._actorNear = false;
+                    for (const act of actors) if (act !== (typeof game !== 'undefined' && game.player) && (act.x - cx) ** 2 + (act.y - cy) ** 2 < R * R) { this._actorNear = true; break; }
+                    return;
+                }
                 if (this.type !== 'hinged') return;
-                const L = this.length, half = this.thickness / 2, MAX = Math.PI / 2 - 0.05;
+                // A leaf folds right back to the wall beside its hinge (not a 90° stop), so no one
+                // is ever pinned behind a door flung wide
+                const L = this.length, half = this.thickness / 2, MAX = Math.PI - 0.25;
                 const a = this.baseAngle + this.angle, ux = Math.cos(a), uy = Math.sin(a);
                 for (const act of actors) {
                     const r = act.radius || 12;
@@ -281,18 +348,20 @@
                     if (Math.abs(this.angVel) > 0.02 && Math.abs(this.angle) > Math.abs(prev) && t - (this._creakAt || -9) > 0.6) { this._creakAt = t; ambience.doorEvent('creak', this); }
                     if (prev !== 0 && Math.abs(this.angle) < 0.03 && Math.abs(prev) >= 0.03 && this._maxOpen > 0.3) { this._maxOpen = 0; ambience.doorEvent('latch', this); }
                 }
-                this.openAmount = Math.abs(this.angle) / (Math.PI / 2);
+                this.openAmount = Math.min(1, Math.abs(this.angle) / (Math.PI / 2));
             }
             
             draw(ctx) {
                 ctx.save();
                 if (this.type === 'sliding') this.drawSliding(ctx);
+                else if (this.type === 'arch') this.drawArch(ctx);
                 else this.drawHinged(ctx);
                 ctx.restore();
             }
             
             drawSliding(ctx) {
-                const slideOffset = this.openAmount * (this.w / 2 + 4);
+                const slideOffset = this.openAmount * ((this.orientation === 'H' ? this.w : this.h) / 2 + 4);
+                if (this.jolt) ctx.translate(this.orientation === 'H' ? 0 : this.jolt, this.orientation === 'H' ? this.jolt : 0);
                 
                 if (this.orientation === 'H') {
                     const midX = this.x + this.w / 2;
@@ -313,6 +382,21 @@
                 }
             }
             
+            /** An open doorway: two stone jambs, a threshold, a gold keystone mark. */
+            drawArch(ctx) {
+                const H = this.orientation === 'H', len = H ? this.w : this.h, th = H ? this.h : this.w;
+                ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+                if (!H) ctx.rotate(Math.PI / 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(-len / 2, -th / 2, len, th);          // threshold
+                ctx.fillStyle = 'rgba(201,164,106,0.35)'; ctx.fillRect(-len / 2 + 4, -0.5, len - 8, 1);  // brass inlay
+                for (const sx of [-1, 1]) {                                                           // jambs
+                    ctx.fillStyle = '#2a2230'; ctx.fillRect(sx * len / 2 - 5, -th / 2 - 3, 10, th + 6);
+                    ctx.fillStyle = 'rgba(255,230,200,0.10)'; ctx.fillRect(sx * len / 2 - 5, -th / 2 - 3, 10, 1.5);
+                }
+                ctx.fillStyle = '#c9a46a'; ctx.beginPath();                                            // keystone
+                ctx.moveTo(0, -th / 2 - 4); ctx.lineTo(3, -th / 2); ctx.lineTo(0, -th / 2 + 2); ctx.lineTo(-3, -th / 2); ctx.closePath(); ctx.fill();
+            }
+
             drawHinged(ctx) {
                 const L = this.length, t = this.thickness;
                 ctx.translate(this.hx, this.hy);
@@ -421,6 +505,27 @@
             }
         }
         
+        /** Where along a moving circle's path (a→b, radius R) it first touches segment c–d: t in 0…1, or null. */
+        function sweepSegment(ax, ay, bx, by, cx, cy, dx, dy, R) {
+            if (segmentsCross(ax, ay, bx, by, cx, cy, dx, dy)) {
+                const rx = bx - ax, ry = by - ay, sx = dx - cx, sy = dy - cy, den = rx * sy - ry * sx;
+                return den ? Math.max(0, Math.min(1, ((cx - ax) * sy - (cy - ay) * sx) / den)) : 0;
+            }
+            const R2 = R * R;                                    // grazing: the circle touches the leaf at an end of the step
+            if (CollisionSystem.distToSegmentSquared(ax, ay, cx, cy, dx, dy) < R2) return 0;
+            if (CollisionSystem.distToSegmentSquared(bx, by, cx, cy, dx, dy) < R2) return 1;
+            if (CollisionSystem.distToSegmentSquared(cx, cy, ax, ay, bx, by) < R2 || CollisionSystem.distToSegmentSquared(dx, dy, ax, ay, bx, by) < R2) return 0.5;
+            return null;
+        }
+
+        /** Do segments a–b and c–d cross? */
+        function segmentsCross(ax, ay, bx, by, cx, cy, dx, dy) {
+            const o = (px, py, qx, qy, rx, ry) => (qx - px) * (ry - py) - (qy - py) * (rx - px);
+            const d1 = o(cx, cy, dx, dy, ax, ay), d2 = o(cx, cy, dx, dy, bx, by);
+            const d3 = o(ax, ay, bx, by, cx, cy), d4 = o(ax, ay, bx, by, dx, dy);
+            return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+        }
+
         /**
          * RoomSystem — Manages rooms, doors, windows, and linens for indoor maps.
          * Built once per map load. Tracks which room the player is in.
@@ -451,12 +556,17 @@
                 
                 // Build rooms
                 for (const [id, roomDef] of Object.entries(def.rooms || {})) {
+                    // One rect, or several (an L-shaped hall); x/y/w/h is then their bounding box
+                    const rects = roomDef.rects || [{ x: roomDef.x, y: roomDef.y, w: roomDef.w, h: roomDef.h }];
+                    const x0 = Math.min(...rects.map(r => r.x)), y0 = Math.min(...rects.map(r => r.y));
+                    const x1 = Math.max(...rects.map(r => r.x + r.w)), y1 = Math.max(...rects.map(r => r.y + r.h));
                     this.rooms[id] = {
                         id,
-                        x: roomDef.x,
-                        y: roomDef.y,
-                        w: roomDef.w,
-                        h: roomDef.h,
+                        x: x0,
+                        y: y0,
+                        w: x1 - x0,
+                        h: y1 - y0,
+                        rects,
                         type: roomDef.type || 'indoor',  // 'indoor' | 'outdoor'
                         label: roomDef.label || id,
                         floorColor: roomDef.floorColor || null,
@@ -505,14 +615,21 @@
              */
             getRoomAt(px, py) {
                 const last = this._lastHit;                      // most queries land in the same room
-                if (last && px >= last.x && px <= last.x + last.w && py >= last.y && py <= last.y + last.h) return last;
+                if (last && RoomSystem.contains(last, px, py)) return last;
                 for (const id in this.rooms) {
                     const r = this.rooms[id];
-                    if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) {
-                        return (this._lastHit = r);
-                    }
+                    if (RoomSystem.contains(r, px, py)) return (this._lastHit = r);
                 }
                 return null;
+            }
+
+            /** Is (px, py) inside room r (any of its rects)? */
+            static contains(r, px, py) {
+                if (px < r.x || px > r.x + r.w || py < r.y || py > r.y + r.h) return false;
+                const R = r.rects;
+                if (R.length === 1) return true;
+                for (let i = 0; i < R.length; i++) { const q = R[i]; if (px >= q.x && px <= q.x + q.w && py >= q.y && py <= q.y + q.h) return true; }
+                return false;
             }
             
             /**
@@ -583,7 +700,43 @@
             /** Hinged-door physics, run from the actor collision pass so doors block and get pushed. */
             stepDoorPhysics(actors) {
                 if (!this.active) return;
-                for (const door of this.doors) if (door.type === 'hinged') door.stepPhysics(actors);
+                for (const door of this.doors) if (door.type !== 'arch') door.stepPhysics(actors);
+            }
+
+            /**
+             * Does a bullet's path this tick (lastX,lastY → x,y) strike a door? Returns
+             * { door, x, y } for the first door hit (and pushes it), else null. Swept, so
+             * a sniper round can't skip through a 6 px leaf.
+             */
+            hitDoors(p) {
+                if (!this.active || !this.doors.length) return null;
+                const x0 = p.lastX ?? p.x - p.vx, y0 = p.lastY ?? p.y - p.vy, x1 = p.x, y1 = p.y, r = p.radius || 5;
+                const mnx = Math.min(x0, x1), mxx = Math.max(x0, x1), mny = Math.min(y0, y1), mxy = Math.max(y0, y1);
+                let best = null, bestT = Infinity;
+                for (const d of this.doors) {
+                    if (d.type === 'arch' || (p._doorHits && p._doorHits.has(d))) continue;
+                    const reach = (d.type === 'hinged' ? d.length : 0) + r + 8;
+                    if (mxx < d.x - reach || mnx > d.x + d.w + reach || mxy < d.y - reach || mny > d.y + d.h + reach) continue;
+                    for (const L of d.leaves()) {
+                        const t = sweepSegment(x0, y0, x1, y1, L[0], L[1], L[2], L[3], r + d.halfThick);
+                        if (t !== null && t < bestT) { bestT = t; best = d; }
+                    }
+                }
+                if (!best) return null;
+                const ix = x0 + (x1 - x0) * bestT, iy = y0 + (y1 - y0) * bestT;
+                best.strike(p, ix, iy);
+                (p._doorHits || (p._doorHits = new Set())).add(best);
+                return { door: best, x: ix, y: iy };
+            }
+
+            /** Does a closed door stand across this line of sight? (Doors that are mostly open don't.) */
+            doorBlocks(x1, y1, x2, y2) {
+                if (!this.active) return false;
+                for (const d of this.doors) {
+                    if (d.type === 'arch' || d.openAmount >= 0.3) continue;
+                    for (const L of d.leaves()) if (segmentsCross(x1, y1, x2, y2, L[0], L[1], L[2], L[3])) return true;
+                }
+                return false;
             }
             
             /**
@@ -602,13 +755,8 @@
              * Get room ID for a world position. Returns null if not in any room.
              */
             getRoomIdAt(x, y) {
-                for (const id in this.rooms) {
-                    const r = this.rooms[id];
-                    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
-                        return id;
-                    }
-                }
-                return null;
+                const r = this.getRoomAt(x, y);
+                return r ? r.id : null;
             }
             
             /**
@@ -742,10 +890,10 @@
                 c.clearRect(0, 0, V.cv.width, V.cv.height);
                 let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;   // only the veiled part is stamped
                 for (const id in this.rooms) {
-                    const r = this.rooms[id], a = (1 - r.vis) * L.VEIL_MAX;
+                    const r = this.rooms[id], a = Math.min(1, (1 - r.vis) * L.VEIL_MAX);
                     if (a < 0.004) continue;
                     c.fillStyle = `rgba(${L.VEIL_RGB}, ${a.toFixed(3)})`;
-                    c.fillRect((r.x - V.x0) * s, (r.y - V.y0) * s, r.w * s, r.h * s);
+                    for (const q of r.rects) c.fillRect((q.x - V.x0) * s, (q.y - V.y0) * s, q.w * s, q.h * s);
                     bx0 = Math.min(bx0, r.x); by0 = Math.min(by0, r.y); bx1 = Math.max(bx1, r.x + r.w); by1 = Math.max(by1, r.y + r.h);
                 }
                 if (bx0 === Infinity) return;
@@ -773,7 +921,7 @@
                 lightCtx.save();
                 lightCtx.globalCompositeOperation = 'destination-out';
                 lightCtx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
-                for (const id in this.rooms) { const r = this.rooms[id]; if (r.type === 'outdoor') lightCtx.fillRect(r.x, r.y, r.w, r.h); }
+                for (const id in this.rooms) { const r = this.rooms[id]; if (r.type === 'outdoor') for (const q of r.rects) lightCtx.fillRect(q.x, q.y, q.w, q.h); }
                 lightCtx.restore();
             }
             
@@ -788,7 +936,7 @@
                     const r = this.rooms[id];
                     if (!r.floorColor) continue;
                     ctx.fillStyle = r.floorColor;
-                    ctx.fillRect(r.x, r.y, r.w, r.h);
+                    for (const q of r.rects) ctx.fillRect(q.x, q.y, q.w, q.h);
                 }
             }
             
@@ -882,6 +1030,71 @@
                     // Bedroom drape near window
                     { x: 1388, y: 340, length: 75, width: 12, anchor: 'top', color: 'rgba(220, 200, 230, 0.08)', lightColor: 'rgba(200, 180, 220, 0.03)', segments: 3 }
                 ]
-            }
+            },
+            // The House of Death (gauntlet). Three loops round the grand hall, so no one gets cornered:
+            // foyer–kitchen–dining–hall, foyer–gallery–courtyard–hall, dining–library–chapel–bedroom–courtyard.
+            'house_of_death': (() => {
+                const WOOD = '#6b3a45', GLASS = 'rgba(170, 150, 230, 0.32)';   // oxblood leaves (light enough to read), violet glass
+                const hinged = (x, y, o, rooms, hingeSide = 'left') => ({ x, y, w: o === 'V' ? 14 : 80, h: o === 'V' ? 80 : 14, type: 'hinged', orientation: o, rooms, color: WOOD, hingeSide, triggerRadius: 60 });
+                const slide = (x, y, o, rooms) => ({ x, y, w: o === 'V' ? 14 : 120, h: o === 'V' ? 120 : 14, type: 'sliding', orientation: o, rooms, color: GLASS, speed: 0.07, triggerRadius: 90 });
+                const STAINED_V = '190, 130, 255', STAINED_R = '255, 120, 170';
+                return {
+                    rooms: {
+                        library:   { x: 14,   y: 14,   w: 546, h: 416, type: 'indoor',  label: 'Library' },
+                        chapel:    { x: 574,  y: 14,   w: 652, h: 416, type: 'indoor',  label: 'Chapel' },
+                        bedroom:   { x: 1240, y: 14,   w: 320, h: 416, type: 'indoor',  label: 'Master Bedroom' },
+                        bath:      { x: 1574, y: 14,   w: 212, h: 416, type: 'indoor',  label: 'Bath' },
+                        dining:    { x: 14,   y: 444,  w: 546, h: 556, type: 'indoor',  label: 'Dining Room' },
+                        hall:      { x: 574,  y: 444,  w: 652, h: 556, type: 'indoor',  label: 'Grand Hall' },
+                        courtyard: { x: 1240, y: 444,  w: 546, h: 556, type: 'outdoor', label: 'Rain Courtyard' },
+                        kitchen:   { x: 14,   y: 1014, w: 546, h: 472, type: 'indoor',  label: 'Kitchen' },
+                        foyer:     { x: 574,  y: 1014, w: 652, h: 486, type: 'indoor',  label: 'Foyer' },
+                        gallery:   { rects: [{ x: 1240, y: 1014, w: 546, h: 150 }, { x: 1636, y: 1164, w: 150, h: 322 }], type: 'indoor', label: 'Gallery' },
+                        reliquary: { x: 1240, y: 1178, w: 382, h: 308, type: 'indoor',  label: 'Reliquary' }
+                    },
+                    doors: [
+                        { x: 820, y: 1000, w: 160, h: 14, type: 'arch', orientation: 'H', rooms: ['foyer', 'hall'] },
+                        hinged(560, 1210, 'V', ['foyer', 'kitchen']),
+                        hinged(1226, 1060, 'V', ['foyer', 'gallery'], 'right'),
+                        hinged(1226, 1340, 'V', ['foyer', 'reliquary']),
+                        hinged(1622, 1300, 'V', ['reliquary', 'gallery'], 'right'),
+                        { x: 180, y: 1000, w: 150, h: 14, type: 'arch', orientation: 'H', rooms: ['kitchen', 'dining'] },
+                        hinged(560, 680, 'V', ['dining', 'hall']),
+                        hinged(240, 430, 'H', ['dining', 'library']),
+                        hinged(560, 200, 'V', ['library', 'chapel'], 'right'),
+                        // The chapel's double doors onto the grand hall
+                        { ...hinged(830, 430, 'H', ['chapel', 'hall'], 'left'), w: 70 },
+                        { ...hinged(900, 430, 'H', ['chapel', 'hall'], 'right'), w: 70 },
+                        hinged(1226, 200, 'V', ['chapel', 'bedroom']),
+                        { ...hinged(1560, 250, 'V', ['bedroom', 'bath']), h: 70 },
+                        slide(1340, 430, 'H', ['bedroom', 'courtyard']),
+                        slide(1226, 660, 'V', ['hall', 'courtyard']),
+                        slide(1450, 1000, 'H', ['courtyard', 'gallery']),
+                    ],
+                    windows: [
+                        // Lancet windows of stained glass: violet and rose (facing = the way the light falls)
+                        { x: 640, y: 0, w: 60, h: 14, facing: 'S', projectionLength: 150, tint: STAINED_V },
+                        { x: 870, y: 0, w: 60, h: 14, facing: 'S', projectionLength: 170, tint: STAINED_R },
+                        { x: 1100, y: 0, w: 60, h: 14, facing: 'S', projectionLength: 150, tint: STAINED_V },
+                        { x: 0, y: 150, w: 14, h: 60, facing: 'E', projectionLength: 120, tint: STAINED_R },
+                        { x: 0, y: 650, w: 14, h: 60, facing: 'E', projectionLength: 120, tint: STAINED_V },
+                        { x: 1330, y: 0, w: 70, h: 14, facing: 'S', projectionLength: 120, tint: STAINED_R },
+                        { x: 1786, y: 150, w: 14, h: 70, facing: 'W', projectionLength: 110, tint: '220, 230, 255' },
+                        // Glass walls onto the courtyard
+                        { x: 1260, y: 430, w: 70, h: 14, facing: 'N', projectionLength: 90, tint: '200, 210, 255' },
+                        { x: 1226, y: 480, w: 14, h: 160, facing: 'W', projectionLength: 110, tint: '200, 210, 255' },
+                        { x: 1226, y: 800, w: 14, h: 170, facing: 'W', projectionLength: 110, tint: '200, 210, 255' },
+                        { x: 1260, y: 1000, w: 170, h: 14, facing: 'S', projectionLength: 90, tint: '200, 210, 255' },
+                        { x: 1786, y: 1260, w: 14, h: 80, facing: 'W', projectionLength: 110, tint: STAINED_V },
+                    ],
+                    linens: [
+                        // Velvet drapes by the chapel lancets and the hall's glass wall
+                        { x: 632, y: 16, length: 70, width: 14, anchor: 'top', color: 'rgba(120, 40, 90, 0.16)', lightColor: 'rgba(190, 120, 255, 0.03)', segments: 4 },
+                        { x: 1168, y: 16, length: 70, width: 14, anchor: 'top', color: 'rgba(120, 40, 90, 0.16)', lightColor: 'rgba(190, 120, 255, 0.03)', segments: 4 },
+                        { x: 1222, y: 470, length: 60, width: 12, anchor: 'right', color: 'rgba(90, 30, 70, 0.16)', lightColor: 'rgba(255, 120, 170, 0.03)', segments: 3 },
+                        { x: 1222, y: 950, length: 60, width: 12, anchor: 'right', color: 'rgba(90, 30, 70, 0.16)', lightColor: 'rgba(255, 120, 170, 0.03)', segments: 3 },
+                    ]
+                };
+            })()
         };
 
