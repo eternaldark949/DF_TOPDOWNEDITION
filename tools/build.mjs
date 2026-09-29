@@ -39,6 +39,7 @@ const SCRIPTS = [
     'story/captions.js',
     'audio/audio.js',
     'world/weather.js',
+    'world/weather-response.js',
     'world/particles-decals.js',
     'world/rooms.js',
     'world/maps.js',

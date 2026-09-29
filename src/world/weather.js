@@ -618,6 +618,7 @@
             // Trigger a lightning flash (used in boss fights and storms)
             triggerLightning() {
                 this.lightningFlash = 1.0;
+                this.strikeCount = (this.strikeCount || 0) + 1;              // characters flinch once per strike (weather-response.js)
                 this.lightningCooldown = 180 + Math.random() * 240; // 3-7 seconds
             }
             

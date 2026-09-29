@@ -374,6 +374,13 @@
                         : this._poseFace(speakerName)),
                     talkUntil: now + (len ? Math.min(3500, 350 + len * 45) : 0), last: ''
                 };
+                // Out in a storm, everyone squints against the wind
+                const wx = weatherAt(this.player);
+                if (wx && wx.strong > 0.4) {
+                    const X = resolveExpression(this._dialogueFace.expression);
+                    X.lids.top = Math.max(X.lids.top, 0.3 * wx.strong + 0.05);
+                    this._dialogueFace.expression = X;
+                }
                 this._paintDialogueFace();
                 if (!this._dialogueFaceTimer) this._dialogueFaceTimer = setInterval(() => this._paintDialogueFace(), 50);
             },
@@ -613,6 +620,8 @@
                             swatch = `<div style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${item.data.color} 45%);border:1px solid rgba(255,255,255,0.2);flex-shrink:0;"></div>`;
                         } else if (category === 'vocal') {
                             swatch = `<div style="width:18px;height:18px;border-radius:50%;background:${item.data.captionColor};border:1px solid rgba(255,255,255,0.15);flex-shrink:0;opacity:0.7;"></div>`;
+                        } else if (category === 'accessory' && item.data.held === 'umbrella') {
+                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:conic-gradient(${item.data.color} 0 12.5%, ${item.data.trim} 12.5% 14%, ${item.data.color} 14% 25%, ${item.data.trim} 25% 26.5%, ${item.data.color} 26.5% 100%);border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"></div>`;
                         } else if (category === 'accessory') {
                             const d = GLASS_DRINKS[this.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne;
                             swatch = `<div style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #fff 0 12%, ${d.liquid} 30%, ${d.liquid2 || d.liquid} 100%);border:1px solid rgba(255,255,255,0.35);box-shadow:inset 0 0 3px rgba(255,255,255,0.6);flex-shrink:0;"></div>`;

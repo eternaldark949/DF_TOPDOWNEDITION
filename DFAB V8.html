@@ -3788,6 +3788,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'wig_ponytail_black':  { id: 'wig_ponytail_black',  category: 'wig',   name: 'Sorcerer\'s Tail',    desc: 'Sabrina\'s sleek ponytail. Near-black with a violet cast.', price: 250, data: { type: 'ponytail', color: '#0a0008' } },
 
             // ─── A.C.C.E.S.S.O.R.I.E.S (held items; optional slot; may have options) ───
+            'acc_umbrella':        { id: 'acc_umbrella',        category: 'accessory', name: 'Moonlit Umbrella', desc: 'Lavender canopy, gold tips. Opens itself when it rains.', price: 250, data: { held: 'umbrella', hand: 'right', color: '#9d8cc8', trim: '#e8c27a' } },
             'acc_glass':           { id: 'acc_glass',           category: 'accessory', name: 'Crystal Glass',  desc: 'Something to sip on. Choose your pour.',                price: 0,    data: { held: 'glass', hand: 'right' }, options: { drink: 'champagne' }, default: true },
 
             // ─── S.K.I.N.s (skin tone / look) ───
@@ -3946,6 +3947,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let held = null;
                 if (acc && acc.data.held === 'glass') {
                     held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne' };
+                } else if (acc && acc.data.held === 'umbrella') {
+                    held = { type: 'umbrella', hand: acc.data.hand || 'right', color: acc.data.color, trim: acc.data.trim };
                 }
                 const hat = this.equippedHat ? COSMETICS_REGISTRY[this.equippedHat] : null;
                 const jewelry = this.equippedJewelry.map(id => COSMETICS_REGISTRY[id]).filter(Boolean).map(e => e.data);
@@ -7439,6 +7442,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Trigger a lightning flash (used in boss fights and storms)
             triggerLightning() {
                 this.lightningFlash = 1.0;
+                this.strikeCount = (this.strikeCount || 0) + 1;              // characters flinch once per strike (weather-response.js)
                 this.lightningCooldown = 180 + Math.random() * 240; // 3-7 seconds
             }
             
@@ -7977,6 +7981,82 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
         
+        /* =====================================================================
+           WEATHER RESPONSE — how the weather reaches a character
+           ---------------------------------------------------------------------
+           weatherAt(entity) → { wind: {x,y}, hairWind: {x,y}, rain, strong } or null
+             wind      cloth's push toward downwind (world px per physics slice),
+                       with a gust that's out of step per character
+             hairWind  the same for hair (lighter, so it streams without whipping)
+             rain      0 … 1 how hard it's raining on them
+             strong    0 … 1 how much the wind makes them lean their head into it
+           Indoor maps are still (except the player on an outdoor part, like the veranda).
+           Lightning: each strike makes outdoor characters flinch, a few hundredths
+           of a second apart, so a crowd ripples instead of jumping as one.
+           ===================================================================== */
+        const WEATHER_RESPONSE = { CLOTH_WIND: 0.085, HAIR_WIND: 0.05, STRONG_FROM: 0.55, STRONG_SPAN: 0.4 };
+
+        function weatherAt(entity) {
+            if (typeof game === 'undefined' || !game || !game.weather || !game.activeMap || !entity) return null;
+            const map = game.activeMap, w = game.weather;
+            // Indoor maps are still, except the player out on an open part of one (the apartment veranda)
+            if (map.type === 'indoor') {
+                const rs = game.roomSystem;
+                if (!(entity === game.player && rs && rs.isPlayerOutdoor && rs.isPlayerOutdoor())) return null;
+            }
+            const seed = entity._wxSeed !== undefined ? entity._wxSeed : (entity._wxSeed = Math.random() * 100);
+            const t = _gameTimeSec;
+            const gust = 1 + 0.35 * Math.sin(t * 2.3 + seed) + 0.15 * Math.sin(t * 5.1 + seed * 1.7);
+            const k = WEATHER_RESPONSE, v = w.windVec || { x: 0, y: 0 };
+            const out = {
+                wind: { x: v.x * k.CLOTH_WIND * gust, y: v.y * k.CLOTH_WIND * gust },
+                hairWind: { x: v.x * k.HAIR_WIND * gust, y: v.y * k.HAIR_WIND * gust },
+                rain: w.isRaining ? Math.min(1, w.intensity || 0) : 0,
+                strong: Math.max(0, Math.min(1, ((w.wind || 0) - k.STRONG_FROM) / k.STRONG_SPAN)),
+                dir: Math.atan2(v.y, v.x)
+            };
+            // Lightning ripple: a flinch per strike, staggered per character
+            const strike = w.strikeCount || 0;
+            if (entity._wxStrike === undefined) entity._wxStrike = strike;
+            if (strike !== entity._wxStrike) { entity._wxStrike = strike; entity._boltAt = t + Math.random() * 0.15; }
+            if (entity._boltAt !== undefined && t >= entity._boltAt) {
+                entity._hitT = t; entity._hitDir = Math.random() * Math.PI * 2; entity._boltAt = undefined;
+            }
+            return out;
+        }
+
+        /** Draw an umbrella seen from above: a ribbed canopy (open 0…1) or a furled stick in the hand. */
+        function drawUmbrella(ctx, cx, cy, handX, handY, open, u) {
+            const color = u.color || '#1a1a1a', trim = u.trim || darkenHex(color, 40);
+            if (open < 0.15) {                                                   // furled: a slim stick along the forearm
+                ctx.strokeStyle = color; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(handX + 1, handY); ctx.lineTo(handX - 13, handY + (handY > 0 ? 2 : -2)); ctx.stroke();
+                ctx.lineCap = 'butt';
+                return;
+            }
+            const R = 17 * open, N = 8;
+            ctx.save();
+            ctx.globalAlpha = 0.93;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            for (let i = 0; i <= N; i++) {                                       // scalloped rim between the ribs
+                const a0 = (i - 1) / N * Math.PI * 2, a1 = i / N * Math.PI * 2, am = (a0 + a1) / 2;
+                if (i === 0) { ctx.moveTo(cx + Math.cos(a1) * R, cy + Math.sin(a1) * R); continue; }
+                ctx.quadraticCurveTo(cx + Math.cos(am) * R * 0.88, cy + Math.sin(am) * R * 0.88, cx + Math.cos(a1) * R, cy + Math.sin(a1) * R);
+            }
+            ctx.fill();
+            // Sheen on the upper panels, ribs, the tip
+            const sh = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, 0, cx, cy, R);
+            sh.addColorStop(0, 'rgba(255,255,255,0.22)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = sh; ctx.fill();
+            ctx.strokeStyle = trim; ctx.lineWidth = 0.7; ctx.beginPath();
+            for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2; ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); }
+            ctx.stroke();
+            ctx.fillStyle = trim;
+            for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * R, cy + Math.sin(a) * R, 0.9, 0, Math.PI * 2); ctx.fill(); }
+            ctx.beginPath(); ctx.arc(cx, cy, 1.4, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
         // PuddleSystem removed — disabled for performance (this.puddles = null at init).
         // All references are guarded with `if (this.puddles)` so no code changes needed.
         // Can be restored from version control if puddle visuals are revisited.
@@ -17278,6 +17358,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * an outfit in the archetype's signature colour (bodyColor), so the crowd is
              * varied but workers still read as workers, tourists as tourists.
              */
+            /** Is it raining where this pedestrian is? */
+            _raining() {
+                return typeof game !== 'undefined' && game.weather && game.weather.isRaining && game.activeMap && game.activeMap.type !== 'indoor';
+            }
+
             static makeLook(ap, r) {
                 const pick = list => pickFrom(r, list);
                 const c = ap.bodyColor;
@@ -17291,6 +17376,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     hair: { type: pick(hairTypes), color: r() < 0.6 ? ap.hairColor : pick(_HAIR_COLORS) },
                     shoes: { type: 'sneakers', color: '#e8e8e8' }
                 };
+                // Rain kit: some carry an umbrella; some hoodie wearers put the hood up
+                if (r() < 0.4) look.umbrella = pick(['#1a1a1a', '#5a0f1e', '#9d8cc8', '#c9d6e8', '#d9b45a', '#2b3a55']);
+                look.rainHood = r() < 0.35;
+                look.hurry = 1.2 + r() * 0.15;
                 const skirtOr = alt => gender === 'female' && r() < 0.5 ? { type: pick(['skirt', 'long_skirt']), color: '#1c1c24' } : alt;
                 switch (ap.name) {
                     case 'suit_male': case 'suit_female': case 'corporate':
@@ -17811,8 +17900,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Move towards target
                 if (dist > 5) {
-                    let moveX = (dx / dist) * this.speed;
-                    let moveY = (dy / dist) * this.speed;
+                    const pace = this.speed * (this._raining() ? (this.look.hurry || 1.25) : 1);   // hurrying in the rain
+                    let moveX = (dx / dist) * pace;
+                    let moveY = (dy / dist) * pace;
                     
                     // Avoid player
                     const playerDist = Math.hypot(player.x - this.x, player.y - this.y);
@@ -18016,7 +18106,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Their own look (Pedestrian.makeLook) — hats, hair and all. Zoomed out (more of
                 // the crowd on screen, too small to read details) they get simple hair, no jewelry.
                 const far = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 1;
-                const look = far && this.look.hair ? { ...this.look, hair: { type: 'short', color: this.look.hair.color }, jewelry: null } : this.look;
+                let look = far && this.look.hair ? { ...this.look, hair: { type: 'short', color: this.look.hair.color }, jewelry: null } : this.look;
+                // Rain: open the umbrella, or pull the hoodie's hood up
+                if (this.look.umbrella) look = { ...look, held: { type: 'umbrella', color: this.look.umbrella, hand: 'right' } };
+                if (this._raining() && this.look.rainHood && !look.hat && look.top && look.top.type === 'hoodie') look = { ...look, hat: { type: 'hood_up', color: look.top.color } };
                 drawProceduralHumanoid(ctx, this, { ...look, stance: 'idle', lerpSpeed: 0.15 });
                 
                 // Waiting indicator (if at crosswalk) - above head at +X
@@ -33015,6 +33108,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Spring toward the rest pose — stiff near the scalp, loose at the tips
                         const k0 = layout.stiffness * (1 - 0.6 * (i / n));
                         let ax = (root.x + rc * L * i - p.x) * k0, ay = (root.y + rs * L * i - p.y) * k0;
+                        if (dyn && dyn.wind) { ax += dyn.wind.x * sc * (i / n); ay += dyn.wind.y * sc * (i / n); }   // the weather's wind
                         if (layout.wiggle) {                           // restless tendrils
                             const w = Math.sin(time * 5 + i * 0.9 + si * 1.7) * layout.wiggle * sc * (i / n);
                             ax += -rs * w; ay += rc * w;
@@ -33865,7 +33959,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const stance = config.stance || 'idle'; 
             const held = config.held || null;
             // Which hand (if any) is holding a drink — it's held out and swings less
-            const glassHand = (held && !isDrivingCfg(config) && (held.type === 'glass' || held.type === 'champagne_glass')) ? (held.hand || 'right') : null;
+            // Weather on this character (world/weather-response.js): wind, rain, lightning; null indoors
+            const W = !isDrivingCfg(config) ? weatherAt(entity) : null;
+            // An umbrella opens in the rain (or when told to) and is held like a drink
+            const umbrella = held && held.type === 'umbrella' && !isDrivingCfg(config) ? held : null;
+            const umbrellaOpen = umbrella ? (umbrella.open !== undefined ? umbrella.open : (W && W.rain > 0.05 ? 1 : 0)) : 0;
+            const glassHand = (held && !isDrivingCfg(config) && (held.type === 'glass' || held.type === 'champagne_glass' || umbrella)) ? (held.hand || 'right') : null;
         
             const clothes = {
                 hair:   config.hair   || null,
@@ -33877,7 +33976,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 jewelry: config.jewelry || null
             };
         
-            const darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * frac)) : '#000';
+            // Rain darkens clothes a touch (not skin)
+            const wet = W ? W.rain * 0.08 : 0;
+            const darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * (hex === skinColor ? frac : frac + wet))) : '#000';
         
             // --- 2. PROPORTIONS ---
             let shoulderSpread = 9; let hipWidth = 8; let hipXOff = -5; let torsoWidth = 10; let torsoXOff = -3;
@@ -34047,6 +34148,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Holding a drink: that hand is held out a little in front, elbow softly bent
                 if (glassHand === 'right') { rFistX += 7; rFistY = 9; }
                 else if (glassHand === 'left') { lFistX += 7; lFistY = -9; }
+                // An open umbrella's handle is held up close to the chest
+                if (umbrellaOpen > 0.15) { if (glassHand === 'right') { rFistX = 3 + bounce; rFistY = 5; } else { lFistX = 3 + bounce; lFistY = -5; } }
             }
             const walkArms = !isDriving && stance !== 'pistol' && stance !== 'rifle' && stance !== 'sniper' && stance !== 'punch';
             // Pose: hands (unarmed only; a hand holding a drink keeps it), twist and breathing
@@ -34312,7 +34415,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
             const jewelryAt = (where) => (clothes.jewelry || []).filter(j => WD && WD.jewelry[j.type] && WD.jewelry[j.type].at === where);
             const headX0 = bounce - bodyRecoil;
-            const clothDyn = { wind: null };                               // weather will blow on this (roadmap step 7)
+            const clothDyn = { wind: W ? W.wind : null };                 // the weather blows on hems and trains
             const g = {
                 darken, skin: skinColor, gender, walkCycle, android: A,
                 torso: { x: torsoXOff, w: torsoWidth }, hip: { x: hipXOff, w: hipWidth },
@@ -34543,13 +34646,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.restore();
         
             // 10. Head & Hair
-            const headX = 0 + bounce - bodyRecoil + pf('head', 0);
-            const headY = pf('head', 1), headTurn = pose ? (pose.turn || 0) * poseW : 0;   // looking around
+            // In strong wind the head dips into it (toward where it's blowing from)
+            const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W ? W.strong * 1.3 : 0;
+            const headX = 0 + bounce - bodyRecoil + pf('head', 0) - Math.cos(windLocal) * dip;
+            const headY = pf('head', 1) - Math.sin(windLocal) * dip, headTurn = pose ? (pose.turn || 0) * poseW : 0;   // looking around
             // 1.0 at the player's base walk speed — keeps the old player hair tuning, now shared by everyone
             const hairMove = gaitSpeed / 5.2;
             // Hair motion comes from the strand physics (hairGeometry): the owner's head
             // position in the world, plus the shoulder sway the strands swing with.
-            const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0 };
+            const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0, wind: W ? W.hairWind : null };
             walkDyn.android = A;
             const turning = headY !== 0 || headTurn !== 0;
             withHead(headX, hx => {
@@ -34572,6 +34677,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // 'champagne_glass' is the legacy id (NPC configs); it's the glass with champagne
                 if (held.type === 'glass' || held.type === 'champagne_glass') {
                     drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand);
+                } else if (umbrella) {
+                    // Canopy over the head, held a little into the wind, bobbing with the step
+                    const lean = W ? 2.5 + W.strong * 3 : 0;
+                    const ux = headX * 0.5 - Math.cos(windLocal) * lean + Math.sin(walkCycle * 2) * 0.5, uy = -Math.sin(windLocal) * lean;
+                    const eased = entity._umbOpen = (entity._umbOpen === undefined ? umbrellaOpen : entity._umbOpen + (umbrellaOpen - entity._umbOpen) * 0.12);
+                    drawUmbrella(ctx, ux, uy, hX, hY, eased, umbrella);
                 }
             }
             
@@ -39184,6 +39295,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             red:  { drop: '150, 10, 14', decal: '110, 6, 8' },
             ink:  { drop: '40, 18, 58',  decal: '11, 6, 16', sheen: '120, 70, 170' },
             oil:  { drop: '40, 40, 40',  decal: '18, 18, 18', sparks: true },
+            // Stella (949): deep wine — Dr. Yin keeps her running, and she isn't quite human
+            wine: { drop: '112, 16, 38', decal: '70, 10, 26', sheen: '150, 40, 70' },
         };
         const COOLANT_TINTS = { silver: '170, 220, 255', gold: '255, 196, 96', bloodmoon: '255, 110, 150' };
 
@@ -39201,6 +39314,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return { drop: t, decal: t, sparks: true, glow: true };
             }
             if (BLOOD_KINDS[named]) return BLOOD_KINDS[named];
+            if (typeof PlayerEntity !== 'undefined' && a instanceof PlayerEntity) return BLOOD_KINDS.wine;
             if ((typeof Drone !== 'undefined' && a instanceof Drone) || (typeof GatlingGunner !== 'undefined' && a instanceof GatlingGunner)) return BLOOD_KINDS.oil;
             if (a.role === 'red_demon_dancer' || (a.role === 'dancer' && a.gender !== 'male')) return BLOOD_KINDS.ink;
             return BLOOD_KINDS.red;
@@ -40762,6 +40876,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         : this._poseFace(speakerName)),
                     talkUntil: now + (len ? Math.min(3500, 350 + len * 45) : 0), last: ''
                 };
+                // Out in a storm, everyone squints against the wind
+                const wx = weatherAt(this.player);
+                if (wx && wx.strong > 0.4) {
+                    const X = resolveExpression(this._dialogueFace.expression);
+                    X.lids.top = Math.max(X.lids.top, 0.3 * wx.strong + 0.05);
+                    this._dialogueFace.expression = X;
+                }
                 this._paintDialogueFace();
                 if (!this._dialogueFaceTimer) this._dialogueFaceTimer = setInterval(() => this._paintDialogueFace(), 50);
             },
@@ -41001,6 +41122,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             swatch = `<div style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${item.data.color} 45%);border:1px solid rgba(255,255,255,0.2);flex-shrink:0;"></div>`;
                         } else if (category === 'vocal') {
                             swatch = `<div style="width:18px;height:18px;border-radius:50%;background:${item.data.captionColor};border:1px solid rgba(255,255,255,0.15);flex-shrink:0;opacity:0.7;"></div>`;
+                        } else if (category === 'accessory' && item.data.held === 'umbrella') {
+                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:conic-gradient(${item.data.color} 0 12.5%, ${item.data.trim} 12.5% 14%, ${item.data.color} 14% 25%, ${item.data.trim} 25% 26.5%, ${item.data.color} 26.5% 100%);border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"></div>`;
                         } else if (category === 'accessory') {
                             const d = GLASS_DRINKS[this.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne;
                             swatch = `<div style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #fff 0 12%, ${d.liquid} 30%, ${d.liquid2 || d.liquid} 100%);border:1px solid rgba(255,255,255,0.35);box-shadow:inset 0 0 3px rgba(255,255,255,0.6);flex-shrink:0;"></div>`;
@@ -46203,7 +46326,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const bleedChance = this.playerHealth < 20 ? 0.3 : 0.1;
                         
                         //if ((isMoving || Math.random() < 0.05) && Math.random() < bleedChance) {
-                            this.decals.addBlood(this.player.x, this.player.y, 3 + Math.random() * 2);
+                            this.decals.addBlood(this.player.x, this.player.y, 3 + Math.random() * 2, BLOOD_KINDS.wine.decal);   // Stella's own
                         //}
                     }
                 }
@@ -49439,6 +49562,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // Outfit from equipped cosmetic
                 const outfit = cosmeticConfig.outfit;
+                const wx = weatherAt(this.player), rainOn = !!(wx && wx.rain > 0.05);
 
                 drawProceduralHumanoid(this.ctx, this.player, {
                     skinColor: cosmeticConfig.skinColor,
@@ -49459,10 +49583,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     bottom: outfit.bottom,
                     shoes: outfit.shoes,
                     train: outfit.train || null,
-                    hat: cosmeticConfig.hat,
+                    // In the rain outdoors a hoodie's hood goes up (unless she's wearing a hat)
+                    hat: cosmeticConfig.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie' ? { type: 'hood_up', color: outfit.top.color } : null),
                     jewelry: cosmeticConfig.jewelry,
                     pose: typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
-                    held: cosmeticConfig.held || outfit.held || null
+                    // A drawn gun takes the hand; the umbrella waits
+                    held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
                 });
                 
                 this.ctx.restore();
@@ -51411,6 +51537,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     else if (slot.category === 'vocal') chipColor = item.data.captionColor;
                     else if (slot.category === 'outfit') chipColor = item.data.top.color;
                     else if (slot.category === 'hat' || slot.category === 'jewelry') chipColor = item.data.color;
+                    else if (slot.category === 'accessory' && item.data.held === 'umbrella') chipColor = item.data.color;
                     else if (slot.category === 'accessory') chipColor = (GLASS_DRINKS[game.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne).liquid;
                     
                     const borderStyle = isEquipped ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)';

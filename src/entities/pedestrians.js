@@ -32,6 +32,11 @@
              * an outfit in the archetype's signature colour (bodyColor), so the crowd is
              * varied but workers still read as workers, tourists as tourists.
              */
+            /** Is it raining where this pedestrian is? */
+            _raining() {
+                return typeof game !== 'undefined' && game.weather && game.weather.isRaining && game.activeMap && game.activeMap.type !== 'indoor';
+            }
+
             static makeLook(ap, r) {
                 const pick = list => pickFrom(r, list);
                 const c = ap.bodyColor;
@@ -45,6 +50,10 @@
                     hair: { type: pick(hairTypes), color: r() < 0.6 ? ap.hairColor : pick(_HAIR_COLORS) },
                     shoes: { type: 'sneakers', color: '#e8e8e8' }
                 };
+                // Rain kit: some carry an umbrella; some hoodie wearers put the hood up
+                if (r() < 0.4) look.umbrella = pick(['#1a1a1a', '#5a0f1e', '#9d8cc8', '#c9d6e8', '#d9b45a', '#2b3a55']);
+                look.rainHood = r() < 0.35;
+                look.hurry = 1.2 + r() * 0.15;
                 const skirtOr = alt => gender === 'female' && r() < 0.5 ? { type: pick(['skirt', 'long_skirt']), color: '#1c1c24' } : alt;
                 switch (ap.name) {
                     case 'suit_male': case 'suit_female': case 'corporate':
@@ -565,8 +574,9 @@
                 
                 // Move towards target
                 if (dist > 5) {
-                    let moveX = (dx / dist) * this.speed;
-                    let moveY = (dy / dist) * this.speed;
+                    const pace = this.speed * (this._raining() ? (this.look.hurry || 1.25) : 1);   // hurrying in the rain
+                    let moveX = (dx / dist) * pace;
+                    let moveY = (dy / dist) * pace;
                     
                     // Avoid player
                     const playerDist = Math.hypot(player.x - this.x, player.y - this.y);
@@ -770,7 +780,10 @@
                 // Their own look (Pedestrian.makeLook) — hats, hair and all. Zoomed out (more of
                 // the crowd on screen, too small to read details) they get simple hair, no jewelry.
                 const far = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 1;
-                const look = far && this.look.hair ? { ...this.look, hair: { type: 'short', color: this.look.hair.color }, jewelry: null } : this.look;
+                let look = far && this.look.hair ? { ...this.look, hair: { type: 'short', color: this.look.hair.color }, jewelry: null } : this.look;
+                // Rain: open the umbrella, or pull the hoodie's hood up
+                if (this.look.umbrella) look = { ...look, held: { type: 'umbrella', color: this.look.umbrella, hand: 'right' } };
+                if (this._raining() && this.look.rainHood && !look.hat && look.top && look.top.type === 'hoodie') look = { ...look, hat: { type: 'hood_up', color: look.top.color } };
                 drawProceduralHumanoid(ctx, this, { ...look, stance: 'idle', lerpSpeed: 0.15 });
                 
                 // Waiting indicator (if at crosswalk) - above head at +X

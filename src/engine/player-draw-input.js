@@ -32,6 +32,7 @@
 
                 // Outfit from equipped cosmetic
                 const outfit = cosmeticConfig.outfit;
+                const wx = weatherAt(this.player), rainOn = !!(wx && wx.rain > 0.05);
 
                 drawProceduralHumanoid(this.ctx, this.player, {
                     skinColor: cosmeticConfig.skinColor,
@@ -52,10 +53,12 @@
                     bottom: outfit.bottom,
                     shoes: outfit.shoes,
                     train: outfit.train || null,
-                    hat: cosmeticConfig.hat,
+                    // In the rain outdoors a hoodie's hood goes up (unless she's wearing a hat)
+                    hat: cosmeticConfig.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie' ? { type: 'hood_up', color: outfit.top.color } : null),
                     jewelry: cosmeticConfig.jewelry,
                     pose: typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
-                    held: cosmeticConfig.held || outfit.held || null
+                    // A drawn gun takes the hand; the umbrella waits
+                    held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
                 });
                 
                 this.ctx.restore();

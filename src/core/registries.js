@@ -150,6 +150,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'wig_ponytail_black':  { id: 'wig_ponytail_black',  category: 'wig',   name: 'Sorcerer\'s Tail',    desc: 'Sabrina\'s sleek ponytail. Near-black with a violet cast.', price: 250, data: { type: 'ponytail', color: '#0a0008' } },
 
             // ─── A.C.C.E.S.S.O.R.I.E.S (held items; optional slot; may have options) ───
+            'acc_umbrella':        { id: 'acc_umbrella',        category: 'accessory', name: 'Moonlit Umbrella', desc: 'Lavender canopy, gold tips. Opens itself when it rains.', price: 250, data: { held: 'umbrella', hand: 'right', color: '#9d8cc8', trim: '#e8c27a' } },
             'acc_glass':           { id: 'acc_glass',           category: 'accessory', name: 'Crystal Glass',  desc: 'Something to sip on. Choose your pour.',                price: 0,    data: { held: 'glass', hand: 'right' }, options: { drink: 'champagne' }, default: true },
 
             // ─── S.K.I.N.s (skin tone / look) ───
@@ -308,6 +309,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let held = null;
                 if (acc && acc.data.held === 'glass') {
                     held = { type: 'glass', hand: acc.data.hand || 'right', drink: this.getAccessoryOption(acc.id, 'drink') || 'champagne' };
+                } else if (acc && acc.data.held === 'umbrella') {
+                    held = { type: 'umbrella', hand: acc.data.hand || 'right', color: acc.data.color, trim: acc.data.trim };
                 }
                 const hat = this.equippedHat ? COSMETICS_REGISTRY[this.equippedHat] : null;
                 const jewelry = this.equippedJewelry.map(id => COSMETICS_REGISTRY[id]).filter(Boolean).map(e => e.data);
