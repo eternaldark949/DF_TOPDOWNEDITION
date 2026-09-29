@@ -586,22 +586,25 @@
             },
 
             // =========================================================
-            //  LOST LUGGAGE (the Double Nights lobby) — a few personics lifted from a
-            //  forgotten case; each case fills again once a day (questState.lobbyLuggage)
+            //  LOST THINGS — the Double Nights lobby's forgotten cases, Moon City's clutches,
+            //  coat and VIP purses. A few personics lifted from each; each fills again once a
+            //  day. Props may carry their own pay range (lootMin/lootMax) and lines (lootLines).
+            //  (Save key questState.lobbyLuggage, kept for old saves, now holds them all.)
             // =========================================================
             searchLostLuggage(prop) {
                 const qs = this.questState, id = prop.noteId || 'lobby';
                 const day = Math.floor((this.worldMinutes || 0) / 1440);
                 qs.lobbyLuggage = qs.lobbyLuggage || {};
                 if (qs.lobbyLuggage[id] === day) { showMessage('EMPTY. SOMEONE BEAT YOU TO IT.'); audioSys.sfx('ui'); return; }
-                const pp = 25 + Math.floor(Math.random() * 56);
+                const lo = prop.lootMin ?? 25, hi = prop.lootMax ?? 80;
+                const pp = lo + Math.floor(Math.random() * (hi - lo + 1));
                 qs.lobbyLuggage[id] = day; prop._searched = true;
                 this.currency += pp; this.updateUI();
-                showMessage(`+${pp} PERSONICS — ${pickFrom(Math.random, ["SOMEONE WON'T MISS IT", 'FINDERS KEEPERS', 'A TIP, OF SORTS', 'THINK EXCELLENCE'])}`);
+                showMessage(`+${pp} PERSONICS — ${pickFrom(Math.random, prop.lootLines || ["SOMEONE WON'T MISS IT", 'FINDERS KEEPERS', 'A TIP, OF SORTS', 'THINK EXCELLENCE'])}`);
                 audioSys.sfx('ui');
             },
 
-            /** Which lobby cases have been searched today (they open; they refill at dawn of the next day). */
+            /** Which lost things have been searched today (they open; they refill at dawn of the next day). */
             refreshLostLuggage() {
                 const L = (this.questState && this.questState.lobbyLuggage) || {}, day = Math.floor((this.worldMinutes || 0) / 1440);
                 for (const p of this.props) if (p.interactionType === 'lost_luggage') p._searched = L[p.noteId] === day;

@@ -941,6 +941,52 @@
                     for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#c42a52' : '#e04a6e'; ctx.beginPath(); ctx.ellipse(x + 6 + (i * 13 % (w - 10)), y + h - 5 - (i % 2) * 3, 2.2, 1.3, i, 0, Math.PI * 2); ctx.fill(); }
                     break;
                 }
+                // Lost things (searchLostLuggage): closed and full, or lying open once searched today
+                case 'mc_lost_clutch': {                                   // a sequined envelope clutch on a gold chain
+                    const open = p._searched;
+                    ctx.strokeStyle = C.gold; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x + 2, y + 2); ctx.quadraticCurveTo(x + w / 2, y - 7, x + w - 2, y + 2); ctx.stroke();
+                    rr(x + 1.5, y + 2, w, h, 2, 'rgba(0,0,0,0.35)');
+                    rr(x, y, w, h, 2, p.noteId === 'club_gents' ? '#1e2a44' : '#5a1440', C.goldDk, 0.8);
+                    ctx.fillStyle = 'rgba(255,235,250,0.55)';
+                    for (let i = 0; i < 9; i++) { const sx = x + 2 + ((i * 7) % (w - 4)), sy = y + 2 + ((i * 5) % (h - 4)), tw = 0.5 + 0.5 * Math.sin(t * 5 + i * 2 + x); ctx.globalAlpha = 0.3 + 0.7 * tw; ctx.fillRect(sx, sy, 1, 1); }
+                    ctx.globalAlpha = 1;
+                    if (open) { ctx.fillStyle = '#12080e'; ctx.beginPath(); ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + w - 1, y + 1); ctx.lineTo(x + w / 2, y + h * 0.75); ctx.closePath(); ctx.fill(); }
+                    else { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w / 2, y + h * 0.6); ctx.lineTo(x + w, y); ctx.fill(); circ(x + w / 2, y + h * 0.6, 1.4, C.gold); }
+                    break;
+                }
+                case 'mc_lost_coat': {                                     // a plum coat with a fur collar, draped over the bench
+                    const open = p._searched;
+                    rr(x + 2, y + 3, w, h, 6, 'rgba(0,0,0,0.35)');
+                    ctx.fillStyle = '#3e1a4a'; ctx.beginPath(); ctx.moveTo(x + 4, y + 4); ctx.lineTo(x + w - 4, y + 4); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x + w / 2, y + 6); ctx.lineTo(x + w / 2, y + h - 1); ctx.stroke();
+                    rr(x + 1, y + h - 8, 7, 10, 3, '#34143e'); rr(x + w - 8, y + h - 8, 7, 10, 3, '#34143e');       // sleeves over the edge
+                    for (let i = 0; i < 9; i++) circ(x + 4 + i * (w - 8) / 8, y + 4 + Math.sin(i * 1.7) * 1.2, 2.6, i % 2 ? '#e8dcd0' : '#cfc2b6');   // the fur collar
+                    circ(x + w / 2 + 3, y + 11, 1, C.gold); circ(x + w / 2 + 3, y + 17, 1, C.gold);
+                    if (open) for (const px of [x + 7, x + w - 12]) rr(px, y + h - 11, 6, 5, 1.5, '#d8cce0', 'rgba(0,0,0,0.4)', 0.5);   // pockets turned out
+                    break;
+                }
+                case 'mc_lost_purse': {                                    // rose velvet, quilted, a gold crescent clasp
+                    const open = p._searched;
+                    rr(x + 2, y + 3, w, h, 4, 'rgba(0,0,0,0.35)');
+                    rr(x, y, w, h, 4, '#a8305a', C.goldDk, 0.8);
+                    ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.clip();
+                    ctx.strokeStyle = 'rgba(60,0,20,0.4)'; ctx.lineWidth = 0.6; ctx.beginPath();
+                    for (let k = -h; k < w; k += 5) { ctx.moveTo(x + k, y); ctx.lineTo(x + k + h, y + h); ctx.moveTo(x + k + h, y); ctx.lineTo(x + k, y + h); }
+                    ctx.stroke(); ctx.restore();
+                    if (open) { rr(x - 1, y - h * 0.5, w + 2, h * 0.55, 3, '#8a2048', C.goldDk, 0.6); rr(x + 2, y + 2, w - 4, h - 4, 2, '#2a0614'); }
+                    else { rr(x + 1, y, w - 2, h * 0.45, 3, '#8a2048'); ctx.save(); circ(x + w / 2, y + h * 0.45, 2.4, C.gold); ctx.globalCompositeOperation = 'destination-out'; circ(x + w / 2 + 1, y + h * 0.45 - 0.6, 1.9, '#000'); ctx.restore(); }
+                    break;
+                }
+                case 'mc_lost_handbag': {                                  // black patent, a gold chain strap
+                    const open = p._searched;
+                    rr(x + 2, y + 3, w, h, 3, 'rgba(0,0,0,0.35)');
+                    rr(x, y, w, h, 3, '#0e0c12', '#4a4458', 0.8);
+                    ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(x + 2, y + 2, w - 6, 1.2);           // the patent shine
+                    ctx.strokeStyle = C.gold; ctx.lineWidth = 0.9; ctx.setLineDash([1.5, 1]); ctx.beginPath(); ctx.moveTo(x + 2, y + 2); ctx.bezierCurveTo(x - 6, y + h + 6, x + w + 6, y + h + 6, x + w - 2, y + 2); ctx.stroke(); ctx.setLineDash([]);
+                    if (open) rr(x + 2, y + 2, w - 4, h - 5, 2, '#2a2436');
+                    else rr(x + w / 2 - 3, y + h * 0.35, 6, 3, 1, C.gold);
+                    break;
+                }
                 case 'mc_suite_couch': {                                   // a long velvet couch, back against the east wall, facing west
                     shadow(12); rr(x, y, w, h, 12, C.velvetDk, C.gold, 1.2);
                     rr(x + w - 16, y + 4, 14, h - 8, 7, C.velvet);
@@ -1226,6 +1272,8 @@
                 this.noNav = !!config.noNav;                     // thin wall pieces paths needn't route round
                 this.patient = !!config.patient;
                 this.noteId = config.noteId || null;
+                if (config.label) this.label = config.label;                   // what the action pill names it
+                if (config.lootLines) { this.lootMin = config.lootMin; this.lootMax = config.lootMax; this.lootLines = config.lootLines; }   // lost things (searchLostLuggage)
                 this.roomId = config.roomId || null;  // For light switches: which room this controls
                 this._switchState = true;  // Light switch: true = lights ON
                 this.angularFriction = 0.9;  // Rotation slows down over time

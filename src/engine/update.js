@@ -250,7 +250,10 @@
             
                 // The Double Nights lobby: guests and staff come and go; searched cases refill daily
                 this.lobbyLife.update(this);
-                if (this.activeMap.id === 'hotel_lobby' && _simTick % 60 === 0) this.refreshLostLuggage();
+                if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
+                    if (this._lostMap !== this.activeMap) { this._lostMap = this.activeMap; this._hasLost = this.props.some(p => p.interactionType === 'lost_luggage'); }
+                    if (this._hasLost) this.refreshLostLuggage();
+                }
 
                 // Graveyard Humanoid Ghosts (Cemetery: x 500-3500, y 8800-10800)
                 const inGraveyard = this.activeMap.id === 'hub_949' && 

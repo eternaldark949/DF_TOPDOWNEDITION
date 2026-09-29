@@ -457,6 +457,12 @@
                     else if (p.decorType === 'mc_lowtable') glow(cx, cy, 30, '255, 220, 170', 0.15 * s);
                     else if (p.decorType === 'mc_dryer') glow(cx, cy, 8, '120, 200, 255', 0.3 * s);
                     else if (p.decorType === 'mc_coatcheck') glow(p.x + p.width - 27, cy, 20, '200, 168, 255', 0.3 * s);
+                    else if (p.decorType.startsWith('mc_lost_') && !p._searched) {           // an unsearched find catches the light now and then
+                        const ph = (t * 0.45 + (p.x * 0.013 + p.y * 0.007)) % 1;
+                        if (ph < 0.14) { const k = Math.sin(ph / 0.14 * Math.PI) * s, gx = p.x + p.width * 0.7, gy = p.y + 2;
+                            glow(gx, gy, 10, '255, 236, 200', 0.55 * k);
+                            ctx.globalAlpha = k; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(gx - 4 * k, gy); ctx.lineTo(gx + 4 * k, gy); ctx.moveTo(gx, gy - 4 * k); ctx.lineTo(gx, gy + 4 * k); ctx.stroke(); }
+                    }
                 }
                 // The VIP wing: rose sconces down the corridor, a low red in every suite
                 for (let y = 330; y < 1180; y += 110) { const s = seen(1285, y); glow(1244, y, 22, '255, 90, 140', 0.4 * s); glow(1326, y + 55, 22, '255, 90, 140', 0.4 * s); }
