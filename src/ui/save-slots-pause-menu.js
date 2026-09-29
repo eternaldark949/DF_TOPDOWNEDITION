@@ -680,6 +680,7 @@
                 syncAmbienceSliders();
                 this._updateValueEl('set-fullscreen', !FullscreenManager.supported()
                     ? 'n/a' : (FullscreenManager.isActive() ? 'on' : 'off'));
+                this._updateValueEl('set-orientation', OrientationManager.label());
                 this._updateValueEl('set-fps', GameSettings.fpsLimit === 0 ? 'none' : String(GameSettings.fpsLimit));
             }
             
@@ -734,6 +735,11 @@
                     if (FullscreenManager.isActive()) FullscreenManager.exit();
                     else FullscreenManager.enter();
                     
+                } else if (key === 'orientation') {
+                    // Inside the tap: if we're fullscreen the lock takes at once, otherwise on the next fullscreen
+                    if (OrientationManager.supported()) OrientationManager.cycle();
+                    this._updateValueEl(el.id, OrientationManager.label());
+
                 } else if (key === 'audioEnabled') {
                     audioSys.setEnabled(!GameSettings.audioEnabled);
                     this._updateValueEl(el.id, GameSettings.audioEnabled ? 'on' : 'off');

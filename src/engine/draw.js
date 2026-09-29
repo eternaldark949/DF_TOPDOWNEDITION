@@ -1202,8 +1202,9 @@
                     
                     const RADAR_RADIUS = 60;
                     const RADAR_RANGE = 600;  // world-px detection radius
-                    const cx = this.canvas.width - RADAR_RADIUS - 16;
-                    const cy = this.canvas.height - RADAR_RADIUS - 60;
+                    // Landscape: top-left under the bars, clear of the fire cluster
+                    const cx = this.isLandscape ? RADAR_RADIUS + 16 : this.canvas.width - RADAR_RADIUS - 16;
+                    const cy = this.isLandscape ? RADAR_RADIUS + 150 : this.canvas.height - RADAR_RADIUS - 60;
                     const playerX = this.isDriving && this.car ? this.car.x : this.player.x;
                     const playerY = this.isDriving && this.car ? this.car.y : this.player.y;
                     const scale = RADAR_RADIUS / RADAR_RANGE;

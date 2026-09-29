@@ -1388,6 +1388,7 @@
                     targetZoom = 1.0 - (speedRatio * 0.65); 
                     if (targetZoom < 0.35) targetZoom = 0.35; 
                 } else if (nearInteractable) { targetZoom = 1.4; }
+                if (this.isLandscape) targetZoom *= 0.9;          // a short screen: a little more ground above and below her
                 
                 const diff = targetZoom - this.camera.zoom;
                 if (Math.abs(diff) > 0.005) this.camera.zoom += diff * 0.05;

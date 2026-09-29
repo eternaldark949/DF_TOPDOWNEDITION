@@ -24,6 +24,7 @@ const STYLES = [
     'styles/base.css',
     'styles/hud-menus.css',
     'styles/panels-phone.css',
+    'styles/landscape.css',
 ];
 
 const SCRIPTS = [

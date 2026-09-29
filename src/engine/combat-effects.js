@@ -155,6 +155,13 @@
                 this.weather.resize(bufW, bufH);
                 
                 // (Lamp shadow shapes are in world space: no rebake needed on resize.)
+
+                // A phone on its side: short and wide. Everything landscape keys off this one class
+                // (styles/landscape.css); portrait never sees it.
+                const land = cssW > cssH && cssH <= 540;
+                this.isLandscape = land;
+                document.body.classList.toggle('landscape', land);
+                document.documentElement.style.setProperty('--phone-scale', land ? Math.min(1, (cssH - 24) / 600).toFixed(3) : '1');
             },
 
             fireWeapon() {

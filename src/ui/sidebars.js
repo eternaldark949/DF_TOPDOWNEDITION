@@ -193,7 +193,7 @@
             }
             
             checkMobile() {
-                const isMobile = window.innerWidth <= this.mobileBreakpoint;
+                const isMobile = window.innerWidth <= this.mobileBreakpoint || (window.innerWidth > window.innerHeight && window.innerHeight <= 540);   // or a phone on its side
                 
                 if (isMobile) {
                     // Auto-collapse on mobile

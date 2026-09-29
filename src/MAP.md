@@ -10,6 +10,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `styles/base.css` | Core colour variables, film grain, map-transition fade |
 | `styles/hud-menus.css` | HUD, main menu, overlays, notes, dialogue, shop screens |
 | `styles/panels-phone.css` | Pause/settings panel, touch controls, colour-grade panel, phone and message apps |
+| `styles/landscape.css` | **Landscape** (a phone on its side): every rule is under `body.landscape`, which `resize()` (`engine/combat-effects.js`) sets when the window is wider than tall and ≤540px tall. It covers the HUD (the cat's paw dropped 90px, the action dock beside it, the ⚙ dock opening sideways), the move-stick zone, dialogue, letterbox and boss title, the phone scaled by `--phone-scale`, the collapsed sidebars, two-column pause, and short-screen menus. Portrait never sees it. |
 
 ## core/ (loaded first)
 | File | What's in it |
@@ -22,7 +23,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `core/utils.js` | Maths helpers, humanoid gait/animation helpers, weapon muzzle helpers, `RenderInterp` |
 | `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs, glow sprites (`glowSprite`, `drawGlow`), `lampFlicker` |
 | `core/appearances.js` | **Every character's look in one place**: `APPEARANCES` (949, the crew, staff, the city's cast), `ROLE_LOOKS` (medics, dancers, androids, pedestrians, gangers, spirits, ghosts), `PALETTE`, `ANDROID_FINISHES`; `lookFor(entity)`, `portraitOf(look)` |
-| `core/settings.js` | `FullscreenManager`, `GameSettings`, object pools, perf utilities, `showMessage` |
+| `core/settings.js` | `FullscreenManager`, `OrientationManager` (Settings → Screen Orientation: Auto / Portrait / Landscape; locks in fullscreen where supported, saved as `dfab_orientation`), `GameSettings`, object pools, perf utilities, `showMessage` |
 
 ## world/
 | File | What's in it |

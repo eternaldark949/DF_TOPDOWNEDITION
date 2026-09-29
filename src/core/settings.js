@@ -66,6 +66,7 @@
                     document.addEventListener(ev, () => {
                         GameSettings.fullscreen = this.isActive();
                         this._persist();
+                        if (GameSettings.fullscreen) OrientationManager.apply();   // a lock only holds in fullscreen
                         // The viewport just changed size; the canvas is sized from
                         // window.innerWidth/Height so it has to be told.
                         if (typeof game !== 'undefined' && game && game.resize) game.resize();
@@ -77,6 +78,33 @@
                     });
                 });
             }
+        };
+
+        /* ============================================================================
+           SCREEN ORIENTATION
+           Auto follows the phone (the layout switches with it: body.landscape, set in resize()).
+           Portrait / Landscape lock the screen — the browser only allows that in fullscreen, so
+           it is applied on every fullscreen entry too. Where lock() doesn't exist (iPhone Safari)
+           supported() is false and the setting row reads "AUTO (PHONE)".
+           ============================================================================ */
+        const OrientationManager = {
+            supported() { return !!(screen.orientation && screen.orientation.lock); },
+            apply() {
+                const o = GameSettings.orientation;
+                if (!this.supported()) return;
+                try {
+                    if (o === 'auto') { screen.orientation.unlock && screen.orientation.unlock(); return; }
+                    const r = screen.orientation.lock(o);
+                    if (r && r.catch) r.catch(() => {});        // not fullscreen yet, or refused: stays as is
+                } catch (e) { /* ignore */ }
+            },
+            cycle() {
+                const order = ['auto', 'portrait', 'landscape'];
+                GameSettings.orientation = order[(order.indexOf(GameSettings.orientation) + 1) % order.length];
+                try { localStorage.setItem('dfab_orientation', GameSettings.orientation); } catch (e) { /* private mode */ }
+                this.apply();
+            },
+            label() { return this.supported() ? GameSettings.orientation : 'auto (phone)'; }
         };
 
         const GameSettings = {
@@ -141,6 +169,12 @@
                 return true;
             })(),
             
+            // 'auto' follows the phone; 'portrait' / 'landscape' lock it (OrientationManager)
+            orientation: (() => {
+                try { const s = localStorage.getItem('dfab_orientation'); if (s === 'portrait' || s === 'landscape') return s; } catch (e) { /* private mode */ }
+                return 'auto';
+            })(),
+
             // --- AUTO-DETECT ---
             _isMobile: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent),
             

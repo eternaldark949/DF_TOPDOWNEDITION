@@ -2379,6 +2379,86 @@
             margin-top: 8px; font-family: Georgia, serif; font-style: italic; font-size: clamp(0.62rem, 2.8vw, 0.9rem);
             color: #e8c9b8; letter-spacing: 0.08em; text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
         }
+        /* =========================================
+           LANDSCAPE (a phone on its side)
+           body.landscape is set by resize() (engine/combat-effects.js) when the window is wider
+           than tall and at most 540px tall. Portrait never sees these rules.
+           ========================================= */
+
+        /* --- Top-left: bars and phone stay; the location name sits under them --- */
+        body.landscape #ui-location { top: 110px; bottom: auto; left: 22px; right: auto; font-size: 1.1rem; }
+
+        /* --- Top-right: pause, the stats under it (tighter), the ⚙ dock to its left opening sideways --- */
+        body.landscape #btn-pause { top: 12px; right: 16px; }
+        body.landscape #ui-stats { top: 64px; right: 18px; }
+        body.landscape #ui-time { font-size: 1rem; margin-bottom: 2px; }
+        body.landscape #ui-currency, body.landscape #ui-scrap { font-size: 0.78rem; }
+        body.landscape #utility-dock { top: 16px; right: 72px; flex-direction: row-reverse; align-items: flex-start; }
+        body.landscape #dock-buttons { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; max-width: 56vw; max-height: 70vh; overflow-y: auto; }
+        body.landscape #game-grade-panel { top: 64px; right: 120px; max-height: 80vh; overflow-y: auto; }
+
+        /* --- The cat's paw: the same arc, dropped 90px so it fits a short screen --- */
+        body.landscape #btn-fire, body.landscape #btn-emote { bottom: 50px; right: 60px; }
+        body.landscape #btn-heal, body.landscape #emote-smile { bottom: 145px; }
+        body.landscape #btn-nv, body.landscape #emote-zany { bottom: 125px; }
+        body.landscape #btn-flit, body.landscape #emote-cry { bottom: 65px; }
+        body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
+        body.landscape #btn-holster, body.landscape #emote-frown { bottom: 120px; }
+
+        /* --- The action dock: beside the arc, not above it --- */
+        body.landscape #action-dock { right: 212px; bottom: 18px; }
+        body.landscape #action-dock .action-pill { height: 42px; min-width: 112px; max-width: 34vw; }
+        body.landscape #action-dock .ap-name { max-width: 20vw; }
+
+        /* --- The move stick: the left of the screen, below the bars --- */
+        body.landscape #input-zone-left { top: 22%; height: 78%; width: 45%; }
+
+        /* --- Dialogue: narrower and lower, so the scene stays in view --- */
+        body.landscape #dialogue-box { bottom: 8px; width: 62%; max-width: 640px; }
+        body.landscape .dialogue-inner { padding: 10px 16px 10px 20px; gap: 12px; }
+        body.landscape #dialogue-portrait { width: 48px; height: 48px; min-width: 48px; }
+        body.landscape #npc-text { margin-bottom: 8px; line-height: 1.45; }
+        body.landscape #dialogue-caption { bottom: 70px; }
+        body.landscape #message-modal { bottom: 60px; }
+
+        /* --- Top-centre notices, clear of the corners --- */
+        body.landscape #comms-bar { left: 22%; right: 22%; height: 54px; }
+        body.landscape #comms-bar.active { top: 10px; }
+        body.landscape #ui-stealth-indicator { top: 30px; font-size: 0.95rem; }
+
+        /* --- Cinema --- */
+        body.landscape #cinematic-bars.active .cine-bar { height: 9vh; }
+        body.landscape #boss-title { bottom: 13%; }
+        body.landscape #boss-title .bt-main { font-size: clamp(1.4rem, 4.4vw, 2.3rem); }
+
+        /* --- Panels on a short screen --- */
+        body.landscape #phone-container { transform: scale(var(--phone-scale, 1)); flex-shrink: 0; }
+        /* Inventory and map sidebars: collapsed behind their diamond handles, as on a narrow phone */
+        body.landscape .screen-sidebar-left { overflow-y: auto; padding: 16px 20px; }
+        body.landscape .screen-sidebar-left.auto-collapse { transform: translateX(-100%); }
+        body.landscape .screen-sidebar-right.auto-collapse { transform: translateX(100%); }
+        body.landscape .screen-main-content { margin-left: 44px; margin-right: 44px; padding: 14px 20px; }
+        body.landscape .sidebar-handle.mobile-visible { opacity: 1; pointer-events: auto; }
+        body.landscape #sleep-menu, body.landscape #vending-menu { max-height: 94vh; overflow-y: auto; box-sizing: border-box; padding: 16px 24px !important; }
+        body.landscape #augment-shop { overflow-y: auto; justify-content: flex-start; }
+        body.landscape .save-slot-panel { max-height: 92vh; overflow-y: auto; }
+        body.landscape #main-menu { margin-top: 5vh; padding-bottom: 20px; }
+        body.landscape .title-script { font-size: 3.6rem; }
+        body.landscape .title-sub { font-size: 1.05rem; letter-spacing: 0.8rem; margin-bottom: 24px; }
+        body.landscape .menu-list-container { gap: 6px; min-height: 0; }
+        body.landscape .menu-item-row { min-height: 34px; padding: 2px 0; }
+        body.landscape .death-text { font-size: 3.6rem; letter-spacing: 12px; }
+
+        /* --- Pause: two columns — the title and objectives on the left, the menu (or settings) on the right --- */
+        body.landscape .pause-content {
+            display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr;
+            column-gap: 5vw; align-items: start; align-content: center; padding: 16px 6vw;
+        }
+        body.landscape .pause-header { grid-column: 1; grid-row: 1; justify-self: end; }
+        body.landscape .pause-mission { grid-column: 1; grid-row: 2; justify-self: end; }
+        body.landscape .pause-menu-list, body.landscape .pause-settings-panel { grid-column: 2; grid-row: 1 / span 2; align-self: center; max-height: calc(100vh - 32px); overflow-y: auto; }
+        body.landscape .pause-header { margin-bottom: 14px; }
+        body.landscape .pause-title { font-size: 2.6rem; }
     </style>
 </head>
 <body>
@@ -3351,6 +3431,10 @@
                 <div class="settings-row">
                     <span class="settings-label">Fullscreen</span>
                     <span class="settings-value val-high" id="set-fullscreen" data-key="fullscreen">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Screen Orientation</span>
+                    <span class="settings-value" id="set-orientation" data-key="orientation">AUTO</span>
                 </div>
                 
                 <div class="settings-section-label">Audio</div>
@@ -6127,6 +6211,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     document.addEventListener(ev, () => {
                         GameSettings.fullscreen = this.isActive();
                         this._persist();
+                        if (GameSettings.fullscreen) OrientationManager.apply();   // a lock only holds in fullscreen
                         // The viewport just changed size; the canvas is sized from
                         // window.innerWidth/Height so it has to be told.
                         if (typeof game !== 'undefined' && game && game.resize) game.resize();
@@ -6138,6 +6223,33 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     });
                 });
             }
+        };
+
+        /* ============================================================================
+           SCREEN ORIENTATION
+           Auto follows the phone (the layout switches with it: body.landscape, set in resize()).
+           Portrait / Landscape lock the screen — the browser only allows that in fullscreen, so
+           it is applied on every fullscreen entry too. Where lock() doesn't exist (iPhone Safari)
+           supported() is false and the setting row reads "AUTO (PHONE)".
+           ============================================================================ */
+        const OrientationManager = {
+            supported() { return !!(screen.orientation && screen.orientation.lock); },
+            apply() {
+                const o = GameSettings.orientation;
+                if (!this.supported()) return;
+                try {
+                    if (o === 'auto') { screen.orientation.unlock && screen.orientation.unlock(); return; }
+                    const r = screen.orientation.lock(o);
+                    if (r && r.catch) r.catch(() => {});        // not fullscreen yet, or refused: stays as is
+                } catch (e) { /* ignore */ }
+            },
+            cycle() {
+                const order = ['auto', 'portrait', 'landscape'];
+                GameSettings.orientation = order[(order.indexOf(GameSettings.orientation) + 1) % order.length];
+                try { localStorage.setItem('dfab_orientation', GameSettings.orientation); } catch (e) { /* private mode */ }
+                this.apply();
+            },
+            label() { return this.supported() ? GameSettings.orientation : 'auto (phone)'; }
         };
 
         const GameSettings = {
@@ -6202,6 +6314,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return true;
             })(),
             
+            // 'auto' follows the phone; 'portrait' / 'landscape' lock it (OrientationManager)
+            orientation: (() => {
+                try { const s = localStorage.getItem('dfab_orientation'); if (s === 'portrait' || s === 'landscape') return s; } catch (e) { /* private mode */ }
+                return 'auto';
+            })(),
+
             // --- AUTO-DETECT ---
             _isMobile: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent),
             
@@ -41870,6 +41988,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.weather.resize(bufW, bufH);
                 
                 // (Lamp shadow shapes are in world space: no rebake needed on resize.)
+
+                // A phone on its side: short and wide. Everything landscape keys off this one class
+                // (styles/landscape.css); portrait never sees it.
+                const land = cssW > cssH && cssH <= 540;
+                this.isLandscape = land;
+                document.body.classList.toggle('landscape', land);
+                document.documentElement.style.setProperty('--phone-scale', land ? Math.min(1, (cssH - 24) / 600).toFixed(3) : '1');
             },
 
             fireWeapon() {
@@ -49915,6 +50040,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     targetZoom = 1.0 - (speedRatio * 0.65); 
                     if (targetZoom < 0.35) targetZoom = 0.35; 
                 } else if (nearInteractable) { targetZoom = 1.4; }
+                if (this.isLandscape) targetZoom *= 0.9;          // a short screen: a little more ground above and below her
                 
                 const diff = targetZoom - this.camera.zoom;
                 if (Math.abs(diff) > 0.005) this.camera.zoom += diff * 0.05;
@@ -51258,8 +51384,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     const RADAR_RADIUS = 60;
                     const RADAR_RANGE = 600;  // world-px detection radius
-                    const cx = this.canvas.width - RADAR_RADIUS - 16;
-                    const cy = this.canvas.height - RADAR_RADIUS - 60;
+                    // Landscape: top-left under the bars, clear of the fire cluster
+                    const cx = this.isLandscape ? RADAR_RADIUS + 16 : this.canvas.width - RADAR_RADIUS - 16;
+                    const cy = this.isLandscape ? RADAR_RADIUS + 150 : this.canvas.height - RADAR_RADIUS - 60;
                     const playerX = this.isDriving && this.car ? this.car.x : this.player.x;
                     const playerY = this.isDriving && this.car ? this.car.y : this.player.y;
                     const scale = RADAR_RADIUS / RADAR_RANGE;
@@ -53612,7 +53739,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     e.preventDefault(); if (J.active) return;
                     const touch = e.changedTouches[0];
                     // Keep the whole ring on screen: shift the stick's centre in from the edges
-                    const ox = Math.max(EDGE, Math.min(window.innerWidth - EDGE, touch.clientX)), oy = Math.max(EDGE, Math.min(window.innerHeight - EDGE, touch.clientY));
+                    const ox = Math.max(EDGE, Math.min(window.innerWidth - EDGE, touch.clientX)), EY = Math.min(EDGE, window.innerHeight * 0.24), oy = Math.max(EY, Math.min(window.innerHeight - EY, touch.clientY));   // a short (landscape) screen: less margin top and bottom
                     J.id = touch.identifier; J.active = true; J.originX = ox; J.originY = oy; J.dx = 0; J.dy = 0; J.armed = true;
                     J.landX = touch.clientX; J.landY = touch.clientY;      // drags count from where the thumb landed
                     J.trail = [{ x: 0, y: 0, t: performance.now() }];
@@ -54123,12 +54250,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         
             initMapControls() { 
                 const canvas = this.mapCanvas;
+                // In landscape the phone is drawn scaled down (--phone-scale): pan by what the finger covered on the phone
+                const k = () => document.body.classList.contains('landscape') ? 1 / (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--phone-scale')) || 1) : 1;
                 canvas.addEventListener('wheel', (e) => { e.preventDefault(); const zoomSpeed = 0.1; const direction = e.deltaY > 0 ? -1 : 1; let newZoom = this.mapView.zoom + (direction * zoomSpeed * this.mapView.zoom); newZoom = Math.max(0.5, Math.min(newZoom, 8.0)); this.mapView.zoom = newZoom; this.drawMap(); });
                 canvas.addEventListener('mousedown', (e) => { this.mapView.isDragging = true; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; canvas.style.cursor = 'grabbing'; });
-                window.addEventListener('mousemove', (e) => { if (!this.mapView.isDragging || this.overlay.style.display === 'none') return; const dx = e.clientX - this.mapView.lastX; const dy = e.clientY - this.mapView.lastY; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; this.mapView.offsetX += dx; this.mapView.offsetY += dy; this.drawMap(); });
+                window.addEventListener('mousemove', (e) => { if (!this.mapView.isDragging || this.overlay.style.display === 'none') return; const dx = e.clientX - this.mapView.lastX; const dy = e.clientY - this.mapView.lastY; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; this.mapView.offsetX += dx * k(); this.mapView.offsetY += dy * k(); this.drawMap(); });
                 window.addEventListener('mouseup', () => { this.mapView.isDragging = false; canvas.style.cursor = 'default'; });
                 canvas.addEventListener('touchstart', (e) => { if (e.touches.length === 1) { this.mapView.isDragging = true; this.mapView.lastX = e.touches[0].clientX; this.mapView.lastY = e.touches[0].clientY; } else if (e.touches.length === 2) { this.mapView.isDragging = false; const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; this.mapView.lastPinchDist = Math.hypot(dx, dy); } });
-                canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (e.touches.length === 1 && this.mapView.isDragging) { const dx = e.touches[0].clientX - this.mapView.lastX; const dy = e.touches[0].clientY - this.mapView.lastY; this.mapView.lastX = e.touches[0].clientX; this.mapView.lastY = e.touches[0].clientY; this.mapView.offsetX += dx; this.mapView.offsetY += dy; this.drawMap(); } else if (e.touches.length === 2) { const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; const currentDist = Math.hypot(dx, dy); if (this.mapView.lastPinchDist > 0) { const zoomFactor = currentDist / this.mapView.lastPinchDist; let newZoom = this.mapView.zoom * zoomFactor; newZoom = Math.max(0.5, Math.min(newZoom, 8.0)); this.mapView.zoom = newZoom; this.drawMap(); } this.mapView.lastPinchDist = currentDist; } });
+                canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (e.touches.length === 1 && this.mapView.isDragging) { const dx = e.touches[0].clientX - this.mapView.lastX; const dy = e.touches[0].clientY - this.mapView.lastY; this.mapView.lastX = e.touches[0].clientX; this.mapView.lastY = e.touches[0].clientY; this.mapView.offsetX += dx * k(); this.mapView.offsetY += dy * k(); this.drawMap(); } else if (e.touches.length === 2) { const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; const currentDist = Math.hypot(dx, dy); if (this.mapView.lastPinchDist > 0) { const zoomFactor = currentDist / this.mapView.lastPinchDist; let newZoom = this.mapView.zoom * zoomFactor; newZoom = Math.max(0.5, Math.min(newZoom, 8.0)); this.mapView.zoom = newZoom; this.drawMap(); } this.mapView.lastPinchDist = currentDist; } });
                 canvas.addEventListener('touchend', (e) => { if (e.touches.length < 2) this.mapView.lastPinchDist = 0; if (e.touches.length === 0) this.mapView.isDragging = false; if (e.touches.length === 1) { this.mapView.isDragging = true; this.mapView.lastX = e.touches[0].clientX; this.mapView.lastY = e.touches[0].clientY; } });
             },
         
@@ -55906,7 +56035,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             checkMobile() {
-                const isMobile = window.innerWidth <= this.mobileBreakpoint;
+                const isMobile = window.innerWidth <= this.mobileBreakpoint || (window.innerWidth > window.innerHeight && window.innerHeight <= 540);   // or a phone on its side
                 
                 if (isMobile) {
                     // Auto-collapse on mobile
@@ -56680,6 +56809,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 syncAmbienceSliders();
                 this._updateValueEl('set-fullscreen', !FullscreenManager.supported()
                     ? 'n/a' : (FullscreenManager.isActive() ? 'on' : 'off'));
+                this._updateValueEl('set-orientation', OrientationManager.label());
                 this._updateValueEl('set-fps', GameSettings.fpsLimit === 0 ? 'none' : String(GameSettings.fpsLimit));
             }
             
@@ -56734,6 +56864,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (FullscreenManager.isActive()) FullscreenManager.exit();
                     else FullscreenManager.enter();
                     
+                } else if (key === 'orientation') {
+                    // Inside the tap: if we're fullscreen the lock takes at once, otherwise on the next fullscreen
+                    if (OrientationManager.supported()) OrientationManager.cycle();
+                    this._updateValueEl(el.id, OrientationManager.label());
+
                 } else if (key === 'audioEnabled') {
                     audioSys.setEnabled(!GameSettings.audioEnabled);
                     this._updateValueEl(el.id, GameSettings.audioEnabled ? 'on' : 'off');
