@@ -318,21 +318,6 @@
                     }
                 }
             
-                // Veranda Rain Trigger — hotel_suite has no room system, so the
-                // balcony is a hardcoded rect. Toggles SUPPRESSION rather than
-                // isRaining: stepping outside reveals whatever the sky is
-                // actually doing, instead of forcing rain on a clear night.
-                if (this.activeMap.id === 'hotel_suite') {
-                    const onVeranda = this.player.x > 800 && this.player.x < 1300 && this.player.y > 800 && this.player.y < 1000;
-                    this.weather.setIndoorSuppressed(!onVeranda);
-                    if (onVeranda && !this.verandaRainTriggered) {
-                        // Only announce it if there's actually weather out there
-                        if (this.weather.intensity > 0.1) showMessage("RAIN BEGINS TO FALL...");
-                        this.verandaRainTriggered = true;
-                    } else if (!onVeranda) {
-                        this.verandaRainTriggered = false;
-                    }
-                }
                 // Restricted Zone (Hostile farming area)
                 if (this.restrictedZone) {
                     this.restrictedZone.update(this);

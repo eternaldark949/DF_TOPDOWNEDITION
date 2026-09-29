@@ -1031,6 +1031,87 @@
                     { x: 1388, y: 340, length: 75, width: 12, anchor: 'top', color: 'rgba(220, 200, 230, 0.08)', lightColor: 'rgba(200, 180, 220, 0.03)', segments: 3 }
                 ]
             },
+            // ── The rest of the indoor maps ─────────────────────────────────────────
+            // Penthouse suite (hotel): the living room opens west–east through a wide arch;
+            // a lounge wraps the bathroom (L-shaped); glass doors onto the balcony.
+            'hotel_suite': {
+                rooms: {
+                    living:   { x: 50,   y: 50,  w: 650, h: 900, type: 'indoor',  label: 'Living Room' },
+                    lounge:   { rects: [{ x: 720, y: 50, w: 380, h: 750 }, { x: 1100, y: 320, w: 250, h: 480 }], type: 'indoor', label: 'Lounge' },
+                    bathroom: { x: 1120, y: 50,  w: 230, h: 250, type: 'indoor',  label: 'Bathroom' },
+                    balcony:  { x: 720,  y: 810, w: 630, h: 190, type: 'outdoor', label: 'Balcony' }
+                },
+                doors: [
+                    { x: 700, y: 300, w: 20, h: 200, type: 'arch', orientation: 'V', rooms: ['living', 'lounge'] },
+                    { x: 1255, y: 300, w: 90, h: 20, type: 'hinged', orientation: 'H', rooms: ['lounge', 'bathroom'], color: '#4a3a30', hingeSide: 'left', triggerRadius: 60 },
+                    { x: 1000, y: 800, w: 150, h: 10, type: 'sliding', orientation: 'H', rooms: ['lounge', 'balcony'], color: 'rgba(150, 200, 220, 0.25)', speed: 0.06, triggerRadius: 100 },
+                ],
+                windows: [
+                    { x: 720, y: 800, w: 270, h: 10, facing: 'N', projectionLength: 110, tint: '200, 220, 255' },   // glass onto the balcony
+                    { x: 1160, y: 800, w: 190, h: 10, facing: 'N', projectionLength: 110, tint: '200, 220, 255' },
+                    { x: 250, y: 0, w: 200, h: 50, facing: 'S', projectionLength: 120, tint: '190, 170, 255' },
+                ]
+            },
+            // Cozy café: the floor wraps round the kitchen (north-east) and the storeroom (south-east),
+            // each now behind a door — the kitchen used to be sealed, Chef Koda out of reach.
+            'cozy_cafe_interior': {
+                rooms: {
+                    cafe:      { rects: [{ x: 0, y: 0, w: 690, h: 315 }, { x: 0, y: 315, w: 1200, h: 385 }, { x: 0, y: 700, w: 940, h: 300 }], type: 'indoor', label: 'Café' },
+                    kitchen:   { x: 705, y: 0,   w: 495, h: 300, type: 'indoor', label: 'Kitchen' },
+                    storeroom: { x: 955, y: 715, w: 245, h: 285, type: 'indoor', label: 'Storeroom' }
+                },
+                doors: [
+                    { x: 760, y: 300, w: 80, h: 15, type: 'hinged', orientation: 'H', rooms: ['cafe', 'kitchen'], color: '#5d3a1a', hingeSide: 'left', triggerRadius: 60 },
+                    { x: 940, y: 790, w: 15, h: 80, type: 'hinged', orientation: 'V', rooms: ['cafe', 'storeroom'], color: '#4a3020', hingeSide: 'left', triggerRadius: 60 },
+                ]
+            },
+            // Torque Auto: the bay, the showroom through an open bay door, the parts room behind its own door.
+            'auto_shop': {
+                rooms: {
+                    bay:      { x: 0,   y: 0,   w: 880, h: 1000, type: 'indoor', label: 'Service Bay' },
+                    showroom: { x: 900, y: 0,   w: 500, h: 690,  type: 'indoor', label: 'Showroom' },
+                    parts:    { x: 900, y: 710, w: 500, h: 290,  type: 'indoor', label: 'Parts Room' }
+                },
+                doors: [
+                    { x: 880, y: 330, w: 20, h: 100, type: 'arch', orientation: 'V', rooms: ['bay', 'showroom'] },
+                    { x: 880, y: 790, w: 20, h: 80, type: 'hinged', orientation: 'V', rooms: ['bay', 'parts'], color: '#555a60', hingeSide: 'left', triggerRadius: 60 },
+                ]
+            },
+            // Enni Cole: couture (west) and accessories (east) wings off the atrium — glass doors
+            // midway, and wide open at the front by the checkout.
+            'enni_cole_interior': {
+                rooms: {
+                    couture:     { x: 0,    y: 0, w: 440, h: 1400, type: 'indoor', label: 'Couture' },
+                    atrium:      { x: 460,  y: 0, w: 1080, h: 1400, type: 'indoor', label: 'Atrium' },
+                    accessories: { x: 1560, y: 0, w: 440, h: 1400, type: 'indoor', label: 'Accessories' }
+                },
+                doors: [
+                    { x: 440, y: 640, w: 20, h: 120, type: 'sliding', orientation: 'V', rooms: ['couture', 'atrium'], color: 'rgba(230, 200, 255, 0.25)', speed: 0.06, triggerRadius: 100 },
+                    { x: 1540, y: 640, w: 20, h: 120, type: 'sliding', orientation: 'V', rooms: ['atrium', 'accessories'], color: 'rgba(230, 200, 255, 0.25)', speed: 0.06, triggerRadius: 100 },
+                    { x: 440, y: 1160, w: 20, h: 190, type: 'arch', orientation: 'V', rooms: ['couture', 'atrium'] },
+                    { x: 1540, y: 1160, w: 20, h: 190, type: 'arch', orientation: 'V', rooms: ['atrium', 'accessories'] },
+                ]
+            },
+            // Neural Systems: the showroom, a small foyer at the door, the consultation and server rooms off it.
+            'neural_sys_interior': {
+                rooms: {
+                    showroom: { x: 0,   y: 0,   w: 1000, h: 550, type: 'indoor', label: 'Showroom' },
+                    foyer:    { x: 415, y: 565, w: 170,  h: 235, type: 'indoor', label: 'Foyer' },
+                    consult:  { x: 0,   y: 565, w: 400,  h: 235, type: 'indoor', label: 'Consultation' },
+                    server:   { x: 600, y: 565, w: 400,  h: 235, type: 'indoor', label: 'Server Room' }
+                },
+                doors: [
+                    { x: 415, y: 550, w: 170, h: 15, type: 'arch', orientation: 'H', rooms: ['showroom', 'foyer'] },
+                    { x: 400, y: 630, w: 15, h: 70, type: 'hinged', orientation: 'V', rooms: ['foyer', 'consult'], color: '#2a2a50', hingeSide: 'left', triggerRadius: 60 },
+                    { x: 585, y: 630, w: 15, h: 70, type: 'hinged', orientation: 'V', rooms: ['foyer', 'server'], color: '#2a2a50', hingeSide: 'right', triggerRadius: 60 },
+                ]
+            },
+            // One-room interiors: no veil to draw, but they share the room lighting (eased lamps,
+            // lightAt), and any doors they gain later take bullets and block sight.
+            'hotel_lobby':         { rooms: { lobby: { x: 0, y: 0, w: 1000, h: 1200, type: 'indoor', label: 'Lobby' } } },
+            'medbay_sw':           { rooms: { clinic: { x: 0, y: 0, w: 800, h: 800, type: 'indoor', label: 'Clinic' } } },
+            'moon_city_nightclub': { rooms: { club: { x: 0, y: 0, w: 1200, h: 1000, type: 'indoor', label: 'Club' } } },
+            'ollo_interior':       { rooms: { shop: { x: 0, y: 0, w: 800, h: 600, type: 'indoor', label: 'Shop' } } },
             // The House of Death (gauntlet). Three loops round the grand hall, so no one gets cornered:
             // foyer–kitchen–dining–hall, foyer–gallery–courtyard–hall, dining–library–chapel–bedroom–courtyard.
             'house_of_death': (() => {
