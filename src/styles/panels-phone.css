@@ -973,11 +973,11 @@
 
         /* The flit ring round the move stick: fill = flit charge (initJoystick / updateFlitRing) */
         #joystick-ring {
-            position: absolute; left: 50%; top: 50%; width: 132px; height: 132px; transform: translate(-50%, -50%);
+            position: absolute; left: 50%; top: 50%; width: 172px; height: 172px; transform: translate(-50%, -50%);
             border-radius: 50%; pointer-events: none; --fill: 100%;
             background: conic-gradient(rgba(190, 140, 255, 0.9) var(--fill), rgba(255, 255, 255, 0.10) 0);
-            -webkit-mask: radial-gradient(circle, transparent 57px, #000 58px, #000 64px, transparent 65px);
-                    mask: radial-gradient(circle, transparent 57px, #000 58px, #000 64px, transparent 65px);
+            -webkit-mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
+                    mask: radial-gradient(circle, transparent 77px, #000 78px, #000 84px, transparent 85px);
             filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6));
             transition: opacity 0.2s;
         }
