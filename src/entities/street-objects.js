@@ -52,6 +52,15 @@
                 ctx.save(); ctx.translate(this.x, this.y + bobY);
                 if (this.type === 'scrap') { ctx.fillStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(6, -6); ctx.lineTo(6, 6); ctx.lineTo(-6, 6); ctx.fill(); ctx.strokeStyle = '#555'; ctx.stroke(); } 
                 else if (this.type === 'pp') { ctx.fillStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 5; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill(); } 
+                else if (this.type === 'dark_element') {
+                    // A shard of Dark Element: black rock veined with neon purple light
+                    const pulse = 0.6 + 0.4 * Math.sin(_gameTimeSec * 4 + this.bobOffset);
+                    ctx.shadowColor = '#a855ff'; ctx.shadowBlur = 10 * pulse;
+                    ctx.fillStyle = '#0b0612'; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(5, -1); ctx.lineTo(2, 7); ctx.lineTo(-4, 4); ctx.lineTo(-5, -3); ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = `rgba(190, 120, 255, ${0.6 + 0.4 * pulse})`; ctx.lineWidth = 1.2;
+                    ctx.beginPath(); ctx.moveTo(-3, -2); ctx.lineTo(1, 1); ctx.lineTo(0, 5); ctx.moveTo(1, 1); ctx.lineTo(3, -3); ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
                 else if (this.type === 'stim') { ctx.fillStyle = '#0f0'; ctx.shadowColor = '#0f0'; ctx.shadowBlur = 5; ctx.fillRect(-4, -4, 8, 8); ctx.fillStyle = '#fff'; ctx.fillRect(-1, -3, 2, 6); ctx.fillRect(-3, -1, 6, 2); }
                 else if (this.type === 'salvage_crate') {
                     // Large golden crate — salvage mission objective

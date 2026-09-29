@@ -326,6 +326,7 @@
                 if (!m) return;
                 m.status = 'completed';
                 game.currency += m.reward;
+                if (game.resonance) game.earnResonance(100, 'MISSION');
                 game.scrap += (m.scrapReward || 0);
                 this.completedCount++;
                 if (m.type === MISSION_TYPES.BOUNTY) this.completedBounties++;

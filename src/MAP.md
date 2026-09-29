@@ -18,6 +18,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | *(generated)* | `ASSETS`: your images and audio from `assets/`, built automatically |
 | `core/assets.js` | `getImage`, `drawAsset`, `playSound` for your assets |
 | `core/registries.js` | Notes, consumables, drinks, cosmetics (wigs, skins, outfits, hats, jewelry…); `CosmeticsSystem`, `BuffSystem` |
+| `core/resonance.js` | `ResonanceSystem`: 949's progression — earning (style-weighted), Dr. Yin's tuning, the Flit / Frame / Arms trees |
 | `core/utils.js` | Maths helpers, humanoid gait/animation helpers, weapon muzzle helpers, `RenderInterp` |
 | `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs |
 | `core/settings.js` | `FullscreenManager`, `GameSettings`, object pools, perf utilities, `showMessage` |
@@ -112,6 +113,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/events.js` | Input and UI event wiring |
 | `engine/combat-effects.js` | Screen shake, time slow, death, firing, boosters, player damage |
 | `engine/combat-fx.js` | What a hit looks like: damage numbers, enemy health bars, blood in each character's own colour (`BLOOD_KINDS`), the hit flinch |
+| `engine/tuning-ui.js` | Resonance on screen: HUD meter, Dr. Yin's tuning overlay, the SKILLS screen |
 | `engine/shops-menus.js` | Vending, garage, auto shop, Zib, sleep |
 | `engine/daytime-flit.js` | Daytime exposure, flit teleport, graveyard ghosts |
 | `engine/screens-ui.js` | HUD update, dialogue and portraits, character/team/story/collection screens, notes, crafting |

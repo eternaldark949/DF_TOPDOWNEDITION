@@ -1076,3 +1076,34 @@
         }
         .aug-shop-close:hover { border-color: #fff; background: rgba(255,255,255,0.05); }
 
+
+/* ── Resonance: Dr. Yin's tuning overlay (engine/tuning-ui.js) ── */
+#ui-resonance { font-family: Orbitron, sans-serif; font-size: 0.7rem; color: #e6dcff; letter-spacing: 1px; }
+#tuning-overlay { position: fixed; inset: 0; background: radial-gradient(ellipse at top, rgba(40, 18, 60, 0.97), rgba(8, 5, 16, 0.98)); z-index: 300; overflow-y: auto; color: #ddd; font-family: Montserrat, sans-serif; }
+.tun-wrap { max-width: 900px; margin: 24px auto; padding: 16px; }
+.tun-title { font-family: Orbitron, sans-serif; font-size: 1.1rem; letter-spacing: 4px; color: #c9a6ff; text-shadow: 0 0 14px rgba(185, 140, 255, 0.5); }
+.tun-sub { font-size: 0.6rem; color: #777; letter-spacing: 2px; margin-bottom: 14px; }
+.tun-quote { font-style: italic; color: #e8d8f0; font-size: 0.8rem; margin: 10px 0 14px; border-left: 2px solid #c4566e; padding-left: 10px; }
+.tun-choice { border: 1px solid rgba(185, 140, 255, 0.35); border-radius: 8px; padding: 14px; margin-bottom: 10px; cursor: pointer; background: rgba(185, 140, 255, 0.06); }
+.tun-choice b { display: block; font-family: Orbitron, sans-serif; letter-spacing: 2px; color: #c9a6ff; font-size: 0.8rem; }
+.tun-choice span { font-size: 0.7rem; color: #aaa; }
+.tun-choice:hover { background: rgba(185, 140, 255, 0.14); }
+.tun-head { margin-bottom: 6px; }
+.tun-lv { font-family: Orbitron, sans-serif; color: #c9a6ff; letter-spacing: 2px; }
+.tun-bar { height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; margin: 6px 0; overflow: hidden; }
+.tun-bar div { height: 100%; background: linear-gradient(90deg, #7a5cff, #c9a6ff); box-shadow: 0 0 8px #b98cff; }
+.tun-dim { font-size: 0.66rem; color: #999; }
+.tun-trees { display: flex; gap: 10px; flex-wrap: wrap; }
+.tun-tree { flex: 1 1 250px; border-top: 2px solid var(--c); padding-top: 8px; }
+.tun-tree-name { font-family: Orbitron, sans-serif; letter-spacing: 3px; color: var(--c); font-size: 0.8rem; }
+.tun-node { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 8px; margin-top: 6px; background: rgba(255, 255, 255, 0.02); }
+.tun-node.can { border-color: var(--c); cursor: pointer; box-shadow: 0 0 10px -4px var(--c); }
+.tun-node.can:hover { background: rgba(255, 255, 255, 0.06); }
+.tun-node.locked { opacity: 0.4; }
+.tun-node-top { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; }
+.tun-pips i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--c); margin-left: 3px; }
+.tun-pips i.on { background: var(--c); box-shadow: 0 0 6px var(--c); }
+.tun-next { color: #777; font-style: italic; }
+.tun-foot { margin-top: 14px; text-align: right; }
+.tun-respec { font-size: 0.65rem; color: #ff8aa0; letter-spacing: 1px; cursor: pointer; }
+.tun-close { margin-top: 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.15); padding: 10px; border-radius: 6px; cursor: pointer; font-family: Orbitron, sans-serif; letter-spacing: 3px; font-size: 0.7rem; }

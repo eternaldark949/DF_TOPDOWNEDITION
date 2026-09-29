@@ -1279,6 +1279,37 @@
         }
         .aug-shop-close:hover { border-color: #fff; background: rgba(255,255,255,0.05); }
 
+
+/* ── Resonance: Dr. Yin's tuning overlay (engine/tuning-ui.js) ── */
+#ui-resonance { font-family: Orbitron, sans-serif; font-size: 0.7rem; color: #e6dcff; letter-spacing: 1px; }
+#tuning-overlay { position: fixed; inset: 0; background: radial-gradient(ellipse at top, rgba(40, 18, 60, 0.97), rgba(8, 5, 16, 0.98)); z-index: 300; overflow-y: auto; color: #ddd; font-family: Montserrat, sans-serif; }
+.tun-wrap { max-width: 900px; margin: 24px auto; padding: 16px; }
+.tun-title { font-family: Orbitron, sans-serif; font-size: 1.1rem; letter-spacing: 4px; color: #c9a6ff; text-shadow: 0 0 14px rgba(185, 140, 255, 0.5); }
+.tun-sub { font-size: 0.6rem; color: #777; letter-spacing: 2px; margin-bottom: 14px; }
+.tun-quote { font-style: italic; color: #e8d8f0; font-size: 0.8rem; margin: 10px 0 14px; border-left: 2px solid #c4566e; padding-left: 10px; }
+.tun-choice { border: 1px solid rgba(185, 140, 255, 0.35); border-radius: 8px; padding: 14px; margin-bottom: 10px; cursor: pointer; background: rgba(185, 140, 255, 0.06); }
+.tun-choice b { display: block; font-family: Orbitron, sans-serif; letter-spacing: 2px; color: #c9a6ff; font-size: 0.8rem; }
+.tun-choice span { font-size: 0.7rem; color: #aaa; }
+.tun-choice:hover { background: rgba(185, 140, 255, 0.14); }
+.tun-head { margin-bottom: 6px; }
+.tun-lv { font-family: Orbitron, sans-serif; color: #c9a6ff; letter-spacing: 2px; }
+.tun-bar { height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; margin: 6px 0; overflow: hidden; }
+.tun-bar div { height: 100%; background: linear-gradient(90deg, #7a5cff, #c9a6ff); box-shadow: 0 0 8px #b98cff; }
+.tun-dim { font-size: 0.66rem; color: #999; }
+.tun-trees { display: flex; gap: 10px; flex-wrap: wrap; }
+.tun-tree { flex: 1 1 250px; border-top: 2px solid var(--c); padding-top: 8px; }
+.tun-tree-name { font-family: Orbitron, sans-serif; letter-spacing: 3px; color: var(--c); font-size: 0.8rem; }
+.tun-node { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 8px; margin-top: 6px; background: rgba(255, 255, 255, 0.02); }
+.tun-node.can { border-color: var(--c); cursor: pointer; box-shadow: 0 0 10px -4px var(--c); }
+.tun-node.can:hover { background: rgba(255, 255, 255, 0.06); }
+.tun-node.locked { opacity: 0.4; }
+.tun-node-top { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; }
+.tun-pips i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--c); margin-left: 3px; }
+.tun-pips i.on { background: var(--c); box-shadow: 0 0 6px var(--c); }
+.tun-next { color: #777; font-style: italic; }
+.tun-foot { margin-top: 14px; text-align: right; }
+.tun-respec { font-size: 0.65rem; color: #ff8aa0; letter-spacing: 1px; cursor: pointer; }
+.tun-close { margin-top: 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.15); padding: 10px; border-radius: 6px; cursor: pointer; font-family: Orbitron, sans-serif; letter-spacing: 3px; font-size: 0.7rem; }
         /* =========================================
            PAUSE SETTINGS PANEL
            ========================================= */
@@ -2288,6 +2319,15 @@
     </div>
 
     <!-- COSMETICS SHOP (Neural Systems / Prisma) -->
+    <!-- Dr. Yin: tune Resonance (engine/tuning-ui.js) -->
+    <div id="tuning-overlay" style="display:none;">
+        <div class="tun-wrap">
+            <div class="tun-title">DR. YIN — RESONANCE TUNING</div>
+            <div class="tun-sub">EMPEREAL MEDBAY · SOUTHWEST</div>
+            <div id="tuning-body"></div>
+            <div class="tun-close" onclick="game.closeTuning()">CLOSE</div>
+        </div>
+    </div>
     <div id="cosmetics-shop-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(5,5,20,0.95); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
         <div style="max-width:700px; margin:30px auto; padding:20px;">
             <!-- Header -->
@@ -2505,6 +2545,7 @@
                 <div id="ui-time">21:00</div>
                 <div id="ui-currency">PP: 0</div>
                 <div id="ui-scrap">Scrap: 0</div>
+                <div id="ui-resonance"></div>
                 <div id="ui-buffs"></div>
             </div>
             
@@ -2900,6 +2941,9 @@
                 <div id="inventory-list"></div>
             </div>
             <!-- AUGMENTS MANAGEMENT SCREEN (hidden by default) -->
+            <div id="skills-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
+                <div id="skills-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;"></div>
+            </div>
             <div id="augments-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
                 <div id="augments-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
                     <!-- Populated dynamically -->
@@ -4172,6 +4216,174 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        /* =====================================================================
+           RESONANCE — 949's progression
+           ---------------------------------------------------------------------
+           Flitting is tuning your body's vibration to a dimension; fighting with
+           style raises that resonance. What you earn in the field is UNSETTLED
+           (the glowing meter) until Dr. Yin tunes it in at the medbay — only then
+           does it become levels and Tuning points she can install. Die first and
+           half of the unsettled Resonance scatters on the way back to her.
+
+           Three trees of five nodes, three ranks each; a node opens once the one
+           above it has a rank. `stat(key, base)` gives any stat with the installed
+           ranks applied — the game asks it wherever a number could be tuned.
+           ===================================================================== */
+        const RESONANCE = {
+            CAP: 30,
+            nextLevel: level => 120 + 70 * level,                 // Resonance from `level` to the next
+            DEATH_LOSS: 0.5,
+            RESPEC_COST: 200,
+            // Kill awards: base by toughness, then style multipliers (they stack)
+            BASE: { Ganger: 20, Drone: 30, GatlingGunner: 80 },
+            USUAL_HP: { Ganger: 40, Drone: 60, GatlingGunner: 200 },
+            FLIT_KILL: 1.5, PUNCH: 1.4, CHAIN_STEP: 0.25, CHAIN_MAX: 2, UNTOUCHED: 1.3,
+            FLIT_WINDOW: 1.0, CHAIN_WINDOW: 2.5, UNTOUCHED_SECS: 20, TEAMMATE_SHARE: 0.3,
+        };
+
+        const RESONANCE_TREES = [
+            { id: 'flit', name: 'Flit', color: '#b89cff', blurb: 'Tune the jump between dimensions.', nodes: [
+                { id: 'reach',        name: 'Reach',        desc: r => `+${10 * r}% flit distance` },
+                { id: 'quick_return', name: 'Quick Return', desc: r => `−${10 * r}% attunement per flit` },
+                { id: 'flit_strike',  name: 'Flit-Strike',  desc: r => `Shots within 1 s after a flit deal +${20 * r}%` },
+                { id: 'afterimage',   name: 'Afterimage',   desc: r => `Your flit ghost draws gangers' eyes for ${(0.5 * r).toFixed(1)} s` },
+                { id: 'double_step',  name: 'Double Step',  desc: r => `+${20 * r} max attunement${r >= 3 ? '; a second flit within 0.6 s costs half' : ''}` },
+            ] },
+            { id: 'frame', name: 'Frame', color: '#c4566e', blurb: 'What Dr. Yin builds into you.', nodes: [
+                { id: 'reinforced',   name: 'Reinforced',   desc: r => `+${10 * r} max health` },
+                { id: 'plating',      name: 'Plating',      desc: r => `−${6 * r}% damage taken` },
+                { id: 'stim_potency', name: 'Stim Potency', desc: r => `Stims heal +${15 * r}` },
+                { id: 'idle_mend',    name: 'Idle Mend',    desc: r => `Regen starts ${2 * r} s sooner, +${r} HP/s` },
+                { id: 'last_stand',   name: 'Last Stand',   desc: r => `Survive a lethal hit at 1 HP (every ${[0, 120, 90, 60][r]} s)` },
+            ] },
+            { id: 'arms', name: 'Arms', color: '#e8c27a', blurb: 'Steadier hands, heavier hits.', nodes: [
+                { id: 'steady',       name: 'Steady',       desc: r => `−${12 * r}% spread` },
+                { id: 'quick_hands',  name: 'Quick Hands',  desc: r => `−${8 * r}% time between shots` },
+                { id: 'hollow_points',name: 'Hollow Points',desc: r => `+${8 * r}% gun damage` },
+                { id: 'heavy_hands',  name: 'Heavy Hands',  desc: r => `+${25 * r}% punch damage and knockback` },
+                { id: 'quick_draw',   name: 'Quick-Draw',   desc: r => `First shot within 0.8 s of drawing: +${25 * r}%` },
+            ] },
+        ];
+
+        class ResonanceSystem {
+            constructor() { this.reset(); }
+
+            reset() {
+                this.level = 0; this.xp = 0; this.unsettled = 0; this.points = 0;
+                this.ranks = {}; this.lastStandReadyAt = 0; this.chain = { t: -99, n: 0 };
+            }
+
+            rank(id) { return this.ranks[id] || 0; }
+
+            /** A stat with installed ranks applied. */
+            stat(key, base) {
+                const r = id => this.rank(id);
+                switch (key) {
+                    case 'flitDistance':   return base * (1 + 0.10 * r('reach'));
+                    case 'flitCost':       return base * (1 - 0.10 * r('quick_return'));
+                    case 'maxAttunement':  return base + 20 * r('double_step');
+                    case 'maxHealth':      return base + 10 * r('reinforced');
+                    case 'damageTaken':    return base * (1 - 0.06 * r('plating'));
+                    case 'stimHeal':       return base + 15 * r('stim_potency');
+                    case 'regenDelay':     return Math.max(60, base - 120 * r('idle_mend'));   // frames
+                    case 'regenAmount':    return base + r('idle_mend');                        // HP per second
+                    case 'spread':         return base * (1 - 0.12 * r('steady'));
+                    case 'fireCooldown':   return base * (1 - 0.08 * r('quick_hands'));
+                    case 'gunDamage':      return base * (1 + 0.08 * r('hollow_points'));
+                    case 'punchDamage':    return base * (1 + 0.25 * r('heavy_hands'));
+                    default: return base;
+                }
+            }
+
+            /** Resonance to reach the next level from where you are (Infinity at the cap). */
+            toNext() { return this.level >= RESONANCE.CAP ? Infinity : RESONANCE.nextLevel(this.level); }
+
+            /** Add earned Resonance to the unsettled pool. */
+            earn(amount) { if (amount > 0) this.unsettled += Math.round(amount); }
+
+            /**
+             * Resonance for a kill. `ctx`: { byPlayer, byTeammate, melee, now, lastFlitAt, lastHurtAt }.
+             * Returns { amount, tags } (tags name the style bonuses that applied).
+             */
+            scoreKill(enemy, ctx) {
+                const R = RESONANCE, name = enemy.constructor ? enemy.constructor.name : '';
+                let base = R.BASE[name] || 15;
+                const usual = R.USUAL_HP[name];
+                if (usual && enemy.maxHp > usual) base *= Math.min(3, enemy.maxHp / usual);   // tougher waves pay more
+                if (ctx.byTeammate) return { amount: Math.round(base * R.TEAMMATE_SHARE), tags: ['CREW'] };
+                if (!ctx.byPlayer) return { amount: 0, tags: [] };
+                let m = 1; const tags = [];
+                if (ctx.now - ctx.lastFlitAt <= R.FLIT_WINDOW) { m *= R.FLIT_KILL; tags.push('FLIT-KILL'); }
+                if (ctx.melee) { m *= R.PUNCH; tags.push('KNOCKOUT'); }
+                if (ctx.now - this.chain.t <= R.CHAIN_WINDOW) this.chain.n++; else this.chain.n = 0;
+                this.chain.t = ctx.now;
+                if (this.chain.n > 0) { m *= Math.min(R.CHAIN_MAX, 1 + R.CHAIN_STEP * this.chain.n); tags.push('CHAIN ×' + (this.chain.n + 1)); }
+                if (ctx.now - ctx.lastHurtAt >= R.UNTOUCHED_SECS) { m *= R.UNTOUCHED; tags.push('UNTOUCHED'); }
+                return { amount: Math.round(base * m), tags };
+            }
+
+            /** Dr. Yin tunes the unsettled Resonance in. Returns how many levels were gained. */
+            tune() {
+                let gained = 0;
+                this.xp += this.unsettled; this.unsettled = 0;
+                while (this.level < RESONANCE.CAP && this.xp >= this.toNext()) {
+                    this.xp -= this.toNext(); this.level++; this.points++; gained++;
+                }
+                if (this.level >= RESONANCE.CAP) this.xp = 0;
+                return gained;
+            }
+
+            /** Returning to Dr. Yin after dying: part of the unsettled Resonance scatters. Returns what was lost. */
+            onDeath() {
+                const lost = Math.floor(this.unsettled * RESONANCE.DEATH_LOSS);
+                this.unsettled -= lost;
+                return lost;
+            }
+
+            /** Can this node take another rank right now? */
+            canRaise(treeId, nodeIndex) {
+                const tree = RESONANCE_TREES.find(t => t.id === treeId);
+                if (!tree || this.points < 1) return false;
+                const node = tree.nodes[nodeIndex];
+                if (!node || this.rank(node.id) >= 3) return false;
+                return nodeIndex === 0 || this.rank(tree.nodes[nodeIndex - 1].id) > 0;
+            }
+
+            raise(treeId, nodeIndex) {
+                if (!this.canRaise(treeId, nodeIndex)) return false;
+                const id = RESONANCE_TREES.find(t => t.id === treeId).nodes[nodeIndex].id;
+                this.ranks[id] = this.rank(id) + 1; this.points--;
+                return true;
+            }
+
+            /** Give back every installed rank as Tuning points. */
+            respec() {
+                let back = 0; for (const k in this.ranks) back += this.ranks[k];
+                this.ranks = {}; this.points += back;
+                return back;
+            }
+
+            /** Last Stand: if a hit would kill, and it's ready, survive it. */
+            tryLastStand(now) {
+                const r = this.rank('last_stand');
+                if (!r || now < this.lastStandReadyAt) return false;
+                this.lastStandReadyAt = now + [0, 120, 90, 60][r];
+                return true;
+            }
+
+            serialize() {
+                return { level: this.level, xp: this.xp, unsettled: this.unsettled, points: this.points, ranks: { ...this.ranks } };
+            }
+
+            deserialize(d) {
+                this.reset();
+                if (!d) return;
+                this.level = Math.min(RESONANCE.CAP, d.level | 0); this.xp = +d.xp || 0; this.unsettled = +d.unsettled || 0;
+                this.points = d.points | 0;
+                const known = new Set(RESONANCE_TREES.flatMap(t => t.nodes.map(n => n.id)));
+                for (const [k, v] of Object.entries(d.ranks || {})) if (known.has(k)) this.ranks[k] = Math.max(0, Math.min(3, v | 0));
+            }
+        }
         // ============================================================================
         //  SHARED UTILITIES — Consolidated from repeated inline patterns
         // ============================================================================
@@ -14659,9 +14871,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this._game && this._game.flitState && this._game.flitState.active) {
                     return false;
                 }
+                const g = this._game;
+                let lastStood = false;
+                if (g && g.resonance && !(this.invincibleTimer > 0) && !this.dead) {
+                    amount = g.resonance.stat('damageTaken', amount);                 // Frame: Plating
+                    // Frame: Last Stand — a hit that would kill leaves 1 HP and a moment's grace
+                    if (this.hp - amount <= 0 && g.resonance.tryLastStand(_gameTimeSec)) {
+                        amount = Math.max(0, this.hp - 1);
+                        lastStood = true;
+                        showMessage('LAST STAND');
+                        if (g.weather) g.weather.spawnExplosion(this.x, this.y, 'rgba(196, 86, 110, 1)');
+                    }
+                    g.lastHurtAt = _gameTimeSec;
+                }
                 
                 // Use ActorEntity's damage system
                 const damaged = super.takeDamage(amount, knockbackX, knockbackY);
+                if (lastStood) this.invincibleTimer = 60;                 // a moment's grace after Last Stand
                 
                 if (damaged && this._game) {
                     // Sync with legacy health system
@@ -14679,6 +14905,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             die() {
                 if (this._game) {
                     showMessage("CRITICAL FAILURE - RESPONDING TO MEDBAY");
+                    // Half the unsettled Resonance scatters on the way back to Dr. Yin
+                    if (this._game.resonance) {
+                        const lost = this._game.resonance.onDeath();
+                        if (lost > 0) setTimeout(() => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 1800);
+                    }
                     
                     // Clear all active buffs (restores maxHP if Stellar Lemonade was active, etc.)
                     this.buffSystem.clearAll(this._game);
@@ -14828,6 +15059,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.active = true;
                 this.markedForDestroy = false;
                 this.penetrating = config.penetrating || false;
+                this.melee = !!config.melee;                              // a punch (Resonance: knockout bonus, Heavy Hands)
                 this.penetrateCount = 0;
                 this.maxPenetrations = config.maxPenetrations || 3;
                 this.hitTargets = new Set();
@@ -14896,6 +15128,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Penetration: projectile passes through targets instead of stopping
                 this.penetrating = config.penetrating || false;
+                this.melee = !!config.melee;                              // a punch (Resonance: knockout bonus, Heavy Hands)
                 this.penetrateCount = config.penetrateCount || 0;  // How many things hit so far
                 this.maxPenetrations = config.maxPenetrations || Infinity;  // Limit penetrations
                 this.hitTargets = new Set();  // Track what we've already hit (avoid double-hits)
@@ -15728,6 +15961,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.save(); ctx.translate(this.x, this.y + bobY);
                 if (this.type === 'scrap') { ctx.fillStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(6, -6); ctx.lineTo(6, 6); ctx.lineTo(-6, 6); ctx.fill(); ctx.strokeStyle = '#555'; ctx.stroke(); } 
                 else if (this.type === 'pp') { ctx.fillStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 5; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill(); } 
+                else if (this.type === 'dark_element') {
+                    // A shard of Dark Element: black rock veined with neon purple light
+                    const pulse = 0.6 + 0.4 * Math.sin(_gameTimeSec * 4 + this.bobOffset);
+                    ctx.shadowColor = '#a855ff'; ctx.shadowBlur = 10 * pulse;
+                    ctx.fillStyle = '#0b0612'; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(5, -1); ctx.lineTo(2, 7); ctx.lineTo(-4, 4); ctx.lineTo(-5, -3); ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = `rgba(190, 120, 255, ${0.6 + 0.4 * pulse})`; ctx.lineWidth = 1.2;
+                    ctx.beginPath(); ctx.moveTo(-3, -2); ctx.lineTo(1, 1); ctx.lineTo(0, 5); ctx.moveTo(1, 1); ctx.lineTo(3, -3); ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
                 else if (this.type === 'stim') { ctx.fillStyle = '#0f0'; ctx.shadowColor = '#0f0'; ctx.shadowBlur = 5; ctx.fillRect(-4, -4, 8, 8); ctx.fillStyle = '#fff'; ctx.fillRect(-1, -3, 2, 6); ctx.fillRect(-3, -1, 6, 2); }
                 else if (this.type === 'salvage_crate') {
                     // Large golden crate — salvage mission objective
@@ -18759,6 +19001,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             onProjectileHit(projectile, game) {
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
+                this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -19044,6 +19287,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             onProjectileHit(projectile, game) {
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
+                this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -19355,6 +19599,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // ... [update method from previous turn] ...
             update(player, walls, buildings, markers, trafficCars, map, enemies) {
                 if (this.dead) return null;
+                // Flit: Afterimage — for a moment they still see you where you flitted from
+                const ai = typeof game !== 'undefined' && game._afterimage;
+                if (ai && _gameTimeSec < ai.until && player === game.player) player = Object.assign(Object.create(player), { x: ai.x, y: ai.y });
                 // Nav-grid routing (null map → old straight-line movement)
                 const navMap = (CONFIG.NAV.GANGER_NAV && map) ? map : null;
                 
@@ -19655,6 +19902,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             onProjectileHit(projectile, game) {
                 if (projectile.isEnemy) return;
+                this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
                 this.suspicion = 100;
                 this.state = 'ALERT';
                 
@@ -19850,6 +20098,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.respawnTimer = this.respawnDelay;
                     const bonus = 30 + this.clearCount * 15;
                     game.currency = (game.currency || 0) + bonus;
+                    if (game.resonance) game.earnResonance(60 + this.clearCount * 15, 'ZONE CLEARED');
                     game.updateUI();
                     showMessage(`${this.name} CLEARED ×${this.clearCount} — +${bonus} PERSONICS`);
                 }
@@ -19982,6 +20231,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const scrapReward = Math.floor(this.wave * 2);
                     game.currency += reward;
                     game.scrap += scrapReward;
+                    if (game.resonance) game.earnResonance(40 * this.wave, `WAVE ${this.wave}`);
+                    if (this.wave % 3 === 0) game.loot.push(new Loot(game.player.x + 30, game.player.y, 'dark_element'));   // every 3rd wave
                     game.updateUI();
                     showMessage(`WAVE ${this.wave} CLEARED — +${reward} PERSONICS, +${scrapReward} SCRAP`);
                     this.waveDelay = 210; // 3.5 seconds between waves
@@ -36213,6 +36464,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (game) {
                         game.currentWeapon = item;
                         game.weaponMode = mode;
+                        game._drawnAt = _gameTimeSec; game._drawShotUsed = false;   // Arms: Quick-Draw
                     }
                 };
             }
@@ -37070,6 +37322,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!m) return;
                 m.status = 'completed';
                 game.currency += m.reward;
+                if (game.resonance) game.earnResonance(100, 'MISSION');
                 game.scrap += (m.scrapReward || 0);
                 this.completedCount++;
                 if (m.type === MISSION_TYPES.BOUNTY) this.completedBounties++;
@@ -38026,6 +38279,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // --- NEW SYSTEMS ---
                 this.augments = new AugmentSystem();
+                this.resonance = new ResonanceSystem();      // 949's progression (core/resonance.js)
+                this.darkElement = 0;                        // premium shards (off-market goods)
+                this.lastHurtAt = -99; this.flitState.lastFlitAt = -99;
                 this.bumperMinigame = new BumperCarMinigame();
                 this.bonding = new BondingSystem();
                 this.dialogueSeq = new DialogueSequence(this);
@@ -38538,6 +38794,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const toggleHolster = (e) => {
                     e.preventDefault();
                     this.weaponHolstered = !this.weaponHolstered;
+                    if (!this.weaponHolstered) { this._drawnAt = _gameTimeSec; this._drawShotUsed = false; }   // Arms: Quick-Draw
                     this.holsterAnimTarget = this.weaponHolstered ? 0 : 1;
                     if (this.weaponHolstered) {
                         this.holsterBtn.classList.add('holstered');
@@ -38700,7 +38957,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     else if (this.activeInteraction instanceof NPC) {
                         if (this.activeInteraction.name === "Dr. Yin") {
                             this.endDialogue();
-                            this.openAugmentShop();
+                            this.openDrYinMenu();                         // tune Resonance, or augments
                             return;
                         }
                         else if (this.activeInteraction.name === "Torque") {
@@ -39011,7 +39268,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         isEnemy: false, 
                         owner: this.player, 
                         color: 'rgba(0,0,0,0)', // Invisible hitbox
-                        radius: 15, speed: 10, life: 5, damage: 15, mass: 50 
+                        radius: 15, speed: 10, life: 5, damage: Math.round(this.resonance.stat('punchDamage', 15)), mass: 50,
+                        melee: true
                     }));
                     this.triggerShake(2);
                     return;
@@ -39021,7 +39279,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const stats = this.currentWeapon.stats || {};
                 
                 // 1. Apply Stats (Recoil & Cooldown)
-                this.shootCooldown = stats.fireRate || 20;
+                this.shootCooldown = Math.max(2, Math.round(this.resonance.stat('fireCooldown', stats.fireRate || 20) * (this.augments.isEquipped('fast_reload') ? 0.8 : 1)));
                 this.triggerShake(stats.recoil || 5);
                 audioSys.sfx('shoot');
             
@@ -39040,7 +39298,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Handle "Scatter" (Anavia) defined in stats, or specific ID check fallback
                 // You can add 'spread: 0.2' to your item stats to make this generic too!
                 if (this.currentWeapon.id === 'pistol_anavia' || stats.spread) {
-                    const magnitude = stats.spread || 0.22;
+                    const magnitude = this.resonance.stat('spread', stats.spread || 0.22);
                     angle += (Math.random() - 0.5) * magnitude;
                 }
             
@@ -39059,7 +39317,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Pull from stats or use safe defaults
                 const shotColor  = stats.projectileColor || '#00f3ff';
                 const shotSpeed  = stats.projectileSpeed || 25;
-                const shotDamage = stats.damage || 35;
+                // Arms: Hollow Points; Flit: Flit-Strike (shots just after a flit); Arms: Quick-Draw (first shot after drawing)
+                let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
+                if (_gameTimeSec - this.flitState.lastFlitAt <= 1) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
+                if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= 0.8 && !this._drawShotUsed) { shotDamage *= 1 + 0.25 * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
+                shotDamage = Math.round(shotDamage);
                 const shotLife   = stats.projectileLife || 60;
                 const isPenetrating = stats.penetrating || false;
                 
@@ -39155,7 +39417,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 if (this.boosterCount > 0) { 
                     this.boosterCount--; 
-                    this.playerHealth = Math.min(this.playerHealth + 50, this.maxPlayerHealth);
+                    this.playerHealth = Math.min(this.playerHealth + this.resonance.stat('stimHeal', 50), this.maxPlayerHealth);
                     this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
                     this.updateUI(); // Updates health bar AND booster count
                     showMessage("STIM PACK USED. HP RESTORED."); 
@@ -39321,6 +39583,31 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         engineMixin({
+            /** Resonance for a kill: base by toughness × style (core/resonance.js), shown as a violet tag. */
+            awardKill(enemy) {
+                if (!this.resonance) return;
+                const by = enemy.lastHitBy;
+                const byPlayer = by === this.player, byTeammate = !!(by && by.role === 'teammate');
+                const { amount, tags } = this.resonance.scoreKill(enemy, {
+                    byPlayer, byTeammate, melee: !!enemy.lastHitMelee, now: _gameTimeSec,
+                    lastFlitAt: this.flitState.lastFlitAt ?? -99, lastHurtAt: this.lastHurtAt ?? -99 });
+                if (amount > 0) this.earnResonance(amount, tags.join(' '), enemy.x, enemy.y - 26);
+                // Dark Element: rare shards from the toughest foes
+                const tough = (typeof GatlingGunner !== 'undefined' && enemy instanceof GatlingGunner) ? 0.25 : (enemy._restrictedZoneId ? 0.04 : 0);
+                if (tough && Math.random() < tough) this.loot.push(new Loot(enemy.x + 12, enemy.y, 'dark_element'));
+            },
+
+            /** Add unsettled Resonance with a violet floating tag (at x,y, or above 949). */
+            earnResonance(amount, label, x, y) {
+                if (!this.resonance || !(amount > 0)) return;
+                this.resonance.earn(amount);
+                const texts = this.floatingTexts || (this.floatingTexts = []);
+                texts.push({ target: null, x: x ?? this.player.x, y: y ?? this.player.y - 30, value: 0, text: `+${Math.round(amount)} ◈${label ? ' ' + label : ''}`,
+                             color: '#c9a6ff', t0: _gameTimeSec, pop: _gameTimeSec, drift: 0, big: true });
+                this._resPulse = _gameTimeSec;
+                if (this.updateUI) this.updateUI();
+            },
+
             /** A hit landed on `actor` (HP already reduced). kbX/kbY = knockback, used as the hit direction. */
             onActorHit(actor, amount, kbX = 0, kbY = 0) {
                 if (!(amount > 0) || !actor) return;
@@ -39375,18 +39662,139 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
                 for (let i = texts.length - 1; i >= 0; i--) {
                     const t = texts[i], age = now - t.t0;
-                    if (age > 0.85 || age < -1) { texts.splice(i, 1); continue; }
+                    const life = t.big ? 1.6 : 0.85;
+                    if (age > life || age < -1) { texts.splice(i, 1); continue; }
                     if (t.target && !t.target.dead) { t.x = t.target.x; t.y = t.target.y - 16; }
                     const x = t.x + t.drift * age * 14, y = t.y - age * 30;
                     if (!inView(x, y)) continue;
                     const pop = Math.max(0, 1 - (now - t.pop) / 0.12);
-                    ctx.globalAlpha = 1 - Math.pow(age / 0.85, 2);
-                    ctx.font = `bold ${Math.round(11 + pop * 4 + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
-                    const s = String(Math.round(t.value));
+                    ctx.globalAlpha = 1 - Math.pow(age / life, 2);
+                    ctx.font = `bold ${Math.round((t.big ? 10 : 11) + pop * 4 + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
+                    const s = t.text || String(Math.round(t.value));
                     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(s, x, y);
                     ctx.fillStyle = t.color; ctx.fillText(s, x, y);
                 }
                 ctx.restore();
+            },
+        });
+        // GameEngine — Resonance on screen: the HUD meter, Dr. Yin's tuning overlay, the
+        // SKILLS screen, and applying installed ranks to 949's stats (see core/resonance.js).
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        engineMixin({
+            /** Push installed ranks into the stats that aren't read on the fly: max health, max attunement. */
+            applyResonanceStats() {
+                if (!this.resonance) return;
+                const maxHp = Math.round(this.resonance.stat('maxHealth', 100));
+                const sl = this.player && this.player.buffSystem.active.stellarLemonade;   // Stellar Lemonade halves max HP while active
+                if (sl && sl.active) { sl.savedMaxHp = maxHp; this.maxPlayerHealth = Math.floor(maxHp / 2); }
+                else this.maxPlayerHealth = maxHp;
+                this.playerHealth = Math.min(this.playerHealth, this.maxPlayerHealth);
+                this.flitState.maxAttunement = this.resonance.stat('maxAttunement', 120);
+                if (this.player) this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);
+            },
+
+            /** HUD: level and how much unsettled Resonance you're carrying (it glows brighter the more). */
+            updateResonanceHUD() {
+                const el = this._uiRes || (this._uiRes = document.getElementById('ui-resonance'));
+                if (!el || !this.resonance) return;
+                const R = this.resonance;
+                const de = this.darkElement > 0 ? ` <span style="color:#b98cff">◆ ${this.darkElement}</span>` : '';
+                el.innerHTML = `<span style="color:#c9a6ff">◈ Lv ${R.level}</span>${R.unsettled > 0 ? ` · ${R.unsettled} unsettled` : ''}${de}`;
+                const glow = Math.min(1, R.unsettled / Math.max(1, R.toNext() === Infinity ? 500 : R.toNext()));
+                el.style.textShadow = `0 0 ${4 + glow * 10}px rgba(185, 140, 255, ${0.3 + glow * 0.6})`;
+            },
+
+            /** Dr. Yin offers a choice: tune Resonance or browse augments. */
+            openDrYinMenu() {
+                this.pauseSystem.acquire('tuning');
+                const ov = document.getElementById('tuning-overlay');
+                ov.style.display = 'block';
+                const body = document.getElementById('tuning-body');
+                const R = this.resonance;
+                body.innerHTML = `
+                    <div class="tun-quote">"Hold still, Stella. Let's see what the fighting did to you."</div>
+                    <div class="tun-choice" data-act="tune"><b>TUNE RESONANCE</b><span>${R.unsettled > 0 ? R.unsettled + ' unsettled to settle' : 'Spend Tuning points, review your trees'}</span></div>
+                    <div class="tun-choice" data-act="aug"><b>AUGMENTS</b><span>Browse and install augments</span></div>`;
+                body.querySelector('[data-act="tune"]').onclick = () => this.openTuning();
+                body.querySelector('[data-act="aug"]').onclick = () => { this.closeTuning(); this.openAugmentShop(); };
+            },
+
+            /** Tune the unsettled Resonance in, then show the trees. */
+            openTuning() {
+                const R = this.resonance;
+                const before = R.level, carried = R.unsettled;
+                const gained = R.tune();
+                this.applyResonanceStats();
+                this.updateUI();
+                if (gained > 0) audioSys.sfx('ui');
+                this._tuneReveal = carried > 0 ? { carried, gained, from: before } : null;
+                this.renderTuning();
+            },
+
+            renderTuning() {
+                const R = this.resonance, body = document.getElementById('tuning-body');
+                const rv = this._tuneReveal;
+                const next = R.toNext();
+                const pct = next === Infinity ? 100 : Math.round(100 * R.xp / next);
+                let html = `<div class="tun-head">
+                        <div><span class="tun-lv">◈ LEVEL ${R.level}</span>${R.level >= RESONANCE.CAP ? ' <span class="tun-dim">(tuned to the limit)</span>' : ''}</div>
+                        <div class="tun-bar"><div style="width:${pct}%"></div></div>
+                        <div class="tun-dim">${next === Infinity ? '' : `${R.xp} / ${next} to the next level`} · <b style="color:#e8c27a">${R.points} Tuning point${R.points === 1 ? '' : 's'}</b></div>
+                    </div>`;
+                if (rv) html += `<div class="tun-quote">${rv.gained > 0
+                        ? `"There. ${rv.carried} settled — you're ${rv.gained > 1 ? rv.gained + ' levels' : 'a level'} stronger. Choose where it goes."`
+                        : R.level >= RESONANCE.CAP ? `"${rv.carried} settled. You're tuned as far as I can take you — for now."`
+                        : `"${rv.carried} settled. Not enough to rise yet — keep moving, keep flitting."`}</div>`;
+                html += `<div class="tun-trees">`;
+                for (const tree of RESONANCE_TREES) {
+                    html += `<div class="tun-tree" style="--c:${tree.color}"><div class="tun-tree-name">${tree.name.toUpperCase()}</div><div class="tun-dim">${tree.blurb}</div>`;
+                    tree.nodes.forEach((n, i) => {
+                        const r = R.rank(n.id), can = R.canRaise(tree.id, i), locked = i > 0 && R.rank(tree.nodes[i - 1].id) === 0;
+                        const pips = [1, 2, 3].map(k => `<i class="${k <= r ? 'on' : ''}"></i>`).join('');
+                        html += `<div class="tun-node${can ? ' can' : ''}${locked ? ' locked' : ''}" data-tree="${tree.id}" data-i="${i}">
+                            <div class="tun-node-top"><b>${n.name}</b><span class="tun-pips">${pips}</span></div>
+                            <div class="tun-dim">${n.desc(Math.max(1, Math.min(3, r + (r < 3 ? 1 : 0))))}${r > 0 && r < 3 ? ' <span class="tun-next">(next rank)</span>' : ''}</div></div>`;
+                    });
+                    html += `</div>`;
+                }
+                html += `</div><div class="tun-foot"><span class="tun-respec">RESPEC — ${RESONANCE.RESPEC_COST} PP</span></div>`;
+                body.innerHTML = html;
+                body.querySelectorAll('.tun-node.can').forEach(el => el.onclick = () => {
+                    if (R.raise(el.dataset.tree, +el.dataset.i)) { audioSys.sfx('ui'); this._tuneReveal = null; this.applyResonanceStats(); this.updateUI(); this.renderTuning(); }
+                });
+                body.querySelector('.tun-respec').onclick = () => {
+                    let spent = 0; for (const k in R.ranks) spent += R.ranks[k];
+                    if (!spent) return showMessage('NOTHING INSTALLED TO RESET');
+                    if (this.currency < RESONANCE.RESPEC_COST) return showMessage('INSUFFICIENT PERSONICS');
+                    this.currency -= RESONANCE.RESPEC_COST; R.respec(); this.applyResonanceStats(); this.updateUI();
+                    showMessage('DR. YIN RESET YOUR TUNING'); this._tuneReveal = null; this.renderTuning();
+                };
+            },
+
+            closeTuning() {
+                document.getElementById('tuning-overlay').style.display = 'none';
+                this.pauseSystem.release('tuning');
+                this._tuneReveal = null;
+            },
+
+            /** SKILLS (sidebar): plan your trees; Dr. Yin is where you spend. */
+            renderSkillsScreen() {
+                const el = document.getElementById('skills-screen-content');
+                if (!el || !this.resonance) return;
+                const R = this.resonance, next = R.toNext();
+                let html = `<div style="font-family:Orbitron,sans-serif;color:#c9a6ff;letter-spacing:2px;">◈ RESONANCE — LEVEL ${R.level}</div>
+                    <div style="font-size:0.7rem;color:#aaa;margin:6px 0 2px;">${next === Infinity ? 'Tuned to the limit.' : `${R.xp} / ${next} to the next level`} · ${R.points} Tuning point${R.points === 1 ? '' : 's'} · <span style="color:#c9a6ff">${R.unsettled} unsettled</span></div>
+                    <div style="font-size:0.7rem;color:#aaa;">Dark Element: <span style="color:#b98cff">◆ ${this.darkElement || 0}</span></div>
+                    <div style="font-size:0.7rem;color:#e8c27a;margin:8px 0 12px;">Visit Dr. Yin at the medbay to tune. Unsettled Resonance is lost by half if you fall before you get there.</div>`;
+                for (const tree of RESONANCE_TREES) {
+                    html += `<div style="margin-bottom:10px;border-left:3px solid ${tree.color};padding-left:8px;"><div style="font-family:Orbitron,sans-serif;font-size:0.75rem;color:${tree.color};letter-spacing:2px;">${tree.name.toUpperCase()}</div>`;
+                    for (const n of tree.nodes) {
+                        const r = R.rank(n.id);
+                        html += `<div style="font-size:0.68rem;color:${r ? '#ddd' : '#777'};margin:3px 0;">${'●'.repeat(r)}${'○'.repeat(3 - r)} <b>${n.name}</b> — ${n.desc(Math.max(1, r))}</div>`;
+                    }
+                    html += `</div>`;
+                }
+                el.innerHTML = html;
             },
         });
         // GameEngine — Vending, garage, auto shop, Zib rides, sleep menu.
@@ -40101,15 +40509,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 overlay.style.webkitBackdropFilter = filterString;
             },
 
+            /** What a flit costs right now: augment, buffs, and Resonance (Quick Return; Double Step's quick second flit). */
+            flitCost() {
+                let cost = this.flitState.dashCost;
+                if (this.augments && this.augments.isEquipped('flit_ext')) cost = Math.floor(cost * 0.7); // 30% cost reduction
+                cost = this.player.buffSystem.getStat('flitCooldown', cost);
+                if (this.resonance) {
+                    cost = this.resonance.stat('flitCost', cost);
+                    if (this.resonance.rank('double_step') >= 3 && _gameTimeSec - this.flitState.lastFlitAt <= 0.6) cost *= 0.5;
+                }
+                return Math.floor(cost);
+            },
+
             triggerFlit() {
                 if (this.isDriving || this.paused) return;
                 
-                // Calculate effective dash cost (reduced by augment + buffs)
-                let cost = this.flitState.dashCost;
-                if (this.augments && this.augments.isEquipped('flit_ext')) {
-                    cost = Math.floor(cost * 0.7); // 30% cost reduction
-                }
-                cost = Math.floor(this.player.buffSystem.getStat('flitCooldown', cost));
+                const cost = this.flitCost();
                 
                 // Check attunement pool
                 if (this.flitState.attunement < cost) return;
@@ -40127,6 +40542,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 let flitDist = this.player.buffSystem.getStat('flitDistance', 120);
                 if (this.augments && this.augments.isEquipped('flit_ext')) flitDist *= 1.3; // 30% more range
+                if (this.resonance) flitDist = this.resonance.stat('flitDistance', flitDist);   // Flit: Reach
+                this.flitState.lastFlitAt = _gameTimeSec;
+                // Flit: Afterimage — gangers keep seeing you where you left
+                const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
+                this._afterimage = ai ? { x: this.player.x, y: this.player.y, until: _gameTimeSec + 0.5 * ai } : null;
 
                 // Flit direction: use movement keys (WASD) or joystick if active, otherwise fall back to facing angle
                 let flitAngle = this.player.angle;
@@ -40530,6 +40950,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Scrap = Secondary resource for upgrades
                 this.uiCurrency.textContent = `PP: ${this.currency}`;
                 this.uiScrap.textContent = `Scrap: ${this.scrap}`;
+                this.updateResonanceHUD();
                 
                 // --- 4. BOOSTER/STIM COUNT ---
                 // Shows remaining healing items on the heal button
@@ -41624,11 +42045,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const baseSpeed = this.player?.speed ?? 5.2;
                 const finalSpeed = this.player?.buffSystem?.getStat('speed', baseSpeed) ?? baseSpeed;
                 const baseFlitDist = 120;
-                const finalFlitDist = this.player?.buffSystem?.getStat('flitDistance', baseFlitDist) ?? baseFlitDist;
+                let finalFlitDist = this.player?.buffSystem?.getStat('flitDistance', baseFlitDist) ?? baseFlitDist;
+                if (this.augments && this.augments.isEquipped('flit_ext')) finalFlitDist *= 1.3;
+                if (this.resonance) finalFlitDist = this.resonance.stat('flitDistance', finalFlitDist);
                 const baseFlitCost = this.flitState?.dashCost ?? 40;
-                let finalFlitCost = baseFlitCost;
-                if (this.augments && this.augments.isEquipped('flit_ext')) finalFlitCost = Math.floor(finalFlitCost * 0.7);
-                finalFlitCost = Math.floor(this.player?.buffSystem?.getStat('flitCooldown', finalFlitCost) ?? finalFlitCost);
+                const finalFlitCost = this.flitCost ? this.flitCost() : baseFlitCost;
                 const baseDetect = 1.0;
                 const finalDetect = this.player?.buffSystem?.getStat('detectionRange', baseDetect) ?? baseDetect;
 
@@ -42267,6 +42688,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     // --- AUGMENTS ---
                     augments: this.augments ? this.augments.serialize() : { owned: [], equipped: [] },
+
+                    // --- RESONANCE & DARK ELEMENT ---
+                    resonance: this.resonance ? this.resonance.serialize() : null,
+                    darkElement: this.darkElement || 0,
                     
                     // --- COSMETICS ---
                     cosmetics: this.cosmetics ? this.cosmetics.serialize() : null,
@@ -42851,6 +43276,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.augments.deserialize(save.augments);
                         console.log(`[LOAD] Restored ${this.augments.owned.length} augments`);
                     }
+
+                    // 10a. Restore Resonance (older saves have none: level 0) and Dark Element
+                    if (this.resonance) { this.resonance.deserialize(save.resonance || null); this.applyResonanceStats(); }
+                    this.darkElement = save.darkElement || 0;
 
                     // 10b. Restore Cosmetics
                     if (this.cosmetics && save.cosmetics) {
@@ -45234,11 +45663,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.flitState.attunement + this.flitState.rechargeRate,
                         this.flitState.maxAttunement
                     );
-                    // Calculate effective cost for button state
-                    let cost = this.flitState.dashCost;
-                    if (this.augments && this.augments.isEquipped('flit_ext')) cost = Math.floor(cost * 0.7);
-                    cost = Math.floor(this.player.buffSystem.getStat('flitCooldown', cost));
-                    if (this.flitState.attunement >= cost) this.flitBtn.classList.remove('cooldown');
+                    if (this.flitState.attunement >= this.flitCost()) this.flitBtn.classList.remove('cooldown');
                 }
                 if (this.flitState.active) { 
                     this.flitState.duration--; 
@@ -45250,8 +45675,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Passive Health Regen (5 HP/sec after 10s no damage)
                 if (this.playerHealth < this.maxPlayerHealth) {
                     this.healthRegenTimer++;
-                    if (this.healthRegenTimer >= 600 && (this.healthRegenTimer - 600) % 60 === 0) {
-                        this.playerHealth = Math.min(this.playerHealth + 5, this.maxPlayerHealth);
+                    const regenDelay = this.resonance.stat('regenDelay', 600);                       // Frame: Idle Mend
+                    if (this.healthRegenTimer >= regenDelay && (this.healthRegenTimer - regenDelay) % 60 === 0) {
+                        const heal = this.resonance.stat('regenAmount', 5) * (this.augments.isEquipped('health_regen') ? 2 : 1);
+                        this.playerHealth = Math.min(this.playerHealth + heal, this.maxPlayerHealth);
                         this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
                     }
                 } else {
@@ -45690,6 +46117,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                     
                     if (enemy.dead) { 
+                        this.awardKill(enemy);                                    // Resonance for the kill (core/resonance.js)
                         audioSys.sfx('explode'); 
                         this.weather.spawnExplosion(enemy.x, enemy.y, '#a469ff'); 
                         this.triggerShake(10); 
@@ -45911,6 +46339,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                 const knockbackStrength = Math.min((p.damage * projSpeed * 0.02) / (targetMass * 0.1), 50);
                                 const kbX = Math.cos(angle) * knockbackStrength;
                                 const kbY = Math.sin(angle) * knockbackStrength;
+                                e.lastHitBy = p.owner; e.lastHitMelee = !!p.melee;       // who gets the Resonance
                                 e.takeDamage(p.damage, kbX, kbY);
                                 
                                 // Spawn sticky DOT orb (Golden Child)
@@ -46073,7 +46502,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Loot Collection
                 for(let i=this.loot.length-1; i>=0; i--) {
                     let l = this.loot[i];
-                    const d = Math.hypot(this.player.x - l.x, this.player.y - l.y);
+                    let d = Math.hypot(this.player.x - l.x, this.player.y - l.y);
+                    // Scrap Magnet augment: small pickups drift in from three times the range
+                    if (d >= 35 && d < 105 && this.augments.isEquipped('scrap_magnet') && (l.type === 'pp' || l.type === 'scrap' || l.type === 'stim' || l.type === 'dark_element')) {
+                        const k = Math.min(1, 4 / d);
+                        l.x += (this.player.x - l.x) * k; l.y += (this.player.y - l.y) * k;
+                        d = Math.hypot(this.player.x - l.x, this.player.y - l.y);
+                    }
                     
                     // Check pickup range
                     if (d < 35) {
@@ -46095,6 +46530,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             continue;
                         } 
                         else if (l.type === 'pp') { this.currency += 20; showMessage("+PERSONICS"); } 
+                        else if (l.type === 'dark_element') {
+                            this.darkElement = (this.darkElement || 0) + 1;
+                            showMessage('DARK ELEMENT SHARD — THE CORPORATIONS WOULD WANT THIS BACK');
+                            audioSys.sfx('ui');
+                        }
                         else if (l.type === 'scrap') { 
                             const amount = 2 + Math.floor(Math.random() * 2); // 2-3 scrap
                             this.scrap += amount; 
@@ -49884,6 +50324,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.augments.equipped = [];
                 }
                 
+                // --- RESONANCE & DARK ELEMENT ---
+                if (this.resonance) { this.resonance.reset(); this.applyResonanceStats(); }
+                this.darkElement = 0;
+                if (this.flitState) this.flitState.lastFlitAt = -99;
+                this.lastHurtAt = -99;
+
                 // --- COSMETICS ---
                 if (this.cosmetics) {
                     this.cosmetics = new CosmeticsSystem();
@@ -51850,6 +52296,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Helper: hide all sub-screens
                         const hideSubScreens = () => {
                             document.getElementById('augments-screen').style.display = 'none';
+                            document.getElementById('skills-screen').style.display = 'none';
                             document.getElementById('contacts-screen').style.display = 'none';
                             document.getElementById('team-screen').style.display = 'none';
                             document.getElementById('character-screen').style.display = 'none';
@@ -51884,6 +52331,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             document.getElementById('augments-screen').style.display = 'block';
                             document.getElementById('screen-title-text').textContent = 'Augments';
                             game.renderAugmentManagement();
+                        } else if (screen === 'skills') {
+                            // Resonance: level, unsettled, the trees (Dr. Yin is where you spend)
+                            if (this.canvas) { game.ui.toggleMap(false); game.inventory.toggleMenu(); }
+                            document.getElementById('inventory-list-container').style.display = 'none';
+                            hideSubScreens();
+                            document.getElementById('skills-screen').style.display = 'block';
+                            document.getElementById('screen-title-text').textContent = 'Skills';
+                            game.renderSkillsScreen();
                         } else if (screen === 'contacts') {
                             // Show contacts screen
                             if (this.canvas) {

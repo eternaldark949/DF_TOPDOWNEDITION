@@ -420,6 +420,7 @@
             onProjectileHit(projectile, game) {
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
+                this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -705,6 +706,7 @@
             onProjectileHit(projectile, game) {
                 // Only take damage from player projectiles
                 if (projectile.isEnemy) return;
+                this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
                 
                 const speed = Math.hypot(projectile.vx, projectile.vy);
                 if (speed > 0) {
@@ -1016,6 +1018,9 @@
             // ... [update method from previous turn] ...
             update(player, walls, buildings, markers, trafficCars, map, enemies) {
                 if (this.dead) return null;
+                // Flit: Afterimage — for a moment they still see you where you flitted from
+                const ai = typeof game !== 'undefined' && game._afterimage;
+                if (ai && _gameTimeSec < ai.until && player === game.player) player = Object.assign(Object.create(player), { x: ai.x, y: ai.y });
                 // Nav-grid routing (null map → old straight-line movement)
                 const navMap = (CONFIG.NAV.GANGER_NAV && map) ? map : null;
                 
@@ -1316,6 +1321,7 @@
             
             onProjectileHit(projectile, game) {
                 if (projectile.isEnemy) return;
+                this.lastHitBy = projectile.owner; this.lastHitMelee = !!projectile.melee;   // who gets the Resonance
                 this.suspicion = 100;
                 this.state = 'ALERT';
                 
@@ -1511,6 +1517,7 @@
                     this.respawnTimer = this.respawnDelay;
                     const bonus = 30 + this.clearCount * 15;
                     game.currency = (game.currency || 0) + bonus;
+                    if (game.resonance) game.earnResonance(60 + this.clearCount * 15, 'ZONE CLEARED');
                     game.updateUI();
                     showMessage(`${this.name} CLEARED ×${this.clearCount} — +${bonus} PERSONICS`);
                 }
@@ -1643,6 +1650,8 @@
                     const scrapReward = Math.floor(this.wave * 2);
                     game.currency += reward;
                     game.scrap += scrapReward;
+                    if (game.resonance) game.earnResonance(40 * this.wave, `WAVE ${this.wave}`);
+                    if (this.wave % 3 === 0) game.loot.push(new Loot(game.player.x + 30, game.player.y, 'dark_element'));   // every 3rd wave
                     game.updateUI();
                     showMessage(`WAVE ${this.wave} CLEARED — +${reward} PERSONICS, +${scrapReward} SCRAP`);
                     this.waveDelay = 210; // 3.5 seconds between waves

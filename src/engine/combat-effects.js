@@ -181,7 +181,8 @@
                         isEnemy: false, 
                         owner: this.player, 
                         color: 'rgba(0,0,0,0)', // Invisible hitbox
-                        radius: 15, speed: 10, life: 5, damage: 15, mass: 50 
+                        radius: 15, speed: 10, life: 5, damage: Math.round(this.resonance.stat('punchDamage', 15)), mass: 50,
+                        melee: true
                     }));
                     this.triggerShake(2);
                     return;
@@ -191,7 +192,7 @@
                 const stats = this.currentWeapon.stats || {};
                 
                 // 1. Apply Stats (Recoil & Cooldown)
-                this.shootCooldown = stats.fireRate || 20;
+                this.shootCooldown = Math.max(2, Math.round(this.resonance.stat('fireCooldown', stats.fireRate || 20) * (this.augments.isEquipped('fast_reload') ? 0.8 : 1)));
                 this.triggerShake(stats.recoil || 5);
                 audioSys.sfx('shoot');
             
@@ -210,7 +211,7 @@
                 // Handle "Scatter" (Anavia) defined in stats, or specific ID check fallback
                 // You can add 'spread: 0.2' to your item stats to make this generic too!
                 if (this.currentWeapon.id === 'pistol_anavia' || stats.spread) {
-                    const magnitude = stats.spread || 0.22;
+                    const magnitude = this.resonance.stat('spread', stats.spread || 0.22);
                     angle += (Math.random() - 0.5) * magnitude;
                 }
             
@@ -229,7 +230,11 @@
                 // Pull from stats or use safe defaults
                 const shotColor  = stats.projectileColor || '#00f3ff';
                 const shotSpeed  = stats.projectileSpeed || 25;
-                const shotDamage = stats.damage || 35;
+                // Arms: Hollow Points; Flit: Flit-Strike (shots just after a flit); Arms: Quick-Draw (first shot after drawing)
+                let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
+                if (_gameTimeSec - this.flitState.lastFlitAt <= 1) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
+                if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= 0.8 && !this._drawShotUsed) { shotDamage *= 1 + 0.25 * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
+                shotDamage = Math.round(shotDamage);
                 const shotLife   = stats.projectileLife || 60;
                 const isPenetrating = stats.penetrating || false;
                 
@@ -325,7 +330,7 @@
                 }
                 if (this.boosterCount > 0) { 
                     this.boosterCount--; 
-                    this.playerHealth = Math.min(this.playerHealth + 50, this.maxPlayerHealth);
+                    this.playerHealth = Math.min(this.playerHealth + this.resonance.stat('stimHeal', 50), this.maxPlayerHealth);
                     this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
                     this.updateUI(); // Updates health bar AND booster count
                     showMessage("STIM PACK USED. HP RESTORED."); 

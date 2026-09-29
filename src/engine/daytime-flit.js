@@ -36,15 +36,22 @@
                 overlay.style.webkitBackdropFilter = filterString;
             },
 
+            /** What a flit costs right now: augment, buffs, and Resonance (Quick Return; Double Step's quick second flit). */
+            flitCost() {
+                let cost = this.flitState.dashCost;
+                if (this.augments && this.augments.isEquipped('flit_ext')) cost = Math.floor(cost * 0.7); // 30% cost reduction
+                cost = this.player.buffSystem.getStat('flitCooldown', cost);
+                if (this.resonance) {
+                    cost = this.resonance.stat('flitCost', cost);
+                    if (this.resonance.rank('double_step') >= 3 && _gameTimeSec - this.flitState.lastFlitAt <= 0.6) cost *= 0.5;
+                }
+                return Math.floor(cost);
+            },
+
             triggerFlit() {
                 if (this.isDriving || this.paused) return;
                 
-                // Calculate effective dash cost (reduced by augment + buffs)
-                let cost = this.flitState.dashCost;
-                if (this.augments && this.augments.isEquipped('flit_ext')) {
-                    cost = Math.floor(cost * 0.7); // 30% cost reduction
-                }
-                cost = Math.floor(this.player.buffSystem.getStat('flitCooldown', cost));
+                const cost = this.flitCost();
                 
                 // Check attunement pool
                 if (this.flitState.attunement < cost) return;
@@ -62,6 +69,11 @@
                 
                 let flitDist = this.player.buffSystem.getStat('flitDistance', 120);
                 if (this.augments && this.augments.isEquipped('flit_ext')) flitDist *= 1.3; // 30% more range
+                if (this.resonance) flitDist = this.resonance.stat('flitDistance', flitDist);   // Flit: Reach
+                this.flitState.lastFlitAt = _gameTimeSec;
+                // Flit: Afterimage — gangers keep seeing you where you left
+                const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
+                this._afterimage = ai ? { x: this.player.x, y: this.player.y, until: _gameTimeSec + 0.5 * ai } : null;
 
                 // Flit direction: use movement keys (WASD) or joystick if active, otherwise fall back to facing angle
                 let flitAngle = this.player.angle;

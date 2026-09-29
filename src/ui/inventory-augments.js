@@ -197,6 +197,7 @@
                     if (game) {
                         game.currentWeapon = item;
                         game.weaponMode = mode;
+                        game._drawnAt = _gameTimeSec; game._drawShotUsed = false;   // Arms: Quick-Draw
                     }
                 };
             }
