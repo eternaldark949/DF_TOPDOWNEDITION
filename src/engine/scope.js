@@ -57,8 +57,10 @@
                 if (k <= 0) return;
                 const p = this.player, t = _gameTimeSec;
                 const steady = Math.min(1, (this._scopeHeld || 0) / SCOPE.STEADY);
-                const a = p.angle + (Math.sin(t * 1.7) * 0.7 + Math.sin(t * 3.1) * 0.3) * SCOPE.SWAY * (1 - steady);
-                const ex = p.x + Math.cos(a) * 6, ey = p.y + Math.sin(a) * 6;              // her eye at the sight
+                // The lane leaves from the gun at her eye — the same line the shot takes (aimFromMuzzle)
+                const shot = p._muzzleLocal && p._muzzleReady ? aimFromMuzzle(p, p.angle) : { x: p.x + Math.cos(p.angle) * 6, y: p.y + Math.sin(p.angle) * 6, angle: p.angle };
+                const a = shot.angle + (Math.sin(t * 1.7) * 0.7 + Math.sin(t * 3.1) * 0.3) * SCOPE.SWAY * (1 - steady);
+                const ex = shot.x, ey = shot.y;
                 const far = raycastNearest(ex, ey, ex + Math.cos(a) * SCOPE.RANGE, ey + Math.sin(a) * SCOPE.RANGE,
                     [...(this.activeMap.walls || []), ...getColliders(this.activeMap)], SCOPE.RANGE);
                 // The veil on its own half-resolution layer (it's all soft), with the lane cut out of it

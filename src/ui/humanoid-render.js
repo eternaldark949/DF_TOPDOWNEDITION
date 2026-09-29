@@ -1088,7 +1088,7 @@
                 // gun line (it used to sit ~8px inside the gun, and both hands' Y was
                 // accidentally computed from the forward aim value).
                 rFistX = 6 + bounce - bodyRecoil - (recoil * 6);
-                rFistY = 14;
+                rFistY = 14 - (config.scopeK || 0) * 11;                               // scoped: the gun comes up to her eye (engine/scope.js)
                 const gunLineY = stance === 'sniper' ? rFistY + 0.5 : rFistY - 0.5;   // centerline of the drawn model
                 lFistX = rFistX + (stance === 'sniper' ? 18 : 14) + (config.scopeK || 0) * 4;   // on the handguard / fore-end (further out, scoped)
                 lFistY = gunLineY;
