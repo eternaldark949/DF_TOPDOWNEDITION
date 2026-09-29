@@ -42,13 +42,16 @@
                 return Math.floor(cost);
             },
 
-            triggerFlit() {
-                if (this.isDriving || this.paused) return;
+            /** Flit. `angleOverride` (radians) comes from the move stick's ring or a flick; otherwise
+             *  the way she's moving (keys, stick) or facing. Returns true if she flitted. */
+            triggerFlit(angleOverride, source) {
+                if (this.isDriving || this.paused) return false;
                 
                 const cost = this.flitCost();
                 
                 // Check attunement pool
-                if (this.flitState.attunement < cost) return;
+                if (this.flitState.attunement < cost) return false;
+                if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }
                 
                 // Spend attunement
                 this.flitState.attunement -= cost;
@@ -83,6 +86,7 @@
                 if (moveX !== 0 || moveY !== 0) {
                     flitAngle = Math.atan2(moveY, moveX);
                 }
+                if (typeof angleOverride === 'number') flitAngle = angleOverride;
 
                 let targetX = this.player.x + Math.cos(flitAngle) * flitDist; let targetY = this.player.y + Math.sin(flitAngle) * flitDist;
                 let hitWall = false; for(let w of this.activeMap.walls) { if (targetX > w.x && targetX < w.x + w.w && targetY > w.y && targetY < w.y + w.h) { hitWall = true; break; } }
@@ -155,6 +159,7 @@
                 
                 // Play flit sound
                 audioSys.sfx('flit');
+                return true;
             },
 
             /* =========================================================

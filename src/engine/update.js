@@ -117,6 +117,7 @@
                     );
                     if (this.flitState.attunement >= this.flitCost()) this.flitBtn.classList.remove('cooldown');
                 }
+                this.updateFlitRing();
                 if (this.flitState.active) { 
                     this.flitState.duration--; 
                     if (this.flitState.duration <= 0) this.flitState.active = false; 

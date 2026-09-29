@@ -120,6 +120,8 @@
                         colorGrade: GameSettings.colorGrade,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
+                        flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
+                        flitTwoFinger: GameSettings.flitTwoFinger, flitButton: GameSettings.flitButton,
                         ambienceVolume: GameSettings.ambienceVolume,
                         musicVolume: GameSettings.musicVolume,
                         fullscreen: GameSettings.fullscreen,
@@ -733,6 +735,11 @@
                         GameSettings.colorGrade = save.settings.colorGrade || 'none';
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;
+                        GameSettings.flitRing = save.settings.flitRing !== false;
+                        GameSettings.flitFlick = !!save.settings.flitFlick;
+                        GameSettings.flitTwoFinger = !!save.settings.flitTwoFinger;
+                        GameSettings.flitButton = save.settings.flitButton !== false;
+                        GameSettings.applyControls();
                         if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
                         if (typeof save.settings.musicVolume === 'number') audioSys.setMusicVolume(save.settings.musicVolume);
                         if (typeof syncAmbienceSliders === 'function') syncAmbienceSliders();

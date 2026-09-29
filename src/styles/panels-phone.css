@@ -970,3 +970,21 @@
         .ui-pill.expanded .control-node { transform: translateY(-50%) rotate(225deg) scale(1.1); }
         .node-btn { font-family: var(--font-ui); font-size: 0.65rem; font-weight: 600; color: #ccc; background: transparent; border: none; cursor: pointer; text-transform: uppercase; padding: 5px 10px; border-radius: 4px; letter-spacing: 1px; transition: all 0.2s; }
         .node-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+        /* The flit ring round the move stick: fill = flit charge (initJoystick / updateFlitRing) */
+        #joystick-ring {
+            position: absolute; left: 50%; top: 50%; width: 132px; height: 132px; transform: translate(-50%, -50%);
+            border-radius: 50%; pointer-events: none; --fill: 100%;
+            background: conic-gradient(rgba(190, 140, 255, 0.9) var(--fill), rgba(255, 255, 255, 0.10) 0);
+            -webkit-mask: radial-gradient(circle, transparent 57px, #000 58px, #000 64px, transparent 65px);
+                    mask: radial-gradient(circle, transparent 57px, #000 58px, #000 64px, transparent 65px);
+            filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6));
+            transition: opacity 0.2s;
+        }
+        #joystick-ring.dim { opacity: 0.35; filter: grayscale(0.6); }
+        #joystick-ring.off { display: none; }
+        #joystick-ring.pulse { animation: flitRingPulse 0.45s ease-out; }
+        #joystick-ring.flash { animation: flitRingFlash 0.35s ease-out; }
+        @keyframes flitRingPulse { 0% { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.08); } 100% { transform: translate(-50%, -50%) scale(1); } }
+        @keyframes flitRingFlash { 0% { filter: drop-shadow(0 0 14px rgba(232, 194, 122, 1)) brightness(1.8); } 100% { filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6)); } }
+        #btn-flit.hidden-by-setting { display: none !important; }

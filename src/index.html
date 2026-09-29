@@ -204,6 +204,26 @@
                         <div class="row-center"><div class="menu-btn" id="lbl-softshadows">Soft Shadows: OFF</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
+                    <div class="menu-item-row" id="btn-toggle-flitring">
+                        <div class="row-left"><div class="desc-box">Push the move stick into its outer ring to flit.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-flitring">Flit Ring: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-flitflick">
+                        <div class="row-left"><div class="desc-box">A fast flick of the move stick flits.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-flitflick">Flick to Flit: OFF</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-flittwo">
+                        <div class="row-left"><div class="desc-box">While firing, tap another finger on the right to flit.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-flittwo">Two-Finger Flit: OFF</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
+                    <div class="menu-item-row" id="btn-toggle-flitbtn">
+                        <div class="row-left"><div class="desc-box">Show the ⚡ flit button.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-flitbtn">Flit Button: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
                     <div class="menu-item-row" id="btn-toggle-audio">
                         <div class="row-left"><div class="desc-box">Mute all SFX and music.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-audio">Master Audio: ON</div></div>
@@ -379,6 +399,7 @@
 
             <div id="input-zone-left"></div> 
             <div id="joystick-zone">
+                <div id="joystick-ring"></div>
                 <div id="joystick-knob"></div>
             </div>
             
@@ -883,6 +904,22 @@
                 <div class="settings-row">
                     <span class="settings-label">Lighting</span>
                     <span class="settings-value val-high" id="set-lighting" data-key="lightingQuality">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Flit Ring</span>
+                    <span class="settings-value val-on" id="set-flitring" data-key="flitRing">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Flick to Flit</span>
+                    <span class="settings-value val-off" id="set-flitflick" data-key="flitFlick">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Two-Finger Flit</span>
+                    <span class="settings-value val-off" id="set-flittwo" data-key="flitTwoFinger">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Flit Button</span>
+                    <span class="settings-value val-on" id="set-flitbtn" data-key="flitButton">ON</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Film Grain</span>
