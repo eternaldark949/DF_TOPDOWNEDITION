@@ -4646,6 +4646,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 //  code steps them back by lagTicks() instead — see drawRainOverlay.)
                 if (L) out.push({ items: L.leaves, pos: true, scalars: ['rotation', 'tumble'] });
                 if (game.graveyardGhosts) out.push({ items: game.graveyardGhosts, pos: true, angles: ['angle'], scalars: ['life'] });
+                if (game.lobbyLife && game.lobbyLife.walkers.length) out.push({ items: game.lobbyLife.walkers, pos: true, angles: ['angle'], scalars: ['life'] });
                 if (game.flitVFX) out.push({ items: game.flitVFX, scalars: ['ghostAlpha', 'trailLife', 'arrivalGlow'] });
                 if (game.lastKnownMarkers) out.push({ items: game.lastKnownMarkers, scalars: ['opacity'] });
                 if (m && m.ferrisWheel) out.push({ items: [m.ferrisWheel], angles: ['angle'] });
@@ -5574,6 +5575,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             stellaSkin: '#c68e63', stellaCurls: '#0a0505', stellaEyes: '#daa520',
             dnGold:   { color: '#2a2418', trim: '#e8c27a' },           // Double Nights uniform, gold staff
             dnSilver: { color: '#1c2030', trim: '#dfe6ff' },           // … and the silver ones
+            dnCrimson: { color: '#3a0a14', trim: '#e8c27a' },          // … and the Blood Moon concierges
             ember: '#ff5a1a',                                          // demoness eyes
             eyeDefault: '#3a2a1a',
             // Crowd pools
@@ -5708,6 +5710,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             robot() {
                 return { gender: 'androgynous', body: { kind: 'android', finish: 'silver' }, top: { type: 'dn_uniform', ...PALETTE.dnSilver },
                          bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge', faceRoom: true };
+            },
+            // Double Nights floor staff (the lobby's crowd, world/lobby-life.js): plating in the house
+            // finishes — gold bellhops, Blood Moon concierges, silver valets — uniforms to match
+            dn_staff(finish, r) {
+                const uni = finish === 'gold' ? PALETTE.dnGold : finish === 'bloodmoon' ? PALETTE.dnCrimson : PALETTE.dnSilver;
+                return { gender: pickFrom(r, ['female', 'male', 'androgynous']), build: pickFrom(r, [undefined, 'slim', 'athletic']),
+                         body: { kind: 'android', finish }, top: { type: 'dn_uniform', ...uni },
+                         bottom: { type: 'pants', color: '#141216' }, shoes: { type: 'loafers', color: '#0e0e10' }, pose: 'concierge' };
             },
             // The Ethereal plane's wanderers
             spirit() {
@@ -10535,17 +10545,25 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { id: 'apt_armory', x: 52, y: 365 }
                 ]
             },
+            // Double Nights Hotel — "Think excellence, think Double Nights." A grand interdimensional
+            // hotel: black marble and gold, a rift fountain, a chandelier over the twin crescents,
+            // guests and AI staff coming and going (world/lobby-life.js). Floor: drawLobbyInterior;
+            // glows, the motto and the elevator doors: drawLobbyGlow; furniture: dn_* (props-decor.js).
             'hotel_lobby': {
                 id: 'hotel_lobby', width: 1000, height: 1200, type: 'indoor',
-                label: 'Double Nights Hotel | Lobby', floorColor: '#151515',
+                label: 'Double Nights Hotel | Lobby', floorColor: '#0c0a0c',
+                ambientDarkness: 0.62,                              // warm and lit, not a dark room
+                navProps: 'all',                                    // the crowd walks round the furniture (lamps and palms too)
+                wallStyle: { fill: '#0e0c10', stroke: 'rgba(232,194,122,0.55)' },   // black lacquer, gold trim
                 spawn: { x: 500, y: 1100 },
-                zones: [ { x: 425, y: 200, w: 150, h: 950, color: '#800020' }, { x: 300, y: 150, w: 400, h: 50, color: '#333' } ],
+                zones: [],
                 walls: [ { x: 0, y: 0, w: 1000, h: 50 }, { x: 0, y: 1150, w: 400, h: 50 }, { x: 600, y: 1150, w: 400, h: 50 }, { x: 0, y: 0, w: 50, h: 1200 }, { x: 950, y: 0, w: 50, h: 1200 }, { x: 350, y: 100, w: 300, h: 50 }, { x: 0, y: 300, w: 80, h: 100 }, { x: 0, y: 500, w: 80, h: 100 }, { x: 0, y: 700, w: 80, h: 100 }, { x: 920, y: 300, w: 80, h: 100 }, { x: 920, y: 500, w: 80, h: 100 }, { x: 920, y: 700, w: 80, h: 100 } ],
-                transitions: [ { x: 400, y: 1150, w: 200, h: 50, target: 'hub_949', label: 'Exit Hotel' }, { x: 50, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator' }, { x: 850, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator' } ],
+                transitions: [ { x: 400, y: 1150, w: 200, h: 50, target: 'hub_949', label: 'Exit Hotel' }, { x: 50, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true }, { x: 850, y: 300, w: 100, h: 500, target: 'hotel_suite', label: 'Use Elevator', quiet: true } ],
                 landmarks: [
                     { id: 'hotel_exit', x: 500, y: 1175 }, { id: 'hotel_desk', x: 500, y: 125 },
                     { id: 'hotel_elevator_left', x: 100, y: 500 }, { id: 'hotel_elevator_right', x: 900, y: 500 },
-                    { id: 'luvshade', x: 500, y: 540 }
+                    { id: 'luvshade', x: 500, y: 540 },
+                    { id: 'suite_elevator', x: 110, y: 450 }        // story step 11 points here
                 ]
             },
             'hotel_suite': {
@@ -10894,9 +10912,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new PropEntity({ x: 340, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table', decorType: 'apt_side', light: { radius: 110, color: '#ffd2a8', intensity: 0.85, dx: -2, dy: -1 } }),
                         new PropEntity({ x: 560, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table', decorType: 'apt_side', light: { radius: 110, color: '#ffd2a8', intensity: 0.85, dx: -2, dy: -1 } }),
                         new PropEntity({ x: 30, y: 340, width: 44, height: 50, color: '#2a2a3a', interactionType: 'armory' }),
-                        new PropEntity({ x: 30, y: 540, width: 44, height: 36, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        new PropEntity({ x: 30, y: 520, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
                         new PropEntity({ x: 1111, y: 226, width: 18, height: 14, color: '#3a4a6a', interactionType: 'read_note', noteId: 'larissa_briefing_darklands' }),
-                        new PropEntity({ x: 30, y: 750, width: 44, height: 36, color: '#0f0', interactionType: 'medbay_refill' }),
+                        new PropEntity({ x: 30, y: 730, width: 40, height: 60, mass: 1e7, color: '#0f0', interactionType: 'medbay_refill' }),
                         new PropEntity({ x: 1010, y: 216, width: 90, height: 110, color: '#334466', interactionType: 'bed_sleep', decorType: 'apt_bed', mass: 1e7 }),
                         new PropEntity({ x: 750, y: 750, width: 60, height: 35, color: '#2a2a3a', interactionType: 'crafting_table' }),
                         // Living room: lounge
@@ -10975,11 +10993,47 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
 
-                case 'hotel_lobby':
-                    e.props = [ new PropEntity({ x: 400, y: 500, width: 200, height: 50, color: '#333' }) ];
+                case 'hotel_lobby': {
+                    // Double Nights: furniture in drawLobbyDecorProp (dn_*), floor in drawLobbyInterior,
+                    // glows and the motto in drawLobbyGlow, the crowd in world/lobby-life.js.
+                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1216', decorType }, extra));
+                    const both = (x, y, w, h, t, extra) => [F(x, y, w, h, t, extra), F(1000 - x - w, y, w, h, t, extra)];   // mirrored east–west
+                    e.props = [
+                        F(445, 265, 110, 110, 'dn_fountain'),                                       // the rift fountain
+                        F(385, 566, 230, 44, 'dn_desk'),                                            // reception
+                        // Lounges either side of the runner
+                        ...both(190, 760, 120, 56, 'dn_sofa'), ...both(215, 842, 70, 38, 'dn_table'),
+                        ...both(180, 904, 40, 40, 'dn_wingback'), ...both(292, 904, 40, 40, 'dn_wingback'),
+                        ...both(330, 760, 22, 22, 'dn_lamp'), ...both(172, 1022, 34, 34, 'dn_palm'), ...both(90, 190, 34, 34, 'dn_palm'),
+                        ...both(250, 1010, 92, 34, 'dn_float_chaise'), ...both(318, 300, 40, 40, 'dn_float_chair'),
+                        ...both(372, 1050, 24, 24, 'dn_lamp'),
+                        // MiniSpree by the doors
+                        new PropEntity({ x: 60, y: 1075, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        new PropEntity({ x: 900, y: 1075, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        // Lost luggage: someone won't miss it (searchable once a day — events.js)
+                        F(214, 1062, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_palm', noNav: true }),
+                        F(812, 462, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_elevator', noNav: true }),
+                        F(760, 726, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_lounge', noNav: true }),
+                    ];
                     e.npcs = [ new NPC(500, 540, "LUVSH4D3", 'robot_crimson'), new NPC(150, 320, "Guard Unit Alpha", 'robot_gold'), new NPC(850, 320, "Guard Unit Beta", 'robot_gold') ];
-                    e.lamps = [ new LampEntity({ x: 60, y: 450, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 60, y: 650, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 940, y: 450, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 940, y: 650, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 420, y: 525, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 580, y: 525, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 400, y: 1100, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 600, y: 1100, lampType: 3, color: '#ffdf80' }) ];
+                    const L = (x, y, color, lightRadius, lampType = 4, angle = 0) => new LampEntity({ x, y, lampType, color, lightRadius, angle });
+                    e.lamps = [
+                        L(500, 850, '#ffd49a', 640), L(500, 236, '#ffcf8a', 420, 5, Math.PI / 2), L(500, 612, '#ffb060', 300),
+                        // Lounge lamps and the doors (the pillar sconces are soft lights: glow without the cost of shadows)
+                        L(341, 771, '#ffcc88', 300), L(659, 771, '#ffcc88', 300),
+                        L(500, 1146, '#ffd29a', 380, 5, -Math.PI / 2),
+                    ];
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    e.softLights = [
+                        { x: 500, y: 620, w: 880, h: 1080, round: 220, soft: true, color: '#ffc890', intensity: 0.42 },   // the room's warm fill
+                        { x: 500, y: 850, w: 380, h: 300, round: 150, soft: true, color: '#ffd9a0', intensity: 0.3 },   // under the chandelier
+                        S(500, 320, 110, '#e0b0ff', 0.35, 3), S(500, 600, 150, '#ffb870', 0.7),                          // the rift, the desk
+                        S(341, 771, 90, '#ffd0a0', 0.7), S(659, 771, 90, '#ffd0a0', 0.7), S(384, 1062, 110, '#ffd0a0', 0.75), S(616, 1062, 110, '#ffd0a0', 0.75),
+                        S(215, 185, 90, '#c89cff', 0.6, 4), S(785, 185, 90, '#c89cff', 0.6, 4),                         // the portals
+                        ...[350, 550, 750].flatMap(y => [S(100, y, 150, '#ffc070', 0.8), S(900, y, 150, '#ffc070', 0.8)]),   // the pillar sconces
+                    ];
                     break;
+                }
 
                 case 'hotel_suite':
                     e.props = [ new PropEntity({ x: 300, y: 300, width: 100, height: 200, color: '#443' }), new PropEntity({ x: 150, y: 700, width: 120, height: 50, color: '#322' }), new PropEntity({ x: 350, y: 700, width: 120, height: 50, color: '#322' }), new PropEntity({ x: 1100, y: 400, width: 150, height: 200, color: '#335' }),
@@ -10996,7 +11050,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // GameEngine.drawClinicInterior.
                     const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#ccc', decorType }, extra));
                     e.props = [
-                        new PropEntity({ x: 200, y: 180, width: 40, height: 60, color: '#0f0', interactionType: 'medbay_refill' }),
+                        new PropEntity({ x: 200, y: 180, width: 40, height: 60, mass: 1e7, color: '#0f0', interactionType: 'medbay_refill' }),
                         // Recovery bay — beds with their heads against the side walls
                         F(58, 300, 120, 56, 'bed', { headSide: 'left' }),   F(58, 470, 120, 56, 'bed', { headSide: 'left', patient: true }),
                         F(622, 300, 120, 56, 'bed', { headSide: 'right' }), F(622, 470, 120, 56, 'bed', { headSide: 'right' }),
@@ -11074,7 +11128,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new PropEntity({ x: 800, y: 100, width: 80, height: 60, color: '#2a1a25' }), new PropEntity({ x: 1050, y: 100, width: 80, height: 60, color: '#2a1a25' }),
                         new PropEntity({ x: 1300, y: 100, width: 80, height: 60, color: '#2a1a25' }), new PropEntity({ x: 1550, y: 100, width: 80, height: 60, color: '#2a1a25' }),
                         new PropEntity({ x: 700, y: 200, width: 100, height: 35, color: '#3a1028' }), new PropEntity({ x: 1100, y: 200, width: 100, height: 35, color: '#3a1028' }),
-                        new PropEntity({ x: 850, y: 1200, width: 300, height: 50, color: '#1a1a1a' }), new PropEntity({ x: 1300, y: 1280, width: 40, height: 60, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        new PropEntity({ x: 850, y: 1200, width: 300, height: 50, color: '#1a1a1a' }), new PropEntity({ x: 1300, y: 1280, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
                     ];
                     e.npcs = [ new NPC(1000, 1220, "Valentina", 'vip'), new NPC(200, 500, "Model Kira", 'dancer'), new NPC(1750, 600, "Model Sienne", 'dancer'), new NPC(1000, 650, "Concierge Lux", 'robot_gold') ];
                     e.lamps = [
@@ -11107,7 +11161,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new PropEntity({ x: 750, y: 100, width: 150, height: 40, color: '#555' }), new PropEntity({ x: 950, y: 80, width: 80, height: 60, color: '#333' }), new PropEntity({ x: 1070, y: 80, width: 50, height: 70, color: '#4a4a4a' }),
                         new PropEntity({ x: 1000, y: 750, width: 60, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 1080, y: 750, width: 60, height: 40, color: '#2a2a2a' }),
                         new PropEntity({ x: 480, y: 860, width: 25, height: 25, color: '#2d5a27' }), new PropEntity({ x: 710, y: 860, width: 25, height: 25, color: '#2d5a27' }),
-                        new PropEntity({ x: 930, y: 880, width: 40, height: 60, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        new PropEntity({ x: 930, y: 880, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
                     ];
                     e.npcs = [ new NPC(200, 150, "Barista Ren", 'bartender'), new NPC(850, 200, "Chef Koda") ];
                     e.lamps = [
@@ -11149,7 +11203,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new PropEntity({ x: 780, y: 300, width: 30, height: 30, color: '#1a3a1a' }),
                         new PropEntity({ x: 780, y: 350, width: 30, height: 30, color: '#3a1a1a' }),
                         // Vending machine
-                        new PropEntity({ x: 1280, y: 600, width: 40, height: 60, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        new PropEntity({ x: 1280, y: 600, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
                     ];
                     e.npcs = [ new NPC(1050, 200, "Torque", 'mechanic') ];
                     e.lamps = [
@@ -13549,8 +13603,209 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        // Double Nights (hotel lobby): black lacquer and marble, gold, silver, crimson velvet.
+        const DNL = {
+            ink: '#0e0c10', marble: '#1b181e', marbleLt: '#2e2934', gold: '#e8c27a', goldDk: '#a8823e', goldLt: '#fff1c2',
+            silver: '#dfe6ff', silverDk: '#8a90a8', crimson: '#8a1024', crimsonLt: '#b8203a', velvet: '#6a0c1c', cream: '#f3e6c8',
+            leaf: '#1f4a34', leafLt: '#2f6a48'
+        };
+
+        function drawLobbyDecorProp(ctx, p) {
+            const x = p.x, w = p.width, h = p.height, t = _frameTime / 1000, C = DNL;
+            // Floating pieces bob on a faint gold hover-glow; their shadow stays on the floor
+            const floats = p.decorType.startsWith('dn_float');
+            const bob = floats ? Math.sin(t * 1.6 + x * 0.05) * 3 - 6 : 0;
+            const y = p.y + bob;
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const shadow = (r = 5) => rr(x + 3, p.y + 4, w, h, r, floats ? `rgba(0,0,0,${0.22 - bob * 0.01})` : 'rgba(0,0,0,0.3)');
+            if (floats) {                                                  // the hover-glow beneath
+                ctx.save(); ctx.globalAlpha = 0.35 + 0.1 * Math.sin(t * 3 + x);
+                ctx.fillStyle = 'rgba(232,194,122,0.5)'; ctx.beginPath(); ctx.ellipse(x + w / 2, p.y + h / 2 + 2, w * 0.45, h * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
+            switch (p.decorType) {
+                case 'dn_fountain': {                                      // black-marble basin, water sheeting down a glass column round a turning rift
+                    const cx = x + w / 2, cy = y + h / 2, R = w / 2;
+                    circ(cx + 3, cy + 4, R, 'rgba(0,0,0,0.35)');
+                    circ(cx, cy, R, C.marble, C.gold, 2); circ(cx, cy, R - 5, null, 'rgba(223,230,255,0.35)', 1);
+                    circ(cx, cy, R - 8, '#0f1a2a');
+                    ctx.strokeStyle = 'rgba(180,210,255,0.35)'; ctx.lineWidth = 1;
+                    for (let i = 0; i < 3; i++) { const ph = (t * 0.45 + i / 3) % 1; ctx.globalAlpha = 1 - ph; circ(cx, cy, 22 + ph * (R - 32), null, 'rgba(180,210,255,0.45)', 1); }
+                    ctx.globalAlpha = 1;
+                    circ(cx, cy, 22, 'rgba(200,220,255,0.10)', 'rgba(223,230,255,0.7)', 1.5);     // the glass column
+                    ctx.save(); ctx.translate(cx, cy); ctx.rotate((t * 0.5) % (Math.PI * 2));   // the rift, turning
+                    for (let k = 0; k < 2; k++) {
+                        ctx.rotate(Math.PI);
+                        ctx.strokeStyle = k ? 'rgba(232,194,122,0.9)' : 'rgba(190,130,255,0.9)'; ctx.lineWidth = 2.2;
+                        ctx.beginPath(); for (let i = 0; i <= 20; i++) { const a = i / 20 * Math.PI * 1.4, r = 3 + i * 0.75; ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); } ctx.stroke();
+                    }
+                    ctx.restore();
+                    circ(cx, cy, 3, '#fff6e0');
+                    break;
+                }
+                case 'dn_desk': {                                          // curved black marble, gold edge; bell, key rack, ledger
+                    const cx = x + w / 2;
+                    ctx.save(); ctx.translate(3, 4); ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(cx, y + h * 0.9, x + w, y); ctx.lineTo(x + w, y + h * 0.5); ctx.quadraticCurveTo(cx, y + h * 1.5, x, y + h * 0.5); ctx.closePath(); ctx.fill(); ctx.restore();
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(cx, y + h * 0.9, x + w, y); ctx.lineTo(x + w, y + h * 0.5); ctx.quadraticCurveTo(cx, y + h * 1.5, x, y + h * 0.5); ctx.closePath();
+                    ctx.fillStyle = C.marbleLt; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 2.5; ctx.stroke();
+                    ctx.strokeStyle = 'rgba(223,230,255,0.22)'; ctx.lineWidth = 1; ctx.beginPath();          // silver veins
+                    for (let i = 0; i < 5; i++) { ctx.moveTo(x + 20 + i * 45, y + 6); ctx.quadraticCurveTo(x + 40 + i * 45, y + 20, x + 30 + i * 45, y + 34); }
+                    ctx.stroke();
+                    circ(x + 34, y + 12, 5, C.gold, C.goldLt, 1); circ(x + 34, y + 12, 1.5, C.goldLt);   // the bell
+                    rr(cx - 12, y + 16, 24, 14, 1, C.cream, C.goldDk, 0.8); ctx.fillStyle = C.crimson; ctx.fillRect(cx - 0.5, y + 16, 1, 14);   // ledger
+                    rr(x + w - 58, y + 6, 30, 10, 1, C.silverDk); for (let i = 0; i < 6; i++) circ(x + w - 54 + i * 4.4, y + 11, 1.3, C.silver);   // keys
+                    break;
+                }
+                case 'dn_sofa': {                                          // red velvet, buttoned, gold feet
+                    shadow(10); rr(x, y, w, h, 10, C.velvet);
+                    const back = p.y < 800 ? 'N' : 'S';                    // faces into the lounge
+                    rr(x + 2, back === 'N' ? y : y + h - 16, w - 4, 16, 8, '#4a0814');
+                    rr(x, y + 4, 14, h - 8, 6, '#4a0814'); rr(x + w - 14, y + 4, 14, h - 8, 6, '#4a0814');
+                    ctx.fillStyle = 'rgba(255,200,210,0.35)';
+                    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(x + 22 + i * (w - 44) / 4, back === 'N' ? y + 8 : y + h - 8, 1.3, 0, Math.PI * 2); ctx.fill(); }
+                    rr(x + 16, back === 'N' ? y + 18 : y + 6, (w - 34) / 2, h - 26, 5, C.crimsonLt); rr(x + w / 2 + 1, back === 'N' ? y + 18 : y + 6, (w - 34) / 2, h - 26, 5, C.crimsonLt);
+                    for (const [fx, fy] of [[x + 2, y + 2], [x + w - 5, y + 2], [x + 2, y + h - 5], [x + w - 5, y + h - 5]]) { ctx.fillStyle = C.gold; ctx.fillRect(fx, fy, 3, 3); }
+                    break;
+                }
+                case 'dn_wingback': {
+                    shadow(6); rr(x, y, w, h, 6, C.velvet);
+                    rr(x + 2, y + (p.y < 950 ? h - 12 : 0), w - 4, 12, 5, '#4a0814'); rr(x, y + 4, 8, h - 8, 4, '#4a0814'); rr(x + w - 8, y + 4, 8, h - 8, 4, '#4a0814');
+                    rr(x + 10, y + 8, w - 20, h - 20, 4, C.crimsonLt);
+                    break;
+                }
+                case 'dn_table': {                                         // marble top on gold legs, champagne and a vase
+                    shadow(h / 2); rr(x, y, w, h, h / 2, '#e9e4ea', C.gold, 2);
+                    ctx.strokeStyle = 'rgba(120,110,130,0.35)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x + 10, y + 8); ctx.quadraticCurveTo(x + w / 2, y + h * 0.7, x + w - 12, y + 10); ctx.stroke();
+                    circ(x + w * 0.3, y + h / 2, 3, 'rgba(255,240,200,0.9)', C.gold, 0.8); circ(x + w * 0.42, y + h / 2 + 3, 3, 'rgba(255,240,200,0.9)', C.gold, 0.8);   // flutes
+                    circ(x + w * 0.72, y + h / 2, 6, C.ink, C.gold, 1); for (let i = 0; i < 5; i++) circ(x + w * 0.72 + Math.cos(i * 1.26) * 4, y + h / 2 + Math.sin(i * 1.26) * 4, 2, i % 2 ? '#e8b4b8' : C.crimsonLt);
+                    break;
+                }
+                case 'dn_lamp': {                                          // a champagne-gold floor lamp
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 2, cy + 3, w / 2, 'rgba(0,0,0,0.3)'); circ(cx, cy, w / 2, C.cream, C.gold, 1.5); circ(cx, cy, w * 0.18, '#fff0c8');
+                    break;
+                }
+                case 'dn_palm': {                                          // a potted palm in a gold urn
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 2, cy + 3, w / 2, 'rgba(0,0,0,0.3)'); circ(cx, cy, w * 0.32, C.ink, C.gold, 1.5);
+                    for (let i = 0; i < 7; i++) {
+                        const a = i * 0.9 + Math.sin(t * 0.8 + i) * 0.04, L = w * 0.62;
+                        ctx.strokeStyle = i % 2 ? C.leafLt : C.leaf; ctx.lineWidth = 4; ctx.lineCap = 'round';
+                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.quadraticCurveTo(cx + Math.cos(a + 0.3) * L * 0.6, cy + Math.sin(a + 0.3) * L * 0.6, cx + Math.cos(a) * L, cy + Math.sin(a) * L); ctx.stroke();
+                    }
+                    ctx.lineCap = 'butt';
+                    break;
+                }
+                case 'dn_float_chaise': {                                  // a chaise hanging in the air, silver-edged
+                    shadow(10); rr(x, y, w, h, 12, '#2a0a14', C.silver, 1.2);
+                    rr(x + 4, y + 4, w * 0.3, h - 8, 8, C.crimsonLt); rr(x + w * 0.34, y + 6, w * 0.6, h - 12, 6, C.velvet);
+                    ctx.fillStyle = 'rgba(223,230,255,0.25)'; ctx.fillRect(x + 12, y + 2, w - 24, 1);
+                    break;
+                }
+                case 'dn_float_chair': {
+                    shadow(8); rr(x, y, w, h, 8, '#2a0a14', C.gold, 1.2);
+                    rr(x + 6, y + 6, w - 12, h - 12, 6, C.crimsonLt);
+                    break;
+                }
+                case 'dn_lost_luggage': {                                  // a hard case; open (and empty) once searched
+                    const open = p._searched;
+                    shadow(3);
+                    rr(x, y, w, h, 3, '#3a2a4a', C.gold, 1);
+                    if (open) { rr(x - 2, y - h * 0.55, w + 4, h * 0.55, 3, '#2a1e38', C.goldDk, 1); rr(x + 3, y + 3, w - 6, h - 6, 2, '#1a1224'); }
+                    else { ctx.fillStyle = C.gold; ctx.fillRect(x + w / 2 - 4, y - 2, 8, 3); ctx.fillRect(x + 4, y + h / 2 - 0.5, w - 8, 1);
+                           const tagSwing = Math.sin(t * 2 + x) * 0.2; ctx.save(); ctx.translate(x + w - 4, y + 2); ctx.rotate(0.6 + tagSwing); ctx.fillStyle = C.cream; ctx.fillRect(0, 0, 5, 8); ctx.restore(); }
+                    break;
+                }
+            }
+        }
+
+        /* The two machines every map shares, one design each (standard size 40×60):
+           MiniSpree — the city's vending brand: glossy black, a lit window of cans, a pink-and-cyan
+           marquee; and the health station — Dr. Yin's refill cabinet: white and wine, a green cross,
+           a rack of stim vials, a vitals readout. */
+        function drawMiniSpree(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
+            const hum = 0.85 + 0.15 * Math.sin(t * 7) * Math.sin(t * 2.3);
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+            ctx.fillStyle = '#0d0d12'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
+            ctx.shadowColor = '#3ef0ff'; ctx.shadowBlur = 8 * hum;                               // neon edge
+            ctx.strokeStyle = `rgba(62,240,255,${0.55 * hum})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 4); ctx.stroke();
+            ctx.shadowBlur = 0;
+            // Marquee
+            const g = ctx.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#ff4fa3'); g.addColorStop(1, '#3ef0ff');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + 2, y + 2, w - 4, 9, 2); ctx.fill();
+            ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.max(5, Math.floor(w * 0.16))}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('MiniSpree', x + w / 2 + 2, y + 6.8);
+            ctx.fillStyle = '#fff6b0'; ctx.beginPath(); const sx = x + 6, sy = y + 6.5;                // the little spark
+            for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 1 : 2.6; ctx[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
+            // The window of cans: bubble tea, Jean soda, stellar lemonade
+            const wx = x + 4, wy = y + 13, ww = w - 8, wh = h * 0.5;
+            ctx.fillStyle = '#10141e'; ctx.fillRect(wx, wy, ww, wh);
+            const cans = ['#c89a6a', '#3a6ad0', '#ffe45a'], cw = (ww - 8) / 3;
+            for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) {
+                const cx = wx + 2 + i * (cw + 2), cy = wy + 2 + row * (wh - 4) / 3;
+                ctx.fillStyle = cans[i]; ctx.beginPath(); ctx.roundRect(cx, cy, cw, (wh - 4) / 3 - 2, 1.5); ctx.fill();
+                ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx + 1, cy + 1, 1, (wh - 4) / 3 - 4);
+            }
+            ctx.fillStyle = `rgba(190,240,255,${0.10 * hum})`; ctx.fillRect(wx, wy, ww, wh);        // the window's light
+            ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + ww * 0.2, wy + wh); ctx.lineTo(wx + ww * 0.75, wy); ctx.stroke();   // glass glint
+            // Keypad, card slot, pickup tray
+            const ky = wy + wh + 3;
+            ctx.fillStyle = '#3ef0ff'; for (let i = 0; i < 6; i++) ctx.fillRect(x + 6 + (i % 3) * 4, ky + Math.floor(i / 3) * 4, 2, 2);
+            ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w - 12, ky, 6, 2);
+            ctx.fillStyle = '#ff4fa3'; ctx.fillRect(x + w - 12, ky + 4, 6, 1);
+            ctx.fillStyle = '#050508'; ctx.beginPath(); ctx.roundRect(x + 5, y + h - 9, w - 10, 5, 1.5); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawHealthStation(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
+            const pulse = 0.7 + 0.3 * Math.sin(t * 2.5);
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+            ctx.fillStyle = '#eceef2'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
+            ctx.strokeStyle = '#6a1a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 4); ctx.stroke();
+            // The green cross, glowing
+            const cx = x + w / 2, cy = y + 11, s = 5;
+            ctx.shadowColor = '#00ff66'; ctx.shadowBlur = 10 * pulse;
+            ctx.fillStyle = '#12c85a'; ctx.fillRect(cx - s, cy - s * 0.35, s * 2, s * 0.7); ctx.fillRect(cx - s * 0.35, cy - s, s * 0.7, s * 2);
+            ctx.shadowBlur = 0;
+            // A rack of stim vials, refilling
+            const ry = y + 20, rh = h * 0.34, n = 5, vw = (w - 10) / n;
+            ctx.fillStyle = '#d4d8de'; ctx.fillRect(x + 4, ry, w - 8, rh);
+            for (let i = 0; i < n; i++) {
+                const vx = x + 5 + i * vw, lvl = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.3));
+                ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(vx + 0.5, ry + 2, vw - 2, rh - 4);
+                ctx.fillStyle = '#19d46a'; ctx.fillRect(vx + 0.5, ry + 2 + (rh - 4) * (1 - lvl), vw - 2, (rh - 4) * lvl);
+                ctx.fillStyle = '#6a1a2a'; ctx.fillRect(vx + 0.5, ry + 1, vw - 2, 1.5);
+            }
+            // Vitals readout: a trace running across a dark screen
+            const sy = ry + rh + 3, sh = h - (sy - y) - 5;
+            ctx.fillStyle = '#0a1410'; ctx.beginPath(); ctx.roundRect(x + 4, sy, w - 8, sh, 2); ctx.fill();
+            ctx.strokeStyle = '#3cff8a'; ctx.lineWidth = 1; ctx.beginPath();
+            const mid = sy + sh / 2, ph = (t * 30) % (w - 8);
+            for (let i = 0; i <= w - 8; i += 1) {
+                const k = (i + ph) % 24, beat = k > 8 && k < 11 ? -sh * 0.35 : k > 11 && k < 13 ? sh * 0.25 : 0;
+                ctx[i ? 'lineTo' : 'moveTo'](x + 4 + i, mid + beat);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
+            if (p.decorType.startsWith('dn_')) return drawLobbyDecorProp(ctx, p);
             if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
@@ -13795,36 +14050,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.translate(-center.x, -center.y);
                     drawClinicDecorProp(ctx, this);
                 } else if (this.interactionType === 'medbay_refill') {
-                    // === STIM REFILL STATION (rectangular, green + white cross) ===
                     ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
-                    
-                    const mx = this.x, my = this.y, mw = this.width, mh = this.height;
-                    
-                    // Black back casing
-                    ctx.fillStyle = '#111';
-                    ctx.fillRect(mx, my, mw, mh);
-                    
-                    // Green front panel (inset)
-                    ctx.fillStyle = '#0a4f0a';
-                    ctx.fillRect(mx + 3, my + 3, mw - 6, mh - 6);
-                    
-                    // Animated green glow
-                    const stimPulse = 0.7 + Math.sin(_frameTime / 400) * 0.3;
-                    ctx.shadowColor = '#00ff44';
-                    ctx.shadowBlur = 18 * stimPulse;
-                    ctx.fillStyle = `rgba(0, 255, 68, ${0.15 * stimPulse})`;
-                    ctx.fillRect(mx + 2, my + 2, mw - 4, mh - 4);
-                    
-                    // White cross (centered)
-                    const crossW = Math.min(mw, mh) * 0.35;
-                    const crossH = crossW * 0.25;
-                    const ccx = mx + mw / 2, ccy = my + mh / 2;
-                    ctx.fillStyle = '#fff';
-                    ctx.fillRect(ccx - crossW / 2, ccy - crossH / 2, crossW, crossH);
-                    ctx.fillRect(ccx - crossH / 2, ccy - crossW / 2, crossH, crossW);
-                    ctx.shadowBlur = 0;
-                    
+                    drawHealthStation(ctx, this);
                 } else if (this.interactionType === 'armory') {
                     // === ARMORY LOCKER (wall-mounted weapons rack) ===
                     ctx.rotate(-this.angle);
@@ -13867,44 +14095,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.textAlign = 'start';
                     
                 } else if (this.interactionType === 'vending_machine') {
-                    // === VENDING MACHINE (rectangular, white front, black back, "minispree") ===
                     ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
-                    
-                    const vx = this.x, vy = this.y, vw = this.width, vh = this.height;
-                    
-                    // Black back casing
-                    ctx.fillStyle = '#0a0a0a';
-                    ctx.fillRect(vx, vy, vw, vh);
-                    
-                    // White front panel (inset)
-                    ctx.fillStyle = '#e8e8e8';
-                    ctx.fillRect(vx + 3, vy + 3, vw - 6, vh - 6);
-                    
-                    // Product display window (dark inset)
-                    ctx.fillStyle = '#1a1a2a';
-                    ctx.fillRect(vx + 5, vy + 5, vw - 10, vh * 0.5);
-                    
-                    // Animated bluish-white glow
-                    const vendPulse = 0.8 + Math.sin(_frameTime / 300) * 0.2;
-                    ctx.shadowColor = '#ccddff';
-                    ctx.shadowBlur = 14 * vendPulse;
-                    ctx.fillStyle = `rgba(200, 220, 255, ${0.12 * vendPulse})`;
-                    ctx.fillRect(vx + 4, vy + 4, vw - 8, vh * 0.55);
-                    ctx.shadowBlur = 0;
-                    
-                    // "minispree" text
-                    ctx.font = `bold ${Math.max(6, Math.floor(vw * 0.18))}px Montserrat, sans-serif`;
-                    ctx.fillStyle = '#00bbff';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('minispree', vx + vw / 2, vy + vh * 0.75);
-                    ctx.textAlign = 'left';
-                    
-                    // Coin slot detail
-                    ctx.fillStyle = '#555';
-                    ctx.fillRect(vx + vw - 10, vy + vh * 0.6, 4, 8);
-                    
+                    drawMiniSpree(ctx, this);
                 } else if (this.interactionType === 'bed_sleep') {
                     // --- NEW: SMALLER BED RENDERER ---
                     ctx.rotate(-this.angle);
@@ -19413,6 +19606,214 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        // ============================================================================
+        //  LOBBY LIFE — the Double Nights lobby's guests and AI staff (hotel_lobby only)
+        //  Guests step out of the portals or in at the doors, check in at the desk, then
+        //  take the elevators, sit a while in the lounges, or leave the way they came.
+        //  Gold bellhops push luggage carts, Blood Moon concierges attend the waiting,
+        //  a silver valet carries cases. They're ambient walkers, not NPCs: no dialogue,
+        //  no prompts, no minimap dots — cheap, and they can't trip the story.
+        //  Updated from engine/update.js, drawn with the characters (engine/draw.js).
+        // ============================================================================
+        const LOBBY_PORTALS = [[215, 185], [785, 185]];
+        const LOBBY_DEPARTURES = [
+            ["VEL'SHARA", 'ON TIME'], ['THE UNDERSKY', 'BOARDING'], ['MOONFALL STATION', 'ON TIME'],
+            ['AURELIAN REACH', 'DELAYED'], ['THE VIOLET MILE', 'ON TIME'], ['SOUTHERN DIMENSIONS', 'ARRIVED'],
+            ['HALCYON DEEP', 'BOARDING'], ['THE NIGHT ORCHARD', 'ON TIME'], ['SILVER TIDE', 'DELAYED']
+        ];
+        const LOBBY_SPOTS = {
+            door: [500, 1122],
+            elevators: [[108, 450], [108, 650], [892, 450], [892, 650]],
+            desk: [[438, 652], [500, 664], [562, 652], [468, 712], [532, 712]],     // the queue before reception
+            lounge: [[250, 880], [250, 740], [160, 860], [750, 880], [750, 740], [840, 860], [400, 950], [600, 950]],
+            mill: [[380, 450], [620, 450], [300, 560], [700, 560], [420, 1000], [580, 1000], [200, 640], [800, 640]],
+            posts: [[410, 630], [590, 630]]                                          // where concierges wait
+        };
+        // Population by the pedestrian density setting
+        const LOBBY_GUESTS = { low: 8, medium: 14, high: 20 };
+
+        class LobbyLife {
+            constructor() { this.walkers = []; this.map = null; this.spots = null; }
+
+            /** Fresh crowd for a (re)entered lobby. */
+            reset(game) {
+                this.walkers = []; this.map = game.activeMap; this._spawnTimer = 0;
+                const nav = NavGrid.for(this.map), snap = ([x, y]) => { const f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; };
+                const S = LOBBY_SPOTS;
+                this.spots = { door: snap(S.door), elevators: S.elevators.map(snap), desk: S.desk.map(snap), lounge: S.lounge.map(snap), mill: S.mill.map(snap), posts: S.posts.map(snap), portals: LOBBY_PORTALS.map(snap) };
+                const r = Math.random;
+                // Staff: two gold bellhops with carts, two Blood Moon concierges, a silver valet
+                for (const [kind, finish] of [['bellhop', 'gold'], ['bellhop', 'gold'], ['concierge', 'bloodmoon'], ['concierge', 'bloodmoon'], ['valet', 'silver']]) {
+                    const p = kind === 'concierge' ? this.spots.posts[this.walkers.length % 2] : pickFrom(r, this.spots.mill);
+                    const w = this._make(kind, p[0], p[1], ROLE_LOOKS.dn_staff(finish, seededRandom('dn' + this.walkers.length)));
+                    w.life = 1; w.speed = kind === 'concierge' ? 1.5 : 1.7;
+                    if (kind === 'valet') w.bag = { type: 'case', color: '#2a2a34' };
+                    this.walkers.push(w);
+                }
+                // Guests already about the place
+                const n = this._target();
+                for (let i = 0; i < Math.round(n * 0.7); i++) this._spawnGuest(true);
+            }
+
+            /** The nearest walkable spot to (x, y). */
+            _free(x, y) { const nav = NavGrid.for(this.map), f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; }
+
+            _target() { return LOBBY_GUESTS[GameSettings.pedestrianDensity] || LOBBY_GUESTS.medium; }
+
+            _make(kind, x, y, look) {
+                return { kind, x, y, angle: Math.PI / 2, walkPhase: 0, look, life: 0, fade: 0, steps: [], timer: 0, speed: 1.5, stuck: 0, lastD: Infinity };
+            }
+
+            /** A guest arrives: from a portal (in a bloom), through the doors, or (at start) already mid-visit. */
+            _spawnGuest(midVisit) {
+                const r = Math.random, S = this.spots;
+                const aps = Pedestrian.APPEARANCES.filter(a => a.name !== 'worker' && a.name !== 'delivery');
+                const look = ROLE_LOOKS.pedestrian(pickFrom(r, aps), seededRandom('guest' + r()));
+                look.umbrella = null; look.rainHood = false;
+                let from = r() < 0.6 ? 'portal' : 'door', p = from === 'portal' ? pickFrom(r, S.portals) : S.door;
+                if (midVisit) { p = pickFrom(r, S.mill.concat(S.lounge)); from = 'mid'; }
+                const g = this._make('guest', p[0] + (r() - 0.5) * 10, p[1] + (r() - 0.5) * 10, look);
+                g.from = from; g.speed = 1.3 + r() * 0.5; g.fade = from === 'mid' ? 0 : from === 'portal' ? 0.025 : 0.06;
+                g.life = from === 'mid' ? 1 : 0; g.angle = from === 'door' ? -Math.PI / 2 : Math.PI / 2;
+                const bag = r();
+                if (bag < 0.55) g.bag = { type: 'roller', color: pickFrom(r, ['#1a1a22', '#5a0f1e', '#c9ccd8', '#2b3a55', '#d9b45a', '#3a2a4a']) };
+                else if (bag < 0.7) g.bag = { type: 'garment', color: pickFrom(r, ['#1a1a1a', '#2d132c']) };
+                else if (bag < 0.8) g.bag = { type: 'hatbox', color: pickFrom(r, ['#e8b4b8', '#f3e6c8', '#8a1024']) };
+                // Itinerary: the desk (if there's room in the queue), then onward
+                if (!midVisit && r() < 0.8) g.steps.push({ desk: true, wait: 150 + r() * 200 | 0, pose: pickFrom(r, ['idle', 'breathe', 'phone']) });
+                const next = r();
+                if (next < 0.4) g.steps.push({ exit: 'elevator', go: pickFrom(r, S.elevators) });
+                else {
+                    if (next < 0.7) g.steps.push({ go: pickFrom(r, S.lounge), wait: 300 + r() * 600 | 0, pose: pickFrom(r, ['breathe', 'phone', 'arms_crossed', 'idle']) });
+                    else g.steps.push({ go: pickFrom(r, S.mill), wait: 120 + r() * 240 | 0, pose: pickFrom(r, ['idle', 'fidget', 'phone']) });
+                    g.steps.push(r() < 0.55 ? { exit: 'portal', go: pickFrom(r, S.portals) } : { exit: 'door', go: S.door });
+                }
+                this.walkers.push(g);
+            }
+
+            update(game) {
+                if (!game.activeMap || game.activeMap.id !== 'hotel_lobby') { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
+                if (this.map !== game.activeMap) this.reset(game);
+                const guests = this.walkers.filter(w => w.kind === 'guest').length;
+                // Arrivals keep pace with departures: quicker when the lobby is thin
+                if (--this._spawnTimer <= 0 && guests < this._target()) { this._spawnGuest(false); this._spawnTimer = (guests < this._target() * 0.75 ? 25 : 60) + Math.random() * 50 | 0; }
+                const pl = game.player, M = game.activeMap;
+                for (let i = this.walkers.length - 1; i >= 0; i--) {
+                    const w = this.walkers[i];
+                    // Fading in (arrival) or out (departure)
+                    if (w.fade > 0) { w.life = Math.min(1, w.life + w.fade); if (w.life >= 1) w.fade = 0; }
+                    if (w.fade < 0) { w.life += w.fade; if (w.life <= 0) { this.walkers.splice(i, 1); continue; } }
+                    if (w.kind !== 'guest') this._staffThink(w);
+                    const step = w.steps[0];
+                    if (!step) { if (w.kind === 'guest' && w.fade >= 0) w.fade = -0.04; continue; }
+                    // The desk: take a free place in the queue, or skip it when the queue is full
+                    if (step.desk && !step.go) {
+                        const S = this.spots.desk, taken = new Set(this.walkers.filter(o => o !== w && o._slot !== undefined).map(o => o._slot));
+                        const slot = S.findIndex((_, k) => !taken.has(k));
+                        if (slot < 0) { w.steps.shift(); continue; }
+                        w._slot = slot; step.go = S[slot]; step.face = [500, 590];
+                    }
+                    const [gx, gy] = step.go, d = Math.hypot(gx - w.x, gy - w.y);
+                    if (d > 6) {
+                        let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
+                        // Make way for 949, and keep a little room from one another
+                        const px = w.x - pl.x, py = w.y - pl.y, pd = Math.hypot(px, py);
+                        if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        for (const o of this.walkers) {
+                            if (o === w || o.life < 0.5) continue;
+                            const ox = w.x - o.x, oy = w.y - o.y, od = Math.hypot(ox, oy);
+                            if (od < 20 && od > 0.1) { vx += (ox / od) * 0.35; vy += (oy / od) * 0.35; }
+                        }
+                        const nav = NavGrid.for(M);
+                        if (nav && !nav.walkable(w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }     // never shoved into furniture
+                        gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
+                        if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
+                        // Stuck? (blocked by a crowd): give up on this stop after a while
+                        if (d < w.lastD - 0.2) { w.lastD = d; w.stuck = 0; } else if (++w.stuck > 360) { w.steps.shift(); w._slot = undefined; w.stuck = 0; w.lastD = Infinity; }
+                        w.look.pose = undefined;
+                        continue;
+                    }
+                    // Arrived
+                    w.lastD = Infinity; w.stuck = 0;
+                    if (step.exit) {                                                   // gone: into the lift, the portal, the night
+                        if (w.fade >= 0) { w.fade = step.exit === 'portal' ? -0.025 : -0.05; w.exitKind = step.exit; if (step.exit === 'elevator') w.angle = w.x < 500 ? Math.PI : 0; }
+                        continue;
+                    }
+                    if (step.face) w.angle = Math.atan2(step.face[1] - w.y, step.face[0] - w.x);
+                    w.look.pose = step.pose;
+                    w.waiting = true;
+                    if (--step.wait <= 0) { w.steps.shift(); w.waiting = false; w.attended = false; if (step.desk) w._slot = undefined; }
+                }
+                // Luggage follows its owner (rollers trail behind)
+                for (const w of this.walkers) if (w.bag && w.bag.type === 'roller') {
+                    const tx = w.x - Math.cos(w.angle) * 16 + Math.cos(w.angle + Math.PI / 2) * 7, ty = w.y - Math.sin(w.angle) * 16 + Math.sin(w.angle + Math.PI / 2) * 7;
+                    if (w.bag.bx === undefined) { w.bag.bx = tx; w.bag.by = ty; }
+                    w.bag.bx += (tx - w.bag.bx) * 0.25; w.bag.by += (ty - w.bag.by) * 0.25;
+                }
+            }
+
+            /** Staff: bellhops and the valet do rounds; concierges attend whoever is waiting. */
+            _staffThink(w) {
+                if (w.steps.length) return;
+                const r = Math.random, S = this.spots;
+                if (w.kind === 'concierge') {
+                    const guest = this.walkers.find(g => g.kind === 'guest' && g.waiting && !g.attended && g.life >= 1);
+                    if (guest) {
+                        guest.attended = true;
+                        const side = Math.cos(guest.angle + Math.PI / 2) > 0 ? 1 : -1;
+                        w.steps.push({ go: this._free(guest.x + side * 26, guest.y + 10), face: [guest.x, guest.y], wait: 220, pose: 'concierge' });
+                    } else w.steps.push({ go: S.posts[this.walkers.indexOf(w) % 2], face: [500, 1000], wait: 90, pose: 'concierge' });
+                } else if (w.kind === 'bellhop') {
+                    w.steps.push({ go: pickFrom(r, S.portals.concat([S.door])), wait: 80, pose: 'polish' },
+                                 { go: pickFrom(r, S.elevators), wait: 100, pose: 'concierge' });
+                } else {
+                    w.steps.push({ go: S.door, wait: 90, pose: 'concierge' }, { go: pickFrom(r, S.elevators), wait: 90, pose: 'concierge' });
+                }
+            }
+
+            /** The walkers, the luggage and the carts; blooms where they step through portals. */
+            draw(ctx, cb) {
+                if (!this.walkers.length) return;
+                const t = _frameTime / 1000;
+                const list = this.walkers.filter(w => !cb || (w.x > cb.left && w.x < cb.right && w.y > cb.top && w.y < cb.bottom)).sort((a, b) => a.y - b.y);
+                for (const w of list) {
+                    // Portal arrivals and departures: a violet-gold bloom that fades as they solidify
+                    if (w.life < 1 && (w.from === 'portal' || w.exitKind === 'portal')) {
+                        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = (1 - w.life) * 0.8;
+                        drawGlow(ctx, w.x, w.y, 34, '200, 150, 255', 0);
+                        ctx.strokeStyle = 'rgba(232,194,122,0.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(w.x, w.y, 10 + (1 - w.life) * 16, 0, Math.PI * 2); ctx.stroke();
+                        ctx.restore();
+                    }
+                    const b = w.bag;
+                    if (b && b.type === 'roller' && b.bx !== undefined) {                // a suitcase rolled behind
+                        ctx.save(); ctx.globalAlpha = w.life; ctx.translate(b.bx, b.by); ctx.rotate(w.angle);
+                        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-5, -6, 12, 14);
+                        ctx.fillStyle = b.color; ctx.beginPath(); ctx.roundRect(-7, -7, 12, 14, 2); ctx.fill();
+                        ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(-6, -1, 10, 1);
+                        ctx.restore();
+                        ctx.save(); ctx.globalAlpha = w.life * 0.8; ctx.strokeStyle = '#8a90a8'; ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(b.bx + Math.cos(w.angle) * 5, b.by + Math.sin(w.angle) * 5); ctx.lineTo(w.x + Math.cos(w.angle + Math.PI / 2) * 7, w.y + Math.sin(w.angle + Math.PI / 2) * 7); ctx.stroke();
+                        ctx.restore();
+                    }
+                    ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.globalAlpha = w.life;
+                    if (w.kind === 'bellhop') {                                       // the gold luggage cart, pushed ahead
+                        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(15, -12, 30, 26);
+                        ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 2; ctx.strokeRect(14, -13, 28, 26);
+                        ctx.fillStyle = '#5a0f1e'; ctx.fillRect(17, -10, 10, 9); ctx.fillStyle = '#c9ccd8'; ctx.fillRect(28, -10, 11, 11);
+                        ctx.fillStyle = '#2b3a55'; ctx.fillRect(17, 1, 22, 9);
+                        ctx.strokeStyle = '#e8c27a'; ctx.beginPath(); ctx.moveTo(14, -13); ctx.quadraticCurveTo(28, -22, 42, -13); ctx.stroke();
+                    }
+                    drawProceduralHumanoid(ctx, w, { stance: 'idle', ...w.look });
+                    if (b && b.type !== 'roller') {                                   // carried: a case, a garment bag, a hat box
+                        ctx.fillStyle = b.color;
+                        if (b.type === 'case') { ctx.fillRect(-2, 9, 12, 5); ctx.fillStyle = '#e8c27a'; ctx.fillRect(3, 8, 3, 1); }
+                        else if (b.type === 'garment') { ctx.beginPath(); ctx.roundRect(-10, 8, 20, 5, 2); ctx.fill(); }
+                        else { ctx.beginPath(); ctx.arc(2, 12, 5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 0.8; ctx.stroke(); }
+                    }
+                    ctx.restore();
+                }
+            }
+        }
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -39009,6 +39410,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 };
                 this.flitVFX = []; // Active flit visual effects (ghost afterimages, lightning trails)
                 this.graveyardGhosts = []; // Procedural humanoid ghosts in the cemetery
+                this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (world/lobby-life.js)
                 
                 // Time slow system for dramatic moments (boss kills, etc.)
                 this.timeSlowState = {
@@ -39283,6 +39685,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             this.refillStims();
                         } else if(this.activeInteraction.interactionType === 'vending_machine') {
                             this.buyBubbleTea();
+                        } else if(this.activeInteraction.interactionType === 'lost_luggage') {
+                            this.searchLostLuggage(this.activeInteraction);
                         } else if(this.activeInteraction.interactionType === 'bed_sleep') {
                             // NEW: Open Sleep UI
                             this.openSleepMenu();
@@ -41156,6 +41560,28 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // Wire close
                 document.getElementById('zib-close').onclick = () => this.closeZibMenu();
+            },
+
+            // =========================================================
+            //  LOST LUGGAGE (the Double Nights lobby) — a few personics lifted from a
+            //  forgotten case; each case fills again once a day (questState.lobbyLuggage)
+            // =========================================================
+            searchLostLuggage(prop) {
+                const qs = this.questState, id = prop.noteId || 'lobby';
+                const day = Math.floor((this.worldMinutes || 0) / 1440);
+                qs.lobbyLuggage = qs.lobbyLuggage || {};
+                if (qs.lobbyLuggage[id] === day) { showMessage('EMPTY. SOMEONE BEAT YOU TO IT.'); audioSys.sfx('ui'); return; }
+                const pp = 25 + Math.floor(Math.random() * 56);
+                qs.lobbyLuggage[id] = day; prop._searched = true;
+                this.currency += pp; this.updateUI();
+                showMessage(`+${pp} PERSONICS — ${pickFrom(Math.random, ["SOMEONE WON'T MISS IT", 'FINDERS KEEPERS', 'A TIP, OF SORTS', 'THINK EXCELLENCE'])}`);
+                audioSys.sfx('ui');
+            },
+
+            /** Which lobby cases have been searched today (they open; they refill at dawn of the next day). */
+            refreshLostLuggage() {
+                const L = (this.questState && this.questState.lobbyLuggage) || {}, day = Math.floor((this.worldMinutes || 0) / 1440);
+                for (const p of this.props) if (p.interactionType === 'lost_luggage') p._searched = L[p.noteId] === day;
             },
 
             // =========================================================
@@ -45121,7 +45547,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.enemies = []; this.loot = []; 
                 // Maps that ask for it (the House) route paths around their big furniture too
                 if (this.activeMap.navProps) this.activeMap.navObstacles = this.props
-                    .filter(p => (p.mass || 0) >= 1e6 && p.width * p.height >= 600 && !p.noNav)
+                    .filter(p => (p.mass || 0) >= 1e6 && p.width * p.height >= (this.activeMap.navProps === 'all' ? 200 : 600) && !p.noNav)
                     .map(p => ({ x: p.x, y: p.y, w: p.width, h: p.height }));
                 
                 // Auto-tag lamps with their containing room ID for per-room light control
@@ -45559,6 +45985,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const dark = this.getAmbientDarkness();
                 if (this.activeMap.id === 'apt_949') this.drawApartmentGlow(ctx);
                 if (this.activeMap.id === 'house_of_death') this.drawHouseGlow(ctx);
+                if (this.activeMap.id === 'hotel_lobby') this.drawLobbyGlow(ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const z = this.camera.zoom || 1;
                     const hw = this.canvas.width / 2 / z + 200, hh = this.canvas.height / 2 / z + 200;
@@ -46575,6 +47002,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
             
+                // The Double Nights lobby: guests and staff come and go; searched cases refill daily
+                this.lobbyLife.update(this);
+                if (this.activeMap.id === 'hotel_lobby' && _simTick % 60 === 0) this.refreshLostLuggage();
+
                 // Graveyard Humanoid Ghosts (Cemetery: x 500-3500, y 8800-10800)
                 const inGraveyard = this.activeMap.id === 'hub_949' && 
                     this.player.x > 400 && this.player.x < 3600 && 
@@ -47649,6 +48080,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.interactBtn.style.display = 'flex'; this.activeInteraction = nearInteractable; 
                     if (nearInteractable instanceof PropEntity) {
                         if (nearInteractable.interactionType === 'medbay_refill') this.interactBtn.innerHTML = "Refill<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
+                        else if (nearInteractable.interactionType === 'lost_luggage') this.interactBtn.innerHTML = "Search<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
                         if (nearInteractable.interactionType === 'vending_machine') this.interactBtn.innerHTML = "Buy<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
                         if (nearInteractable.interactionType === 'bed_sleep') this.interactBtn.innerHTML = "Rest<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
                         if (nearInteractable.interactionType === 'crafting_table') this.interactBtn.innerHTML = "Craft<br><span style='font-size:0.5rem;opacity:0.7'>(E)</span>";
@@ -48081,6 +48513,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.drawClinicInterior(this.ctx);
                 }
                 if (this.activeMap.id === 'house_of_death') this.drawHouseInterior(this.ctx);
+                if (this.activeMap.id === 'hotel_lobby') this.drawLobbyInterior(this.ctx);
                 
                 // Indoor V2: Room floors, windows, and doors
                 if (this.roomSystem.active) {
@@ -48144,6 +48577,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const pulse = (Math.sin(_frameTime / 200) + 1) / 2;
                     this.ctx.save();
                     this.activeMap.transitions.forEach(t => {
+                        if (t.quiet) return;                           // marked by the map's own art (the lobby's gilded lifts)
                         if (t.x + t.w < cbW.left || t.x > cbW.right || t.y + t.h < cbW.top || t.y > cbW.bottom) return;
                         
                         const cx = t.x + t.w / 2;
@@ -48467,6 +48901,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         n.draw(this.ctx);
                     });
                     this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
+                    this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
                     this.teammates.forEach(tm => {
                         if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) return;
                         tm.draw(this.ctx, this.player);
@@ -49292,6 +49727,148 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 glow(900, 720, 90, '255, 190, 120', 0.18);
                 // Stained glass on the chapel's north wall, lit from within
                 for (const [x, rgb] of [[670, '190, 130, 255'], [900, '255, 120, 170'], [1130, '190, 130, 255']]) glow(x, 16, 40, rgb, 0.35);
+                ctx.restore();
+            },
+
+            /** The Double Nights lobby floor, painted once: black marble veined silver, a checker border,
+             *  the crimson runner, the twin gold crescents under the chandelier, the motto at the door. */
+            drawLobbyInterior(ctx) {
+                if (!this._lobbyFloor) this._lobbyFloor = this._paintLobbyFloor();
+                ctx.drawImage(this._lobbyFloor, 0, 0);
+            },
+
+            _paintLobbyFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1000; cv.height = 1200;
+                const c = cv.getContext('2d'), r = seededRandom(949), GOLD = '#e8c27a', SILVER = '#dfe6ff';
+                c.fillStyle = '#0c0a0c'; c.fillRect(0, 0, 1000, 1200);
+                // Black marble slabs, each a touch different, veined in silver
+                for (let y = 50; y < 1150; y += 100) for (let x = 50; x < 950; x += 100) {
+                    const v = r() * 8 | 0; c.fillStyle = `rgb(${18 + v},${15 + v},${20 + v})`; c.fillRect(x, y, 100, 100);
+                }
+                c.strokeStyle = 'rgba(232,194,122,0.16)'; c.lineWidth = 1; c.beginPath();
+                for (let x = 150; x < 950; x += 100) { c.moveTo(x, 50); c.lineTo(x, 1150); }
+                for (let y = 150; y < 1150; y += 100) { c.moveTo(50, y); c.lineTo(950, y); }
+                c.stroke();
+                for (let i = 0; i < 46; i++) {
+                    let x = 50 + r() * 900, y = 50 + r() * 1100; c.strokeStyle = `rgba(223,230,255,${0.05 + r() * 0.08})`; c.lineWidth = 0.5 + r();
+                    c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (r() - 0.3) * 70; y += (r() - 0.5) * 50; c.lineTo(x, y); } c.stroke();
+                }
+                // Checker border in ivory and gold
+                const sq = 15;
+                for (let x = 50, i = 0; x < 950; x += sq, i++) for (const [y, j] of [[50, 0], [1135, 1]]) { c.fillStyle = (i + j) % 2 ? '#e9e2d2' : '#b8914a'; c.fillRect(x, y, sq, sq); }
+                for (let y = 65, i = 0; y < 1135; y += sq, i++) for (const [x, j] of [[80, 0], [905, 1]]) { c.fillStyle = (i + j) % 2 ? '#e9e2d2' : '#b8914a'; c.fillRect(x, y, sq, sq); }
+                // Gilt sunbursts before each elevator bay
+                for (const [bx, dir] of [[80, 1], [920, -1]]) for (const by of [450, 650]) {
+                    c.save(); c.translate(bx, by); c.globalAlpha = 0.55;
+                    for (let k = 0; k < 13; k++) { const a = -Math.PI / 2 + k * Math.PI / 12; c.strokeStyle = k % 2 ? GOLD : '#a8823e'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 0); c.lineTo(dir * Math.cos(a) * 60, Math.sin(a) * 60); c.stroke(); }
+                    c.restore();
+                }
+                // Around the fountain, a gold ring
+                c.strokeStyle = GOLD; c.lineWidth = 2; c.beginPath(); c.arc(500, 320, 92, 0, Math.PI * 2); c.stroke();
+                c.strokeStyle = 'rgba(223,230,255,0.4)'; c.lineWidth = 1; c.beginPath(); c.arc(500, 320, 100, 0, Math.PI * 2); c.stroke();
+                // The crimson runner, door to desk, gold-bordered with a diamond stitch
+                c.fillStyle = '#5a0a18'; c.fillRect(440, 612, 120, 538);
+                c.fillStyle = GOLD; c.fillRect(444, 612, 2, 538); c.fillRect(554, 612, 2, 538);
+                c.fillStyle = 'rgba(232,194,122,0.35)';
+                for (let y = 630; y < 1140; y += 26) { c.beginPath(); c.moveTo(500, y - 5); c.lineTo(505, y); c.lineTo(500, y + 5); c.lineTo(495, y); c.closePath(); c.fill(); }
+                // The medallion: silver and gold rings, and the twin crescents overlapping at its heart
+                const M = { x: 500, y: 850 };
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.arc(M.x + 3, M.y + 4, 150, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#100c12'; c.beginPath(); c.arc(M.x, M.y, 150, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = SILVER; c.lineWidth = 3; c.beginPath(); c.arc(M.x, M.y, 148, 0, Math.PI * 2); c.stroke();
+                c.strokeStyle = GOLD; c.lineWidth = 2; c.beginPath(); c.arc(M.x, M.y, 136, 0, Math.PI * 2); c.stroke();
+                c.lineWidth = 1; c.beginPath(); c.arc(M.x, M.y, 128, 0, Math.PI * 2); c.stroke();
+                for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12; c.fillStyle = k % 2 ? SILVER : GOLD; c.beginPath(); c.arc(M.x + Math.cos(a) * 142, M.y + Math.sin(a) * 142, 2, 0, Math.PI * 2); c.fill(); }
+                const crescent = (cx, cy, R, off, color) => {                 // a disc less an offset disc
+                    const t = document.createElement('canvas'); t.width = t.height = R * 2 + 8; const k = t.getContext('2d');
+                    const g = k.createLinearGradient(0, 0, t.width, t.height); g.addColorStop(0, '#fff1c2'); g.addColorStop(0.5, color); g.addColorStop(1, '#a8823e');
+                    k.fillStyle = g; k.beginPath(); k.arc(R + 4, R + 4, R, 0, Math.PI * 2); k.fill();
+                    k.globalCompositeOperation = 'destination-out'; k.beginPath(); k.arc(R + 4 + off, R + 4, R * 0.82, 0, Math.PI * 2); k.fill();
+                    c.drawImage(t, cx - R - 4, cy - R - 4);
+                };
+                crescent(M.x - 26, M.y, 78, 30, GOLD);                         // ☾ opening right…
+                crescent(M.x + 26, M.y, 78, -30, GOLD);                        // …☽ opening left, the two overlapping
+                c.fillStyle = '#fff1c2'; c.beginPath(); c.arc(M.x, M.y, 5, 0, Math.PI * 2); c.fill();
+                // The motto, set in gold at the door
+                c.save(); c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 17px Georgia, serif';
+                c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillText('THINK EXCELLENCE  ✦  THINK DOUBLE NIGHTS', 501, 1107);
+                c.fillStyle = GOLD; c.fillText('THINK EXCELLENCE  ✦  THINK DOUBLE NIGHTS', 500, 1106);
+                c.restore();
+                return cv;
+            },
+
+            /** The lobby after the darkness layer: the chandelier, the rift, the portals, sconces, gold
+             *  light strips, the elevator doors, the departures board, the motto banner, drifting stars. */
+            drawLobbyGlow(ctx) {
+                const t = _frameTime / 1000;
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                // The chandelier: three tiers of warm lights and crystal glints
+                glow(500, 850, 170, '255, 200, 130', 0.12);
+                for (const [R, n, a0] of [[74, 16, 0], [50, 12, 0.2], [26, 8, 0.4]]) for (let i = 0; i < n; i++) {
+                    const a = a0 + i * Math.PI * 2 / n, x = 500 + Math.cos(a) * R, y = 850 + Math.sin(a) * R;
+                    const tw = 0.7 + 0.3 * Math.sin(t * 4 + i * 1.7 + R);
+                    glow(x, y, 9, '255, 214, 150', 0.3 * tw);
+                    ctx.globalAlpha = tw; ctx.fillStyle = '#fff6e0'; ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
+                }
+                for (let i = 0; i < 6; i++) {                                         // glints flashing across the crystals
+                    const ph = (t * 0.7 + i / 6) % 1, a = i * 1.05 + t * 0.1, R = 20 + (i * 13) % 55;
+                    if (ph < 0.12) { const k = 1 - ph / 0.12, x = 500 + Math.cos(a) * R, y = 850 + Math.sin(a) * R; ctx.globalAlpha = k; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 6 * k, y); ctx.lineTo(x + 6 * k, y); ctx.moveTo(x, y - 6 * k); ctx.lineTo(x, y + 6 * k); ctx.stroke(); }
+                }
+                // The rift fountain
+                glow(500, 320, 70, '190, 130, 255', 0.16 + 0.05 * Math.sin(t * 1.3));
+                // Portals: rings of spinning arcs in gold and violet (angles wrapped: huge ones break arc())
+                for (const [px, py] of LOBBY_PORTALS) {
+                    glow(px, py, 60, '200, 150, 255', 0.2);
+                    ctx.lineWidth = 2;
+                    for (let k = 0; k < 3; k++) {
+                        const R = 22 + k * 8, sp = (k % 2 ? -1 : 1) * (0.8 + k * 0.3);
+                        ctx.globalAlpha = 0.75 - k * 0.15; ctx.strokeStyle = k === 1 ? 'rgba(232,194,122,1)' : 'rgba(190,140,255,1)';
+                        for (let j = 0; j < 3; j++) { const a = ((t * sp) % (Math.PI * 2)) + j * Math.PI * 2 / 3; ctx.beginPath(); ctx.arc(px, py, R, a, a + 1.3); ctx.stroke(); }
+                    }
+                    glow(px, py, 16, '255, 230, 255', 0.15 + 0.08 * Math.sin(t * 5 + px));
+                }
+                // Sconces, desk under-glow, gold strips along the marble edges
+                for (const y of [350, 550, 750]) { glow(86, y, 26, '255, 196, 110', 0.5); glow(914, y, 26, '255, 196, 110', 0.5); }
+                glow(500, 600, 120, '255, 170, 90', 0.18);
+                ctx.globalAlpha = 0.35 + 0.08 * Math.sin(t * 1.2); ctx.fillStyle = '#ffcf8a';
+                ctx.fillRect(95, 66, 1.5, 1068); ctx.fillRect(903.5, 66, 1.5, 1068); ctx.fillRect(96, 66, 808, 1.5);
+                // Stars drifting through the air
+                for (let i = 0; i < 26; i++) {
+                    const sx = 80 + ((i * 337) % 840) + Math.sin(t * 0.2 + i) * 20, sy = 1120 - ((t * (6 + i % 5) + i * 97) % 1060);
+                    const tw = 0.5 + 0.5 * Math.sin(t * 3 + i * 2.1);
+                    ctx.globalAlpha = 0.5 * tw; ctx.fillStyle = i % 3 ? '#fff1c2' : '#e8d8ff'; ctx.beginPath(); ctx.arc(sx, sy, 1.1, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.restore();
+                // (Solid, not glowing) the elevator doors, the departures board and the motto banner
+                ctx.save();
+                for (const [wx, dir] of [[50, 1], [950, -1]]) for (const by of [400, 600]) {
+                    const x0 = dir > 0 ? wx - 4 : wx - 8;
+                    ctx.fillStyle = '#b8914a'; ctx.fillRect(x0, by + 6, 12, 88);
+                    ctx.fillStyle = '#e8c27a'; ctx.fillRect(x0 + 2, by + 8, 8, 41); ctx.fillRect(x0 + 2, by + 51, 8, 41);
+                    ctx.strokeStyle = '#6a4f22'; ctx.lineWidth = 1; ctx.strokeRect(x0 + 2, by + 8, 8, 41); ctx.strokeRect(x0 + 2, by + 51, 8, 41);
+                    // the dial on the pillar face above, its needle drifting between floors
+                    const dx = dir > 0 ? 80 : 920, dy = by - 12, nd = Math.PI + (0.5 + 0.5 * Math.sin(t * 0.3 + by + wx)) * Math.PI;
+                    ctx.fillStyle = '#1a1216'; ctx.beginPath(); ctx.arc(dx, dy, 10, Math.PI, 0); ctx.fill();
+                    ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(dx, dy, 10, Math.PI, 0); ctx.stroke();
+                    ctx.strokeStyle = '#ffb060'; ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(dx + Math.cos(nd) * 8, dy + Math.sin(nd) * 8); ctx.stroke();
+                }
+                // The departures board on the check-in wall: other dimensions, letters flipping
+                ctx.fillStyle = '#07060a'; ctx.fillRect(360, 104, 280, 42);
+                ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1.5; ctx.strokeRect(360, 104, 280, 42);
+                ctx.font = 'bold 8px monospace'; ctx.textBaseline = 'middle';
+                const rows = LOBBY_DEPARTURES, step = Math.floor(t / 6);
+                for (let i = 0; i < 3; i++) {
+                    const row = rows[(step + i) % rows.length], flip = (t % 6) < 0.35 && i === 0;
+                    const scram = s => flip ? s.replace(/[A-Z]/g, () => String.fromCharCode(65 + Math.random() * 26 | 0)) : s;
+                    ctx.fillStyle = '#ffcf8a'; ctx.textAlign = 'left'; ctx.fillText(scram(row[0]), 368, 114 + i * 11);
+                    ctx.fillStyle = row[1] === 'DELAYED' ? '#ff7a8a' : row[1] === 'BOARDING' ? '#bfe6ff' : '#9fe0a0'; ctx.textAlign = 'right'; ctx.fillText(scram(row[1]), 632, 114 + i * 11);
+                }
+                // The motto, a warm hologram floating before the wall
+                const sh = 0.82 + 0.1 * Math.sin(t * 2.3);
+                ctx.textAlign = 'center'; ctx.font = 'italic bold 15px Georgia, serif';
+                ctx.globalAlpha = 0.35 * sh; ctx.fillStyle = '#ffb060'; ctx.fillText('Think excellence, think Double Nights.', 500, 172);
+                ctx.globalAlpha = 0.95 * sh; ctx.fillStyle = '#ffe2a8'; ctx.fillText('Think excellence, think Double Nights.', 500, 171);
                 ctx.restore();
             },
 
@@ -52732,6 +53309,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         game.refillStims();
                     } else if (game.activeInteraction.interactionType === 'vending_machine') {
                         game.buyBubbleTea();
+                    } else if (game.activeInteraction.interactionType === 'lost_luggage') {
+                        game.searchLostLuggage(game.activeInteraction);
                     } else if (game.activeInteraction.interactionType === 'bed_sleep') {
                         game.openSleepMenu();
                     } else if (game.activeInteraction.interactionType === 'crafting_table') {
@@ -53096,7 +53675,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     'road_test': 'Outskirts',
                     'ethereal_plane': 'Ethereal Plane',
                     'apt_949': '949\'s Apartment',
-                    'hotel_lobby': 'Crescent Hotel',
+                    'hotel_lobby': 'Double Nights Hotel',
                     'hotel_suite': 'Hotel Suite',
                     'medbay_sw': 'Medbay SW',
                     'moon_city_nightclub': 'Nightclub',

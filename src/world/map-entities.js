@@ -43,9 +43,9 @@
                         new PropEntity({ x: 340, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table', decorType: 'apt_side', light: { radius: 110, color: '#ffd2a8', intensity: 0.85, dx: -2, dy: -1 } }),
                         new PropEntity({ x: 560, y: 470, width: 30, height: 30, color: '#3d2a22', interactionType: 'bedside_table', decorType: 'apt_side', light: { radius: 110, color: '#ffd2a8', intensity: 0.85, dx: -2, dy: -1 } }),
                         new PropEntity({ x: 30, y: 340, width: 44, height: 50, color: '#2a2a3a', interactionType: 'armory' }),
-                        new PropEntity({ x: 30, y: 540, width: 44, height: 36, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        new PropEntity({ x: 30, y: 520, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
                         new PropEntity({ x: 1111, y: 226, width: 18, height: 14, color: '#3a4a6a', interactionType: 'read_note', noteId: 'larissa_briefing_darklands' }),
-                        new PropEntity({ x: 30, y: 750, width: 44, height: 36, color: '#0f0', interactionType: 'medbay_refill' }),
+                        new PropEntity({ x: 30, y: 730, width: 40, height: 60, mass: 1e7, color: '#0f0', interactionType: 'medbay_refill' }),
                         new PropEntity({ x: 1010, y: 216, width: 90, height: 110, color: '#334466', interactionType: 'bed_sleep', decorType: 'apt_bed', mass: 1e7 }),
                         new PropEntity({ x: 750, y: 750, width: 60, height: 35, color: '#2a2a3a', interactionType: 'crafting_table' }),
                         // Living room: lounge
@@ -124,11 +124,47 @@
                     break;
                 }
 
-                case 'hotel_lobby':
-                    e.props = [ new PropEntity({ x: 400, y: 500, width: 200, height: 50, color: '#333' }) ];
+                case 'hotel_lobby': {
+                    // Double Nights: furniture in drawLobbyDecorProp (dn_*), floor in drawLobbyInterior,
+                    // glows and the motto in drawLobbyGlow, the crowd in world/lobby-life.js.
+                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1216', decorType }, extra));
+                    const both = (x, y, w, h, t, extra) => [F(x, y, w, h, t, extra), F(1000 - x - w, y, w, h, t, extra)];   // mirrored east–west
+                    e.props = [
+                        F(445, 265, 110, 110, 'dn_fountain'),                                       // the rift fountain
+                        F(385, 566, 230, 44, 'dn_desk'),                                            // reception
+                        // Lounges either side of the runner
+                        ...both(190, 760, 120, 56, 'dn_sofa'), ...both(215, 842, 70, 38, 'dn_table'),
+                        ...both(180, 904, 40, 40, 'dn_wingback'), ...both(292, 904, 40, 40, 'dn_wingback'),
+                        ...both(330, 760, 22, 22, 'dn_lamp'), ...both(172, 1022, 34, 34, 'dn_palm'), ...both(90, 190, 34, 34, 'dn_palm'),
+                        ...both(250, 1010, 92, 34, 'dn_float_chaise'), ...both(318, 300, 40, 40, 'dn_float_chair'),
+                        ...both(372, 1050, 24, 24, 'dn_lamp'),
+                        // MiniSpree by the doors
+                        new PropEntity({ x: 60, y: 1075, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        new PropEntity({ x: 900, y: 1075, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        // Lost luggage: someone won't miss it (searchable once a day — events.js)
+                        F(214, 1062, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_palm', noNav: true }),
+                        F(812, 462, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_elevator', noNav: true }),
+                        F(760, 726, 28, 20, 'dn_lost_luggage', { interactionType: 'lost_luggage', noteId: 'lobby_lounge', noNav: true }),
+                    ];
                     e.npcs = [ new NPC(500, 540, "LUVSH4D3", 'robot_crimson'), new NPC(150, 320, "Guard Unit Alpha", 'robot_gold'), new NPC(850, 320, "Guard Unit Beta", 'robot_gold') ];
-                    e.lamps = [ new LampEntity({ x: 60, y: 450, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 60, y: 650, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 940, y: 450, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 940, y: 650, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 420, y: 525, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 580, y: 525, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 400, y: 1100, lampType: 3, color: '#ffdf80' }), new LampEntity({ x: 600, y: 1100, lampType: 3, color: '#ffdf80' }) ];
+                    const L = (x, y, color, lightRadius, lampType = 4, angle = 0) => new LampEntity({ x, y, lampType, color, lightRadius, angle });
+                    e.lamps = [
+                        L(500, 850, '#ffd49a', 640), L(500, 236, '#ffcf8a', 420, 5, Math.PI / 2), L(500, 612, '#ffb060', 300),
+                        // Lounge lamps and the doors (the pillar sconces are soft lights: glow without the cost of shadows)
+                        L(341, 771, '#ffcc88', 300), L(659, 771, '#ffcc88', 300),
+                        L(500, 1146, '#ffd29a', 380, 5, -Math.PI / 2),
+                    ];
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    e.softLights = [
+                        { x: 500, y: 620, w: 880, h: 1080, round: 220, soft: true, color: '#ffc890', intensity: 0.42 },   // the room's warm fill
+                        { x: 500, y: 850, w: 380, h: 300, round: 150, soft: true, color: '#ffd9a0', intensity: 0.3 },   // under the chandelier
+                        S(500, 320, 110, '#e0b0ff', 0.35, 3), S(500, 600, 150, '#ffb870', 0.7),                          // the rift, the desk
+                        S(341, 771, 90, '#ffd0a0', 0.7), S(659, 771, 90, '#ffd0a0', 0.7), S(384, 1062, 110, '#ffd0a0', 0.75), S(616, 1062, 110, '#ffd0a0', 0.75),
+                        S(215, 185, 90, '#c89cff', 0.6, 4), S(785, 185, 90, '#c89cff', 0.6, 4),                         // the portals
+                        ...[350, 550, 750].flatMap(y => [S(100, y, 150, '#ffc070', 0.8), S(900, y, 150, '#ffc070', 0.8)]),   // the pillar sconces
+                    ];
                     break;
+                }
 
                 case 'hotel_suite':
                     e.props = [ new PropEntity({ x: 300, y: 300, width: 100, height: 200, color: '#443' }), new PropEntity({ x: 150, y: 700, width: 120, height: 50, color: '#322' }), new PropEntity({ x: 350, y: 700, width: 120, height: 50, color: '#322' }), new PropEntity({ x: 1100, y: 400, width: 150, height: 200, color: '#335' }),
@@ -145,7 +181,7 @@
                     // GameEngine.drawClinicInterior.
                     const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#ccc', decorType }, extra));
                     e.props = [
-                        new PropEntity({ x: 200, y: 180, width: 40, height: 60, color: '#0f0', interactionType: 'medbay_refill' }),
+                        new PropEntity({ x: 200, y: 180, width: 40, height: 60, mass: 1e7, color: '#0f0', interactionType: 'medbay_refill' }),
                         // Recovery bay — beds with their heads against the side walls
                         F(58, 300, 120, 56, 'bed', { headSide: 'left' }),   F(58, 470, 120, 56, 'bed', { headSide: 'left', patient: true }),
                         F(622, 300, 120, 56, 'bed', { headSide: 'right' }), F(622, 470, 120, 56, 'bed', { headSide: 'right' }),
@@ -223,7 +259,7 @@
                         new PropEntity({ x: 800, y: 100, width: 80, height: 60, color: '#2a1a25' }), new PropEntity({ x: 1050, y: 100, width: 80, height: 60, color: '#2a1a25' }),
                         new PropEntity({ x: 1300, y: 100, width: 80, height: 60, color: '#2a1a25' }), new PropEntity({ x: 1550, y: 100, width: 80, height: 60, color: '#2a1a25' }),
                         new PropEntity({ x: 700, y: 200, width: 100, height: 35, color: '#3a1028' }), new PropEntity({ x: 1100, y: 200, width: 100, height: 35, color: '#3a1028' }),
-                        new PropEntity({ x: 850, y: 1200, width: 300, height: 50, color: '#1a1a1a' }), new PropEntity({ x: 1300, y: 1280, width: 40, height: 60, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        new PropEntity({ x: 850, y: 1200, width: 300, height: 50, color: '#1a1a1a' }), new PropEntity({ x: 1300, y: 1280, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
                     ];
                     e.npcs = [ new NPC(1000, 1220, "Valentina", 'vip'), new NPC(200, 500, "Model Kira", 'dancer'), new NPC(1750, 600, "Model Sienne", 'dancer'), new NPC(1000, 650, "Concierge Lux", 'robot_gold') ];
                     e.lamps = [
@@ -256,7 +292,7 @@
                         new PropEntity({ x: 750, y: 100, width: 150, height: 40, color: '#555' }), new PropEntity({ x: 950, y: 80, width: 80, height: 60, color: '#333' }), new PropEntity({ x: 1070, y: 80, width: 50, height: 70, color: '#4a4a4a' }),
                         new PropEntity({ x: 1000, y: 750, width: 60, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 1080, y: 750, width: 60, height: 40, color: '#2a2a2a' }),
                         new PropEntity({ x: 480, y: 860, width: 25, height: 25, color: '#2d5a27' }), new PropEntity({ x: 710, y: 860, width: 25, height: 25, color: '#2d5a27' }),
-                        new PropEntity({ x: 930, y: 880, width: 40, height: 60, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        new PropEntity({ x: 930, y: 880, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
                     ];
                     e.npcs = [ new NPC(200, 150, "Barista Ren", 'bartender'), new NPC(850, 200, "Chef Koda") ];
                     e.lamps = [
@@ -298,7 +334,7 @@
                         new PropEntity({ x: 780, y: 300, width: 30, height: 30, color: '#1a3a1a' }),
                         new PropEntity({ x: 780, y: 350, width: 30, height: 30, color: '#3a1a1a' }),
                         // Vending machine
-                        new PropEntity({ x: 1280, y: 600, width: 40, height: 60, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        new PropEntity({ x: 1280, y: 600, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
                     ];
                     e.npcs = [ new NPC(1050, 200, "Torque", 'mechanic') ];
                     e.lamps = [

@@ -24,6 +24,7 @@
             stellaSkin: '#c68e63', stellaCurls: '#0a0505', stellaEyes: '#daa520',
             dnGold:   { color: '#2a2418', trim: '#e8c27a' },           // Double Nights uniform, gold staff
             dnSilver: { color: '#1c2030', trim: '#dfe6ff' },           // … and the silver ones
+            dnCrimson: { color: '#3a0a14', trim: '#e8c27a' },          // … and the Blood Moon concierges
             ember: '#ff5a1a',                                          // demoness eyes
             eyeDefault: '#3a2a1a',
             // Crowd pools
@@ -158,6 +159,14 @@
             robot() {
                 return { gender: 'androgynous', body: { kind: 'android', finish: 'silver' }, top: { type: 'dn_uniform', ...PALETTE.dnSilver },
                          bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge', faceRoom: true };
+            },
+            // Double Nights floor staff (the lobby's crowd, world/lobby-life.js): plating in the house
+            // finishes — gold bellhops, Blood Moon concierges, silver valets — uniforms to match
+            dn_staff(finish, r) {
+                const uni = finish === 'gold' ? PALETTE.dnGold : finish === 'bloodmoon' ? PALETTE.dnCrimson : PALETTE.dnSilver;
+                return { gender: pickFrom(r, ['female', 'male', 'androgynous']), build: pickFrom(r, [undefined, 'slim', 'athletic']),
+                         body: { kind: 'android', finish }, top: { type: 'dn_uniform', ...uni },
+                         bottom: { type: 'pants', color: '#141216' }, shoes: { type: 'loafers', color: '#0e0e10' }, pose: 'concierge' };
             },
             // The Ethereal plane's wanderers
             spirit() {

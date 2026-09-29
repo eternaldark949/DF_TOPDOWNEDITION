@@ -477,8 +477,209 @@
             }
         }
 
+        // Double Nights (hotel lobby): black lacquer and marble, gold, silver, crimson velvet.
+        const DNL = {
+            ink: '#0e0c10', marble: '#1b181e', marbleLt: '#2e2934', gold: '#e8c27a', goldDk: '#a8823e', goldLt: '#fff1c2',
+            silver: '#dfe6ff', silverDk: '#8a90a8', crimson: '#8a1024', crimsonLt: '#b8203a', velvet: '#6a0c1c', cream: '#f3e6c8',
+            leaf: '#1f4a34', leafLt: '#2f6a48'
+        };
+
+        function drawLobbyDecorProp(ctx, p) {
+            const x = p.x, w = p.width, h = p.height, t = _frameTime / 1000, C = DNL;
+            // Floating pieces bob on a faint gold hover-glow; their shadow stays on the floor
+            const floats = p.decorType.startsWith('dn_float');
+            const bob = floats ? Math.sin(t * 1.6 + x * 0.05) * 3 - 6 : 0;
+            const y = p.y + bob;
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const shadow = (r = 5) => rr(x + 3, p.y + 4, w, h, r, floats ? `rgba(0,0,0,${0.22 - bob * 0.01})` : 'rgba(0,0,0,0.3)');
+            if (floats) {                                                  // the hover-glow beneath
+                ctx.save(); ctx.globalAlpha = 0.35 + 0.1 * Math.sin(t * 3 + x);
+                ctx.fillStyle = 'rgba(232,194,122,0.5)'; ctx.beginPath(); ctx.ellipse(x + w / 2, p.y + h / 2 + 2, w * 0.45, h * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
+            switch (p.decorType) {
+                case 'dn_fountain': {                                      // black-marble basin, water sheeting down a glass column round a turning rift
+                    const cx = x + w / 2, cy = y + h / 2, R = w / 2;
+                    circ(cx + 3, cy + 4, R, 'rgba(0,0,0,0.35)');
+                    circ(cx, cy, R, C.marble, C.gold, 2); circ(cx, cy, R - 5, null, 'rgba(223,230,255,0.35)', 1);
+                    circ(cx, cy, R - 8, '#0f1a2a');
+                    ctx.strokeStyle = 'rgba(180,210,255,0.35)'; ctx.lineWidth = 1;
+                    for (let i = 0; i < 3; i++) { const ph = (t * 0.45 + i / 3) % 1; ctx.globalAlpha = 1 - ph; circ(cx, cy, 22 + ph * (R - 32), null, 'rgba(180,210,255,0.45)', 1); }
+                    ctx.globalAlpha = 1;
+                    circ(cx, cy, 22, 'rgba(200,220,255,0.10)', 'rgba(223,230,255,0.7)', 1.5);     // the glass column
+                    ctx.save(); ctx.translate(cx, cy); ctx.rotate((t * 0.5) % (Math.PI * 2));   // the rift, turning
+                    for (let k = 0; k < 2; k++) {
+                        ctx.rotate(Math.PI);
+                        ctx.strokeStyle = k ? 'rgba(232,194,122,0.9)' : 'rgba(190,130,255,0.9)'; ctx.lineWidth = 2.2;
+                        ctx.beginPath(); for (let i = 0; i <= 20; i++) { const a = i / 20 * Math.PI * 1.4, r = 3 + i * 0.75; ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); } ctx.stroke();
+                    }
+                    ctx.restore();
+                    circ(cx, cy, 3, '#fff6e0');
+                    break;
+                }
+                case 'dn_desk': {                                          // curved black marble, gold edge; bell, key rack, ledger
+                    const cx = x + w / 2;
+                    ctx.save(); ctx.translate(3, 4); ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(cx, y + h * 0.9, x + w, y); ctx.lineTo(x + w, y + h * 0.5); ctx.quadraticCurveTo(cx, y + h * 1.5, x, y + h * 0.5); ctx.closePath(); ctx.fill(); ctx.restore();
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(cx, y + h * 0.9, x + w, y); ctx.lineTo(x + w, y + h * 0.5); ctx.quadraticCurveTo(cx, y + h * 1.5, x, y + h * 0.5); ctx.closePath();
+                    ctx.fillStyle = C.marbleLt; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 2.5; ctx.stroke();
+                    ctx.strokeStyle = 'rgba(223,230,255,0.22)'; ctx.lineWidth = 1; ctx.beginPath();          // silver veins
+                    for (let i = 0; i < 5; i++) { ctx.moveTo(x + 20 + i * 45, y + 6); ctx.quadraticCurveTo(x + 40 + i * 45, y + 20, x + 30 + i * 45, y + 34); }
+                    ctx.stroke();
+                    circ(x + 34, y + 12, 5, C.gold, C.goldLt, 1); circ(x + 34, y + 12, 1.5, C.goldLt);   // the bell
+                    rr(cx - 12, y + 16, 24, 14, 1, C.cream, C.goldDk, 0.8); ctx.fillStyle = C.crimson; ctx.fillRect(cx - 0.5, y + 16, 1, 14);   // ledger
+                    rr(x + w - 58, y + 6, 30, 10, 1, C.silverDk); for (let i = 0; i < 6; i++) circ(x + w - 54 + i * 4.4, y + 11, 1.3, C.silver);   // keys
+                    break;
+                }
+                case 'dn_sofa': {                                          // red velvet, buttoned, gold feet
+                    shadow(10); rr(x, y, w, h, 10, C.velvet);
+                    const back = p.y < 800 ? 'N' : 'S';                    // faces into the lounge
+                    rr(x + 2, back === 'N' ? y : y + h - 16, w - 4, 16, 8, '#4a0814');
+                    rr(x, y + 4, 14, h - 8, 6, '#4a0814'); rr(x + w - 14, y + 4, 14, h - 8, 6, '#4a0814');
+                    ctx.fillStyle = 'rgba(255,200,210,0.35)';
+                    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(x + 22 + i * (w - 44) / 4, back === 'N' ? y + 8 : y + h - 8, 1.3, 0, Math.PI * 2); ctx.fill(); }
+                    rr(x + 16, back === 'N' ? y + 18 : y + 6, (w - 34) / 2, h - 26, 5, C.crimsonLt); rr(x + w / 2 + 1, back === 'N' ? y + 18 : y + 6, (w - 34) / 2, h - 26, 5, C.crimsonLt);
+                    for (const [fx, fy] of [[x + 2, y + 2], [x + w - 5, y + 2], [x + 2, y + h - 5], [x + w - 5, y + h - 5]]) { ctx.fillStyle = C.gold; ctx.fillRect(fx, fy, 3, 3); }
+                    break;
+                }
+                case 'dn_wingback': {
+                    shadow(6); rr(x, y, w, h, 6, C.velvet);
+                    rr(x + 2, y + (p.y < 950 ? h - 12 : 0), w - 4, 12, 5, '#4a0814'); rr(x, y + 4, 8, h - 8, 4, '#4a0814'); rr(x + w - 8, y + 4, 8, h - 8, 4, '#4a0814');
+                    rr(x + 10, y + 8, w - 20, h - 20, 4, C.crimsonLt);
+                    break;
+                }
+                case 'dn_table': {                                         // marble top on gold legs, champagne and a vase
+                    shadow(h / 2); rr(x, y, w, h, h / 2, '#e9e4ea', C.gold, 2);
+                    ctx.strokeStyle = 'rgba(120,110,130,0.35)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x + 10, y + 8); ctx.quadraticCurveTo(x + w / 2, y + h * 0.7, x + w - 12, y + 10); ctx.stroke();
+                    circ(x + w * 0.3, y + h / 2, 3, 'rgba(255,240,200,0.9)', C.gold, 0.8); circ(x + w * 0.42, y + h / 2 + 3, 3, 'rgba(255,240,200,0.9)', C.gold, 0.8);   // flutes
+                    circ(x + w * 0.72, y + h / 2, 6, C.ink, C.gold, 1); for (let i = 0; i < 5; i++) circ(x + w * 0.72 + Math.cos(i * 1.26) * 4, y + h / 2 + Math.sin(i * 1.26) * 4, 2, i % 2 ? '#e8b4b8' : C.crimsonLt);
+                    break;
+                }
+                case 'dn_lamp': {                                          // a champagne-gold floor lamp
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 2, cy + 3, w / 2, 'rgba(0,0,0,0.3)'); circ(cx, cy, w / 2, C.cream, C.gold, 1.5); circ(cx, cy, w * 0.18, '#fff0c8');
+                    break;
+                }
+                case 'dn_palm': {                                          // a potted palm in a gold urn
+                    const cx = x + w / 2, cy = y + h / 2;
+                    circ(cx + 2, cy + 3, w / 2, 'rgba(0,0,0,0.3)'); circ(cx, cy, w * 0.32, C.ink, C.gold, 1.5);
+                    for (let i = 0; i < 7; i++) {
+                        const a = i * 0.9 + Math.sin(t * 0.8 + i) * 0.04, L = w * 0.62;
+                        ctx.strokeStyle = i % 2 ? C.leafLt : C.leaf; ctx.lineWidth = 4; ctx.lineCap = 'round';
+                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.quadraticCurveTo(cx + Math.cos(a + 0.3) * L * 0.6, cy + Math.sin(a + 0.3) * L * 0.6, cx + Math.cos(a) * L, cy + Math.sin(a) * L); ctx.stroke();
+                    }
+                    ctx.lineCap = 'butt';
+                    break;
+                }
+                case 'dn_float_chaise': {                                  // a chaise hanging in the air, silver-edged
+                    shadow(10); rr(x, y, w, h, 12, '#2a0a14', C.silver, 1.2);
+                    rr(x + 4, y + 4, w * 0.3, h - 8, 8, C.crimsonLt); rr(x + w * 0.34, y + 6, w * 0.6, h - 12, 6, C.velvet);
+                    ctx.fillStyle = 'rgba(223,230,255,0.25)'; ctx.fillRect(x + 12, y + 2, w - 24, 1);
+                    break;
+                }
+                case 'dn_float_chair': {
+                    shadow(8); rr(x, y, w, h, 8, '#2a0a14', C.gold, 1.2);
+                    rr(x + 6, y + 6, w - 12, h - 12, 6, C.crimsonLt);
+                    break;
+                }
+                case 'dn_lost_luggage': {                                  // a hard case; open (and empty) once searched
+                    const open = p._searched;
+                    shadow(3);
+                    rr(x, y, w, h, 3, '#3a2a4a', C.gold, 1);
+                    if (open) { rr(x - 2, y - h * 0.55, w + 4, h * 0.55, 3, '#2a1e38', C.goldDk, 1); rr(x + 3, y + 3, w - 6, h - 6, 2, '#1a1224'); }
+                    else { ctx.fillStyle = C.gold; ctx.fillRect(x + w / 2 - 4, y - 2, 8, 3); ctx.fillRect(x + 4, y + h / 2 - 0.5, w - 8, 1);
+                           const tagSwing = Math.sin(t * 2 + x) * 0.2; ctx.save(); ctx.translate(x + w - 4, y + 2); ctx.rotate(0.6 + tagSwing); ctx.fillStyle = C.cream; ctx.fillRect(0, 0, 5, 8); ctx.restore(); }
+                    break;
+                }
+            }
+        }
+
+        /* The two machines every map shares, one design each (standard size 40×60):
+           MiniSpree — the city's vending brand: glossy black, a lit window of cans, a pink-and-cyan
+           marquee; and the health station — Dr. Yin's refill cabinet: white and wine, a green cross,
+           a rack of stim vials, a vitals readout. */
+        function drawMiniSpree(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
+            const hum = 0.85 + 0.15 * Math.sin(t * 7) * Math.sin(t * 2.3);
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+            ctx.fillStyle = '#0d0d12'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
+            ctx.shadowColor = '#3ef0ff'; ctx.shadowBlur = 8 * hum;                               // neon edge
+            ctx.strokeStyle = `rgba(62,240,255,${0.55 * hum})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 4); ctx.stroke();
+            ctx.shadowBlur = 0;
+            // Marquee
+            const g = ctx.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#ff4fa3'); g.addColorStop(1, '#3ef0ff');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + 2, y + 2, w - 4, 9, 2); ctx.fill();
+            ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.max(5, Math.floor(w * 0.16))}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('MiniSpree', x + w / 2 + 2, y + 6.8);
+            ctx.fillStyle = '#fff6b0'; ctx.beginPath(); const sx = x + 6, sy = y + 6.5;                // the little spark
+            for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 1 : 2.6; ctx[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
+            // The window of cans: bubble tea, Jean soda, stellar lemonade
+            const wx = x + 4, wy = y + 13, ww = w - 8, wh = h * 0.5;
+            ctx.fillStyle = '#10141e'; ctx.fillRect(wx, wy, ww, wh);
+            const cans = ['#c89a6a', '#3a6ad0', '#ffe45a'], cw = (ww - 8) / 3;
+            for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) {
+                const cx = wx + 2 + i * (cw + 2), cy = wy + 2 + row * (wh - 4) / 3;
+                ctx.fillStyle = cans[i]; ctx.beginPath(); ctx.roundRect(cx, cy, cw, (wh - 4) / 3 - 2, 1.5); ctx.fill();
+                ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx + 1, cy + 1, 1, (wh - 4) / 3 - 4);
+            }
+            ctx.fillStyle = `rgba(190,240,255,${0.10 * hum})`; ctx.fillRect(wx, wy, ww, wh);        // the window's light
+            ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + ww * 0.2, wy + wh); ctx.lineTo(wx + ww * 0.75, wy); ctx.stroke();   // glass glint
+            // Keypad, card slot, pickup tray
+            const ky = wy + wh + 3;
+            ctx.fillStyle = '#3ef0ff'; for (let i = 0; i < 6; i++) ctx.fillRect(x + 6 + (i % 3) * 4, ky + Math.floor(i / 3) * 4, 2, 2);
+            ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w - 12, ky, 6, 2);
+            ctx.fillStyle = '#ff4fa3'; ctx.fillRect(x + w - 12, ky + 4, 6, 1);
+            ctx.fillStyle = '#050508'; ctx.beginPath(); ctx.roundRect(x + 5, y + h - 9, w - 10, 5, 1.5); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawHealthStation(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
+            const pulse = 0.7 + 0.3 * Math.sin(t * 2.5);
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+            ctx.fillStyle = '#eceef2'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
+            ctx.strokeStyle = '#6a1a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 4); ctx.stroke();
+            // The green cross, glowing
+            const cx = x + w / 2, cy = y + 11, s = 5;
+            ctx.shadowColor = '#00ff66'; ctx.shadowBlur = 10 * pulse;
+            ctx.fillStyle = '#12c85a'; ctx.fillRect(cx - s, cy - s * 0.35, s * 2, s * 0.7); ctx.fillRect(cx - s * 0.35, cy - s, s * 0.7, s * 2);
+            ctx.shadowBlur = 0;
+            // A rack of stim vials, refilling
+            const ry = y + 20, rh = h * 0.34, n = 5, vw = (w - 10) / n;
+            ctx.fillStyle = '#d4d8de'; ctx.fillRect(x + 4, ry, w - 8, rh);
+            for (let i = 0; i < n; i++) {
+                const vx = x + 5 + i * vw, lvl = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.3));
+                ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(vx + 0.5, ry + 2, vw - 2, rh - 4);
+                ctx.fillStyle = '#19d46a'; ctx.fillRect(vx + 0.5, ry + 2 + (rh - 4) * (1 - lvl), vw - 2, (rh - 4) * lvl);
+                ctx.fillStyle = '#6a1a2a'; ctx.fillRect(vx + 0.5, ry + 1, vw - 2, 1.5);
+            }
+            // Vitals readout: a trace running across a dark screen
+            const sy = ry + rh + 3, sh = h - (sy - y) - 5;
+            ctx.fillStyle = '#0a1410'; ctx.beginPath(); ctx.roundRect(x + 4, sy, w - 8, sh, 2); ctx.fill();
+            ctx.strokeStyle = '#3cff8a'; ctx.lineWidth = 1; ctx.beginPath();
+            const mid = sy + sh / 2, ph = (t * 30) % (w - 8);
+            for (let i = 0; i <= w - 8; i += 1) {
+                const k = (i + ph) % 24, beat = k > 8 && k < 11 ? -sh * 0.35 : k > 11 && k < 13 ? sh * 0.25 : 0;
+                ctx[i ? 'lineTo' : 'moveTo'](x + 4 + i, mid + beat);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
+            if (p.decorType.startsWith('dn_')) return drawLobbyDecorProp(ctx, p);
             if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
@@ -723,36 +924,9 @@
                     ctx.translate(-center.x, -center.y);
                     drawClinicDecorProp(ctx, this);
                 } else if (this.interactionType === 'medbay_refill') {
-                    // === STIM REFILL STATION (rectangular, green + white cross) ===
                     ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
-                    
-                    const mx = this.x, my = this.y, mw = this.width, mh = this.height;
-                    
-                    // Black back casing
-                    ctx.fillStyle = '#111';
-                    ctx.fillRect(mx, my, mw, mh);
-                    
-                    // Green front panel (inset)
-                    ctx.fillStyle = '#0a4f0a';
-                    ctx.fillRect(mx + 3, my + 3, mw - 6, mh - 6);
-                    
-                    // Animated green glow
-                    const stimPulse = 0.7 + Math.sin(_frameTime / 400) * 0.3;
-                    ctx.shadowColor = '#00ff44';
-                    ctx.shadowBlur = 18 * stimPulse;
-                    ctx.fillStyle = `rgba(0, 255, 68, ${0.15 * stimPulse})`;
-                    ctx.fillRect(mx + 2, my + 2, mw - 4, mh - 4);
-                    
-                    // White cross (centered)
-                    const crossW = Math.min(mw, mh) * 0.35;
-                    const crossH = crossW * 0.25;
-                    const ccx = mx + mw / 2, ccy = my + mh / 2;
-                    ctx.fillStyle = '#fff';
-                    ctx.fillRect(ccx - crossW / 2, ccy - crossH / 2, crossW, crossH);
-                    ctx.fillRect(ccx - crossH / 2, ccy - crossW / 2, crossH, crossW);
-                    ctx.shadowBlur = 0;
-                    
+                    drawHealthStation(ctx, this);
                 } else if (this.interactionType === 'armory') {
                     // === ARMORY LOCKER (wall-mounted weapons rack) ===
                     ctx.rotate(-this.angle);
@@ -795,44 +969,9 @@
                     ctx.textAlign = 'start';
                     
                 } else if (this.interactionType === 'vending_machine') {
-                    // === VENDING MACHINE (rectangular, white front, black back, "minispree") ===
                     ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
-                    
-                    const vx = this.x, vy = this.y, vw = this.width, vh = this.height;
-                    
-                    // Black back casing
-                    ctx.fillStyle = '#0a0a0a';
-                    ctx.fillRect(vx, vy, vw, vh);
-                    
-                    // White front panel (inset)
-                    ctx.fillStyle = '#e8e8e8';
-                    ctx.fillRect(vx + 3, vy + 3, vw - 6, vh - 6);
-                    
-                    // Product display window (dark inset)
-                    ctx.fillStyle = '#1a1a2a';
-                    ctx.fillRect(vx + 5, vy + 5, vw - 10, vh * 0.5);
-                    
-                    // Animated bluish-white glow
-                    const vendPulse = 0.8 + Math.sin(_frameTime / 300) * 0.2;
-                    ctx.shadowColor = '#ccddff';
-                    ctx.shadowBlur = 14 * vendPulse;
-                    ctx.fillStyle = `rgba(200, 220, 255, ${0.12 * vendPulse})`;
-                    ctx.fillRect(vx + 4, vy + 4, vw - 8, vh * 0.55);
-                    ctx.shadowBlur = 0;
-                    
-                    // "minispree" text
-                    ctx.font = `bold ${Math.max(6, Math.floor(vw * 0.18))}px Montserrat, sans-serif`;
-                    ctx.fillStyle = '#00bbff';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('minispree', vx + vw / 2, vy + vh * 0.75);
-                    ctx.textAlign = 'left';
-                    
-                    // Coin slot detail
-                    ctx.fillStyle = '#555';
-                    ctx.fillRect(vx + vw - 10, vy + vh * 0.6, 4, 8);
-                    
+                    drawMiniSpree(ctx, this);
                 } else if (this.interactionType === 'bed_sleep') {
                     // --- NEW: SMALLER BED RENDERER ---
                     ctx.rotate(-this.angle);

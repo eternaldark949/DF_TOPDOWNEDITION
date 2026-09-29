@@ -244,6 +244,7 @@
                 //  code steps them back by lagTicks() instead — see drawRainOverlay.)
                 if (L) out.push({ items: L.leaves, pos: true, scalars: ['rotation', 'tumble'] });
                 if (game.graveyardGhosts) out.push({ items: game.graveyardGhosts, pos: true, angles: ['angle'], scalars: ['life'] });
+                if (game.lobbyLife && game.lobbyLife.walkers.length) out.push({ items: game.lobbyLife.walkers, pos: true, angles: ['angle'], scalars: ['life'] });
                 if (game.flitVFX) out.push({ items: game.flitVFX, scalars: ['ghostAlpha', 'trailLife', 'arrivalGlow'] });
                 if (game.lastKnownMarkers) out.push({ items: game.lastKnownMarkers, scalars: ['opacity'] });
                 if (m && m.ferrisWheel) out.push({ items: [m.ferrisWheel], angles: ['angle'] });

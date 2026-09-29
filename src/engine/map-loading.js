@@ -980,7 +980,7 @@
                 this.enemies = []; this.loot = []; 
                 // Maps that ask for it (the House) route paths around their big furniture too
                 if (this.activeMap.navProps) this.activeMap.navObstacles = this.props
-                    .filter(p => (p.mass || 0) >= 1e6 && p.width * p.height >= 600 && !p.noNav)
+                    .filter(p => (p.mass || 0) >= 1e6 && p.width * p.height >= (this.activeMap.navProps === 'all' ? 200 : 600) && !p.noNav)
                     .map(p => ({ x: p.x, y: p.y, w: p.width, h: p.height }));
                 
                 // Auto-tag lamps with their containing room ID for per-room light control

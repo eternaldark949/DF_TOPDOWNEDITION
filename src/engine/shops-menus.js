@@ -586,6 +586,28 @@
             },
 
             // =========================================================
+            //  LOST LUGGAGE (the Double Nights lobby) — a few personics lifted from a
+            //  forgotten case; each case fills again once a day (questState.lobbyLuggage)
+            // =========================================================
+            searchLostLuggage(prop) {
+                const qs = this.questState, id = prop.noteId || 'lobby';
+                const day = Math.floor((this.worldMinutes || 0) / 1440);
+                qs.lobbyLuggage = qs.lobbyLuggage || {};
+                if (qs.lobbyLuggage[id] === day) { showMessage('EMPTY. SOMEONE BEAT YOU TO IT.'); audioSys.sfx('ui'); return; }
+                const pp = 25 + Math.floor(Math.random() * 56);
+                qs.lobbyLuggage[id] = day; prop._searched = true;
+                this.currency += pp; this.updateUI();
+                showMessage(`+${pp} PERSONICS — ${pickFrom(Math.random, ["SOMEONE WON'T MISS IT", 'FINDERS KEEPERS', 'A TIP, OF SORTS', 'THINK EXCELLENCE'])}`);
+                audioSys.sfx('ui');
+            },
+
+            /** Which lobby cases have been searched today (they open; they refill at dawn of the next day). */
+            refreshLostLuggage() {
+                const L = (this.questState && this.questState.lobbyLuggage) || {}, day = Math.floor((this.worldMinutes || 0) / 1440);
+                for (const p of this.props) if (p.interactionType === 'lost_luggage') p._searched = L[p.noteId] === day;
+            },
+
+            // =========================================================
             //  GAUNTLET MAP PICKER (Grum North) — one card per GAUNTLET_MAPS entry;
             //  sealed ones are placeholders for maps to come
             // =========================================================

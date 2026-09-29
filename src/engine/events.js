@@ -57,6 +57,8 @@
                             this.refillStims();
                         } else if(this.activeInteraction.interactionType === 'vending_machine') {
                             this.buyBubbleTea();
+                        } else if(this.activeInteraction.interactionType === 'lost_luggage') {
+                            this.searchLostLuggage(this.activeInteraction);
                         } else if(this.activeInteraction.interactionType === 'bed_sleep') {
                             // NEW: Open Sleep UI
                             this.openSleepMenu();
