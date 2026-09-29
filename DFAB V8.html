@@ -7526,7 +7526,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         if (!cur || cur.track !== spec.track) return;       // left the map while it decoded
                         if (M.src) { try { M.src.stop(); } catch (e) { /* already stopped */ } }
                         const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(M.f); s.start();
-                        M.src = s; M.name = spec.track;
+                        M.src = s; M.name = spec.track; M.t0 = ctx.currentTime; M.dur = buf.duration;
                     });
                 }
                 // How loud and how bright, from where 949 is
@@ -7550,6 +7550,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (M.level > 0.002) M.quietSince = now;
                     else if (now - M.quietSince > 4) { try { M.src.stop(); } catch (e) { /* already stopped */ } M.src = null; M.name = null; }
                 } else M.quietSince = now;
+            }
+
+            /** Beats played so far of this map's track (MAP_MUSIC bpm/beat0), counted from where the
+             *  speakers actually are in the loop, or null when it isn't playing. Lights keep time with it. */
+            musicBeat(game) {
+                const M = this._mus, spec = game.activeMap && MAP_MUSIC[game.activeMap.id];
+                if (!M || !M.src || !spec || !spec.bpm || M.name !== spec.track || M.level < 0.002) return null;
+                const ctx = this.audio.ctx;
+                if (ctx.state !== 'running') return null;                       // a locked or paused clock stands still
+                const el = ctx.currentTime - M.t0 - (ctx.outputLatency || ctx.baseLatency || 0);
+                if (el < 0) return null;
+                const loops = Math.floor(el / M.dur), perLoop = Math.round(M.dur * spec.bpm / 60);
+                return loops * perLoop + ((el - loops * M.dur) - (spec.beat0 || 0)) * spec.bpm / 60;
             }
 
             _voice(nodes, dur) {
@@ -7664,7 +7677,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            `room` is where its speakers are (it's fullest there), `volume` its level. */
         const MAP_MUSIC = {
             apt_949: { track: 'silver queen tst', room: 'main_room', volume: 0.5 },   // the Silver Queen suite
+            // Swig: a 16-bar loop at 140 BPM, the kick on the first sample; the club's lights dance to it
+            moon_city_nightclub: { track: 'swig', room: 'hall', volume: 0.55, bpm: 140, beat0: 0 },
         };
+        const CLUB_BPM = 140;
+
+        /** The club's beat count: from the music when it's playing, else a free-running 140 BPM clock. */
+        function clubBeatN() {
+            const b = typeof ambience !== 'undefined' && typeof game !== 'undefined' && game ? ambience.musicBeat(game) : null;
+            return b !== null ? b : (_frameTime / 1000) * CLUB_BPM / 60;
+        }
 
         const ambience = new AmbienceSystem(audioSys);
 
@@ -14082,7 +14104,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         function drawClubDecorProp(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000, C = MC, d = p.decor || {};
-            const beat = (t * 124 / 60) % 1, pulse = Math.pow(1 - beat, 3);          // 124 BPM, a kick on each beat
+            const beat = ((clubBeatN() % 1) + 1) % 1, pulse = Math.pow(1 - beat, 3);   // on the music's kick (audio.js)
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
                 if (fill) { ctx.fillStyle = fill; ctx.fill(); }
@@ -50888,13 +50910,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return cv;
             },
 
-            /** Moon City after the darkness layer, on a 124 BPM clock: the dance floor's tiles, beams
+            /** Moon City after the darkness layer, in time with the music (clubBeatN, audio.js): the dance floor's tiles, beams
              *  sweeping from the DJ rig, mirror-ball specks, pole uplights, the bar's backlight, the
              *  restroom mirrors, the VIP wing's red, the neon at the door. A room she isn't in keeps
              *  only a little of its glow (its veil eases it). */
             drawClubGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;
-                const beatN = t * 124 / 60, beat = beatN % 1, bar = Math.floor(beatN / 8), kick = Math.pow(1 - beat, 3);
+                const beatN = clubBeatN(), beat = ((beatN % 1) + 1) % 1, bar = Math.floor(beatN / 8), kick = Math.pow(1 - beat, 3);
                 const seen = (x, y) => { const r = rs && rs.active ? rs.getRoomAt(x, y) : null; return r ? 0.2 + 0.8 * r.vis : 1; };
                 const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
                 const PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];

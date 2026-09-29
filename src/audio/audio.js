@@ -294,7 +294,7 @@
                         if (!cur || cur.track !== spec.track) return;       // left the map while it decoded
                         if (M.src) { try { M.src.stop(); } catch (e) { /* already stopped */ } }
                         const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(M.f); s.start();
-                        M.src = s; M.name = spec.track;
+                        M.src = s; M.name = spec.track; M.t0 = ctx.currentTime; M.dur = buf.duration;
                     });
                 }
                 // How loud and how bright, from where 949 is
@@ -318,6 +318,19 @@
                     if (M.level > 0.002) M.quietSince = now;
                     else if (now - M.quietSince > 4) { try { M.src.stop(); } catch (e) { /* already stopped */ } M.src = null; M.name = null; }
                 } else M.quietSince = now;
+            }
+
+            /** Beats played so far of this map's track (MAP_MUSIC bpm/beat0), counted from where the
+             *  speakers actually are in the loop, or null when it isn't playing. Lights keep time with it. */
+            musicBeat(game) {
+                const M = this._mus, spec = game.activeMap && MAP_MUSIC[game.activeMap.id];
+                if (!M || !M.src || !spec || !spec.bpm || M.name !== spec.track || M.level < 0.002) return null;
+                const ctx = this.audio.ctx;
+                if (ctx.state !== 'running') return null;                       // a locked or paused clock stands still
+                const el = ctx.currentTime - M.t0 - (ctx.outputLatency || ctx.baseLatency || 0);
+                if (el < 0) return null;
+                const loops = Math.floor(el / M.dur), perLoop = Math.round(M.dur * spec.bpm / 60);
+                return loops * perLoop + ((el - loops * M.dur) - (spec.beat0 || 0)) * spec.bpm / 60;
             }
 
             _voice(nodes, dur) {
@@ -432,7 +445,16 @@
            `room` is where its speakers are (it's fullest there), `volume` its level. */
         const MAP_MUSIC = {
             apt_949: { track: 'silver queen tst', room: 'main_room', volume: 0.5 },   // the Silver Queen suite
+            // Swig: a 16-bar loop at 140 BPM, the kick on the first sample; the club's lights dance to it
+            moon_city_nightclub: { track: 'swig', room: 'hall', volume: 0.55, bpm: 140, beat0: 0 },
         };
+        const CLUB_BPM = 140;
+
+        /** The club's beat count: from the music when it's playing, else a free-running 140 BPM clock. */
+        function clubBeatN() {
+            const b = typeof ambience !== 'undefined' && typeof game !== 'undefined' && game ? ambience.musicBeat(game) : null;
+            return b !== null ? b : (_frameTime / 1000) * CLUB_BPM / 60;
+        }
 
         const ambience = new AmbienceSystem(audioSys);
 

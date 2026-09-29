@@ -728,7 +728,7 @@
 
         function drawClubDecorProp(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000, C = MC, d = p.decor || {};
-            const beat = (t * 124 / 60) % 1, pulse = Math.pow(1 - beat, 3);          // 124 BPM, a kick on each beat
+            const beat = ((clubBeatN() % 1) + 1) % 1, pulse = Math.pow(1 - beat, 3);   // on the music's kick (audio.js)
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
                 if (fill) { ctx.fillStyle = fill; ctx.fill(); }
