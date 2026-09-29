@@ -550,6 +550,7 @@
                 this.windows = [];
                 this.linens = [];
                 this.currentRoom = null;
+                this._lastHit = null;           // the lookup cache belongs to the old map's rooms
                 
                 if (!def) { this.active = false; return; }
                 this.active = true;
@@ -602,6 +603,7 @@
              * Clear the system (called on map change).
              */
             clear() {
+                this._lastHit = null;
                 this.rooms = {};
                 this.doors = [];
                 this.windows = [];

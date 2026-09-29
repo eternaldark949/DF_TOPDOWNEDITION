@@ -922,7 +922,8 @@
                     // Room light switches fade the lamp (and a faulty one flickers)
                     l._lightK = rsys.lampLight(l) * lampFlicker(l);
                     l._forcedOff = l._lightK < 0.02;
-                    const outdoorRoom = rsys.active && l._roomId && rsys.rooms[l._roomId].type === 'outdoor';
+                    const lr = rsys.active && l._roomId ? rsys.rooms[l._roomId] : null;
+                    const outdoorRoom = !!lr && lr.type === 'outdoor';
                     l.draw(this.ctx, outdoorRoom ? skyLampDay : daylight);
                 }); 
             
