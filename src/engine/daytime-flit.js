@@ -157,8 +157,9 @@
                     dist
                 });
                 
-                // Play flit sound
+                // Play flit sound — and a flit is heard close by
                 audioSys.sfx('flit');
+                this.emitNoise(targetX, targetY, CONFIG.NOISE.flit, 'flit');
                 return true;
             },
 

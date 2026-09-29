@@ -620,6 +620,7 @@
                 }
             
                 this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
+                this.drawNoiseRipples(this.ctx);
                 
                 // PERFORMANCE: AABB viewport culling for entities
                 {

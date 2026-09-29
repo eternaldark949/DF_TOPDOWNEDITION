@@ -173,6 +173,7 @@
                     const px = this.player.x + Math.cos(punchAngle) * 20;
                     const py = this.player.y + Math.sin(punchAngle) * 20;
                     
+                    this.emitNoise(this.player.x, this.player.y, CONFIG.NOISE.punch, 'punch');
                     this.projectiles.push(new ProjectileEntity({
                         x: px, y: py, 
                         angle: punchAngle, 
@@ -265,6 +266,10 @@
                     dotInterval: stats.dotInterval || 10
                 }));
             
+                // Gunfire carries: gangers in earshot come to look (engine/noise.js)
+                { const N = CONFIG.NOISE, id = (this.currentWeapon && this.currentWeapon.id) || '';
+                  this.emitNoise(this.player.x, this.player.y, isSniperVisual || id.includes('sniper') ? N.sniper : id.includes('rifle') ? N.rifle : N.pistol, 'shot'); }
+
                 // 5. Spawn Muzzle Flash
                 this.muzzleFlashes.push({ 
                     x: px, 
