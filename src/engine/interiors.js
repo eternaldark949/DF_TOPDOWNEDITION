@@ -325,7 +325,7 @@
                 c.strokeStyle = 'rgba(200,168,255,0.08)'; c.lineWidth = 1; c.beginPath();
                 for (let x = 374; x <= 1226; x += 71) { c.moveTo(x, 14); c.lineTo(x, 986); } for (let y = 14; y <= 986; y += 71) { c.moveTo(374, y); c.lineTo(1226, y); } c.stroke();
                 veins(374, 14, 852, 972, 50, a => `rgba(170,120,255,${a})`);
-                // The dance floor: dark glass tiles (the light show is drawClubGlow), a chrome frame
+                // The dance floor: dark glass tiles (lit by drawClubFloorLights), a chrome frame
                 c.fillStyle = '#100a18'; c.fillRect(580, 300, 440, 400);
                 c.strokeStyle = 'rgba(255,255,255,0.06)'; c.beginPath();
                 for (let x = 580; x <= 1020; x += 40) { c.moveTo(x, 300); c.lineTo(x, 700); } for (let y = 300; y <= 700; y += 40) { c.moveTo(580, y); c.lineTo(1020, y); } c.stroke();
@@ -371,6 +371,43 @@
                 return cv;
             },
 
+            /** Moon City's dance floor and pole plinths, lit from within: drawn on the floor, under the
+             *  dancers (clubLightLayer lets them through the darkness and tints whoever stands on them).
+             *  One of four patterns per 8-beat bar, colours walking the palette, on the music's beat. */
+            drawClubFloorLights(ctx) {
+                const beatN = clubBeatN(), beat = ((beatN % 1) + 1) % 1, bar = Math.floor(beatN / 8), kick = Math.pow(1 - beat, 3), mode = ((bar % 4) + 4) % 4;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                for (let i = 0; i < 11; i++) for (let j = 0; j < 10; j++) {
+                    const cx = 600 + i * 40, cy = 320 + j * 40, dx = (cx - 800) / 40, dy = (cy - 500) / 40;
+                    let v;
+                    if (mode === 0) v = Math.max(0, Math.cos((Math.hypot(dx, dy) - beatN * 1.5) * 1.3));                 // ripples out from the centre
+                    else if (mode === 1) v = Math.max(0, Math.sin((dx + dy) * 0.8 - beatN * Math.PI * 0.5));             // a diagonal wave
+                    else if (mode === 2) v = ((i + j + Math.floor(beatN)) % 2) ? kick : 0.12;                             // checker on the kick
+                    else v = Math.max(0, Math.cos(Math.atan2(dy, dx) * 2 - beatN * 1.6)) * (0.4 + 0.6 * kick);           // a turning pinwheel
+                    const col = CLUB_PAL[(i + j + bar) % 4 === 0 ? (bar + 2) % 4 : bar % 4 === 3 ? 0 : bar % 4];
+                    ctx.globalAlpha = 0.1 + 0.45 * v; ctx.fillStyle = `rgb(${col})`; ctx.fillRect(cx - 18, cy - 18, 36, 36);
+                }
+                for (const p of this.props) {                              // the plinths glow up round each pole
+                    if (p.decorType !== 'mc_pole') continue;
+                    const cx = p.x + p.width / 2, cy = p.y + p.height / 2;
+                    ctx.globalAlpha = Math.min(1, 0.5 + 0.3 * kick); drawGlow(ctx, cx, cy, 40, cx > 1300 ? '255, 70, 120' : '210, 160, 255', 0);
+                }
+                ctx.restore();
+            },
+
+            /** The club in the light layer (lighting.js): 'hole' lets the dance floor through the darkness,
+             *  strongest on the kick; 'color' washes whoever's on it in the bar's colour, from below. */
+            clubLightLayer(lc, phase) {
+                const beatN = clubBeatN(), beat = ((beatN % 1) + 1) % 1, bar = Math.floor(beatN / 8), kick = Math.pow(1 - beat, 3);
+                if (phase === 'hole') {
+                    lc.globalAlpha = 0.5 + 0.3 * kick; lc.fillStyle = '#ffffff'; lc.fillRect(590, 310, 420, 380);
+                    lc.globalAlpha = 0.35; drawGlow(lc, 800, 500, 300, '255, 255, 255', 0.4);
+                } else {
+                    lc.globalAlpha = 0.14 + 0.12 * kick; drawGlow(lc, 800, 500, 290, CLUB_PAL[((bar % 3) + 3) % 3], 0.3);
+                }
+                lc.globalAlpha = 1;
+            },
+
             /** Moon City after the darkness layer, in time with the music (clubBeatN, audio.js): the dance floor's tiles, beams
              *  sweeping from the DJ rig, mirror-ball specks, pole uplights, the bar's backlight, the
              *  restroom mirrors, the VIP wing's red, the neon at the door. A room she isn't in keeps
@@ -380,22 +417,12 @@
                 const beatN = clubBeatN(), beat = ((beatN % 1) + 1) % 1, bar = Math.floor(beatN / 8), kick = Math.pow(1 - beat, 3);
                 const seen = (x, y) => { const r = rs && rs.active ? rs.getRoomAt(x, y) : null; return r ? 0.2 + 0.8 * r.vis : 1; };
                 const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
-                const PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];
+                const PAL = CLUB_PAL;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                // The dance floor: one of four patterns per 8-beat bar, colours walking the palette
-                const hall = seen(800, 500), mode = bar % 4;
+                // (The dance floor's tiles and the pole uplights are on the floor: drawClubFloorLights,
+                //  lit through the darkness by clubLightLayer. What's drawn here hangs in the air.)
+                const hall = seen(800, 500);
                 if (hall > 0.01) {
-                    for (let i = 0; i < 11; i++) for (let j = 0; j < 10; j++) {
-                        const cx = 600 + i * 40, cy = 320 + j * 40, dx = (cx - 800) / 40, dy = (cy - 500) / 40;
-                        let v;
-                        if (mode === 0) v = Math.max(0, Math.cos((Math.hypot(dx, dy) - beatN * 1.5) * 1.3));                 // ripples out from the centre
-                        else if (mode === 1) v = Math.max(0, Math.sin((dx + dy) * 0.8 - beatN * Math.PI * 0.5));             // a diagonal wave
-                        else if (mode === 2) v = ((i + j + Math.floor(beatN)) % 2) ? kick : 0.12;                             // checker on the kick
-                        else v = Math.max(0, Math.cos(Math.atan2(dy, dx) * 2 - beatN * 1.6)) * (0.4 + 0.6 * kick);           // a turning pinwheel
-                        const col = PAL[(i + j + bar) % 4 === 0 ? (bar + 2) % 4 : bar % 4 === 3 ? 0 : bar % 4];
-                        ctx.globalAlpha = (0.08 + 0.3 * v) * hall; ctx.fillStyle = `rgb(${col})`; ctx.fillRect(cx - 18, cy - 18, 36, 36);
-                    }
-                    glow(800, 500, 300, PAL[bar % 3], (0.12 + 0.1 * kick) * hall);
                     // Beams from the rig over the stage, sweeping the floor
                     for (let b = 0; b < 3; b++) {
                         const sx = 700 + b * 100, sy = 100, a = Math.PI / 2 + Math.sin(t * (0.5 + b * 0.17) + b * 2) * 0.55, L = 620, spread = 0.07;
@@ -421,12 +448,11 @@
                     for (let y = 250; y < 770; y += 60) glow(392, y, 24, '255, 190, 120', 0.14 * seen(420, y));
                     for (let y = 280; y < 760; y += 80) glow(488, y, 16, '232, 194, 122', 0.12 * seen(470, y));
                 }
-                // Pole uplights (hall and suites)
+                // Orbs, mirrors, tables, the dryers' ready-lights, the coat-check screen
                 for (const p of this.props) {
                     if (!p.decorType || !p.decorType.startsWith('mc_')) continue;
                     const cx = p.x + p.width / 2, cy = p.y + p.height / 2, s = seen(cx, cy);
-                    if (p.decorType === 'mc_pole') { glow(cx, cy, 44, cx > 1300 ? '255, 70, 120' : '210, 160, 255', (0.4 + 0.25 * kick) * s); ctx.globalAlpha = s; ctx.fillStyle = '#ffffff'; ctx.fillRect(cx - 0.5, cy - 4, 1, 3); }
-                    else if (p.decorType === 'mc_orb') glow(cx, cy - 3, 26, '220, 200, 255', (0.35 + 0.08 * Math.sin(t * 1.5 + cx)) * s);
+                    if (p.decorType === 'mc_orb') glow(cx, cy - 3, 26, '220, 200, 255', (0.35 + 0.08 * Math.sin(t * 1.5 + cx)) * s);
                     else if (p.decorType === 'mc_vanity') { const my = p.decor && p.decor.face === 'N' ? p.y + p.height : p.y - 1; for (let x = p.x + 12; x < p.x + p.width; x += 34) glow(x, my, 20, '255, 225, 200', 0.35 * s); }
                     else if (p.decorType === 'mc_lowtable') glow(cx, cy, 30, '255, 220, 170', 0.15 * s);
                     else if (p.decorType === 'mc_dryer') glow(cx, cy, 8, '120, 200, 255', 0.3 * s);

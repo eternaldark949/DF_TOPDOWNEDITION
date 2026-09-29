@@ -87,12 +87,15 @@
                     return { l: [7, -2], r: [9, 2], le: [1, -10], re: [2, 10], bounce: b * 0.25, head: [1.5, 0],
                              turn: Math.sin(t * 0.7) * 0.06 };
                 },
-                // Three dances; each dancer's seed picks one and offsets the beat
+                // Three dances; each dancer's seed picks one. With the map's music (o.beat, a beat count)
+                // everyone keeps time: a sway to a side each beat, a dip on every kick, a turn over four
+                // beats; the third dance sways at half time, slow and sultry, but still dips on the kick.
+                // Without music, a relaxed 120 BPM on each dancer's own phase.
                 dance(t, o) {
-                    const beat = t * TAU * 1.0 + o.seed, s = Math.sin(beat), up = Math.abs(Math.sin(beat * 2));
-                    const v = Math.floor(o.seed) % 3;
+                    const B = o.beat != null ? o.beat : t * 2 + o.seed, v = Math.floor(o.seed) % 3;
+                    const ph = Math.PI * B, s = Math.sin(v === 2 ? ph / 2 : ph), up = Math.abs(Math.sin(ph));
                     const base = { hip: s * 0.25, torso: -s * 0.15, bounce: up * 0.8,
-                                   lf: [0, s * 1.2], rf: [0, s * 1.2], turn: Math.sin(beat * 0.5) * 0.3, hint: 'sultry' };
+                                   lf: [0, s * 1.2], rf: [0, s * 1.2], turn: Math.sin(ph / 4) * 0.3, hint: 'sultry' };
                     if (v === 0) return { ...base, l: [4 + s * 4, -12 - s * 2], r: [4 - s * 4, 12 - s * 2] };
                     if (v === 1) return { ...base, l: [10 + up * 2, -5 + s * 3], r: [10 + up * 2, 5 + s * 3], le: [4, -12], re: [4, 12] };
                     return { ...base, l: [9 + s * 3, -6 - up * 2], r: [-1, 8.5], re: [-5, 15] };
