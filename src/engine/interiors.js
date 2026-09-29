@@ -371,13 +371,13 @@
                 return cv;
             },
 
-            /** Moon City after the darkness layer, on a 124 BPM clock: the dance floor's tiles, beams
+            /** Moon City after the darkness layer, in time with the music (clubBeatN, audio.js): the dance floor's tiles, beams
              *  sweeping from the DJ rig, mirror-ball specks, pole uplights, the bar's backlight, the
              *  restroom mirrors, the VIP wing's red, the neon at the door. A room she isn't in keeps
              *  only a little of its glow (its veil eases it). */
             drawClubGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;
-                const beatN = t * 124 / 60, beat = beatN % 1, bar = Math.floor(beatN / 8), kick = Math.pow(1 - beat, 3);
+                const beatN = clubBeatN(), beat = ((beatN % 1) + 1) % 1, bar = Math.floor(beatN / 8), kick = Math.pow(1 - beat, 3);
                 const seen = (x, y) => { const r = rs && rs.active ? rs.getRoomAt(x, y) : null; return r ? 0.2 + 0.8 * r.vis : 1; };
                 const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
                 const PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];
