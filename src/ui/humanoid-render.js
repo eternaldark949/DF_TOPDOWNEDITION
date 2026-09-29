@@ -1049,7 +1049,7 @@
                 ps.t += dt;
                 const target = !moving && ps.still > 0.4 ? 1 : 0;
                 ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
-                if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender }); poseW = ps.w; }
+                if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender, beat: name === 'dance' ? mapBeatN() : null }); poseW = ps.w; }
             }
             const pf = (key, i) => (pose && pose[key] ? pose[key][i] * poseW : 0);
 

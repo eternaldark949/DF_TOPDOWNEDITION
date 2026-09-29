@@ -333,6 +333,8 @@
                     lc.drawImage(holeGlow, g.x - r, g.y - r, r * 2, r * 2);
                 }
                 
+                if (this.activeMap.id === 'moon_city_nightclub') this.clubLightLayer(lc, 'hole');   // the dance floor, through the dark
+
                 // Rooms she isn't in: the veil dims their pools of light (their glow stays, below)
                 if (rsOn && ambient >= 0.5) { lc.globalCompositeOperation = 'source-over'; rs.drawVeil(lc, 1); }
 
@@ -381,6 +383,8 @@
                     drawGlow(lc, g.x, g.y, 180, g.medbay ? '#00ff00' : '#00f3ff', 0.3);
                 }
             
+                if (this.activeMap.id === 'moon_city_nightclub') this.clubLightLayer(lc, 'color');  // the floor's colour on whoever dances on it
+
                 // Soft light colour (the warm pool each decor light casts)
                 for (const s of softLights) {
                     lc.globalAlpha = Math.min(1, 0.22 * s.a);

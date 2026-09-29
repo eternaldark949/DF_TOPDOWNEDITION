@@ -449,10 +449,21 @@
             moon_city_nightclub: { track: 'swig', room: 'hall', volume: 0.55, bpm: 140, beat0: 0 },
         };
         const CLUB_BPM = 140;
+        const CLUB_PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];   // the club's lights: violet, lavender, rose, gold
 
-        /** The club's beat count: from the music when it's playing, else a free-running 140 BPM clock. */
+        /** The current map's beat count, if its track has a tempo (MAP_MUSIC bpm): from the music while
+         *  it plays, else a free-running clock at that tempo (audio locked, paused). null without one. */
+        function mapBeatN() {
+            if (typeof game === 'undefined' || !game || !game.activeMap) return null;
+            const spec = MAP_MUSIC[game.activeMap.id];
+            if (!spec || !spec.bpm) return null;
+            const b = typeof ambience !== 'undefined' ? ambience.musicBeat(game) : null;
+            return b !== null ? b : (_frameTime / 1000) * spec.bpm / 60;
+        }
+
+        /** The club's beat count (its lights and dancers keep time with Swig). */
         function clubBeatN() {
-            const b = typeof ambience !== 'undefined' && typeof game !== 'undefined' && game ? ambience.musicBeat(game) : null;
+            const b = mapBeatN();
             return b !== null ? b : (_frameTime / 1000) * CLUB_BPM / 60;
         }
 
