@@ -54,9 +54,10 @@
                     // the scheduler owns that now, and two systems assigning the
                     // same bool every frame would just overwrite each other.
                     // Stepping inside hides the rain; the storm keeps running.
-                    this.weather.setIndoorSuppressed(
-                        this.activeMap.type === 'indoor' && !this.roomSystem.isPlayerOutdoor()
-                    );
+                    // Eased with her step outside: the rain fades in rather than switching on.
+                    const out = this.roomSystem.outdoorness;
+                    this.weather.setIndoorSuppressed(this.activeMap.type === 'indoor' && out < 0.02);
+                    if (out !== this._lastOutdoorness) { this._lastOutdoorness = out; this.updateDaytimeExposure(); }
                 }
                 
                 // Owned car marker fade logic

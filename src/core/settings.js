@@ -89,7 +89,7 @@
             // --- VISUAL ---
             lightingQuality: 'high',        // 'low' | 'medium' | 'high'
             filmGrain: true,                // Film grain overlay
-            softShadows: true,              // Gaussian blur on baked shadow pass (expensive)
+            softShadows: true,              // Soft shadow edges: the light layer at half resolution, blurred (on for high quality)
             bloom: true,                    // Post-process light bleed
             wetReflections: true,           // Elongated light reflections on wet surfaces
             atmosphereTint: '',             // Color wash: '' | 'amber' | 'violet' | 'crimson' | 'teal'

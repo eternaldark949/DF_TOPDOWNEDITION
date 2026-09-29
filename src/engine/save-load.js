@@ -720,7 +720,7 @@
                         GameSettings.rainDensity = save.settings.rainDensity || 'high';
                         GameSettings.lightingQuality = save.settings.lightingQuality || 'high';
                         GameSettings.filmGrain = save.settings.filmGrain !== false;
-                        GameSettings.softShadows = save.settings.softShadows || false;
+                        GameSettings.softShadows = save.settings.softShadows ?? (GameSettings.lightingQuality === 'high');
                         GameSettings.bloom = save.settings.bloom !== false;
                         GameSettings.wetReflections = save.settings.wetReflections !== false;
                         GameSettings.atmosphereTint = save.settings.atmosphereTint ?? '';

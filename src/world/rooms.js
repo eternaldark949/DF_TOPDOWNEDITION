@@ -1,9 +1,36 @@
         // ============================================================================
-        //  ROOM SYSTEM — Indoor V2 Architecture
+        //  ROOM SYSTEM — the standard for every indoor map
         //  Gives indoor maps the same depth as outdoor: rooms, doors, windows, linens.
         //  Each room carries its own type (indoor/outdoor) enabling per-room weather,
         //  daylight projection through windows, and door animations.
+        //
+        //  How it looks: the room 949 is in is fully seen; the others sit in a soft
+        //  violet shadow (feathered, never a hard cut) and brighten as she walks in,
+        //  with light spilling through doorways as the doors open. From an outdoor
+        //  room (a veranda) the interior dims as if seen through glass — its lamps
+        //  keep glowing. Outdoor rooms carry the sky's light, so a veranda is bright
+        //  at noon. Room lights fade when switched. Everything eases over time.
+        //
+        //  Giving an indoor map rooms — add an entry to ROOM_DEFS below:
+        //    rooms    { id: { x, y, w, h, type: 'indoor'|'outdoor', label } } — cover
+        //             every walkable area; outdoor rooms get sky light and weather
+        //    doors    { x, y, w, h, type: 'sliding'|'hinged', orientation: 'H'|'V',
+        //               rooms: [a, b] } — the two rooms it joins (light spills
+        //             through it); walls are cut for doors automatically
+        //    windows  { x, y, w, h, facing: 'N'|'S'|'E'|'W' } — daylight projections
+        //    linens   decorative cloth
+        //  and give light switches (map-entities.js) the `roomId` they control.
+        //  Lamps are tagged with their room when the map loads.
         // ============================================================================
+        const ROOM_LOOK = {
+            AWAY_VIS: 0.55,        // rooms 949 isn't in
+            GLASS_VIS: 0.35,       // indoor rooms seen from outside
+            DOOR_SPILL: 0.85,      // how far an open door lifts the room beyond it
+            VEIL_MAX: 0.82,        // veil strength at vis 0
+            VEIL_RGB: '16, 8, 34', // violet-indigo, the night's own colour
+            FEATHER: 12,           // world px per veil texel (edge softness)
+            VIS_RATE: 5, LIGHT_RATE: 9, OUTDOOR_RATE: 4   // easing, per second
+        };
         
         /**
          * IndoorWindow — Projects daylight/exterior glow through walls.
@@ -434,13 +461,20 @@
                         label: roomDef.label || id,
                         floorColor: roomDef.floorColor || null,
                         floorTexture: roomDef.floorTexture || null,
-                        lightsOff: false  // Stealth: toggled by light switches
+                        lightsOff: false, // Stealth: toggled by light switches
+                        lightK: 1,        // eased 0…1 light level (switches fade)
+                        vis: 1            // eased 0…1 how seen the room is (1 = no veil)
                     };
                 }
+                this.outdoorness = 0;
+                this._lastT = undefined;
+                this._veil = null;
                 
-                // Build doors
+                // Build doors (each names the two rooms it joins — light spills through it)
                 for (const d of (def.doors || [])) {
                     this.doors.push(new IndoorDoor(d));
+                    if (!d.rooms || !this.rooms[d.rooms[0]] || !this.rooms[d.rooms[1]])
+                        console.warn('[RoomSystem] door at', d.x, d.y, 'joins unknown rooms', d.rooms);
                 }
                 
                 // Build windows
@@ -470,10 +504,12 @@
              * Determine which room the player is in. Returns the room object or null.
              */
             getRoomAt(px, py) {
+                const last = this._lastHit;                      // most queries land in the same room
+                if (last && px >= last.x && px <= last.x + last.w && py >= last.y && py <= last.y + last.h) return last;
                 for (const id in this.rooms) {
                     const r = this.rooms[id];
                     if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) {
-                        return r;
+                        return (this._lastHit = r);
                     }
                 }
                 return null;
@@ -485,11 +521,56 @@
             update(playerX, playerY) {
                 if (!this.active) return;
                 
-                this.currentRoom = this.getRoomAt(playerX, playerY);
+                // In a wall gap between rooms, 949 is still where she was
+                this.currentRoom = this.getRoomAt(playerX, playerY) || this.currentRoom;
                 
                 for (const door of this.doors) {
                     door.update(playerX, playerY);
                 }
+                this._ease();
+            }
+
+            /** Ease every room's visibility and light level, and how outside 949 is (time-based). */
+            _ease() {
+                const now = _frameTime / 1000;
+                const dt = this._lastT === undefined ? 1 : Math.min(0.25, Math.max(0, now - this._lastT));
+                this._lastT = now;
+                const L = ROOM_LOOK, k = rate => 1 - Math.exp(-rate * dt);
+                const cur = this.currentRoom, outside = !!(cur && cur.type === 'outdoor');
+                // Targets: the room she's in is fully seen; open doors lift the room beyond
+                const target = {};
+                for (const id in this.rooms) {
+                    const r = this.rooms[id];
+                    target[id] = r.type === 'outdoor' || r === cur ? 1 : (outside ? L.GLASS_VIS : L.AWAY_VIS);
+                }
+                if (cur) for (const d of this.doors) {
+                    const [a, b] = d.rooms, other = a === cur.id ? b : b === cur.id ? a : null;
+                    if (!other || !(other in target) || d.openAmount <= 0) continue;
+                    target[other] = Math.max(target[other], target[other] + (1 - target[other]) * d.openAmount * L.DOOR_SPILL);
+                }
+                const kv = k(L.VIS_RATE), kl = k(L.LIGHT_RATE);
+                for (const id in this.rooms) {
+                    const r = this.rooms[id];
+                    r.vis += (target[id] - r.vis) * kv;
+                    r.lightK += ((r.lightsOff ? 0 : 1) - r.lightK) * kl;
+                    if (Math.abs(r.lightK - (r.lightsOff ? 0 : 1)) < 0.002) r.lightK = r.lightsOff ? 0 : 1;
+                }
+                this.outdoorness += ((outside ? 1 : 0) - this.outdoorness) * k(L.OUTDOOR_RATE);
+                if (Math.abs(this.outdoorness - (outside ? 1 : 0)) < 0.002) this.outdoorness = outside ? 1 : 0;
+            }
+
+            /** Light level (0…1) of a lamp's room — switches fade rather than snap. */
+            lampLight(lamp) {
+                if (!this.active || !lamp._roomId) return 1;
+                const room = this.rooms[lamp._roomId];
+                return room ? room.lightK : 1;
+            }
+
+            /** Light level at a point (soft lights, glows, props that move). */
+            lightAt(x, y) {
+                if (!this.active) return 1;
+                const r = this.getRoomAt(x, y);
+                return r ? r.lightK : 1;
             }
             
             /**
@@ -538,6 +619,7 @@
                 if (!this.active) return;
                 for (const lamp of lamps) {
                     lamp._roomId = this.getRoomIdAt(lamp.x, lamp.y);
+                    if (!lamp._roomId) console.warn('[RoomSystem] lamp outside every room at', lamp.x, lamp.y);
                 }
             }
             
@@ -547,7 +629,7 @@
             isLampRoomDark(lamp) {
                 if (!this.active || !lamp._roomId) return false;
                 const room = this.rooms[lamp._roomId];
-                return room ? room.lightsOff : false;
+                return room ? room.lightK < 0.01 : false;
             }
             
             // ================================================================
@@ -636,31 +718,63 @@
             }
             
             // ================================================================
-            //  ROOF OCCLUSION — Draw a roof layer over indoor rooms
-            //  when the player is in an outdoor segment (like a balcony).
-            //  Fades in/out smoothly.
+            //  THE VEIL — rooms 949 isn't in sit in a soft violet shadow, feathered
+            //  at the edges (drawn small, then scaled up smoothly), eased per room.
+            //  On a dark map it goes into the light layer (dimming the lamp pools) before
+            //  the light's colour — so the lamps still glow through it; in bright light,
+            //  over the scene.
             // ================================================================
-            drawRoofOcclusion(ctx) {
+            drawVeil(ctx, alpha = 1) {
                 if (!this.active) return;
-                
-                // Target opacity based on player being outdoors
-                const targetRoof = this.isPlayerOutdoor() ? 0.95 : 0;
-                if (this._roofOpacity === undefined) this._roofOpacity = 0;
-                this._roofOpacity += (targetRoof - this._roofOpacity) * 0.06;
-                
-                if (this._roofOpacity < 0.01) return;
-                
-                ctx.globalAlpha = this._roofOpacity;
-                ctx.fillStyle = '#0a0610';
-                
-                for (const id in this.rooms) {
-                    const r = this.rooms[id];
-                    if (r.type !== 'outdoor') {
-                        ctx.fillRect(r.x, r.y, r.w, r.h);
-                    }
+                const L = ROOM_LOOK;
+                let any = false;
+                for (const id in this.rooms) if (this.rooms[id].vis < 0.995) { any = true; break; }
+                if (!any) return;
+                if (!this._veil) {                                      // world-aligned, one texel per FEATHER px
+                    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+                    for (const id in this.rooms) { const r = this.rooms[id]; x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
+                    const pad = L.FEATHER * 2, cv = document.createElement('canvas');
+                    x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+                    cv.width = Math.ceil((x1 - x0) / L.FEATHER); cv.height = Math.ceil((y1 - y0) / L.FEATHER);
+                    this._veil = { cv, c: cv.getContext('2d'), x0, y0, w: cv.width * L.FEATHER, h: cv.height * L.FEATHER };
                 }
-                
-                ctx.globalAlpha = 1.0;
+                const V = this._veil, c = V.c, s = 1 / L.FEATHER;
+                c.clearRect(0, 0, V.cv.width, V.cv.height);
+                let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;   // only the veiled part is stamped
+                for (const id in this.rooms) {
+                    const r = this.rooms[id], a = (1 - r.vis) * L.VEIL_MAX;
+                    if (a < 0.004) continue;
+                    c.fillStyle = `rgba(${L.VEIL_RGB}, ${a.toFixed(3)})`;
+                    c.fillRect((r.x - V.x0) * s, (r.y - V.y0) * s, r.w * s, r.h * s);
+                    bx0 = Math.min(bx0, r.x); by0 = Math.min(by0, r.y); bx1 = Math.max(bx1, r.x + r.w); by1 = Math.max(by1, r.y + r.h);
+                }
+                if (bx0 === Infinity) return;
+                // Source rect in texels (padded by the feather), snapped to whole texels
+                const tx0 = Math.max(0, Math.floor((bx0 - V.x0) * s) - 2), ty0 = Math.max(0, Math.floor((by0 - V.y0) * s) - 2);
+                const tx1 = Math.min(V.cv.width, Math.ceil((bx1 - V.x0) * s) + 2), ty1 = Math.min(V.cv.height, Math.ceil((by1 - V.y0) * s) + 2);
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.imageSmoothingEnabled = true;
+                ctx.drawImage(V.cv, tx0, ty0, tx1 - tx0, ty1 - ty0, V.x0 + tx0 * L.FEATHER, V.y0 + ty0 * L.FEATHER, (tx1 - tx0) * L.FEATHER, (ty1 - ty0) * L.FEATHER);
+                ctx.restore();
+            }
+
+            /** Old name, kept for callers. */
+            drawRoofOcclusion(ctx) { this.drawVeil(ctx); }
+
+            /**
+             * Outdoor rooms carry the sky's light: on the light layer (darkness `ambient`),
+             * thin the darkness over each outdoor room down to the outdoor sky's `skyDark`.
+             */
+            carveSkyLight(lightCtx, ambient, skyDark) {
+                if (!this.active || ambient <= 0) return;
+                const a = 1 - Math.min(1, skyDark / ambient);
+                if (a < 0.01) return;
+                lightCtx.save();
+                lightCtx.globalCompositeOperation = 'destination-out';
+                lightCtx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
+                for (const id in this.rooms) { const r = this.rooms[id]; if (r.type === 'outdoor') lightCtx.fillRect(r.x, r.y, r.w, r.h); }
+                lightCtx.restore();
             }
             
             /**

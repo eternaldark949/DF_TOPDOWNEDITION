@@ -190,3 +190,44 @@
             ctx.restore();
         }
 
+
+        /* ---------------------------------------------------------------------
+           Glow sprites — a soft round glow in one colour, rendered once and then
+           stamped with drawImage (sized, and faded with globalAlpha). Far cheaper
+           than shadowBlur or a new radial gradient every frame.
+           --------------------------------------------------------------------- */
+        const _glowSprites = new Map();
+        /** A 64×64 glow for `color` ('#rrggbb' or 'r, g, b'); `core` 0…1 is how solid the centre is (0 = linear falloff). */
+        function glowSprite(color, core = 0.35) {
+            const key = color + '|' + core;
+            let cv = _glowSprites.get(key);
+            if (cv) return cv;
+            const rgb = color[0] === '#' ? hexToRgb(color) : color;
+            cv = document.createElement('canvas'); cv.width = cv.height = 64;
+            const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+            g.addColorStop(0, `rgba(${rgb}, 1)`);
+            if (core > 0) g.addColorStop(core, `rgba(${rgb}, 0.45)`);        // core 0: a plain linear falloff
+            g.addColorStop(1, `rgba(${rgb}, 0)`);
+            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+            _glowSprites.set(key, cv);
+            return cv;
+        }
+        /** Stamp a glow of radius r at x, y (alpha from the context's globalAlpha). */
+        function drawGlow(ctx, x, y, r, color, core) {
+            ctx.drawImage(glowSprite(color, core), x - r, y - r, r * 2, r * 2);
+        }
+
+        /**
+         * A faulty street lamp, now and then: about one outdoor lamp in ten stutters for
+         * a moment every several seconds. Returns a light multiplier (1 = steady).
+         */
+        function lampFlicker(l) {
+            if (l._flick === undefined) {
+                const h = Math.abs(Math.sin(l.x * 12.9898 + l.y * 78.233) * 43758.5453) % 1;
+                l._flick = h < 0.1 ? h * 10 : -1;
+            }
+            if (l._flick < 0 || (typeof game !== 'undefined' && game.activeMap && game.activeMap.type !== 'outdoor')) return 1;
+            const cyc = 6 + l._flick * 7, ph = (_frameTime / 1000 + l._flick * 37) % cyc;
+            if (ph > 0.9) return 1;
+            return Math.sin(ph * 47) * Math.sin(ph * 23 + 1.3) > 0.15 ? 0.3 : 1;
+        }

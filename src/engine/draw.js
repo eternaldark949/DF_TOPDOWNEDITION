@@ -99,11 +99,13 @@
                 // Pre-calculate daylight factor for windows, lamps, and lighting
                 // Indoor V2: If room system is active, use room type; otherwise use map type
                 // worldMinutes is monotonic — derive hour-of-day with % 1440.
-                const hour = (this.worldMinutes % 1440) / 60;
-                const isEffectivelyOutdoor = this.activeMap.type === 'outdoor' || this.roomSystem.isPlayerOutdoor();
-                const daylight = isEffectivelyOutdoor ? Math.max(0, 1 - (Math.abs(12 - hour) / 6)) : 0;
+                // One day cycle (world-state.js dayCycle) for windows, lamps and the dark
+                const dayC = this.dayCycle();
+                // Lamps under the sky follow the street-lamp schedule; indoor lamps always burn
+                const skyLampDay = dayC.lampsOn ? 0 : 1;
+                const daylight = this.activeMap.type === 'outdoor' ? skyLampDay : 0;
                 // For windows: they always project based on world time, even in indoor maps
-                const windowDaylight = Math.max(0, 1 - (Math.abs(12 - hour) / 6));
+                const windowDaylight = dayC.daylight;
                 this._windowDaylight = windowDaylight; // Store for lighting system access
                 // Floor Base - PERFORMANCE: Clip to visible area instead of full map
                 // Uses actual camera zoom (not cullZoom) so floor always fills the screen
@@ -681,9 +683,10 @@
                     this.bumperMinigame.draw(this.ctx, this.camera);
                 }
                 
-                // Indoor V2: Roof occlusion (fades in when player is on outdoor segment)
-                if (this.roomSystem.active) {
-                    this.roomSystem.drawRoofOcclusion(this.ctx);
+                // Rooms she isn't in sit in a soft violet shadow (RoomSystem.drawVeil). On a dark map
+                // the light layer carries the veil (lighting.js); in bright light it goes on the scene.
+                if (this.roomSystem.active && this.getAmbientDarkness() < 0.5) {
+                    this.roomSystem.drawVeil(this.ctx);
                 }
                 
                 // Flit VFX (ghost afterimage, lightning trails — drawn behind player)
@@ -908,19 +911,14 @@
                 // 2. Draw lamps passing the calculated daylight factor
                 // PERFORMANCE: AABB viewport culling
                 const cbLamps = cullBounds.lamps;
-                const _roofHidesIndoorLamps = this.roomSystem.active && (this.roomSystem._roofOpacity || 0) > 0.3;
+                const rsys = this.roomSystem;
                 this.lamps.forEach(l => {
                     if (l.x < cbLamps.left || l.x > cbLamps.right || l.y < cbLamps.top || l.y > cbLamps.bottom) return;
-                    // Skip indoor lamps when roof is occluding
-                    if (_roofHidesIndoorLamps) {
-                        for (const rid in this.roomSystem.rooms) {
-                            const r = this.roomSystem.rooms[rid];
-                            if (r.type !== 'outdoor' && l.x >= r.x && l.x <= r.x + r.w && l.y >= r.y && l.y <= r.y + r.h) return;
-                        }
-                    }
-                    // Set per-frame forced-off flag for room light switches
-                    l._forcedOff = this.roomSystem.isLampRoomDark(l);
-                    l.draw(this.ctx, daylight);
+                    // Room light switches fade the lamp (and a faulty one flickers)
+                    l._lightK = rsys.lampLight(l) * lampFlicker(l);
+                    l._forcedOff = l._lightK < 0.02;
+                    const outdoorRoom = rsys.active && l._roomId && rsys.rooms[l._roomId].type === 'outdoor';
+                    l.draw(this.ctx, outdoorRoom ? skyLampDay : daylight);
                 }); 
             
                 // 3. Draw projectiles and weather effects
@@ -1071,10 +1069,13 @@
                 }
                 this.drawAtmospherePass(this.ctx);
                 
-                const showRainOverlay = this.activeMap.type === 'outdoor' || this.roomSystem.isPlayerOutdoor();
-                if (showRainOverlay) {
+                // Rain on screen: outdoors, or fading in as she steps out onto a veranda
+                const rainK = this.activeMap.type === 'outdoor' ? 1 : (this.roomSystem.active ? this.roomSystem.outdoorness : 0);
+                if (rainK > 0.01) {
                     const rainLamps = this.activeMap._interiorLights ? [...this.lamps, ...this.activeMap._interiorLights] : this.lamps;
+                    this.ctx.save(); this.ctx.globalAlpha = rainK;
                     this.weather.drawRainOverlay(this.ctx, this.camera, rainLamps);
+                    this.ctx.restore();
                 }
                 
                 // Dynamic Bokeh (Screen-space dreampunk depth-of-field)

@@ -1,4 +1,4 @@
-        // GameEngine — Lighting, bloom, wet reflections, atmosphere, colour grade.
+        // GameEngine — Lighting, bloom, wet reflections, atmosphere.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
             /**
@@ -9,700 +9,429 @@
             _clipBeam(ctx, owner, cx, cy, beamLength, beamWidth) {
                 const a = owner.angle, slope = Math.max(0.05, (beamWidth - 15) / beamLength);
                 const back = 15 / slope, half = Math.atan(slope) + 0.02;
-                const c = owner._beamCache;
-                let poly;
-                if (c && Math.abs(c.x - cx) < 1.5 && Math.abs(c.y - cy) < 1.5 && Math.abs(c.a - a) < 0.01 && c.L === beamLength && c.map === this.activeMap) poly = c.poly;
+                const c = owner._beamCache, tick = _simTick;
+                let poly, dx = 0, dy = 0;
+                const same = c && c.L === beamLength && c.map === this.activeMap;
+                if (same && Math.abs(c.x - cx) < 1.5 && Math.abs(c.y - cy) < 1.5 && Math.abs(c.a - a) < 0.01) poly = c.poly;
+                // A moving car: reuse its last shape (slid along with it) for a couple of ticks
+                else if (same && tick - c.tick < 3 && Math.hypot(c.x - cx, c.y - cy) < 30 && Math.abs(c.a - a) < 0.08) { poly = c.poly; dx = cx - c.x; dy = cy - c.y; }
                 else {
                     const ax = cx - Math.cos(a) * back, ay = cy - Math.sin(a) * back;
                     poly = computeVisibilityPoly(ax, ay, beamLength + back, getOccluders(this.activeMap),
                         { aMin: a - half, aMax: a + half, arcStep: 0.1, minDist: back });
                     poly.ax = ax; poly.ay = ay;
-                    owner._beamCache = { x: cx, y: cy, a, L: beamLength, map: this.activeMap, poly };
+                    owner._beamCache = { x: cx, y: cy, a, L: beamLength, map: this.activeMap, poly, tick };
                 }
-                ctx.beginPath(); ctx.moveTo(poly.ax, poly.ay);
-                for (const pt of poly) ctx.lineTo(pt.x, pt.y);
+                ctx.beginPath(); ctx.moveTo(poly.ax + dx, poly.ay + dy);
+                for (const pt of poly) ctx.lineTo(pt.x + dx, pt.y + dy);
                 ctx.closePath(); ctx.clip();
             },
 
+            /** A headlight beam, pre-rendered once per colour and size: fades along its length and toward its edges. */
+            _beamSprite(color, L, W) {
+                const cache = this._beamSprites || (this._beamSprites = new Map());
+                const key = color + '|' + L + '|' + W;
+                let cv = cache.get(key);
+                if (cv) return cv;
+                const S = 0.5, rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '255, 255, 220';
+                cv = document.createElement('canvas'); cv.width = Math.ceil(L * S); cv.height = Math.ceil(2 * W * S);
+                const c = cv.getContext('2d');
+                c.scale(S, S); c.translate(0, W);
+                const along = c.createLinearGradient(0, 0, L, 0);
+                along.addColorStop(0, `rgba(${rgb}, 1)`); along.addColorStop(1, `rgba(${rgb}, 0)`);
+                c.fillStyle = along; c.beginPath();
+                c.moveTo(0, -15); c.lineTo(L, -W); c.lineTo(L, W); c.lineTo(0, 15); c.fill();
+                c.globalCompositeOperation = 'destination-in';                 // softer toward the edges
+                const across = c.createLinearGradient(0, -W, 0, W);
+                across.addColorStop(0, 'rgba(0,0,0,0.3)'); across.addColorStop(0.5, 'rgba(0,0,0,1)'); across.addColorStop(1, 'rgba(0,0,0,0.3)');
+                c.fillStyle = across; c.fillRect(0, -W, L, 2 * W);
+                cache.set(key, cv);
+                return cv;
+            },
+
+            /** Stamp one headlight beam (clipped by walls and buildings) into the light layer. */
+            _drawBeam(b) {
+                const ctx = this.lightCtx;
+                ctx.save();
+                this._clipBeam(ctx, b.owner, b.cx, b.cy, b.L, b.W);
+                ctx.translate(b.cx, b.cy); ctx.rotate(b.owner.angle);
+                ctx.drawImage(this._beamSprite(b.color, b.L, b.W), 0, -b.W, b.L, 2 * b.W);
+                ctx.restore();
+            },
+
+            /**
+             * Interior lights (building interiors on the city map) are static, and so are the
+             * walls that shadow them: bake each one's light — minus its wall shadows — once, into
+             * a hole sprite and a colour sprite. Each light only ever shadows its own light.
+             */
+            _interiorLightSprites(lamp, segs) {
+                if (lamp._sprites) return lamp._sprites;
+                const R = Math.max(lamp.radius, lamp.colorRadius || 0), S = 0.5, size = Math.max(2, Math.ceil(2 * R * S));
+                const wedges = new Path2D(), ext = lamp.radius * 1.2;
+                for (const seg of segs) {
+                    const d1 = Math.hypot(seg.x1 - lamp.x, seg.y1 - lamp.y), d2 = Math.hypot(seg.x2 - lamp.x, seg.y2 - lamp.y);
+                    if (d1 > lamp.radius * 1.5 && d2 > lamp.radius * 1.5) continue;
+                    const a1 = Math.atan2(seg.y1 - lamp.y, seg.x1 - lamp.x), a2 = Math.atan2(seg.y2 - lamp.y, seg.x2 - lamp.x);
+                    wedges.moveTo(seg.x1, seg.y1);
+                    wedges.lineTo(lamp.x + Math.cos(a1) * ext, lamp.y + Math.sin(a1) * ext);
+                    wedges.lineTo(lamp.x + Math.cos(a2) * ext, lamp.y + Math.sin(a2) * ext);
+                    wedges.lineTo(seg.x2, seg.y2); wedges.closePath();
+                }
+                const bake = paint => {
+                    const cv = document.createElement('canvas'); cv.width = cv.height = size;
+                    const c = cv.getContext('2d');
+                    c.scale(S, S); c.translate(R - lamp.x, R - lamp.y);
+                    paint(c);
+                    c.globalCompositeOperation = 'destination-out'; c.fillStyle = '#000'; c.fill(wedges);
+                    return cv;
+                };
+                const hole = bake(c => {
+                    const g = c.createRadialGradient(lamp.x, lamp.y, 10, lamp.x, lamp.y, lamp.radius);
+                    g.addColorStop(0, `rgba(255, 255, 255, ${lamp.intensity})`); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    c.fillStyle = g; c.beginPath(); c.arc(lamp.x, lamp.y, lamp.radius, 0, Math.PI * 2); c.fill();
+                });
+                const color = bake(c => {
+                    const g = c.createRadialGradient(lamp.x, lamp.y, 0, lamp.x, lamp.y, lamp.colorRadius);
+                    g.addColorStop(0, '#ffffff'); g.addColorStop(0.1, lamp.color); g.addColorStop(0.6, lamp.color); g.addColorStop(1, 'rgba(0,0,0,0)');
+                    c.fillStyle = g; c.beginPath(); c.arc(lamp.x, lamp.y, lamp.colorRadius, 0, Math.PI * 2); c.fill();
+                });
+                return (lamp._sprites = { hole, color, x: lamp.x - R, y: lamp.y - R, d: 2 * R });
+            },
+
             /* =====================================================================
-               LIGHTING SYSTEM RENDERER (OPTIMIZED)
+               LIGHTING — the darkness layer
                ---------------------------------------------------------------------
-               Handles the dynamic lighting layer, shadows, and night vision.
-               Supports dynamic resolution scaling via 'lightingScale'.
-               ===================================================================== */
-            /* =====================================================================
-               LIGHTING SYSTEM RENDERER (FIXED)
-               ---------------------------------------------------------------------
-               Handles the dynamic lighting layer, shadows, and night vision.
-               Now correctly syncs with Cutscene Camera.
+               An offscreen layer filled with the colour of the dark (violet-indigo at
+               night, gold at dusk, rose at dawn: dayCycle), then light holes cut into
+               it (lamps, soft lights, windows, headlights, shots), then light colour
+               added, then laid over the scene at the ambient darkness.
+               Static lights are cached: lamp shadow shapes (Path2D) and gradients,
+               interior lights baked into sprites, headlight beams as sprites.
+               Soft shadows render the layer at half resolution and blur that.
                ===================================================================== */
             drawLightingSystem(ctx) {
                 const ambient = this.getAmbientDarkness();
-                
-                // THE FIX: Maintain original shadow opacity (ambient), but fade it to 0 as NV turns on.
-                const finalOpacity = ambient * (1.0 - this.nvIntensity);
+                const flash = this.weather.lightningFlash > 0 ? this.weather.lightningFlash : 0;
+                // Maintain the shadow opacity (ambient), fading it as night vision turns on; lightning lifts it
+                const finalOpacity = ambient * (1.0 - this.nvIntensity) * (1 - 0.8 * flash);
                 
                 // Optimization: If shadows are invisible and we don't need the NV boost, stop.
                 if (finalOpacity <= 0.01 && !this.nightVision) return; 
-            
-                // 1. CLEAR BUFFER
-                this.lightCtx.clearRect(0, 0, this.lightCanvas.width, this.lightCanvas.height);
-            
-                this.lightCtx.save();
+
+                // Layer resolution: lighting quality, halved for soft shadows (the upscale softens edges)
+                const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1);
+                const lw = Math.max(1, Math.round(this.canvas.width * LS)), lh = Math.max(1, Math.round(this.canvas.height * LS));
+                if (this.lightCanvas.width !== lw || this.lightCanvas.height !== lh) { this.lightCanvas.width = lw; this.lightCanvas.height = lh; }
+                const lc = this.lightCtx;
+                const rs = this.roomSystem, rsOn = rs && rs.active;
+                const dc = this.dayCycle();
                 
-                // --- FIDELITY SCALE ---
-                this.lightCtx.scale(this.lightingScale, this.lightingScale);
+                // 1. CLEAR BUFFER
+                lc.clearRect(0, 0, lw, lh);
+                lc.save();
+                lc.scale(LS, LS);
             
                 // 2. CAMERA TRANSFORM (SYNCED WITH MAIN RENDERER)
-                this.lightCtx.translate(this.canvas.width/2, this.canvas.height/2);
-                this.lightCtx.scale(this.camera.zoom, this.camera.zoom);
-                
-                // --- FIX: USE ACTIVE CAMERA COORDINATES, NOT PLAYER COORDINATES ---
+                lc.translate(this.canvas.width/2, this.canvas.height/2);
+                lc.scale(this.camera.zoom, this.camera.zoom);
                 let camX, camY;
-                if (this.cutscene && this.cutscene.active) {
-                    camX = this.camera.x;
-                    camY = this.camera.y;
-                } else {
-                    camX = this.player.x;
-                    camY = this.player.y;
-                }
-                this.lightCtx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
+                if (this.cutscene && this.cutscene.active) { camX = this.camera.x; camY = this.camera.y; }
+                else { camX = this.player.x; camY = this.player.y; }
+                lc.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
                 
-                // PERFORMANCE: Pre-calculate viewport culling bounds for lighting pass
-                const lightCullZoom = Math.max(CONFIG.CULLING.ZOOM_MIN, Math.min(CONFIG.CULLING.ZOOM_MAX, this.camera.zoom));
-                const lightCullHalfW = (this.canvas.width / 2) / lightCullZoom;
-                const lightCullHalfH = (this.canvas.height / 2) / lightCullZoom;
-                const lightCullBounds = {
-                    headlights: { left: camX - lightCullHalfW - CONFIG.CULLING.HEADLIGHTS, right: camX + lightCullHalfW + CONFIG.CULLING.HEADLIGHTS, top: camY - lightCullHalfH - CONFIG.CULLING.HEADLIGHTS, bottom: camY + lightCullHalfH + CONFIG.CULLING.HEADLIGHTS },
-                    props:      { left: camX - lightCullHalfW - CONFIG.CULLING.PROPS,      right: camX + lightCullHalfW + CONFIG.CULLING.PROPS,      top: camY - lightCullHalfH - CONFIG.CULLING.PROPS,      bottom: camY + lightCullHalfH + CONFIG.CULLING.PROPS },
-                    lampGlow:   { left: camX - lightCullHalfW - CONFIG.CULLING.LAMP_GLOW,  right: camX + lightCullHalfW + CONFIG.CULLING.LAMP_GLOW,  top: camY - lightCullHalfH - CONFIG.CULLING.LAMP_GLOW,  bottom: camY + lightCullHalfH + CONFIG.CULLING.LAMP_GLOW },
-                    neonSigns:  { left: camX - lightCullHalfW - CONFIG.CULLING.NEON_SIGNS, right: camX + lightCullHalfW + CONFIG.CULLING.NEON_SIGNS, top: camY - lightCullHalfH - CONFIG.CULLING.NEON_SIGNS, bottom: camY + lightCullHalfH + CONFIG.CULLING.NEON_SIGNS }
-                };
-                
-                // PERFORMANCE: Calculate visible world bounds for clipping large draws
-                const lightViewMargin = 200; // Extra margin for light bleed
-                const visLeft   = Math.max(0, camX - lightCullHalfW - lightViewMargin);
-                const visTop    = Math.max(0, camY - lightCullHalfH - lightViewMargin);
-                const visRight  = Math.min(this.activeMap.width, camX + lightCullHalfW + lightViewMargin);
-                const visBottom = Math.min(this.activeMap.height, camY + lightCullHalfH + lightViewMargin);
-                const visW = visRight - visLeft;
-                const visH = visBottom - visTop;
+                // The view, at the actual zoom (lights are culled by their own reach)
+                const halfW = (this.canvas.width / 2) / this.camera.zoom, halfH = (this.canvas.height / 2) / this.camera.zoom;
+                const vL = camX - halfW, vR = camX + halfW, vT = camY - halfH, vB = camY + halfH;
+                const inView = (x, y, r) => x + r > vL && x - r < vR && y + r > vT && y - r < vB;
+                const lightViewMargin = 200;
+                const visLeft   = Math.max(0, vL - lightViewMargin);
+                const visTop    = Math.max(0, vT - lightViewMargin);
+                const visRight  = Math.min(this.activeMap.width, vR + lightViewMargin);
+                const visBottom = Math.min(this.activeMap.height, vB + lightViewMargin);
             
-                // 3. DRAW BASE DARKNESS (Viewport-Only)
-                // NEW: No map-sized shadow canvas. Fill viewport with black, then cut
-                // light holes using cached per-lamp shadow polygons. Cost scales with
-                // visible lamp count (~10-15), not map pixel count (was 44M).
-                this.lightCtx.fillStyle = '#000000';
-                this.lightCtx.fillRect(visLeft, visTop, visW, visH);
+                // 3. THE DARK — tinted: the hour's colour outdoors, night's violet-indigo indoors
+                const tint = this.activeMap.type === 'indoor' ? '22, 10, 48' : dc.tintRGB;
+                lc.fillStyle = `rgb(${tint})`;
+                lc.fillRect(visLeft, visTop, visRight - visLeft, visBottom - visTop);
+                // Outdoor rooms (a veranda) carry the sky's light
+                if (rsOn) rs.carveSkyLight(lc, ambient, dc.darkness);
             
-                // 3b. INTERIOR LAMP PASS — Per-lamp shadow projection from building interior walls
-                // Matches editor lighting pipeline: invisible emitters that cast real-time
-                // shadow wedges from interior_wall segments on the same level.
-                if (this.activeMap._interiorLights && this.activeMap._interiorLights.length > 0) {
-                    const iLights = this.activeMap._interiorLights;
+                // 3b. INTERIOR LIGHTS (buildings on the city map) — baked sprites, each with its own wall shadows
+                const iLights = this.activeMap._interiorLights;
+                const iVisible = [];
+                if (iLights && iLights.length > 0) {
                     const iSegsByLevel = this.activeMap._interiorShadowSegs || {};
-                    
-                    iLights.forEach(lamp => {
-                        // Viewport cull
-                        if (lamp.x + lamp.radius < visLeft || lamp.x - lamp.radius > visRight ||
-                            lamp.y + lamp.radius < visTop || lamp.y - lamp.radius > visBottom) return;
-                        
-                        // Step A: Cut this lamp's light hole
-                        this.lightCtx.globalCompositeOperation = 'destination-out';
-                        const grad = this.lightCtx.createRadialGradient(lamp.x, lamp.y, 10, lamp.x, lamp.y, lamp.radius);
-                        grad.addColorStop(0, `rgba(255, 255, 255, ${lamp.intensity})`);
-                        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                        this.lightCtx.fillStyle = grad;
-                        this.lightCtx.beginPath();
-                        this.lightCtx.arc(lamp.x, lamp.y, lamp.radius, 0, Math.PI * 2);
-                        this.lightCtx.fill();
-                        
-                        // Step B: Add color glow (before shadows mask it)
-                        this.lightCtx.globalCompositeOperation = 'lighter';
-                        const cGrad = this.lightCtx.createRadialGradient(lamp.x, lamp.y, 0, lamp.x, lamp.y, lamp.colorRadius);
-                        cGrad.addColorStop(0, '#ffffff');
-                        cGrad.addColorStop(0.1, lamp.color);
-                        cGrad.addColorStop(0.6, lamp.color);
-                        cGrad.addColorStop(1, 'rgba(0,0,0,0)');
-                        this.lightCtx.globalAlpha = 0.08 * lamp.intensity;
-                        this.lightCtx.fillStyle = cGrad;
-                        this.lightCtx.beginPath();
-                        this.lightCtx.arc(lamp.x, lamp.y, lamp.colorRadius, 0, Math.PI * 2);
-                        this.lightCtx.fill();
-                        this.lightCtx.globalAlpha = 1.0;
-                        
-                        // Step C: Paint shadow wedges back from same-level wall segments
-                        this.lightCtx.globalCompositeOperation = 'source-over';
-                        const segs = iSegsByLevel[lamp.level] || [];
-                        segs.forEach(seg => {
-                            const d1 = Math.hypot(seg.x1 - lamp.x, seg.y1 - lamp.y);
-                            const d2 = Math.hypot(seg.x2 - lamp.x, seg.y2 - lamp.y);
-                            if (d1 > lamp.radius * 1.5 && d2 > lamp.radius * 1.5) return;
-                            const a1 = Math.atan2(seg.y1 - lamp.y, seg.x1 - lamp.x);
-                            const a2 = Math.atan2(seg.y2 - lamp.y, seg.x2 - lamp.x);
-                            const ext = lamp.radius * 1.2;
-                            this.lightCtx.fillStyle = '#000000';
-                            this.lightCtx.beginPath();
-                            this.lightCtx.moveTo(seg.x1, seg.y1);
-                            this.lightCtx.lineTo(lamp.x + Math.cos(a1) * ext, lamp.y + Math.sin(a1) * ext);
-                            this.lightCtx.lineTo(lamp.x + Math.cos(a2) * ext, lamp.y + Math.sin(a2) * ext);
-                            this.lightCtx.lineTo(seg.x2, seg.y2);
-                            this.lightCtx.closePath();
-                            this.lightCtx.fill();
-                        });
-                    });
+                    lc.globalCompositeOperation = 'destination-out';
+                    for (const lamp of iLights) {
+                        if (!inView(lamp.x, lamp.y, lamp.radius)) continue;
+                        const sp = this._interiorLightSprites(lamp, iSegsByLevel[lamp.level] || []);
+                        lc.drawImage(sp.hole, sp.x, sp.y, sp.d, sp.d);
+                        iVisible.push(lamp);
+                    }
                 }
             
-                // 4. CUT STATIC LAMP SHADOWS (Destination-Out from cached geometry)
-                this.lightCtx.globalCompositeOperation = 'destination-out';
-                
+                // 4. STREET AND ROOM LAMPS — cached shadow shapes and gradients, nearest first within the budget
+                lc.globalCompositeOperation = 'destination-out';
+                const litLamps = [];
                 if (this.lightingBaked) {
-                    const cbLampShadow = lightCullBounds.lampGlow;
-                    let litLampCount = 0;
-                    
-                    // Roof occlusion: when player is outdoors, skip lamps inside indoor rooms
-                    // so their light doesn't punch through the roof
-                    const roofActive = this.roomSystem.active && (this.roomSystem._roofOpacity || 0) > 0.3;
-                    
-                    // Collect visible lamps, then sort by distance to camera so the
-                    // budget cap (_maxLitLamps) always prioritizes lamps closest to the
-                    // player. Without this, lamps earlier in the array lit up while
-                    // nearby lamps added later were dark.
                     const visibleLamps = [];
-                    for (let lamp of this.lamps) {
-                        // AABB cull — skip lamps outside viewport
-                        if (lamp.x < cbLampShadow.left || lamp.x > cbLampShadow.right || 
-                            lamp.y < cbLampShadow.top || lamp.y > cbLampShadow.bottom) continue;
-                        
-                        // Skip indoor lamps when roof is occluding
-                        if (roofActive) {
-                            let insideIndoor = false;
-                            for (const rid in this.roomSystem.rooms) {
-                                const r = this.roomSystem.rooms[rid];
-                                if (r.type !== 'outdoor' && lamp.x >= r.x && lamp.x <= r.x + r.w && lamp.y >= r.y && lamp.y <= r.y + r.h) {
-                                    insideIndoor = true;
-                                    break;
-                                }
-                            }
-                            if (insideIndoor) continue;
-                        }
-                        
+                    for (const lamp of this.lamps) {
+                        if (!inView(lamp.x, lamp.y, lamp.radius)) continue;
                         if (!lamp._shadowPoly || lamp._shadowPoly.length === 0) continue;
-                        
-                        // Skip lamps in rooms where lights have been switched off
-                        if (this.roomSystem.isLampRoomDark(lamp)) continue;
-                        
-                        // Squared distance to camera center (cheap, no sqrt needed for sort)
-                        const dx = lamp.x - camX;
-                        const dy = lamp.y - camY;
+                        // Room switches fade lamps; a faulty street lamp stutters now and then
+                        const k = (rsOn ? rs.lampLight(lamp) : 1) * lampFlicker(lamp) * (lamp.intensity ?? 1);
+                        if (k < 0.01) continue;
+                        lamp._litK = k;
+                        const dx = lamp.x - camX, dy = lamp.y - camY;
                         lamp._distSq = dx * dx + dy * dy;
                         visibleLamps.push(lamp);
                     }
-                    
-                    // Sort nearest-first so budget cap keeps the closest lights on
                     visibleLamps.sort((a, b) => a._distSq - b._distSq);
-                    
                     for (const lamp of visibleLamps) {
-                        if (litLampCount >= this._maxLitLamps) break;
-                        
+                        if (litLamps.length >= this._maxLitLamps) break;
                         const poly = lamp._shadowPoly;
-                        
-                        // Draw the cached shadow polygon with radial gradient
-                        this.lightCtx.beginPath();
-                        this.lightCtx.moveTo(poly[0].x, poly[0].y);
-                        for (let i = 1; i < poly.length; i++) {
-                            this.lightCtx.lineTo(poly[i].x, poly[i].y);
+                        if (lamp._shadowPathOf !== poly) {
+                            const path = new Path2D();
+                            path.moveTo(poly[0].x, poly[0].y);
+                            for (let i = 1; i < poly.length; i++) path.lineTo(poly[i].x, poly[i].y);
+                            path.closePath();
+                            lamp._shadowPath = path; lamp._shadowPathOf = poly;
                         }
-                        this.lightCtx.closePath();
-                        
-                        const range = lamp.radius;
-                        const grad = this.lightCtx.createRadialGradient(lamp.x, lamp.y, 10, lamp.x, lamp.y, range);
-                        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-                        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                        this.lightCtx.fillStyle = grad;
-                        this.lightCtx.fill();
-                        litLampCount++;
+                        if (!lamp._holeGrad || lamp._holeGradAt !== lamp.x + ',' + lamp.y + ',' + lamp.radius) {
+                            const g = lc.createRadialGradient(lamp.x, lamp.y, 10, lamp.x, lamp.y, lamp.radius);
+                            g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                            lamp._holeGrad = g; lamp._holeGradAt = lamp.x + ',' + lamp.y + ',' + lamp.radius;
+                        }
+                        lc.globalAlpha = Math.min(1, lamp._litK);
+                        lc.fillStyle = lamp._holeGrad;
+                        lc.fill(lamp._shadowPath);
+                        litLamps.push(lamp);
                     }
+                    lc.globalAlpha = 1;
                 }
             
-                // 5. CUT DYNAMIC HOLES (Destination-Out)
-                this.lightCtx.globalCompositeOperation = 'destination-out';
-                
-                // Projectiles
-                this.projectiles.forEach(p => {
-                    this.lightCtx.beginPath(); this.lightCtx.arc(p.x, p.y, 45, 0, Math.PI*2);
-                    this.lightCtx.fillStyle = 'rgba(255, 255, 255, 1.0)'; this.lightCtx.fill();
-                });
-            
-                // Muzzle Flashes
-                this.muzzleFlashes.forEach(f => {
-                    this.lightCtx.beginPath(); this.lightCtx.arc(f.x, f.y, f.radius * 1.2, 0, Math.PI*2);
-                    this.lightCtx.fillStyle = 'rgba(255, 255, 255, 1.0)'; this.lightCtx.fill();
-                });
+                // 5. DYNAMIC HOLES — shots and muzzle flashes light softly around them
+                const white = glowSprite('255, 255, 255', 0.3);
+                for (const p of this.projectiles) if (inView(p.x, p.y, 50)) lc.drawImage(white, p.x - 50, p.y - 50, 100, 100);
+                for (const f of this.muzzleFlashes) {
+                    const r = f.radius * 1.6;
+                    if (inView(f.x, f.y, r)) lc.drawImage(white, f.x - r, f.y - r, r * 2, r * 2);
+                }
             
                 // Laser Sight beam cuts through darkness (same geometry as the visible beam)
                 const lsGeom = this.getLaserSight();
                 if (lsGeom) {
-                    const mx = lsGeom.x0, my = lsGeom.y0, hx = lsGeom.x1, hy = lsGeom.y1;
-                    
-                    // Thin faint light line cutting through shadow
-                    const lsGrad = this.lightCtx.createLinearGradient(mx, my, hx, hy);
-                    lsGrad.addColorStop(0, 'rgba(255, 50, 0, 0.6)');
-                    lsGrad.addColorStop(1, 'rgba(255, 50, 0, 0.1)');
-                    this.lightCtx.strokeStyle = lsGrad;
-                    this.lightCtx.lineWidth = 3;
-                    this.lightCtx.beginPath();
-                    this.lightCtx.moveTo(mx, my);
-                    this.lightCtx.lineTo(hx, hy);
-                    this.lightCtx.stroke();
-                    
-                    // Small glow at hit point
-                    this.lightCtx.beginPath();
-                    this.lightCtx.arc(hx, hy, 8, 0, Math.PI * 2);
-                    this.lightCtx.fillStyle = 'rgba(255, 50, 0, 0.4)';
-                    this.lightCtx.fill();
+                    lc.strokeStyle = 'rgba(255, 50, 0, 0.45)';
+                    lc.lineWidth = 3;
+                    lc.beginPath(); lc.moveTo(lsGeom.x0, lsGeom.y0); lc.lineTo(lsGeom.x1, lsGeom.y1); lc.stroke();
+                    lc.beginPath(); lc.arc(lsGeom.x1, lsGeom.y1, 8, 0, Math.PI * 2);
+                    lc.fillStyle = 'rgba(255, 50, 0, 0.4)'; lc.fill();
                 }
             
-                // Car Headlights (Dynamic Beam Length)
-                if (this.isDriving || (this.car && this.car.forceLights)) {
-                    const bumperOffset = this.car.length / 2;
-                    const cx = this.car.x + Math.cos(this.car.angle) * bumperOffset;
-                    const cy = this.car.y + Math.sin(this.car.angle) * bumperOffset;
-                    
-                    const lightStat = this.car.lightRange || 60; 
-                    const beamLength = lightStat * 6; 
-                    const beamWidth = lightStat * 1.5;
-            
-                    this.lightCtx.save(); 
-                    this._clipBeam(this.lightCtx, this.car, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
-                    this.lightCtx.translate(cx, cy); 
-                    this.lightCtx.rotate(this.car.angle);
-                    
-                    const grad = this.lightCtx.createLinearGradient(0, 0, beamLength, 0); 
-                    //const grad = this.lightCtx.createLinearGradient(0, 0, beamLength, 0);
-                    const lightingElement = this.car.headlightColor || '#ffffdd';
-                    //const LERGB = this.hexToRgb(lightingElement) || '255, 255, 170';
-                    const hexMatch = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(lightingElement);
-                    const rgb = hexMatch 
-                        ? `${parseInt(hexMatch[1], 16)}, ${parseInt(hexMatch[2], 16)}, ${parseInt(hexMatch[3], 16)}` 
-                        : '255, 255, 170';
-                    const gradCol = lightingElement;
-                    grad.addColorStop(0, gradCol);
-                    grad.addColorStop(1, `rgba(${rgb}, 0)`)
-
-                    //const gradCol = this.car.headlightColor || 'rgba(255, 0, 0, 0.0)';
-                    //grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)'); 
-                    //grad.addColorStop(1, 'rgba(255, 255, 255, 0)');   
-                    //grad.addColorStop(0, gradCol);
-                    //grad.addColorStop(1, gradCol);
-                    
-                    this.lightCtx.fillStyle = grad; 
-                    this.lightCtx.beginPath(); 
-                    this.lightCtx.moveTo(0, -15); 
-                    this.lightCtx.lineTo(beamLength, -beamWidth); 
-                    this.lightCtx.lineTo(beamLength, beamWidth); 
-                    this.lightCtx.lineTo(0, 15); 
-                    this.lightCtx.fill(); 
-                    this.lightCtx.restore();
-                }
-                
-                // AI Vehicle Headlights (same cone effect)
-                // PERFORMANCE: AABB viewport culling + vehicle count limit
+                // Headlights: the player's car, up to six in traffic, bumper cars
+                const beams = [];
+                const beamOf = (owner, stat, color, haze) => {
+                    const off = owner.length / 2;
+                    beams.push({ owner, cx: owner.x + Math.cos(owner.angle) * off, cy: owner.y + Math.sin(owner.angle) * off,
+                                 L: stat * 6, W: stat * 1.5, color, haze });
+                };
+                if (this.isDriving || (this.car && this.car.forceLights)) beamOf(this.car, this.car.lightRange || 60, this.car.headlightColor || '#ffffdd', this.isDriving ? 1 : 0);
                 if (this.traffic && this.traffic.vehicles) {
-                    const cbHL = lightCullBounds.headlights;
-                    let headlightCount = 0;
-                    
-                    for (let i = 0; i < this.traffic.vehicles.length && headlightCount < 6; i++) {
+                    let n = 0;
+                    for (let i = 0; i < this.traffic.vehicles.length && n < 6; i++) {
                         const v = this.traffic.vehicles[i];
-                        if (!v.visible || v.dead || v === this.car) continue;
-                        
-                        // AABB check
-                        if (v.x < cbHL.left || v.x > cbHL.right || v.y < cbHL.top || v.y > cbHL.bottom) continue;
-                        
-                        headlightCount++;
-                        
-                        const bumperOffset = v.length / 2;
-                        const cx = v.x + Math.cos(v.angle) * bumperOffset;
-                        const cy = v.y + Math.sin(v.angle) * bumperOffset;
-                        
-                        const lightStat = 40;
-                        const beamLength = lightStat * 6;
-                        const beamWidth = lightStat * 1.5;
-                        
-                        this.lightCtx.save();
-                        this._clipBeam(this.lightCtx, v, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
-                        this.lightCtx.translate(cx, cy);
-                        this.lightCtx.rotate(v.angle);
-                        
-                        const grad = this.lightCtx.createLinearGradient(0, 0, beamLength, 0);
-                        const vHlc = v.headlightColor || '#ffffee';
-                        const vHex = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(vHlc);
-                        const vRgb = vHex ? `${parseInt(vHex[1],16)}, ${parseInt(vHex[2],16)}, ${parseInt(vHex[3],16)}` : '255, 255, 230';
-                        grad.addColorStop(0, vHlc);
-                        grad.addColorStop(1, `rgba(${vRgb}, 0)`);
-                        
-                        this.lightCtx.fillStyle = grad;
-                        this.lightCtx.beginPath();
-                        this.lightCtx.moveTo(0, -15);
-                        this.lightCtx.lineTo(beamLength, -beamWidth);
-                        this.lightCtx.lineTo(beamLength, beamWidth);
-                        this.lightCtx.lineTo(0, 15);
-                        this.lightCtx.fill();
-                        this.lightCtx.restore();
+                        if (!v.visible || v.dead || v === this.car || !inView(v.x, v.y, 260)) continue;
+                        n++; beamOf(v, 40, v.headlightColor || '#ffffee', 0.7);
                     }
                 }
-                
-                // Bumper Car Headlights (during minigame — same logic as player headlight)
                 if (this.bumperMinigame && this.bumperMinigame.active) {
                     for (const car of this.bumperMinigame.cars) {
                         if (car === this.bumperMinigame.playerCar) continue;
-                        
-                        const bumperOffset = car.length / 2;
-                        const cx = car.x + Math.cos(car.angle) * bumperOffset;
-                        const cy = car.y + Math.sin(car.angle) * bumperOffset;
-                        
-                        const lightStat = car.lightRange || 60;
-                        const beamLength = lightStat * 6;
-                        const beamWidth = lightStat * 1.5;
-                        
-                        this.lightCtx.save();
-                        this._clipBeam(this.lightCtx, car, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
-                        this.lightCtx.translate(cx, cy);
-                        this.lightCtx.rotate(car.angle);
-                        
-                        const grad = this.lightCtx.createLinearGradient(0, 0, beamLength, 0);
-                        const lightingElement = car.headlightColor || car.bodyColor || '#ffffdd';
-                        const hexMatch = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(lightingElement);
-                        const rgb = hexMatch 
-                            ? `${parseInt(hexMatch[1], 16)}, ${parseInt(hexMatch[2], 16)}, ${parseInt(hexMatch[3], 16)}` 
-                            : '255, 255, 170';
-                        const gradCol = lightingElement;
-                        grad.addColorStop(0, gradCol);
-                        grad.addColorStop(1, `rgba(${rgb}, 0)`);
-                        
-                        this.lightCtx.fillStyle = grad;
-                        this.lightCtx.beginPath();
-                        this.lightCtx.moveTo(0, -15);
-                        this.lightCtx.lineTo(beamLength, -beamWidth);
-                        this.lightCtx.lineTo(beamLength, beamWidth);
-                        this.lightCtx.lineTo(0, 15);
-                        this.lightCtx.fill();
-                        this.lightCtx.restore();
+                        beamOf(car, car.lightRange || 60, car.headlightColor || car.bodyColor || '#ffffdd', 1);
                     }
                 }
-                
-                this.lightCtx.shadowBlur = 0;
+                for (const b of beams) this._drawBeam(b);
                 
                 // Indoor V2: Window daylight projections (cut light through shadow)
-                if (this.roomSystem.active) {
-                    this.roomSystem.drawWindowLightProjections(this.lightCtx, this._windowDaylight || 0);
-                }
+                if (rsOn) rs.drawWindowLightProjections(lc, this._windowDaylight || 0);
                 
                 // Soft lights: shadowless glow holes for decor lamps, candles, fire, string lights.
                 // Fixed ones come from activeMap.softLights; props with a `light` carry theirs
-                // with them when pushed. Lights in a room whose switch is off stay dark.
-                const cbProps = lightCullBounds.props;
-                const softLights = [];
+                // with them when pushed. Room switches fade the lights in that room.
+                // (Props are walked once: lights, and vending machines / medbays.)
+                const softLights = [], propGlows = [];
                 {
-                    const rs = this.roomSystem, tNow = _frameTime / 1000;
+                    const tNow = _frameTime / 1000;
                     const push = (src, x, y) => {
                         if (!src.radius) src.radius = Math.max(src.w || 0, src.h || 0) / 2;
-                        if (x < cbProps.left - src.radius || x > cbProps.right + src.radius || y < cbProps.top - src.radius || y > cbProps.bottom + src.radius) return;
-                        if (rs && rs.active) { const room = rs.getRoomAt(x, y); if (room && room.lightsOff) return; }
+                        const r = src.radius || Math.max(src.w, src.h) / 2;
+                        if (!inView(x, y, r)) return;
+                        const k = rsOn ? rs.lightAt(x, y) : 1;
+                        if (k < 0.01) return;
                         const f = src.flicker ? 0.82 + 0.18 * Math.sin(tNow * src.flicker + x * 0.7) * Math.sin(tNow * src.flicker * 0.37 + y) : 1;
-                        softLights.push({ src, x, y, r: src.radius || Math.max(src.w, src.h) / 2, a: (src.intensity ?? 0.8) * f });
+                        softLights.push({ src, x, y, r, a: (src.intensity ?? 0.8) * f * k });
                     };
                     for (const s of (this.activeMap.softLights || [])) push(s, s.x, s.y);
-                    for (const p of this.props) if (p.light && p.visible !== false) { const c = p.getCenter(); push(p.light, c.x + (p.light.dx || 0), c.y + (p.light.dy || 0)); }
+                    for (const p of this.props) {
+                        if (p.light && p.visible !== false) { const c = p.getCenter(); push(p.light, c.x + (p.light.dx || 0), c.y + (p.light.dy || 0)); }
+                        if (p.interactionType === 'medbay_refill' || p.interactionType === 'vending_machine') {
+                            const c = p.getCenter();
+                            if (inView(c.x, c.y, 180)) propGlows.push({ p, x: c.x, y: c.y, medbay: p.interactionType === 'medbay_refill' });
+                        }
+                    }
                 }
                 const softGrad = (s, key, make) => {               // gradients are reused while the light stays put
-                    const k = s.x + ',' + s.y;
-                    if (s.src[key] && s.src[key + 'At'] === k) return s.src[key];
-                    s.src[key + 'At'] = k; return (s.src[key] = make());
+                    const src = s.src;
+                    if (src[key] && src[key + 'X'] === s.x && src[key + 'Y'] === s.y) return src[key];
+                    src[key + 'X'] = s.x; src[key + 'Y'] = s.y; return (src[key] = make());
                 };
                 // Area lights (w × h): a rounded rectangle with a soft edge. A band across the
                 // middle plus two half-oval end caps that share the same falloff, so no seams.
                 // stops: [[offset from the centre line 0..1, colour], …]
                 const softArea = (s, key, stops) => {
-                    const ctx = this.lightCtx, hw = s.src.w / 2, hh = s.src.h / 2, r = Math.min(hw, s.src.round ?? hh);
+                    const hw = s.src.w / 2, hh = s.src.h / 2, r = Math.min(hw, s.src.round ?? hh);
                     const x0 = s.x - hw + r, x1 = s.x + hw - r;
                     const band = softGrad(s, key + 'Band', () => {
-                        const g = ctx.createLinearGradient(0, s.y - hh, 0, s.y + hh);
+                        const g = lc.createLinearGradient(0, s.y - hh, 0, s.y + hh);
                         for (const [o, c] of stops) { g.addColorStop(0.5 - o / 2, c); g.addColorStop(0.5 + o / 2, c); }
                         return g;
                     });
-                    ctx.fillStyle = band; ctx.fillRect(x0, s.y - hh, x1 - x0, hh * 2);
+                    lc.fillStyle = band; lc.fillRect(x0, s.y - hh, x1 - x0, hh * 2);
                     const cap = s.src[key + 'Cap'] || (s.src[key + 'Cap'] = (() => {
-                        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+                        const g = lc.createRadialGradient(0, 0, 0, 0, 0, 1);
                         for (const [o, c] of stops) g.addColorStop(o, c);
                         return g;
                     })());
                     for (const side of [-1, 1]) {
-                        ctx.save();
-                        ctx.beginPath(); ctx.rect(side < 0 ? x0 - r : x1, s.y - hh, r, hh * 2); ctx.clip();
-                        ctx.translate(side < 0 ? x0 : x1, s.y); ctx.scale(r, hh);
-                        ctx.fillStyle = cap; ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
-                        ctx.restore();
+                        lc.save();
+                        lc.beginPath(); lc.rect(side < 0 ? x0 - r : x1, s.y - hh, r, hh * 2); lc.clip();
+                        lc.translate(side < 0 ? x0 : x1, s.y); lc.scale(r, hh);
+                        lc.fillStyle = cap; lc.beginPath(); lc.arc(0, 0, 1, 0, Math.PI * 2); lc.fill();
+                        lc.restore();
                     }
                 };
                 const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
                 const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
                 for (const s of softLights) {
-                    this.lightCtx.globalAlpha = Math.min(1, s.a);
+                    lc.globalAlpha = Math.min(1, s.a);
                     if (s.src.w) { softArea(s, '_hole', s.src.soft ? HOLE_AREA_SOFT : HOLE_AREA); continue; }
-                    this.lightCtx.fillStyle = softGrad(s, '_holeGrad', () => {
-                        const g = this.lightCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
+                    lc.fillStyle = softGrad(s, '_holeGrad', () => {
+                        const g = lc.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
                         g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)');
                         return g;
                     });
-                    this.lightCtx.beginPath(); this.lightCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2); this.lightCtx.fill();
+                    lc.beginPath(); lc.arc(s.x, s.y, s.r, 0, Math.PI * 2); lc.fill();
                 }
-                this.lightCtx.globalAlpha = 1;
+                lc.globalAlpha = 1;
 
-                // Prop Glows (Vending/Medbay) - PERFORMANCE: AABB culling
-                // FIX: Use getCenter() for accurate tracking of pushed/rotated props
-                // and stable entity ID seed so animation doesn't jump on movement
-                this.props.forEach(p => {
-                    if (p.interactionType === 'medbay_refill' || p.interactionType === 'vending_machine') {
-                        const center = p.getCenter();
-                        const px = center.x; const py = center.y;
-                        if (px < cbProps.left || px > cbProps.right || py < cbProps.top || py > cbProps.bottom) return;
-                        
-                        const time = _frameTime; const offset = (p.id || 0) * 1337;
-                        let radiusMod = p.interactionType === 'medbay_refill' ? 1.0 + (Math.sin((time + offset) / 400) * 0.05) : 1.0 + (Math.sin((time + offset) / 50) * 0.02);
-                        const holeRadius = 170 * radiusMod;
-                        const grad = this.lightCtx.createRadialGradient(px, py, 20, px, py, holeRadius);
-                        grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)'); grad.addColorStop(0.4, 'rgba(255, 255, 255, 0.5)'); grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');   
-                        this.lightCtx.fillStyle = grad; this.lightCtx.beginPath(); this.lightCtx.arc(px, py, holeRadius, 0, Math.PI*2); this.lightCtx.fill();
-                    }
-                });
+                // Vending machines and medbays glow (pulsing; they can be pushed, so sprites, not cached gradients)
+                const time = _frameTime;
+                const holeGlow = glowSprite('255, 255, 255', 0.4);
+                for (const g of propGlows) {
+                    const offset = (g.p.id || 0) * 1337;
+                    const r = 170 * (g.medbay ? 1.0 + Math.sin((time + offset) / 400) * 0.05 : 1.0 + Math.sin((time + offset) / 50) * 0.02);
+                    lc.drawImage(holeGlow, g.x - r, g.y - r, r * 2, r * 2);
+                }
                 
+                // Rooms she isn't in: the veil dims their pools of light (their glow stays, below)
+                if (rsOn && ambient >= 0.5) { lc.globalCompositeOperation = 'source-over'; rs.drawVeil(lc, 1); }
+
                 // 6. COLOR PASS (Lighter Blend)
-                this.lightCtx.globalCompositeOperation = 'lighter'; 
+                lc.globalCompositeOperation = 'lighter'; 
                 const isIndoor = this.activeMap.type === 'indoor';
-                const baseAlpha = (isIndoor ? 0.08 : 0.18); 
+                const baseAlpha = (isIndoor ? 0.08 : 0.22);   // lamps read warm against the tinted night
                 
-                // Indoor V2: Window warm daylight color (lighter blend)
-                if (this.roomSystem.active) {
-                    this.roomSystem.drawWindowColorPass(this.lightCtx, this._windowDaylight || 0);
+                if (rsOn) rs.drawWindowColorPass(lc, this._windowDaylight || 0);
+
+                // Interior lights' colour (baked with their wall shadows)
+                for (const lamp of iVisible) {
+                    const sp = lamp._sprites;
+                    lc.globalAlpha = 0.08 * lamp.intensity;
+                    lc.drawImage(sp.color, sp.x, sp.y, sp.d, sp.d);
                 }
             
-                // Lamps - PERFORMANCE: AABB culling + cached gradients
-                const cbLampGlow = lightCullBounds.lampGlow;
-                const _roofBlocksColor = this.roomSystem.active && (this.roomSystem._roofOpacity || 0) > 0.3;
-                this.lamps.forEach(l => {
-                    if (l.x < cbLampGlow.left || l.x > cbLampGlow.right || l.y < cbLampGlow.top || l.y > cbLampGlow.bottom) return;
-                    
-                    // Skip indoor lamps when roof is occluding
-                    if (_roofBlocksColor) {
-                        for (const rid in this.roomSystem.rooms) {
-                            const r = this.roomSystem.rooms[rid];
-                            if (r.type !== 'outdoor' && l.x >= r.x && l.x <= r.x + r.w && l.y >= r.y && l.y <= r.y + r.h) return;
-                        }
-                    }
-                    
-                    // Skip lamps in rooms with lights switched off
-                    if (this.roomSystem.isLampRoomDark(l)) return;
-                    
+                // Lamps — the same ones lit above
+                for (const l of litLamps) {
                     if (!l._cachedGrad) {
-                        l._cachedGrad = this.lightCtx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.radius);
+                        l._cachedGrad = lc.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.radius);
                         l._cachedGrad.addColorStop(0, '#ffffff'); l._cachedGrad.addColorStop(0.1, l.color); l._cachedGrad.addColorStop(0.6, l.color); l._cachedGrad.addColorStop(1, 'rgba(0,0,0,0)');
                     }
-                    this.lightCtx.globalAlpha = baseAlpha; 
-                    this.lightCtx.fillStyle = l._cachedGrad; this.lightCtx.beginPath(); this.lightCtx.arc(l.x, l.y, l.radius, 0, Math.PI*2); this.lightCtx.fill();
-                });
+                    lc.globalAlpha = baseAlpha * Math.min(1, l._litK);
+                    lc.fillStyle = l._cachedGrad; lc.beginPath(); lc.arc(l.x, l.y, l.radius, 0, Math.PI*2); lc.fill();
+                }
             
-                // Neon Signs - PERFORMANCE: AABB culling + cached gradients
-                const cbNeon = lightCullBounds.neonSigns;
-                this.neonSigns.forEach(s => {
-                    if (s.x < cbNeon.left || s.x > cbNeon.right || s.y < cbNeon.top || s.y > cbNeon.bottom) return;
-                    
+                // Neon Signs — cached gradients; the odd one buzzes
+                for (const s of this.neonSigns) {
+                    if (!inView(s.x, s.y, 150)) continue;
                     if (!s._cachedGrad) {
                         const radius = 150;
-                        s._cachedGrad = this.lightCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, radius);
+                        s._cachedGrad = lc.createRadialGradient(s.x, s.y, 0, s.x, s.y, radius);
                         s._cachedGrad.addColorStop(0, s.color); s._cachedGrad.addColorStop(1, 'rgba(0,0,0,0)');
                         s._cachedRadius = radius;
                     }
-                    this.lightCtx.globalAlpha = baseAlpha * 1.5; 
-                    this.lightCtx.fillStyle = s._cachedGrad; this.lightCtx.beginPath(); this.lightCtx.arc(s.x, s.y, s._cachedRadius, 0, Math.PI*2); this.lightCtx.fill();
-                });
+                    lc.globalAlpha = baseAlpha * 1.5 * lampFlicker(s);
+                    lc.fillStyle = s._cachedGrad; lc.beginPath(); lc.arc(s.x, s.y, s._cachedRadius, 0, Math.PI*2); lc.fill();
+                }
             
-                // Prop Colors - Dynamic glow tint (no caching — props can be pushed)
-                this.props.forEach(p => {
-                    if (p.interactionType === 'medbay_refill' || p.interactionType === 'vending_machine') {
-                        const center = p.getCenter();
-                        const px = center.x; const py = center.y;
-                        if (px < cbProps.left || px > cbProps.right || py < cbProps.top || py > cbProps.bottom) return;
-                        
-                        const isMedbay = p.interactionType === 'medbay_refill';
-                        const baseColor = isMedbay ? '#00ff00' : '#00f3ff';
-                        const grad = this.lightCtx.createRadialGradient(px, py, 10, px, py, 180);
-                        grad.addColorStop(0, 'rgba(255, 255, 255, 0.9)'); grad.addColorStop(0.3, baseColor); grad.addColorStop(1, 'rgba(0,0,0,0)');
-                        
-                        const time = _frameTime; const offset = (p.id || 0) * 1337;
-                        const intensityMod = isMedbay ? 0.9 + (Math.sin((time + offset) / 400) * 0.2) : (1.0 + Math.sin((time + offset) / 50) * 0.05);
-                        this.lightCtx.globalAlpha = Math.min(1.0, 0.2 * intensityMod);
-                        this.lightCtx.fillStyle = grad; this.lightCtx.beginPath(); this.lightCtx.arc(px, py, 180, 0, Math.PI*2); this.lightCtx.fill();
-                    }
-                });
+                // Vending / medbay colour
+                for (const g of propGlows) {
+                    const offset = (g.p.id || 0) * 1337;
+                    const mod = g.medbay ? 0.9 + Math.sin((time + offset) / 400) * 0.2 : 1.0 + Math.sin((time + offset) / 50) * 0.05;
+                    lc.globalAlpha = Math.min(1.0, 0.2 * mod);
+                    drawGlow(lc, g.x, g.y, 180, g.medbay ? '#00ff00' : '#00f3ff', 0.3);
+                }
             
                 // Soft light colour (the warm pool each decor light casts)
                 for (const s of softLights) {
-                    this.lightCtx.globalAlpha = Math.min(1, 0.22 * s.a);
+                    lc.globalAlpha = Math.min(1, 0.22 * s.a);
                     if (s.src.w) { softArea(s, '_tint', [[0, s.src.color || '#ffd9b0'], [0.55, s.src.color || '#ffd9b0'], [1, 'rgba(0,0,0,0)']]); continue; }
-                    this.lightCtx.fillStyle = softGrad(s, '_tintGrad', () => {
-                        const g = this.lightCtx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
+                    lc.fillStyle = softGrad(s, '_tintGrad', () => {
+                        const g = lc.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
                         g.addColorStop(0, s.src.color || '#ffd9b0'); g.addColorStop(1, 'rgba(0,0,0,0)');
                         return g;
                     });
-                    this.lightCtx.beginPath(); this.lightCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2); this.lightCtx.fill();
-                }
-                this.lightCtx.globalAlpha = 1;
-
-                // Car Headlights (Color Haze)
-                if (this.isDriving) {
-                    this.lightCtx.globalAlpha = baseAlpha; 
-                    const bumperOffset = this.car.length / 2;
-                    const cx = this.car.x + Math.cos(this.car.angle) * bumperOffset;
-                    const cy = this.car.y + Math.sin(this.car.angle) * bumperOffset;
-                    
-                    const lightStat = this.car.lightRange || 60; 
-                    const beamLength = lightStat * 6; 
-                    const beamWidth = lightStat * 1.5;
-            
-                    this.lightCtx.save(); 
-                    this._clipBeam(this.lightCtx, this.car, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
-                    this.lightCtx.translate(cx, cy); 
-                    this.lightCtx.rotate(this.car.angle);
-                    
-                    const grad = this.lightCtx.createLinearGradient(0, 0, beamLength, 0);
-                    const lightingElement = this.car.headlightColor || '#ffffdd';
-                    //const LERGB = this.hexToRgb(lightingElement) || '255, 255, 170';
-                    const hexMatch = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(lightingElement);
-                    const rgb = hexMatch 
-                        ? `${parseInt(hexMatch[1], 16)}, ${parseInt(hexMatch[2], 16)}, ${parseInt(hexMatch[3], 16)}` 
-                        : '255, 255, 170';
-                    const gradCol = lightingElement;
-                    grad.addColorStop(0, gradCol);
-                    grad.addColorStop(1, `rgba(${rgb}, 0)`)
-                    //grad.addColorStop(0, '#ffffdd');
-                    //grad.addColorStop(1, 'rgba(255,255,200,0)');
-                    
-                    this.lightCtx.fillStyle = grad; 
-                    this.lightCtx.beginPath(); 
-                    this.lightCtx.moveTo(0, -15); 
-                    this.lightCtx.lineTo(beamLength, -beamWidth); 
-                    this.lightCtx.lineTo(beamLength, beamWidth); 
-                    this.lightCtx.lineTo(0, 15); 
-                    this.lightCtx.fill(); 
-                    this.lightCtx.restore();
-                }
-                
-                // AI Vehicle Headlights (Color Haze)
-                // PERFORMANCE: AABB viewport culling + vehicle count limit
-                if (this.traffic && this.traffic.vehicles) {
-                    this.lightCtx.globalAlpha = baseAlpha * 0.7;
-                    const cbHL2 = lightCullBounds.headlights;
-                    let headlightCount = 0;
-                    
-                    for (let i = 0; i < this.traffic.vehicles.length && headlightCount < 6; i++) {
-                        const v = this.traffic.vehicles[i];
-                        if (!v.visible || v.dead || v === this.car) continue;
-                        
-                        // AABB check
-                        if (v.x < cbHL2.left || v.x > cbHL2.right || v.y < cbHL2.top || v.y > cbHL2.bottom) continue;
-                        
-                        headlightCount++;
-                        
-                        const bumperOffset = v.length / 2;
-                        const cx = v.x + Math.cos(v.angle) * bumperOffset;
-                        const cy = v.y + Math.sin(v.angle) * bumperOffset;
-                        
-                        const lightStat = 40;
-                        const beamLength = lightStat * 6;
-                        const beamWidth = lightStat * 1.5;
-                        
-                        this.lightCtx.save();
-                        this._clipBeam(this.lightCtx, v, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
-                        this.lightCtx.translate(cx, cy);
-                        this.lightCtx.rotate(v.angle);
-                        
-                        const grad = this.lightCtx.createLinearGradient(0, 0, beamLength, 0);
-                        const vHlc2 = v.headlightColor || '#ffffcc';
-                        const vHex2 = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(vHlc2);
-                        const vRgb2 = vHex2 ? `${parseInt(vHex2[1],16)}, ${parseInt(vHex2[2],16)}, ${parseInt(vHex2[3],16)}` : '255, 255, 200';
-                        grad.addColorStop(0, vHlc2);
-                        grad.addColorStop(1, `rgba(${vRgb2}, 0)`);
-                        
-                        this.lightCtx.fillStyle = grad;
-                        this.lightCtx.beginPath();
-                        this.lightCtx.moveTo(0, -15);
-                        this.lightCtx.lineTo(beamLength, -beamWidth);
-                        this.lightCtx.lineTo(beamLength, beamWidth);
-                        this.lightCtx.lineTo(0, 15);
-                        this.lightCtx.fill();
-                        this.lightCtx.restore();
-                    }
-                }
-            
-                // Bumper Car Headlights (Color Haze — same pass as player/traffic)
-                if (this.bumperMinigame && this.bumperMinigame.active) {
-                    this.lightCtx.globalAlpha = baseAlpha;
-                    for (const car of this.bumperMinigame.cars) {
-                        if (car === this.bumperMinigame.playerCar) continue;
-                        
-                        const bumperOffset = car.length / 2;
-                        const cx = car.x + Math.cos(car.angle) * bumperOffset;
-                        const cy = car.y + Math.sin(car.angle) * bumperOffset;
-                        
-                        const lightStat = car.lightRange || 60;
-                        const beamLength = lightStat * 6;
-                        const beamWidth = lightStat * 1.5;
-                        
-                        this.lightCtx.save();
-                        this._clipBeam(this.lightCtx, car, cx, cy, beamLength, beamWidth);   // stops at walls and buildings
-                        this.lightCtx.translate(cx, cy);
-                        this.lightCtx.rotate(car.angle);
-                        
-                        const grad = this.lightCtx.createLinearGradient(0, 0, beamLength, 0);
-                        const lightingElement = car.headlightColor || car.bodyColor || '#ffffdd';
-                        const hexMatch = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(lightingElement);
-                        const rgb = hexMatch 
-                            ? `${parseInt(hexMatch[1], 16)}, ${parseInt(hexMatch[2], 16)}, ${parseInt(hexMatch[3], 16)}` 
-                            : '255, 255, 170';
-                        const gradCol = lightingElement;
-                        grad.addColorStop(0, gradCol);
-                        grad.addColorStop(1, `rgba(${rgb}, 0)`);
-                        
-                        this.lightCtx.fillStyle = grad;
-                        this.lightCtx.beginPath();
-                        this.lightCtx.moveTo(0, -15);
-                        this.lightCtx.lineTo(beamLength, -beamWidth);
-                        this.lightCtx.lineTo(beamLength, beamWidth);
-                        this.lightCtx.lineTo(0, 15);
-                        this.lightCtx.fill();
-                        this.lightCtx.restore();
-                    }
+                    lc.beginPath(); lc.arc(s.x, s.y, s.r, 0, Math.PI * 2); lc.fill();
                 }
 
-                this.lightCtx.restore();
+                // Shots light in their own colour
+                const hexOr = (c, d) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : d;
+                for (const p of this.projectiles) {
+                    if (!inView(p.x, p.y, 40)) continue;
+                    lc.globalAlpha = 0.3; drawGlow(lc, p.x, p.y, 40, hexOr(p.color, '#ffd9a0'), 0.25);
+                }
+                for (const f of this.muzzleFlashes) {
+                    const r = f.radius * 1.4;
+                    if (!inView(f.x, f.y, r)) continue;
+                    lc.globalAlpha = 0.45 * Math.min(1, (f.life || 3) / 3); drawGlow(lc, f.x, f.y, r, hexOr(f.color, '#ffcc88'), 0.25);
+                }
+
+                // Headlight haze, and a glow at each headlamp
+                for (const b of beams) {
+                    if (!b.haze) continue;
+                    lc.globalAlpha = baseAlpha * b.haze;
+                    this._drawBeam(b);
+                    const nx = -Math.sin(b.owner.angle), ny = Math.cos(b.owner.angle), side = (b.owner.width || 22) * 0.35;
+                    lc.globalAlpha = Math.min(1, baseAlpha * 2.2 * b.haze);
+                    for (const sgn of [-1, 1]) drawGlow(lc, b.cx + nx * side * sgn, b.cy + ny * side * sgn, 22, hexOr(b.color, '#ffffdd'), 0.2);
+                }
+                lc.globalAlpha = 1;
+
+                lc.restore();
             
-                // 7. RENDER TO SCREEN (UPSCALING)
+                // 7. RENDER TO SCREEN (UPSCALING) — soft shadows: blur the small layer, then scale it up
                 ctx.save();
                 ctx.setTransform(1, 0, 0, 1, 0, 0); 
                 ctx.globalAlpha = finalOpacity;
-                
-                // Soft Shadows: single GPU-accelerated blur over entire lighting layer.
-                // Much smoother than per-polygon shadowBlur — uniform softness on all edges.
+                let layer = this.lightCanvas;
                 if (GameSettings.softShadows) {
-                    ctx.filter = 'blur(4px)';
+                    const sc = this._softCanvas || (this._softCanvas = document.createElement('canvas'));
+                    if (sc.width !== lw || sc.height !== lh) { sc.width = lw; sc.height = lh; }
+                    const sx = sc.getContext('2d');
+                    sx.clearRect(0, 0, lw, lh); sx.filter = 'blur(1.5px)'; sx.drawImage(this.lightCanvas, 0, 0); sx.filter = 'none';
+                    layer = sc;
                 }
-                
-                ctx.drawImage(this.lightCanvas, 0, 0, this.canvas.width, this.canvas.height);
-                
-                if (GameSettings.softShadows) {
-                    ctx.filter = 'none';
-                }
+                ctx.imageSmoothingEnabled = true;
+                ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
                 
                 // 8. NV SIGNAL BOOST
                 if (this.nvIntensity > 0.01) {
@@ -712,11 +441,11 @@
                     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
                 }
             
-                // Lightning Flash Effect
-                if (this.weather.lightningFlash > 0) {
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.globalAlpha = this.weather.lightningFlash * 0.7;
-                    ctx.fillStyle = `rgba(200, 220, 255, 1)`;
+                // Lightning: the dark lifts (above) and the night goes briefly cold blue-white
+                if (flash > 0) {
+                    ctx.globalCompositeOperation = 'screen';
+                    ctx.globalAlpha = flash * 0.4;
+                    ctx.fillStyle = 'rgb(170, 195, 255)';
                     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
                 }
                 ctx.restore();
@@ -726,6 +455,7 @@
 
             // ═══ WET-WORLD POST-PROCESSING ═══
             
+            /** Light bleed: a third-size copy, blurred small (cheap), then scaled up twice. */
             drawBloomPass(ctx) {
                 if (!GameSettings.bloom) return;
                 const W = this.canvas.width, H = this.canvas.height;
@@ -740,15 +470,18 @@
                 this.bloomCtx.drawImage(this.bloomCanvas, 0, 0);
                 this.bloomCtx.globalAlpha = 1.0;
                 this.bloomCtx.globalCompositeOperation = 'source-over';
+                const blurred = this._bloomBlur || (this._bloomBlur = [document.createElement('canvas'), document.createElement('canvas')]);
                 ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.globalCompositeOperation = 'lighter';
-                ctx.globalAlpha = 0.15;
-                ctx.filter = 'blur(12px)';
-                ctx.drawImage(this.bloomCanvas, 0, 0, W, H);
-                ctx.filter = 'blur(24px)';
-                ctx.globalAlpha = 0.08;
-                ctx.drawImage(this.bloomCanvas, 0, 0, W, H);
-                ctx.filter = 'none';
+                ctx.imageSmoothingEnabled = true;
+                [[4, 0.15], [8, 0.08]].forEach(([px, alpha], i) => {          // 4 / 8 px here ≈ 12 / 24 px on screen
+                    const cv = blurred[i];
+                    if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+                    const c = cv.getContext('2d');
+                    c.clearRect(0, 0, bw, bh); c.filter = `blur(${px}px)`; c.drawImage(this.bloomCanvas, 0, 0); c.filter = 'none';
+                    ctx.globalAlpha = alpha;
+                    ctx.drawImage(cv, 0, 0, W, H);
+                });
                 ctx.globalAlpha = 1.0;
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.restore();
@@ -768,30 +501,35 @@
                 ctx.globalCompositeOperation = 'lighter';
                 const halfW = (this.canvas.width / 2) / this.camera.zoom;
                 const halfH = (this.canvas.height / 2) / this.camera.zoom;
+                const rs = this.roomSystem;
                 for (const l of this.lamps) {
                     if (l.x < camX - halfW - 300 || l.x > camX + halfW + 300 ||
                         l.y < camY - halfH - 300 || l.y > camY + halfH + 300) continue;
-                    if (this.roomSystem && this.roomSystem.isLampRoomDark && this.roomSystem.isLampRoomDark(l)) continue;
+                    const k = (rs && rs.active ? rs.lampLight(l) : 1) * lampFlicker(l);
+                    if (k < 0.01) continue;
                     const r = l.radius || 200;
-                    const color = l.color || '#ffeebb';
-                    const intensity = l.intensity || 0.8;
-                    const hex = color.replace('#', '');
-                    const cr = parseInt(hex.substr(0, 2), 16) || 255;
-                    const cg = parseInt(hex.substr(2, 2), 16) || 238;
-                    const cb = parseInt(hex.substr(4, 2), 16) || 187;
-                    const reflectH = r * 1.2, reflectW = r * 0.4;
-                    const grad = ctx.createRadialGradient(l.x, l.y + r * 0.3, 0, l.x, l.y + r * 0.3, reflectH);
-                    grad.addColorStop(0, `rgba(${cr},${cg},${cb},${0.06 * intensity})`);
-                    grad.addColorStop(0.3, `rgba(${cr},${cg},${cb},${0.03 * intensity})`);
-                    grad.addColorStop(1, 'rgba(0,0,0,0)');
-                    ctx.fillStyle = grad;
-                    ctx.beginPath(); ctx.ellipse(l.x, l.y + r * 0.3, reflectW, reflectH, 0, 0, Math.PI * 2); ctx.fill();
-                    const hotGrad = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, r * 0.25);
-                    hotGrad.addColorStop(0, `rgba(${Math.min(255, cr + 40)},${Math.min(255, cg + 40)},${Math.min(255, cb + 40)},${0.08 * intensity})`);
-                    hotGrad.addColorStop(1, 'rgba(0,0,0,0)');
-                    ctx.fillStyle = hotGrad;
+                    if (!l._wet || l._wetAt !== l.x + ',' + l.y + ',' + r) {         // lamps don't move: build once
+                        const color = /^#[0-9a-f]{6}$/i.test(l.color || '') ? l.color : '#ffeebb';
+                        const [cr, cg, cb] = hexToRgb(color).split(',').map(Number);
+                        const intensity = l.intensity || 0.8;
+                        const reflectH = r * 1.2;
+                        const grad = ctx.createRadialGradient(l.x, l.y + r * 0.3, 0, l.x, l.y + r * 0.3, reflectH);
+                        grad.addColorStop(0, `rgba(${cr},${cg},${cb},${0.06 * intensity})`);
+                        grad.addColorStop(0.3, `rgba(${cr},${cg},${cb},${0.03 * intensity})`);
+                        grad.addColorStop(1, 'rgba(0,0,0,0)');
+                        const hot = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, r * 0.25);
+                        hot.addColorStop(0, `rgba(${Math.min(255, cr + 40)},${Math.min(255, cg + 40)},${Math.min(255, cb + 40)},${0.08 * intensity})`);
+                        hot.addColorStop(1, 'rgba(0,0,0,0)');
+                        l._wet = { grad, hot, reflectH, reflectW: r * 0.4 }; l._wetAt = l.x + ',' + l.y + ',' + r;
+                    }
+                    const w = l._wet;
+                    ctx.globalAlpha = Math.min(1, k);
+                    ctx.fillStyle = w.grad;
+                    ctx.beginPath(); ctx.ellipse(l.x, l.y + r * 0.3, w.reflectW, w.reflectH, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = w.hot;
                     ctx.beginPath(); ctx.arc(l.x, l.y, r * 0.25, 0, Math.PI * 2); ctx.fill();
                 }
+                ctx.globalAlpha = 1;
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.restore();
             },
@@ -811,40 +549,6 @@
                 ctx.restore();
             },
             
-            applyColorGrade() {
-                const GRADES = {
-                    none: { brightness: 100, contrast: 100, saturate: 100, tempR: 128, tempG: 128, tempB: 128, tempOpacity: 0, vignette: 0 },
-                    amber_night: { brightness: 95, contrast: 130, saturate: 110, tempR: 178, tempG: 118, tempB: 88, tempOpacity: 0.08, vignette: 35 },
-                    violet_noir: { brightness: 90, contrast: 140, saturate: 80, tempR: 108, tempG: 88, tempB: 178, tempOpacity: 0.08, vignette: 45 },
-                    crimson: { brightness: 92, contrast: 135, saturate: 120, tempR: 178, tempG: 98, tempB: 108, tempOpacity: 0.07, vignette: 30 },
-                    cold_teal: { brightness: 95, contrast: 125, saturate: 75, tempR: 78, tempG: 138, tempB: 178, tempOpacity: 0.07, vignette: 25 },
-                    dreampunk: { brightness: 93, contrast: 145, saturate: 95, tempR: 148, tempG: 108, tempB: 168, tempOpacity: 0.06, vignette: 50 }
-                };
-                const g = GRADES[GameSettings.colorGrade] || GRADES.none;
-                const filters = [];
-                if (g.brightness !== 100) filters.push(`brightness(${g.brightness / 100})`);
-                if (g.contrast !== 100) filters.push(`contrast(${g.contrast / 100})`);
-                if (g.saturate !== 100) filters.push(`saturate(${g.saturate / 100})`);
-                this.canvas.style.filter = filters.length > 0 ? filters.join(' ') : 'none';
-                // Temperature overlay
-                let ov = document.getElementById('grade-overlay');
-                if (!ov) {
-                    ov = document.createElement('div');
-                    ov.id = 'grade-overlay';
-                    ov.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;mix-blend-mode:soft-light;';
-                    this.canvas.parentElement.appendChild(ov);
-                }
-                if (g.tempOpacity > 0) {
-                    ov.style.background = `rgb(${g.tempR},${g.tempG},${g.tempB})`;
-                    ov.style.opacity = g.tempOpacity;
-                    ov.style.display = 'block';
-                } else { ov.style.display = 'none'; }
-                // Vignette
-                if (g.vignette > 0) {
-                    this.canvas.style.boxShadow = `inset 0 0 ${g.vignette * 2}px ${g.vignette}px rgba(0,0,0,${g.vignette / 100})`;
-                } else { this.canvas.style.boxShadow = 'none'; }
-            },
-
             roundRect(x, y, w, h, r) { if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2; this.ctx.beginPath(); this.ctx.moveTo(x + r, y); this.ctx.arcTo(x + w, y, x + w, y + h, r); this.ctx.arcTo(x + w, y + h, x, y + h, r); this.ctx.arcTo(x, y + h, x, y, r); this.ctx.arcTo(x, y, x + w, y, r); this.ctx.closePath(); },
 
         });

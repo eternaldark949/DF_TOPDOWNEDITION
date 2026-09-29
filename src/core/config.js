@@ -64,14 +64,6 @@
                 UPDATE_RANGE_SKIP: 1500
             },
             
-            // --- LIGHTING ---
-            LIGHTING: {
-                NIGHT_DARKNESS: 0.85,
-                DAWN_START: 5,
-                DUSK_END: 20,
-                LAMP_DEFAULT_RADIUS: 250
-            },
-            
             // --- WEATHER ---
             WEATHER: {
                 RAIN_DROP_RATE: 90,          // Drops spawned per frame (base, at zoom=1)
