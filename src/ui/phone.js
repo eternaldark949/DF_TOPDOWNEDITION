@@ -1385,6 +1385,7 @@
                     else if (slot.category === 'vocal') chipColor = item.data.captionColor;
                     else if (slot.category === 'outfit') chipColor = item.data.top.color;
                     else if (slot.category === 'hat' || slot.category === 'jewelry') chipColor = item.data.color;
+                    else if (slot.category === 'accessory' && item.data.held === 'umbrella') chipColor = item.data.color;
                     else if (slot.category === 'accessory') chipColor = (GLASS_DRINKS[game.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne).liquid;
                     
                     const borderStyle = isEquipped ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)';

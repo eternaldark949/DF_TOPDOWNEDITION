@@ -102,6 +102,7 @@
                         // Spring toward the rest pose — stiff near the scalp, loose at the tips
                         const k0 = layout.stiffness * (1 - 0.6 * (i / n));
                         let ax = (root.x + rc * L * i - p.x) * k0, ay = (root.y + rs * L * i - p.y) * k0;
+                        if (dyn && dyn.wind) { ax += dyn.wind.x * sc * (i / n); ay += dyn.wind.y * sc * (i / n); }   // the weather's wind
                         if (layout.wiggle) {                           // restless tendrils
                             const w = Math.sin(time * 5 + i * 0.9 + si * 1.7) * layout.wiggle * sc * (i / n);
                             ax += -rs * w; ay += rc * w;
@@ -952,7 +953,12 @@
             const stance = config.stance || 'idle'; 
             const held = config.held || null;
             // Which hand (if any) is holding a drink — it's held out and swings less
-            const glassHand = (held && !isDrivingCfg(config) && (held.type === 'glass' || held.type === 'champagne_glass')) ? (held.hand || 'right') : null;
+            // Weather on this character (world/weather-response.js): wind, rain, lightning; null indoors
+            const W = !isDrivingCfg(config) ? weatherAt(entity) : null;
+            // An umbrella opens in the rain (or when told to) and is held like a drink
+            const umbrella = held && held.type === 'umbrella' && !isDrivingCfg(config) ? held : null;
+            const umbrellaOpen = umbrella ? (umbrella.open !== undefined ? umbrella.open : (W && W.rain > 0.05 ? 1 : 0)) : 0;
+            const glassHand = (held && !isDrivingCfg(config) && (held.type === 'glass' || held.type === 'champagne_glass' || umbrella)) ? (held.hand || 'right') : null;
         
             const clothes = {
                 hair:   config.hair   || null,
@@ -964,7 +970,9 @@
                 jewelry: config.jewelry || null
             };
         
-            const darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * frac)) : '#000';
+            // Rain darkens clothes a touch (not skin)
+            const wet = W ? W.rain * 0.08 : 0;
+            const darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * (hex === skinColor ? frac : frac + wet))) : '#000';
         
             // --- 2. PROPORTIONS ---
             let shoulderSpread = 9; let hipWidth = 8; let hipXOff = -5; let torsoWidth = 10; let torsoXOff = -3;
@@ -1134,6 +1142,8 @@
                 // Holding a drink: that hand is held out a little in front, elbow softly bent
                 if (glassHand === 'right') { rFistX += 7; rFistY = 9; }
                 else if (glassHand === 'left') { lFistX += 7; lFistY = -9; }
+                // An open umbrella's handle is held up close to the chest
+                if (umbrellaOpen > 0.15) { if (glassHand === 'right') { rFistX = 3 + bounce; rFistY = 5; } else { lFistX = 3 + bounce; lFistY = -5; } }
             }
             const walkArms = !isDriving && stance !== 'pistol' && stance !== 'rifle' && stance !== 'sniper' && stance !== 'punch';
             // Pose: hands (unarmed only; a hand holding a drink keeps it), twist and breathing
@@ -1399,7 +1409,7 @@
             const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
             const jewelryAt = (where) => (clothes.jewelry || []).filter(j => WD && WD.jewelry[j.type] && WD.jewelry[j.type].at === where);
             const headX0 = bounce - bodyRecoil;
-            const clothDyn = { wind: null };                               // weather will blow on this (roadmap step 7)
+            const clothDyn = { wind: W ? W.wind : null };                 // the weather blows on hems and trains
             const g = {
                 darken, skin: skinColor, gender, walkCycle, android: A,
                 torso: { x: torsoXOff, w: torsoWidth }, hip: { x: hipXOff, w: hipWidth },
@@ -1630,13 +1640,15 @@
             ctx.restore();
         
             // 10. Head & Hair
-            const headX = 0 + bounce - bodyRecoil + pf('head', 0);
-            const headY = pf('head', 1), headTurn = pose ? (pose.turn || 0) * poseW : 0;   // looking around
+            // In strong wind the head dips into it (toward where it's blowing from)
+            const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W ? W.strong * 1.3 : 0;
+            const headX = 0 + bounce - bodyRecoil + pf('head', 0) - Math.cos(windLocal) * dip;
+            const headY = pf('head', 1) - Math.sin(windLocal) * dip, headTurn = pose ? (pose.turn || 0) * poseW : 0;   // looking around
             // 1.0 at the player's base walk speed — keeps the old player hair tuning, now shared by everyone
             const hairMove = gaitSpeed / 5.2;
             // Hair motion comes from the strand physics (hairGeometry): the owner's head
             // position in the world, plus the shoulder sway the strands swing with.
-            const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0 };
+            const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0, wind: W ? W.hairWind : null };
             walkDyn.android = A;
             const turning = headY !== 0 || headTurn !== 0;
             withHead(headX, hx => {
@@ -1659,6 +1671,12 @@
                 // 'champagne_glass' is the legacy id (NPC configs); it's the glass with champagne
                 if (held.type === 'glass' || held.type === 'champagne_glass') {
                     drawHeldGlass(ctx, hX, hY, held.drink || 'champagne', entity, held.hand);
+                } else if (umbrella) {
+                    // Canopy over the head, held a little into the wind, bobbing with the step
+                    const lean = W ? 2.5 + W.strong * 3 : 0;
+                    const ux = headX * 0.5 - Math.cos(windLocal) * lean + Math.sin(walkCycle * 2) * 0.5, uy = -Math.sin(windLocal) * lean;
+                    const eased = entity._umbOpen = (entity._umbOpen === undefined ? umbrellaOpen : entity._umbOpen + (umbrellaOpen - entity._umbOpen) * 0.12);
+                    drawUmbrella(ctx, ux, uy, hX, hY, eased, umbrella);
                 }
             }
             

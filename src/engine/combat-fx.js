@@ -13,6 +13,8 @@
             red:  { drop: '150, 10, 14', decal: '110, 6, 8' },
             ink:  { drop: '40, 18, 58',  decal: '11, 6, 16', sheen: '120, 70, 170' },
             oil:  { drop: '40, 40, 40',  decal: '18, 18, 18', sparks: true },
+            // Stella (949): deep wine — Dr. Yin keeps her running, and she isn't quite human
+            wine: { drop: '112, 16, 38', decal: '70, 10, 26', sheen: '150, 40, 70' },
         };
         const COOLANT_TINTS = { silver: '170, 220, 255', gold: '255, 196, 96', bloodmoon: '255, 110, 150' };
 
@@ -30,6 +32,7 @@
                 return { drop: t, decal: t, sparks: true, glow: true };
             }
             if (BLOOD_KINDS[named]) return BLOOD_KINDS[named];
+            if (typeof PlayerEntity !== 'undefined' && a instanceof PlayerEntity) return BLOOD_KINDS.wine;
             if ((typeof Drone !== 'undefined' && a instanceof Drone) || (typeof GatlingGunner !== 'undefined' && a instanceof GatlingGunner)) return BLOOD_KINDS.oil;
             if (a.role === 'red_demon_dancer' || (a.role === 'dancer' && a.gender !== 'male')) return BLOOD_KINDS.ink;
             return BLOOD_KINDS.red;

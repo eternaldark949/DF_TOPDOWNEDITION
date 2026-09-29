@@ -1206,7 +1206,7 @@
                         const bleedChance = this.playerHealth < 20 ? 0.3 : 0.1;
                         
                         //if ((isMoving || Math.random() < 0.05) && Math.random() < bleedChance) {
-                            this.decals.addBlood(this.player.x, this.player.y, 3 + Math.random() * 2);
+                            this.decals.addBlood(this.player.x, this.player.y, 3 + Math.random() * 2, BLOOD_KINDS.wine.decal);   // Stella's own
                         //}
                     }
                 }
