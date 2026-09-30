@@ -143,6 +143,9 @@
         };
         const _floraCache = new Map();
         /** The sprite for a kind/size (sizes bucketed to 0.2), in 4 variants. */
+        /** Where a plant's canopy sits (drawn above its anchor: palms and trees high, bushes low). Shadows centre on it. */
+        function foliageCanopyY(f) { return f.y - (f.type === 'bush' ? 2 : f.type === 'palm' ? 30 : 25) * (f.size || 1); }
+
         function floraSprite(type, size, variant) {
             const sz = Math.round(size * 5) / 5, key = type + '|' + sz + '|' + variant;
             let spr = _floraCache.get(key);
@@ -285,15 +288,16 @@
                 // Calculate sway based on wind strength and time
                 const sway = Math.sin(time * 2 + this.phaseOffset) * wind * 8 * this.swayMultiplier * windDirection;
                 const s = this.size, palm = this.type === 'palm', bush = this.type === 'bush';
-                // Shadow on the ground: by day the sun's shadow layer throws it (engine/daylight.js); at night, a soft pool beneath
+                const cx = this.x + sway * (bush ? 0.6 : palm ? 0.3 : 1), cy = foliageCanopyY(this);
+                // Shadow on the ground, under the leaves: by day the sun's shadow layer throws it (engine/daylight.js); at night, a soft pool beneath
                 if (!_sunShadow.on) {
+                    const r = (bush ? 13 : palm ? 16 : 19) * s;
                     ctx.fillStyle = 'rgba(0,0,0,0.22)';
-                    ctx.beginPath(); ctx.ellipse(this.x + sway * 0.4 + 4 * s, this.y + (bush ? 3 : 6) * s, (bush ? 13 : palm ? 16 : 19) * s, (bush ? 6 : 8) * s, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(cx + 3 * s, cy + 4 * s, r, r * 0.82, 0, 0, Math.PI * 2); ctx.fill();
                 }
                 // The canopy: its painted sprite, carried by the wind
                 if (this._variant === undefined) this._variant = Math.floor(this.phaseOffset * 0.637) % 4;
                 const spr = floraSprite(this.type, s, this._variant);
-                const cx = this.x + sway * (bush ? 0.6 : palm ? 0.3 : 1), cy = this.y - (bush ? 2 : palm ? 30 : 25) * s;
                 if (palm) {
                     ctx.save(); ctx.translate(cx, cy); ctx.rotate(sway * 0.012); ctx.drawImage(spr.cv, -spr.w / 2, -spr.w / 2); ctx.restore();
                 } else ctx.drawImage(spr.cv, cx - spr.w / 2, cy - spr.w / 2);
