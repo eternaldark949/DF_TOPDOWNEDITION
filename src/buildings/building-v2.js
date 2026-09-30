@@ -275,11 +275,13 @@
                 
                 // Draw shadow for each section
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                this.sections.forEach(section => {
+                if (this.roundR) this._leanFaces();                                // (rounded corners: the shadow follows them)
+                this.sections.forEach((section, si) => {
                     const sx = this.x + section.x;
                     const sy = this.y + section.y;
                     const shadowOffset = this.facadeDepth;
-                    ctx.fillRect(sx + shadowOffset, sy + shadowOffset, section.w, section.h);
+                    if (this._roundSec) { ctx.save(); ctx.translate(shadowOffset, shadowOffset); ctx.fill(this._roofPath(section, si)); ctx.restore(); }
+                    else ctx.fillRect(sx + shadowOffset, sy + shadowOffset, section.w, section.h);
                 });
                 
                 // Draw ground-level elements (entrance area, ground floor)
@@ -635,6 +637,7 @@
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
                     this.sills = { lip: 'rgba(236, 232, 250, 0.75)', shade: 'rgba(20, 10, 48, 0.55)' };   // window sills (_drawFaceWindows)
+                    this.roundR = CONFIG.BUILDINGS.SQ_CORNER_R;                  // rounded outer corners (_roundCorners)
                     this.emissiveReach = 700;                              // searchlight beams reach well past the footprint
                 }
             },
@@ -691,12 +694,65 @@
                         });
                         for (const [lo, hi] of segs) {
                             if (hi - lo < 2) continue;
-                            faces.push(e.horiz ? { side: e.side, section: i, x1: lo, y1: e.fixed, x2: hi, y2: e.fixed }
-                                               : { side: e.side, section: i, x1: e.fixed, y1: lo, x2: e.fixed, y2: hi });
+                            const nx = e.side === 'E' ? 1 : e.side === 'W' ? -1 : 0, ny = e.side === 'S' ? 1 : e.side === 'N' ? -1 : 0;
+                            faces.push(e.horiz ? { side: e.side, section: i, x1: lo, y1: e.fixed, x2: hi, y2: e.fixed, nx, ny }
+                                               : { side: e.side, section: i, x1: e.fixed, y1: lo, x2: e.fixed, y2: hi, nx, ny });
                         }
                     }
                 });
+                if (this.roundR) this._roundCorners(faces, S);
                 return (this._faces = faces);
+            },
+
+            /**
+             * Rounded outer corners (this.roundR, px): each straight face stops R short of an outer
+             * corner and the corner becomes an arc of short facets (side 'C', with their own outward
+             * normal). A corner where another section continues the wall stays square.
+             */
+            _roundCorners(faces, S) {
+                const R = this.roundR, N = 5, inside = (x, y, j) => S.some((o, k) => k !== j && x >= o.x0 - 0.5 && x <= o.x1 + 0.5 && y >= o.y0 - 0.5 && y <= o.y1 + 0.5);
+                this._roundSec = S.map((s, j) => {
+                    const corners = [[s.x0, s.y0, -1, -1], [s.x1, s.y0, 1, -1], [s.x1, s.y1, 1, 1], [s.x0, s.y1, -1, 1]];   // tl, tr, br, bl
+                    return corners.map(([x, y, sx, sy]) => {
+                        if (inside(x, y, j)) return 0;
+                        // trim the two straight faces that meet here
+                        for (const f of faces) {
+                            if (f.section !== j) continue;
+                            if (f.x1 === x && f.y1 === y) { if (f.y1 === f.y2) f.x1 += R * (f.x2 > f.x1 ? 1 : -1); else f.y1 += R * (f.y2 > f.y1 ? 1 : -1); }
+                            if (f.x2 === x && f.y2 === y) { if (f.y1 === f.y2) f.x2 -= R * (f.x2 > f.x1 ? 1 : -1); else f.y2 -= R * (f.y2 > f.y1 ? 1 : -1); }
+                        }
+                        // the arc: centre R in from the corner, from one face's end round to the other's
+                        const cx = x - sx * R, cy = y - sy * R, a0 = Math.atan2(sy, 0), a1 = Math.atan2(0, sx);
+                        let da = a1 - a0; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
+                        for (let i = 0; i < N; i++) {
+                            const t0 = a0 + da * i / N, t1 = a0 + da * (i + 1) / N, tm = (t0 + t1) / 2;
+                            faces.push({ side: 'C', section: j, x1: cx + Math.cos(t0) * R, y1: cy + Math.sin(t0) * R, x2: cx + Math.cos(t1) * R, y2: cy + Math.sin(t1) * R, nx: Math.cos(tm), ny: Math.sin(tm) });
+                        }
+                        return R;
+                    });
+                });
+            },
+
+            /** A section's footprint as points (its rounded corners traced), for shadows. */
+            _footprint(section, si) {
+                const x0 = this.x + section.x, y0 = this.y + section.y, x1 = x0 + section.w, y1 = y0 + section.h;
+                if (this.roundR) this._leanFaces();
+                const r = this._roundSec && this._roundSec[si];
+                if (!r) return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+                const pts = [], arc = (cx, cy, R, a0) => { for (let i = 0; i <= 5; i++) { const a = a0 + i / 5 * Math.PI / 2; pts.push([cx + Math.cos(a) * R, cy + Math.sin(a) * R]); } };
+                if (r[0]) arc(x0 + r[0], y0 + r[0], r[0], Math.PI); else pts.push([x0, y0]);
+                if (r[1]) arc(x1 - r[1], y0 + r[1], r[1], -Math.PI / 2); else pts.push([x1, y0]);
+                if (r[2]) arc(x1 - r[2], y1 - r[2], r[2], 0); else pts.push([x1, y1]);
+                if (r[3]) arc(x0 + r[3], y1 - r[3], r[3], Math.PI / 2); else pts.push([x0, y1]);
+                return pts;
+            },
+
+            /** A section's roof outline, with its rounded corners (world coordinates). */
+            _roofPath(section, si, inset = 0) {
+                const r = this._roundSec && this._roundSec[si], p = new Path2D(), x = this.x + section.x + inset, y = this.y + section.y + inset;
+                const w = section.w - inset * 2, h = section.h - inset * 2;
+                if (r) p.roundRect(x, y, w, h, r.map(v => Math.max(0, v - inset))); else p.rect(x, y, w, h);
+                return p;
             },
 
             _leanScale(extraFloors = 0) {
@@ -709,7 +765,8 @@
             _visibleFaces(cam) {
                 return this._leanFaces().filter(f =>
                     (f.side === 'S' && cam.y > f.y1) || (f.side === 'N' && cam.y < f.y1) ||
-                    (f.side === 'E' && cam.x > f.x1) || (f.side === 'W' && cam.x < f.x1));
+                    (f.side === 'E' && cam.x > f.x1) || (f.side === 'W' && cam.x < f.x1) ||
+                    (f.side === 'C' && (cam.x - (f.x1 + f.x2) / 2) * f.nx + (cam.y - (f.y1 + f.y2) / 2) * f.ny > 0));
             },
 
             _drawLeanTop(ctx) {
@@ -722,7 +779,7 @@
                 for (const f of faces) {
                     const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
                     const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
-                    const shade = f.side === 'S' ? 18 : f.side === 'N' ? -8 : 6;
+                    const shade = f.side === 'S' ? 18 : f.side === 'N' ? -8 : f.side === 'C' ? Math.round(6 + (f.ny > 0 ? 12 : 14) * f.ny) : 6;
                     const g = ctx.createLinearGradient((ax + bx) / 2, (ay + by) / 2, (cx + dx) / 2, (cy + dy) / 2);
                     g.addColorStop(0, darkenHex(wall, 6));
                     g.addColorStop(1, shade >= 0 ? lightenHex(wall, shade) : darkenHex(wall, -shade));
@@ -743,7 +800,8 @@
                     if (sq) {                                                                  // lavender slab with a soft sheen (world-space gradients, made once)
                         ctx.fillStyle = LandmarkKit.grad(this, 'roof' + si, () => { const g = ctx.createLinearGradient(sx, sy, sx + section.w, sy + section.h); g.addColorStop(0, SQ_THEME.roof); g.addColorStop(1, SQ_THEME.roofLo); return g; });
                     } else ctx.fillStyle = this.colors.roof;
-                    ctx.fillRect(sx, sy, section.w, section.h);
+                    const outline = this._roundSec ? this._roofPath(section, si) : null;
+                    if (outline) { ctx.save(); ctx.fill(outline); ctx.clip(outline); } else ctx.fillRect(sx, sy, section.w, section.h);
                     if (sq) {                                                                  // a pearl sheen pooled toward the north-west corner
                         ctx.fillStyle = LandmarkKit.grad(this, 'sheen' + si, () => {
                             const pg = ctx.createRadialGradient(sx + section.w * 0.25, sy + section.h * 0.2, 10, sx + section.w * 0.25, sy + section.h * 0.2, Math.max(section.w, section.h) * 0.8);
@@ -752,9 +810,10 @@
                     }
                     ctx.strokeStyle = sq ? 'rgba(217,191,134,0.08)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;          // tar seams
                     for (let gx = 36; gx < section.w; gx += 36) { ctx.beginPath(); ctx.moveTo(sx + gx, sy); ctx.lineTo(sx + gx, sy + section.h); ctx.stroke(); }
+                    if (outline) ctx.restore();
                     ctx.strokeStyle = sq ? SQ_THEME.trim : lightenHex(this.colors.roof, 22); ctx.lineWidth = sq ? 4 : 5;       // parapet
-                    ctx.strokeRect(sx + 2.5, sy + 2.5, section.w - 5, section.h - 5);
-                    if (sq) { ctx.strokeStyle = 'rgba(45,29,89,0.45)'; ctx.lineWidth = 1; ctx.strokeRect(sx + 6, sy + 6, section.w - 12, section.h - 12); }
+                    if (outline) ctx.stroke(this._roofPath(section, si, 2.5)); else ctx.strokeRect(sx + 2.5, sy + 2.5, section.w - 5, section.h - 5);
+                    if (sq) { ctx.strokeStyle = 'rgba(45,29,89,0.45)'; ctx.lineWidth = 1; if (outline) ctx.stroke(this._roofPath(section, si, 6)); else ctx.strokeRect(sx + 6, sy + 6, section.w - 12, section.h - 12); }
                 });
                 if (sq) this._sqRoofEdgeLights(ctx, false);
                 if (this.style) this._drawRoofFeatures(ctx, false);
@@ -819,6 +878,7 @@
              * at night the lips catch the building's lamp colour (LandmarkKit.rim).
              */
             _drawFaceWindows(ctx, f, P, emissive) {
+                if (f.side === 'C') return;                          // rounded corners: no windows on the curve
                 const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS);
                 const ax = f.x1, ay = f.y1, bx = f.x2, by = f.y2;
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);

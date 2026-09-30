@@ -96,6 +96,7 @@
 
             /** Verandas: glass-railed balconies in the bays between pilasters, every fourth floor. */
             _sqBalconies(f) {
+                if (f.side === 'C') return [];
                 if (f._sqBal) return f._sqBal;
                 const pil = this._sqPilasters(f), out = [];
                 if (!f._sqEntrance) {
@@ -125,9 +126,9 @@
                 const ex = bx - ax, ey = by - ay, tx = cx - dx, ty = cy - dy, ux = dx - ax, uy = dy - ay;
                 const at = (u, v) => [ax + ex * u + (ux + tx * u - ex * u) * v, ay + ey * u + (uy + ty * u - ey * u) * v];
                 const sub = (p, u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); p.moveTo(a[0], a[1]); p.lineTo(b[0], b[1]); p.lineTo(c[0], c[1]); p.lineTo(d[0], d[1]); p.closePath(); };
-                const pil = this._sqPilasters(f), H = this._sqH(), lod = _zoomLOD, K = LandmarkKit, T = SQ_THEME;
+                const corner = f.side === 'C', pil = corner ? { us: [], w: 0, len: Math.hypot(f.x2 - f.x1, f.y2 - f.y1) } : this._sqPilasters(f), H = this._sqH(), lod = _zoomLOD, K = LandmarkKit, T = SQ_THEME;
                 const vBelt = SQ_PORTICO.floors * CONFIG.BUILDINGS.FLOOR_HEIGHT / H;
-                const nx = f.side === 'E' ? 1 : f.side === 'W' ? -1 : 0, ny = f.side === 'S' ? 1 : f.side === 'N' ? -1 : 0;
+                const nx = f.nx, ny = f.ny;
                 const edge = [{ a: [ax, ay], b: [bx, by], nx, ny }];
                 ctx.save();
                 ctx.globalAlpha *= Math.min(1, (depth - 4) / 14);
@@ -151,13 +152,16 @@
                         // Belt course at the portico's roof line, the crown cornice at the top
                         lips.push(K.ledge(ctx, edge, (vBelt + 0.012) * H, 3, 0.022 * H, '#6b5cae', T.roof, 'rgba(236, 226, 255, 0.55)'));
                         lips.push(K.ledge(ctx, edge, H, 4, 0.045 * H, '#ddd8ee', '#9d95bd', 'rgba(255, 250, 255, 0.7)'));
-                        if (lod === 0) {                                                                         // dentils under the cornice
+                        if (lod === 0 && !corner) {                                                              // dentils under the cornice
                             const n = Math.floor(pil.len / 6), den = new Path2D();
                             for (let i = 0; i < n; i++) { const u = (i + 0.3) / n; sub(den, u, u + 0.4 / n, 0.935, 0.952); }
                             ctx.fillStyle = 'rgba(38,28,58,0.55)'; ctx.fill(den);
                         }
                         f._sqLips = lips;
                         if (f._sqEntrance) this._sqArch(ctx, f, at, false);
+                    } else if (corner) {                                                                         // round the corner, only the ledges' rim
+                        const rim = K.rim(this, this._sqDark || 0);
+                        if (rim.a > 0.01 && f._sqLips) { ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(${rim.rgb}, ${0.6 * rim.a})`; ctx.lineWidth = 1.2; for (const lp of f._sqLips) if (lp) ctx.stroke(lp); }
                     } else if ((this._sqDark || 0) > 0.05) {
                         ctx.globalCompositeOperation = 'lighter';
                         const pulse = 0.82 + 0.18 * Math.sin(_gameTimeSec * 0.7 + (this._seed || 0));
@@ -629,7 +633,7 @@
                 const cam = game.camera, k = 1 + this._leanScale();                                            // moonlit specular across the roofs
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const b = this.getBounds(), sweep = ((t * 0.012) % 1.6) - 0.3, sx = b.x + b.w * sweep;
-                ctx.beginPath(); for (const s of this.sections) ctx.rect(this.x + s.x, this.y + s.y, s.w, s.h); ctx.clip();
+                const clipP = new Path2D(); this.sections.forEach((s, si) => clipP.addPath(this._roofPath(s, si))); ctx.clip(clipP);
                 const g = ctx.createLinearGradient(sx - 140, b.y, sx + 140, b.y + 90);
                 g.addColorStop(0, 'rgba(220,210,255,0)'); g.addColorStop(0.5, `rgba(220,210,255,${0.07 * a})`); g.addColorStop(1, 'rgba(220,210,255,0)');
                 ctx.fillStyle = g; ctx.fillRect(b.x, b.y, b.w, b.h);
@@ -908,6 +912,7 @@
                 if (!this._sqBulbs) {
                     const inset = 10, step = 22, bulbs = [];
                     for (const f of this._leanFaces()) {
+                        if (f.side === 'C') { bulbs.push([(f.x1 + f.x2) / 2 - f.nx * inset, (f.y1 + f.y2) / 2 - f.ny * inset]); continue; }
                         const horiz = f.y1 === f.y2, lo = horiz ? f.x1 : f.y1, hi = horiz ? f.x2 : f.y2;
                         const inward = f.side === 'S' || f.side === 'E' ? -inset : inset;
                         const n = Math.max(1, Math.round((hi - lo - 2 * inset) / step));

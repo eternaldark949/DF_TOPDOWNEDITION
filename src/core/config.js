@@ -355,6 +355,7 @@
                 CAM_HEIGHT: 700,        // virtual camera height (px) at REF_ZOOM; lower = stronger lean
                 REF_ZOOM: 1.0,          // zoomed out, the camera rises (leanCamHeight) so heights scale with footprints
                 FLOOR_HEIGHT: 9,        // px of height per floor
+                SQ_CORNER_R: 40,        // Silver Queen's rounded outer corners (px); 0 = square
                 MAX_FLOORS: 14          // taller buildings are capped so roofs don't swing too far
             },
 
