@@ -629,7 +629,7 @@
                     if (this.scenes && this.scenes.actors.length) this.scenes.drawActors(this.ctx);   // a scene's cast
                     this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
                     this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
-                    this.teammates.forEach(tm => {
+                    if (!(this.scenes && this.scenes.crewOffstage)) this.teammates.forEach(tm => {
                         if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) return;
                         tm.draw(this.ctx, this.player);
                     });

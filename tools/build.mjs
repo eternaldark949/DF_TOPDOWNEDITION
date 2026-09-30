@@ -96,6 +96,7 @@ const SCRIPTS = [
     'story/scene-runner.js',
     'story/scenes/cast.js',
     'story/scenes/prologue.js',
+    'story/scenes/van.js',
     'engine/pause-system.js',
     'engine/game-engine.js',
     'engine/events.js',

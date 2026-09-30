@@ -2595,7 +2595,7 @@
         body.scene-hud-on #cinematic-bars .cine-bar { height: 0 !important; }
 
         /* The call card (phoneSystem.ringCall): rises while it rings, settles to a small pill once answered */
-        #call-card { position: fixed; left: 50%; top: 16vh; z-index: 1155; display: flex; flex-direction: column; align-items: center; gap: 10px;
+        #call-card { position: fixed; left: 50%; top: 40vh; z-index: 1155; display: flex; flex-direction: column; align-items: center; gap: 10px;
             width: min(78vw, 280px); padding: 20px 18px 18px; border-radius: 26px; pointer-events: auto;
             background: linear-gradient(180deg, rgba(28, 12, 44, 0.94), rgba(10, 4, 18, 0.96));
             box-shadow: 0 20px 50px rgba(4, 0, 10, 0.7), inset 0 0 0 1px rgba(232, 194, 122, 0.22), 0 0 50px -16px rgba(164, 105, 255, 0.7);
@@ -2625,7 +2625,7 @@
         #call-card.live .cc-who b { font-size: 1.05rem; }
         #call-card.live .cc-answer { display: none; }
         #call-card.live .cc-time { display: block; }
-        body.landscape #call-card { top: 10vh; }
+        body.landscape #call-card { top: 30vh; left: 62%; }
         body.landscape #call-card.live { top: calc(9vh + 8px); }
         /* =========================================
            LANDSCAPE (a phone on its side)
@@ -6818,13 +6818,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         /* =====================================================================
            NARRATIVE DATABASE (Granular Steps)
            ---------------------------------------------------------------------
-           Breakdown:
-           0: Intro Cutscene (Non-interactive)
-           1: Check Phone (Interactive)
-           2: Leave Apartment (Interactive - Walk to door)
-           3: Car Reveal Cutscene (Non-interactive)
-           4: Enter Vehicle (Interactive)
-           ...
+           Chapter 1: the van (and the night before) → Double Nights → the
+           penthouse ambush → the note → the BlackMark → Mirabel, in person.
            ===================================================================== */
         const STORY_DB = {
             // PART 1
@@ -6843,254 +6838,186 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                 locationDesc: "Melting pot of cultures traveling to this location.",
                                 completionTime: "1HR",
                                 target: "THE DARK MAKER",
+                                // Steps are addressed by name (story.goTo / isAt / isBefore). The numbers are
+                                // just their order; saves keep the name (StoryManager.serialize).
                                 steps: {
-                                    // STEP 0: The Awakening (Cutscene)
+                                    // The van ride and the night before (story/scenes/van.js). Ends at the hotel door.
                                     0: {
-                                        name: "INTRO_SEQUENCE",
-                                        banner: null, 
-                                        targetMap: "apt_949",
-                                        target: "player", // Center on player
-                                        condition: "TIMER_360", // Wait 6 seconds
-                                        onStart: (game) => {
-                                            game.cutscene.start();
-                                            // Start cutscene at current zoomed-in level
-                                            game.cutscene.camZoomTarget = game.camera.zoom;
-                                            game.cutscene.camTargetX = game.player.x;
-                                            game.cutscene.camTargetY = game.player.y;
-                                            
-                                            // Phase 1: Hold the close-up for a beat (1s), then begin zoom out
-                                            game.addPausableTimeout(() => {
-                                                game.cutscene.camZoomTarget = 1.0; // Zoom out to normal
-                                            }, 1000);
-                                            
-                                            // Phase 2: Show title cards mid-zoom (1.5s in)
-                                            game.addPausableTimeout(() => {
-                                                game.cutscene.showTitle(4000);
-                                            }, 1500);
-                                        }
+                                        name: "VAN_RIDE",
+                                        banner: null,
+                                        targetMap: null,
+                                        target: "player",
+                                        condition: (game) => !!game.questState.vanDone,
+                                        onStart: (game) => { if (!game.questState.vanDone && !game.scenes.running) game.story.playVan(); }
                                     },
-                                    // STEP 1: Check Phone
+                                    // Out of the van: she walks (the move stick), the door pill shows her how to go in
                                     1: {
-                                        name: "CHECK_PHONE",
-                                        banner: "CHECK YOUR PHONE",
-                                        targetMap: "apt_949",
-                                        target: "player",
-                                        condition: "PHONE_OPENED_CONTACTS",
-                                        onStart: (game) => {
-                                            game.cutscene.end(); // Give control back
-                                            // Reset fade overlay to default speed
-                                            const fadeOv = document.getElementById('fade-overlay');
-                                            if (fadeOv) fadeOv.style.transition = 'opacity 0.4s ease';
-                                            // Dot is now derived from the unread ledger; the typing
-                                            // indicator fires immediately and serves as the prompt.
-                                            if(typeof phoneSystem !== 'undefined') {
-                                                // Show typing indicator first, then deliver message after delay
-                                                phoneSystem.sendText('Mirabel', "949, I need your expertise. Meet me at the Moon City Nightclub. Come quickly, this is urgent.", true, 2500);
-                                                phoneSystem.metNPCs.add('Anavia');
-                                                phoneSystem.sendText('Anavia', "Meet me outside when you have a moment, I want to see your face.", true, 5000);
-                                            }
-                                        }
-                                    },
-                                    // STEP 2: Leave Apartment
-                                    2: {
-                                        name: "LEAVE_APARTMENT",
-                                        banner: "LEAVE THE APARTMENT",
-                                        targetMap: "apt_949",
-                                        target: "apt_door", // <--- Modular ID
-                                        condition: "LOC_HUB" 
-                                    },
-                                    // STEP 3: Car Reveal & City Establishing Shot
-                                    3: {
-                                        name: "CAR_REVEAL",
-                                        banner: null, 
-                                        targetMap: "hub_949",
-                                        target: "player_car",
-                                        condition: "TIMER_600", 
-                                        onStart: (game) => {
-                                            // Camera Snap to prevent swinging
-                                            game.camera.x = game.player.x;
-                                            game.camera.y = game.player.y;
-                                            
-                                            game.cutscene.start(); 
-                                            if(game.ownedCar) game.ownedCar.forceLights = true;
-                                            
-                                            // Cinematic Sequence
-                                            game.addPausableTimeout(() => game.story.triggerComms("747", "Nine. Be careful out there.", 4000), 500);
-                                            
-                                            // --- MODULAR PAN COMMANDS ---
-                                            // 1. Pan to Car (at 1s) — dynamic position
-                                            game.addPausableTimeout(() => game.cutscene.panTo('player_car', 0.8), 1000); 
-                                            
-                                            // 2. Pan to Club (at 4s)
-                                            game.addPausableTimeout(() => game.cutscene.panTo('club_entrance', 0.7), 4000); 
-                                            
-                                            // 3. Pan back to Player (at 7s)
-                                            game.addPausableTimeout(() => game.cutscene.panTo('player', 1.0), 7000);
-                                        }
-                                    },
-                                    // STEP 4: Enter Vehicle
-                                    4: {
-                                        name: "ENTER_VEHICLE",
-                                        banner: "ENTER YOUR VEHICLE",
-                                        targetMap: "hub_949",
-                                        target: "player_car",
-                                        condition: "PLAYER_IN_OWNED_CAR",
-                                        onStart: (game) => {
-                                            game.cutscene.end(); 
-                                            game.story.triggerComms("949", "There she is. I'll be on the way shortly.", 4000);
-        
-                                            // Cleanup UI — derived from the ledger
-                                            if (typeof phoneSystem !== 'undefined') phoneSystem.markAllRead();
-                                        }
-                                    },
-                                    // STEP 5: Drive to Club
-                                    5: {
-                                        name: "DRIVE_CLUB",
-                                        banner: "DRIVE TO MOON CITY NIGHTCLUB",
-                                        targetMap: "hub_949",
-                                        target: "club_entrance", // <--- Modular ID
-                                        condition: "LOC_NIGHTCLUB",
-                                        onStart: (game) => {
-                                            // Sibling Banter while driving
-                                            game.addPausableTimeout(() => {
-                                                game.story.triggerComms("747", "I can't shake the feeling Nine. This hunt reeks.", 4000);
-                                            }, 2000);
-        
-                                            game.addPausableTimeout(() => {
-                                                game.story.triggerComms("949", "I know, Seven. We don't know what we're getting involved in.", 4000);
-                                            }, 7000);
-        
-                                            game.addPausableTimeout(() => {
-                                                game.story.triggerComms("747", "*Sigh* Mirabel for goodness sake. Keep me updated.", 4000);
-                                            }, 12000);
-                                        }
-                                    },
-                                    // STEP 6: Wait inside Club
-                                    6: {
-                                        name: "WAIT_FOR_TEXT",
-                                        banner: "...",
-                                        targetMap: "moon_city_nightclub",
-                                        target: "player",
-                                        condition: "TIMER_120"
-                                    },
-                                    // STEP 7: Receive & Read Message
-                                    7: {
-                                        name: "READ_MESSAGE",
-                                        banner: "NEW MESSAGE RECEIVED",
-                                        targetMap: "moon_city_nightclub",
-                                        target: "player",
-                                        condition: "MESSAGE_READ_MIRABEL",
-                                        onStart: (game) => {
-                                            game.story.nsm.flags.messageReadMirabel = false;
-                                            if(typeof phoneSystem !== 'undefined') {
-                                                // Show typing indicator first, then deliver message
-                                                phoneSystem.sendText('Mirabel', "I'm in the back right booth. Wearing red.", true, 2000);
-                                                phoneSystem.sendText('Mirabel', "I have your team with me too. They know the deal.", true, 8000);
-                                            }
-                                        }
-                                    },
-                                    // STEP 8: Find Mirabel
-                                    8: {
-                                        name: "FIND_MIRABEL",
-                                        banner: "FIND MIRABEL",
-                                        targetMap: "moon_city_nightclub",
-                                        target: "mirabel_booth", // <--- Modular ID
-                                        condition: "HAS_KEYCARD",
-                                        onStart: (game) => {
-                                            // Derived from the ledger — see phoneSystem.refreshNotifications
-                                            if (typeof phoneSystem !== 'undefined') phoneSystem.markAllRead();
-                                        }
-                                    },
-                                    // STEP 9: Leave Club
-                                    9: {
-                                        name: "LEAVE_CLUB",
-                                        banner: "LEAVE THE NIGHTCLUB",
-                                        targetMap: "moon_city_nightclub",
-                                        target: "club_exit",
-                                        condition: "LOC_HUB"
-                                    },
-                                    // STEP 10: Go to Hotel
-                                    10: {
-                                        name: "ARRIVE_HOTEL",
-                                        banner: "ARRIVE AT DOUBLE NIGHTS HOTEL",
+                                        name: "ENTER_HOTEL",
+                                        banner: "ENTER DOUBLE NIGHTS",
                                         targetMap: "hub_949",
                                         target: "hotel_entrance",
-                                        condition: "LOC_HOTEL_LOBBY"
+                                        condition: "LOC_HOTEL_LOBBY",
+                                        onStart: (game) => {
+                                            const H = game.hud, S = game.story;
+                                            H.reveal('health'); H.reveal('location');
+                                            const x0 = game.player.x, y0 = game.player.y;
+                                            if (game.activeMap.id === 'hub_949' && !game.coach.taught.has('move'))
+                                                H.reveal('move', { title: 'Move', text: 'Drag anywhere here to move.', ghost: 'drag', timeout: 12000,
+                                                                   until: g => Math.hypot(g.player.x - x0, g.player.y - y0) > 40 });
+                                            else H.reveal('move');
+                                            S.watch(g => {                                            // the first pill she meets: the door
+                                                if (H.has('action') || g.coach.cur) return H.has('action');
+                                                const pill = document.getElementById('btn-transition'), p2 = document.getElementById('btn-interact');
+                                                const shown = [pill, p2].find(e => e && e.style.display !== 'none' && getComputedStyle(e).display !== 'none');
+                                                if (!shown) return false;
+                                                H.reveal('action', { title: 'Actions', text: 'Doors, people, things to search: what you can do shows up here. Tap it.', until: 'tap', timeout: 15000 });
+                                                return true;
+                                            });
+                                        }
                                     },
-                                    // STEP 11: Take the elevator
-                                    11: {
-                                        name: "ENTER_SUITE",
+                                    // The lobby: Seven holds it; the elevator to the penthouse
+                                    2: {
+                                        name: "TAKE_ELEVATOR",
                                         banner: "TAKE THE ELEVATOR TO THE PENTHOUSE",
                                         targetMap: "hotel_lobby",
                                         target: "suite_elevator",
                                         condition: "LOC_HOTEL_SUITE",
                                         onStart: (game) => {
-                                            game.addPausableTimeout(() => {
-                                                game.story.triggerComms("747", "Well, welcome to the Penthouse. Watch your corners, Nine.", 4000);
-                                            }, 1500);
+                                            game.hud.reveal('action');
+                                            game.addPausableTimeout(() => game.story.triggerComms("747", "I'll hold the lobby and watch the feeds. Comms open.", 4500), 1200);
                                         }
                                     },
-                                    // STEP 12: Walk deeper into suite
-                                    12: {
+                                    // The penthouse: she draws her FP-X (the fire stick), and walks in deeper
+                                    3: {
                                         name: "SEARCH_SUITE",
                                         banner: "SEARCH THE PENTHOUSE",
                                         targetMap: "hotel_suite",
                                         target: "suite_balcony",
-                                        condition: "PLAYER_DEEP_IN_SUITE"
+                                        condition: "PLAYER_DEEP_IN_SUITE",
+                                        onStart: (game) => {
+                                            if (game.inventory && game.inventory.items.some(i => i.id === 'pistol_fpx')) { game.inventory.equipItem('pistol_fpx'); game.weaponHolstered = false; }
+                                            game.hud.reveal('holster');
+                                            game.addPausableTimeout(() => {
+                                                game.hud.reveal('fire', { title: 'Your FP-X', text: 'Hold to aim. Push past the gold line to fire.', timeout: 14000, until: g => g.fireJoystick.active || g.mouseDown });
+                                            }, 600);
+                                            game.addPausableTimeout(() => game.story.triggerComms("747", "Well, welcome to the Penthouse. Watch your corners, Nine.", 4000), 2500);
+                                        }
                                     },
-                                    // STEP 13: Ambush — drones breach, survive
-                                    13: {
+                                    // The red light, the wall blows in, the drones
+                                    4: {
                                         name: "SURVIVE_AMBUSH",
                                         banner: null,
                                         targetMap: "hotel_suite",
                                         target: "player",
                                         condition: "AMBUSH_CLEARED",
                                         onStart: (game) => {
-                                            game.questState.suiteAmbushTriggered = true;
-                                            showMessage("BREACH DETECTED!");
-                                            game.triggerShake(25);
-                                            // Break the back wall
-                                            const w = game.activeMap.walls.find(w => w.breach);   // tagged in world/maps.js
-                                            if (w) {
-                                                for (let ex = w.x; ex < w.x + w.w; ex += 40) {
-                                                    game.weather.spawnExplosion(ex, w.y, '#ff8800');
-                                                    game.weather.spawnExplosion(ex + 20, w.y + 10, '#ff4500');
-                                                }
-                                                game.removeWall(w);
-                                            }
-                                            // Spawn Drones
-                                            game.enemies.push(new Drone(900, 1100));
-                                            game.enemies.push(new Drone(1000, 1150));
-                                            game.enemies.push(new Drone(1100, 1100));
-                                            
+                                            const S = game.story, H = game.hud;
+                                            game.questState.suiteAmbushTriggered = false;          // set when the wall goes (AMBUSH_CLEARED waits on it)
+                                            S.triggerComms("949", "Threat, bedroom.", 2200);
+                                            game.addPausableTimeout(() => S.triggerComms("Yenna", "Copacetic, en route!", 1800), 1300);
                                             game.addPausableTimeout(() => {
-                                                game.story.triggerComms("747", "Nine! Multiple contacts! Drones — they're breaching!", 4000);
-                                            }, 500);
+                                                if (game.activeMap.id !== 'hotel_suite') { game.story.goTo('SEARCH_SUITE'); return; }   // she left before it blew
+                                                game.questState.suiteAmbushTriggered = true;
+                                                showMessage("BREACH DETECTED!");
+                                                game.triggerShake(25);
+                                                // Break the back wall
+                                                const w = game.activeMap.walls.find(w => w.breach);   // tagged in world/maps.js
+                                                if (w) {
+                                                    for (let ex = w.x; ex < w.x + w.w; ex += 40) {
+                                                        game.weather.spawnExplosion(ex, w.y, '#ff8800');
+                                                        game.weather.spawnExplosion(ex + 20, w.y + 10, '#ff4500');
+                                                    }
+                                                    game.removeWall(w);
+                                                }
+                                                // The drones
+                                                game.enemies.push(new Drone(900, 1100));
+                                                game.enemies.push(new Drone(1000, 1150));
+                                                game.enemies.push(new Drone(1100, 1100));
+                                            }, 3200);
+                                            game.addPausableTimeout(() => S.triggerComms("Max", "Fuck!", 1500), 3700);
+                                            game.addPausableTimeout(() => S.triggerComms("Victoria", "It's them.", 2200), 5400);
+                                            game.addPausableTimeout(() => S.triggerComms("Max", "And here we go…", 2200), 7800);
+                                            // A stim after the first hit; the flit once they start telegraphing (or she's hit)
+                                            S.watch(g => {
+                                                if (g.coach.cur) return false;
+                                                if (g.playerHealth < g.maxPlayerHealth) { H.reveal('heal', { title: 'Stims', text: 'Hurt? Tap to heal.', mode: 'ring', timeout: 5000 }); return true; }
+                                                return false;
+                                            });
+                                            S.watch(g => {
+                                                if (g.coach.cur) return false;
+                                                const tele = (g.enemies || []).some(e => e.telegraph || e.isTelegraphing || e._telegraph);
+                                                if (tele || g.playerHealth < g.maxPlayerHealth * 0.8) {
+                                                    H.reveal('flit', { title: 'Flit', text: 'Tap ⚡ (or drag past the ring) to blink out of the line.', mode: 'ring', timeout: 6000 });
+                                                    return true;
+                                                }
+                                                return false;
+                                            });
                                         }
                                     },
-                                    // STEP 14: Report back to Mirabel
-                                    14: {
-                                        name: "REPORT_BACK",
-                                        banner: "REPORT TO MIRABEL",
+                                    // The aftermath: search the rubble; Yenna spots the note
+                                    5: {
+                                        name: "FIND_NOTE",
+                                        banner: "SEARCH THE RUBBLE",
+                                        targetMap: "hotel_suite",
+                                        target: "dark_maker_note",
+                                        condition: (game) => (game.foundNotes || []).includes('dark_maker_letter'),
+                                        onStart: (game) => {
+                                            const S = game.story, H = game.hud;
+                                            game.questState.ambushCleared = true;
+                                            H.reveal('heal'); H.reveal('flit');
+                                            game.addPausableTimeout(() => S.triggerComms("Max", "This… is bullshit.", 2400), 1500);
+                                            game.addPausableTimeout(() => S.triggerComms("Sabrina", "Better than bullshit. It's raw building material.", 3200), 4200);
+                                            S.watch(g => {
+                                                const note = (g.props || []).find(p => p.noteId === 'dark_maker_letter' || (p.interactionType === 'read_note' && /dark/i.test(p.noteId || p.label || '')));
+                                                if (!note || g.activeMap.id !== 'hotel_suite') return false;
+                                                if (Math.hypot(g.player.x - (note.x + (note.w || 0) / 2), g.player.y - (note.y + (note.h || 0) / 2)) > 150) return false;
+                                                S.triggerComms("Yenna", "What's that?", 2400);
+                                                g.addPausableTimeout(() => S.triggerComms("949", "Yenna, you really are a sniper.", 2600), 2600);
+                                                return true;
+                                            });
+                                        }
+                                    },
+                                    // Josh's rage, then out before the news arrives: the BlackMark is at the curb
+                                    6: {
+                                        name: "LEAVE_HOTEL",
+                                        banner: "GET TO THE BLACKMARK",
+                                        targetMap: "hub_949",
+                                        target: "player_car",
+                                        condition: "PLAYER_IN_OWNED_CAR",
+                                        onStart: (game) => {
+                                            const S = game.story;
+                                            game.addPausableTimeout(() => { game.triggerShake(6); S.triggerComms("Josh", "RAAAGH—", 1600); }, 1200);
+                                            game.addPausableTimeout(() => S.triggerComms("949", "Josh.", 2000), 3200);
+                                            game.addPausableTimeout(() => S.triggerComms("747", "News crews'll be on us any minute. The BlackMark's out front, Nine.", 4200), 6000);
+                                            S.watch(g => g.activeMap.id === 'hub_949' && (S.placeCarAtHotel(), true));   // once she's back on the street
+                                            S.watch(g => {
+                                                if (!g.isDriving || g.coach.cur) return false;
+                                                g.hud.reveal('autodrive', { title: 'Auto-drive', text: 'Tap to let the BlackMark drive you to your marker.', mode: 'ring', timeout: 6000 });
+                                                return true;
+                                            });
+                                        }
+                                    },
+                                    // Mirabel, in person for the first time: the balance, and her favour
+                                    7: {
+                                        name: "REPORT_TO_MIRABEL",
+                                        banner: "MEET MIRABEL AT MOON CITY NIGHTCLUB",
                                         targetMap: "hub_949",
                                         target: "club_entrance",
                                         condition: "CONTRACTOR_REWARDED",
                                         onStart: (game) => {
                                             game.questState.ambushCleared = true;
-                                            showMessage("AREA SECURE. RETURN TO MIRABEL.");
-                                            game.addPausableTimeout(() => {
-                                                game.story.triggerComms("747", "You good? Get back to Mirabel. Debrief.", 4000);
-                                            }, 2000);
+                                            game.hud.reveal('autodrive');
                                         }
                                     },
-                                    // STEP 15: Chapter complete (terminal)
-                                    15: {
+                                    // Chapter complete (terminal)
+                                    8: {
                                         name: "CHAPTER_COMPLETE",
                                         banner: null,
                                         targetMap: null,
                                         target: "player",
                                         condition: null, // Terminal — no auto-advance
                                         onStart: (game) => {
+                                            if (game.hud) game.hud.revealAll();
                                             game.ui.showMissionBanner("CHAPTER 1 COMPLETE — THE AWAKENING", "gold", "COMPLETED");
                                             game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "He slipped through. But we rattled him. Rest up, Nine. This isn't over.", 6000);
@@ -11245,7 +11172,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 transitions: [ { x: 50, y: 400, w: 50, h: 200, target: 'hotel_lobby', label: 'Elevator' }, { x: 1120, y: 50, w: 120, h: 200, target: 'church_boss', label: 'Strange Portal' } ],
                 landmarks: [
                     { id: 'suite_elevator', x: 75, y: 500 }, { id: 'suite_portal', x: 1180, y: 150 },
-                    { id: 'suite_bathroom', x: 1200, y: 150 }, { id: 'suite_balcony', x: 1050, y: 900 }
+                    { id: 'suite_bathroom', x: 1200, y: 150 }, { id: 'suite_balcony', x: 1050, y: 900 }, { id: 'dark_maker_note', x: 1096, y: 959 }
                 ]
             },
             'medbay_sw': {
@@ -17782,7 +17709,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this._game.questState.suiteAmbushTriggered = false;
                     // Reset story step so ambush can re-trigger on return
                     const st = this._game.story;
-                    if (st && !st.isBefore('SEARCH_SUITE') && st.isBefore('REPORT_BACK')) st.goTo('ENTER_SUITE');
+                    if (st && !st.isBefore('SEARCH_SUITE') && st.isBefore('FIND_NOTE')) st.goTo('TAKE_ELEVATOR');
                     // Reset optional sanctum quest if active (boss respawns on re-entry)
                     if (this._game.story && this._game.story.activeOptional && this._game.story.activeOptional.id === 'sanctum') {
                         this._game.story.activeOptional = null;
@@ -34598,54 +34525,66 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.completedOptional = [];       // ['sanctum', ...]
             }
         
+            /** New Game, after the Keeper's prologue: chapter 1 opens in the van (story/scenes/van.js). */
             startPrologue() {
-                console.log("STORY: Initializing Prologue via Database...");
-                
-                // START AT STEP 0
+                console.log("STORY: Chapter 1 — the van");
+                const g = this.game;
                 this.state = { part: 1, chapter: 1, mission: 1, step: 0 };
-                this.initializedStep = false;
-                this.currentStepData = null;
-                this.stepTimer = 0;
-        
-                // Reset Systems
-                if(typeof phoneSystem !== 'undefined') {
+                this.stepTimer = 0; this.watchers = [];
+                if (typeof phoneSystem !== 'undefined') {
                     phoneSystem.close();
                     phoneSystem.contactOverrides = {};
                     phoneSystem.seedDefaultContacts();
                 }
-        
-                // Setup World
-                this.game.loadMap('apt_949', {x: 1050, y: 370});
-                this.game.player.angle = -Math.PI/2;
-                
-                // --- CINEMATIC INTRO: Start zoomed in on Stella ---
-                this.game.camera.x = this.game.player.x;
-                this.game.camera.y = this.game.player.y;
-                this.game.camera.zoom = 3.5; // Tight close-up on Stella
-                
-                // Fade-in from black
-                const fadeOverlay = document.getElementById('fade-overlay');
-                fadeOverlay.style.transition = 'none';
-                fadeOverlay.classList.add('active'); // Start fully black
-                // Force reflow then enable slow fade
-                fadeOverlay.offsetHeight;
-                fadeOverlay.style.transition = 'opacity 2.5s ease-out';
-                setTimeout(() => fadeOverlay.classList.remove('active'), 50);
+                if (g.hud) g.hud.startFresh();                        // the HUD arrives piece by piece (ui/hud-reveal.js)
+                if (g.coach) g.coach.deserialize([]);
+                for (const t of g.teammates || []) t.recruited = true;   // a team from the start
+                this.currentStepData = this.nsm.getStepData(1, 1, 1, 0);
+                this.initializedStep = true;
+                this.playVan();
+            }
+
+            /** The van scene, then the hand-over at the hotel door (also after a skip). */
+            playVan() {
+                return this.game.scenes.play('van').then(() => vanAftermath(this.game));
+            }
+
+            /** A check run every tick until it returns true (the chapter's one-off hints). */
+            watch(fn) { (this.watchers || (this.watchers = [])).push(fn); }
+            _runWatchers() {
+                if (!this.watchers || !this.watchers.length) return;
+                this.watchers = this.watchers.filter(w => { try { return !w(this.game); } catch (e) { console.error(e); return false; } });
+            }
+
+            /** After the ambush the BlackMark waits at the hotel curb. */
+            placeCarAtHotel() {
+                const c = this.game.ownedCar; if (!c) return;
+                c.x = 1790; c.y = 905; c.angle = 0; c.vx = 0; c.vy = 0; if ('speed' in c) c.speed = 0;
+            }
+
+            /** Seven holds the lobby while the crew goes up (chapter 1). */
+            _sevenInLobby() {
+                const g = this.game;
+                if (!g.activeMap || g.activeMap.id !== 'hotel_lobby' || !g.questState.vanDone) return;
+                if (!this.isBefore('LEAVE_HOTEL') || (g.npcs || []).some(n => n.name === '747')) return;
+                const n = new NPC(560, 1030, '747', 'story', {});
+                n.angle = -Math.PI / 2;
+                g.npcs.push(n);
             }
             
             // Direct Event Handler
             onMessageRead(contactName) {
-                if (this.isAt('READ_MESSAGE') && contactName === 'Mirabel') {
-                    console.log("STORY EVENT: Mirabel message read.");
-                    this.advanceStep();
-                }
+                // (Chapter 1 no longer waits on a text; the hook stays for chapters that will.)
             }
         
             update() {
                 if (this.game.scenes && this.game.scenes.running) return;   // the story waits while a scene plays
+                if (this._needsRecruit) { this._needsRecruit = false; for (const t of this.game.teammates || []) t.recruited = true; }
                 if (this.state.part === 1) {
                     this.checkOverrides(); 
+                    this._sevenInLobby();
                 }
+                this._runWatchers();
 
                 // ── OPTIONAL QUESTS (run regardless of main story state) ──
                 this.updateOptional();
@@ -34712,54 +34651,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.initializedStep = false;
             }
         
-            // UPDATED FAILSAFES
+            // Fail-safes: the world says where the story is (an older save, a skipped beat)
             checkOverrides() {
                 const mapId = this.game.activeMap.id;
                 const qs = this.game.questState;
-        
-                // 1. HUB ARRIVAL FAIL-SAFE
-                if (mapId === 'hub_949' && this.isBefore('CAR_REVEAL')) {
-                    console.log("STORY OVERRIDE: Player in Hub. Jumping to Step 3 (Car Reveal).");
-                    this.goTo('CAR_REVEAL');
-                    this.cleanupPhone();
-                }
+                if (!qs.vanDone) return;                                   // still in the van
 
-                // 2. KEYCARD OVERRIDE -> Step 9 (Leave Club)
-                if (qs.hasKeycard && this.isBefore('LEAVE_CLUB')) {
-                    console.log("STORY OVERRIDE: Keycard found. Jumping to Step 9.");
-                    this.goTo('LEAVE_CLUB');
-                    this.cleanupPhone();
-                }
-        
-                // 3. EXIT OVERRIDE -> Step 10 (Arrive Hotel)
-                if (this.isAt('LEAVE_CLUB') && mapId === 'hub_949') {
-                    console.log("STORY OVERRIDE: Left club. Jumping to Step 10.");
-                    this.goTo('ARRIVE_HOTEL');
-                }
-        
-                // 4. ARRIVAL OVERRIDE -> Step 6 (Wait inside Club)
-                if (mapId === 'moon_city_nightclub' && this.isBefore('WAIT_FOR_TEXT')) {
-                    console.log("STORY OVERRIDE: Arrived at Nightclub. Jumping to Step 6.");
-                    this.goTo('WAIT_FOR_TEXT');
-                }
+                if (mapId === 'hotel_lobby' && this.isBefore('TAKE_ELEVATOR')) this.goTo('TAKE_ELEVATOR');
+                if (mapId === 'hotel_suite' && this.isBefore('SEARCH_SUITE')) this.goTo('SEARCH_SUITE');
+                if (qs.ambushCleared && this.isBefore('FIND_NOTE')) this.goTo('FIND_NOTE');
+                if ((this.game.foundNotes || []).includes('dark_maker_letter') && qs.ambushCleared && this.isBefore('LEAVE_HOTEL')) this.goTo('LEAVE_HOTEL');
+                if (qs.rewardClaimedContractor && this.isBefore('CHAPTER_COMPLETE')) this.goTo('CHAPTER_COMPLETE');
 
-                // 5. AMBUSH CLEARED OVERRIDE -> Step 14 (Report back)
-                // Handles old saves where ambushCleared was set by inline code
-                if (qs.ambushCleared && this.isBefore('REPORT_BACK')) {
-                    console.log("STORY OVERRIDE: Ambush already cleared. Jumping to Step 14.");
-                    this.goTo('REPORT_BACK');
-                }
-
-                // 6. CONTRACTOR REWARDED -> Step 15 (Chapter complete)
-                if (qs.rewardClaimedContractor && this.isBefore('CHAPTER_COMPLETE')) {
-                    console.log("STORY OVERRIDE: Contractor rewarded. Jumping to Step 15.");
-                    this.goTo('CHAPTER_COMPLETE');
-                }
-
-                // 7. CHURCH BOSS OVERRIDE — mark sanctum optional as complete
+                // The Sanctum: mark it complete if the boss is already down
                 if (qs.churchBossDefeated && !this.completedOptional.includes('sanctum')) {
                     this.completedOptional.push('sanctum');
-                    console.log("STORY OVERRIDE: Church boss already defeated. Marking sanctum complete.");
                 }
             }
         
@@ -34881,9 +34787,30 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             // ── SAVE / LOAD ──
 
+            /**
+             * Saves carry the step's name; older ones only its number in the old chapter 1
+             * (apartment → club → hotel). Those map by name; the retired opening (apartment,
+             * car, club) resumes at the hotel door with the team and the keycard.
+             */
+            _migrateStep(data) {
+                const st = this.state, has = n => { try { this.stepIndex(n); return true; } catch (e) { return false; } };
+                if (data.stepName && has(data.stepName)) { st.step = this.stepIndex(data.stepName); return; }
+                if (data.stepName || st.part !== 1 || st.chapter !== 1 || st.mission !== 1) return;
+                const OLD = ['INTRO_SEQUENCE', 'CHECK_PHONE', 'LEAVE_APARTMENT', 'CAR_REVEAL', 'ENTER_VEHICLE', 'DRIVE_CLUB', 'WAIT_FOR_TEXT', 'READ_MESSAGE',
+                             'FIND_MIRABEL', 'LEAVE_CLUB', 'ARRIVE_HOTEL', 'ENTER_SUITE', 'SEARCH_SUITE', 'SURVIVE_AMBUSH', 'REPORT_BACK', 'CHAPTER_COMPLETE'];
+                const RENAMED = { ARRIVE_HOTEL: 'ENTER_HOTEL', ENTER_SUITE: 'TAKE_ELEVATOR', REPORT_BACK: 'REPORT_TO_MIRABEL' };
+                const old = OLD[st.step], name = RENAMED[old] || old;
+                const qs = this.game.questState;
+                qs.vanDone = true; qs.hasKeycard = true;
+                if (qs.mirabelFavor === undefined) qs.mirabelFavor = 1;
+                this._needsRecruit = true;
+                st.step = this.stepIndex(old && has(name) ? name : 'ENTER_HOTEL');
+            }
+
             serialize() {
                 return {
                     state: { ...this.state },
+                    stepName: this.currentStepData ? this.currentStepData.name : (this.nsm.getStepData(this.state.part, this.state.chapter, this.state.mission, this.state.step) || {}).name,
                     completedOptional: [...this.completedOptional],
                     // Persist mid-quest progress; def/stepData re-derive from NSM on load
                     activeOptional: this.activeOptional ? {
@@ -34900,6 +34827,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.currentStepData = null;
                     this.initializedStep = false;
                     this.stepTimer = 0;
+                    this.watchers = [];
+                    this._migrateStep(data);
                 }
                 if (data.completedOptional) {
                     this.completedOptional = data.completedOptional;
@@ -40841,18 +40770,25 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
             },
-            'Mirabel': {                                                               // the chapter's client: the keycard, then her payment
-                text: g => g.questState.ambushCleared && !g.questState.rewardClaimedContractor
-                    ? "949, you're alive! He escaped?? Starry Heavens above... Well take this payment as promised, and be ready for my next call."
-                    : g.questState.rewardClaimedContractor
-                        ? "For the love of starry heavens! Fuck, he can't be far."
-                        : "Starry heavens, 949! We finally meet in the flesh. We have no time to waste. The Dark Maker is in the Double Nights, get him before he escapes! The fucker. Take this keycard, for the Suite.",
+            // Mirabel, founder of W. MINDUSTRIAL: the call came first (story/scenes/van.js); here she's met in person
+            '747': { text: g => g.questState.ambushCleared ? "Nice work up there. Let's move before the news does." : "I've got the lobby and the feeds. Go — and watch your corners, Nine.",
+                     buttons: () => ({ accept: null, decline: 'Go' }) },
+            'Mirabel': {
+                text(g) {
+                    const qs = g.questState;
+                    if (qs.rewardClaimedContractor) return "For the love of starry heavens. He can't be far. I'll call the moment I hear something.";
+                    if (!qs.ambushCleared) return "949. The job is at the Double Nights, not in my booth. Bring me good news.";
+                    return qs.mirabelFavor >= 2
+                        ? "949. In the flesh, finally — and in one piece. He escaped?? Starry heavens... No matter. You kept your word, and W. MINDUSTRIAL remembers its friends. The balance, as promised. And when the time comes, bring me that FP-X of yours. My people will make it sing."
+                        : "949. In the flesh, finally. He escaped?? Starry heavens... Well. The balance, as promised. Bring me results next time, and W. MINDUSTRIAL might look after that pistol of yours.";
+                },
+                buttons: g => (g.questState.ambushCleared && !g.questState.rewardClaimedContractor ? { accept: 'Collect' } : { accept: null, decline: 'Leave' }),
                 accept(g) {
-                    if (g.questState.ambushCleared && !g.questState.rewardClaimedContractor) {
-                        g.currency += 500; g.questState.rewardClaimedContractor = true;
-                        g.updateUI(); showMessage("PAYMENT RECEIVED: 500 PERSONICS");
-                    } else if (!g.questState.hasKeycard) {
-                        showMessage("MISSION ACCEPTED. RECEIVED: VIP KEYCARD."); g.questState.hasKeycard = true;
+                    const qs = g.questState;
+                    if (qs.ambushCleared && !qs.rewardClaimedContractor) {
+                        const pay = 500 - (qs.mirabelDeposit || 0) + (qs.mirabelFavor >= 2 ? 100 : 0);
+                        g.currency += pay; qs.rewardClaimedContractor = true; qs.mirabelArmory = true;
+                        g.updateUI(); showMessage(`PAYMENT RECEIVED: ${pay} PERSONICS`);
                     }
                 }
             },
@@ -41664,6 +41600,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.vision = new SceneVision();
             }
             get running() { return !!this.active; }
+            /** The scene plays the crew itself (meta.hideCrew): the real teammates neither move nor draw. */
+            get crewOffstage() { return !!(this.active && this.active.meta.hideCrew); }
 
             /** Play a scene by name. Resolves when it ends (or is skipped). */
             play(name, opts = {}) {
@@ -41866,10 +41804,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     /** n knocks on the partition, spaced like a fist would. */
                     knock(n = 5, gap = 13) {
                         let k = 0, f = 0;
-                        return { done: () => { if (k < n && f++ % gap === 0) { k++; if (typeof audioSys !== 'undefined') audioSys.sfx('knock'); g.triggerShake && g.triggerShake(1.2); } return k >= n && f > (n - 1) * gap + 8; } };
+                        return { done: () => { if (k < n && f % gap === 0) { k++; if (typeof audioSys !== 'undefined') audioSys.sfx('knock'); g.triggerShake && g.triggerShake(1.2); } f++; return k >= n && f > (n - 1) * gap + 8; } };
                     },
                     /** The flashback's look: cooler, softer, a vignette and grain (0..1 over frames). */
-                    memory(on, frames = 40) { ui.memory(on ? 1 : 0, frames); return { done: () => !ui.memoryEasing() }; },
+                    memory(on, frames = 40) { ui.memory(on === true ? 1 : on === false ? 0 : +on || 0, frames); return { done: () => !ui.memoryEasing() }; },
                     /** Reveal a part of the HUD (ui/hud-reveal.js); with a title/text the coach points at it. */
                     hud(key, opts = {}) { return g.hud ? g.hud.reveal(key, opts) : null; },
                     /** Point at any element (ui/coach.js). */
@@ -42029,6 +41967,220 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             yield s.fade('out', 140);
             s.vision.hide(0);
             yield 30;
+        });
+        /* =====================================================================
+           CHAPTER 1 — THE VAN (Story of 949, chapter 1)
+           ---------------------------------------------------------------------
+           The crew in the back of a military van, closing in on the Double Nights.
+           After Max's "lap dogs", the camera pushes in on 949 and we drop into the
+           night before: Mirabel's call (the player answers it — the phone is the
+           first thing the HUD shows). A jolt brings us back; the van stops; five
+           knocks; they pour out in front of the hotel.
+           The novel's lines, verbatim where it has them.
+           ===================================================================== */
+        const VAN_DROP = {                                   // where everyone stands when the scene hands over (hub_949, the hotel door)
+            van: { x: 1792, y: 905, angle: 0 },
+            '949': { x: 1700, y: 842 }, '747': { x: 1752, y: 852 },
+            Yenna: { x: 1648, y: 850 }, Sabrina: { x: 1668, y: 880 }, Max: { x: 1732, y: 884 },
+            Victoria: { x: 1624, y: 878 }, Josh: { x: 1776, y: 876 }
+        };
+        const VAN_POSES = { '949': 'sit_work', '747': 'sit', Yenna: 'sit', Sabrina: 'sit', Max: 'sit_lean', Victoria: 'sit', Josh: 'sit' };
+        const MIRABEL_DEPOSIT = 250;                          // 50 percent down
+
+        /** 949 as she looks right now (her cosmetics), with or without her field mask. */
+        function stellaSceneLook(g, masked) {
+            const c = g.cosmetics ? g.cosmetics.getRenderConfig() : null, me = APPEARANCES['949'];
+            if (!c) return masked ? { ...me, jewelry: [FIELD_MASK_949] } : me;
+            const jewelry = masked ? [...(c.jewelry || []), FIELD_MASK_949] : c.jewelry;
+            return { skinColor: c.skinColor, hair: c.hair, gender: me.gender, eyeColor: me.eyeColor, top: c.outfit.top, bottom: c.outfit.bottom,
+                     shoes: c.outfit.shoes, train: c.outfit.train || null, hat: c.hat, jewelry };
+        }
+
+        /** The real teammates wait off-stage while the scene's actors play them. */
+        function parkCrew(g) { for (const t of g.teammates || []) { t.x = -5000; t.y = -5000; } }
+
+        /** Blue sparks off Max's fingers. */
+        function maxSparks(g, a) {
+            if (!g.weather || !a) return;
+            const n0 = g.weather.particles.length;
+            g.weather.spawnSparks(a.x - 8, a.y + 6, 7);
+            for (let i = n0; i < g.weather.particles.length; i++) g.weather.particles[i].color = i % 2 ? '#7ad0ff' : '#3b82f6';
+        }
+
+        /**
+         * After the ride (played or skipped): the crew is with her at the hotel door, the contract
+         * is paid, and the parts of the HUD the scene introduced are there. Safe to run twice.
+         */
+        function vanAftermath(g) {
+            const qs = g.questState;
+            qs.hasKeycard = true;                             // the contract came with access to the suite
+            if (!qs.mirabelDeposit) { qs.mirabelDeposit = MIRABEL_DEPOSIT; g.currency += MIRABEL_DEPOSIT; }
+            if (qs.mirabelFavor === undefined) qs.mirabelFavor = 1;
+            for (const t of g.teammates || []) t.recruited = true;
+            if (g.hud) { g.hud.reveal('phone'); g.hud.reveal('pp'); }
+            if (typeof phoneSystem !== 'undefined') phoneSystem.endCall();
+            g.fieldMask = null; g.vanMoving = undefined; g.camera.sway = 0;
+            if (!g.activeMap || g.activeMap.id !== 'hub_949') { g._doLoadMap('hub_949', { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }); g.bakeStaticLighting(); }
+            g.player.x = VAN_DROP['949'].x; g.player.y = VAN_DROP['949'].y; g.player.angle = -Math.PI / 2; g.player.visible = true;
+            for (const t of g.teammates || []) { const p = VAN_DROP[t.name]; if (p) { t.x = p.x; t.y = p.y; } }
+            g.camera.x = g.player.x; g.camera.y = g.player.y; g.camera.zoom = 1.6;
+            if (g.updateUI) g.updateUI();
+            qs.vanDone = true;
+        }
+
+        defineScene('van', { startMap: { id: 'van_interior', at: { x: 200, y: 470 } }, flag: 'vanSeen', releaseFrames: 45, hideCrew: true }, function* (s) {
+            const g = s.game;
+            const seat = () => {
+                const A = {};
+                for (const [id, p] of Object.entries(VAN.SEATS))
+                    A[id] = s.actor(id, id === '949' ? stellaSceneLook(g, true) : APPEARANCES[id], p.x, p.y, p.a).setPose(VAN_POSES[id]);
+                return A;
+            };
+
+            // ── The van ─────────────────────────────────────────────────────
+            s.mask(true); g.vanMoving = true;
+            s.map('van_interior', { cam: { x: 200, y: 470 }, zoom: 1.5 });
+            parkCrew(g);
+            let A = seat();
+            s.sway(1.1);
+            yield s.fade('in', 100);
+            s.marker('Moon City', 'En route to Double Nights');
+            s.cam.to({ x: 200, y: 440 }, { zoom: 1.9, frames: 480, ease: 'smooth' });
+            yield 90;
+            yield s.narrate('The Dark Maker. The name was unforgettable. Eerie, almost.');
+            yield s.narrate('The past twelve dark and rainy hours had been sleepless for 949. Her hands calibrated her FP-X almost absently, going through the well-practiced motions.');
+            s.bump(6); yield 30;
+            s.cam.to(A.Yenna, { zoom: 2.3, frames: 90, dx: 64 });
+            yield s.say('yenna', 'Three months? The hell was she thinking?');
+            yield s.say('sabrina', "You haven't heard the news? Business days are business months now.");
+            s.cam.to(A.Max, { zoom: 2.4, frames: 70, dx: -50 });
+            yield 30; maxSparks(g, A.Max);
+            yield s.say('max', "Fuck that shit. So now we're just lap dogs, are we?", { mood: 'angry' });
+            maxSparks(g, A.Max);
+
+            // ── The push-in: into her head, and the night before ─────────────
+            s.clearLine();
+            s.cam.to(A['949'], { zoom: 4.4, frames: 170, ease: 'inOut' });
+            yield 100;
+            yield s.all(s.memory(1, 60), s.fade('out', 60));
+            g.vanMoving = false; s.sway(0); s.mask(false);
+            s.map('apt_949', { cam: { x: 1050, y: 380 }, zoom: 2.3 });
+            const me = s.actor('949', stellaSceneLook(g, false), 1050, 372, Math.PI / 2).setPose('sit_wrap');
+            yield s.fade('in', 70);
+            s.marker('The night before', 'Silver Queen Apartments');
+            s.cam.to({ x: 1050, y: 372 }, { zoom: 2.8, frames: 400, ease: 'smooth' });
+            yield s.narrate('Rain on the glass. Sleep wouldn\'t come.');
+            yield 40;
+
+            // The phone: the first thing the HUD shows
+            phoneSystem.ringCall('Mirabel', { subtitle: 'W. MINDUSTRIAL' });
+            s.memory(0.45, 30); s.showHud(true);
+            yield s.hud('phone', { title: 'Your phone', text: "Someone's calling. Tap to answer.", until: () => phoneSystem.callAnswered() });
+            s.showHud(false); s.memory(1, 30);
+            me.setPose('sit_phone');
+            yield 24;
+            yield s.say('mirabel', 'I want you to find him and bring him back to me, 949.');
+            yield s.say('mirabel', 'No one but you is to do this, do I make myself clear? He will be mine.', { mood: 'angry' });
+            yield s.narrate('A seething, visceral layer of rage lined her voice.');
+            yield s.say('mirabel', "You do understand the trust that I'm placing in your hands?");
+            const pact = yield s.choose(['I understand.', 'Why me?', 'Half up front.'], { timer: 600, def: 0, weighty: [0, 1, 2] });
+            let deposit = MIRABEL_DEPOSIT;
+            if (pact === 0) { yield s.say('949', 'I understand.'); g.questState.mirabelFavor = 2; }
+            else if (pact === 1) { yield s.say('949', 'Why me?'); yield s.say('mirabel', 'Because no one else has ever disappointed me less.'); g.questState.mirabelFavor = 1; }
+            else { yield s.say('949', 'Half up front.'); yield s.say('mirabel', 'Fifty percent. Tonight.'); g.questState.mirabelFavor = 1; deposit += 50; }
+            yield s.say('mirabel', 'W. MINDUSTRIAL remembers its friends, 949.');
+            phoneSystem.endCall();
+            me.setPose('sit_wrap');
+            // The deposit lands
+            g.questState.mirabelDeposit = deposit; g.currency += deposit; g.updateUI();
+            s.showHud(true);
+            yield s.hud('pp', { title: 'Personics', text: `Deposit received: +${deposit}. Half now, half on delivery.`, mode: 'ring', timeout: 3400 });
+            s.showHud(false);
+            yield s.narrate('And so, it was settled: 50 percent down, and the hunt began.');
+            yield s.narrate('Revenge was a very dangerous thing to get involved in, and its stench colored the whole mission. What are we getting ourselves into?');
+
+            // ── Back in the van: a jolt ──────────────────────────────────────
+            yield s.fade('out', 22);
+            s.memory(0, 0); s.mask(true); g.vanMoving = true;
+            s.map('van_interior', { cam: VAN.SEATS['949'], zoom: 3.4 });
+            parkCrew(g);
+            A = seat();
+            s.sway(1.1); s.bump(10);
+            yield s.fade('in', 10);
+            yield s.narrate('A jostle of the van over a particularly sizable bump brought her mind back into the moment.');
+            s.cam.to({ x: 200, y: 404 }, { zoom: 2.7, frames: 120 });
+            yield s.narrate('Directly across from her, her brother. His black mask a mirror of her own, tinged a subtle purple in the dim light; his eyes glowing slits of gold.');
+            yield s.narrate('He said nothing. But she knew he was giving her that small grin, the cute one that flashed across his serious face whenever they caught eyes.');
+            s.cam.to(A.Josh, { zoom: 2.4, frames: 90, dx: -60 });
+            yield s.say('josh', 'Well, more like hired mercenaries.');
+            maxSparks(g, A.Max);
+            yield s.say('max', 'Of course. Thanks, Josh, for pointing out the fucking obvious.', { mood: 'angry' });
+            yield s.say('josh', "You're welcome.");
+            yield s.narrate('Max just sucked his teeth, to the sniggers of Sabrina.');
+            s.cam.to(A.Victoria, { zoom: 2.5, frames: 60, dx: -60 });
+            yield s.say('victoria', 'Save me somebody from these sad motherfuckers attached to me at either fucking hip.');
+            s.bump(5);
+            s.cam.to(A.Yenna, { zoom: 2.4, frames: 70, dx: 60 });
+            yield s.say('yenna', 'I swear the missions just get more and more ludicrous. Three months of him being on the loose before she thought to contact us?');
+            s.cam.to(A['949'], { zoom: 2.6, frames: 70, dx: 50 });
+            const answer = yield s.choose([
+                'Mirabel can be a slight bit… funny sometimes. Keep on point.',
+                'I have my doubts too. But we stay sharp.',
+                'Eyes on the job.'
+            ], { timer: 720, def: 0, weighty: [0, 1, 2] });
+            const bond = (who, n) => { const t = (g.teammates || []).find(q => q.name === who); if (t) t.relationship = Math.max(0, Math.min(100, (t.relationship || 0) + n)); };
+            if (answer === 0) {
+                yield s.say('949', "Well, Mirabel can be a slight bit… funny sometimes. Just keep on point like we've always done, and we'll be fine.");
+                yield s.narrate('She bit her lip and kept her doubts to herself. They were all already stressed enough as it was.');
+                for (const n of ['Yenna', 'Sabrina', 'Max', 'Victoria', 'Josh']) bond(n, 3);
+            } else if (answer === 1) {
+                yield s.say('949', "I have my doubts too. But we stay sharp, and we get it done. Like always.");
+                yield s.say('yenna', '…Thanks for saying it.');
+                bond('Yenna', 6); bond('Josh', 3); bond('Max', -2);
+            } else {
+                yield s.say('949', 'Eyes on the job.');
+                yield s.say('victoria', 'Finally. Somebody said it.');
+                yield s.say('max', 'Tch.');
+                bond('Victoria', 6); bond('Max', -3);
+            }
+
+            // ── The stop ────────────────────────────────────────────────────
+            g.vanMoving = false; s.sway(0.4);
+            yield s.narrate('The van slowed to a stop, finally.');
+            s.sway(0);
+            s.cam.to(A['747'], { zoom: 2.8, frames: 60, dx: -40 });
+            A['747'].setPose('sit_lean');
+            yield s.say('747', "We're here, team. Be ready for anything.");
+            s.clearLine();
+            yield s.knock(5);
+            yield 20;
+            yield s.fade('out', 26);
+
+            // ── Double Nights ───────────────────────────────────────────────
+            const V = VAN_DROP.van;
+            s.map('hub_949', { at: { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }, cam: { x: 1735, y: 880 }, zoom: 1.9 });
+            parkCrew(g);
+            const van = s.prop('van', drawVanExterior, V.x, V.y, V.angle); van.doors = 0;
+            const rear = { x: V.x - 64, y: V.y };
+            const order = ['747', '949', 'Yenna', 'Max', 'Sabrina', 'Josh', 'Victoria'];
+            const crew = {};
+            for (const id of order) { crew[id] = s.actor(id, id === '949' ? stellaSceneLook(g, true) : APPEARANCES[id], rear.x + 30, rear.y, Math.PI); crew[id].visible = false; }
+            yield s.fade('in', 30);
+            yield s.tween(van, 'doors', 1, 24, 'out');
+            for (const id of order) {
+                const a = crew[id], to = VAN_DROP[id];
+                a.visible = true; a.x = rear.x; a.y = rear.y + (Math.random() - 0.5) * 10;
+                a.walk([{ x: rear.x - 26, y: rear.y }, { x: to.x, y: to.y }], 2.6);
+                yield 12;
+            }
+            yield 40;
+            for (const id of order) crew[id].face({ x: 1700, y: 700 }, 20);
+            s.cam.to({ x: 1700, y: 600 }, { zoom: 1.0, frames: 260, ease: 'inOut' });
+            yield 60;
+            s.marker('Double Nights Hotel', 'Moon City');
+            yield s.narrate('Towering before them was the building: Double Nights Hotel. Majestic, glistening, and warmly corporate.');
+            s.cam.to({ x: 1700, y: 842 }, { zoom: 1.6, frames: 120 });
+            yield 120;
         });
         /**
          * PauseSystem — token-based pause registry.
@@ -50064,7 +50216,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Teammates & Companions (Unified loop)
                 // Skip during bumper car minigame — teammates are in bumper cars
-                if (!(this.bumperMinigame && this.bumperMinigame.active)) {
+                // (and while a scene plays the crew with its own actors: meta.hideCrew)
+                if (!(this.bumperMinigame && this.bumperMinigame.active) && !(this.scenes && this.scenes.crewOffstage)) {
 
                 // ── FORMATION SLOTS ──
                 // Build the active list and assign each member a stable slot around
@@ -51823,7 +51976,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (this.scenes && this.scenes.actors.length) this.scenes.drawActors(this.ctx);   // a scene's cast
                     this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
                     this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
-                    this.teammates.forEach(tm => {
+                    if (!(this.scenes && this.scenes.crewOffstage)) this.teammates.forEach(tm => {
                         if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) return;
                         tm.draw(this.ctx, this.player);
                     });
@@ -55512,6 +55665,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // --- STORY ---
                 if (this.story) {
                     this.story.state = { part: 1, chapter: 1, mission: 1, step: 0 };
+                    this.story.watchers = [];
                     this.story.currentStepData = null;
                     this.story.initializedStep = false;
                     this.story.stepTimer = 0;

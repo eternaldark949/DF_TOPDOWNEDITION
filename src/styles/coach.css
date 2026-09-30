@@ -63,7 +63,7 @@
         body.scene-hud-on #cinematic-bars .cine-bar { height: 0 !important; }
 
         /* The call card (phoneSystem.ringCall): rises while it rings, settles to a small pill once answered */
-        #call-card { position: fixed; left: 50%; top: 16vh; z-index: 1155; display: flex; flex-direction: column; align-items: center; gap: 10px;
+        #call-card { position: fixed; left: 50%; top: 40vh; z-index: 1155; display: flex; flex-direction: column; align-items: center; gap: 10px;
             width: min(78vw, 280px); padding: 20px 18px 18px; border-radius: 26px; pointer-events: auto;
             background: linear-gradient(180deg, rgba(28, 12, 44, 0.94), rgba(10, 4, 18, 0.96));
             box-shadow: 0 20px 50px rgba(4, 0, 10, 0.7), inset 0 0 0 1px rgba(232, 194, 122, 0.22), 0 0 50px -16px rgba(164, 105, 255, 0.7);
@@ -93,5 +93,5 @@
         #call-card.live .cc-who b { font-size: 1.05rem; }
         #call-card.live .cc-answer { display: none; }
         #call-card.live .cc-time { display: block; }
-        body.landscape #call-card { top: 10vh; }
+        body.landscape #call-card { top: 30vh; left: 62%; }
         body.landscape #call-card.live { top: calc(9vh + 8px); }

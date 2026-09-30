@@ -251,54 +251,66 @@
                 this.completedOptional = [];       // ['sanctum', ...]
             }
         
+            /** New Game, after the Keeper's prologue: chapter 1 opens in the van (story/scenes/van.js). */
             startPrologue() {
-                console.log("STORY: Initializing Prologue via Database...");
-                
-                // START AT STEP 0
+                console.log("STORY: Chapter 1 — the van");
+                const g = this.game;
                 this.state = { part: 1, chapter: 1, mission: 1, step: 0 };
-                this.initializedStep = false;
-                this.currentStepData = null;
-                this.stepTimer = 0;
-        
-                // Reset Systems
-                if(typeof phoneSystem !== 'undefined') {
+                this.stepTimer = 0; this.watchers = [];
+                if (typeof phoneSystem !== 'undefined') {
                     phoneSystem.close();
                     phoneSystem.contactOverrides = {};
                     phoneSystem.seedDefaultContacts();
                 }
-        
-                // Setup World
-                this.game.loadMap('apt_949', {x: 1050, y: 370});
-                this.game.player.angle = -Math.PI/2;
-                
-                // --- CINEMATIC INTRO: Start zoomed in on Stella ---
-                this.game.camera.x = this.game.player.x;
-                this.game.camera.y = this.game.player.y;
-                this.game.camera.zoom = 3.5; // Tight close-up on Stella
-                
-                // Fade-in from black
-                const fadeOverlay = document.getElementById('fade-overlay');
-                fadeOverlay.style.transition = 'none';
-                fadeOverlay.classList.add('active'); // Start fully black
-                // Force reflow then enable slow fade
-                fadeOverlay.offsetHeight;
-                fadeOverlay.style.transition = 'opacity 2.5s ease-out';
-                setTimeout(() => fadeOverlay.classList.remove('active'), 50);
+                if (g.hud) g.hud.startFresh();                        // the HUD arrives piece by piece (ui/hud-reveal.js)
+                if (g.coach) g.coach.deserialize([]);
+                for (const t of g.teammates || []) t.recruited = true;   // a team from the start
+                this.currentStepData = this.nsm.getStepData(1, 1, 1, 0);
+                this.initializedStep = true;
+                this.playVan();
+            }
+
+            /** The van scene, then the hand-over at the hotel door (also after a skip). */
+            playVan() {
+                return this.game.scenes.play('van').then(() => vanAftermath(this.game));
+            }
+
+            /** A check run every tick until it returns true (the chapter's one-off hints). */
+            watch(fn) { (this.watchers || (this.watchers = [])).push(fn); }
+            _runWatchers() {
+                if (!this.watchers || !this.watchers.length) return;
+                this.watchers = this.watchers.filter(w => { try { return !w(this.game); } catch (e) { console.error(e); return false; } });
+            }
+
+            /** After the ambush the BlackMark waits at the hotel curb. */
+            placeCarAtHotel() {
+                const c = this.game.ownedCar; if (!c) return;
+                c.x = 1790; c.y = 905; c.angle = 0; c.vx = 0; c.vy = 0; if ('speed' in c) c.speed = 0;
+            }
+
+            /** Seven holds the lobby while the crew goes up (chapter 1). */
+            _sevenInLobby() {
+                const g = this.game;
+                if (!g.activeMap || g.activeMap.id !== 'hotel_lobby' || !g.questState.vanDone) return;
+                if (!this.isBefore('LEAVE_HOTEL') || (g.npcs || []).some(n => n.name === '747')) return;
+                const n = new NPC(560, 1030, '747', 'story', {});
+                n.angle = -Math.PI / 2;
+                g.npcs.push(n);
             }
             
             // Direct Event Handler
             onMessageRead(contactName) {
-                if (this.isAt('READ_MESSAGE') && contactName === 'Mirabel') {
-                    console.log("STORY EVENT: Mirabel message read.");
-                    this.advanceStep();
-                }
+                // (Chapter 1 no longer waits on a text; the hook stays for chapters that will.)
             }
         
             update() {
                 if (this.game.scenes && this.game.scenes.running) return;   // the story waits while a scene plays
+                if (this._needsRecruit) { this._needsRecruit = false; for (const t of this.game.teammates || []) t.recruited = true; }
                 if (this.state.part === 1) {
                     this.checkOverrides(); 
+                    this._sevenInLobby();
                 }
+                this._runWatchers();
 
                 // ── OPTIONAL QUESTS (run regardless of main story state) ──
                 this.updateOptional();
@@ -365,54 +377,21 @@
                 this.initializedStep = false;
             }
         
-            // UPDATED FAILSAFES
+            // Fail-safes: the world says where the story is (an older save, a skipped beat)
             checkOverrides() {
                 const mapId = this.game.activeMap.id;
                 const qs = this.game.questState;
-        
-                // 1. HUB ARRIVAL FAIL-SAFE
-                if (mapId === 'hub_949' && this.isBefore('CAR_REVEAL')) {
-                    console.log("STORY OVERRIDE: Player in Hub. Jumping to Step 3 (Car Reveal).");
-                    this.goTo('CAR_REVEAL');
-                    this.cleanupPhone();
-                }
+                if (!qs.vanDone) return;                                   // still in the van
 
-                // 2. KEYCARD OVERRIDE -> Step 9 (Leave Club)
-                if (qs.hasKeycard && this.isBefore('LEAVE_CLUB')) {
-                    console.log("STORY OVERRIDE: Keycard found. Jumping to Step 9.");
-                    this.goTo('LEAVE_CLUB');
-                    this.cleanupPhone();
-                }
-        
-                // 3. EXIT OVERRIDE -> Step 10 (Arrive Hotel)
-                if (this.isAt('LEAVE_CLUB') && mapId === 'hub_949') {
-                    console.log("STORY OVERRIDE: Left club. Jumping to Step 10.");
-                    this.goTo('ARRIVE_HOTEL');
-                }
-        
-                // 4. ARRIVAL OVERRIDE -> Step 6 (Wait inside Club)
-                if (mapId === 'moon_city_nightclub' && this.isBefore('WAIT_FOR_TEXT')) {
-                    console.log("STORY OVERRIDE: Arrived at Nightclub. Jumping to Step 6.");
-                    this.goTo('WAIT_FOR_TEXT');
-                }
+                if (mapId === 'hotel_lobby' && this.isBefore('TAKE_ELEVATOR')) this.goTo('TAKE_ELEVATOR');
+                if (mapId === 'hotel_suite' && this.isBefore('SEARCH_SUITE')) this.goTo('SEARCH_SUITE');
+                if (qs.ambushCleared && this.isBefore('FIND_NOTE')) this.goTo('FIND_NOTE');
+                if ((this.game.foundNotes || []).includes('dark_maker_letter') && qs.ambushCleared && this.isBefore('LEAVE_HOTEL')) this.goTo('LEAVE_HOTEL');
+                if (qs.rewardClaimedContractor && this.isBefore('CHAPTER_COMPLETE')) this.goTo('CHAPTER_COMPLETE');
 
-                // 5. AMBUSH CLEARED OVERRIDE -> Step 14 (Report back)
-                // Handles old saves where ambushCleared was set by inline code
-                if (qs.ambushCleared && this.isBefore('REPORT_BACK')) {
-                    console.log("STORY OVERRIDE: Ambush already cleared. Jumping to Step 14.");
-                    this.goTo('REPORT_BACK');
-                }
-
-                // 6. CONTRACTOR REWARDED -> Step 15 (Chapter complete)
-                if (qs.rewardClaimedContractor && this.isBefore('CHAPTER_COMPLETE')) {
-                    console.log("STORY OVERRIDE: Contractor rewarded. Jumping to Step 15.");
-                    this.goTo('CHAPTER_COMPLETE');
-                }
-
-                // 7. CHURCH BOSS OVERRIDE — mark sanctum optional as complete
+                // The Sanctum: mark it complete if the boss is already down
                 if (qs.churchBossDefeated && !this.completedOptional.includes('sanctum')) {
                     this.completedOptional.push('sanctum');
-                    console.log("STORY OVERRIDE: Church boss already defeated. Marking sanctum complete.");
                 }
             }
         
@@ -534,9 +513,30 @@
 
             // ── SAVE / LOAD ──
 
+            /**
+             * Saves carry the step's name; older ones only its number in the old chapter 1
+             * (apartment → club → hotel). Those map by name; the retired opening (apartment,
+             * car, club) resumes at the hotel door with the team and the keycard.
+             */
+            _migrateStep(data) {
+                const st = this.state, has = n => { try { this.stepIndex(n); return true; } catch (e) { return false; } };
+                if (data.stepName && has(data.stepName)) { st.step = this.stepIndex(data.stepName); return; }
+                if (data.stepName || st.part !== 1 || st.chapter !== 1 || st.mission !== 1) return;
+                const OLD = ['INTRO_SEQUENCE', 'CHECK_PHONE', 'LEAVE_APARTMENT', 'CAR_REVEAL', 'ENTER_VEHICLE', 'DRIVE_CLUB', 'WAIT_FOR_TEXT', 'READ_MESSAGE',
+                             'FIND_MIRABEL', 'LEAVE_CLUB', 'ARRIVE_HOTEL', 'ENTER_SUITE', 'SEARCH_SUITE', 'SURVIVE_AMBUSH', 'REPORT_BACK', 'CHAPTER_COMPLETE'];
+                const RENAMED = { ARRIVE_HOTEL: 'ENTER_HOTEL', ENTER_SUITE: 'TAKE_ELEVATOR', REPORT_BACK: 'REPORT_TO_MIRABEL' };
+                const old = OLD[st.step], name = RENAMED[old] || old;
+                const qs = this.game.questState;
+                qs.vanDone = true; qs.hasKeycard = true;
+                if (qs.mirabelFavor === undefined) qs.mirabelFavor = 1;
+                this._needsRecruit = true;
+                st.step = this.stepIndex(old && has(name) ? name : 'ENTER_HOTEL');
+            }
+
             serialize() {
                 return {
                     state: { ...this.state },
+                    stepName: this.currentStepData ? this.currentStepData.name : (this.nsm.getStepData(this.state.part, this.state.chapter, this.state.mission, this.state.step) || {}).name,
                     completedOptional: [...this.completedOptional],
                     // Persist mid-quest progress; def/stepData re-derive from NSM on load
                     activeOptional: this.activeOptional ? {
@@ -553,6 +553,8 @@
                     this.currentStepData = null;
                     this.initializedStep = false;
                     this.stepTimer = 0;
+                    this.watchers = [];
+                    this._migrateStep(data);
                 }
                 if (data.completedOptional) {
                     this.completedOptional = data.completedOptional;

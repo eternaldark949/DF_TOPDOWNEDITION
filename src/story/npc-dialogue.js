@@ -112,18 +112,25 @@
                     }
                 }
             },
-            'Mirabel': {                                                               // the chapter's client: the keycard, then her payment
-                text: g => g.questState.ambushCleared && !g.questState.rewardClaimedContractor
-                    ? "949, you're alive! He escaped?? Starry Heavens above... Well take this payment as promised, and be ready for my next call."
-                    : g.questState.rewardClaimedContractor
-                        ? "For the love of starry heavens! Fuck, he can't be far."
-                        : "Starry heavens, 949! We finally meet in the flesh. We have no time to waste. The Dark Maker is in the Double Nights, get him before he escapes! The fucker. Take this keycard, for the Suite.",
+            // Mirabel, founder of W. MINDUSTRIAL: the call came first (story/scenes/van.js); here she's met in person
+            '747': { text: g => g.questState.ambushCleared ? "Nice work up there. Let's move before the news does." : "I've got the lobby and the feeds. Go — and watch your corners, Nine.",
+                     buttons: () => ({ accept: null, decline: 'Go' }) },
+            'Mirabel': {
+                text(g) {
+                    const qs = g.questState;
+                    if (qs.rewardClaimedContractor) return "For the love of starry heavens. He can't be far. I'll call the moment I hear something.";
+                    if (!qs.ambushCleared) return "949. The job is at the Double Nights, not in my booth. Bring me good news.";
+                    return qs.mirabelFavor >= 2
+                        ? "949. In the flesh, finally — and in one piece. He escaped?? Starry heavens... No matter. You kept your word, and W. MINDUSTRIAL remembers its friends. The balance, as promised. And when the time comes, bring me that FP-X of yours. My people will make it sing."
+                        : "949. In the flesh, finally. He escaped?? Starry heavens... Well. The balance, as promised. Bring me results next time, and W. MINDUSTRIAL might look after that pistol of yours.";
+                },
+                buttons: g => (g.questState.ambushCleared && !g.questState.rewardClaimedContractor ? { accept: 'Collect' } : { accept: null, decline: 'Leave' }),
                 accept(g) {
-                    if (g.questState.ambushCleared && !g.questState.rewardClaimedContractor) {
-                        g.currency += 500; g.questState.rewardClaimedContractor = true;
-                        g.updateUI(); showMessage("PAYMENT RECEIVED: 500 PERSONICS");
-                    } else if (!g.questState.hasKeycard) {
-                        showMessage("MISSION ACCEPTED. RECEIVED: VIP KEYCARD."); g.questState.hasKeycard = true;
+                    const qs = g.questState;
+                    if (qs.ambushCleared && !qs.rewardClaimedContractor) {
+                        const pay = 500 - (qs.mirabelDeposit || 0) + (qs.mirabelFavor >= 2 ? 100 : 0);
+                        g.currency += pay; qs.rewardClaimedContractor = true; qs.mirabelArmory = true;
+                        g.updateUI(); showMessage(`PAYMENT RECEIVED: ${pay} PERSONICS`);
                     }
                 }
             },

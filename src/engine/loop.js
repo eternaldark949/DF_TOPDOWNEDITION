@@ -90,6 +90,7 @@
                 // --- STORY ---
                 if (this.story) {
                     this.story.state = { part: 1, chapter: 1, mission: 1, step: 0 };
+                    this.story.watchers = [];
                     this.story.currentStepData = null;
                     this.story.initializedStep = false;
                     this.story.stepTimer = 0;

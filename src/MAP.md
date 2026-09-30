@@ -90,7 +90,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `story/story-db.js` | `STORY_DB`: story text and beats |
 | `story/captions.js` | Caption/subtitle system |
-| `story/narrative-cutscenes.js` | Cutscene manager, narrative state machine, `StoryManager`. Steps are addressed **by name**: `story.goTo('LEAVE_CLUB')`, `isAt`, `isBefore` (numbers shift when a chapter changes). Conditions: named strings, `TIMER_<ticks>`, `LOC_<map id>`, or a function `(game, ticks) => bool` |
+| `story/narrative-cutscenes.js` | Cutscene manager, narrative state machine, `StoryManager`. Chapter 1: `VAN_RIDE` → `ENTER_HOTEL` → `TAKE_ELEVATOR` → `SEARCH_SUITE` → `SURVIVE_AMBUSH` → `FIND_NOTE` → `LEAVE_HOTEL` → `REPORT_TO_MIRABEL` → `CHAPTER_COMPLETE`; `story.watch(fn)` for one-off hints; saves keep the step's name (older saves migrate by name). Steps are addressed **by name**: `story.goTo('LEAVE_CLUB')`, `isAt`, `isBefore` (numbers shift when a chapter changes). Conditions: named strings, `TIMER_<ticks>`, `LOC_<map id>`, or a function `(game, ticks) => bool` |
 | `story/missions.js` | Mission types, `MissionSystem`, crafting schematics |
 | `story/dialogue-bonding.js` | Bonding dialogues, companion idle spots, `SPEAKER_COLORS` (every speaker's colour, used everywhere incl. the cinematic cast), dialogue transcript/sequence, `BondingSystem` |
 | `story/npc-dialogue.js` | **`NPC_DIALOGUE`**: what everyone in the world says and what their buttons do — by name, then by role (`@dancer`, `@robot`, `@teammate`…), then `@passing`. `npcDialogueFor(npc)`; the box is `startDialogue` (engine/screens-ui.js) |
@@ -101,6 +101,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `story/scene-runner.js` | **The story's director.** `defineScene(name, meta, function* (s) {...})` and `ScenePlayer` (`game.scenes.play(name) → Promise`): scripts are generators that `yield` on ticks, lines, camera moves, choices. Verbs: `wait`, `fade`, `card`, `marker`, `map`/`cut`, `cam.to/cut/shake`, `actor` (walk, face, `setPose`), `prop` (anything drawn, e.g. the van), `tween`, `sway`, `bump`, `knock`, `say`/`narrate`/`choose`, `vision`, `memory` (a flashback's grade), `hud`/`coach`/`showHud` (the playable beats), `mask`, `flag`. Locks input, blocks saves and toasts, freezes with pause |
 | `story/scenes/cast.js` | `SCENE_CAST`: each speaker's subtitle name, look and side (949 left); colours from `SPEAKER_COLORS` |
 | `story/scenes/prologue.js` | **The prologue**: the epigraph, the climb up the Keeper's hill ("Somewhere between the realms… 6125"), the parlor by the fire, the vision of Vanoga. New Game plays it, then chapter 1 (`questState.prologueSeen`) |
+| `story/scenes/van.js` | **Chapter 1's opening**: the crew in the van (the novel's lines), the push-in to the night before — Mirabel's call, answered by the player (the phone's first reveal), a choice that sets `mirabelFavor`, the deposit — the jolt back, the crew's choice (bonding), five knocks, and the crew pouring out at the Double Nights door. `vanAftermath` hands over (also after a skip) |
 
 ## ui/
 | File | What's in it |
