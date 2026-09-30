@@ -938,17 +938,33 @@
             if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);
         }
 
-        /* ── Shading ── Matte by default: seen from above, limbs are cylinders and the head a dome, so
-           each gets a smooth, wide gradient of light on the side toward the sun (a soft sprite, no
-           hard edge) and, on named characters, a soft shade on the far side. Only glossy fabric
-           (a piece or item with finish: 'gloss', e.g. leggings) keeps a crisp sheen; jewelry shines
-           on its own. humanShade() works out the light once per body (null = flat); the passes read it. */
+        /* ── Shading ── Matte: no highlights at all. Seen from above, limbs are cylinders and the head a
+           dome, so each gets a smooth, wide shade on the side away from the sun (a soft sprite, no hard
+           edge). Hair gradients within its own colour: dark hair lifts a little toward the light, light
+           hair deepens a little away from it. Only glossy fabric (finish: 'gloss', e.g. leggings) keeps
+           a crisp sheen; jewelry shines on its own. humanShade() works out the light once per body
+           (null = flat); the passes read it. */
         /** A soft light or shade (a radial sprite stretched to w×h, centred at x, y) at alpha a. */
         function _softSpot(ctx, x, y, w, h, rgb, a) {
             if (a <= 0.004) return;
             const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * a;
             ctx.drawImage(glowSprite(rgb, 0), x - w / 2, y - h / 2, w, h);
             ctx.globalAlpha = a0;
+        }
+        /** Hair's own gradient tone: dark hair → a slightly lighter shade of itself (toward the light),
+         *  light hair → a slightly darker one (away from it). { rgb, up } (up: toward the light). */
+        const _hairTones = new Map();
+        function _hairTone(hex) {
+            let t = _hairTones.get(hex);
+            if (t) return t;
+            const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+            if (!m) return null;
+            const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255, luma = (0.3 * r + 0.59 * g + 0.11 * b) / 255;
+            const up = luma < 0.45, k = up ? 38 + 30 * (0.45 - luma) : -48;
+            const c = v => Math.max(0, Math.min(255, Math.round(v + k)));
+            t = { rgb: `${c(r)}, ${c(g)}, ${c(b)}`, up };
+            _hairTones.set(hex, t);
+            return t;
         }
         /** Is this piece of clothing glossy? The item's own finish wins, else the wardrobe piece's. */
         function _glossy(piece, item) { return !!item && (item.finish ? item.finish === 'gloss' : !!(piece && piece.finish === 'gloss')); }
@@ -1454,8 +1470,7 @@
                         ctx.fillStyle = SH.hl2;
                         ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.36, 0, 0, Math.PI*2); ctx.fill();
                     } else {                                                // matte: a smooth gradient, lit side to shaded side
-                        _softSpot(ctx, lx, ly * width * 0.55, len * 1.7, width * 1.7, SH.rgb, SH.m);
-                        if (SH.body && (SH.lx || SH.ly)) _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.2);
+                        if (SH.lx || SH.ly) _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.3);
                     }
                 }
                 ctx.restore();
@@ -1722,10 +1737,6 @@
             ctx.fillStyle = darken(skinColor, 0.4);
             ctx.beginPath(); ctx.ellipse(lFistX, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
             ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
-            if (SH && SH.body) {                                            // soft light on the hands (named characters)
-                const ox = SH.lx * 1.2, oy = SH.ly * 1.2;
-                _softSpot(ctx, lFistX + ox, lFistY + oy, 7, 5.5, SH.rgb, SH.m); _softSpot(ctx, rFistX + ox, rFistY + oy, 7, 5.5, SH.rgb, SH.m);
-            }
         
             // 7. Forearms (fabric only under long sleeves)
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
@@ -1766,9 +1777,8 @@
                 if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
             }
             for (const j of jewelryAt('neck')) WD.jewelry[j.type].draw(ctx, g, j);
-            if (SH && SH.body) {                                            // the torso's form: soft light on the sun's side, soft shade on the other
+            if (SH && SH.body) {                                            // the torso's form: soft shade on the side away from the sun
                 const cx = torsoXOff + torsoWidth * 0.5;
-                _softSpot(ctx, cx + SH.lx * 2, SH.ly * 5, torsoWidth * 1.6, 22, SH.rgb, SH.m);
                 if (SH.lx || SH.ly) _softSpot(ctx, cx - SH.lx * 2.5, -SH.ly * 7, torsoWidth * 1.5, 16, _SHADOW_RGB, SH.shA * 1.3);
                 if (topGloss) {                                             // glossy fabric: a crisp ridge across the shoulders too
                     ctx.fillStyle = SH.hl2;
@@ -1801,9 +1811,10 @@
             withHead(headX, hx => {
                 if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }
                 drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
-                if (SH && SH.level > 1) {                                   // the head as a matte dome: light toward the sun, shade away
-                    _softSpot(ctx, hx + SH.lx * 2.8, SH.ly * 2.8, 13, 13, SH.rgb, SH.m);
-                    if (SH.body && (SH.lx || SH.ly)) _softSpot(ctx, hx - SH.lx * 3.5, -SH.ly * 3.5, 13, 13, _SHADOW_RGB, SH.shA * 1.3);
+                if (SH && SH.level > 1 && (SH.lx || SH.ly)) {               // the head as a matte dome: hair gradients in its own colour, then shade away from the sun
+                    const ht = clothes.hair && !clothes.hat ? _hairTone(clothes.hair.color) : null;
+                    if (ht) { const s = ht.up ? 1 : -1; _softSpot(ctx, hx + s * SH.lx * 3, s * SH.ly * 3, 13, 13, ht.rgb, 0.55 * Math.hypot(SH.lx, SH.ly)); }
+                    _softSpot(ctx, hx - SH.lx * 3.5, -SH.ly * 3.5, 13, 13, _SHADOW_RGB, SH.shA * (SH.body ? 1.3 : 0.9));
                 }
                 if (turning) ctx.restore();
             });
