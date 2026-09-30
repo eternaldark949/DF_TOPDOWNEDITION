@@ -516,13 +516,14 @@
         // =====================================================================
         const _bldHash = (seed, i) => { const s = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; return s - Math.floor(s); };
 
+        // The city's curated palette: plum, charcoal and brass, ivory stone, rose, midnight
         const APARTMENT_PALETTES = [
-            { name: 'rose',     roof: '#2b1f27', wall: '#27171f', accent: '#ff5fa2', lit: '#ffd6a8' },
-            { name: 'teal',     roof: '#1d272a', wall: '#152125', accent: '#3fe0d0', lit: '#c4f6ff' },
-            { name: 'amber',    roof: '#2b251c', wall: '#231d14', accent: '#ffb347', lit: '#ffe4ad' },
-            { name: 'lavender', roof: '#25202f', wall: '#1d1927', accent: '#b58cff', lit: '#ffdcf2' },
-            { name: 'crimson',  roof: '#2b1b1d', wall: '#241517', accent: '#ff4d57', lit: '#ffd09c' },
-            { name: 'mint',     roof: '#1f2b25', wall: '#17231d', accent: '#6dffb0', lit: '#f4ffd9' }
+            { name: 'plum',     roof: '#2a1c30', wall: '#22152a', accent: '#c89bff', lit: '#ffd8b0' },
+            { name: 'charcoal', roof: '#25242b', wall: '#1c1b22', accent: '#e8c27a', lit: '#ffe2b0' },
+            { name: 'ivory',    roof: '#3a3440', wall: '#2c2733', accent: '#f3e6d0', lit: '#fff1d6' },
+            { name: 'rose',     roof: '#2e1d27', wall: '#26171f', accent: '#ff8fb8', lit: '#ffd6c8' },
+            { name: 'midnight', roof: '#1d2032', wall: '#161827', accent: '#a9bfff', lit: '#e8eeff' },
+            { name: 'brass',    roof: '#2c2419', wall: '#221b12', accent: '#e8b860', lit: '#ffe0a8' }
         ];
         const APARTMENT_NAMES = ['Luna Court', 'Velvet Arms', 'The Marlowe', 'Crescent House', 'Starlight Flats', 'Neon Terrace',
                                  'Orchid Row', 'Halcyon', 'The Violet', 'Moonrise', 'Echo Lofts', 'Solace Place', 'Nocturne', 'Aurelia'];

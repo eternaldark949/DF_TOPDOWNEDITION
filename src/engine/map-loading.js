@@ -204,6 +204,10 @@
                     
                     // Track original prop count so we can extract graveyard stones for cache later
                     this._hubCache_hubPropCount = mapData.props.length;
+
+                    // The same city every visit: generation draws from a seeded stream (restored below)
+                    const _unseededRandom = Math.random;
+                    Math.random = seededRandom(949);
                     
                     // 1. CREATE CITY LAYOUT
                     const city = new CityLayout({
@@ -226,7 +230,8 @@
                     city.addVerticalRoad(1200, 'West Ave', 2);
                     city.addVerticalRoad(2800, 'East Ave', 2);
                     
-                    // 3. GENERATE BLOCKS (must be done before placing buildings)
+                    // 3. GENERATE BLOCKS (must be done before placing buildings); the parks are kept free (world/parks.js)
+                    for (const [block, name] of Object.entries(HUB_PARKS)) city.setZoneType(block, CityLayout.ZONE.PARK, { name });
                     city.generateBlocks();
                     
                     // Debug: Log blocks to console
@@ -649,6 +654,13 @@
                         mapData.foliage = mapData.foliage.filter(f => !inCourt(f));
                         mapData.lamps = mapData.lamps.filter(l => !inCourt(l));
                     }
+                    // The parks' trees and lanterns (their ground is painted by the ground baker)
+                    for (const b of city.blocks) {
+                        if (b.type !== CityLayout.ZONE.PARK) continue;
+                        const P = parkLayout(b);
+                        for (const t of P.trees) mapData.foliage.push(new Foliage(t.x, t.y, t.type, t.size));
+                        for (const l of P.lamps) mapData.lamps.push(new LampEntity({ x: l.x, y: l.y, lampType: 1, color: '#ffd9a8', lightRadius: 170 }));
+                    }
                     console.log(`Generated ${mapData.foliage.length} foliage elements (including glowing trees)`);
                     
                     // 11d. SOUTHERN GRAVEYARD
@@ -764,6 +776,7 @@
                     // =========================================================
                     //  CACHE RESULTS for instant restore on future visits
                     // =========================================================
+                    Math.random = _unseededRandom;
                     this._hubCache = {
                         buildings: mapData.buildings,
                         buildingColliders: mapData.buildingColliders,
