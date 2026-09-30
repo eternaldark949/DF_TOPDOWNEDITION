@@ -80,6 +80,13 @@
             }
         }
 
+        /** Something the scene draws that isn't a person (the van at the curb): draw(ctx, prop) in world space. */
+        class SceneProp {
+            constructor(id, draw, x, y, angle = 0) { this.id = id; this.drawFn = draw; this.x = x; this.y = y; this.angle = angle; this.visible = true; }
+            tick() {}
+            draw(ctx) { if (this.visible) this.drawFn(ctx, this); }
+        }
+
         class ScenePlayer {
             constructor(game) {
                 this.game = game;
@@ -116,6 +123,7 @@
                 A.frame++;
                 this._tickCam();
                 for (const a of this.actors) a.tick();
+                this._tickTweens();
                 this.ui.tick();
                 this.vision.tick();
                 // Run the script until it waits on something that isn't done
@@ -150,10 +158,23 @@
                 this.ui.clear(); this.vision.hide(0); this.ui.showSkip(false);
                 this.actors = [];
                 const g = this.game;
+                g.camera.sway = 0; g.fieldMask = null; g.vanMoving = undefined;
+                if (g.coach) g.coach.dismiss();
+                this.ui.memory(0, 0); this._showHud(false);
+                if (typeof phoneSystem !== 'undefined' && phoneSystem.endCall) phoneSystem.endCall();
                 g.cutscene.end();
                 if (A.meta.flag) g.questState[A.meta.flag] = true;
                 this.ui.black(1, 0); this.ui.releaseBlack(A.meta.releaseFrames || 50);   // the next scene/map fades itself in under this
                 A.resolve({ skipped });
+            }
+
+            _tickTweens() {
+                const A = this.active; if (!A || !A.tweens) return;
+                A.tweens = A.tweens.filter(tw => {
+                    tw.t = Math.min(1, tw.t + 1 / tw.frames);
+                    tw.obj[tw.key] = tw.from + (tw.to - tw.from) * (SCENE_EASE[tw.ease] || SCENE_EASE.inOut)(tw.t);
+                    return tw.t < 1;
+                });
             }
 
             _toWait(v) {
@@ -169,6 +190,14 @@
                 if (g.fireJoystick) { g.fireJoystick.active = false; g.fireJoystick.firing = false; }
                 g.mouseDown = false;
                 if (g.keys) for (const k in g.keys) g.keys[k] = false;
+            }
+
+            /** The HUD inside a scene (for the playable beats): shown over the letterbox, or hidden again. */
+            _showHud(on) {
+                const ui = document.getElementById('game-ui'); if (!ui) return;
+                ui.style.opacity = on ? 1 : (this.active ? 0 : ui.style.opacity);
+                ui.classList.toggle('scene-hud', !!on);
+                document.body.classList.toggle('scene-hud-on', !!on);          // the letterbox steps back (styles/coach.css)
             }
 
             _loadMap(id, at) {
@@ -250,6 +279,37 @@
                     sfx(name) { if (typeof audioSys !== 'undefined') audioSys.sfx(name); },
                     flag(key, v = true) { g.questState[key] = v; },
                     vision: self.vision,
+                    /** A thing to draw (not a person): draw(ctx, prop) in world space. */
+                    prop(id, draw, x, y, angle) {
+                        let p = self.actors.find(q => q.id === id);
+                        if (!p) { p = new SceneProp(id, draw, x, y, angle); self.actors.push(p); }
+                        return p;
+                    },
+                    /** Ease obj[key] to a value over some frames. */
+                    tween(obj, key, to, frames = 30, ease = 'inOut') {
+                        const A = self.active, tw = { obj, key, from: obj[key] || 0, to, frames: Math.max(1, frames), ease, t: 0 };
+                        (A.tweens || (A.tweens = [])).push(tw);
+                        return { done: () => tw.t >= 1 };
+                    },
+                    /** A gentle road sway on the camera (px); 0 stops it. */
+                    sway(px) { g.camera.sway = px; },
+                    /** The van hits a seam: a jolt and a thud. */
+                    bump(n = 5) { g.triggerShake && g.triggerShake(n); if (typeof audioSys !== 'undefined') audioSys.sfx('bump'); },
+                    /** n knocks on the partition, spaced like a fist would. */
+                    knock(n = 5, gap = 13) {
+                        let k = 0, f = 0;
+                        return { done: () => { if (k < n && f++ % gap === 0) { k++; if (typeof audioSys !== 'undefined') audioSys.sfx('knock'); g.triggerShake && g.triggerShake(1.2); } return k >= n && f > (n - 1) * gap + 8; } };
+                    },
+                    /** The flashback's look: cooler, softer, a vignette and grain (0..1 over frames). */
+                    memory(on, frames = 40) { ui.memory(on ? 1 : 0, frames); return { done: () => !ui.memoryEasing() }; },
+                    /** Reveal a part of the HUD (ui/hud-reveal.js); with a title/text the coach points at it. */
+                    hud(key, opts = {}) { return g.hud ? g.hud.reveal(key, opts) : null; },
+                    /** Point at any element (ui/coach.js). */
+                    coach(target, opts = {}) { return g.coach ? g.coach.point(typeof target === 'string' ? document.getElementById(target) : target, opts) : null; },
+                    /** Show the revealed HUD during the scene (a playable beat), or hide it again. */
+                    showHud(on = true) { self._showHud(on); },
+                    /** Force 949's field mask on or off for the scene (null: the map decides). */
+                    mask(on) { g.fieldMask = on; },
                     /** Wait for several waitables at once. */
                     all(...ws) { const W = ws.map(w => self._toWait(w)); return { done: () => W.every(w => w.done()) }; }
                 };

@@ -11,7 +11,8 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `styles/hud-menus.css` | HUD, main menu, overlays, notes, dialogue, shop screens |
 | `styles/panels-phone.css` | Pause/settings panel, touch controls, colour-grade panel, phone and message apps |
 | `styles/landscape.css` | **Landscape** (a phone on its side): every rule is under `body.landscape`, which `resize()` (`engine/combat-effects.js`) sets when the window is wider than tall and ≤540px tall. It covers the HUD (the cat's paw dropped 90px, the action dock beside it, the ⚙ dock opening sideways), the move-stick zone, dialogue, letterbox and boss title, the phone scaled by `--phone-scale`, the collapsed sidebars, two-column pause, and short-screen menus. Portrait never sees it. |
-| `styles/cinematic.css` | The cinematic dialogue: subtitles over a scrim, portrait cameos, choices, title cards, the place/time marker, hold to skip, narration |
+| `styles/cinematic.css` | The cinematic dialogue: subtitles over a scrim, portrait cameos, choices, title cards, the place/time marker, hold to skip, narration, the flashback vignette |
+| `styles/coach.css` | The coach (spotlight, ring, caption card, ghost thumb), `.hud-veiled` and the reveal bloom, the call card |
 
 ## core/ (loaded first)
 | File | What's in it |
@@ -23,7 +24,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `core/resonance.js` | `ResonanceSystem`: 949's progression — earning (style-weighted), Dr. Yin's tuning, the Flit / Frame / Arms trees |
 | `core/utils.js` | Maths helpers, humanoid gait/animation helpers, weapon muzzle helpers, `RenderInterp` |
 | `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs, glow sprites (`glowSprite`, `drawGlow`), `lampFlicker`, `glowA` (a glow at an alpha: the interiors' light passes) |
-| `core/appearances.js` | **Every character's look in one place**: `APPEARANCES` (949, the crew, staff, the city's cast), `ROLE_LOOKS` (medics, dancers, androids, pedestrians, gangers, spirits, ghosts), `PALETTE`, `ANDROID_FINISHES`; `lookFor(entity)`, `portraitOf(look)` |
+| `core/appearances.js` | **Every character's look in one place**: `APPEARANCES` (949, the crew, staff, the city's cast), `ROLE_LOOKS` (medics, dancers, androids, pedestrians, gangers, spirits, ghosts), `PALETTE`, `ANDROID_FINISHES`; `lookFor(entity)`, `portraitOf(look)`; 747's look; the field mask rule (`withFieldMask`: 949 masked away from home) |
 | `core/settings.js` | `FullscreenManager`, `OrientationManager` (Settings → Screen Orientation: Auto / Portrait / Landscape; locks in fullscreen where supported, saved as `dfab_orientation`), `GameSettings`, object pools, perf utilities, `showMessage` |
 
 ## world/
@@ -94,8 +95,10 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `story/dialogue-bonding.js` | Bonding dialogues, companion idle spots, `SPEAKER_COLORS` (every speaker's colour, used everywhere incl. the cinematic cast), dialogue transcript/sequence, `BondingSystem` |
 | `story/npc-dialogue.js` | **`NPC_DIALOGUE`**: what everyone in the world says and what their buttons do — by name, then by role (`@dancer`, `@robot`, `@teammate`…), then `@passing`. `npcDialogueFor(npc)`; the box is `startDialogue` (engine/screens-ui.js) |
 | `story/scene-vision.js` | `SceneVision`: full-screen painted sequences a scene steps through with `beat()` (`vanoga`: the flames, the dark, the golden egg, the burst, the pink orb of the Empereal Lord) |
-| `ui/cinematic-dialogue.js` | `CinematicDialogue`: how scenes look — `say` (typed subtitle, speaker colour, living cameo, dimmed listener), `choose` (keys/taps, timed, weighty ◆), `card`, `marker`, the black layer, hold to skip. Paced by sim ticks |
-| `story/scene-runner.js` | **The story's director.** `defineScene(name, meta, function* (s) {...})` and `ScenePlayer` (`game.scenes.play(name) → Promise`): scripts are generators that `yield` on ticks, lines, camera moves, choices. Verbs: `wait`, `fade`, `card`, `marker`, `map`/`cut`, `cam.to/cut/shake`, `actor` (walk, face, `setPose`), `say`/`narrate`/`choose`, `vision`, `flag`. Locks input, blocks saves and toasts, freezes with pause |
+| `ui/cinematic-dialogue.js` | `CinematicDialogue`: how scenes look — `say` (typed subtitle, speaker colour, living cameo, dimmed listener), `choose` (keys/taps, timed, weighty ◆), `card`, `marker`, the black layer, `memory` (vignette and grain; the colour grade is in draw.js), hold to skip. Paced by sim ticks |
+| `ui/hud-reveal.js` | **`HudReveal`** (`game.hud`): the HUD appears part by part as the story introduces it (`HUD_PARTS`; `.hud-veiled`). `reveal(key, {title, text})`, `startFresh`, `revealAll`; saved as `hudRevealed` |
+| `ui/coach.js` | **`Coach`** (`game.coach`): points at a piece of UI — spotlight (dim, only the target tappable) the first time, a ring after; a caption card; a ghost thumb for drags. Scenes yield on it. Styles: `styles/coach.css` |
+| `story/scene-runner.js` | **The story's director.** `defineScene(name, meta, function* (s) {...})` and `ScenePlayer` (`game.scenes.play(name) → Promise`): scripts are generators that `yield` on ticks, lines, camera moves, choices. Verbs: `wait`, `fade`, `card`, `marker`, `map`/`cut`, `cam.to/cut/shake`, `actor` (walk, face, `setPose`), `prop` (anything drawn, e.g. the van), `tween`, `sway`, `bump`, `knock`, `say`/`narrate`/`choose`, `vision`, `memory` (a flashback's grade), `hud`/`coach`/`showHud` (the playable beats), `mask`, `flag`. Locks input, blocks saves and toasts, freezes with pause |
 | `story/scenes/cast.js` | `SCENE_CAST`: each speaker's subtitle name, look and side (949 left); colours from `SPEAKER_COLORS` |
 | `story/scenes/prologue.js` | **The prologue**: the epigraph, the climb up the Keeper's hill ("Somewhere between the realms… 6125"), the parlor by the fire, the vision of Vanoga. New Game plays it, then chapter 1 (`questState.prologueSeen`) |
 
@@ -104,7 +107,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `ui/ui-system.js` | `UISystem`: HUD, banners, prompts |
 | `ui/music-widget.js` | The radio/music widget (through the music bus) |
-| `ui/poses.js` | `POSES`: idle life (breathing, weight shift, looking around) and poses: arms crossed, lean, fidget, typing, phone, dance… |
+| `ui/poses.js` | `POSES`: idle life (breathing, weight shift, looking around) and poses: arms crossed, lean, fidget, typing, phone, dance, seated (`sit`, `sit_wrap`, `sit_lean`, `sit_work`, `sit_phone`)… |
 | `ui/expressions.js` | `EXPRESSIONS`: faces for portraits (smile, sultry, worried…), mood from dialogue text, blinking |
 | `ui/bodies.js` | `BUILDS` (slim, athletic, curvy, broad, heavy) and height; drawing Double Nights androids (finishes in `core/appearances.js`): plating, visor, emblem, hover |
 | `ui/cloth.js` | Cloth physics: coat hems, skirts and trains swing, trail and settle (same method as the hair) |
@@ -112,7 +115,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `ui/humanoid-render.js` | Drawing characters: hair, portraits, bodies, held drinks, weapons |
 | `ui/inventory-augments.js` | Items, abilities, inventory, augments |
 | `ui/action-dock.js` | The action dock: context pills (talk, search, enter, exit…) above the right-hand cluster, clear of the fire ring — `setActionPill`, `transitionAction`, the glyphs; `game.setInteract(verb, name)` sets the interact pill |
-| `ui/phone.js` | The phone (contacts, messages, map, apps), NEUME UI, global keys |
+| `ui/phone.js` | The phone (contacts, messages, map, apps), incoming calls (`ringCall`/`answerCall`/`endCall`: a call card, no pause), NEUME UI, global keys |
 | `ui/sidebars.js` | Inventory and map sidebars |
 | `ui/save-slots-pause-menu.js` | Save slots and the pause/settings menu |
 
@@ -137,6 +140,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/update.js` | `update()`: the per-tick simulation |
 | `engine/draw.js` | `draw()`: the frame renderer |
 | `engine/interiors.js` | **`INTERIOR_ART`**: each painted place's `floor` and `glow` (one line per place; draw.js and drawEmissivePass look it up). Apartment, clinic, House of Death, Double Nights lobby and penthouse (the mirror rift), the Sanctum (rose window, sigil runes), and Moon City Nightclub interiors (floors, glows; the club's light show in time with its track), the graveyard's candle flames, the city seen from the veranda |
+| `engine/van-art.js` | Chapter 1's van: `van_interior` (roof off, nose up: the cab, the partition, benches of violet webbing, the road going by beneath, passing neon), `VAN.SEATS`, and `drawVanExterior` for the street (rear doors open) |
 | `engine/keeper-art.js` | The prologue's places: `keepers_hill` (the island above the clouds, the path, flowers, the house with its floating gable, portals and planets) and `keepers_parlor` (checkerboard tiles, the red wingback and burgundy chesterfield, the fire and its embers, the window above it); `keeperEmberPop` |
 | `engine/lighting.js` | Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, wet reflections, atmosphere |
 | `engine/player-draw-input.js` | Drawing the player, emotes, `addPausableTimeout` (game-time timers: they pause with the game and clear on new game/load — use these, not `setTimeout`, for anything in the story or world), joysticks — the touch sticks: the move stick's flit ring (and flick / two-finger flit settings), the fire stick's threshold ring (aim inside, fire past it; sniper fire-on-release) and aim memory |

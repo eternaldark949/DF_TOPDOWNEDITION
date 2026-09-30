@@ -97,6 +97,12 @@
                 ambientDarkness: 0.78, zones: [], walls: [], transitions: [], spawn: { x: 450, y: 600 },
                 landmarks: [ { id: 'hearth', x: 450, y: 70 }, { id: 'parlor_mid', x: 520, y: 260 }, { id: 'keeper_seat', x: 450, y: 262 }, { id: 'traveler_seat', x: 648, y: 306 }, { id: 'parlor_window', x: 450, y: 20 } ]
             },
+            // Chapter 1 opens here: the crew's van, roof off, nose up (engine/van-art.js paints it; story/scenes/van.js plays it)
+            'van_interior': {
+                id: 'van_interior', width: 400, height: 820, type: 'indoor', label: 'En route to Double Nights', floorColor: '#0b0a10',
+                ambientDarkness: 0.62, zones: [], walls: [], transitions: [], spawn: { x: 200, y: 460 },
+                landmarks: [ { id: 'van_center', x: 200, y: 450 }, { id: 'van_949', x: 136, y: 404 }, { id: 'van_747', x: 264, y: 404 }, { id: 'van_rear', x: 200, y: 700 }, { id: 'van_partition', x: 200, y: 186 } ]
+            },
             'hotel_suite': {
                 id: 'hotel_suite', width: 1400, height: 1000, type: 'indoor',
                 label: 'Penthouse Suite', floorColor: '#0c0a0e',

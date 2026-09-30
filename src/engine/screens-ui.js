@@ -174,9 +174,9 @@
                         const c = this.cosmetics.getRenderConfig();
                         const face = this.playerExpression ? { expression: this.playerExpression } : {};
                         const me = APPEARANCES['949'];
-                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: me.eyeColor, gender: me.gender, top: c.outfit.top, hat: c.hat, jewelry: c.jewelry, ...face };
+                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: me.eyeColor, gender: me.gender, top: c.outfit.top, hat: c.hat, jewelry: withFieldMask(this, c.jewelry), ...face };
                     }
-                    return portraitOf(APPEARANCES['949']);
+                    return portraitOf(APPEARANCES['949'], { jewelry: withFieldMask(this, APPEARANCES['949'].jewelry) });
                 }
 
                 // 2. Everyone else: their look (core/appearances.js) — a live NPC or teammate by name

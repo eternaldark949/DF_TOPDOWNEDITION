@@ -180,6 +180,8 @@
                 this.dialogueSeq = new DialogueSequence(this);
                 this.transcript = new DialogueTranscript();
                 this.scenes = new ScenePlayer(this);            // story/scene-runner.js: the story's scenes
+                this.coach = new Coach(this);                   // ui/coach.js: points at the UI and says what it's for
+                this.hud = new HudReveal(this);                 // ui/hud-reveal.js: the HUD appears as the story introduces it
                 // Universal capture: any write to the NPC text element gets transcribed,
                 // regardless of which code path produced it (DialogueSequence, single-line
                 // shop greetings, recruit prompts, story handler). Pulls the speaker from

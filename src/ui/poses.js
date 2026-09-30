@@ -55,6 +55,17 @@
                     const b = breath(t);
                     return { l: [10.5, -2.5], r: [10.5, 2.5], le: [6, -8], re: [6, 8], lf: [9, 2], rf: [9, -2], bounce: 1.8 + b * 0.2, head: [1.4, 0], hint: 'curious' };
                 },
+                // Seated, working something in the lap (949 calibrating her FP-X): small, practiced motions
+                sit_work(t, o) {
+                    const b = breath(t), w = Math.sin(t * 5.3 + o.seed) * 0.7, k = Math.sin(t * 1.7) > 0.6 ? 1 : 0;
+                    return { l: [9.5, -2 + w * 0.5], r: [10 + k * 0.8, 2.2 - w * 0.4], le: [4, -9], re: [4, 9], lf: [9, 1.5], rf: [9, -1.5],
+                             bounce: 1.2 + b * 0.2, head: [1, 0], turn: Math.sin(t * 0.7 + o.seed) * 0.08, hint: 'neutral' };
+                },
+                // Seated with a phone to her ear
+                sit_phone(t) {
+                    const b = breath(t);
+                    return { l: [4.5, -6.5], le: [7, -11], r: [7.5, 4.5], re: [2, 10], lf: [9, 1], rf: [9, -1], bounce: -0.6 + b * 0.25, head: [0.4, 0], turn: -0.12, hint: 'neutral' };
+                },
                 arms_crossed(t, o) {
                     const b = breath(t);
                     return { l: [5.5, 3], r: [6.5, -3], le: [1, -11], re: [1.5, 11], bounce: b * 0.3,

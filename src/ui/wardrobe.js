@@ -441,6 +441,64 @@
                     portrait(ctx, P, c) { const { cx, fw, eyeY, eyeSpacing } = P; ctx.fillStyle = c.color || '#141414'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + s * eyeSpacing, eyeY, fw * 0.33, fw * 0.22, 0, 0, Math.PI * 2); ctx.fill(); } ctx.strokeStyle = c.color || '#141414'; ctx.lineWidth = fw * 0.06; ctx.beginPath(); ctx.moveTo(cx - eyeSpacing + fw * 0.3, eyeY - fw * 0.05); ctx.lineTo(cx + eyeSpacing - fw * 0.3, eyeY - fw * 0.05); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + s * eyeSpacing - fw * 0.1, eyeY - fw * 0.07, fw * 0.08, fw * 0.04, -0.4, 0, Math.PI * 2); ctx.fill(); } } },
                 necklace: { at: 'neck', draw(ctx, g, c) { const gold = c.color || '#d8d8e0'; ctx.strokeStyle = gold; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(g.headInTorso, 0, 9.6, -0.95, 0.95); ctx.stroke(); ctx.fillStyle = gold; ctx.beginPath(); ctx.arc(g.headInTorso + 10.2, 0, 1.3, 0, Math.PI * 2); ctx.fill(); },
                     portrait(ctx, P, c) { const { cx, cy, fw, fh } = P; const col = c.color || '#d8d8e0'; ctx.strokeStyle = col; ctx.lineWidth = fw * 0.04; ctx.beginPath(); ctx.moveTo(cx - fw * 0.42, cy + fh * 1.1); ctx.quadraticCurveTo(cx, cy + fh * 1.95, cx + fw * 0.42, cy + fh * 1.1); ctx.stroke(); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(cx, cy + fh * 1.62); ctx.lineTo(cx + fw * 0.08, cy + fh * 1.78); ctx.lineTo(cx, cy + fh * 1.92); ctx.lineTo(cx - fw * 0.08, cy + fh * 1.78); ctx.fill(); } },
+                // The Freelancers' field mask: black, a sheen in `tint`, eye slits glowing in `eyes`.
+                // In portraits it goes on under the fringe (at: 'face'); top-down, over the head.
+                field_mask: { at: 'face', draw(ctx, g, c) {
+                    const hx = g.headX;
+                    ctx.fillStyle = c.color || '#0b0710';
+                    ctx.beginPath(); ctx.arc(hx, 0, 8.3, -1.25, 1.25); ctx.arc(hx + 1.2, 0, 5.2, 1.1, -1.1, true); ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = c.tint || '#5a2a8a'; ctx.globalAlpha = 0.55; ctx.lineWidth = 0.7;
+                    ctx.beginPath(); ctx.arc(hx, 0, 8.1, -1.1, 1.1); ctx.stroke(); ctx.globalAlpha = 1;
+                    ctx.fillStyle = c.eyes || '#e8c27a'; ctx.shadowColor = c.eyes || '#e8c27a'; ctx.shadowBlur = 3;
+                    for (const s of [-1, 1]) { ctx.save(); ctx.translate(hx + 6.2, s * 2.6); ctx.rotate(s * 0.35); ctx.fillRect(-0.45, -1.3, 0.9, 2.6); ctx.restore(); }
+                    ctx.shadowBlur = 0;
+                },
+                    portrait(ctx, P, c) {
+                        const { cx, cy, fw, fh, eyeY, eyeSpacing } = P, eyes = c.eyes || '#e8c27a';
+                        ctx.save();
+                        // The shell: the whole face from the brow down, jaw included
+                        ctx.beginPath();
+                        ctx.moveTo(cx - fw * 1.02, cy - fh * 0.42);
+                        ctx.quadraticCurveTo(cx, cy - fh * 0.62, cx + fw * 1.02, cy - fh * 0.42);
+                        ctx.lineTo(cx + fw * 1.02, cy);
+                        ctx.quadraticCurveTo(cx + fw * 0.78, cy + fh * 1.12, cx, cy + fh * 1.08);
+                        ctx.quadraticCurveTo(cx - fw * 0.78, cy + fh * 1.12, cx - fw * 1.02, cy);
+                        ctx.closePath();
+                        const g = ctx.createLinearGradient(cx - fw, cy - fh, cx + fw, cy + fh);
+                        g.addColorStop(0, c.color || '#0b0710'); g.addColorStop(0.55, c.color || '#0b0710'); g.addColorStop(1, c.tint || '#3a1a5a');
+                        ctx.fillStyle = g; ctx.fill();
+                        ctx.clip();
+                        // A soft sheen down one side and a ridge down the nose
+                        ctx.globalAlpha = 0.18; ctx.fillStyle = c.tint || '#7a4ab0';
+                        ctx.beginPath(); ctx.ellipse(cx - fw * 0.55, cy - fh * 0.05, fw * 0.22, fh * 0.6, -0.15, 0, Math.PI * 2); ctx.fill();
+                        ctx.globalAlpha = 0.25; ctx.strokeStyle = c.tint || '#7a4ab0'; ctx.lineWidth = fw * 0.04;
+                        ctx.beginPath(); ctx.moveTo(cx, eyeY + fh * 0.05); ctx.lineTo(cx, cy + fh * 0.45); ctx.stroke();
+                        ctx.globalAlpha = 1;
+                        ctx.restore();
+                    },
+                    // Eye slits: sharp, lifting outward, the curve that rounds out beneath them — drawn over
+                    // the fringe, so they glow through the hair like the brows do
+                    portraitOver(ctx, P, c) {
+                        const { cx, fw, fh, eyeY, eyeSpacing } = P, eyes = c.eyes || '#e8c27a';
+                        ctx.save();
+                        ctx.shadowColor = eyes; ctx.shadowBlur = fw * 0.45;
+                        for (const s of [-1, 1]) {
+                            const ex = cx + s * eyeSpacing;
+                            ctx.fillStyle = eyes;
+                            ctx.beginPath();
+                            ctx.moveTo(ex - s * fw * 0.3, eyeY + fh * 0.04);
+                            ctx.quadraticCurveTo(ex - s * fw * 0.02, eyeY - fh * 0.12, ex + s * fw * 0.36, eyeY - fh * 0.14);
+                            ctx.quadraticCurveTo(ex + s * fw * 0.06, eyeY + fh * 0.04, ex - s * fw * 0.3, eyeY + fh * 0.04);
+                            ctx.fill();
+                            ctx.fillStyle = 'rgba(255,250,235,0.85)';                               // a hot core
+                            ctx.beginPath(); ctx.ellipse(ex + s * fw * 0.02, eyeY - fh * 0.04, fw * 0.1, fh * 0.018, s * -0.35, 0, Math.PI * 2); ctx.fill();
+                            ctx.strokeStyle = eyes; ctx.globalAlpha = 0.6; ctx.lineWidth = fw * 0.04; ctx.shadowBlur = fw * 0.2;
+                            ctx.beginPath(); ctx.moveTo(ex - s * fw * 0.26, eyeY + fh * 0.12);
+                            ctx.quadraticCurveTo(ex + s * fw * 0.06, eyeY + fh * 0.26, ex + s * fw * 0.34, eyeY + fh * 0.03); ctx.stroke();
+                            ctx.globalAlpha = 1;
+                        }
+                        ctx.restore();
+                    } },
                 bangles: { at: 'wrists', draw(ctx, g, c) {
                     const gold = c.color || '#e8c27a';
                     for (let i = 0; i < 2; i++) {

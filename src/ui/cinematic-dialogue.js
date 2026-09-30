@@ -25,6 +25,7 @@
                 if (this.root) return;
                 const el = (tag, id, cls, parent) => { const e = document.createElement(tag); if (id) e.id = id; if (cls) e.className = cls; (parent || this.root).appendChild(e); return e; };
                 this.root = document.createElement('div'); this.root.id = 'cine'; document.body.appendChild(this.root);
+                this.memEl = el('div', 'cine-memory');            // the flashback's vignette and grain (memory())
                 this.blackEl = el('div', 'cine-black');
                 this.tapEl = el('div', 'cine-tap');
                 this.scrim = el('div', 'cine-scrim');
@@ -71,6 +72,21 @@
                 this.blackTo = this.blackT = 0;
                 this.blackEl.style.transition = `opacity ${ms}ms ease ${Math.round(ms * 0.6)}ms`;
                 this.blackEl.style.opacity = 0;
+            }
+
+            // ── Memory (a flashback's look) ──────────────────────────────────
+            /** Ease the flashback grade to `to` (0..1): the world cooler and softer, a vignette, grain. */
+            memory(to, frames) {
+                this._build();
+                this.memTo = to; this.memK = this.memK || 0;
+                this.memStep = frames ? Math.abs(to - this.memK) / frames : 1;
+                if (!frames) { this.memK = to; this._applyMemory(); }
+            }
+            memoryEasing() { return Math.abs((this.memK || 0) - (this.memTo || 0)) > 0.001; }
+            _applyMemory() {
+                const k = this.memK || 0;                           // the world's own grade takes it from here (draw.js filter chain)
+                this.memEl.style.opacity = k.toFixed(3);
+                this.memEl.classList.toggle('on', k > 0.001);
             }
 
             // ── Lines ────────────────────────────────────────────────────────
@@ -204,6 +220,11 @@
                 if (this.fading()) {
                     this.blackT += Math.sign(this.blackTo - this.blackT) * Math.min(this.blackStep, Math.abs(this.blackTo - this.blackT));
                     this.blackEl.style.opacity = this.blackT;
+                }
+                // Memory grade
+                if (this.memoryEasing()) {
+                    this.memK += Math.sign(this.memTo - this.memK) * Math.min(this.memStep, Math.abs(this.memTo - this.memK));
+                    this._applyMemory();
                 }
                 // The line
                 const L = this.line;

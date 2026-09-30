@@ -334,6 +334,12 @@
                     e.softLights = [ A(900, 1500, 1100, 2500, '#b0c0e8', 0.16), A(900, 600, 760, 520, '#ffb070', 0.12), S(900, 740, 150, '#ffc080', 0.7, 3), S(790, 640, 80, '#ffb070', 0.5), S(1010, 640, 80, '#ffb070', 0.5) ];
                     break;
                 }
+                case 'van_interior': {
+                    // The red dome light over the bay, the violet strip, a little light spilling from the cab
+                    const S = softLight;
+                    e.softLights = [ S(200, 440, 200, '#c02848', 0.22, 5), S(200, 300, 150, '#a469ff', 0.16), S(200, 580, 150, '#a469ff', 0.14), S(200, 120, 90, '#8fd8ff', 0.16) ];
+                    break;
+                }
                 case 'keepers_parlor': {
                     // Firelit: the hearth, the candles, the cool window light
                     const S = softLight;

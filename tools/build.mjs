@@ -25,6 +25,7 @@ const STYLES = [
     'styles/hud-menus.css',
     'styles/panels-phone.css',
     'styles/cinematic.css',
+    'styles/coach.css',
     'styles/landscape.css',
 ];
 
@@ -90,6 +91,8 @@ const SCRIPTS = [
     'story/npc-dialogue.js',
     'story/scene-vision.js',
     'ui/cinematic-dialogue.js',
+    'ui/hud-reveal.js',
+    'ui/coach.js',
     'story/scene-runner.js',
     'story/scenes/cast.js',
     'story/scenes/prologue.js',
@@ -112,6 +115,7 @@ const SCRIPTS = [
     'engine/draw.js',
     'engine/interiors.js',
     'engine/keeper-art.js',
+    'engine/van-art.js',
     'engine/lighting.js',
     'engine/player-draw-input.js',
     'engine/loop.js',

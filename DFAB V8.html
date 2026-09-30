@@ -2515,6 +2515,118 @@
         /* Narration: the novel's voice — no name, italic serif */
         #cine-sub.narr .cine-name { display: none; }
         #cine-sub.narr .cine-text { font-family: Georgia, 'Times New Roman', serif; font-style: italic; color: #e6daf6; font-size: 0.98rem; }
+
+        /* Memory: a flashback's frame — a soft violet vignette, the edges out of focus, film grain */
+        #cine-memory { position: absolute; inset: 0; opacity: 0; pointer-events: none; display: none;
+            background: radial-gradient(ellipse 75% 65% at 50% 46%, transparent 45%, rgba(26, 10, 44, 0.55) 80%, rgba(10, 4, 18, 0.9) 100%); }
+        #cine-memory.on { display: block; }
+        #cine-memory::before { content: ''; position: absolute; inset: 0;
+            backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+            -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 46%, transparent 55%, #000 95%);
+                    mask-image: radial-gradient(ellipse 70% 60% at 50% 46%, transparent 55%, #000 95%);
+            animation: cineMemBreathe 5s ease-in-out infinite; }
+        #cine-memory::after { content: ''; position: absolute; inset: -20px; opacity: 0.1; mix-blend-mode: overlay;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            animation: cineGrain 0.5s steps(4) infinite; }
+        @keyframes cineMemBreathe { 50% { opacity: 0.65; } }
+        @keyframes cineGrain { 0% { transform: translate(0, 0); } 25% { transform: translate(-8px, 5px); } 50% { transform: translate(6px, -7px); } 75% { transform: translate(-4px, -3px); } }
+        /* =========================================
+           COACH (ui/coach.js) and HUD REVEAL (ui/hud-reveal.js)
+           ========================================= */
+        /* Parts of the HUD the story hasn't introduced yet */
+        .hud-veiled { visibility: hidden !important; pointer-events: none !important; }
+        /* …and the moment one arrives: it resolves out of a blur with a gold bloom */
+        .hud-arrive { animation: hudArrive 1.2s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        @keyframes hudArrive {
+            0%   { opacity: 0; scale: 0.82; filter: blur(8px) drop-shadow(0 0 0 rgba(243, 220, 166, 0)); }
+            45%  { opacity: 1; scale: 1.06; filter: blur(0) drop-shadow(0 0 18px rgba(243, 220, 166, 0.95)); }
+            100% { opacity: 1; scale: 1; filter: drop-shadow(0 0 0 rgba(243, 220, 166, 0)); }
+        }
+
+        #coach { position: fixed; inset: 0; z-index: 1160; pointer-events: none; display: none; }
+        #coach.show { display: block; }
+        #coach .co-hole, #coach .co-block, #coach .co-ring, #coach .co-thumb, #coach .co-card { position: absolute; }
+
+        /* Spotlight: a hole in a violet-black dim; only the target can be tapped */
+        #coach .co-hole { pointer-events: none; opacity: 0; transition: opacity 0.4s ease; }
+        #coach.spot .co-hole { opacity: 1; box-shadow: 0 0 0 200vmax rgba(8, 3, 16, 0.66), 0 0 24px 10px rgba(8, 3, 16, 0.45); animation: coDim 0.5s ease both; }
+        @keyframes coDim { from { box-shadow: 0 0 0 200vmax rgba(8, 3, 16, 0), 0 0 24px 10px rgba(8, 3, 16, 0); } }
+        #coach .co-block { display: none; }
+        #coach.spot .co-block { display: block; pointer-events: auto; }
+
+        /* The ring: two gold hairlines breathing outward */
+        #coach .co-ring { pointer-events: none; }
+        #coach .co-ring i { position: absolute; inset: 0; border-radius: inherit; border: 1.5px solid rgba(243, 220, 166, 0.95);
+            box-shadow: 0 0 14px rgba(232, 194, 122, 0.8), inset 0 0 10px rgba(232, 194, 122, 0.35); animation: coRing 1.8s ease-out infinite; }
+        #coach .co-ring i + i { animation-delay: 0.9s; }
+        @keyframes coRing { 0% { transform: scale(0.94); opacity: 0.95; } 100% { transform: scale(1.22); opacity: 0; } }
+        #coach .co-ring.nudge { animation: coNudge 0.4s ease; }
+        @keyframes coNudge { 30% { transform: scale(1.12); } 60% { transform: scale(0.96); } }
+
+        /* The ghost thumb: a soft pad drifting in an arc to show a drag */
+        #coach .co-thumb { display: none; border-radius: 50%; pointer-events: none;
+            background: radial-gradient(circle, rgba(255, 246, 224, 0.7) 0%, rgba(243, 220, 166, 0.35) 45%, transparent 70%);
+            box-shadow: 0 0 18px rgba(243, 220, 166, 0.55); }
+        #coach.ghost .co-thumb { display: block; animation: coThumb 2.4s ease-in-out infinite; }
+        @keyframes coThumb {
+            0% { transform: translate(0, 0) scale(0.7); opacity: 0; }
+            15% { transform: translate(0, 0) scale(1); opacity: 1; }
+            55% { transform: translate(38px, -46px) scale(1); opacity: 1; }
+            80% { transform: translate(-30px, -30px) scale(1); opacity: 0.9; }
+            100% { transform: translate(-30px, -30px) scale(0.7); opacity: 0; }
+        }
+
+        /* The caption card: violet glass, a gold title, the line in the dialogue's voice */
+        #coach .co-card { pointer-events: none; padding: 12px 16px 13px; border-radius: 16px;
+            background: linear-gradient(180deg, rgba(24, 10, 40, 0.9), rgba(10, 4, 18, 0.94));
+            box-shadow: 0 12px 34px rgba(4, 0, 10, 0.7), inset 0 0 0 1px rgba(232, 194, 122, 0.2), 0 0 40px -14px rgba(232, 194, 122, 0.6);
+            animation: coCard 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        #coach .co-card::before { content: ''; position: absolute; left: 10%; right: 10%; top: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, #f3dca6, transparent); box-shadow: 0 0 8px rgba(232, 194, 122, 0.6); }
+        #coach .co-card b { display: block; margin-bottom: 4px; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 0.62rem;
+            letter-spacing: 0.3em; text-transform: uppercase; color: #f3dca6; text-shadow: 0 0 10px rgba(232, 194, 122, 0.55); }
+        #coach .co-card span { display: block; font-family: 'Montserrat', sans-serif; font-size: 0.84rem; line-height: 1.45; color: #efe6fb; }
+        #coach .co-card.untitled b { display: none; }
+        #coach.ring .co-card { padding: 8px 12px; border-radius: 12px; }
+        #coach.ring .co-card span { font-size: 0.76rem; }
+        @keyframes coCard { from { opacity: 0; transform: translateY(6px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+
+        /* A scene's playable beat: the letterbox retracts so the HUD's corners are free */
+        body.scene-hud-on #cinematic-bars .cine-bar { height: 0 !important; }
+
+        /* The call card (phoneSystem.ringCall): rises while it rings, settles to a small pill once answered */
+        #call-card { position: fixed; left: 50%; top: 16vh; z-index: 1155; display: flex; flex-direction: column; align-items: center; gap: 10px;
+            width: min(78vw, 280px); padding: 20px 18px 18px; border-radius: 26px; pointer-events: auto;
+            background: linear-gradient(180deg, rgba(28, 12, 44, 0.94), rgba(10, 4, 18, 0.96));
+            box-shadow: 0 20px 50px rgba(4, 0, 10, 0.7), inset 0 0 0 1px rgba(232, 194, 122, 0.22), 0 0 50px -16px rgba(164, 105, 255, 0.7);
+            opacity: 0; transform: translate(-50%, 24px) scale(0.96); filter: blur(4px);
+            transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s ease, top 0.6s cubic-bezier(0.22, 1, 0.36, 1), width 0.6s, padding 0.6s; }
+        #call-card.show { opacity: 1; transform: translate(-50%, 0); filter: none; }
+        #call-card.gone { opacity: 0; transform: translate(-50%, -10px) scale(0.97); }
+        #call-card .cc-ring { position: relative; width: 84px; height: 84px; }
+        #call-card .cc-ring canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; border: 1px solid rgba(243, 220, 166, 0.6); }
+        #call-card .cc-ring i { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid rgba(243, 220, 166, 0.8); animation: coRing 1.4s ease-out infinite; }
+        #call-card .cc-ring i + i { animation-delay: 0.7s; }
+        #call-card .cc-who { text-align: center; }
+        #call-card .cc-who b { display: block; font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-weight: 600; font-size: 1.4rem; color: #f3dca6;
+            text-shadow: 0 0 14px rgba(232, 194, 122, 0.5); }
+        #call-card .cc-who span { font-family: 'Montserrat', sans-serif; font-size: 0.58rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(220, 200, 255, 0.7); }
+        #call-card .cc-answer { margin-top: 4px; padding: 9px 30px; border-radius: 999px; cursor: pointer; font-family: 'Montserrat', sans-serif; font-weight: 600;
+            font-size: 0.66rem; letter-spacing: 0.26em; text-transform: uppercase; color: #fff6e0; border: 1px solid rgba(243, 220, 166, 0.8);
+            background: linear-gradient(180deg, rgba(232, 194, 122, 0.35), rgba(164, 105, 255, 0.18)); box-shadow: 0 0 18px rgba(232, 194, 122, 0.4); animation: ccPulse 1.4s ease-in-out infinite; }
+        @keyframes ccPulse { 50% { box-shadow: 0 0 30px rgba(232, 194, 122, 0.75); } }
+        #call-card .cc-time { display: none; font-family: 'Montserrat', sans-serif; font-size: 0.7rem; letter-spacing: 0.2em; color: rgba(243, 220, 166, 0.85); }
+        /* On the line: a slim pill at the top, out of the subtitles' way */
+        #call-card.live { top: calc(12vh + 10px); left: 16px; transform: none; flex-direction: row; width: auto; padding: 8px 18px 8px 8px; gap: 12px; border-radius: 999px; white-space: nowrap; }
+        #call-card.live .cc-who span { letter-spacing: 0.22em; }
+        #call-card.live .cc-ring { width: 40px; height: 40px; }
+        #call-card.live .cc-ring i { animation: none; opacity: 0; }
+        #call-card.live .cc-who { text-align: left; }
+        #call-card.live .cc-who b { font-size: 1.05rem; }
+        #call-card.live .cc-answer { display: none; }
+        #call-card.live .cc-time { display: block; }
+        body.landscape #call-card { top: 10vh; }
+        body.landscape #call-card.live { top: calc(9vh + 8px); }
         /* =========================================
            LANDSCAPE (a phone on its side)
            body.landscape is set by resize() (engine/combat-effects.js) when the window is wider
@@ -6017,6 +6129,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             '949': { skinColor: PALETTE.stellaSkin, gender: 'female', hair: { type: 'curls', color: PALETTE.stellaCurls },
                      eyeColor: PALETTE.stellaEyes, accent: PALETTE.stellaEyes, blood: 'wine' },
 
+            // ── 747 (Seven), her brother: her mirror in the field, the mask tinged purple, eyes slits of gold ──
+            '747': { skinColor: PALETTE.stellaSkin, gender: 'male', build: 'athletic', hair: { type: 'short', color: '#0a0505' },
+                     eyeColor: '#ffcc55', accent: '#8a5cff', blood: 'wine',
+                     top: { type: 'coat', color: '#0e0a14', inner: '#241834' }, bottom: { type: 'pants', color: '#0c0a10' },
+                     shoes: { type: 'boots', color: '#0a0a0a' },
+                     jewelry: [{ type: 'field_mask', color: '#0a0710', tint: '#4b2a9a', eyes: '#ffcc55' }] },
+
             // ── The crew ──
             'Victoria': { skinColor: '#c68642', gender: 'female', eyeColor: '#b0707f', accent: '#ff69b4',
                           top: { type: 'suit', color: '#2a0a3a' }, bottom: { type: 'pants', color: '#1a0820' },
@@ -6283,6 +6402,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             if (look.faceRoom && look.pose !== 'dance') look = { idleAngle: Math.PI / 2, ...look };
             return (entity._look = look);
+        }
+
+        /* The Freelancers wear their masks in the field; 949's comes off at home (and in the
+           Keeper's house). game.fieldMask = true / false forces it (scenes, the flashback). */
+        const FIELD_MASK_949 = { type: 'field_mask', color: '#0b0710', tint: '#6a2a7a', eyes: PALETTE.stellaEyes };
+        const HOME_MAPS = new Set(['apt_949', 'keepers_hill', 'keepers_parlor']);
+        function stellaMasked(game) {
+            if (!game) return false;
+            if (game.fieldMask === true || game.fieldMask === false) return game.fieldMask;
+            return !!(game.activeMap && !HOME_MAPS.has(game.activeMap.id));
+        }
+        /** Her jewelry, with the mask added when she's in the field (a mask of her own wins). */
+        function withFieldMask(game, jewelry) {
+            const list = jewelry || [];
+            if (!stellaMasked(game) || list.some(j => j.type === 'field_mask')) return jewelry;
+            return [...list, FIELD_MASK_949];
         }
 
         /** A dialogue portrait from a look. Androids' eyes glow in their finish. */
@@ -7648,6 +7783,32 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     sub.start(now);
                     sub.stop(now + dur);
                 }
+                else if (type === 'knock') {
+                    // KNOCK: a gloved fist on the van's partition — a short, dull metal thud
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(70, now + 0.09);
+                    gain.gain.setValueAtTime(0.0001, now);
+                    gain.gain.exponentialRampToValueAtTime(0.22, now + 0.006);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+                    osc.start(now);
+                    osc.stop(now + 0.14);
+                }
+                else if (type === 'bump') {
+                    // BUMP: the van hitting a seam in the road — a low thump with a rattle after
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(90, now);
+                    osc.frequency.exponentialRampToValueAtTime(38, now + 0.25);
+                    gain.gain.setValueAtTime(0.0001, now);
+                    gain.gain.exponentialRampToValueAtTime(0.3, now + 0.015);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.32);
+                    const r = this.ctx.createOscillator(), rg = this.ctx.createGain();
+                    r.type = 'square'; r.frequency.setValueAtTime(420, now + 0.05); r.connect(rg); rg.connect(out);
+                    rg.gain.setValueAtTime(0.0001, now); rg.gain.exponentialRampToValueAtTime(0.018, now + 0.06); rg.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+                    r.start(now + 0.04); r.stop(now + 0.22);
+                }
                 else if (type === 'ui') {
                     // UI BLIP: Clean sine tone, short and high
                     osc.type = 'sine';
@@ -7719,7 +7880,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     wind: layer(pink, [windBand], 0.87),
                     city: layer(brown, [bq('lowpass', 380)], 1.07),
                     fire: layer(brown, [bq('lowpass', 250)], 0.81),
-                    room: layer(brown, [bq('lowpass', 140)], 0.71)
+                    room: layer(brown, [bq('lowpass', 140)], 0.71),
+                    road: layer(brown, [bq('lowpass', 95)], 0.63)          // tyres on wet asphalt, felt through the van floor
                 };
                 const lfo = ctx.createOscillator(), lfoAmt = ctx.createGain();   // wind gusts drift the band around
                 lfo.frequency.value = 0.07; lfoAmt.gain.value = 300; lfo.connect(lfoAmt); lfoAmt.connect(windBand.frequency); lfo.start();
@@ -7754,8 +7916,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const vol = GameSettings.ambienceVolume ?? 0.7;
 
                 this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
+                const van = map.id === 'van_interior', rolling = van && game.vanMoving !== false;   // the crew's van: rain drums on the roof, the road hums underneath
                 this._set(this.L.rain, outside && !realm ? 0.3 * rain : 0, 0.8);
-                this._set(this.L.rainIn, outside ? 0 : 0.22 * rain, 0.8);
+                this._set(this.L.rainIn, van ? 0.2 : outside ? 0 : 0.22 * rain, 0.8);
+                this._set(this.L.road, rolling ? 0.32 : 0, rolling ? 1.2 : 0.6);
                 this._set(this.L.wind, outside ? 0.04 + 0.12 * wind : 0.015 * wind, 1.2);
                 this._set(this.L.city, realm ? 0 : !indoorMap ? 0.1 + 0.07 * day : veranda ? 0.09 : apt ? 0.025 : 0.015, 1.0);
                 this._set(this.L.room, apt && !veranda ? 0.035 : 0, 1.0);
@@ -11062,6 +11226,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ambientDarkness: 0.78, zones: [], walls: [], transitions: [], spawn: { x: 450, y: 600 },
                 landmarks: [ { id: 'hearth', x: 450, y: 70 }, { id: 'parlor_mid', x: 520, y: 260 }, { id: 'keeper_seat', x: 450, y: 262 }, { id: 'traveler_seat', x: 648, y: 306 }, { id: 'parlor_window', x: 450, y: 20 } ]
             },
+            // Chapter 1 opens here: the crew's van, roof off, nose up (engine/van-art.js paints it; story/scenes/van.js plays it)
+            'van_interior': {
+                id: 'van_interior', width: 400, height: 820, type: 'indoor', label: 'En route to Double Nights', floorColor: '#0b0a10',
+                ambientDarkness: 0.62, zones: [], walls: [], transitions: [], spawn: { x: 200, y: 460 },
+                landmarks: [ { id: 'van_center', x: 200, y: 450 }, { id: 'van_949', x: 136, y: 404 }, { id: 'van_747', x: 264, y: 404 }, { id: 'van_rear', x: 200, y: 700 }, { id: 'van_partition', x: 200, y: 186 } ]
+            },
             'hotel_suite': {
                 id: 'hotel_suite', width: 1400, height: 1000, type: 'indoor',
                 label: 'Penthouse Suite', floorColor: '#0c0a0e',
@@ -11727,6 +11897,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const A = areaLight;
                     const S = softLight;
                     e.softLights = [ A(900, 1500, 1100, 2500, '#b0c0e8', 0.16), A(900, 600, 760, 520, '#ffb070', 0.12), S(900, 740, 150, '#ffc080', 0.7, 3), S(790, 640, 80, '#ffb070', 0.5), S(1010, 640, 80, '#ffb070', 0.5) ];
+                    break;
+                }
+                case 'van_interior': {
+                    // The red dome light over the bay, the violet strip, a little light spilling from the cab
+                    const S = softLight;
+                    e.softLights = [ S(200, 440, 200, '#c02848', 0.22, 5), S(200, 300, 150, '#a469ff', 0.16), S(200, 580, 150, '#a469ff', 0.14), S(200, 120, 90, '#8fd8ff', 0.16) ];
                     break;
                 }
                 case 'keepers_parlor': {
@@ -34866,6 +35042,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const b = breath(t);
                     return { l: [10.5, -2.5], r: [10.5, 2.5], le: [6, -8], re: [6, 8], lf: [9, 2], rf: [9, -2], bounce: 1.8 + b * 0.2, head: [1.4, 0], hint: 'curious' };
                 },
+                // Seated, working something in the lap (949 calibrating her FP-X): small, practiced motions
+                sit_work(t, o) {
+                    const b = breath(t), w = Math.sin(t * 5.3 + o.seed) * 0.7, k = Math.sin(t * 1.7) > 0.6 ? 1 : 0;
+                    return { l: [9.5, -2 + w * 0.5], r: [10 + k * 0.8, 2.2 - w * 0.4], le: [4, -9], re: [4, 9], lf: [9, 1.5], rf: [9, -1.5],
+                             bounce: 1.2 + b * 0.2, head: [1, 0], turn: Math.sin(t * 0.7 + o.seed) * 0.08, hint: 'neutral' };
+                },
+                // Seated with a phone to her ear
+                sit_phone(t) {
+                    const b = breath(t);
+                    return { l: [4.5, -6.5], le: [7, -11], r: [7.5, 4.5], re: [2, 10], lf: [9, 1], rf: [9, -1], bounce: -0.6 + b * 0.25, head: [0.4, 0], turn: -0.12, hint: 'neutral' };
+                },
                 arms_crossed(t, o) {
                     const b = breath(t);
                     return { l: [5.5, 3], r: [6.5, -3], le: [1, -11], re: [1.5, 11], bounce: b * 0.3,
@@ -35753,6 +35940,64 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     portrait(ctx, P, c) { const { cx, fw, eyeY, eyeSpacing } = P; ctx.fillStyle = c.color || '#141414'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + s * eyeSpacing, eyeY, fw * 0.33, fw * 0.22, 0, 0, Math.PI * 2); ctx.fill(); } ctx.strokeStyle = c.color || '#141414'; ctx.lineWidth = fw * 0.06; ctx.beginPath(); ctx.moveTo(cx - eyeSpacing + fw * 0.3, eyeY - fw * 0.05); ctx.lineTo(cx + eyeSpacing - fw * 0.3, eyeY - fw * 0.05); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + s * eyeSpacing - fw * 0.1, eyeY - fw * 0.07, fw * 0.08, fw * 0.04, -0.4, 0, Math.PI * 2); ctx.fill(); } } },
                 necklace: { at: 'neck', draw(ctx, g, c) { const gold = c.color || '#d8d8e0'; ctx.strokeStyle = gold; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(g.headInTorso, 0, 9.6, -0.95, 0.95); ctx.stroke(); ctx.fillStyle = gold; ctx.beginPath(); ctx.arc(g.headInTorso + 10.2, 0, 1.3, 0, Math.PI * 2); ctx.fill(); },
                     portrait(ctx, P, c) { const { cx, cy, fw, fh } = P; const col = c.color || '#d8d8e0'; ctx.strokeStyle = col; ctx.lineWidth = fw * 0.04; ctx.beginPath(); ctx.moveTo(cx - fw * 0.42, cy + fh * 1.1); ctx.quadraticCurveTo(cx, cy + fh * 1.95, cx + fw * 0.42, cy + fh * 1.1); ctx.stroke(); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(cx, cy + fh * 1.62); ctx.lineTo(cx + fw * 0.08, cy + fh * 1.78); ctx.lineTo(cx, cy + fh * 1.92); ctx.lineTo(cx - fw * 0.08, cy + fh * 1.78); ctx.fill(); } },
+                // The Freelancers' field mask: black, a sheen in `tint`, eye slits glowing in `eyes`.
+                // In portraits it goes on under the fringe (at: 'face'); top-down, over the head.
+                field_mask: { at: 'face', draw(ctx, g, c) {
+                    const hx = g.headX;
+                    ctx.fillStyle = c.color || '#0b0710';
+                    ctx.beginPath(); ctx.arc(hx, 0, 8.3, -1.25, 1.25); ctx.arc(hx + 1.2, 0, 5.2, 1.1, -1.1, true); ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = c.tint || '#5a2a8a'; ctx.globalAlpha = 0.55; ctx.lineWidth = 0.7;
+                    ctx.beginPath(); ctx.arc(hx, 0, 8.1, -1.1, 1.1); ctx.stroke(); ctx.globalAlpha = 1;
+                    ctx.fillStyle = c.eyes || '#e8c27a'; ctx.shadowColor = c.eyes || '#e8c27a'; ctx.shadowBlur = 3;
+                    for (const s of [-1, 1]) { ctx.save(); ctx.translate(hx + 6.2, s * 2.6); ctx.rotate(s * 0.35); ctx.fillRect(-0.45, -1.3, 0.9, 2.6); ctx.restore(); }
+                    ctx.shadowBlur = 0;
+                },
+                    portrait(ctx, P, c) {
+                        const { cx, cy, fw, fh, eyeY, eyeSpacing } = P, eyes = c.eyes || '#e8c27a';
+                        ctx.save();
+                        // The shell: the whole face from the brow down, jaw included
+                        ctx.beginPath();
+                        ctx.moveTo(cx - fw * 1.02, cy - fh * 0.42);
+                        ctx.quadraticCurveTo(cx, cy - fh * 0.62, cx + fw * 1.02, cy - fh * 0.42);
+                        ctx.lineTo(cx + fw * 1.02, cy);
+                        ctx.quadraticCurveTo(cx + fw * 0.78, cy + fh * 1.12, cx, cy + fh * 1.08);
+                        ctx.quadraticCurveTo(cx - fw * 0.78, cy + fh * 1.12, cx - fw * 1.02, cy);
+                        ctx.closePath();
+                        const g = ctx.createLinearGradient(cx - fw, cy - fh, cx + fw, cy + fh);
+                        g.addColorStop(0, c.color || '#0b0710'); g.addColorStop(0.55, c.color || '#0b0710'); g.addColorStop(1, c.tint || '#3a1a5a');
+                        ctx.fillStyle = g; ctx.fill();
+                        ctx.clip();
+                        // A soft sheen down one side and a ridge down the nose
+                        ctx.globalAlpha = 0.18; ctx.fillStyle = c.tint || '#7a4ab0';
+                        ctx.beginPath(); ctx.ellipse(cx - fw * 0.55, cy - fh * 0.05, fw * 0.22, fh * 0.6, -0.15, 0, Math.PI * 2); ctx.fill();
+                        ctx.globalAlpha = 0.25; ctx.strokeStyle = c.tint || '#7a4ab0'; ctx.lineWidth = fw * 0.04;
+                        ctx.beginPath(); ctx.moveTo(cx, eyeY + fh * 0.05); ctx.lineTo(cx, cy + fh * 0.45); ctx.stroke();
+                        ctx.globalAlpha = 1;
+                        ctx.restore();
+                    },
+                    // Eye slits: sharp, lifting outward, the curve that rounds out beneath them — drawn over
+                    // the fringe, so they glow through the hair like the brows do
+                    portraitOver(ctx, P, c) {
+                        const { cx, fw, fh, eyeY, eyeSpacing } = P, eyes = c.eyes || '#e8c27a';
+                        ctx.save();
+                        ctx.shadowColor = eyes; ctx.shadowBlur = fw * 0.45;
+                        for (const s of [-1, 1]) {
+                            const ex = cx + s * eyeSpacing;
+                            ctx.fillStyle = eyes;
+                            ctx.beginPath();
+                            ctx.moveTo(ex - s * fw * 0.3, eyeY + fh * 0.04);
+                            ctx.quadraticCurveTo(ex - s * fw * 0.02, eyeY - fh * 0.12, ex + s * fw * 0.36, eyeY - fh * 0.14);
+                            ctx.quadraticCurveTo(ex + s * fw * 0.06, eyeY + fh * 0.04, ex - s * fw * 0.3, eyeY + fh * 0.04);
+                            ctx.fill();
+                            ctx.fillStyle = 'rgba(255,250,235,0.85)';                               // a hot core
+                            ctx.beginPath(); ctx.ellipse(ex + s * fw * 0.02, eyeY - fh * 0.04, fw * 0.1, fh * 0.018, s * -0.35, 0, Math.PI * 2); ctx.fill();
+                            ctx.strokeStyle = eyes; ctx.globalAlpha = 0.6; ctx.lineWidth = fw * 0.04; ctx.shadowBlur = fw * 0.2;
+                            ctx.beginPath(); ctx.moveTo(ex - s * fw * 0.26, eyeY + fh * 0.12);
+                            ctx.quadraticCurveTo(ex + s * fw * 0.06, eyeY + fh * 0.26, ex + s * fw * 0.34, eyeY + fh * 0.03); ctx.stroke();
+                            ctx.globalAlpha = 1;
+                        }
+                        ctx.restore();
+                    } },
                 bangles: { at: 'wrists', draw(ctx, g, c) {
                     const gold = c.color || '#e8c27a';
                     for (let i = 0; i < 2; i++) {
@@ -36646,6 +36891,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.globalAlpha = 1.0;
             }
 
+            // A mask goes on over the face, under the fringe
+            for (const j of jewelry) if (WD.jewelry[j.type].at === 'face') WD.jewelry[j.type].portrait(ctx, P, j);
+
             // ─── HAIR (FRONT LAYER — on top of face) ───
             if (hair) {
                 const renderer = PORTRAIT_HAIR_RENDERERS[hair.type];
@@ -36663,6 +36911,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             // ─── JEWELRY AND HAT ───
             for (const j of jewelry) if (WD.jewelry[j.type].at === 'head') WD.jewelry[j.type].portrait(ctx, P, j);
+            for (const j of jewelry) if (WD.jewelry[j.type].portraitOver) WD.jewelry[j.type].portraitOver(ctx, P, j);   // a mask's eyes, through the fringe
             const hatPiece = WD && config.hat ? WD.hats[config.hat.type] : null;
             if (hatPiece) hatPiece.portrait(ctx, P, config.hat);
         }
@@ -36695,7 +36944,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             // Jewelry worn on the head (sunglasses, earrings)
             if (jewelry && typeof WARDROBE !== 'undefined') {
-                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && piece.at === 'head') piece.draw(ctx, { headX }, j); }
+                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && (piece.at === 'head' || piece.at === 'face')) piece.draw(ctx, { headX }, j); }
             }
             // Hat (renders on top of everything)
             if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);
@@ -40860,6 +41109,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.root) return;
                 const el = (tag, id, cls, parent) => { const e = document.createElement(tag); if (id) e.id = id; if (cls) e.className = cls; (parent || this.root).appendChild(e); return e; };
                 this.root = document.createElement('div'); this.root.id = 'cine'; document.body.appendChild(this.root);
+                this.memEl = el('div', 'cine-memory');            // the flashback's vignette and grain (memory())
                 this.blackEl = el('div', 'cine-black');
                 this.tapEl = el('div', 'cine-tap');
                 this.scrim = el('div', 'cine-scrim');
@@ -40906,6 +41156,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.blackTo = this.blackT = 0;
                 this.blackEl.style.transition = `opacity ${ms}ms ease ${Math.round(ms * 0.6)}ms`;
                 this.blackEl.style.opacity = 0;
+            }
+
+            // ── Memory (a flashback's look) ──────────────────────────────────
+            /** Ease the flashback grade to `to` (0..1): the world cooler and softer, a vignette, grain. */
+            memory(to, frames) {
+                this._build();
+                this.memTo = to; this.memK = this.memK || 0;
+                this.memStep = frames ? Math.abs(to - this.memK) / frames : 1;
+                if (!frames) { this.memK = to; this._applyMemory(); }
+            }
+            memoryEasing() { return Math.abs((this.memK || 0) - (this.memTo || 0)) > 0.001; }
+            _applyMemory() {
+                const k = this.memK || 0;                           // the world's own grade takes it from here (draw.js filter chain)
+                this.memEl.style.opacity = k.toFixed(3);
+                this.memEl.classList.toggle('on', k > 0.001);
             }
 
             // ── Lines ────────────────────────────────────────────────────────
@@ -41040,6 +41305,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.blackT += Math.sign(this.blackTo - this.blackT) * Math.min(this.blackStep, Math.abs(this.blackTo - this.blackT));
                     this.blackEl.style.opacity = this.blackT;
                 }
+                // Memory grade
+                if (this.memoryEasing()) {
+                    this.memK += Math.sign(this.memTo - this.memK) * Math.min(this.memStep, Math.abs(this.memTo - this.memK));
+                    this._applyMemory();
+                }
                 // The line
                 const L = this.line;
                 if (L && !L.done) {
@@ -41078,6 +41348,223 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (this.skipHold >= 48) { const cb = this.onSkip; this.onSkip = null; this.skipHeld = false; cb(); }
                 } else if (this.skipHold) { this.skipHold = Math.max(0, this.skipHold - 3); this.skipEl.style.setProperty('--k', this.skipHold / 48); }
             }
+        }
+        /* =====================================================================
+           HUD REVEAL — the HUD appears piece by piece as the story introduces it
+           ---------------------------------------------------------------------
+           A new story game starts with only the pause button; each part is
+           revealed when it's first needed (game.hud.reveal), often with the
+           coach pointing at it (ui/coach.js). Unrevealed parts carry
+           .hud-veiled, which beats the many inline style.display writes.
+           Older saves and the gauntlet show everything.
+           ===================================================================== */
+        const HUD_PARTS = {
+            phone:     ['btn-phone'],
+            health:    ['ui-health', 'ui-shield-bar', 'ui-flit-bar-container'],
+            move:      ['input-zone-left'],
+            fire:      ['btn-fire'],
+            holster:   ['btn-holster', 'btn-emote'],
+            heal:      ['btn-heal'],
+            flit:      ['btn-flit', 'joystick-ring'],
+            nv:        ['btn-nv'],
+            pp:        ['ui-currency'],
+            stats:     ['ui-time', 'ui-scrap', 'ui-resonance'],
+            location:  ['ui-location'],
+            dock:      ['utility-dock'],
+            action:    ['action-dock'],
+            autodrive: ['btn-autodrive'],
+        };
+        const HUD_KEYS = Object.keys(HUD_PARTS);
+
+        class HudReveal {
+            constructor(game) {
+                this.game = game;
+                this.revealed = new Set(HUD_KEYS);   // everything, until a story game starts fresh
+                this.apply();
+            }
+
+            has(key) { return this.revealed.has(key); }
+
+            /** A new story: only the pause button. */
+            startFresh() { this.revealed = new Set(); this.apply(); }
+
+            /** Everything (chapter end, gauntlet, older saves). */
+            revealAll() { for (const k of HUD_KEYS) this.revealed.add(k); this.apply(); }
+
+            /** The part's first element on screen (what the coach points at). */
+            el(key) {
+                for (const id of HUD_PARTS[key] || []) {
+                    const e = document.getElementById(id);
+                    if (e && e.getClientRects().length) return e;
+                }
+                return document.getElementById((HUD_PARTS[key] || [])[0]);
+            }
+
+            /** Put the veil on every part that isn't revealed yet. */
+            apply() {
+                for (const k of HUD_KEYS) for (const id of HUD_PARTS[k]) {
+                    const e = document.getElementById(id);
+                    if (e) e.classList.toggle('hud-veiled', !this.revealed.has(k));
+                }
+            }
+
+            /**
+             * Reveal a part: it materialises (a blur-to-sharp bloom). With a title or text
+             * the coach points at it too — a spotlight the first time, a ring after.
+             * Returns a waitable for scenes ({done(), value()}).
+             */
+            reveal(key, opts = {}) {
+                const was = this.revealed.has(key);
+                this.revealed.add(key);
+                this.apply();
+                if (!was) for (const id of HUD_PARTS[key] || []) {
+                    const e = document.getElementById(id);
+                    if (!e) continue;
+                    e.classList.remove('hud-arrive'); void e.offsetWidth; e.classList.add('hud-arrive');
+                    setTimeout(() => e.classList.remove('hud-arrive'), 1400);
+                }
+                if ((opts.title || opts.text) && this.game.coach) return this.game.coach.first(key, this.el(key), opts);
+                return { done: () => true, value: () => null };
+            }
+
+            serialize() { return [...this.revealed]; }
+            deserialize(list) {
+                this.revealed = Array.isArray(list) ? new Set(list.filter(k => HUD_PARTS[k])) : new Set(HUD_KEYS);
+                this.apply();
+            }
+        }
+        /* =====================================================================
+           COACH — points at a piece of the UI and says what it's for
+           ---------------------------------------------------------------------
+           Spotlight (the first time): the screen dims around the target, a gold
+           ring pulses on it, a caption card explains it, and only the target
+           can be tapped. Ring (after that): just the ring and a small caption,
+           nothing blocked. A ghost thumb can show a drag (the move stick).
+
+             game.coach.point(el, { mode:'spot'|'ring', title, text, until, timeout, ghost })
+             game.coach.first(key, el, opts)   spotlight once per key, ring after
+
+           `until` is 'tap' (the target is tapped), a function (game) => bool, or
+           omitted (a tap anywhere, or the timeout). Both return a waitable
+           ({done(), value()}) so scenes can yield on them. Page level, above the
+           cinematic layer (#cine) and below pause.
+           ===================================================================== */
+        class Coach {
+            constructor(game) {
+                this.game = game;
+                this.taught = new Set();
+                this.cur = null;
+                this.root = null;
+            }
+
+            _build() {
+                if (this.root) return;
+                const r = this.root = document.createElement('div');
+                r.id = 'coach';
+                r.innerHTML = '<div class="co-hole"></div>'
+                    + '<div class="co-block"></div><div class="co-block"></div><div class="co-block"></div><div class="co-block"></div>'
+                    + '<div class="co-ring"><i></i><i></i></div><div class="co-thumb"></div>'
+                    + '<div class="co-card"><b></b><span></span></div>';
+                document.body.appendChild(r);
+                this.hole = r.querySelector('.co-hole');
+                this.blocks = [...r.querySelectorAll('.co-block')];
+                this.ring = r.querySelector('.co-ring');
+                this.thumb = r.querySelector('.co-thumb');
+                this.card = r.querySelector('.co-card');
+                // A tap on the dim (outside the target) in spotlight mode: nudge the ring
+                for (const b of this.blocks) b.addEventListener('pointerdown', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    this.ring.classList.remove('nudge'); void this.ring.offsetWidth; this.ring.classList.add('nudge');
+                });
+            }
+
+            /** Spotlight the first time for this key, a ring after. */
+            first(key, target, opts = {}) {
+                const mode = this.taught.has(key) ? 'ring' : 'spot';
+                this.taught.add(key);
+                return this.point(target, { ...opts, mode: opts.mode || mode });
+            }
+
+            point(target, opts = {}) {
+                this._build();
+                this.dismiss();
+                const c = this.cur = {
+                    target, mode: opts.mode || 'spot', until: opts.until, finished: false, result: null,
+                    t0: performance.now(), timeout: opts.timeout || (opts.mode === 'ring' ? 6000 : 0)
+                };
+                const r = this.root;
+                r.className = 'show ' + (c.mode === 'spot' ? 'spot' : 'ring');
+                r.classList.toggle('ghost', opts.ghost === 'drag');
+                this.card.querySelector('b').textContent = opts.title || '';
+                this.card.querySelector('span').textContent = opts.text || '';
+                this.card.classList.toggle('untitled', !opts.title);
+                // Finishing on a tap: the target (passes through the hole) or anywhere
+                if (c.until === 'tap' && target) {
+                    c.onTap = () => this._finish(c, 'tap');
+                    target.addEventListener('pointerdown', c.onTap, { once: true, capture: true });
+                    target.addEventListener('click', c.onTap, { once: true, capture: true });
+                } else if (!c.until) {
+                    c.onTap = (e) => { if (performance.now() - c.t0 > 500) this._finish(c, 'tap'); };
+                    setTimeout(() => { if (this.cur === c) window.addEventListener('pointerdown', c.onTap, true); }, 0);
+                }
+                this._place();
+                const tick = () => {
+                    if (this.cur !== c || c.finished) return;
+                    this._place();
+                    if (typeof c.until === 'function' && c.until(this.game)) { this._finish(c, 'done'); return; }
+                    if (c.timeout && performance.now() - c.t0 > c.timeout) { this._finish(c, 'timeout'); return; }
+                    requestAnimationFrame(tick);
+                };
+                requestAnimationFrame(tick);
+                return { done: () => c.finished, value: () => c.result };
+            }
+
+            _finish(c, why) {
+                if (c.finished) return;
+                c.finished = true; c.result = why;
+                if (c.onTap) {
+                    window.removeEventListener('pointerdown', c.onTap, true);
+                    if (c.target) { c.target.removeEventListener('pointerdown', c.onTap, true); c.target.removeEventListener('click', c.onTap, true); }
+                }
+                if (this.cur === c) { this.cur = null; if (this.root) this.root.className = ''; }
+            }
+
+            /** Drop whatever is showing (a new point, a scene skip, a load). */
+            dismiss() { if (this.cur) this._finish(this.cur, 'dismissed'); }
+
+            /** Follow the target: the hole, the blockers, the ring and the card. */
+            _place() {
+                const c = this.cur; if (!c || !c.target) return;
+                const b = c.target.getBoundingClientRect();
+                const W = window.innerWidth, H = window.innerHeight, pad = 10;
+                const x = b.left - pad, y = b.top - pad, w = b.width + pad * 2, h = b.height + pad * 2;
+                const round = Math.abs(b.width - b.height) < 24 && b.width < 140;
+                const set = (el, L, T, Wd, Ht) => { el.style.left = L + 'px'; el.style.top = T + 'px'; el.style.width = Math.max(0, Wd) + 'px'; el.style.height = Math.max(0, Ht) + 'px'; };
+                set(this.hole, x, y, w, h);
+                this.hole.style.borderRadius = round ? '50%' : '22px';
+                set(this.blocks[0], 0, 0, W, y);                     // above
+                set(this.blocks[1], 0, y + h, W, H - y - h);         // below
+                set(this.blocks[2], 0, y, x, h);                     // left
+                set(this.blocks[3], x + w, y, W - x - w, h);         // right
+                const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+                const rs = round ? Math.max(b.width, b.height) + 26 : 0;
+                if (round) { set(this.ring, cx - rs / 2, cy - rs / 2, rs, rs); this.ring.style.borderRadius = '50%'; }
+                else { set(this.ring, x - 4, y - 4, w + 8, h + 8); this.ring.style.borderRadius = '26px'; }
+                set(this.thumb, cx - 22, cy - 22, 44, 44);
+                // The card goes on whichever side has room, clamped to the gutters
+                const cw = Math.min(290, W - 32);
+                this.card.style.width = cw + 'px';
+                const ch = this.card.offsetHeight || 70;
+                const below = cy < H / 2;
+                let top = below ? y + h + 16 : y - ch - 16;
+                if (!below && top < 12) top = Math.min(H - ch - 12, y + h + 16);
+                if (b.height > H * 0.45) top = Math.max(12, y + 18);          // a big area (the move zone): inside, at its top
+                const left = Math.max(16, Math.min(W - cw - 16, cx - cw / 2));
+                this.card.style.left = left + 'px'; this.card.style.top = Math.max(12, Math.min(H - ch - 12, top)) + 'px';
+            }
+
+            serialize() { return [...this.taught]; }
+            deserialize(list) { this.taught = new Set(Array.isArray(list) ? list : []); }
         }
         /* =====================================================================
            SCENES — the story's director
@@ -41161,6 +41648,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        /** Something the scene draws that isn't a person (the van at the curb): draw(ctx, prop) in world space. */
+        class SceneProp {
+            constructor(id, draw, x, y, angle = 0) { this.id = id; this.drawFn = draw; this.x = x; this.y = y; this.angle = angle; this.visible = true; }
+            tick() {}
+            draw(ctx) { if (this.visible) this.drawFn(ctx, this); }
+        }
+
         class ScenePlayer {
             constructor(game) {
                 this.game = game;
@@ -41197,6 +41691,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 A.frame++;
                 this._tickCam();
                 for (const a of this.actors) a.tick();
+                this._tickTweens();
                 this.ui.tick();
                 this.vision.tick();
                 // Run the script until it waits on something that isn't done
@@ -41231,10 +41726,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.ui.clear(); this.vision.hide(0); this.ui.showSkip(false);
                 this.actors = [];
                 const g = this.game;
+                g.camera.sway = 0; g.fieldMask = null; g.vanMoving = undefined;
+                if (g.coach) g.coach.dismiss();
+                this.ui.memory(0, 0); this._showHud(false);
+                if (typeof phoneSystem !== 'undefined' && phoneSystem.endCall) phoneSystem.endCall();
                 g.cutscene.end();
                 if (A.meta.flag) g.questState[A.meta.flag] = true;
                 this.ui.black(1, 0); this.ui.releaseBlack(A.meta.releaseFrames || 50);   // the next scene/map fades itself in under this
                 A.resolve({ skipped });
+            }
+
+            _tickTweens() {
+                const A = this.active; if (!A || !A.tweens) return;
+                A.tweens = A.tweens.filter(tw => {
+                    tw.t = Math.min(1, tw.t + 1 / tw.frames);
+                    tw.obj[tw.key] = tw.from + (tw.to - tw.from) * (SCENE_EASE[tw.ease] || SCENE_EASE.inOut)(tw.t);
+                    return tw.t < 1;
+                });
             }
 
             _toWait(v) {
@@ -41250,6 +41758,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (g.fireJoystick) { g.fireJoystick.active = false; g.fireJoystick.firing = false; }
                 g.mouseDown = false;
                 if (g.keys) for (const k in g.keys) g.keys[k] = false;
+            }
+
+            /** The HUD inside a scene (for the playable beats): shown over the letterbox, or hidden again. */
+            _showHud(on) {
+                const ui = document.getElementById('game-ui'); if (!ui) return;
+                ui.style.opacity = on ? 1 : (this.active ? 0 : ui.style.opacity);
+                ui.classList.toggle('scene-hud', !!on);
+                document.body.classList.toggle('scene-hud-on', !!on);          // the letterbox steps back (styles/coach.css)
             }
 
             _loadMap(id, at) {
@@ -41331,6 +41847,37 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     sfx(name) { if (typeof audioSys !== 'undefined') audioSys.sfx(name); },
                     flag(key, v = true) { g.questState[key] = v; },
                     vision: self.vision,
+                    /** A thing to draw (not a person): draw(ctx, prop) in world space. */
+                    prop(id, draw, x, y, angle) {
+                        let p = self.actors.find(q => q.id === id);
+                        if (!p) { p = new SceneProp(id, draw, x, y, angle); self.actors.push(p); }
+                        return p;
+                    },
+                    /** Ease obj[key] to a value over some frames. */
+                    tween(obj, key, to, frames = 30, ease = 'inOut') {
+                        const A = self.active, tw = { obj, key, from: obj[key] || 0, to, frames: Math.max(1, frames), ease, t: 0 };
+                        (A.tweens || (A.tweens = [])).push(tw);
+                        return { done: () => tw.t >= 1 };
+                    },
+                    /** A gentle road sway on the camera (px); 0 stops it. */
+                    sway(px) { g.camera.sway = px; },
+                    /** The van hits a seam: a jolt and a thud. */
+                    bump(n = 5) { g.triggerShake && g.triggerShake(n); if (typeof audioSys !== 'undefined') audioSys.sfx('bump'); },
+                    /** n knocks on the partition, spaced like a fist would. */
+                    knock(n = 5, gap = 13) {
+                        let k = 0, f = 0;
+                        return { done: () => { if (k < n && f++ % gap === 0) { k++; if (typeof audioSys !== 'undefined') audioSys.sfx('knock'); g.triggerShake && g.triggerShake(1.2); } return k >= n && f > (n - 1) * gap + 8; } };
+                    },
+                    /** The flashback's look: cooler, softer, a vignette and grain (0..1 over frames). */
+                    memory(on, frames = 40) { ui.memory(on ? 1 : 0, frames); return { done: () => !ui.memoryEasing() }; },
+                    /** Reveal a part of the HUD (ui/hud-reveal.js); with a title/text the coach points at it. */
+                    hud(key, opts = {}) { return g.hud ? g.hud.reveal(key, opts) : null; },
+                    /** Point at any element (ui/coach.js). */
+                    coach(target, opts = {}) { return g.coach ? g.coach.point(typeof target === 'string' ? document.getElementById(target) : target, opts) : null; },
+                    /** Show the revealed HUD during the scene (a playable beat), or hide it again. */
+                    showHud(on = true) { self._showHud(on); },
+                    /** Force 949's field mask on or off for the scene (null: the map decides). */
+                    mask(on) { g.fieldMask = on; },
                     /** Wait for several waitables at once. */
                     all(...ws) { const W = ws.map(w => self._toWait(w)); return { done: () => W.every(w => w.done()) }; }
                 };
@@ -41747,6 +42294,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.dialogueSeq = new DialogueSequence(this);
                 this.transcript = new DialogueTranscript();
                 this.scenes = new ScenePlayer(this);            // story/scene-runner.js: the story's scenes
+                this.coach = new Coach(this);                   // ui/coach.js: points at the UI and says what it's for
+                this.hud = new HudReveal(this);                 // ui/hud-reveal.js: the HUD appears as the story introduces it
                 // Universal capture: any write to the NPC text element gets transcribed,
                 // regardless of which code path produced it (DialogueSequence, single-line
                 // shop greetings, recruit prompts, story handler). Pulls the speaker from
@@ -44136,6 +44685,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              *  the way she's moving (keys, stick) or facing. Returns true if she flitted. */
             triggerFlit(angleOverride, source) {
                 if (this.isDriving || this.paused) return false;
+                if (this.hud && !this.hud.has('flit')) return false;   // not introduced yet (ui/hud-reveal.js)
                 
                 const cost = this.flitCost();
                 
@@ -44692,9 +45242,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const c = this.cosmetics.getRenderConfig();
                         const face = this.playerExpression ? { expression: this.playerExpression } : {};
                         const me = APPEARANCES['949'];
-                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: me.eyeColor, gender: me.gender, top: c.outfit.top, hat: c.hat, jewelry: c.jewelry, ...face };
+                        return { skinColor: c.skinColor, hair: c.hair, eyeColor: me.eyeColor, gender: me.gender, top: c.outfit.top, hat: c.hat, jewelry: withFieldMask(this, c.jewelry), ...face };
                     }
-                    return portraitOf(APPEARANCES['949']);
+                    return portraitOf(APPEARANCES['949'], { jewelry: withFieldMask(this, APPEARANCES['949'].jewelry) });
                 }
 
                 // 2. Everyone else: their look (core/appearances.js) — a live NPC or teammate by name
@@ -46189,6 +46739,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     // --- NOTES ---
                     foundNotes: this.foundNotes || [],
+
+                    // --- HUD: which parts the story has introduced, what the coach has taught ---
+                    hudRevealed: this.hud ? this.hud.serialize() : undefined,
+                    coachTaught: this.coach ? this.coach.serialize() : undefined,
                     
                     // --- MISSIONS ---
                     missions: this.missions ? this.missions.serialize() : { completedCount: 0, missionLog: [] },
@@ -46786,6 +47340,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.story.deserialize(save.story);
                         console.log(`[LOAD] Restored story at step ${this.story.state.step}, ${this.story.completedOptional.length} optional quests completed`);
                     }
+
+                    // 10c2. The HUD the story has introduced (older saves: all of it)
+                    if (this.coach) { this.coach.dismiss(); this.coach.deserialize(save.coachTaught); }
+                    if (this.hud) this.hud.deserialize(save.hudRevealed);
 
                     // 10d. Restore Found Notes
                     if (save.foundNotes) {
@@ -49232,6 +49790,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
             
+                // 3. A scene's road sway (story/scene-runner.js: s.sway) — slow, uneven, like a van on a city street
+                if (this.camera.sway) {
+                    const t = _gameTimeSec, k = this.camera.sway;
+                    this.camera.shakeX += Math.sin(t * 1.3) * k + Math.sin(t * 3.7) * k * 0.25;
+                    this.camera.shakeY += Math.sin(t * 0.9 + 1) * k * 0.5 + Math.sin(t * 5.1) * k * 0.15;
+                }
+
                 // Ability & Regen Timers
                 // Flit Attunement recharge
                 if (this.flitState.attunement < this.flitState.maxAttunement) {
@@ -51813,6 +52378,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 
+                // A flashback (story/scene-runner.js s.memory): cooler, softer, a little faded
+                const memK = this.scenes && this.scenes.ui ? (this.scenes.ui.memK || 0) : 0;
+                if (memK > 0.001) filterChain += ` saturate(${(1 - 0.5 * memK).toFixed(3)}) sepia(${(0.14 * memK).toFixed(3)}) hue-rotate(${(-22 * memK).toFixed(1)}deg) contrast(${(1 - 0.08 * memK).toFixed(3)})`;
                 if (this.canvas.style.filter !== filterChain) {
                     this.canvas.style.filter = filterChain;
                 }
@@ -51958,6 +52526,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             moon_city_nightclub: { floor: (g, c) => { g.drawClubInterior(c); g.drawClubFloorLights(c); }, glow: (g, c) => g.drawClubGlow(c) },
             keepers_hill:        { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },   // the prologue's fireside (engine/keeper-art.js)
             keepers_parlor:      { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },
+            van_interior:        { floor: (g, c) => g.drawVanInterior(c),     glow: (g, c) => g.drawVanGlow(c) },     // chapter 1's ride (engine/van-art.js)
             hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) }
         };
 
@@ -53715,6 +54284,168 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             }
         });
+        // GameEngine — the crew's van: the cabin the chapter opens in (van_interior), and the van
+        // itself for the street (drawVanExterior, drawn by a scene prop). Scene-only: painted, no props.
+        //   van_interior  top-down with the roof off, nose up: the cab, the partition, two benches
+        //                 of violet webbing, the gun rack, the rear doors; the road runs by beneath
+        // Floor: drawVanInterior (draw.js, under the lighting). Light: drawVanGlow (world-state.js).
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        const VAN = {
+            W: 400, H: 820,
+            BODY: { x: 104, y: 70, w: 192, h: 670 },          // the van's outline
+            CABIN: { x: 116, y: 196, w: 168, h: 520 },         // the cargo bay the crew rides in
+            PARTITION_Y: 186,
+            BENCH: { left: 116, right: 250, w: 34 },
+            // Where everyone sits (x, y, facing) — 949 across from 747, the novel's order
+            SEATS: {
+                '949':    { x: 136, y: 404, a: 0 },       'Yenna':    { x: 136, y: 470, a: 0 },      'Sabrina': { x: 136, y: 536, a: 0 },
+                '747':    { x: 264, y: 404, a: Math.PI }, 'Max':      { x: 264, y: 470, a: Math.PI },
+                'Victoria': { x: 264, y: 536, a: Math.PI }, 'Josh':   { x: 264, y: 602, a: Math.PI }
+            },
+            NEON: ['255, 60, 170', '80, 220, 255', '232, 194, 122', '164, 105, 255']
+        };
+
+        /** The van on the street (a scene prop): matte violet-black, gold pinstripe, rear doors that open (v.doors 0..1). */
+        function drawVanExterior(ctx, v) {
+            const L = 120, W = 54, doors = v.doors || 0;
+            ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle || 0);
+            ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.roundRect(-L / 2 + 4, -W / 2 + 5, L, W, 8); ctx.fill();   // shadow
+            ctx.fillStyle = '#17111f'; ctx.beginPath(); ctx.roundRect(-L / 2, -W / 2, L, W, 8); ctx.fill();                  // body
+            ctx.fillStyle = '#1f1729'; ctx.beginPath(); ctx.roundRect(-L / 2 + 6, -W / 2 + 5, L - 30, W - 10, 5); ctx.fill();   // roof panel
+            ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+            for (let x = -L / 2 + 14; x < L / 2 - 26; x += 12) { ctx.beginPath(); ctx.moveTo(x, -W / 2 + 7); ctx.lineTo(x, W / 2 - 7); ctx.stroke(); }   // roof ribs
+            ctx.strokeStyle = '#3a2f46'; ctx.lineWidth = 2; ctx.strokeRect(-L / 2 + 16, -W / 2 + 10, L - 50, W - 20);      // roof rack
+            ctx.fillStyle = '#0c0a12'; ctx.beginPath(); ctx.roundRect(L / 2 - 24, -W / 2 + 5, 17, W - 10, 3); ctx.fill();    // windshield
+            ctx.fillStyle = 'rgba(160,140,220,0.18)'; ctx.fillRect(L / 2 - 21, -W / 2 + 8, 3, W - 16);
+            ctx.strokeStyle = 'rgba(232,194,122,0.75)'; ctx.lineWidth = 1;                                                   // gold pinstripe
+            ctx.beginPath(); ctx.roundRect(-L / 2 + 2, -W / 2 + 2, L - 4, W - 4, 7); ctx.stroke();
+            ctx.fillStyle = '#fff6e0'; ctx.fillRect(L / 2 - 2, -W / 2 + 4, 2, 9); ctx.fillRect(L / 2 - 2, W / 2 - 13, 2, 9);   // headlights
+            ctx.fillStyle = '#ff2a4a'; ctx.fillRect(-L / 2, -W / 2 + 4, 2, 7); ctx.fillRect(-L / 2, W / 2 - 11, 2, 7);       // tail lights
+            // The rear doors swing out from the back corners
+            for (const s of [-1, 1]) {
+                ctx.save(); ctx.translate(-L / 2, s * W / 2); ctx.rotate(s * doors * 1.7);
+                ctx.fillStyle = '#1d1526'; ctx.fillRect(-3, s > 0 ? -W / 2 : 0, 3, W / 2);
+                ctx.fillStyle = 'rgba(232,194,122,0.6)'; ctx.fillRect(-3, s > 0 ? -W / 2 + 2 : W / 2 - 4, 3, 2);
+                ctx.restore();
+            }
+            if (doors > 0.05) {                                                                                              // the dim red cabin inside
+                ctx.fillStyle = `rgba(120,20,40,${0.5 * doors})`; ctx.fillRect(-L / 2 + 1, -W / 2 + 6, 10, W - 12);
+            }
+            ctx.restore();
+        }
+
+        engineMixin({
+            /** Under the lighting: the road going by, then the van's cabin (painted once). */
+            drawVanInterior(ctx) {
+                const t = _gameTimeSec, moving = this.vanMoving !== false;
+                // The road beneath: asphalt, lane dashes and streetlight pools sliding back (the van drives up)
+                ctx.fillStyle = '#0b0a10'; ctx.fillRect(0, 0, VAN.W, VAN.H);
+                const run = moving ? (t * 520) % 160 : 0;
+                ctx.fillStyle = 'rgba(232,220,200,0.22)';
+                for (let y = -160 + run; y < VAN.H; y += 160) { ctx.fillRect(40, y, 5, 70); ctx.fillRect(355, y, 5, 70); }
+                const pool = moving ? (t * 520) % 900 : 300;
+                for (let y = -300 + pool; y < VAN.H + 300; y += 900) {
+                    const g = ctx.createRadialGradient(60, y, 0, 60, y, 180); g.addColorStop(0, 'rgba(255,200,140,0.12)'); g.addColorStop(1, 'rgba(255,200,140,0)');
+                    ctx.fillStyle = g; ctx.fillRect(0, y - 180, 260, 360);
+                }
+                if (!this._vanCabin) this._vanCabin = this._paintVanCabin();
+                ctx.drawImage(this._vanCabin, 0, 0);
+            },
+
+            _paintVanCabin() {
+                const cv = document.createElement('canvas'); cv.width = VAN.W; cv.height = VAN.H;
+                const c = cv.getContext('2d'), B = VAN.BODY, C = VAN.CABIN;
+                // The body, its shadow on the road, the gold pinstripe
+                c.fillStyle = 'rgba(0,0,0,0.55)'; c.beginPath(); c.roundRect(B.x + 8, B.y + 10, B.w, B.h, 26); c.fill();
+                c.fillStyle = '#17111f'; c.beginPath(); c.roundRect(B.x, B.y, B.w, B.h, 26); c.fill();
+                c.strokeStyle = 'rgba(232,194,122,0.7)'; c.lineWidth = 1.5; c.beginPath(); c.roundRect(B.x + 4, B.y + 4, B.w - 8, B.h - 8, 22); c.stroke();
+                // The cab: dash, windshield, two seats (the driver stays a shape in the dark)
+                c.fillStyle = '#0c0a12'; c.beginPath(); c.roundRect(B.x + 14, B.y + 10, B.w - 28, 30, 10); c.fill();
+                c.fillStyle = 'rgba(140,120,210,0.16)'; c.fillRect(B.x + 20, B.y + 14, B.w - 40, 6);
+                c.fillStyle = '#211a2b'; c.fillRect(B.x + 16, B.y + 42, B.w - 32, 18);                                  // dash
+                c.fillStyle = 'rgba(80,220,255,0.5)'; c.fillRect(B.x + 40, B.y + 48, 22, 5);                              // a readout
+                for (const sx of [B.x + 34, B.x + B.w - 74]) {                                                             // cab seats
+                    c.fillStyle = '#2a1f33'; c.beginPath(); c.roundRect(sx, B.y + 70, 40, 44, 8); c.fill();
+                    c.fillStyle = '#1c1524'; c.beginPath(); c.roundRect(sx + 3, B.y + 100, 34, 14, 5); c.fill();
+                }
+                c.fillStyle = '#0d0a12'; c.beginPath(); c.arc(B.x + B.w - 54, B.y + 90, 12, 0, Math.PI * 2); c.fill();     // the driver
+                // The partition, with its slot
+                c.fillStyle = '#261d31'; c.fillRect(B.x + 8, VAN.PARTITION_Y - 8, B.w - 16, 12);
+                c.fillStyle = '#07050b'; c.fillRect(B.x + B.w / 2 - 22, VAN.PARTITION_Y - 6, 44, 6);
+                c.strokeStyle = 'rgba(232,194,122,0.4)'; c.lineWidth = 1; c.strokeRect(B.x + B.w / 2 - 22.5, VAN.PARTITION_Y - 6.5, 45, 7);
+                // The cargo floor: ribbed steel, tie-down rails
+                const fl = c.createLinearGradient(C.x, 0, C.x + C.w, 0);
+                fl.addColorStop(0, '#16121c'); fl.addColorStop(0.5, '#221c2a'); fl.addColorStop(1, '#16121c');
+                c.fillStyle = fl; c.fillRect(C.x, C.y, C.w, C.h);
+                for (let y = C.y + 6; y < C.y + C.h; y += 10) {
+                    c.fillStyle = 'rgba(255,255,255,0.035)'; c.fillRect(C.x + 36, y, C.w - 72, 2);
+                    c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(C.x + 36, y + 2, C.w - 72, 1);
+                }
+                for (const x of [C.x + 40, C.x + C.w - 42]) {
+                    c.fillStyle = '#2e2638'; c.fillRect(x, C.y + 10, 2, C.h - 20);
+                    for (let y = C.y + 20; y < C.y + C.h - 10; y += 40) { c.fillStyle = '#4a3f58'; c.beginPath(); c.arc(x + 1, y, 2.2, 0, Math.PI * 2); c.fill(); }
+                }
+                // The benches: dark leather pads, violet webbing straps behind the seats
+                for (const [bx, side] of [[VAN.BENCH.left, 1], [VAN.BENCH.right, -1]]) {
+                    c.fillStyle = '#0f0b14'; c.fillRect(bx, C.y + 150, VAN.BENCH.w, C.h - 180);
+                    for (let y = C.y + 154; y < C.y + C.h - 34; y += 33) {
+                        c.fillStyle = '#2a1d30'; c.beginPath(); c.roundRect(bx + 3, y, VAN.BENCH.w - 6, 30, 5); c.fill();
+                        c.fillStyle = 'rgba(255,255,255,0.05)'; c.fillRect(bx + 6, y + 3, VAN.BENCH.w - 12, 3);
+                    }
+                    const wx = side > 0 ? bx + 2 : bx + VAN.BENCH.w - 4;
+                    c.strokeStyle = 'rgba(120,70,190,0.75)'; c.lineWidth = 2.5;
+                    for (let y = C.y + 160; y < C.y + C.h - 40; y += 22) { c.beginPath(); c.moveTo(wx, y); c.lineTo(wx, y + 18); c.stroke(); }
+                    c.strokeStyle = 'rgba(120,70,190,0.5)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(wx, C.y + 158); c.lineTo(wx, C.y + C.h - 32); c.stroke();
+                }
+                // Up front: the gun rack (left) and the first-aid case (right)
+                c.fillStyle = '#0f0b14'; c.fillRect(C.x + 4, C.y + 12, 34, 120);
+                for (let i = 0; i < 4; i++) {
+                    const y = C.y + 22 + i * 28;
+                    c.fillStyle = '#2b2533'; c.fillRect(C.x + 8, y, 26, 6); c.fillStyle = '#45394f'; c.fillRect(C.x + 8, y + 1, 10, 4);
+                    c.fillStyle = 'rgba(232,194,122,0.5)'; c.fillRect(C.x + 30, y + 2, 3, 2);
+                }
+                c.fillStyle = '#e8e2ee'; c.beginPath(); c.roundRect(C.x + C.w - 34, C.y + 30, 26, 20, 3); c.fill();
+                c.fillStyle = '#c0304a'; c.fillRect(C.x + C.w - 24, C.y + 34, 6, 12); c.fillRect(C.x + C.w - 27, C.y + 37, 12, 6);
+                c.fillStyle = '#1a1422'; c.beginPath(); c.roundRect(C.x + C.w - 36, C.y + 70, 30, 56, 4); c.fill();           // an ammo locker
+                c.strokeStyle = 'rgba(232,194,122,0.35)'; c.strokeRect(C.x + C.w - 35.5, C.y + 70.5, 29, 55);
+                // The rear doors, with their two small windows
+                const ry = C.y + C.h;
+                c.fillStyle = '#1d1526'; c.fillRect(B.x + 8, ry, B.w - 16, B.y + B.h - ry - 8);
+                c.fillStyle = '#07050b'; c.fillRect(B.x + B.w / 2 - 1, ry, 2, B.y + B.h - ry - 8);
+                for (const wx of [B.x + 30, B.x + B.w / 2 + 12]) { c.fillStyle = '#0a0812'; c.fillRect(wx, ry + 6, 50, 10); c.fillStyle = 'rgba(160,140,230,0.18)'; c.fillRect(wx + 2, ry + 7, 46, 3); }
+                c.fillStyle = 'rgba(232,194,122,0.6)'; c.fillRect(B.x + B.w / 2 - 12, ry + 18, 8, 2); c.fillRect(B.x + B.w / 2 + 4, ry + 18, 8, 2);   // handles
+                return cv;
+            },
+
+            /** After the darkness: the dome light, the strip light, passing neon sweeping through, rain on the rear windows. */
+            drawVanGlow(ctx) {
+                const t = _gameTimeSec, C = VAN.CABIN, moving = this.vanMoving !== false;
+                const flick = 0.92 + Math.sin(t * 13) * 0.03 + (Math.sin(t * 2.3) > 0.97 ? -0.25 : 0);
+                glowA(ctx, 200, 440, 130, '190, 30, 60', 0.15 * flick);                                  // the red dome light
+                glowA(ctx, 200, 440, 18, '255, 120, 130', 0.4 * flick);
+                const strip = ctx.createLinearGradient(0, C.y, 0, C.y + C.h);
+                strip.addColorStop(0, 'rgba(164,105,255,0)'); strip.addColorStop(0.5, 'rgba(164,105,255,0.1)'); strip.addColorStop(1, 'rgba(164,105,255,0)');
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = strip; ctx.fillRect(196, C.y, 8, C.h);                                   // the violet strip overhead
+                if (moving) {                                                                            // street neon, sliding back through the bay
+                    for (let i = 0; i < 3; i++) {
+                        const period = 3.4 + i * 1.3, k = ((t + i * 1.7) % period) / period, y = C.y - 120 + k * (C.h + 240);
+                        const col = VAN.NEON[(Math.floor((t + i * 1.7) / period) + i) % VAN.NEON.length];
+                        const g = ctx.createLinearGradient(0, y - 60, 0, y + 60);
+                        g.addColorStop(0, `rgba(${col},0)`); g.addColorStop(0.5, `rgba(${col},0.13)`); g.addColorStop(1, `rgba(${col},0)`);
+                        ctx.fillStyle = g; ctx.fillRect(VAN.BODY.x, y - 60, VAN.BODY.w, 120);
+                    }
+                }
+                ctx.restore();
+                // Rain running down the rear windows
+                const ry = C.y + C.h + 6;
+                ctx.strokeStyle = 'rgba(200,190,255,0.35)'; ctx.lineWidth = 0.6;
+                for (let i = 0; i < 10; i++) {
+                    const x = VAN.BODY.x + 32 + ((i * 37) % 130) + (i > 4 ? 12 : 0), k = ((t * 0.6 + i * 0.29) % 1);
+                    ctx.beginPath(); ctx.moveTo(x, ry + k * 8); ctx.lineTo(x + 0.6, ry + k * 8 + 2.5); ctx.stroke();
+                }
+            },
+        });
         // GameEngine — Lighting, bloom, wet reflections, atmosphere.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -53853,7 +54584,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 lc.scale(this.camera.zoom, this.camera.zoom);
                 let camX, camY;
                 if (this.cutscene && this.cutscene.active) { camX = this.camera.x; camY = this.camera.y; }
-                else { camX = this.player.x; camY = this.player.y; }
+                else { camX = this.player.x + (this.scopeLeanX || 0); camY = this.player.y + (this.scopeLeanY || 0); }   // same camera as draw.js (scope lean included)
                 lc.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
                 
                 // The view, at the actual zoom (lights are culled by their own reach)
@@ -54217,7 +54948,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.scale(this.camera.zoom, this.camera.zoom);
                 let camX, camY;
                 if (this.cutscene && this.cutscene.active) { camX = this.camera.x; camY = this.camera.y; }
-                else { camX = this.player.x; camY = this.player.y; }
+                else { camX = this.player.x + (this.scopeLeanX || 0); camY = this.player.y + (this.scopeLeanY || 0); }   // same camera as draw.js (scope lean included)
                 ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
                 ctx.globalCompositeOperation = 'lighter';
                 const halfW = (this.canvas.width / 2) / this.camera.zoom;
@@ -54332,7 +55063,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     train: outfit.train || null,
                     // In the rain outdoors a hoodie's hood goes up (unless she's wearing a hat)
                     hat: cosmeticConfig.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie' ? { type: 'hood_up', color: outfit.top.color } : null),
-                    jewelry: cosmeticConfig.jewelry,
+                    jewelry: withFieldMask(this, cosmeticConfig.jewelry),   // masked in the field (core/appearances.js)
                     pose: typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
                     // A drawn gun takes the hand; the umbrella waits
                     held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
@@ -54721,6 +55452,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             resetGameState() {
                 if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
+                if (this.coach) { this.coach.dismiss(); this.coach.deserialize([]); }   // a story New Game then calls hud.startFresh()
+                if (this.hud) this.hud.revealAll();
                 // --- PLAYER STATE ---
                 this.currency = 100;
                 this.scrap = 0;
@@ -55069,7 +55802,45 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 canvas.addEventListener('touchend', (e) => { if (e.touches.length < 2) this.mapView.lastPinchDist = 0; if (e.touches.length === 0) this.mapView.isDragging = false; if (e.touches.length === 1) { this.mapView.isDragging = true; this.mapView.lastX = e.touches[0].clientX; this.mapView.lastY = e.touches[0].clientY; } });
             },
         
+            // ── Calls: a voice on the line while the scene plays on (no pause) ──
+            call: null,
+            /** Someone's calling: the phone buzzes, a call card rises; tapping it (or the phone button) answers. */
+            ringCall(name, opts = {}) {
+                this.endCall();
+                const c = this.call = { name, subtitle: opts.subtitle || '', answered: false, t0: 0, el: null };
+                const el = c.el = document.createElement('div');
+                el.id = 'call-card';
+                el.innerHTML = '<div class="cc-ring"><i></i><i></i><canvas width="120" height="120"></canvas></div>'
+                    + '<div class="cc-who"><b></b><span></span></div><button class="cc-answer">Answer</button><div class="cc-time"></div>';
+                el.querySelector('b').textContent = name;
+                el.querySelector('span').textContent = c.subtitle || 'incoming call';
+                document.body.appendChild(el);
+                if (game.paintPortraitTo) game.paintPortraitTo(el.querySelector('canvas'), name, 'rgba(40, 10, 50, 0.95)');
+                el.querySelector('.cc-answer').addEventListener('click', (e) => { e.stopPropagation(); this.answerCall(); });
+                requestAnimationFrame(() => el.classList.add('show'));
+                c.buzz = setInterval(() => { try { if (navigator.vibrate) navigator.vibrate([90, 60, 90]); } catch (e) { /* no haptics */ } audioSys.sfx('ui'); }, 1400);
+                return c;
+            },
+            answerCall() {
+                const c = this.call; if (!c || c.answered) return;
+                c.answered = true; c.t0 = performance.now(); clearInterval(c.buzz);
+                c.el.classList.add('live');
+                c.el.querySelector('span').textContent = 'on the line';
+                const time = c.el.querySelector('.cc-time');
+                c.clock = setInterval(() => { const s = Math.floor((performance.now() - c.t0) / 1000); time.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }, 250);
+                audioSys.sfx('ui');
+                this.addMessage(c.name, '☎ Call', false, c.name);
+            },
+            callAnswered() { return !!(this.call && this.call.answered); },
+            endCall() {
+                const c = this.call; if (!c) return;
+                clearInterval(c.buzz); clearInterval(c.clock);
+                const el = c.el; el.classList.remove('show'); el.classList.add('gone'); setTimeout(() => el.remove(), 600);
+                this.call = null;
+            },
+
             open() {
+                if (this.call && !this.call.answered) { this.answerCall(); return; }   // the phone's ringing: the button answers it
                 this.isOpen = true;
                 this.overlay.style.display = 'flex';
                 this.showHome();

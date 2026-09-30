@@ -56,7 +56,7 @@
                     train: outfit.train || null,
                     // In the rain outdoors a hoodie's hood goes up (unless she's wearing a hat)
                     hat: cosmeticConfig.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie' ? { type: 'hood_up', color: outfit.top.color } : null),
-                    jewelry: cosmeticConfig.jewelry,
+                    jewelry: withFieldMask(this, cosmeticConfig.jewelry),   // masked in the field (core/appearances.js)
                     pose: typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
                     // A drawn gun takes the hand; the umbrella waits
                     held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)

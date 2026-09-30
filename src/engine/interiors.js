@@ -15,6 +15,7 @@
             moon_city_nightclub: { floor: (g, c) => { g.drawClubInterior(c); g.drawClubFloorLights(c); }, glow: (g, c) => g.drawClubGlow(c) },
             keepers_hill:        { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },   // the prologue's fireside (engine/keeper-art.js)
             keepers_parlor:      { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },
+            van_interior:        { floor: (g, c) => g.drawVanInterior(c),     glow: (g, c) => g.drawVanGlow(c) },     // chapter 1's ride (engine/van-art.js)
             hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) }
         };
 

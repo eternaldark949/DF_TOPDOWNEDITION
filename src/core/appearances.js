@@ -53,6 +53,13 @@
             '949': { skinColor: PALETTE.stellaSkin, gender: 'female', hair: { type: 'curls', color: PALETTE.stellaCurls },
                      eyeColor: PALETTE.stellaEyes, accent: PALETTE.stellaEyes, blood: 'wine' },
 
+            // ── 747 (Seven), her brother: her mirror in the field, the mask tinged purple, eyes slits of gold ──
+            '747': { skinColor: PALETTE.stellaSkin, gender: 'male', build: 'athletic', hair: { type: 'short', color: '#0a0505' },
+                     eyeColor: '#ffcc55', accent: '#8a5cff', blood: 'wine',
+                     top: { type: 'coat', color: '#0e0a14', inner: '#241834' }, bottom: { type: 'pants', color: '#0c0a10' },
+                     shoes: { type: 'boots', color: '#0a0a0a' },
+                     jewelry: [{ type: 'field_mask', color: '#0a0710', tint: '#4b2a9a', eyes: '#ffcc55' }] },
+
             // ── The crew ──
             'Victoria': { skinColor: '#c68642', gender: 'female', eyeColor: '#b0707f', accent: '#ff69b4',
                           top: { type: 'suit', color: '#2a0a3a' }, bottom: { type: 'pants', color: '#1a0820' },
@@ -319,6 +326,22 @@
             }
             if (look.faceRoom && look.pose !== 'dance') look = { idleAngle: Math.PI / 2, ...look };
             return (entity._look = look);
+        }
+
+        /* The Freelancers wear their masks in the field; 949's comes off at home (and in the
+           Keeper's house). game.fieldMask = true / false forces it (scenes, the flashback). */
+        const FIELD_MASK_949 = { type: 'field_mask', color: '#0b0710', tint: '#6a2a7a', eyes: PALETTE.stellaEyes };
+        const HOME_MAPS = new Set(['apt_949', 'keepers_hill', 'keepers_parlor']);
+        function stellaMasked(game) {
+            if (!game) return false;
+            if (game.fieldMask === true || game.fieldMask === false) return game.fieldMask;
+            return !!(game.activeMap && !HOME_MAPS.has(game.activeMap.id));
+        }
+        /** Her jewelry, with the mask added when she's in the field (a mask of her own wins). */
+        function withFieldMask(game, jewelry) {
+            const list = jewelry || [];
+            if (!stellaMasked(game) || list.some(j => j.type === 'field_mask')) return jewelry;
+            return [...list, FIELD_MASK_949];
         }
 
         /** A dialogue portrait from a look. Androids' eyes glow in their finish. */

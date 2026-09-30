@@ -1,0 +1,97 @@
+        /* =========================================
+           COACH (ui/coach.js) and HUD REVEAL (ui/hud-reveal.js)
+           ========================================= */
+        /* Parts of the HUD the story hasn't introduced yet */
+        .hud-veiled { visibility: hidden !important; pointer-events: none !important; }
+        /* …and the moment one arrives: it resolves out of a blur with a gold bloom */
+        .hud-arrive { animation: hudArrive 1.2s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        @keyframes hudArrive {
+            0%   { opacity: 0; scale: 0.82; filter: blur(8px) drop-shadow(0 0 0 rgba(243, 220, 166, 0)); }
+            45%  { opacity: 1; scale: 1.06; filter: blur(0) drop-shadow(0 0 18px rgba(243, 220, 166, 0.95)); }
+            100% { opacity: 1; scale: 1; filter: drop-shadow(0 0 0 rgba(243, 220, 166, 0)); }
+        }
+
+        #coach { position: fixed; inset: 0; z-index: 1160; pointer-events: none; display: none; }
+        #coach.show { display: block; }
+        #coach .co-hole, #coach .co-block, #coach .co-ring, #coach .co-thumb, #coach .co-card { position: absolute; }
+
+        /* Spotlight: a hole in a violet-black dim; only the target can be tapped */
+        #coach .co-hole { pointer-events: none; opacity: 0; transition: opacity 0.4s ease; }
+        #coach.spot .co-hole { opacity: 1; box-shadow: 0 0 0 200vmax rgba(8, 3, 16, 0.66), 0 0 24px 10px rgba(8, 3, 16, 0.45); animation: coDim 0.5s ease both; }
+        @keyframes coDim { from { box-shadow: 0 0 0 200vmax rgba(8, 3, 16, 0), 0 0 24px 10px rgba(8, 3, 16, 0); } }
+        #coach .co-block { display: none; }
+        #coach.spot .co-block { display: block; pointer-events: auto; }
+
+        /* The ring: two gold hairlines breathing outward */
+        #coach .co-ring { pointer-events: none; }
+        #coach .co-ring i { position: absolute; inset: 0; border-radius: inherit; border: 1.5px solid rgba(243, 220, 166, 0.95);
+            box-shadow: 0 0 14px rgba(232, 194, 122, 0.8), inset 0 0 10px rgba(232, 194, 122, 0.35); animation: coRing 1.8s ease-out infinite; }
+        #coach .co-ring i + i { animation-delay: 0.9s; }
+        @keyframes coRing { 0% { transform: scale(0.94); opacity: 0.95; } 100% { transform: scale(1.22); opacity: 0; } }
+        #coach .co-ring.nudge { animation: coNudge 0.4s ease; }
+        @keyframes coNudge { 30% { transform: scale(1.12); } 60% { transform: scale(0.96); } }
+
+        /* The ghost thumb: a soft pad drifting in an arc to show a drag */
+        #coach .co-thumb { display: none; border-radius: 50%; pointer-events: none;
+            background: radial-gradient(circle, rgba(255, 246, 224, 0.7) 0%, rgba(243, 220, 166, 0.35) 45%, transparent 70%);
+            box-shadow: 0 0 18px rgba(243, 220, 166, 0.55); }
+        #coach.ghost .co-thumb { display: block; animation: coThumb 2.4s ease-in-out infinite; }
+        @keyframes coThumb {
+            0% { transform: translate(0, 0) scale(0.7); opacity: 0; }
+            15% { transform: translate(0, 0) scale(1); opacity: 1; }
+            55% { transform: translate(38px, -46px) scale(1); opacity: 1; }
+            80% { transform: translate(-30px, -30px) scale(1); opacity: 0.9; }
+            100% { transform: translate(-30px, -30px) scale(0.7); opacity: 0; }
+        }
+
+        /* The caption card: violet glass, a gold title, the line in the dialogue's voice */
+        #coach .co-card { pointer-events: none; padding: 12px 16px 13px; border-radius: 16px;
+            background: linear-gradient(180deg, rgba(24, 10, 40, 0.9), rgba(10, 4, 18, 0.94));
+            box-shadow: 0 12px 34px rgba(4, 0, 10, 0.7), inset 0 0 0 1px rgba(232, 194, 122, 0.2), 0 0 40px -14px rgba(232, 194, 122, 0.6);
+            animation: coCard 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        #coach .co-card::before { content: ''; position: absolute; left: 10%; right: 10%; top: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, #f3dca6, transparent); box-shadow: 0 0 8px rgba(232, 194, 122, 0.6); }
+        #coach .co-card b { display: block; margin-bottom: 4px; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 0.62rem;
+            letter-spacing: 0.3em; text-transform: uppercase; color: #f3dca6; text-shadow: 0 0 10px rgba(232, 194, 122, 0.55); }
+        #coach .co-card span { display: block; font-family: 'Montserrat', sans-serif; font-size: 0.84rem; line-height: 1.45; color: #efe6fb; }
+        #coach .co-card.untitled b { display: none; }
+        #coach.ring .co-card { padding: 8px 12px; border-radius: 12px; }
+        #coach.ring .co-card span { font-size: 0.76rem; }
+        @keyframes coCard { from { opacity: 0; transform: translateY(6px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+
+        /* A scene's playable beat: the letterbox retracts so the HUD's corners are free */
+        body.scene-hud-on #cinematic-bars .cine-bar { height: 0 !important; }
+
+        /* The call card (phoneSystem.ringCall): rises while it rings, settles to a small pill once answered */
+        #call-card { position: fixed; left: 50%; top: 16vh; z-index: 1155; display: flex; flex-direction: column; align-items: center; gap: 10px;
+            width: min(78vw, 280px); padding: 20px 18px 18px; border-radius: 26px; pointer-events: auto;
+            background: linear-gradient(180deg, rgba(28, 12, 44, 0.94), rgba(10, 4, 18, 0.96));
+            box-shadow: 0 20px 50px rgba(4, 0, 10, 0.7), inset 0 0 0 1px rgba(232, 194, 122, 0.22), 0 0 50px -16px rgba(164, 105, 255, 0.7);
+            opacity: 0; transform: translate(-50%, 24px) scale(0.96); filter: blur(4px);
+            transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s ease, top 0.6s cubic-bezier(0.22, 1, 0.36, 1), width 0.6s, padding 0.6s; }
+        #call-card.show { opacity: 1; transform: translate(-50%, 0); filter: none; }
+        #call-card.gone { opacity: 0; transform: translate(-50%, -10px) scale(0.97); }
+        #call-card .cc-ring { position: relative; width: 84px; height: 84px; }
+        #call-card .cc-ring canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; border: 1px solid rgba(243, 220, 166, 0.6); }
+        #call-card .cc-ring i { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid rgba(243, 220, 166, 0.8); animation: coRing 1.4s ease-out infinite; }
+        #call-card .cc-ring i + i { animation-delay: 0.7s; }
+        #call-card .cc-who { text-align: center; }
+        #call-card .cc-who b { display: block; font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-weight: 600; font-size: 1.4rem; color: #f3dca6;
+            text-shadow: 0 0 14px rgba(232, 194, 122, 0.5); }
+        #call-card .cc-who span { font-family: 'Montserrat', sans-serif; font-size: 0.58rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(220, 200, 255, 0.7); }
+        #call-card .cc-answer { margin-top: 4px; padding: 9px 30px; border-radius: 999px; cursor: pointer; font-family: 'Montserrat', sans-serif; font-weight: 600;
+            font-size: 0.66rem; letter-spacing: 0.26em; text-transform: uppercase; color: #fff6e0; border: 1px solid rgba(243, 220, 166, 0.8);
+            background: linear-gradient(180deg, rgba(232, 194, 122, 0.35), rgba(164, 105, 255, 0.18)); box-shadow: 0 0 18px rgba(232, 194, 122, 0.4); animation: ccPulse 1.4s ease-in-out infinite; }
+        @keyframes ccPulse { 50% { box-shadow: 0 0 30px rgba(232, 194, 122, 0.75); } }
+        #call-card .cc-time { display: none; font-family: 'Montserrat', sans-serif; font-size: 0.7rem; letter-spacing: 0.2em; color: rgba(243, 220, 166, 0.85); }
+        /* On the line: a slim pill at the top, out of the subtitles' way */
+        #call-card.live { top: calc(12vh + 10px); left: 16px; transform: none; flex-direction: row; width: auto; padding: 8px 18px 8px 8px; gap: 12px; border-radius: 999px; white-space: nowrap; }
+        #call-card.live .cc-who span { letter-spacing: 0.22em; }
+        #call-card.live .cc-ring { width: 40px; height: 40px; }
+        #call-card.live .cc-ring i { animation: none; opacity: 0; }
+        #call-card.live .cc-who { text-align: left; }
+        #call-card.live .cc-who b { font-size: 1.05rem; }
+        #call-card.live .cc-answer { display: none; }
+        #call-card.live .cc-time { display: block; }
+        body.landscape #call-card { top: 10vh; }
+        body.landscape #call-card.live { top: calc(9vh + 8px); }
