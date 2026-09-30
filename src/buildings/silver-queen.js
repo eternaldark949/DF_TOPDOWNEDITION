@@ -17,7 +17,7 @@
         };
         const SQ_PORTICO = {
             depth: 52, floors: 4, overhang: 6, colR: 3.6,
-            colLine: 60, colFloors: 3.5,        // lantern columns: stand just in front of the portico, lanterns a little under its roof
+            colLine: 74, colFloors: 3.5,        // lantern columns: free-standing on the floor well in front of the portico, lanterns under its roof line
             // Column offsets from the door centre (px). The paired columns flank the
             // door; ±80 and ±143 line up with the pilasters that run up the wall.
             cols: [-168, -143, -80, -62, 62, 80, 143, 168],
@@ -354,7 +354,7 @@
                     loL.moveTo(c.x + px * r * 0.75, c.y + py * r * 0.75); loL.lineTo(t0[0] + px * r * 0.75 * kT, t0[1] + py * r * 0.75 * kT);
                     const cc = P3(c.x, c.y, zC);                                                           // gilt collar under the lantern
                     collars.moveTo(cc[0] - px * r * kC * 1.15, cc[1] - py * r * kC * 1.15); collars.lineTo(cc[0] + px * r * kC * 1.15, cc[1] + py * r * kC * 1.15);
-                    hexP(lanO, t0[0], t0[1], (r + 3.2) * kT); hexP(lanI, t0[0], t0[1], (r + 0.6) * kT);  // lantern: silver frame, violet glass
+                    hexP(lanO, t0[0], t0[1], (r + 1.8) * kT); hexP(lanI, t0[0], t0[1], (r + 0.2) * kT);  // lantern: silver frame, violet glass
                 }
                 ctx.fillStyle = '#4c4468'; ctx.fill(plin); ctx.strokeStyle = '#a49cc6'; ctx.lineWidth = 1; ctx.stroke(plin);
                 ctx.fillStyle = T.silver; ctx.fill(shafts);
@@ -381,11 +381,20 @@
                 if (!g) return;
                 const w = g.x1 - g.x0, d = SQ_PORTICO.colLine + 8;
                 ctx.save();
-                ctx.fillStyle = SQ_THEME.marble; ctx.fillRect(g.x0, g.yf, w, d);
-                ctx.beginPath(); ctx.rect(g.x0, g.yf, w, d); ctx.clip();
-                ctx.strokeStyle = 'rgba(205,190,245,0.10)'; ctx.lineWidth = 1; ctx.beginPath();
-                for (let x = g.x0 - d; x < g.x1 + d; x += 16) { ctx.moveTo(x, g.yf); ctx.lineTo(x + d, g.yf + d); ctx.moveTo(x + d, g.yf); ctx.lineTo(x, g.yf + d); }
+                // The floor: square marble flags (not the roof's diagonal inlay, so the two never read as one)
+                ctx.fillStyle = '#231a44'; ctx.fillRect(g.x0, g.yf, w, d);
+                ctx.strokeStyle = 'rgba(205,190,245,0.12)'; ctx.lineWidth = 1; ctx.beginPath();
+                for (let x = g.x0 + 17; x < g.x1; x += 17) { ctx.moveTo(x, g.yf); ctx.lineTo(x, g.yf + d); }
+                for (let y = g.yf + 17; y < g.yf + d; y += 17) { ctx.moveTo(g.x0, y); ctx.lineTo(g.x1, y); }
                 ctx.stroke();
+                // The portico's shade on the floor under it: deep by the doors, lifting at its front edge
+                const sh = ctx.createLinearGradient(0, g.yf, 0, g.yb + 6);
+                sh.addColorStop(0, 'rgba(6, 2, 16, 0.55)'); sh.addColorStop(0.85, 'rgba(6, 2, 16, 0.35)'); sh.addColorStop(1, 'rgba(6, 2, 16, 0)');
+                ctx.fillStyle = sh; ctx.fillRect(g.x0, g.yf, w, g.yb + 6 - g.yf);
+                // Each lantern column's contact shadow, where it meets the floor
+                ctx.fillStyle = 'rgba(6, 2, 16, 0.45)'; ctx.beginPath();
+                for (const c of g.cols) { ctx.moveTo(c.x + 9, c.y + 2); ctx.ellipse(c.x + 1.5, c.y + 2, 7.5, 4, 0, 0, Math.PI * 2); }
+                ctx.fill();
                 ctx.restore();
                 ctx.save();
                 const ys = g.yf + d;                                                                          // steps
