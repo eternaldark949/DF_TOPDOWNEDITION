@@ -716,8 +716,6 @@
                 ctx.restore();
             }
 
-            /** The look for this NPC (core/appearances.js); kept for callers that ask by this name. */
-            _staffLook() { return lookFor(this); }
 
             /**
              * Teammate renderer — uses config-driven appearance via drawProceduralHumanoid.

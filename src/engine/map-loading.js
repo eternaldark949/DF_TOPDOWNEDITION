@@ -54,6 +54,20 @@
                 return { x: M.spawn.x, y: M.spawn.y, angle: -Math.PI / 2 };   // nothing clear: the map's own spawn
             },
 
+            /** Take a wall out of the live map (the suite's breach): its collision body, the render grid,
+             *  the lamp shadows it cast, and (through its signature) the nav grid all follow. */
+            removeWall(w) {
+                const M = this.activeMap, i = M ? M.walls.indexOf(w) : -1;
+                if (i < 0) return false;
+                const bodies = this._staticWallEntities || [];
+                const body = bodies.length === M.walls.length ? bodies[i] : null;   // built from this array, in this order
+                M.walls.splice(i, 1);
+                if (body) { body.active = false; body.markedForDestroy = true; body._finalDestroy(); bodies.splice(i, 1); }
+                if (this._renderGridWalls) this._renderGridWalls.build(M.walls);
+                this.bakeStaticLighting();
+                return true;
+            },
+
             _doLoadMap(mapId, spawnAt) {
                 // =========================================================
                 //  PHASE 1: CLEANUP
@@ -1085,7 +1099,7 @@
                 if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission) {
                     const m = this.missions.activeMission;
                     if (m.status === 'active') {
-                        setTimeout(() => {
+                        this.addPausableTimeout(() => {
                             if (this.ui && this.ui.showMissionBanner) {
                                 const text = this.missions.getObjectiveText();
                                 if (text) this.ui.showMissionBanner(text, 'gold', 'IN PROGRESS');

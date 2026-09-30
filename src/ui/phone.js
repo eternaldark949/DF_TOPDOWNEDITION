@@ -1553,48 +1553,7 @@
             }
             
             // 5. Handle 'E' Key (Interact - talk, enter car, etc.)
-            if ((e.key === 'e' || e.key === 'E') && game.running && !game.paused) {
-                if (game.activeInteraction) {
-                    if (game.activeInteraction.interactionType === 'medbay_refill') {
-                        game.refillStims();
-                    } else if (game.activeInteraction.interactionType === 'vending_machine') {
-                        game.buyBubbleTea();
-                    } else if (game.activeInteraction.interactionType === 'lost_luggage') {
-                        game.searchLostLuggage(game.activeInteraction);
-                    } else if (game.activeInteraction.interactionType === 'bed_sleep') {
-                        game.openSleepMenu();
-                    } else if (game.activeInteraction.interactionType === 'crafting_table') {
-                        game.openCraftingTable();
-                    } else if (game.activeInteraction.interactionType === 'delivery_pickup') {
-                        // Trigger delivery pickup through mission system
-                        if (game.missions.activeMission && !game.missions.activeMission.pickedUp) {
-                            game.missions.activeMission.pickedUp = true;
-                            showMessage('PACKAGE SECURED. DELIVER TO THE TARGET LOCATION.');
-                            if (game.ui && game.ui.showMissionBanner) {
-                                game.ui.showMissionBanner(game.missions.activeMission.banner, 'gold', 'IN PROGRESS');
-                            }
-                            audioSys.sfx('ui');
-                        }
-                    } else if (game.activeInteraction.interactionType === 'adopt_cat') {
-                        game.questState.hasVelvetCat = true;
-                        if (game.velvetCat) {
-                            game.velvetCat._discoverable = false;
-                            game.velvetCat.state = 'following';
-                            game.velvetCat.idleBehavior = null;
-                        }
-                        showMessage('VELVET HAS JOINED YOU.');
-                        audioSys.sfx('ui');
-                    } else if (game.activeInteraction.type === 'hail_zib') {
-                        game.openZibMenu(game.activeInteraction.target);
-                    } else if (game.activeInteraction.type === 'hijack') {
-                        game.hijackVehicle(game.activeInteraction.target);
-                    } else if (game.activeInteraction instanceof NPC) {
-                        game.startDialogue(game.activeInteraction);
-                    }
-                } else {
-                    game.toggleVehicle();
-                }
-            }
+            if ((e.key === 'e' || e.key === 'E') && game.running && !game.paused) game.interact();   // the same action as the pill (engine/events.js)
             
             // 6. Handle 'F' Key (Use Transition Point)
             if ((e.key === 'f' || e.key === 'F') && game.running && !game.paused) {

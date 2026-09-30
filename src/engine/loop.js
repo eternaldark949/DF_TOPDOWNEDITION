@@ -1,17 +1,12 @@
         // GameEngine — start / stop / reset and the main loop.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
-            start(mapId) { 
-                // Auto-detect mobile on first load (no saved settings override)
-                if (GameSettings._isMobile && !localStorage.getItem('dimensions_save_data') && !localStorage.getItem('dfab_save_slot_0')) {
-                    GameSettings.applyPreset('medium');
-                    this.lightingScale = 0.75;
-                    GameSettings.applyFilmGrain();
-                    GameSettings.applyControls();
-                    this.resize();
-                    console.log('[AUTO-DETECT] Mobile device — applied MEDIUM preset');
-                }
-                this.running = true; this.loadMap(mapId); document.getElementById('ui-layer').style.display = 'none'; document.getElementById('game-container').style.display = 'block'; if (this.ui) this.ui.showMissionBanner("WELCOME TO SOUTHERN DIMENSIONS CITY", "new", "WELCOME"); this.loop(); 
+            /** From the menu into the world: hide the menu layer, show the canvas, start the loop. */
+            enterWorld() {
+                document.getElementById('ui-layer').style.display = 'none';
+                document.getElementById('game-container').style.display = 'block';
+                this.running = true;
+                this.loop();
             },
             stop() {
                 this.running = false;
@@ -34,6 +29,7 @@
              * Resets: inventory, quest progress, health, currency, driving, entities.
              */
             resetGameState() {
+                if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
                 // --- PLAYER STATE ---
                 this.currency = 100;
                 this.scrap = 0;

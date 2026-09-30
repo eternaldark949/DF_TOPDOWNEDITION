@@ -601,7 +601,7 @@
                         for (const e of this.enemies) {
                             if (e.isTelegraphing && !e.dead) {
                                 this.questState.larissa_telegraph_hint = true;
-                                setTimeout(() => {
+                                this.addPausableTimeout(() => {
                                     this.story.triggerComms("LARISSA", "Watch the line, 949. That's your window.", 4500);
                                 }, 300);
                                 break;
@@ -613,7 +613,7 @@
                         for (const e of this.enemies) {
                             if (e instanceof Ganger && e.state === 'ALERT' && !e.dead) {
                                 this.questState.larissa_stealth_hint = true;
-                                setTimeout(() => {
+                                this.addPausableTimeout(() => {
                                     this.story.triggerComms("LARISSA", "They can't see in the dark. Use it.", 4500);
                                 }, 4800); // Delayed so it doesn't overlap telegraph hint
                                 break;
@@ -1227,9 +1227,10 @@
                         const isMoving = (Math.abs(inputX) > 0 || Math.abs(inputY) > 0);
                         const bleedChance = this.playerHealth < 20 ? 0.3 : 0.1;
                         
-                        //if ((isMoving || Math.random() < 0.05) && Math.random() < bleedChance) {
+                        // Drops as she moves (now and then when still), more often when badly hurt
+                        if ((isMoving || Math.random() < 0.05) && Math.random() < bleedChance) {
                             this.decals.addBlood(this.player.x, this.player.y, 3 + Math.random() * 2, BLOOD_KINDS.wine.decal);   // Stella's own
-                        //}
+                        }
                     }
                 }
                 
@@ -1486,23 +1487,6 @@
                 this.traffic.resolveCollisions(this.car, this.player, this.weather, audioSys, this.ownedCar, this.decals);
             },
 
-            // Helper: Checks if two rotated cars intersect
-            checkCarIntersect(c1, c2) {
-                // Get corners of Car 1
-                const corners1 = this.getOBBCorners(c1);
-                // Get corners of Car 2
-                const corners2 = this.getOBBCorners(c2);
-            
-                // Check if any corner of C1 is inside C2
-                for(let p of corners1) {
-                    if(this.isPointInRotatedRect(p.x, p.y, c2)) return true;
-                }
-                // Check if any corner of C2 is inside C1
-                for(let p of corners2) {
-                    if(this.isPointInRotatedRect(p.x, p.y, c1)) return true;
-                }
-                return false;
-            },
             
             getOBBCorners(c) {
                 const cos = Math.cos(c.angle); const sin = Math.sin(c.angle);

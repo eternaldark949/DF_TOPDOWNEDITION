@@ -1754,8 +1754,6 @@
             get highestWave() { return Math.max(0, ...Object.values(this.highestWaves)); }
             set highestWave(v) { if (v > 0) this.highestWaves[GAUNTLET_MAPS[0].id] = Math.max(this.highestWaves[GAUNTLET_MAPS[0].id] || 0, v); }
 
-            /** Is this map one of the gauntlet's? */
-            static isGauntletMap(mapId) { return GAUNTLET_MAPS.some(g => g.mapId === mapId); }
 
             getWaveConfig(wave) {
                 const gangerCount = Math.min(5 + wave, 14);

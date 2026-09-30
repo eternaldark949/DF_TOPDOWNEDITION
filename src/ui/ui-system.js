@@ -406,85 +406,6 @@
                 this.lastPlayerNavPos = { x: player.x, y: player.y };
             }
             
-            // --- DRAW NAVIGATION PATH (Glowing Purple Line with V2 Curves) ---
-            drawNavPath(ctx) {
-                if (!this.navPath || this.navPath.length < 2) return;
-                
-                const time = _frameTimeSec;
-                const dashOffset = time * 50;
-                
-                ctx.save();
-                
-                // === V2 PRECISE PATH WITH CURVES ===
-                if (this.drawablePathSegments && this.drawablePathSegments.length > 0) {
-                    // Outer glow
-                    ctx.strokeStyle = 'rgba(138, 43, 226, 0.4)';
-                    ctx.lineWidth = 24;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    ctx.shadowColor = '#8a2be2';
-                    ctx.shadowBlur = 30;
-                    this._drawPathSegments(ctx, this.drawablePathSegments);
-                    
-                    // Middle glow
-                    ctx.strokeStyle = 'rgba(148, 0, 211, 0.7)';
-                    ctx.lineWidth = 12;
-                    ctx.shadowBlur = 15;
-                    this._drawPathSegments(ctx, this.drawablePathSegments);
-                    
-                    // Core line with animated dash
-                    ctx.strokeStyle = '#da70d6';
-                    ctx.lineWidth = 4;
-                    ctx.shadowBlur = 10;
-                    ctx.setLineDash([20, 15]);
-                    ctx.lineDashOffset = -dashOffset;
-                    this._drawPathSegments(ctx, this.drawablePathSegments);
-                    
-                    ctx.restore();
-                    return;
-                }
-                
-                // === V1 FALLBACK: Simple line path ===
-                // Outer glow
-                ctx.strokeStyle = 'rgba(138, 43, 226, 0.4)';
-                ctx.lineWidth = 24;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.shadowColor = '#8a2be2';
-                ctx.shadowBlur = 30;
-                ctx.beginPath();
-                ctx.moveTo(this.navPath[0].x, this.navPath[0].y);
-                for (let i = 1; i < this.navPath.length; i++) {
-                    ctx.lineTo(this.navPath[i].x, this.navPath[i].y);
-                }
-                ctx.stroke();
-                
-                // Middle glow
-                ctx.strokeStyle = 'rgba(148, 0, 211, 0.7)';
-                ctx.lineWidth = 12;
-                ctx.shadowBlur = 15;
-                ctx.beginPath();
-                ctx.moveTo(this.navPath[0].x, this.navPath[0].y);
-                for (let i = 1; i < this.navPath.length; i++) {
-                    ctx.lineTo(this.navPath[i].x, this.navPath[i].y);
-                }
-                ctx.stroke();
-                
-                // Core line with animated dash
-                ctx.strokeStyle = '#da70d6';
-                ctx.lineWidth = 4;
-                ctx.shadowBlur = 10;
-                ctx.setLineDash([20, 15]);
-                ctx.lineDashOffset = -dashOffset;
-                ctx.beginPath();
-                ctx.moveTo(this.navPath[0].x, this.navPath[0].y);
-                for (let i = 1; i < this.navPath.length; i++) {
-                    ctx.lineTo(this.navPath[i].x, this.navPath[i].y);
-                }
-                ctx.stroke();
-                
-                ctx.restore();
-            }
             
             // Helper: Draw path segments (lines and curves)
             _drawPathSegments(ctx, segments) {
@@ -1680,48 +1601,6 @@
                 this.iconCanvas.height = window.innerHeight;
             }
             
-            // ... (Keep your Control Node / Banner logic here) ...
-            // --- 1. CONTROL NODE GENERATOR ---
-            createItemPill(item) {
-                const pill = document.createElement('div');
-                pill.className = 'ui-pill';
-            
-                // Item Details Container
-                // 'overflow: hidden' ensures the description doesn't spill out
-                pill.innerHTML = `
-                    <div style="flex:1; overflow:hidden; padding-right:10px;">
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:2px;">
-                            <div style="font-family:'Orbitron'; font-size:0.9rem; color:#fff; white-space:nowrap;">
-                                ${item.name.toUpperCase()}
-                            </div>
-                            <div style="font-family:'Orbitron'; font-size:0.7rem; color:var(--gold-primary); opacity:0.8;">
-                                x${item.qty || 1}
-                            </div>
-                        </div>
-                        <div style="font-family:'Montserrat'; font-size:0.65rem; color:#bbb; line-height:1.2; font-style:italic; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-                            ${item.desc || "Standard issue gear."}
-                        </div>
-                    </div>
-                `;
-            
-                // The Control Node (Right Anchor)
-                const node = document.createElement('div');
-                node.className = 'control-node';
-            
-                // The Hidden Menu
-                const menu = document.createElement('div');
-                menu.className = 'node-menu';
-                menu.innerHTML = `
-                    <button class="node-btn" onclick="game.inventory.equipItem('${item.id}')">EQUIP</button>
-                    <button class="node-btn" style="color:#ff5555" onclick="game.inventory.dropItem('${item.id}')">DROP</button>
-                `;
-            
-                pill.appendChild(node);
-                pill.appendChild(menu);
-            
-                this.bindDragLogic(node, pill);
-                return pill;
-            }
         
             bindDragLogic(node, pill) {
                 node.addEventListener('mousedown', (e) => {

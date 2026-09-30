@@ -134,13 +134,6 @@
                 return `${mon} ${day}, ${hr}:${min}`;
             }
 
-            _formatPlayTime(totalMinutes) {
-                const h = Math.floor(totalMinutes / 60);
-                const m = totalMinutes % 60;
-                const period = h >= 12 ? 'PM' : 'AM';
-                const displayH = h % 12 || 12;
-                return `${displayH}:${String(m).padStart(2,'0')} ${period}`;
-            }
 
             _render() {
                 const title = this.mode === 'save' ? 'Save Game' : 'Load Game';

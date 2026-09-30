@@ -456,9 +456,6 @@
                 return tier;
             }
 
-            getTierName(relationship) {
-                return BONDING_TIERS[this.getTier(relationship)].name;
-            }
 
             canBond(teammate) {
                 if (!teammate.recruited) return false;
@@ -524,7 +521,7 @@
                 audioSys.sfx('ui');
 
                 if (newTier > oldTier && BONDING_TIERS[newTier].message) {
-                    setTimeout(() => {
+                    game.addPausableTimeout(() => {
                         showMessage(`${teammate.name.toUpperCase()}: ${BONDING_TIERS[newTier].message}`);
                     }, 1500);
                 }

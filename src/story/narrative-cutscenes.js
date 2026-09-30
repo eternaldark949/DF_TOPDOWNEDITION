@@ -2,8 +2,6 @@
             constructor(game) {
                 this.game = game;
                 this.active = false;
-                this.timer = 0;
-                this.step = 0;
                 
                 // Camera control
                 this.camTargetX = 0;
@@ -21,8 +19,7 @@
                 // 1. Letterbox Effect
                 if (this.bars) this.bars.classList.add('active'); 
                 
-                // 2. Lock Player Input
-                if (this.game.player) this.game.player.locked = true; 
+                // 2. (Input is locked by the scene runner while a scene plays: ScenePlayer._lockInput)
                 
                 // 3. Hide HUD
                 const ui = document.getElementById('game-ui');
@@ -41,8 +38,6 @@
                 // 1. Remove Letterbox
                 if (this.bars) this.bars.classList.remove('active');
                 
-                // 2. Unlock Player
-                if (this.game.player) this.game.player.locked = false;
                 
                 // 3. Show HUD
                 const ui = document.getElementById('game-ui');
@@ -55,7 +50,7 @@
             showTitle(duration) {
                 if (this.overlay) {
                     this.overlay.style.opacity = '1';
-                    setTimeout(() => {
+                    this.game.addPausableTimeout(() => {
                         this.overlay.style.opacity = '0';
                     }, duration);
                 }
@@ -202,12 +197,6 @@
                     case "LOC_HOTEL_LOBBY":
                         return g.activeMap.id === 'hotel_lobby';
         
-                    case "TIMER_60": return timerValue >= 60;
-                    case "TIMER_120": return timerValue >= 120;
-                    case "TIMER_300": return timerValue >= 300;
-                    case "TIMER_360": return timerValue >= 360;
-                    case "TIMER_600": return timerValue >=600;
-        
                     case "HAS_KEYCARD":
                         return g.questState.hasKeycard;
 
@@ -229,8 +218,13 @@
                     case "CHURCH_BOSS_DEFEATED":
                         return g.activeMap.id === 'church_boss' && g.enemies.length === 0;
         
-                    default:
+                    default: {
+                        // TIMER_<ticks>, and LOC_<map id> for any map
+                        const m = /^TIMER_(\d+)$/.exec(conditionString);
+                        if (m) return timerValue >= +m[1];
+                        if (conditionString.startsWith('LOC_')) return g.activeMap.id === conditionString.slice(4).toLowerCase();
                         return false;
+                    }
                 }
             }
         }
@@ -251,7 +245,6 @@
                 this.currentStepData = null;
                 this.stepTimer = 0; 
                 this.initializedStep = false;
-                this.commsTimeout = null;
 
                 // Optional quest state
                 this.activeOptional = null;       // { id, step, stepData, timer, initialized }
@@ -295,8 +288,7 @@
             
             // Direct Event Handler
             onMessageRead(contactName) {
-                // Handle "Read Message" Step (Index 7)
-                if (this.state.step === 7 && contactName === 'Mirabel') {
+                if (this.isAt('READ_MESSAGE') && contactName === 'Mirabel') {
                     console.log("STORY EVENT: Mirabel message read.");
                     this.advanceStep();
                 }
@@ -343,7 +335,8 @@
         
                 // 4. Check Completion
                 if (this.currentStepData.condition) {
-                    const isComplete = this.nsm.checkCondition(this.currentStepData.condition, this.stepTimer);
+                    const c = this.currentStepData.condition;
+                    const isComplete = typeof c === 'function' ? c(this.game, this.stepTimer) : this.nsm.checkCondition(c, this.stepTimer);
                     if (isComplete) {
                         console.log(`STORY: Step ${this.state.step} Condition Met.`);
                         this.advanceStep();
@@ -351,6 +344,21 @@
                 }
             }
         
+            // ── Steps by name (story-db.js names every step): numbers shift when a chapter changes; names don't
+            _stepsOf(st = this.state) { const M = this.nsm.db[st.part]?.chapters[st.chapter]?.missions[st.mission]; return M ? M.steps : {}; }
+            stepIndex(name) {
+                const S = this._stepsOf();
+                for (const k in S) if (S[k].name === name) return +k;
+                throw new Error('No story step named ' + name);
+            }
+            isAt(name) { return this.state.step === this.stepIndex(name); }
+            isBefore(name) { return this.state.step < this.stepIndex(name); }
+            /** Jump to a named step (its onStart runs on the next update). */
+            goTo(name) {
+                this.state.step = this.stepIndex(name);
+                this.currentStepData = null; this.initializedStep = false;
+            }
+
             advanceStep() {
                 this.state.step++;
                 this.currentStepData = null; 
@@ -363,48 +371,42 @@
                 const qs = this.game.questState;
         
                 // 1. HUB ARRIVAL FAIL-SAFE
-                if (mapId === 'hub_949' && this.state.step < 3) {
+                if (mapId === 'hub_949' && this.isBefore('CAR_REVEAL')) {
                     console.log("STORY OVERRIDE: Player in Hub. Jumping to Step 3 (Car Reveal).");
-                    this.state.step = 3;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('CAR_REVEAL');
                     this.cleanupPhone();
                 }
 
                 // 2. KEYCARD OVERRIDE -> Step 9 (Leave Club)
-                if (qs.hasKeycard && this.state.step < 9) {
+                if (qs.hasKeycard && this.isBefore('LEAVE_CLUB')) {
                     console.log("STORY OVERRIDE: Keycard found. Jumping to Step 9.");
-                    this.state.step = 9;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('LEAVE_CLUB');
                     this.cleanupPhone();
                 }
         
                 // 3. EXIT OVERRIDE -> Step 10 (Arrive Hotel)
-                if (this.state.step === 9 && mapId === 'hub_949') {
+                if (this.isAt('LEAVE_CLUB') && mapId === 'hub_949') {
                     console.log("STORY OVERRIDE: Left club. Jumping to Step 10.");
-                    this.state.step = 10;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('ARRIVE_HOTEL');
                 }
         
                 // 4. ARRIVAL OVERRIDE -> Step 6 (Wait inside Club)
-                if (mapId === 'moon_city_nightclub' && this.state.step < 6) {
+                if (mapId === 'moon_city_nightclub' && this.isBefore('WAIT_FOR_TEXT')) {
                     console.log("STORY OVERRIDE: Arrived at Nightclub. Jumping to Step 6.");
-                    this.state.step = 6;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('WAIT_FOR_TEXT');
                 }
 
                 // 5. AMBUSH CLEARED OVERRIDE -> Step 14 (Report back)
                 // Handles old saves where ambushCleared was set by inline code
-                if (qs.ambushCleared && this.state.step < 14) {
+                if (qs.ambushCleared && this.isBefore('REPORT_BACK')) {
                     console.log("STORY OVERRIDE: Ambush already cleared. Jumping to Step 14.");
-                    this.state.step = 14;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('REPORT_BACK');
                 }
 
                 // 6. CONTRACTOR REWARDED -> Step 15 (Chapter complete)
-                if (qs.rewardClaimedContractor && this.state.step < 15) {
+                if (qs.rewardClaimedContractor && this.isBefore('CHAPTER_COMPLETE')) {
                     console.log("STORY OVERRIDE: Contractor rewarded. Jumping to Step 15.");
-                    this.state.step = 15;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('CHAPTER_COMPLETE');
                 }
 
                 // 7. CHURCH BOSS OVERRIDE — mark sanctum optional as complete

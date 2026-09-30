@@ -910,8 +910,6 @@
                 ctx.restore();
             }
 
-            /** Old name, kept for callers. */
-            drawRoofOcclusion(ctx) { this.drawVeil(ctx); }
 
             /**
              * Outdoor rooms carry the sky's light: on the light layer (darkness `ambient`),

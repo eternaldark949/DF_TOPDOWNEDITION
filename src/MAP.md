@@ -16,7 +16,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## core/ (loaded first)
 | File | What's in it |
 |---|---|
-| `core/config.js` | Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…) |
+| `core/config.js` | Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…). `console.log` is silent unless `localStorage.dfab_debug = '1'` |
 | *(generated)* | `ASSETS`: your images and audio from `assets/`, built automatically |
 | `core/assets.js` | `getImage`, `drawAsset`, `playSound` / `loadSound` for your assets |
 | `core/registries.js` | Notes, consumables, drinks, cosmetics (wigs, skins, outfits, hats, jewelry…); `CosmeticsSystem`, `BuffSystem` |
@@ -89,7 +89,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `story/story-db.js` | `STORY_DB`: story text and beats |
 | `story/captions.js` | Caption/subtitle system |
-| `story/narrative-cutscenes.js` | Cutscene manager, narrative state machine, `StoryManager` |
+| `story/narrative-cutscenes.js` | Cutscene manager, narrative state machine, `StoryManager`. Steps are addressed **by name**: `story.goTo('LEAVE_CLUB')`, `isAt`, `isBefore` (numbers shift when a chapter changes). Conditions: named strings, `TIMER_<ticks>`, `LOC_<map id>`, or a function `(game, ticks) => bool` |
 | `story/missions.js` | Mission types, `MissionSystem`, crafting schematics |
 | `story/dialogue-bonding.js` | Bonding dialogues, companion idle spots, speaker colours, dialogue transcript/sequence, `BondingSystem` |
 | `story/scene-vision.js` | `SceneVision`: full-screen painted sequences a scene steps through with `beat()` (`vanoga`: the flames, the dark, the golden egg, the burst, the pink orb of the Empereal Lord) |
@@ -120,7 +120,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `engine/pause-system.js` | `PauseSystem` |
 | `engine/game-engine.js` | `class GameEngine`: constructor, companions, and `engineMixin` (how the files below attach) |
-| `engine/events.js` | Input and UI event wiring |
+| `engine/events.js` | Input and UI event wiring; `interact()` — the one action for the pill and the E key |
 | `engine/combat-effects.js` | Screen shake, time slow, death, firing, boosters, player damage |
 | `engine/scope.js` | Scope view: with a sniper up to her eye, the world darkens to a lit lane along her line of fire (clipped at walls), the camera leans down it, the lane steadies; ambience quiets. Setting: Scope View |
 | `engine/noise.js` | Noise: `emitNoise` — gunshots, flits, punches, struck doors, shattered glass carry (`CONFIG.NOISE`), muffled by walls and shut doors; gangers in earshot hear roughly where and go to look; the ripple she sees |
@@ -131,15 +131,15 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/daytime-flit.js` | Daytime exposure, flit teleport, graveyard ghosts |
 | `engine/screens-ui.js` | HUD update, dialogue and portraits, character/team/story/collection screens, notes, crafting |
 | `engine/save-load.js` | Saving, loading, migrations |
-| `engine/map-loading.js` | `loadMap`: building each map when you enter it; baked lighting |
+| `engine/map-loading.js` | `loadMap`: building each map when you enter it; baked lighting; `removeWall(w)` (collision, render grid and shadows follow) |
 | `engine/world-state.js` | Emissive pass, debug views, transitions, vehicles, visibility, time of day (`dayCycle`: darkness, the colour of the dark, daylight, sun, lamps on), darkness |
 | `engine/update.js` | `update()`: the per-tick simulation |
 | `engine/draw.js` | `draw()`: the frame renderer |
 | `engine/interiors.js` | Apartment, clinic, House of Death, Double Nights lobby and penthouse (the mirror rift), the Sanctum (rose window, sigil runes), and Moon City Nightclub interiors (floors, glows; the club's light show in time with its track), the graveyard's candle flames, the city seen from the veranda |
 | `engine/keeper-art.js` | The prologue's places: `keepers_hill` (the island above the clouds, the path, flowers, the house with its floating gable, portals and planets) and `keepers_parlor` (checkerboard tiles, the red wingback and burgundy chesterfield, the fire and its embers, the window above it); `keeperEmberPop` |
 | `engine/lighting.js` | Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, wet reflections, atmosphere |
-| `engine/player-draw-input.js` | Drawing the player, emotes, timers, joysticks — the touch sticks: the move stick's flit ring (and flick / two-finger flit settings), the fire stick's threshold ring (aim inside, fire past it; sniper fire-on-release) and aim memory |
-| `engine/loop.js` | `start`, `stop`, `resetGameState`, the main loop |
+| `engine/player-draw-input.js` | Drawing the player, emotes, `addPausableTimeout` (game-time timers: they pause with the game and clear on new game/load — use these, not `setTimeout`, for anything in the story or world), joysticks — the touch sticks: the move stick's flit ring (and flick / two-finger flit settings), the fire stick's threshold ring (aim inside, fire past it; sniper fire-on-release) and aim memory |
+| `engine/loop.js` | `enterWorld` (menu → world), `stop`, `resetGameState`, the main loop |
 
 ## app/ (loaded last)
 | File | What's in it |

@@ -1624,28 +1624,6 @@
                 this.h = this.height;
             }
             
-            /**
-             * Handle player pushing this prop
-             */
-            handlePlayerPush(player) {
-                const center = this.getCenter();
-                const dist = Math.hypot(center.x - player.x, center.y - player.y);
-                const pushRadius = Math.max(this.width, this.height) / 2 - 5;
-                
-                if (dist < pushRadius) {
-                    const dx = center.x - player.x;
-                    const dy = center.y - player.y;
-                    const len = Math.hypot(dx, dy) || 1;
-                    
-                    // FIX: Define a push force (e.g., 20) and divide by mass
-                    // Heavier objects (mass 50,000) will result in tiny, imperceptible velocity
-                    const pushForce = 20; 
-                    const acceleration = pushForce / (this.mass || 1); 
-            
-                    this.vx += (dx / len) * acceleration;
-                    this.vy += (dy / len) * acceleration;
-                }
-            }
             
             draw(ctx) {
                 if (!this.visible) return;

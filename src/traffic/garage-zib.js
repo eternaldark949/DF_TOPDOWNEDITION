@@ -673,33 +673,6 @@
                 };
             }
             
-            /**
-             * Calculate a look-ahead target point on a turn path (bezier curve).
-             * @param {TrafficVehicle} vehicle - The vehicle
-             * @param {Object} turnPath - The bezier turn path
-             * @param {number} currentProgress - Current progress along path (0-1)
-             * @param {number} lookAhead - Progress increment to look ahead
-             * @returns {{x: number, y: number, angle: number, progress: number}}
-             */
-            static getTurnPathTarget(vehicle, turnPath, currentProgress, lookAhead = 0.1) {
-                if (!turnPath) return null;
-                
-                // Adjust look-ahead based on speed
-                const speedMod = Math.max(0.5, Math.abs(vehicle.speed) / 5);
-                const adjustedLookAhead = lookAhead * speedMod;
-                
-                // Get target progress (don't overshoot)
-                const targetProgress = Math.min(currentProgress + adjustedLookAhead, 1.0);
-                const point = turnPath.getPoint(targetProgress);
-                const angle = turnPath.getAngle(targetProgress);
-                
-                return {
-                    x: point.x,
-                    y: point.y,
-                    angle: angle,
-                    progress: targetProgress
-                };
-            }
             
             /**
              * Calculate appropriate speed for a turn based on curvature.

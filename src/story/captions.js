@@ -394,16 +394,7 @@
                 }
             },
             
-            // Legacy alias
-            victoriaCombatQuip() { this.teammateCombatQuip('Victoria'); },
             
-            // Trigger dancer reaction during combat
-            dancerCombatReaction(dancerName) {
-                if (Math.random() < 0.08) { // 8% chance
-                    const line = this.getRandomLine('dancers', 'combat');
-                    if (line) this.show(dancerName, line, 2500);
-                }
-            },
             
             // Check for NPC proximity greetings
             checkProximityGreetings(player, npcs, teammates) {
