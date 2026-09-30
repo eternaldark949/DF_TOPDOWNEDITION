@@ -24,15 +24,16 @@
         engineMixin({
             /**
              * A spent casing flies from the gun's ejection port (to the right of the barrel, a little
-             * back), spins, bounces and settles on the ground, then fades. Only guns whose model
-             * throws brass (ui/weapon-models.js); at most CASINGS_MAX lie about at once.
+             * back), spins and settles, and lies there glinting like a fleck of glitter in the gun's
+             * colour (its model's `brass`, ui/weapon-models.js; none for energy guns). At most 24.
              */
             spawnCasing(x, y, angle, weaponId) {
-                if (!weaponId || !weaponModel(weaponId).brass || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
+                const col = weaponId ? weaponModel(weaponId).brass : null;
+                if (!col || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
                 const L = this.casings || (this.casings = []), c = Math.cos(angle), s = Math.sin(angle);
                 const sniper = weaponId.includes('sniper'), back = sniper ? 30 : 8, v = 1.7 + Math.random() * 1.1;
                 L.push({ x: x - c * back, y: y - s * back, vx: -s * v - c * (0.35 + Math.random() * 0.4), vy: c * v - s * (0.35 + Math.random() * 0.4),
-                         a: angle, spin: (Math.random() - 0.5) * 0.9, t: 0, big: sniper });
+                         a: angle, spin: (Math.random() - 0.5) * 0.9, t: 0, big: sniper, col, ph: Math.random() * 6.28, rate: 0.004 + Math.random() * 0.005 });
                 if (L.length > 24) L.shift();
             },
             updateCasings() {
@@ -44,22 +45,31 @@
                     if (k.t > 420) L.splice(i, 1);
                 }
             },
-            /** Casings on the ground (after decals, under everyone): one path, one fill. */
+            /**
+             * Casings on the ground (after decals, under everyone) as glitter: a fleck in the gun's colour
+             * that twinkles on its own rhythm, and at the top of each twinkle a four-point glint.
+             */
             drawCasings(ctx, cb) {
                 const L = this.casings;
                 if (!L || !L.length || _zoomLOD >= 1) return;
                 ctx.save();
-                ctx.fillStyle = '#d9a93c';
-                ctx.beginPath();
-                let n = 0;
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.lineCap = 'round';
                 for (const k of L) {
                     if (k.x < cb.left || k.x > cb.right || k.y < cb.top || k.y > cb.bottom) continue;
-                    const hl = k.big ? 1.9 : 1.2, hw = k.big ? 0.65 : 0.5, c = Math.cos(k.a), s = Math.sin(k.a);
-                    ctx.moveTo(k.x + c * hl - s * hw, k.y + s * hl + c * hw); ctx.lineTo(k.x - c * hl - s * hw, k.y - s * hl + c * hw);
-                    ctx.lineTo(k.x - c * hl + s * hw, k.y - s * hl - c * hw); ctx.lineTo(k.x + c * hl + s * hw, k.y + s * hl - c * hw); ctx.closePath();
-                    n++;
+                    const fade = k.t > 360 ? (420 - k.t) / 60 : 1, spin = k.t < 26 ? 1 : 0;
+                    const tw = Math.pow(Math.abs(Math.sin(_frameTime * k.rate + k.ph)), 6), s = k.big ? 1.3 : 1;
+                    ctx.globalAlpha = fade * (0.45 + 0.55 * Math.max(tw, spin * 0.7));
+                    ctx.fillStyle = k.col;
+                    ctx.fillRect(k.x - 0.6 * s, k.y - 0.6 * s, 1.2 * s, 1.2 * s);        // the fleck
+                    if (tw > 0.35) {                                                     // the glint
+                        const r = (1.2 + 2.6 * tw) * s;
+                        ctx.globalAlpha = fade * tw;
+                        ctx.fillStyle = '#ffffff'; ctx.fillRect(k.x - 0.35, k.y - 0.35, 0.7, 0.7);
+                        ctx.strokeStyle = k.col; ctx.lineWidth = 0.45;
+                        ctx.beginPath(); ctx.moveTo(k.x - r, k.y); ctx.lineTo(k.x + r, k.y); ctx.moveTo(k.x, k.y - r); ctx.lineTo(k.x, k.y + r); ctx.stroke();
+                    }
                 }
-                if (n) { ctx.fill(); ctx.strokeStyle = 'rgba(70, 40, 10, 0.55)'; ctx.lineWidth = 0.3; ctx.stroke(); }
                 ctx.restore();
             },
             /** The star of each fresh muzzle flash, at the muzzle along the shot (its light is the lighting pass's). */
