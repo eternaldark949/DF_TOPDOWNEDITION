@@ -298,6 +298,8 @@
                     }
                 }
                 this.decals.draw(this.ctx, cullBounds.world);
+                // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day
+                this.drawCastShadows(this.ctx, cullBounds.world);
                 
                 this.profiler.stop('Render:Buildings');
                 
@@ -1021,6 +1023,8 @@
                 // 4. LIGHTING SYSTEM & DEBUG
                 this.profiler.start('Render:Lighting');
                 this.drawLightingSystem(this.ctx);
+                // By day, the sun's warmth over the frame (engine/daylight.js)
+                this.drawDaylight(this.ctx);
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
                 this.drawEmissivePass(this.ctx);
                 // Looking down a sniper's sight: the world narrows to her line
@@ -1181,10 +1185,12 @@
                         this.visualGrayscale += (this.targetGrayscale - this.visualGrayscale) * 0.05;
                         if (this.visualGrayscale < 0.5) this.visualGrayscale = 0;
                     }
-                    const sat = 1.4 * (1.0 - this.nvIntensity) * ggSaturate; 
-                    const con = (1.35 + (0.15 * this.nvIntensity)) * ggContrast; 
-                    const sepia = 0.18 * (1.0 - this.nvIntensity);
-                    const bright = (1.1 + (1.4 * this.nvIntensity)) * ggBright * ggExposure;
+                    // The grade follows the hour: the night's rich contrast, the day's softer, clearer light
+                    const dayG = this.sunState().k * this._sunReach();
+                    const sat = (1.4 - 0.1 * dayG) * (1.0 - this.nvIntensity) * ggSaturate; 
+                    const con = (1.35 - 0.08 * dayG + (0.15 * this.nvIntensity)) * ggContrast; 
+                    const sepia = (0.18 - 0.12 * dayG) * (1.0 - this.nvIntensity);
+                    const bright = (1.1 + 0.2 * dayG + (1.4 * this.nvIntensity)) * ggBright * ggExposure;
                     const effectiveGray = Math.max(this.visualGrayscale, this.nvIntensity * 100);
                     filterChain = `grayscale(${effectiveGray.toFixed(0)}%) contrast(${con.toFixed(2)}) saturate(${sat.toFixed(2)}) sepia(${sepia.toFixed(2)}) brightness(${bright.toFixed(2)})`;
                     // Ms. Jean Soda: subtle pink warmth even outside NV

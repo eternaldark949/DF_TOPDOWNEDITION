@@ -18,11 +18,9 @@
                 }
                 this._exposureOff = false;
         
-                // Brightness: 100% -> 130%
-                const brightness = 100 + (intensity * 60);
-                
-                // Contrast: 100% -> 80%
-                const contrast = 100 - (intensity * 20);
+                // A gentle lift only: the day's real light is drawn (engine/daylight.js drawDaylight)
+                const brightness = 100 + (intensity * 8);
+                const contrast = 100;
         
                 const filterString = `brightness(${brightness}%) contrast(${contrast}%)`;
                 

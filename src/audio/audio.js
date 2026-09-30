@@ -476,8 +476,14 @@
            `room` is where its speakers are (it's fullest there), `volume` its level. */
         const MAP_MUSIC = {
             apt_949: { track: 'silver queen tst', room: 'main_room', volume: 0.5 },   // the Silver Queen suite
-            // Swig: a 16-bar loop at 140 BPM, the kick on the first sample; the club's lights dance to it
-            moon_city_nightclub: { track: 'swig', room: 'hall', volume: 0.55, bpm: 140, beat0: 0 },
+            // Swig (the club's cut): a 24-bar loop at 140 BPM, the kick on the first sample; the club's lights dance to it
+            moon_city_nightclub: { track: 'moon city nightclub - swig', room: 'hall', volume: 0.55, bpm: 140, beat0: 0 },
+            // The Visitor: the Keeper's fireside — the same track on the hill and in the parlor, so it plays on across the cut
+            keepers_hill: { track: 'the visitor', volume: 0.5 },
+            keepers_parlor: { track: 'the visitor', volume: 0.5 },
+            // The Sanctum: the Triumvirate
+            church_boss: { track: 'triumvirate boss fight', volume: 0.55 },
+            // ('house on the hill' ships in the build, not placed yet)
         };
         const CLUB_BPM = 140;
         const CLUB_PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];   // the club's lights: violet, lavender, rose, gold
