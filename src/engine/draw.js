@@ -329,6 +329,7 @@
                     }
                 }
                 this.decals.draw(this.ctx, cullBounds.world);
+                this.drawCasings(this.ctx, cullBounds.world);                 // spent brass (engine/combat-effects.js)
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day
                 this.drawCastShadows(this.ctx, cullBounds.world);
                 
@@ -795,6 +796,8 @@
                     this.ctx.restore();
                 }
                 
+                this.drawMuzzleStars(this.ctx);                              // the flash's star at each muzzle
+
                 // Passenger lean-out rendering — draw in-car companions at their seat positions
                 // Uses drawProceduralHumanoid with isDriving flag for unified lean-out animation
                 // Drawn BEFORE the car overlay so the car body partially covers them

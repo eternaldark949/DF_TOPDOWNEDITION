@@ -711,11 +711,7 @@
                 if (scaleX !== 1 || scaleY !== 1) ctx.scale(scaleX, scaleY);
                 if (bodyAlpha !== 1) ctx.globalAlpha = bodyAlpha;
                 
-                // Shadow (behind feet, which are at -X)
-                ctx.fillStyle = 'rgba(0,0,0,0.4)';
-                ctx.beginPath();
-                ctx.ellipse(-12, 0, 5, 10, 0, 0, Math.PI * 2);
-                ctx.fill();
+                // (their contact shadow is the renderer's: drawHumanContactShadow, cast along the sun)
                 
                 // Their own look (Pedestrian.makeLook) — hats, hair and all. Zoomed out (more of
                 // the crowd on screen, too small to read details) they get simple hair, no jewelry.

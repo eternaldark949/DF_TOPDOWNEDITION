@@ -81,14 +81,10 @@
             return 'pistol';
         }
 
-        /** Barrel tip of a drawWeapon() shape in the weapon's own coords (scale 1).
-         *  Mirrors drawWeapon's shape order so the id resolves to the same model. */
+        /** Barrel tip of a weapon's drawn model in its own coords (scale 1): WEAPON_MODELS (ui/weapon-models.js). */
         function weaponMuzzleLocal(type) {
-            if (type.includes('pistol')) return { x: 12, y: 1 };
-            if (type.includes('sniper')) return { x: 55, y: 0.5 };
-            if (type.includes('rifle'))  return { x: 28, y: 1.5 };
-            if (type.includes('golden')) return { x: 20, y: 1 };
-            return { x: 12, y: 1 };
+            const m = weaponModel(type).muzzle;
+            return { x: m[0], y: m[1] };
         }
 
         /** World position of an actor's drawn muzzle if it faced `dirAngle` (falls back to its

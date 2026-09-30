@@ -4105,6 +4105,19 @@
                of phase = PI / w ticks). For the planted foot to stay put, that 2A
                sweep must equal the ground the body covers meanwhile (v * PI / w).
                With CADENCE 0.2: A ~ 7.85 * sqrt(v) -> 14.7px @3.5, 17.9px @5.2, 20.8px @7.0. */
+            // Humanoid shading (ui/humanoid-render.js humanShade): a shine down every limb, torso and
+            // head (they're cylinders and domes seen from above), a soft contact shadow cast along
+            // the sun, and at night a rim of the nearest street lamp's colour.
+            HUMAN_SHADE: {
+                HL_DAY: 0.24,           // shine alpha by day (tinted by the sun)
+                HL_NIGHT: 0.13,         // … and at night (lavender moonlight)
+                HL_RAIN: 0.12,          // extra shine when wet
+                SHADE: 0.22,            // the torso's side away from the light
+                SHADOW_DAY: 0.34, SHADOW_NIGHT: 0.3,    // contact shadow alphas
+                RIM_R: 180,             // a lamp this close (px) rims them in its colour
+                RIM_A: 0.6,
+                RIM_PEDS: 8             // pedestrians rimmed per frame (named characters always are)
+            },
             GAIT: {
                 CADENCE: 0.2,           // sqrt curve: within ~5% of the old 0.25 + 0.04v at speeds 3.5-7, but slows down at crawl speeds instead of shuffling
                 SLIP_FACTOR: 1.0,       // 1 = no slip. <1 = shorter strides (feet glide forward), >1 = longer (feet slip back)
@@ -5092,14 +5105,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return 'pistol';
         }
 
-        /** Barrel tip of a drawWeapon() shape in the weapon's own coords (scale 1).
-         *  Mirrors drawWeapon's shape order so the id resolves to the same model. */
+        /** Barrel tip of a weapon's drawn model in its own coords (scale 1): WEAPON_MODELS (ui/weapon-models.js). */
         function weaponMuzzleLocal(type) {
-            if (type.includes('pistol')) return { x: 12, y: 1 };
-            if (type.includes('sniper')) return { x: 55, y: 0.5 };
-            if (type.includes('rifle'))  return { x: 28, y: 1.5 };
-            if (type.includes('golden')) return { x: 20, y: 1 };
-            return { x: 12, y: 1 };
+            const m = weaponModel(type).muzzle;
+            return { x: m[0], y: m[1] };
         }
 
         /** World position of an actor's drawn muzzle if it faced `dirAngle` (falls back to its
@@ -21038,11 +21047,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (scaleX !== 1 || scaleY !== 1) ctx.scale(scaleX, scaleY);
                 if (bodyAlpha !== 1) ctx.globalAlpha = bodyAlpha;
                 
-                // Shadow (behind feet, which are at -X)
-                ctx.fillStyle = 'rgba(0,0,0,0.4)';
-                ctx.beginPath();
-                ctx.ellipse(-12, 0, 5, 10, 0, 0, Math.PI * 2);
-                ctx.fill();
+                // (their contact shadow is the renderer's: drawHumanContactShadow, cast along the sun)
                 
                 // Their own look (Pedestrian.makeLook) — hats, hair and all. Zoomed out (more of
                 // the crowd on screen, too small to read details) they get simple hair, no jewelry.
@@ -38055,6 +38060,228 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return { tops, bottoms, shoes, hats, jewelry };
         })();
 
+        /* =====================================================================
+           WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
+           the barrel, the grip hand near 0,0, +y to the holder's right), each in a
+           material. A model is painted once into a sprite (bakeWeapon) and stamped
+           by drawWeapon (ui/humanoid-render.js); only its glows are drawn live.
+           Seen from above a barrel is a cylinder, so its shine runs down the middle
+           whichever way the holder turns: the baked shading never needs relighting.
+             muzzle   barrel tip (shots and the laser leave from here: weaponMuzzleLocal)
+             rail     where an under-barrel laser module sits (its front end)
+             brass    spent casings fly from the ejection port on each shot
+             glow     live emitters [x, y, r, colour]
+           ===================================================================== */
+        const GUN_MATERIALS = {             // base, edge (dark rim), hi (the shine down the middle)
+            gunmetal: ['#3a3f4a', '#121419', '#8a92a4'],
+            polymer:  ['#27252e', '#0c0b10', '#56526a'],
+            black:    ['#1b1a22', '#050508', '#5d5b72'],
+            silver:   ['#b4b8c8', '#4f5264', '#f4f5fb'],
+            gold:     ['#c8982a', '#5e400b', '#ffe79a'],
+            pearl:    ['#d6cff0', '#6f6799', '#fdfbff'],
+            lavender: ['#b4acea', '#4f4796', '#efebff'],
+            pink:     ['#ff4aa6', '#7d0f49', '#ffb3da'],
+            crimson:  ['#b0142f', '#4a0612', '#ff6078'],
+            teal:     ['#17c4a6', '#075044', '#8dffe9'],
+            violet:   ['#6c40cc', '#26105a', '#b89aff']
+        };
+
+        // rr: rounded rect [x, y, w, h, r] · poly: points · ring: stroked rounded rect · lines: [x1, y1, x2, y2]… in `c`
+        const WEAPON_MODELS = {
+            pistol_fpx: {
+                stance: 'pistol', muzzle: [13.4, 1], rail: [11, 3.9], brass: true,
+                parts: [
+                    { poly: [[-2.5, 3], [1.8, 3], [1, 8.5], [-3.4, 8]], m: 'polymer' },
+                    { ring: [1.2, 3, 3.4, 2.6, 1.2], m: 'polymer' },
+                    { rr: [-3, -1.3, 15, 4.6, 1.2], m: 'gunmetal' },
+                    { rr: [11.8, -0.2, 1.6, 2.4, 0.5], m: 'black' },
+                    { lines: [[-2.2, -0.8, -2.2, 2.8], [-1.4, -0.8, -1.4, 2.8], [-0.6, -0.8, -0.6, 2.8], [0.2, -0.8, 0.2, 2.8]], c: 'rgba(8, 8, 12, 0.55)', w: 0.35 },
+                    { rr: [4, -0.3, 3.4, 0.9, 0.3], m: 'black' },                              // ejection port
+                    { dot: [9.5, 1, 0.75], c: '#00f3ff' }
+                ],
+                glow: [[9.5, 1, 3, '#00f3ff']]
+            },
+            pistol_anavia: {
+                stance: 'pistol', muzzle: [13.4, 1], rail: [11, 3.9], brass: false,
+                parts: [
+                    { poly: [[-2.4, 3], [1.6, 3], [0.6, 8.2], [-3.2, 7.8]], m: 'black' },
+                    { ring: [1.1, 3, 3.3, 2.5, 1.2], m: 'gold' },
+                    { poly: [[-3, -1.4], [9.5, -1.4], [13.2, 0.1], [13.2, 1.9], [9.5, 3.4], [-3, 3.4]], m: 'lavender' },
+                    { lines: [[-2, 1, 9.5, 1]], c: '#f7d77a', w: 0.55 },                        // gold inlay down the spine
+                    { rr: [2, -0.9, 7, 0.7, 0.35], m: 'gold' }, { rr: [2, 2.2, 7, 0.7, 0.35], m: 'gold' },
+                    { rr: [9.8, 0.4, 2.6, 1.2, 0.6], c: '#d8d8ff' }
+                ],
+                glow: [[11.2, 1, 3.4, '#ccccff'], [5, 1, 2.2, '#ccccff']]
+            },
+            pistol_ganger: {                                                                    // the hot pink pistol
+                stance: 'pistol', muzzle: [12.9, 1], rail: [10.5, 3.9], brass: true,
+                parts: [
+                    { poly: [[-2.5, 3], [1.8, 3], [1, 8.5], [-3.4, 8]], m: 'pink' },
+                    { ring: [1.2, 3, 3.4, 2.6, 1.2], m: 'pink' },
+                    { rr: [-2.6, 2.1, 12, 1.6, 0.6], m: 'pink' },
+                    { rr: [-3, -1.2, 14.5, 4.4, 1.1], m: 'silver' },
+                    { rr: [11.3, -0.1, 1.6, 2.2, 0.5], m: 'black' },
+                    { lines: [[-2.2, -0.7, -2.2, 2.7], [-1.4, -0.7, -1.4, 2.7], [-0.6, -0.7, -0.6, 2.7]], c: 'rgba(40, 30, 50, 0.5)', w: 0.35 },
+                    { rr: [4, -0.2, 3.2, 0.9, 0.3], m: 'black' }
+                ],
+                glow: []
+            },
+            rifle_rb98: {                                                                       // SMG-class: stubby, a forward grip, a curved mag
+                stance: 'rifle', muzzle: [29.3, 1.5], rail: [22, 4.8], brass: true,
+                parts: [
+                    { poly: [[-9, 0.2], [-1, 0.4], [-1, 4.6], [-9, 5.4]], m: 'polymer' },
+                    { rr: [-6.6, 1.8, 4, 1.8, 0.8], c: '#0a090e' },                                // skeleton stock cut-out
+                    { rr: [-9.8, -0.4, 1.4, 6.2, 0.6], m: 'black' },
+                    { poly: [[4, 4.6], [7.8, 4.6], [8.8, 10.4], [5, 11]], m: 'polymer' },
+                    { rr: [15.5, 4.2, 2.6, 4.2, 1], m: 'polymer' },
+                    { rr: [-1, -1.8, 17, 6.6, 1.5], m: 'gunmetal' },
+                    { lines: [[1, -1.4, 1, -0.6], [2.3, -1.4, 2.3, -0.6], [3.6, -1.4, 3.6, -0.6], [4.9, -1.4, 4.9, -0.6], [6.2, -1.4, 6.2, -0.6], [7.5, -1.4, 7.5, -0.6], [8.8, -1.4, 8.8, -0.6], [10.1, -1.4, 10.1, -0.6], [11.4, -1.4, 11.4, -0.6]], c: 'rgba(6, 6, 10, 0.6)', w: 0.45 },
+                    { rr: [13, -1, 10, 5, 1.4], m: 'teal' },
+                    { lines: [[14.6, -0.3, 14.6, 3.3], [16.2, -0.3, 16.2, 3.3], [17.8, -0.3, 17.8, 3.3], [19.4, -0.3, 19.4, 3.3], [21, -0.3, 21, 3.3]], c: 'rgba(4, 40, 34, 0.7)', w: 0.5 },
+                    { rr: [23, 0.5, 5, 2, 0.6], m: 'black' },
+                    { rr: [27, 0, 2.3, 3, 0.7], m: 'gunmetal' },
+                    { rr: [5, 3.2, 3.4, 1, 0.3], m: 'black' }
+                ],
+                glow: [[18, 1.5, 3.2, '#00ffcc']]
+            },
+            sniper_sara: {                                                                      // YourGirlSara: gold and black, fluted, a brake
+                stance: 'sniper', muzzle: [55.2, 0.5], rail: [44, 3.2], brass: true,
+                parts: [
+                    { poly: [[-12, -1.5], [-1, -1], [-1, 3.2], [-8, 5.4], [-12, 5]], m: 'black' },
+                    { rr: [-9, -1.2, 6.4, 1.7, 0.7], m: 'gold' },
+                    { rr: [2.6, 3, 1.2, 3, 0.4], m: 'gunmetal' }, { rr: [2.2, 5.4, 2, 2, 1], m: 'gunmetal' },   // bolt handle
+                    { rr: [-1, -2.2, 26, 5.4, 1.4], m: 'gold' },
+                    { rr: [25, -0.8, 27, 2.6, 0.9], m: 'black' },
+                    { lines: [[27, -0.1, 48, -0.1], [27, 1.1, 48, 1.1]], c: 'rgba(120, 118, 140, 0.55)', w: 0.35 },
+                    { rr: [51, -1.6, 4.2, 4.2, 0.8], m: 'gunmetal' },
+                    { lines: [[52.2, -1.4, 52.2, 2.4], [53.7, -1.4, 53.7, 2.4]], c: 'rgba(0, 0, 0, 0.7)', w: 0.5 },
+                    { rr: [3, -6.6, 17, 3.4, 1.5], m: 'black' },
+                    { rr: [1.6, -7.3, 3.2, 4.8, 1], m: 'black' }, { rr: [16.8, -7.3, 3.6, 4.8, 1], m: 'black' },
+                    { rr: [7, -7.1, 1.2, 4.4, 0.4], m: 'gold' }, { rr: [13, -7.1, 1.2, 4.4, 0.4], m: 'gold' },
+                    { rr: [20.2, -6.9, 0.8, 4, 0.3], c: '#00f3ff' }
+                ],
+                glow: [[20.6, -4.9, 3.2, '#00f3ff']]
+            },
+            sniper_sr86: {                                                                      // SR-86: crimson thumbhole, folded bipod, a can
+                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 3.6], brass: true,
+                parts: [
+                    { poly: [[-12, -1.2], [-1, -1], [-1, 3.4], [-5, 3.8], [-7, 2.4], [-9, 3.8], [-12, 5]], m: 'crimson' },
+                    { rr: [-7.8, 0.9, 2.8, 1.4, 0.7], c: '#14040a' },                              // the thumbhole
+                    { rr: [26, 3, 12, 0.9, 0.4], m: 'gunmetal' }, { rr: [26, -2.9, 12, 0.9, 0.4], m: 'gunmetal' },   // bipod legs, folded
+                    { rr: [-1, -2, 24, 5, 1.2], m: 'gunmetal' },
+                    { rr: [12, -1.8, 14, 4.6, 1.4], m: 'crimson' },
+                    { rr: [23, -0.6, 27, 2.2, 0.8], m: 'black' },
+                    { rr: [49, -1.3, 6.2, 3.6, 1.6], m: 'gunmetal' },
+                    { lines: [[50.5, -1.1, 50.5, 2.1], [52, -1.1, 52, 2.1], [53.5, -1.1, 53.5, 2.1]], c: 'rgba(0, 0, 0, 0.45)', w: 0.3 },
+                    { rr: [2, -6.4, 15, 3.2, 1.4], m: 'black' },
+                    { rr: [0.8, -7, 3, 4.4, 1], m: 'black' }, { rr: [15, -7, 3.2, 4.4, 1], m: 'black' },
+                    { rr: [6, -6.8, 1.2, 4, 0.4], m: 'crimson' }, { rr: [11.5, -6.8, 1.2, 4, 0.4], m: 'crimson' },
+                    { rr: [18, -6.6, 0.8, 3.6, 0.3], c: '#ff4060' }
+                ],
+                glow: [[18.4, -4.8, 3, '#ff4060']]
+            },
+            golden_child: {                                                                     // an orb launcher: ornate gold round a violet core
+                stance: 'pistol', muzzle: [20, 1], rail: [14, 5.4], brass: false,
+                parts: [
+                    { poly: [[-2, 3.5], [2.6, 3.5], [1.8, 9], [-2.8, 8.6]], m: 'black' },
+                    { rr: [-3, -3, 17, 8, 3], m: 'gold' },
+                    { lines: [[-1, -1.8, 2, -2.3], [2, -2.3, 5, -1.8], [5, -1.8, 8, -2.3], [8, -2.3, 11, -1.8], [-1, 3.8, 2, 4.3], [2, 4.3, 5, 3.8], [5, 3.8, 8, 4.3], [8, 4.3, 11, 3.8]], c: '#fff2b8', w: 0.4 },
+                    { rr: [3, -0.4, 7, 2.8, 1.2], m: 'violet' },
+                    { rr: [13, -2, 6.4, 6, [0, 2.4, 2.4, 0]], m: 'black' },
+                    { dot: [17, 1, 1.9], c: '#ffd700' }
+                ],
+                glow: [[6.5, 1, 3.4, '#b89aff'], [17, 1, 3.6, '#ffd700']]
+            }
+        };
+        const LASER_MODULE = [                                                                  // under-barrel laser: body, then emitter at its front
+            { rr: [-5.5, -0.9, 5.5, 1.9, 0.6], m: 'gunmetal' }, { dot: [-0.3, 0.05, 0.45], c: '#ff2a3a' }
+        ];
+
+        /** The model for a weapon id: its own, else the closest by name, else the FP-X — never nothing. */
+        function weaponModel(id) {
+            id = id || '';
+            return WEAPON_MODELS[id] || (id.includes('sniper') ? WEAPON_MODELS.sniper_sara : id.includes('rifle') ? WEAPON_MODELS.rifle_rb98
+                : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
+        }
+
+        const _weaponSprites = new Map();
+        const WEAPON_BAKE = 4;                                                                  // sprite px per model px
+
+        function _gunPartPath(p, ox = 0, oy = 0) {
+            const path = new Path2D();
+            if (p.rr) path.roundRect(p.rr[0] + ox, p.rr[1] + oy, p.rr[2], p.rr[3], p.rr[4]);
+            else if (p.ring) path.roundRect(p.ring[0] + ox, p.ring[1] + oy, p.ring[2], p.ring[3], p.ring[4]);
+            else if (p.poly) p.poly.forEach(([x, y], i) => i ? path.lineTo(x + ox, y + oy) : path.moveTo(x + ox, y + oy));
+            else if (p.dot) path.arc(p.dot[0] + ox, p.dot[1] + oy, p.dot[2], 0, Math.PI * 2);
+            if (p.poly) path.closePath();
+            return path;
+        }
+        function _gunPartBox(p) {
+            if (p.rr || p.ring) { const r = p.rr || p.ring; return [r[0], r[1], r[0] + r[2], r[1] + r[3]]; }
+            if (p.poly) { const xs = p.poly.map(q => q[0]), ys = p.poly.map(q => q[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
+            if (p.dot) return [p.dot[0] - p.dot[2], p.dot[1] - p.dot[2], p.dot[0] + p.dot[2], p.dot[1] + p.dot[2]];
+            if (p.lines) { const xs = p.lines.flatMap(l => [l[0], l[2]]), ys = p.lines.flatMap(l => [l[1], l[3]]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
+            return [0, 0, 0, 0];
+        }
+
+        /**
+         * Paint one part: a cylinder across its width (dark rims, the body, a shine a little
+         * above the middle, a 1-sprite-px specular line), or plain colour for glass and emitters.
+         */
+        function _paintGunPart(c, p) {
+            const [x0, y0, x1, y1] = _gunPartBox(p);
+            if (p.lines) {
+                c.strokeStyle = p.c; c.lineWidth = p.w || 0.4; c.lineCap = 'round'; c.beginPath();
+                for (const l of p.lines) { c.moveTo(l[0], l[1]); c.lineTo(l[2], l[3]); }
+                c.stroke(); return;
+            }
+            const path = _gunPartPath(p);
+            if (p.ring) {
+                const M = GUN_MATERIALS[p.m];
+                c.strokeStyle = M[1]; c.lineWidth = 1.1; c.stroke(path);
+                c.strokeStyle = M[0]; c.lineWidth = 0.6; c.stroke(path); return;
+            }
+            if (!p.m) { c.fillStyle = p.c; c.fill(path); return; }
+            const M = GUN_MATERIALS[p.m], g = c.createLinearGradient(0, y0, 0, y1);
+            g.addColorStop(0, M[1]); g.addColorStop(0.16, M[0]); g.addColorStop(0.38, M[2]); g.addColorStop(0.6, M[0]); g.addColorStop(1, M[1]);
+            c.fillStyle = g; c.fill(path);
+            if (y1 - y0 > 1.4 && x1 - x0 > 2.5) {                                               // the specular line along the shine
+                c.save(); c.clip(path);
+                c.strokeStyle = 'rgba(255, 255, 255, 0.55)'; c.lineWidth = 1 / WEAPON_BAKE;
+                const sy = y0 + (y1 - y0) * 0.36; c.beginPath(); c.moveTo(x0 + 0.6, sy); c.lineTo(x1 - 0.6, sy); c.stroke();
+                c.restore();
+            }
+        }
+
+        /**
+         * The baked sprite of a model (with an under-barrel laser when `laser`): drawn at 1/WEAPON_BAKE
+         * scale with its top-left at (x, y) in the gun's frame. An ink outline under every solid part
+         * keeps the silhouette readable at any zoom.
+         */
+        function bakeWeapon(model, laser) {
+            const key = model, cache = _weaponSprites.get(key) || {};
+            if (cache[laser ? 1 : 0]) return cache[laser ? 1 : 0];
+            let parts = model.parts;
+            if (laser && model.rail) parts = parts.concat(LASER_MODULE.map(p => {
+                const q = { ...p };
+                if (p.rr) q.rr = [p.rr[0] + model.rail[0], p.rr[1] + model.rail[1], p.rr[2], p.rr[3], p.rr[4]];
+                if (p.dot) q.dot = [p.dot[0] + model.rail[0], p.dot[1] + model.rail[1], p.dot[2]];
+                return q;
+            }));
+            let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+            for (const p of parts) { const b = _gunPartBox(p); bx0 = Math.min(bx0, b[0]); by0 = Math.min(by0, b[1]); bx1 = Math.max(bx1, b[2]); by1 = Math.max(by1, b[3]); }
+            bx0 -= 1; by0 -= 1; bx1 += 1; by1 += 1;
+            const cv = document.createElement('canvas'), K = WEAPON_BAKE;
+            cv.width = Math.ceil((bx1 - bx0) * K); cv.height = Math.ceil((by1 - by0) * K);
+            const c = cv.getContext('2d');
+            c.scale(K, K); c.translate(-bx0, -by0); c.lineJoin = 'round';
+            c.strokeStyle = 'rgba(10, 6, 20, 0.85)'; c.lineWidth = 0.9;                         // the ink outline, all solids at once
+            for (const p of parts) if (!p.lines && !p.dot) c.stroke(_gunPartPath(p));
+            for (const p of parts) _paintGunPart(c, p);
+            const out = { cv, x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 };
+            cache[laser ? 1 : 0] = out; _weaponSprites.set(key, cache);
+            return out;
+        }
         const HAIR_SIM = {
             STEP: 1 / 120,          // game seconds per physics slice
             MAX_STEPS: 12,          // catch-up cap after a stall
@@ -38995,6 +39222,90 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);
         }
 
+        /* ── Shading ── Seen from above, limbs are cylinders and the head a dome: their shine runs
+           down the middle whichever way the body faces, nudged toward the sun. humanShade() works out
+           the light once per body (null = flat, as before); the passes read it. */
+        let _shadeFrame = -1, _shadeRims = 0, _lampGrid = null, _shadeCols = null, _bodyRot = 0;
+        const _SHADOW_RGB = '12, 6, 28';
+
+        /** Street lamps bucketed in 200px cells, rebuilt when the map's lamp list changes. */
+        function _lampNear(x, y, R) {
+            const L = typeof game !== 'undefined' ? game.lamps : null;
+            if (!L || !L.length) return null;
+            if (!_lampGrid || _lampGrid.src !== L || _lampGrid.n !== L.length) {
+                const cells = new Map();
+                for (const l of L) { if (l.candle) continue; const k = Math.floor(l.x / 200) + ',' + Math.floor(l.y / 200); (cells.get(k) || cells.set(k, []).get(k)).push(l); }
+                _lampGrid = { src: L, n: L.length, cells };
+            }
+            const cx = Math.floor(x / 200), cy = Math.floor(y / 200);
+            let best = null, bd = R;
+            for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+                const c = _lampGrid.cells.get((cx + i) + ',' + (cy + j));
+                if (c) for (const l of c) { const d = Math.hypot(l.x - x, l.y - y); if (d < bd) { bd = d; best = l; } }
+            }
+            return best ? { l: best, d: bd } : null;
+        }
+
+        /**
+         * The light on this body right now, in its own frame: level (0 flat · 1 limbs only · 2 all),
+         * lx/ly (unit-ish toward the light, 0 when it's overhead), hl/sh (shine and shade fills),
+         * body (knuckles and torso too: named characters, not the crowd), rim (a lamp's colour,
+         * its direction and strength) or null.
+         */
+        function humanShade(ctx, entity, config) {
+            const lod = typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0;
+            const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
+            const level = lod === 0 ? 2 : (lod === 1 && !ped ? 1 : 0);
+            if (!level || typeof sunNow !== 'function') return null;
+            if (_shadeFrame !== _frameTime) { _shadeFrame = _frameTime; _shadeRims = 0; _shadeCols = null; }
+            const C = CONFIG.HUMAN_SHADE, sun = sunNow();
+            const rot = _bodyRot, c = Math.cos(rot), s = Math.sin(rot);
+            const d = sun.day > 0.05 ? Math.min(1, sun.day * 1.4) : 0;
+            const W = Math.round((config._wet || 0) * 4) / 4;
+            const lx = (c * sun.dx + s * sun.dy) * d, ly = (-s * sun.dx + c * sun.dy) * d;
+            // The fills are the same for everyone this frame (per wetness step): built once
+            if (!_shadeCols) _shadeCols = new Map();
+            let K = _shadeCols.get(W);
+            if (!K) {
+                const a = (d > 0 ? C.HL_DAY * (0.5 + 0.5 * d) : C.HL_NIGHT) + W * C.HL_RAIN, rgb = d > 0 ? sun.rgb : '214, 204, 255';
+                K = { a, rgb, hl: `rgba(${rgb}, ${a.toFixed(3)})`, hl2: `rgba(${rgb}, ${(a * 1.25).toFixed(3)})`,
+                      sh: `rgba(${_SHADOW_RGB}, ${(C.SHADE * (0.4 + 0.6 * d)).toFixed(3)})` };
+                _shadeCols.set(W, K);
+            }
+            const S = { level, body: level > 1 && !ped, lx, ly, a: K.a, rgb: K.rgb, hl: K.hl, hl2: K.hl2, sh: K.sh, rim: null };
+            // Night: the nearest burning street lamp rims them in its colour (the block's lamp colour)
+            if (level === 2 && sun.night > 0.3 && entity.x !== undefined && (!ped || _shadeRims < C.RIM_PEDS)) {
+                const n = _lampNear(entity.x, entity.y, C.RIM_R);
+                if (n) {
+                    const on = lampWake(n.l) * lampFlicker(n.l) * (n.l.intensity ?? 1);
+                    const k = on * (1 - n.d / C.RIM_R) * Math.min(1, (sun.night - 0.3) / 0.4) * C.RIM_A;
+                    if (k > 0.03) {
+                        if (ped) _shadeRims++;
+                        const wx = n.l.x - entity.x, wy = n.l.y - entity.y, m = Math.hypot(wx, wy) || 1;
+                        const col = /^#[0-9a-f]{6}$/i.test(n.l.color || '') ? hexToRgb(n.l.color) : '255, 238, 187';
+                        S.rim = { ang: Math.atan2(-s * wx / m + c * wy / m, c * wx / m + s * wy / m), style: `rgba(${col}, ${k.toFixed(3)})` };
+                    }
+                }
+            }
+            return S;
+        }
+
+        /** A soft shadow under the feet: cast along the sun by day, a round pool at night and indoors. */
+        function drawHumanContactShadow(ctx) {
+            if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
+            const C = CONFIG.HUMAN_SHADE, sp = glowSprite(_SHADOW_RGB, 0.45), a0 = ctx.globalAlpha;
+            ctx.save();
+            ctx.translate(-4, 0);
+            if (typeof _sunShadow !== 'undefined' && _sunShadow.on) {
+                const L = Math.min(1.6, _sunShadow.len) * _sunShadow.k;
+                ctx.rotate(Math.atan2(_sunShadow.dy, _sunShadow.dx) - _bodyRot);
+                ctx.translate(2 + 5 * L, 0); ctx.scale((11 + 9 * L) / 32, 9 / 32);
+                ctx.globalAlpha = a0 * (C.SHADOW_NIGHT + (C.SHADOW_DAY - C.SHADOW_NIGHT) * _sunShadow.k);
+            } else { ctx.scale(12 / 32, 10 / 32); ctx.globalAlpha = a0 * C.SHADOW_NIGHT; }
+            ctx.drawImage(sp, -32, -32);
+            ctx.restore();
+        }
+
         /**
          * Draw a procedural character. Builds and height (ui/bodies.js) scale the body
          * frame here; a hovering android bobs over a soft glow.
@@ -39002,6 +39313,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function drawProceduralHumanoid(ctx, entity, config = {}) {
             const S = bodyScale(config), A = androidLook(config.body);
             const hover = A && A.hover && !config.isDriving;
+            if (!config.isDriving && _zoomLOD < 2) {
+                const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a);         // the body's facing on screen, for its light
+                if (!config.noShadow) drawHumanContactShadow(ctx);
+            }
             if (!S && !hover) return _drawHumanoidBody(ctx, entity, config, null, A);
             const bob = hover ? 1 + Math.sin(_gameTimeSec * 2.2 + (entity.x || 0) * 0.01) * 0.035 : 1;
             if (hover) {                                                    // light under a floating android
@@ -39048,6 +39363,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         
             // Rain darkens clothes a touch (not skin)
             const wet = W ? W.rain * 0.08 : 0;
+            const SH = isDriving ? null : humanShade(ctx, entity, { _wet: W ? W.rain : 0 });
             const darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * (hex === skinColor ? frac : frac + wet))) : '#000';
         
             // --- 2. PROPORTIONS ---
@@ -39404,6 +39720,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
                 ctx.fillStyle = color;
                 ctx.beginPath(); ctx.ellipse(0, 0, len, width, 0, 0, Math.PI*2); ctx.fill();
+                if (SH) {                                                   // the shine down the limb, toward the light
+                    const c = Math.cos(ang), s = Math.sin(ang), oy = (-s * SH.lx + c * SH.ly) * width * 0.4;
+                    ctx.fillStyle = SH.hl;
+                    ctx.beginPath(); ctx.ellipse((c * SH.lx + s * SH.ly) * len * 0.12, oy, len * 0.78, width * 0.42, 0, 0, Math.PI*2); ctx.fill();
+                }
                 ctx.restore();
             };
             
@@ -39443,7 +39764,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // the retract). Sniper models sit 2px lower in the hand, matching NPCs.
                     if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
                         const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
-                        drawWeapon(ctx, weaponId, wx, wy, 0, scale);
+                        const laser = game.inventory && game.inventory.getEquippedAttachment()?.effect === 'laser_sight';
+                        drawWeapon(ctx, weaponId, wx, wy, 0, scale, laser);
                         // Muzzle in the player's frame — laser sight and shots start here
                         const mz = weaponMuzzleLocal(weaponId);
                         entity._muzzleLocal = { x: wx + mz.x * scale, y: wy + mz.y * scale };
@@ -39666,6 +39988,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.fillStyle = darken(skinColor, 0.4);
             ctx.beginPath(); ctx.ellipse(lFistX, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
             ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+            if (SH && SH.body) {                                            // knuckle shine (named characters)
+                const ox = SH.lx * 1.2, oy = SH.ly * 1.2; ctx.fillStyle = SH.hl; ctx.beginPath();
+                ctx.ellipse(lFistX + ox, lFistY + oy, 2, 1.4, 0, 0, Math.PI*2); ctx.ellipse(rFistX + ox, rFistY + oy, 2, 1.4, 0, 0, Math.PI*2); ctx.fill();
+            }
         
             // 7. Forearms (fabric only under long sleeves)
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
@@ -39706,6 +40032,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
             }
             for (const j of jewelryAt('neck')) WD.jewelry[j.type].draw(ctx, g, j);
+            if (SH && SH.body) {                                            // the torso's form: a ridge of light across the shoulders, the far side in shade
+                ctx.fillStyle = SH.hl;
+                ctx.beginPath(); ctx.roundRect(torsoXOff + torsoWidth * 0.5 - 1.8 + SH.lx * 1.5, -8 + SH.ly * 1.5, 3.6, 16, 1.8); ctx.fill();
+                if (Math.abs(SH.ly) > 0.15 || !SH.lx) {
+                    ctx.fillStyle = SH.sh;
+                    ctx.beginPath(); ctx.roundRect(torsoXOff + 0.5, SH.ly > 0 ? -10 : 5.5, torsoWidth - 1, 4.5, 2); ctx.fill();
+                }
+            }
             if (A && !clothes.top) {                                        // bare plating: chest panel seams and the Double Nights mark
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6; ctx.beginPath();
                 ctx.moveTo(torsoXOff + 1, 0); ctx.lineTo(torsoXOff + torsoWidth - 1, 0);
@@ -39732,8 +40066,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             withHead(headX, hx => {
                 if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }
                 drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
+                if (SH && SH.level > 1) {                                   // the crown's shine: a soft spot and a sheen arc toward the light
+                    const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * Math.min(1, SH.a * 2.2);
+                    drawGlow(ctx, hx + SH.lx * 2.6, SH.ly * 2.6, 4.2, SH.rgb, 0);
+                    ctx.globalAlpha = a0;
+                    if (SH.lx || SH.ly) {
+                        const la = Math.atan2(SH.ly, SH.lx);
+                        ctx.strokeStyle = SH.hl2; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(hx, 0, 6.2, la - 0.6, la + 0.6); ctx.stroke();
+                    }
+                }
                 if (turning) ctx.restore();
             });
+            if (SH && SH.rim) {                                             // a street lamp's colour catching shoulder and head
+                const r = SH.rim.ang;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.arc(-1, 0, 10, r - 0.7, r + 0.7);
+                ctx.moveTo(headX + Math.cos(r - 0.9) * 8, Math.sin(r - 0.9) * 8); ctx.arc(headX, 0, 8, r - 0.9, r + 0.9);
+                ctx.stroke(); ctx.restore();
+            }
             if (hitK > 0.05) {                                              // the flash of the hit
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 const fl = ctx.createRadialGradient(headX * 0.5, 0, 0, headX * 0.5, 0, 15);
@@ -39918,106 +40268,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         /**
-         * Renders a weapon using canvas primitives.
-         * Used by both Player (equipped) and Loot (dropped).
+         * A weapon from its model (ui/weapon-models.js): one baked sprite, then its emitters
+         * glowing live. Used for guns in hand (player, NPCs, the drive-by) and dropped loot.
+         * `laser`: an under-barrel laser module is fitted.
          */
-        function drawWeapon(ctx, type, x, y, angle, scale = 1.0) {
+        function drawWeapon(ctx, type, x, y, angle, scale = 1.0, laser = false) {
+            const M = weaponModel(type), sp = bakeWeapon(M, laser);
             ctx.save();
             ctx.translate(x, y);
-            ctx.rotate(angle);
-            ctx.scale(scale, scale);
-        
-            // Common styling
-            ctx.shadowBlur = 0;
-            
-            if (type.includes('pistol')) {
-                // --- PISTOL (Short, compact) ---
-                // Grip (held in hand)
-                ctx.fillStyle = '#333';
-                ctx.fillRect(-2, 2, 4, 6); 
-                
-                // Body/Slide
-                ctx.fillStyle = type.includes('anavia') ? '#CCCCFF' : '#555'; // Anavia is periwinkle
-                ctx.fillRect(-2, -2, 12, 6);
-                
-                // Barrel Tip
-                ctx.fillStyle = '#111';
-                ctx.fillRect(10, -1, 2, 4);
-                
-                // Laser/Glow
-                ctx.fillStyle = type.includes('anavia') ? '#00f3ff' : '#ff0000';
-                ctx.fillRect(8, 0, 2, 2);
-                
-            } else if (type.includes('sniper')) {
-                // --- SNIPER (Long, scope) ---
-                // Stock
-                ctx.fillStyle = '#1a1a1a';
-                ctx.fillRect(-10, 0, 10, 6);
-                
-                // Body
-                ctx.fillStyle = '#C5A000'; // Gold body for "YourGirlSara"
-                ctx.fillRect(0, -2, 25, 5);
-                
-                // Long Barrel
-                ctx.fillStyle = '#111';
-                ctx.fillRect(25, -1, 30, 3);
-                
-                // Scope
-                ctx.fillStyle = '#333';
-                ctx.fillRect(5, -6, 12, 3); // Scope body
-                ctx.fillStyle = '#00f3ff';
-                ctx.fillRect(5, -6, 2, 3);  // Lens
-                
-            } else if (type.includes('rifle')) {
-                // --- RIFLE / SMG ---
-                // Stock
-                ctx.fillStyle = '#222';
-                ctx.fillRect(-8, 0, 8, 8);
-                
-                // Body
-                ctx.fillStyle = '#00ffcc'; // Teal for RB-98
-                ctx.fillRect(0, -2, 18, 7);
-                
-                // Mag
-                ctx.fillStyle = '#111';
-                ctx.fillRect(4, 5, 4, 6);
-                
-                // Barrel
-                ctx.fillStyle = '#333';
-                ctx.fillRect(18, 0, 10, 3);
-                
-            } else if (type.includes('golden')) {
-                // --- GOLDEN CHILD (Orb launcher) ---
-                // Grip
-                ctx.fillStyle = '#1a1a1a';
-                ctx.fillRect(-2, 2, 5, 7);
-                
-                // Body — rounded gold housing
-                ctx.fillStyle = '#B8860B';
-                ctx.beginPath();
-                ctx.roundRect(-2, -3, 16, 8, 3);
-                ctx.fill();
-                
-                // Gold trim
-                ctx.fillStyle = '#FFD700';
-                ctx.fillRect(0, -2, 12, 2);
-                
-                // Barrel — wide bore for orbs
-                ctx.fillStyle = '#222';
-                ctx.beginPath();
-                ctx.roundRect(14, -2, 6, 6, [0, 2, 2, 0]);
-                ctx.fill();
-                
-                // Orb glow in barrel
-                ctx.fillStyle = '#FFD700';
-                ctx.shadowColor = '#FFD700';
-                ctx.shadowBlur = 6;
-                ctx.beginPath();
-                ctx.arc(17, 1, 2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
+            if (angle) ctx.rotate(angle);
+            if (scale !== 1) ctx.scale(scale, scale);
+            ctx.drawImage(sp.cv, sp.x, sp.y, sp.w, sp.h);
+            if (M.glow.length && _zoomLOD < 2) {
+                const a0 = ctx.globalAlpha, pulse = 0.8 + 0.2 * Math.sin(_frameTime / 260 + x);
+                ctx.globalCompositeOperation = 'lighter';
+                for (const g of M.glow) { ctx.globalAlpha = a0 * 0.55 * pulse; drawGlow(ctx, g[0], g[1], g[2], g[3], 0.2); }
+                ctx.globalAlpha = a0;
             }
-        
             ctx.restore();
         }
         
@@ -41545,15 +41812,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                     ctx.translate(this.x, this.y);
                                     const bob = Math.sin(_frameTime / 500) * 3;
                                     
-                                    // Ground Glow
-                                    ctx.shadowColor = '#a469ff'; 
-                                    ctx.shadowBlur = 15;
-                                    ctx.fillStyle = 'rgba(164, 105, 255, 0.4)';
-                                    ctx.beginPath();
-                                    ctx.ellipse(0, 10, 15, 5, 0, 0, Math.PI*2);
-                                    ctx.fill();
-                                    ctx.shadowBlur = 0;
-                    
+                                    // Ground glow: a violet pool squashed flat under it
+                                    ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75;
+                                    drawGlow(ctx, 0, 0, 22, '#a469ff', 0.3);
+                                    ctx.restore();
+
                                     drawWeapon(ctx, this.item.id, 0, bob, this.angle, 0.8);
                                     ctx.restore();
                                 }
@@ -44529,7 +44792,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.decals = new DecalSystem();
                 this.puddles = null; // PuddleSystem disabled for performance (will revisit)
                 this.leafParticles = new LeafParticleSystem(this); // Floating leaves
-                this.projectiles = []; this.props = []; this.npcs = []; this.enemies = []; this.loot = []; this.lamps = []; this.lastKnownMarkers = []; this.muzzleFlashes = [];
+                this.projectiles = []; this.props = []; this.npcs = []; this.enemies = []; this.loot = []; this.lamps = []; this.lastKnownMarkers = []; this.muzzleFlashes = []; this.casings = [];
                 this.stickyOrbs = []; // Golden Child DOT orbs attached to enemies
                 this.traffic = new TrafficManager(); // <--- ADD THIS LINE
                 this.pedestrians = new PedestrianManager(); // Roaming civilians
@@ -45225,7 +45488,85 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         // GameEngine — Screen shake, time slow, death, resize, firing, boosters, player damage.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        const _muzzleStars = new Map();
+        /** A muzzle flash's star (96×48, its centre at 24,24, the long spike forward along +x) in `color`. */
+        function muzzleStarSprite(color) {
+            let cv = _muzzleStars.get(color);
+            if (cv) return cv;
+            cv = document.createElement('canvas'); cv.width = 96; cv.height = 48;
+            const c = cv.getContext('2d'), rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '255, 204, 136';
+            const spike = (x0, y0, x1, y1, w) => {                          // a tapered spike from (x0,y0) to (x1,y1)
+                const a = Math.atan2(y1 - y0, x1 - x0), nx = -Math.sin(a) * w, ny = Math.cos(a) * w;
+                c.beginPath(); c.moveTo(x0 + nx, y0 + ny); c.lineTo(x1, y1); c.lineTo(x0 - nx, y0 - ny); c.closePath(); c.fill();
+            };
+            const g = c.createRadialGradient(24, 24, 0, 24, 24, 22);
+            g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(0.3, `rgba(${rgb}, 0.9)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
+            c.fillStyle = g; c.fillRect(0, 0, 48, 48);
+            c.fillStyle = `rgba(${rgb}, 0.95)`;
+            spike(24, 24, 96, 24, 7); spike(24, 24, 60, 8, 4); spike(24, 24, 60, 40, 4); spike(24, 24, 24, 4, 3.5); spike(24, 24, 24, 44, 3.5);
+            c.fillStyle = 'rgba(255, 255, 255, 0.95)'; spike(24, 24, 70, 24, 3); c.beginPath(); c.arc(24, 24, 5, 0, Math.PI * 2); c.fill();
+            _muzzleStars.set(color, cv);
+            return cv;
+        }
+
         engineMixin({
+            /**
+             * A spent casing flies from the gun's ejection port (to the right of the barrel, a little
+             * back), spins, bounces and settles on the ground, then fades. Only guns whose model
+             * throws brass (ui/weapon-models.js); at most CASINGS_MAX lie about at once.
+             */
+            spawnCasing(x, y, angle, weaponId) {
+                if (!weaponId || !weaponModel(weaponId).brass || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
+                const L = this.casings || (this.casings = []), c = Math.cos(angle), s = Math.sin(angle);
+                const sniper = weaponId.includes('sniper'), back = sniper ? 30 : 8, v = 1.7 + Math.random() * 1.1;
+                L.push({ x: x - c * back, y: y - s * back, vx: -s * v - c * (0.35 + Math.random() * 0.4), vy: c * v - s * (0.35 + Math.random() * 0.4),
+                         a: angle, spin: (Math.random() - 0.5) * 0.9, t: 0, big: sniper });
+                if (L.length > 24) L.shift();
+            },
+            updateCasings() {
+                const L = this.casings;
+                if (!L || !L.length) return;
+                for (let i = L.length - 1; i >= 0; i--) {
+                    const k = L[i]; k.t++;
+                    if (k.t < 26) { k.x += k.vx; k.y += k.vy; k.vx *= 0.86; k.vy *= 0.86; k.a += k.spin; k.spin *= 0.9; }
+                    if (k.t > 420) L.splice(i, 1);
+                }
+            },
+            /** Casings on the ground (after decals, under everyone): one path, one fill. */
+            drawCasings(ctx, cb) {
+                const L = this.casings;
+                if (!L || !L.length || _zoomLOD >= 1) return;
+                ctx.save();
+                ctx.fillStyle = '#d9a93c';
+                ctx.beginPath();
+                let n = 0;
+                for (const k of L) {
+                    if (k.x < cb.left || k.x > cb.right || k.y < cb.top || k.y > cb.bottom) continue;
+                    const hl = k.big ? 1.9 : 1.2, hw = k.big ? 0.65 : 0.5, c = Math.cos(k.a), s = Math.sin(k.a);
+                    ctx.moveTo(k.x + c * hl - s * hw, k.y + s * hl + c * hw); ctx.lineTo(k.x - c * hl - s * hw, k.y - s * hl + c * hw);
+                    ctx.lineTo(k.x - c * hl + s * hw, k.y - s * hl - c * hw); ctx.lineTo(k.x + c * hl + s * hw, k.y + s * hl - c * hw); ctx.closePath();
+                    n++;
+                }
+                if (n) { ctx.fill(); ctx.strokeStyle = 'rgba(70, 40, 10, 0.55)'; ctx.lineWidth = 0.3; ctx.stroke(); }
+                ctx.restore();
+            },
+            /** The star of each fresh muzzle flash, at the muzzle along the shot (its light is the lighting pass's). */
+            drawMuzzleStars(ctx) {
+                const F = this.muzzleFlashes;
+                if (!F || !F.length) return;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                const base = ctx.getTransform();
+                for (const f of F) {
+                    if (f.angle === undefined) continue;
+                    const k = Math.min(1, (f.life || 0) / 3), s = (f.radius || 50) / 170 * (0.7 + 0.3 * k);
+                    ctx.setTransform(base);
+                    ctx.translate(f.x, f.y); ctx.rotate(f.angle); ctx.scale(s, s * (0.8 + 0.4 * ((f.x * 7 + f.life) % 1)));
+                    ctx.globalAlpha = 0.35 + 0.65 * k;
+                    ctx.drawImage(muzzleStarSprite(f.color), -24, -24);
+                }
+                ctx.restore();
+            },
+
             triggerShake(amount) {
                 if (amount > this.camera.shake) {
                     this.camera.shake = amount;
@@ -45479,8 +45820,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     y: py, 
                     radius: stats.flashRadius || 50, 
                     color: shotColor, // Flash matches bullet color
-                    life: 3 
+                    life: 3,
+                    angle
                 });
+                if (onFoot) this.spawnCasing(px, py, angle, this.currentWeapon.id);
             },
 
             // Inside GameEngine class
@@ -52024,6 +52367,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.muzzleFlashes[i].life--;
                     if(this.muzzleFlashes[i].life <= 0) this.muzzleFlashes.splice(i, 1);
                 }
+                this.updateCasings();
             
                 this.updateTime();
                 this.updateUI();
@@ -52408,7 +52752,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const flashColor = (weaponDef?.stats?.projectileColor) || (abilityDef?.stats?.flashColor) || shot.color || '#ffaa00';
                         const flashRadius = (weaponDef?.stats?.flashRadius) || (abilityDef?.stats?.flashRadius) || 40;
                         this.projectiles.push(shot);
-                        this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: flashRadius, color: flashColor, life: 3 });
+                        const shotAng = Math.atan2(shot.vy, shot.vx);
+                        this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: flashRadius, color: flashColor, life: 3, angle: shotAng });
+                        this.spawnCasing(shot.x, shot.y, shotAng, tm.equippedWeaponId);
                         if (tm.hireType === 'permanent') captionSystem.teammateCombatQuip(tm.name);
                         else captionSystem.dancerFollowQuip(tm.name);
                     };
@@ -52546,7 +52892,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         for (const shot of shots) {
                             if (shot instanceof ProjectileEntity) {
                                 this.projectiles.push(shot);
-                                this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: 50, color: shot.color, life: 3 });
+                                const shotAng = Math.atan2(shot.vy, shot.vx);
+                                this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: 50, color: shot.color, life: 3, angle: shotAng });
+                                if (enemy.equippedWeaponId !== undefined) this.spawnCasing(shot.x, shot.y, shotAng, enemy.equippedWeaponId || 'pistol_ganger');
                             }
                         }
                     }
@@ -53814,6 +54162,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 this.decals.draw(this.ctx, cullBounds.world);
+                this.drawCasings(this.ctx, cullBounds.world);                 // spent brass (engine/combat-effects.js)
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day
                 this.drawCastShadows(this.ctx, cullBounds.world);
                 
@@ -54280,6 +54629,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.ctx.restore();
                 }
                 
+                this.drawMuzzleStars(this.ctx);                              // the flash's star at each muzzle
+
                 // Passenger lean-out rendering — draw in-car companions at their seat positions
                 // Uses drawProceduralHumanoid with isDriving flag for unified lean-out animation
                 // Drawn BEFORE the car overlay so the car body partially covers them
@@ -58112,7 +58463,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // --- TRANSIENT ENTITIES ---
                 this.projectiles = [];
                 this.stickyOrbs = [];
-                this.muzzleFlashes = [];
+                this.muzzleFlashes = []; this.casings = [];
                 this.loot = [];
                 this.activeInteraction = null;
                 

@@ -333,6 +333,19 @@
                of phase = PI / w ticks). For the planted foot to stay put, that 2A
                sweep must equal the ground the body covers meanwhile (v * PI / w).
                With CADENCE 0.2: A ~ 7.85 * sqrt(v) -> 14.7px @3.5, 17.9px @5.2, 20.8px @7.0. */
+            // Humanoid shading (ui/humanoid-render.js humanShade): a shine down every limb, torso and
+            // head (they're cylinders and domes seen from above), a soft contact shadow cast along
+            // the sun, and at night a rim of the nearest street lamp's colour.
+            HUMAN_SHADE: {
+                HL_DAY: 0.24,           // shine alpha by day (tinted by the sun)
+                HL_NIGHT: 0.13,         // … and at night (lavender moonlight)
+                HL_RAIN: 0.12,          // extra shine when wet
+                SHADE: 0.22,            // the torso's side away from the light
+                SHADOW_DAY: 0.34, SHADOW_NIGHT: 0.3,    // contact shadow alphas
+                RIM_R: 180,             // a lamp this close (px) rims them in its colour
+                RIM_A: 0.6,
+                RIM_PEDS: 8             // pedestrians rimmed per frame (named characters always are)
+            },
             GAIT: {
                 CADENCE: 0.2,           // sqrt curve: within ~5% of the old 0.25 + 0.04v at speeds 3.5-7, but slows down at crawl speeds instead of shuffling
                 SLIP_FACTOR: 1.0,       // 1 = no slip. <1 = shorter strides (feet glide forward), >1 = longer (feet slip back)
