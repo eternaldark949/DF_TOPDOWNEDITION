@@ -285,9 +285,11 @@
                 // Calculate sway based on wind strength and time
                 const sway = Math.sin(time * 2 + this.phaseOffset) * wind * 8 * this.swayMultiplier * windDirection;
                 const s = this.size, palm = this.type === 'palm', bush = this.type === 'bush';
-                // Shadow on the ground (drawn live: in daylight it will follow the sun)
-                ctx.fillStyle = 'rgba(0,0,0,0.22)';
-                ctx.beginPath(); ctx.ellipse(this.x + sway * 0.4 + 4 * s, this.y + (bush ? 3 : 6) * s, (bush ? 13 : palm ? 16 : 19) * s, (bush ? 6 : 8) * s, 0, 0, Math.PI * 2); ctx.fill();
+                // Shadow on the ground: by day the sun's shadow layer throws it (engine/daylight.js); at night, a soft pool beneath
+                if (!_sunShadow.on) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+                    ctx.beginPath(); ctx.ellipse(this.x + sway * 0.4 + 4 * s, this.y + (bush ? 3 : 6) * s, (bush ? 13 : palm ? 16 : 19) * s, (bush ? 6 : 8) * s, 0, 0, Math.PI * 2); ctx.fill();
+                }
                 // The canopy: its painted sprite, carried by the wind
                 if (this._variant === undefined) this._variant = Math.floor(this.phaseOffset * 0.637) % 4;
                 const spr = floraSprite(this.type, s, this._variant);

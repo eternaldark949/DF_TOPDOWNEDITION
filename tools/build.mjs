@@ -121,6 +121,7 @@ const SCRIPTS = [
     'engine/keeper-art.js',
     'engine/van-art.js',
     'engine/lighting.js',
+    'engine/daylight.js',
     'engine/player-draw-input.js',
     'engine/loop.js',
     'app/menu-wiring.js',
