@@ -23982,10 +23982,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             /**
-             * Draw neon sign layer (ABOVE drawTop) - positioned over the entrance
-             * so the player can see it while approaching the transition point.
+             * The sign layer the engine draws after every building's top. With the lean on,
+             * each sign is drawn inside its own building's top pass instead (_paintSign, after
+             * the walls, before the roof), so a roof or a taller wall in front of it hides it —
+             * the perspective holds. Without the lean, it's drawn here as before.
              */
             drawSign(ctx) {
+                if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) return;
+                this._paintSign(ctx);
+            }
+
+            /**
+             * A neon sign over the entrance. Double Nights: script on the porte-cochère.
+             * Silver Queen: on the portico's roof, in its plane. Everyone else: on a small
+             * cantilevered awning two floors up over the door, in that plane (_signAwning).
+             */
+            _paintSign(ctx) {
                 if (this.style === 'double_nights') { if (typeof game !== 'undefined' && game.camera) this._dnDrawSign(ctx); return; }
                 if (!this.attachedSign || !this.attachedTransition) return;
                 
@@ -24009,6 +24021,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                     textY = sqG.yf + SQ_PORTICO.depth * 0.5;
                     ctx.globalAlpha = Math.max(0.45, this._sqFade == null ? 1 : this._sqFade);
+                } else if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) {
+                    const A = this._signAwning(ctx, signText, signFontSize);                 // the awning, then the sign lying on it
+                    LandmarkKit.plane(ctx, A.k);
+                    textY = A.y;
                 }
                 
                 // --- FLICKER ENGINE ---
@@ -24102,7 +24118,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 } // End full quality else block
                 
                 ctx.restore();
-                if (this.style === 'silver_queen' && CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) this._sqDrawColumns(ctx);
+            }
+
+            /**
+             * A cantilevered entrance awning for the sign: a slab two floors up, out from the wall
+             * over the door, as wide as the sign. Draws it (LandmarkKit.ledge) and returns the plane
+             * and the line the sign sits on.
+             */
+            _signAwning(ctx, text, size) {
+                if (!this._awn || this._awn.text !== text) {
+                    const m = document.createElement('canvas').getContext('2d'); m.font = `${size}px "Great Vibes", cursive`;
+                    const tw = Math.min(this.w - 20, m.measureText(text).width + 34), d = Math.round(size * 0.95);
+                    const cx = this.attachedTransition.x + this.attachedTransition.w / 2, wall = this.attachedTransition.y - 10;
+                    this._awn = { text, x0: cx - tw / 2, x1: cx + tw / 2, wall, d, z: 2 * CONFIG.BUILDINGS.FLOOR_HEIGHT };
+                }
+                const A = this._awn, K = LandmarkKit;
+                K.ledge(ctx, [{ a: [A.x0, A.wall], b: [A.x1, A.wall], nx: 0, ny: 1 }], A.z, A.d, 3,
+                        darkenHex(this.colors.wall || '#2a2436', 8), darkenHex(this.colors.wall || '#2a2436', 22), `rgba(${hexToRgb(this.colors.accent || '#a469ff')}, 0.55)`);
+                return { k: K.k(A.z + 0.5), y: A.wall + A.d / 2 };
             }
             
             
@@ -24334,6 +24367,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this._drawFaceFeature(ctx, f, P, false);
                 }
                 if (this.style === 'silver_queen') this._sqDrawPortico(ctx);
+                this._paintSign(ctx);                                                          // the sign, before the roof (so the roof can hide it)
+                if (this.style === 'silver_queen') this._sqDrawColumns(ctx);                   // the lantern columns stand in front of the portico
                 // --- Roofs (drawn in world coords under the scale-about-camera transform) ---
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const sq = this.style === 'silver_queen';
@@ -24923,8 +24958,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             gold: '#e8c27a', goldHi: '#fff1c9'
         };
         const SQ_PORTICO = {
-            depth: 52, floors: 4, overhang: 6, colR: 5.5,
-            colLine: 60, colFloors: 7,          // columns stand just in front of the canopy and rise above it
+            depth: 52, floors: 4, overhang: 6, colR: 3.6,
+            colLine: 60, colFloors: 3.5,        // lantern columns: stand just in front of the portico, lanterns a little under its roof
             // Column offsets from the door centre (px). The paired columns flank the
             // door; ±80 and ±143 line up with the pilasters that run up the wall.
             cols: [-168, -143, -80, -62, 62, 80, 143, 168],
@@ -25238,14 +25273,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             },
 
-            /** Portico columns: hexagonal plinth, silver shaft, collar at the canopy line, hexagon lantern on top.
-                Drawn after the sign, since the columns stand in front of the canopy and rise above it. */
+            /** Lantern columns: hexagonal plinth, silver shaft, a gilt collar under the lantern, hexagon lantern on top.
+                Drawn after the sign (they stand in front of the portico), before the building's roof. */
             _sqDrawColumns(ctx) {
                 const g = this._sqPortico();
                 if (!g) return;
                 const T = SQ_THEME, r = SQ_PORTICO.colR, P3 = (x, y, z) => this._sqP(x, y, z);
                 const hex = (x, y, rr) => { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.closePath(); };
-                const kT = this._sqK(g.zCol), kC = this._sqK(g.z);
+                const zC = g.zCol * 0.8, kT = this._sqK(g.zCol), kC = this._sqK(zC);
                 ctx.save();
                 // All eight columns batched: plinths, shafts (silver, a bright line down the lit side, a dark one down the other), collars, lanterns
                 const plin = new Path2D(), shafts = new Path2D(), hiL = new Path2D(), loL = new Path2D(), collars = new Path2D(), lanO = new Path2D(), lanI = new Path2D();
@@ -25259,7 +25294,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     shafts.moveTo(c.x + r, c.y); shafts.arc(c.x, c.y, r, 0, Math.PI * 2);
                     hiL.moveTo(c.x - px * r * 0.2, c.y - py * r * 0.2); hiL.lineTo(t0[0] - px * r * 0.2 * kT, t0[1] - py * r * 0.2 * kT);
                     loL.moveTo(c.x + px * r * 0.75, c.y + py * r * 0.75); loL.lineTo(t0[0] + px * r * 0.75 * kT, t0[1] + py * r * 0.75 * kT);
-                    const cc = P3(c.x, c.y, g.z);                                                          // collar where the canopy ties in
+                    const cc = P3(c.x, c.y, zC);                                                           // gilt collar under the lantern
                     collars.moveTo(cc[0] - px * r * kC * 1.15, cc[1] - py * r * kC * 1.15); collars.lineTo(cc[0] + px * r * kC * 1.15, cc[1] + py * r * kC * 1.15);
                     hexP(lanO, t0[0], t0[1], (r + 3.2) * kT); hexP(lanI, t0[0], t0[1], (r + 0.6) * kT);  // lantern: silver frame, violet glass
                 }
@@ -26186,6 +26221,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 K.rings(ctx, (() => { const p = new Path2D(); for (const e of lv) { p.moveTo(e.a[0], e.a[1]); p.lineTo(e.b[0], e.b[1]); } return p; })(), [K.k(DN.ATRIUM_Z)], 0.8, 'rgba(232,194,122,0.35)');
                 this._dnAtriumRoof(ctx, false);
                 this._dnCanopy(ctx, G, false);
+                this._dnDrawSign(ctx);                                   // the script on the canopy, before the towers can hide it
                 this._dnTop = {};
                 for (const [sh, key] of [[G.west, 'w'], [G.east, 'e']]) {
                     this._dnTop[key] = this._dnTowerWalls(ctx, sh, key, H);

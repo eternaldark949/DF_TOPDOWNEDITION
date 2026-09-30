@@ -16,8 +16,8 @@
             gold: '#e8c27a', goldHi: '#fff1c9'
         };
         const SQ_PORTICO = {
-            depth: 52, floors: 4, overhang: 6, colR: 5.5,
-            colLine: 60, colFloors: 7,          // columns stand just in front of the canopy and rise above it
+            depth: 52, floors: 4, overhang: 6, colR: 3.6,
+            colLine: 60, colFloors: 3.5,        // lantern columns: stand just in front of the portico, lanterns a little under its roof
             // Column offsets from the door centre (px). The paired columns flank the
             // door; ±80 and ±143 line up with the pilasters that run up the wall.
             cols: [-168, -143, -80, -62, 62, 80, 143, 168],
@@ -331,14 +331,14 @@
                 ctx.restore();
             },
 
-            /** Portico columns: hexagonal plinth, silver shaft, collar at the canopy line, hexagon lantern on top.
-                Drawn after the sign, since the columns stand in front of the canopy and rise above it. */
+            /** Lantern columns: hexagonal plinth, silver shaft, a gilt collar under the lantern, hexagon lantern on top.
+                Drawn after the sign (they stand in front of the portico), before the building's roof. */
             _sqDrawColumns(ctx) {
                 const g = this._sqPortico();
                 if (!g) return;
                 const T = SQ_THEME, r = SQ_PORTICO.colR, P3 = (x, y, z) => this._sqP(x, y, z);
                 const hex = (x, y, rr) => { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.closePath(); };
-                const kT = this._sqK(g.zCol), kC = this._sqK(g.z);
+                const zC = g.zCol * 0.8, kT = this._sqK(g.zCol), kC = this._sqK(zC);
                 ctx.save();
                 // All eight columns batched: plinths, shafts (silver, a bright line down the lit side, a dark one down the other), collars, lanterns
                 const plin = new Path2D(), shafts = new Path2D(), hiL = new Path2D(), loL = new Path2D(), collars = new Path2D(), lanO = new Path2D(), lanI = new Path2D();
@@ -352,7 +352,7 @@
                     shafts.moveTo(c.x + r, c.y); shafts.arc(c.x, c.y, r, 0, Math.PI * 2);
                     hiL.moveTo(c.x - px * r * 0.2, c.y - py * r * 0.2); hiL.lineTo(t0[0] - px * r * 0.2 * kT, t0[1] - py * r * 0.2 * kT);
                     loL.moveTo(c.x + px * r * 0.75, c.y + py * r * 0.75); loL.lineTo(t0[0] + px * r * 0.75 * kT, t0[1] + py * r * 0.75 * kT);
-                    const cc = P3(c.x, c.y, g.z);                                                          // collar where the canopy ties in
+                    const cc = P3(c.x, c.y, zC);                                                           // gilt collar under the lantern
                     collars.moveTo(cc[0] - px * r * kC * 1.15, cc[1] - py * r * kC * 1.15); collars.lineTo(cc[0] + px * r * kC * 1.15, cc[1] + py * r * kC * 1.15);
                     hexP(lanO, t0[0], t0[1], (r + 3.2) * kT); hexP(lanI, t0[0], t0[1], (r + 0.6) * kT);  // lantern: silver frame, violet glass
                 }

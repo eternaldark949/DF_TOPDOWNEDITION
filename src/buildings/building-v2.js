@@ -348,10 +348,22 @@
             }
             
             /**
-             * Draw neon sign layer (ABOVE drawTop) - positioned over the entrance
-             * so the player can see it while approaching the transition point.
+             * The sign layer the engine draws after every building's top. With the lean on,
+             * each sign is drawn inside its own building's top pass instead (_paintSign, after
+             * the walls, before the roof), so a roof or a taller wall in front of it hides it —
+             * the perspective holds. Without the lean, it's drawn here as before.
              */
             drawSign(ctx) {
+                if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) return;
+                this._paintSign(ctx);
+            }
+
+            /**
+             * A neon sign over the entrance. Double Nights: script on the porte-cochère.
+             * Silver Queen: on the portico's roof, in its plane. Everyone else: on a small
+             * cantilevered awning two floors up over the door, in that plane (_signAwning).
+             */
+            _paintSign(ctx) {
                 if (this.style === 'double_nights') { if (typeof game !== 'undefined' && game.camera) this._dnDrawSign(ctx); return; }
                 if (!this.attachedSign || !this.attachedTransition) return;
                 
@@ -375,6 +387,10 @@
                     ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                     textY = sqG.yf + SQ_PORTICO.depth * 0.5;
                     ctx.globalAlpha = Math.max(0.45, this._sqFade == null ? 1 : this._sqFade);
+                } else if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) {
+                    const A = this._signAwning(ctx, signText, signFontSize);                 // the awning, then the sign lying on it
+                    LandmarkKit.plane(ctx, A.k);
+                    textY = A.y;
                 }
                 
                 // --- FLICKER ENGINE ---
@@ -468,7 +484,24 @@
                 } // End full quality else block
                 
                 ctx.restore();
-                if (this.style === 'silver_queen' && CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) this._sqDrawColumns(ctx);
+            }
+
+            /**
+             * A cantilevered entrance awning for the sign: a slab two floors up, out from the wall
+             * over the door, as wide as the sign. Draws it (LandmarkKit.ledge) and returns the plane
+             * and the line the sign sits on.
+             */
+            _signAwning(ctx, text, size) {
+                if (!this._awn || this._awn.text !== text) {
+                    const m = document.createElement('canvas').getContext('2d'); m.font = `${size}px "Great Vibes", cursive`;
+                    const tw = Math.min(this.w - 20, m.measureText(text).width + 34), d = Math.round(size * 0.95);
+                    const cx = this.attachedTransition.x + this.attachedTransition.w / 2, wall = this.attachedTransition.y - 10;
+                    this._awn = { text, x0: cx - tw / 2, x1: cx + tw / 2, wall, d, z: 2 * CONFIG.BUILDINGS.FLOOR_HEIGHT };
+                }
+                const A = this._awn, K = LandmarkKit;
+                K.ledge(ctx, [{ a: [A.x0, A.wall], b: [A.x1, A.wall], nx: 0, ny: 1 }], A.z, A.d, 3,
+                        darkenHex(this.colors.wall || '#2a2436', 8), darkenHex(this.colors.wall || '#2a2436', 22), `rgba(${hexToRgb(this.colors.accent || '#a469ff')}, 0.55)`);
+                return { k: K.k(A.z + 0.5), y: A.wall + A.d / 2 };
             }
             
             
@@ -700,6 +733,8 @@
                     this._drawFaceFeature(ctx, f, P, false);
                 }
                 if (this.style === 'silver_queen') this._sqDrawPortico(ctx);
+                this._paintSign(ctx);                                                          // the sign, before the roof (so the roof can hide it)
+                if (this.style === 'silver_queen') this._sqDrawColumns(ctx);                   // the lantern columns stand in front of the portico
                 // --- Roofs (drawn in world coords under the scale-about-camera transform) ---
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const sq = this.style === 'silver_queen';
