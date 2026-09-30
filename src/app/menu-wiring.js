@@ -34,6 +34,25 @@
         const storyModeList = document.getElementById('story-mode-list');
         const mainMenuDiv = document.getElementById('main-menu');
 
+        // Tap to begin: the one gesture the browser needs — fullscreen, the landscape lock, the sound — then the menu
+        (() => {
+            const ttb = document.getElementById('tap-to-begin');
+            if (!ttb) return;
+            const evs = ['pointerup', 'touchend', 'keydown'];
+            const begin = (e) => {
+                evs.forEach(ev => ttb.removeEventListener(ev, begin));
+                document.removeEventListener('keydown', begin);
+                FullscreenManager.requestIfEnabled();
+                OrientationManager.apply();
+                try { audioSys.init(); } catch (err) { /* sound can wait for the next tap */ }
+                if (typeof game !== 'undefined' && game && game.resize) game.resize();
+                ttb.classList.add('gone');
+                setTimeout(() => ttb.remove(), 650);
+            };
+            evs.forEach(ev => ttb.addEventListener(ev, begin));
+            document.addEventListener('keydown', begin);
+        })();
+
         document.getElementById('btn-new-game').addEventListener('click', () => { FullscreenManager.requestIfEnabled(); mainMenuList.classList.add('hidden'); storyModeList.classList.remove('hidden'); });
         document.getElementById('btn-story-949').addEventListener('click', () => { 
             // 1. Initialize Audio Context (Browser requirement)

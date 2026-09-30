@@ -7,7 +7,8 @@
            ----------------------------------------------------------------------------
            The API only grants fullscreen from inside a user gesture, so this can
            never be requested on load — the game goes fullscreen (and locks to its
-           orientation) on the first tap or key press anywhere (armFirstGesture),
+           orientation) on the tap-to-begin screen (app/menu-wiring.js), or failing
+           that the first tap or key press anywhere (armFirstGesture),
            and again from the menu taps that start or resume a game and from the
            settings toggle. The preference changes only when the player flips the
            toggle: leaving by Esc or the back gesture doesn't turn it off for good. Vendor prefixes are
@@ -58,7 +59,7 @@
             },
 
             _persist() {
-                try { localStorage.setItem('dfab_fullscreen', GameSettings.fullscreen ? '1' : '0'); }
+                try { localStorage.setItem('dfab_fullscreen_pref', GameSettings.fullscreen ? '1' : '0'); }
                 catch (e) { /* private mode */ }
             },
 
@@ -181,9 +182,12 @@
             // Preference, not live state. FullscreenManager syncs it back down
             // when the player leaves fullscreen by Esc or the system back gesture,
             // so the settings row never claims to be on while the browser is off.
+            // Only the settings toggle writes it (dfab_fullscreen_pref). The old dfab_fullscreen key
+            // recorded every exit from fullscreen as "off", so it is dropped: everyone starts on.
             fullscreen: (() => {
                 try {
-                    const stored = localStorage.getItem('dfab_fullscreen');
+                    localStorage.removeItem('dfab_fullscreen');
+                    const stored = localStorage.getItem('dfab_fullscreen_pref');
                     if (stored !== null) return stored === '1';
                 } catch (e) { /* private mode */ }
                 return true;

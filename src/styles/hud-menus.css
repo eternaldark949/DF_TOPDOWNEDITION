@@ -1107,3 +1107,18 @@
 .tun-foot { margin-top: 14px; text-align: right; }
 .tun-respec { font-size: 0.65rem; color: #ff8aa0; letter-spacing: 1px; cursor: pointer; }
 .tun-close { margin-top: 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.15); padding: 10px; border-radius: 6px; cursor: pointer; font-family: Orbitron, sans-serif; letter-spacing: 3px; font-size: 0.7rem; }
+
+        /* Tap to begin — the veil before the menu; its one tap goes fullscreen, locks landscape, wakes the sound */
+        #tap-to-begin { position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; cursor: pointer; overflow: hidden;
+            background: radial-gradient(ellipse at 50% 42%, rgba(74, 44, 120, 0.55), rgba(10, 5, 20, 0.97) 70%), #07030e; transition: opacity 0.6s ease; -webkit-tap-highlight-color: transparent; user-select: none; }
+        #tap-to-begin.gone { opacity: 0; }   /* still catches taps while it fades, so none fall through to the menu */
+        #tap-to-begin .title-script { font-size: min(6rem, 17vw); left: 0; }
+        #tap-to-begin .title-sub { margin-bottom: 56px; font-size: min(1.5rem, 4.6vw); letter-spacing: min(1.2rem, 3.4vw); }
+        #tap-to-begin .ttb-cta { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 1.6rem; letter-spacing: 0.35rem; color: #e8c27a; text-shadow: 0 0 12px rgba(232, 194, 122, 0.55); animation: ttbBreathe 2.8s ease-in-out infinite; }
+        #tap-to-begin .ttb-hint { margin-top: 14px; font-family: var(--font-ui); font-size: 0.7rem; letter-spacing: 0.4rem; text-transform: uppercase; color: rgba(214, 200, 240, 0.4); }
+        #tap-to-begin .ttb-motes { position: absolute; inset: -50% 0 0 0; pointer-events: none; opacity: 0.7; animation: dlgMotes 22s linear infinite;
+            background-image: radial-gradient(1.5px 1.5px at 12% 20%, rgba(232, 194, 122, 0.8), transparent), radial-gradient(1px 1px at 30% 65%, rgba(214, 190, 255, 0.7), transparent),
+                radial-gradient(1.5px 1.5px at 55% 35%, rgba(232, 194, 122, 0.6), transparent), radial-gradient(1px 1px at 72% 80%, rgba(214, 190, 255, 0.6), transparent),
+                radial-gradient(2px 2px at 88% 15%, rgba(232, 194, 122, 0.5), transparent), radial-gradient(1px 1px at 45% 90%, rgba(232, 194, 122, 0.6), transparent);
+            background-size: 100% 50%; }
+        @keyframes ttbBreathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
