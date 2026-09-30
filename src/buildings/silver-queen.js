@@ -12,7 +12,7 @@
             silverHi: '#efecf8', silver: '#bdb6d6', silverLo: '#5f5782', silverDk: '#453e62',
             plum: '#2d1d59', terrace: '#3a2a6e', marble: '#1c1242',
             // from the silver_queen_exp editor design
-            roof: '#7664ce', roofLo: '#6150b6', trim: '#f1eefc', bay: '#2d1d59', glass: '#17005c', ground: '#100033',
+            roof: '#4c3a94', roofLo: '#2a1d5c', trim: '#d9bf86', bay: '#2d1d59', glass: '#17005c', ground: '#100033',
             gold: '#e8c27a', goldHi: '#fff1c9'
         };
         const SQ_PORTICO = {
@@ -28,9 +28,9 @@
             _sqH() { const B = CONFIG.BUILDINGS; return Math.min(this.floors, B.MAX_FLOORS) * B.FLOOR_HEIGHT; },
 
             _sqK(z) {
-                const B = CONFIG.BUILDINGS, H = this._sqH();
-                if (z <= H) return 1 + z / (B.CAM_HEIGHT - H);
-                return B.CAM_HEIGHT / (B.CAM_HEIGHT - Math.min(z, B.CAM_HEIGHT * 0.86));
+                const C = leanCamHeight(), H = this._sqH();
+                if (z <= H) return 1 + z / (C - H);
+                return C / (C - Math.min(z, C * 0.86));
             },
 
             _sqP(x, y, z) { const cam = game.camera, k = this._sqK(z); return [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k]; },
@@ -327,7 +327,7 @@
                     ctx.lineTo(t0[0] + px * r * kT, t0[1] + py * r * kT); ctx.lineTo(c.x + px * r, c.y + py * r); ctx.closePath(); ctx.fill();
                     ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill();
                     const cc = P3(c.x, c.y, g.z);                                                          // collar where the canopy ties in
-                    ctx.strokeStyle = '#e4e0f2'; ctx.lineWidth = 1.6;
+                    ctx.strokeStyle = '#d9bf86'; ctx.lineWidth = 1.6;
                     ctx.beginPath(); ctx.moveTo(cc[0] - px * r * kC * 1.15, cc[1] - py * r * kC * 1.15); ctx.lineTo(cc[0] + px * r * kC * 1.15, cc[1] + py * r * kC * 1.15); ctx.stroke();
                     hex(t0[0], t0[1], (r + 3.2) * kT); ctx.fillStyle = '#e4e0f2'; ctx.fill();                  // lantern: silver frame, violet glass
                     hex(t0[0], t0[1], (r + 0.6) * kT); ctx.fillStyle = '#5b4d86'; ctx.fill();
@@ -366,7 +366,7 @@
                 const rw = 40, rx = g.dx - rw / 2, rl = 132;                                                  // carpet
                 ctx.fillStyle = '#3a1d63'; ctx.fillRect(rx, g.yf, rw, rl);
                 ctx.fillStyle = '#56309a'; ctx.fillRect(rx + 3, g.yf, rw - 6, rl);
-                ctx.strokeStyle = 'rgba(232,224,248,0.6)'; ctx.lineWidth = 1;
+                ctx.strokeStyle = 'rgba(217,191,134,0.6)'; ctx.lineWidth = 1;
                 ctx.beginPath(); ctx.moveTo(rx + 5, g.yf); ctx.lineTo(rx + 5, g.yf + rl); ctx.moveTo(rx + rw - 5, g.yf); ctx.lineTo(rx + rw - 5, g.yf + rl); ctx.stroke();
                 const E = SQ_ENTRY, T = SQ_THEME;
                 for (const s of [-1, 1]) {                                                                    // velvet rope on gold stanchions
@@ -484,7 +484,7 @@
                 for (const [sx, sy, ph] of srcs) {
                     const az = -Math.PI / 2 + (ph ? 0.45 : -0.45) + Math.sin(t * 0.19 + ph) * 0.95;
                     const elev = 1.02 + 0.16 * Math.sin(t * 0.11 + ph * 1.7);
-                    const zTop = CONFIG.BUILDINGS.CAM_HEIGHT * 0.8, run = (zTop - H) / Math.tan(elev);
+                    const zTop = leanCamHeight() * 0.8, run = (zTop - H) / Math.tan(elev);
                     const p0 = this._sqP(sx, sy, H), p1 = this._sqP(sx + Math.cos(az) * run, sy + Math.sin(az) * run, zTop);
                     const vx = p1[0] - p0[0], vy = p1[1] - p0[1], L = Math.hypot(vx, vy) || 1, nx = -vy / L, ny = vx / L;
                     const beam = (w0, w1, c0, c1) => {
@@ -569,6 +569,28 @@
 
         Object.assign(BuildingV2.prototype, {
             /** Roof transform is applied by the caller (world coords at roof height). */
+            /** Night finish: a low mist veil round the base, moonlight sliding slowly over the lacquer roofs. */
+            _sqVeil(ctx, dark) {
+                if (dark < 0.2) return;
+                const t = _gameTimeSec, a = Math.min(1, (dark - 0.2) * 1.6);
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                if (_zoomLOD === 0) for (const s of this.sections) {                                           // mist hugging the footprint
+                    const x = this.x + s.x, y = this.y + s.y;
+                    for (let i = 0; i < 2; i++) {
+                        const u = ((t * 0.015 + i * 0.5 + s.x * 0.001) % 1), px = x + s.w * u, py = y + s.h + 10 + Math.sin(t * 0.3 + i) * 6;
+                        sqGlow(ctx, px, py, 70, `rgba(190,170,255,${0.1 * a * Math.sin(u * Math.PI)})`, 'rgba(190,170,255,0)');
+                    }
+                }
+                const cam = game.camera, k = 1 + this._leanScale();                                            // moonlit specular across the roofs
+                ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
+                const b = this.getBounds(), sweep = ((t * 0.012) % 1.6) - 0.3, sx = b.x + b.w * sweep;
+                ctx.beginPath(); for (const s of this.sections) ctx.rect(this.x + s.x, this.y + s.y, s.w, s.h); ctx.clip();
+                const g = ctx.createLinearGradient(sx - 140, b.y, sx + 140, b.y + 90);
+                g.addColorStop(0, 'rgba(220,210,255,0)'); g.addColorStop(0.5, `rgba(220,210,255,${0.07 * a})`); g.addColorStop(1, 'rgba(220,210,255,0)');
+                ctx.fillStyle = g; ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.restore();
+            },
+
             _sqDrawRoof(ctx, emissive) {
                 if (emissive && (this._sqDark || 0) <= 0.05) return;
                 const main = this.sections[0], mx = this.x + main.x, my = this.y + main.y;
@@ -585,9 +607,9 @@
                 const y0 = y + h * 0.43, y1 = y + h * 0.57, ribs = 7, ribX = (i) => x + w * (0.08 + i * 0.66 / (ribs - 1));
                 const cabs = [[x + w * 0.86, y + h * 0.22], [x + w * 0.86, y + h * 0.78]];
                 if (!emissive) {
-                    ctx.fillStyle = '#3b2d78'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
-                    ctx.strokeStyle = 'rgba(241,238,252,0.55)'; ctx.lineWidth = 1.5; ctx.stroke();
-                    ctx.fillStyle = 'rgba(230,224,247,0.3)'; ctx.fillRect(x + w * 0.05, y0, w * 0.9, y1 - y0);      // pale stone walk
+                    ctx.fillStyle = '#2e2266'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
+                    ctx.strokeStyle = 'rgba(217,191,134,0.55)'; ctx.lineWidth = 1.2; ctx.stroke();
+                    ctx.fillStyle = 'rgba(214,202,240,0.22)'; ctx.fillRect(x + w * 0.05, y0, w * 0.9, y1 - y0);      // pale stone walk
                     for (let i = 0; i < 8; i++) {
                         const cx = x + w * (0.1 + (i >> 1) * 0.17), cy = (i & 1) ? y + h * 0.8 : y + h * 0.2, rr = 11 + r(i) * 6, wist = r(i + 40) < 0.5;
                         ctx.fillStyle = 'rgba(16,0,51,0.35)'; ctx.beginPath(); ctx.arc(cx + 3, cy + 3, rr, 0, Math.PI * 2); ctx.fill();
@@ -656,7 +678,8 @@
                 const lotus = [];
                 for (let i = 0; i < 9; i++) lotus.push([x + w * (0.08 + r(i) * 0.84), y + h * (0.14 + r(i + 20) * 0.72), 5 + r(i + 40) * 3, r(i + 60) * 6.28]);
                 if (!emissive) {
-                    ctx.fillStyle = '#ece8f8'; ctx.beginPath(); ctx.roundRect(x - 9, y - 9, w + 18, h + 18, 6); ctx.fill();   // marble deck
+                    ctx.fillStyle = '#b8acdc'; ctx.beginPath(); ctx.roundRect(x - 9, y - 9, w + 18, h + 18, 6); ctx.fill();   // pearl marble deck
+                    ctx.strokeStyle = 'rgba(217,191,134,0.6)'; ctx.lineWidth = 1; ctx.stroke();
                     ctx.strokeStyle = 'rgba(118,100,206,0.4)'; ctx.lineWidth = 1; ctx.strokeRect(x - 4.5, y - 4.5, w + 9, h + 9);
                     const water = ctx.createLinearGradient(x, y, x + w, y + h);
                     water.addColorStop(0, '#3b2c9e'); water.addColorStop(0.55, '#1f0f70'); water.addColorStop(1, T.glass);
@@ -724,8 +747,8 @@
                         ctx.fillStyle = '#9d7de6'; ctx.beginPath(); ctx.arc(px - 3, py - 3, 8, 0, Math.PI * 2); ctx.fill();
                     }
                     sqHex(ctx, cx, cy, R); ctx.fillStyle = T.bay; ctx.fill(); ctx.strokeStyle = T.trim; ctx.lineWidth = 2; ctx.stroke();
-                    sqHex(ctx, cx, cy, R - 8); ctx.strokeStyle = 'rgba(241,238,252,0.3)'; ctx.lineWidth = 1; ctx.stroke();
-                    ctx.setLineDash([5, 7]); ctx.strokeStyle = 'rgba(241,238,252,0.45)';
+                    sqHex(ctx, cx, cy, R - 8); ctx.strokeStyle = 'rgba(217,191,134,0.3)'; ctx.lineWidth = 1; ctx.stroke();
+                    ctx.setLineDash([5, 7]); ctx.strokeStyle = 'rgba(217,191,134,0.4)';
                     ctx.beginPath(); ctx.arc(cx, cy, R * 0.74, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
                     ctx.fillStyle = T.ground; ctx.beginPath(); ctx.arc(cx, cy, E, 0, Math.PI * 2); ctx.fill();
                     ctx.strokeStyle = T.gold; ctx.lineWidth = 3; ctx.stroke();

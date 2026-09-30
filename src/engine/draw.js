@@ -285,9 +285,10 @@
                 if (this.activeMap.buildings && this.activeMap.type === 'outdoor') {
                     const cbW = cullBounds.world;
                     for (const b of this.activeMap.buildings) {
-                        if (b.style !== 'silver_queen' || !b._sqDrawGround) continue;
-                        if (b.x + b.w < cbW.left || b.x > cbW.right || b.y > cbW.bottom || b.y + b.h + 160 < cbW.top) continue;
-                        b._sqDrawGround(this.ctx);
+                        const ground = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : null;
+                        if (!ground) continue;
+                        if (b.x + b.w + 60 < cbW.left || b.x - 60 > cbW.right || b.y > cbW.bottom || b.y + b.h + 480 < cbW.top) continue;
+                        ground.call(b, this.ctx);
                     }
                 }
                 this.decals.draw(this.ctx, cullBounds.world);

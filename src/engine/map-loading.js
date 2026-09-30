@@ -641,11 +641,11 @@
                         });
                     });
                     
-                    // Keep the Silver Queen forecourt (portico, steps, carpet) clear of street trees
-                    const _sqBld = (mapData.buildings || []).find(b => b.id === 'silver_queen');
-                    const _sqCourt = _sqBld && _sqBld._sqForecourt ? _sqBld._sqForecourt() : null;
-                    if (_sqCourt) {
-                        const inCourt = (o) => o.x > _sqCourt.x && o.x < _sqCourt.x + _sqCourt.w && o.y > _sqCourt.y && o.y < _sqCourt.y + _sqCourt.h;
+                    // Keep the landmark forecourts (Silver Queen's portico and carpet, Double Nights' drive and fountain) clear of street trees
+                    for (const b of mapData.buildings || []) {
+                        const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : null;
+                        if (!court) continue;
+                        const inCourt = (o) => o.x > court.x && o.x < court.x + court.w && o.y > court.y && o.y < court.y + court.h;
                         mapData.foliage = mapData.foliage.filter(f => !inCourt(f));
                         mapData.lamps = mapData.lamps.filter(l => !inCourt(l));
                     }

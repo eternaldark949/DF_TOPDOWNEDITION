@@ -499,17 +499,13 @@
         
         BuildingV2Registry.register('double_nights', {
             factory: createDoubleNightsHotel,
-            sections: [
-                { x: 0, y: 0, w: 800, h: 150 },
-                { x: 0, y: 150, w: 200, h: 300 },
-                { x: 600, y: 150, w: 200, h: 300 }
-            ],
-            accentColor: '#ff0055',
+            sections: doubleNightsSections(),     // twin crescents and the atrium, as collision bands (buildings/double-nights.js)
+            accentColor: '#ffcf8a',               // warm gold: the block's street lamps take this colour
             label: 'Double Nights Hotel',
             type: 'hotel',
             category: 'hospitality',
-            floors: 12,
-            sign: { text: 'Double Nights', color: '#ff0055', size: 32 },
+            floors: 14,
+            sign: { text: 'Double Nights', color: '#ff1a55', size: 32 },
             door: { target: 'hotel_lobby', label: 'Enter Hotel', lightColor: '#ffdf80' }
         });
         

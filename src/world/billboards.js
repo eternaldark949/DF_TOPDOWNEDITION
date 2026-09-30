@@ -54,7 +54,7 @@
             _P(s, t, z) {
                 const B = CONFIG.BUILDINGS, cam = game.camera, g = this._ground(s, t);
                 const zz = z != null ? z : this.lift + t * this.rise;
-                const k = B.CAM_HEIGHT / (B.CAM_HEIGHT - Math.min(zz, B.CAM_HEIGHT * 0.86));
+                const C = leanCamHeight(), k = C / (C - Math.min(zz, C * 0.86));
                 return [cam.x + (g[0] - cam.x) * k, cam.y + (g[1] - cam.y) * k];
             }
 

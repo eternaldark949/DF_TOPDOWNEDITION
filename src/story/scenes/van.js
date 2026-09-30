@@ -8,11 +8,11 @@
            knocks; they pour out in front of the hotel.
            The novel's lines, verbatim where it has them.
            ===================================================================== */
-        const VAN_DROP = {                                   // where everyone stands when the scene hands over (hub_949, the hotel door)
-            van: { x: 1792, y: 905, angle: 0 },
-            '949': { x: 1700, y: 842 }, '747': { x: 1752, y: 852 },
-            Yenna: { x: 1648, y: 850 }, Sabrina: { x: 1668, y: 880 }, Max: { x: 1732, y: 884 },
-            Victoria: { x: 1624, y: 878 }, Josh: { x: 1776, y: 876 }
+        const VAN_DROP = {                                   // where everyone stands when the scene hands over (hub_949, under the Double Nights canopy)
+            van: { x: 2010, y: 836, angle: 0 },              // on the drive, in front of the porte-cochère (buildings/double-nights.js)
+            '949': { x: 2000, y: 784 }, '747': { x: 2036, y: 792 },
+            Yenna: { x: 1962, y: 792 }, Sabrina: { x: 1940, y: 806 }, Max: { x: 2060, y: 806 },
+            Victoria: { x: 1918, y: 800 }, Josh: { x: 2082, y: 800 }
         };
         const VAN_POSES = { '949': 'sit_work', '747': 'sit', Yenna: 'sit', Sabrina: 'sit', Max: 'sit_lean', Victoria: 'sit', Josh: 'sit' };
         const MIRABEL_DEPOSIT = 250;                          // 50 percent down
@@ -188,7 +188,7 @@
 
             // ── Double Nights ───────────────────────────────────────────────
             const V = VAN_DROP.van;
-            s.map('hub_949', { at: { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }, cam: { x: 1735, y: 880 }, zoom: 1.9 });
+            s.map('hub_949', { at: { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }, cam: { x: 1990, y: 830 }, zoom: 1.9 });
             parkCrew(g);
             const van = s.prop('van', drawVanExterior, V.x, V.y, V.angle); van.doors = 0;
             const rear = { x: V.x - 64, y: V.y };
@@ -204,11 +204,11 @@
                 yield 12;
             }
             yield 40;
-            for (const id of order) crew[id].face({ x: 1700, y: 700 }, 20);
-            s.cam.to({ x: 1700, y: 600 }, { zoom: 1.0, frames: 260, ease: 'inOut' });
+            for (const id of order) crew[id].face({ x: 2000, y: 700 }, 20);
+            s.cam.to({ x: 2000, y: 520 }, { zoom: 0.9, frames: 260, ease: 'inOut' });
             yield 60;
             s.marker('Double Nights Hotel', 'Moon City');
             yield s.narrate('Towering before them was the building: Double Nights Hotel. Majestic, glistening, and warmly corporate.');
-            s.cam.to({ x: 1700, y: 842 }, { zoom: 1.6, frames: 120 });
+            s.cam.to({ x: 2000, y: 790 }, { zoom: 1.6, frames: 120 });
             yield 120;
         });

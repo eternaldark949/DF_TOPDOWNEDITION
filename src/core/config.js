@@ -346,7 +346,8 @@
                lights draw in an emissive pass after lighting so they glow at night. */
             BUILDINGS: {
                 LEAN: true,
-                CAM_HEIGHT: 700,        // virtual camera height (px); lower = stronger lean
+                CAM_HEIGHT: 700,        // virtual camera height (px) at REF_ZOOM; lower = stronger lean
+                REF_ZOOM: 1.0,          // zoomed out, the camera rises (leanCamHeight) so heights scale with footprints
                 FLOOR_HEIGHT: 9,        // px of height per floor
                 MAX_FLOORS: 14          // taller buildings are capped so roofs don't swing too far
             },
@@ -418,3 +419,12 @@
             }
         });
 
+
+        /** The lean's camera height for the current zoom: zoomed out, the camera sits higher, so a
+            building's apparent height shrinks with its footprint instead of towering over it. */
+        function leanCamHeight() {
+            const B = CONFIG.BUILDINGS;
+            let z = B.REF_ZOOM;
+            try { if (game && game.camera && game.camera.zoom) z = game.camera.zoom; } catch (e) { /* before the engine exists */ }
+            return B.CAM_HEIGHT * Math.max(0.7, Math.min(3.2, B.REF_ZOOM / z));
+        }
