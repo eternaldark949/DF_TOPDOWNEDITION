@@ -30,6 +30,8 @@
              */
             resetGameState() {
                 if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
+                if (this.coach) { this.coach.dismiss(); this.coach.deserialize([]); }   // a story New Game then calls hud.startFresh()
+                if (this.hud) this.hud.revealAll();
                 // --- PLAYER STATE ---
                 this.currency = 100;
                 this.scrap = 0;

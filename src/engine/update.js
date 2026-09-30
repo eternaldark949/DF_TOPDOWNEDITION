@@ -124,6 +124,13 @@
                     }
                 }
             
+                // 3. A scene's road sway (story/scene-runner.js: s.sway) — slow, uneven, like a van on a city street
+                if (this.camera.sway) {
+                    const t = _gameTimeSec, k = this.camera.sway;
+                    this.camera.shakeX += Math.sin(t * 1.3) * k + Math.sin(t * 3.7) * k * 0.25;
+                    this.camera.shakeY += Math.sin(t * 0.9 + 1) * k * 0.5 + Math.sin(t * 5.1) * k * 0.15;
+                }
+
                 // Ability & Regen Timers
                 // Flit Attunement recharge
                 if (this.flitState.attunement < this.flitState.maxAttunement) {

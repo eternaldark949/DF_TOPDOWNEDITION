@@ -136,7 +136,7 @@
                 lc.scale(this.camera.zoom, this.camera.zoom);
                 let camX, camY;
                 if (this.cutscene && this.cutscene.active) { camX = this.camera.x; camY = this.camera.y; }
-                else { camX = this.player.x; camY = this.player.y; }
+                else { camX = this.player.x + (this.scopeLeanX || 0); camY = this.player.y + (this.scopeLeanY || 0); }   // same camera as draw.js (scope lean included)
                 lc.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
                 
                 // The view, at the actual zoom (lights are culled by their own reach)
@@ -500,7 +500,7 @@
                 ctx.scale(this.camera.zoom, this.camera.zoom);
                 let camX, camY;
                 if (this.cutscene && this.cutscene.active) { camX = this.camera.x; camY = this.camera.y; }
-                else { camX = this.player.x; camY = this.player.y; }
+                else { camX = this.player.x + (this.scopeLeanX || 0); camY = this.player.y + (this.scopeLeanY || 0); }   // same camera as draw.js (scope lean included)
                 ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
                 ctx.globalCompositeOperation = 'lighter';
                 const halfW = (this.canvas.width / 2) / this.camera.zoom;

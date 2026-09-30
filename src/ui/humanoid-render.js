@@ -879,6 +879,9 @@
             ctx.globalAlpha = 1.0;
             }
 
+            // A mask goes on over the face, under the fringe
+            for (const j of jewelry) if (WD.jewelry[j.type].at === 'face') WD.jewelry[j.type].portrait(ctx, P, j);
+
             // ─── HAIR (FRONT LAYER — on top of face) ───
             if (hair) {
                 const renderer = PORTRAIT_HAIR_RENDERERS[hair.type];
@@ -896,6 +899,7 @@
 
             // ─── JEWELRY AND HAT ───
             for (const j of jewelry) if (WD.jewelry[j.type].at === 'head') WD.jewelry[j.type].portrait(ctx, P, j);
+            for (const j of jewelry) if (WD.jewelry[j.type].portraitOver) WD.jewelry[j.type].portraitOver(ctx, P, j);   // a mask's eyes, through the fringe
             const hatPiece = WD && config.hat ? WD.hats[config.hat.type] : null;
             if (hatPiece) hatPiece.portrait(ctx, P, config.hat);
         }
@@ -928,7 +932,7 @@
             }
             // Jewelry worn on the head (sunglasses, earrings)
             if (jewelry && typeof WARDROBE !== 'undefined') {
-                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && piece.at === 'head') piece.draw(ctx, { headX }, j); }
+                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && (piece.at === 'head' || piece.at === 'face')) piece.draw(ctx, { headX }, j); }
             }
             // Hat (renders on top of everything)
             if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);

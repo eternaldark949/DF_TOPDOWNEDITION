@@ -1184,6 +1184,9 @@
                     }
                 }
                 
+                // A flashback (story/scene-runner.js s.memory): cooler, softer, a little faded
+                const memK = this.scenes && this.scenes.ui ? (this.scenes.ui.memK || 0) : 0;
+                if (memK > 0.001) filterChain += ` saturate(${(1 - 0.5 * memK).toFixed(3)}) sepia(${(0.14 * memK).toFixed(3)}) hue-rotate(${(-22 * memK).toFixed(1)}deg) contrast(${(1 - 0.08 * memK).toFixed(3)})`;
                 if (this.canvas.style.filter !== filterChain) {
                     this.canvas.style.filter = filterChain;
                 }

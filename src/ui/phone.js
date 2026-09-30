@@ -37,7 +37,45 @@
                 canvas.addEventListener('touchend', (e) => { if (e.touches.length < 2) this.mapView.lastPinchDist = 0; if (e.touches.length === 0) this.mapView.isDragging = false; if (e.touches.length === 1) { this.mapView.isDragging = true; this.mapView.lastX = e.touches[0].clientX; this.mapView.lastY = e.touches[0].clientY; } });
             },
         
+            // ── Calls: a voice on the line while the scene plays on (no pause) ──
+            call: null,
+            /** Someone's calling: the phone buzzes, a call card rises; tapping it (or the phone button) answers. */
+            ringCall(name, opts = {}) {
+                this.endCall();
+                const c = this.call = { name, subtitle: opts.subtitle || '', answered: false, t0: 0, el: null };
+                const el = c.el = document.createElement('div');
+                el.id = 'call-card';
+                el.innerHTML = '<div class="cc-ring"><i></i><i></i><canvas width="120" height="120"></canvas></div>'
+                    + '<div class="cc-who"><b></b><span></span></div><button class="cc-answer">Answer</button><div class="cc-time"></div>';
+                el.querySelector('b').textContent = name;
+                el.querySelector('span').textContent = c.subtitle || 'incoming call';
+                document.body.appendChild(el);
+                if (game.paintPortraitTo) game.paintPortraitTo(el.querySelector('canvas'), name, 'rgba(40, 10, 50, 0.95)');
+                el.querySelector('.cc-answer').addEventListener('click', (e) => { e.stopPropagation(); this.answerCall(); });
+                requestAnimationFrame(() => el.classList.add('show'));
+                c.buzz = setInterval(() => { try { if (navigator.vibrate) navigator.vibrate([90, 60, 90]); } catch (e) { /* no haptics */ } audioSys.sfx('ui'); }, 1400);
+                return c;
+            },
+            answerCall() {
+                const c = this.call; if (!c || c.answered) return;
+                c.answered = true; c.t0 = performance.now(); clearInterval(c.buzz);
+                c.el.classList.add('live');
+                c.el.querySelector('span').textContent = 'on the line';
+                const time = c.el.querySelector('.cc-time');
+                c.clock = setInterval(() => { const s = Math.floor((performance.now() - c.t0) / 1000); time.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }, 250);
+                audioSys.sfx('ui');
+                this.addMessage(c.name, '☎ Call', false, c.name);
+            },
+            callAnswered() { return !!(this.call && this.call.answered); },
+            endCall() {
+                const c = this.call; if (!c) return;
+                clearInterval(c.buzz); clearInterval(c.clock);
+                const el = c.el; el.classList.remove('show'); el.classList.add('gone'); setTimeout(() => el.remove(), 600);
+                this.call = null;
+            },
+
             open() {
+                if (this.call && !this.call.answered) { this.answerCall(); return; }   // the phone's ringing: the button answers it
                 this.isOpen = true;
                 this.overlay.style.display = 'flex';
                 this.showHome();

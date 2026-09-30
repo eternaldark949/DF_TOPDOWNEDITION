@@ -141,6 +141,32 @@
                     sub.start(now);
                     sub.stop(now + dur);
                 }
+                else if (type === 'knock') {
+                    // KNOCK: a gloved fist on the van's partition — a short, dull metal thud
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(70, now + 0.09);
+                    gain.gain.setValueAtTime(0.0001, now);
+                    gain.gain.exponentialRampToValueAtTime(0.22, now + 0.006);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+                    osc.start(now);
+                    osc.stop(now + 0.14);
+                }
+                else if (type === 'bump') {
+                    // BUMP: the van hitting a seam in the road — a low thump with a rattle after
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(90, now);
+                    osc.frequency.exponentialRampToValueAtTime(38, now + 0.25);
+                    gain.gain.setValueAtTime(0.0001, now);
+                    gain.gain.exponentialRampToValueAtTime(0.3, now + 0.015);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.32);
+                    const r = this.ctx.createOscillator(), rg = this.ctx.createGain();
+                    r.type = 'square'; r.frequency.setValueAtTime(420, now + 0.05); r.connect(rg); rg.connect(out);
+                    rg.gain.setValueAtTime(0.0001, now); rg.gain.exponentialRampToValueAtTime(0.018, now + 0.06); rg.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+                    r.start(now + 0.04); r.stop(now + 0.22);
+                }
                 else if (type === 'ui') {
                     // UI BLIP: Clean sine tone, short and high
                     osc.type = 'sine';
@@ -212,7 +238,8 @@
                     wind: layer(pink, [windBand], 0.87),
                     city: layer(brown, [bq('lowpass', 380)], 1.07),
                     fire: layer(brown, [bq('lowpass', 250)], 0.81),
-                    room: layer(brown, [bq('lowpass', 140)], 0.71)
+                    room: layer(brown, [bq('lowpass', 140)], 0.71),
+                    road: layer(brown, [bq('lowpass', 95)], 0.63)          // tyres on wet asphalt, felt through the van floor
                 };
                 const lfo = ctx.createOscillator(), lfoAmt = ctx.createGain();   // wind gusts drift the band around
                 lfo.frequency.value = 0.07; lfoAmt.gain.value = 300; lfo.connect(lfoAmt); lfoAmt.connect(windBand.frequency); lfo.start();
@@ -247,8 +274,10 @@
                 const vol = GameSettings.ambienceVolume ?? 0.7;
 
                 this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
+                const van = map.id === 'van_interior', rolling = van && game.vanMoving !== false;   // the crew's van: rain drums on the roof, the road hums underneath
                 this._set(this.L.rain, outside && !realm ? 0.3 * rain : 0, 0.8);
-                this._set(this.L.rainIn, outside ? 0 : 0.22 * rain, 0.8);
+                this._set(this.L.rainIn, van ? 0.2 : outside ? 0 : 0.22 * rain, 0.8);
+                this._set(this.L.road, rolling ? 0.32 : 0, rolling ? 1.2 : 0.6);
                 this._set(this.L.wind, outside ? 0.04 + 0.12 * wind : 0.015 * wind, 1.2);
                 this._set(this.L.city, realm ? 0 : !indoorMap ? 0.1 + 0.07 * day : veranda ? 0.09 : apt ? 0.025 : 0.015, 1.0);
                 this._set(this.L.room, apt && !veranda ? 0.035 : 0, 1.0);

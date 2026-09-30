@@ -84,6 +84,10 @@
                     
                     // --- NOTES ---
                     foundNotes: this.foundNotes || [],
+
+                    // --- HUD: which parts the story has introduced, what the coach has taught ---
+                    hudRevealed: this.hud ? this.hud.serialize() : undefined,
+                    coachTaught: this.coach ? this.coach.serialize() : undefined,
                     
                     // --- MISSIONS ---
                     missions: this.missions ? this.missions.serialize() : { completedCount: 0, missionLog: [] },
@@ -681,6 +685,10 @@
                         this.story.deserialize(save.story);
                         console.log(`[LOAD] Restored story at step ${this.story.state.step}, ${this.story.completedOptional.length} optional quests completed`);
                     }
+
+                    // 10c2. The HUD the story has introduced (older saves: all of it)
+                    if (this.coach) { this.coach.dismiss(); this.coach.deserialize(save.coachTaught); }
+                    if (this.hud) this.hud.deserialize(save.hudRevealed);
 
                     // 10d. Restore Found Notes
                     if (save.foundNotes) {

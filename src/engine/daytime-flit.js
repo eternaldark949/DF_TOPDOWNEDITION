@@ -46,6 +46,7 @@
              *  the way she's moving (keys, stick) or facing. Returns true if she flitted. */
             triggerFlit(angleOverride, source) {
                 if (this.isDriving || this.paused) return false;
+                if (this.hud && !this.hud.has('flit')) return false;   // not introduced yet (ui/hud-reveal.js)
                 
                 const cost = this.flitCost();
                 
