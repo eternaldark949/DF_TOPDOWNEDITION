@@ -110,8 +110,12 @@
                 for (const f of map.foliage || []) {                                             // canopies, thrown along the sun
                     if (f.x < cull.left - 120 || f.x > cull.right + 120 || f.y < cull.top - 120 || f.y > cull.bottom + 120) continue;
                     const s = f.size || 1, ht = (f.type === 'bush' ? 8 : 34) * s, r = (f.type === 'bush' ? 12 : f.type === 'palm' ? 17 : 19) * s;
-                    const cx = f.x + dx * ht, cy = f.y + dy * ht - (f.type === 'bush' ? 0 : 8 * s);
-                    c.moveTo(cx + r * (1 + S.len * 0.25), cy); c.ellipse(cx, cy, r * (1 + S.len * 0.25), r * 0.8, Math.atan2(dy, dx), 0, Math.PI * 2);
+                    // Swept from under the canopy out along the sun (tapering back to the tree), so a long shadow stays attached
+                    const x0 = f.x, y0 = foliageCanopyY(f), rot = Math.atan2(dy, dx), N = S.len > 0.6 ? 4 : 1;
+                    for (let i = N === 1 ? 1 : 0; i <= N; i++) {
+                        const t = i / N, cx = x0 + dx * ht * t, cy = y0 + dy * ht * t, rr = r * (0.6 + 0.4 * t), rx = rr * (1 + S.len * 0.25 * t);
+                        c.moveTo(cx + rx * Math.cos(rot), cy + rx * Math.sin(rot)); c.ellipse(cx, cy, rx, rr * 0.8, rot, 0, Math.PI * 2);
+                    }
                 }
                 c.fill();
                 ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);

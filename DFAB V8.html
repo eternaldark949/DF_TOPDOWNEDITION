@@ -18848,6 +18848,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
         const _floraCache = new Map();
         /** The sprite for a kind/size (sizes bucketed to 0.2), in 4 variants. */
+        /** Where a plant's canopy sits (drawn above its anchor: palms and trees high, bushes low). Shadows centre on it. */
+        function foliageCanopyY(f) { return f.y - (f.type === 'bush' ? 2 : f.type === 'palm' ? 30 : 25) * (f.size || 1); }
+
         function floraSprite(type, size, variant) {
             const sz = Math.round(size * 5) / 5, key = type + '|' + sz + '|' + variant;
             let spr = _floraCache.get(key);
@@ -18990,15 +18993,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Calculate sway based on wind strength and time
                 const sway = Math.sin(time * 2 + this.phaseOffset) * wind * 8 * this.swayMultiplier * windDirection;
                 const s = this.size, palm = this.type === 'palm', bush = this.type === 'bush';
-                // Shadow on the ground: by day the sun's shadow layer throws it (engine/daylight.js); at night, a soft pool beneath
+                const cx = this.x + sway * (bush ? 0.6 : palm ? 0.3 : 1), cy = foliageCanopyY(this);
+                // Shadow on the ground, under the leaves: by day the sun's shadow layer throws it (engine/daylight.js); at night, a soft pool beneath
                 if (!_sunShadow.on) {
+                    const r = (bush ? 13 : palm ? 16 : 19) * s;
                     ctx.fillStyle = 'rgba(0,0,0,0.22)';
-                    ctx.beginPath(); ctx.ellipse(this.x + sway * 0.4 + 4 * s, this.y + (bush ? 3 : 6) * s, (bush ? 13 : palm ? 16 : 19) * s, (bush ? 6 : 8) * s, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(cx + 3 * s, cy + 4 * s, r, r * 0.82, 0, 0, Math.PI * 2); ctx.fill();
                 }
                 // The canopy: its painted sprite, carried by the wind
                 if (this._variant === undefined) this._variant = Math.floor(this.phaseOffset * 0.637) % 4;
                 const spr = floraSprite(this.type, s, this._variant);
-                const cx = this.x + sway * (bush ? 0.6 : palm ? 0.3 : 1), cy = this.y - (bush ? 2 : palm ? 30 : 25) * s;
                 if (palm) {
                     ctx.save(); ctx.translate(cx, cy); ctx.rotate(sway * 0.012); ctx.drawImage(spr.cv, -spr.w / 2, -spr.w / 2); ctx.restore();
                 } else ctx.drawImage(spr.cv, cx - spr.w / 2, cy - spr.w / 2);
@@ -56446,8 +56450,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const f of map.foliage || []) {                                             // canopies, thrown along the sun
                     if (f.x < cull.left - 120 || f.x > cull.right + 120 || f.y < cull.top - 120 || f.y > cull.bottom + 120) continue;
                     const s = f.size || 1, ht = (f.type === 'bush' ? 8 : 34) * s, r = (f.type === 'bush' ? 12 : f.type === 'palm' ? 17 : 19) * s;
-                    const cx = f.x + dx * ht, cy = f.y + dy * ht - (f.type === 'bush' ? 0 : 8 * s);
-                    c.moveTo(cx + r * (1 + S.len * 0.25), cy); c.ellipse(cx, cy, r * (1 + S.len * 0.25), r * 0.8, Math.atan2(dy, dx), 0, Math.PI * 2);
+                    // Swept from under the canopy out along the sun (tapering back to the tree), so a long shadow stays attached
+                    const x0 = f.x, y0 = foliageCanopyY(f), rot = Math.atan2(dy, dx), N = S.len > 0.6 ? 4 : 1;
+                    for (let i = N === 1 ? 1 : 0; i <= N; i++) {
+                        const t = i / N, cx = x0 + dx * ht * t, cy = y0 + dy * ht * t, rr = r * (0.6 + 0.4 * t), rx = rr * (1 + S.len * 0.25 * t);
+                        c.moveTo(cx + rx * Math.cos(rot), cy + rx * Math.sin(rot)); c.ellipse(cx, cy, rx, rr * 0.8, rot, 0, Math.PI * 2);
+                    }
                 }
                 c.fill();
                 ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
