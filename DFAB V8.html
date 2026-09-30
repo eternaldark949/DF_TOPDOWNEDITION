@@ -3918,10 +3918,16 @@
             // The cull area is always sized for the max zoom-out, so no pop-in.
             // Tuning: Lower both toward 0.35 for wider cull (safer, more entities drawn).
             //         Raise both toward 1.0 for tighter cull (better perf, risk of edge pop-in at low zoom).
+            // The city's baked ground tiles (world/ground-baker.js)
+            GROUND_BAKE: { HALF_RES_BELOW: 0.55, FULL_RES_ABOVE: 0.65, MIN_PER_FRAME: 2, MAX_PER_FRAME: 6, FRAME_MS: 3, AHEAD_TICKS: 45 },
+
+            // Zoom detail steps (engine/draw.js _zoomLOD): below `in` drop a step, above `out` come back
+            LOD_ZOOM: [{ in: 0.68, out: 0.74 }, { in: 0.48, out: 0.54 }],
+
             CULLING: {
                 // Zoom clamp for culling viewport (locked = fixed cull rect regardless of camera zoom)
-                ZOOM_MIN: 0.35,                 // Locked: matches actual minimum camera zoom (max speed)
-                ZOOM_MAX: 0.35,                 // Locked: same value = cull rect never changes size
+                ZOOM_MIN: 0.45,                 // The driving floor (VEHICLE_DRIVE.CAM_ZOOM, landscape); draw.js
+                ZOOM_MAX: 0.45,                 //   also never culls tighter than the actual zoom
                 
                 // Rendering margins (added to cull viewport half-dimensions as pop-in buffer)
                 BUILDINGS: 400,                 // Building bodies
@@ -4213,6 +4219,7 @@
                 HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
                 REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
+                CAM_ZOOM: { SPAN: 0.5, FLOOR: 0.5 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
                 STICK_YAW_DAMP: 5,
                 IMPACT_YAW: 0.9,                // Twist from an off-centre knock (onImpact)              // Touch stick unwinds by this × yawRate (no overshoot)
                 COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)
@@ -7715,6 +7722,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            - 'flit'    : Rising warp for teleport (triangle wave, 200Hz → 600Hz)
            - 'crunch'  : A car hit (thump + metal noise + glass), opts.gain by impact
            - tyres(l)  : Looped tyre squeal for the driven car, level 0..1
+           - engine(s) : The driven car's electric hum (ENGINE_HUM per brand)
            ===================================================================== */
         class AudioSystem {
             constructor() {
@@ -7912,6 +7920,45 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
 
+            /**
+             * The driven car's motor: a low, smooth, many-voiced electric hum. A detuned pair
+             * (the body) with a slow chorus, a quiet fifth (warmth), a filtered saw that opens
+             * with the throttle (shimmer), and a faint high whine past half speed. Pitch glides
+             * with speed — no gears. Each brand has its own root (ENGINE_HUM). Built on first
+             * use; `on` swells it in and out.
+             *   engine({ on, speed01, throttle, brand })
+             */
+            engine(st) {
+                const on = !!(st && st.on);
+                if (!this._eng) {
+                    if (!on) return;
+                    const c = this.ctx, bus = c.createGain(); bus.gain.value = 0; bus.connect(this.masterGain);
+                    const osc = (type, g0) => { const o = c.createOscillator(), g = c.createGain(); o.type = type; g.gain.value = g0; o.connect(g); o.start(); return { o, g }; };
+                    const body1 = osc('sine', 0.5), body2 = osc('sine', 0.3), fifth = osc('triangle', 0.09), whine = osc('sine', 0);
+                    const saw = osc('sawtooth', 0.07), lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.8; lp.frequency.value = 300;
+                    saw.g.connect(lp);
+                    const tone = c.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 2600;   // rounds off the whole bank
+                    for (const n of [body1.g, body2.g, fifth.g, whine.g, lp]) n.connect(tone);
+                    tone.connect(bus);
+                    const chorus = c.createOscillator(), cg = c.createGain(); chorus.frequency.value = 0.23; cg.gain.value = 5;   // ±5 cents, slowly
+                    chorus.connect(cg); cg.connect(body2.o.detune); chorus.start();
+                    body1.o.detune.value = -4; body2.o.detune.value = 4;
+                    this._eng = { bus, body1, body2, fifth, whine, saw, lp };
+                }
+                const E = this._eng, now = this.ctx.currentTime, H = ENGINE_HUM[st && st.brand] || ENGINE_HUM.Gelfash;
+                const v = Math.max(0, Math.min(1, (st && st.speed01) || 0)), thr = Math.max(0, Math.min(1, (st && st.throttle) || 0));
+                const f = H.root * (1 + 1.1 * v);                                  // one smooth glide, idle to top speed
+                const glide = (p, x) => p.setTargetAtTime(x, now, 0.12);
+                glide(E.body1.o.frequency, f); glide(E.body2.o.frequency, f * 2);
+                glide(E.fifth.o.frequency, f * 1.5); glide(E.saw.o.frequency, f * 3); glide(E.whine.o.frequency, f * 8);
+                glide(E.lp.frequency, 250 + 1250 * Math.max(thr, v * 0.6) * H.shimmer);
+                glide(E.whine.g.gain, H.whine * Math.max(0, v - 0.5) * 2 * 0.06);
+                glide(E.body1.g.gain, 0.5 * H.body);
+                const level = on ? H.level * (0.72 + 0.18 * v + 0.1 * thr) : 0;
+                E.bus.gain.setTargetAtTime(level, now, on ? (this._engOn ? 0.1 : 0.2) : 0.27);   // swells in over ~0.6 s, out over ~0.8 s
+                this._engOn = on;
+            }
+
             /** One second of white noise, made once. */
             _noise() {
                 if (this._noiseBuf) return this._noiseBuf;
@@ -7944,6 +7991,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._tyreL = L;
             }
         }
+        /** Each brand's motor (AudioSystem.engine): root pitch in Hz and how the voices sit. */
+        const ENGINE_HUM = {
+            LADY:    { root: 44, body: 1.15, shimmer: 0.8, whine: 0.8, level: 0.11 },   // darkest, most body
+            Zenxera: { root: 55, body: 1.0,  shimmer: 1.2, whine: 1.0, level: 0.1 },    // brighter, more shimmer
+            Gelfash: { root: 62, body: 0.85, shimmer: 0.9, whine: 0.5, level: 0.09 }    // thinner, little whine
+        };
+
         // Global audio system instance
         const audioSys = new AudioSystem();
 
@@ -8030,6 +8084,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const vol = GameSettings.ambienceVolume ?? 0.7;
                 const drv = !paused && game.isDriving && game.car && game.car.controlMode === 'PLAYER';
                 a.tyres(drv ? Math.min(1, (game.car.tyreSlip || 0) * 0.45) : 0);   // the driven car's tyres, however hard they're sliding
+                const car = game.car, inCar = !paused && game.isDriving && car && (car.controlMode === 'PLAYER' || car.controlMode === 'AI');
+                a.engine({ on: inCar, brand: car && car.brand, speed01: car ? Math.abs(car.speed || 0) / (car.maxSpeed || 10) : 0,
+                           throttle: car ? Math.abs(car.controlMode === 'PLAYER' ? (car.pedal || 0) : (car.manualGas || 0)) : 0 });   // her motor (auto-drive too)
 
                 this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
                 const van = map.id === 'van_interior', rolling = van && game.vanMoving !== false;   // the crew's van: rain drums on the roof, the road hums underneath
@@ -33647,8 +33704,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            pavements and crossings are painted into 512 px tiles the first time
            they come into view, and after that the frame just blits them (it used
            to redraw every road in full every frame). Tiles are kept in a small
-           LRU; at most a couple are painted per frame (a tile still being
-           painted shows the plain ground colour for that frame).
+           LRU (sized by memory: a half-res tile counts a quarter); a couple are
+           painted per frame, more while the frame has time, and ahead of a
+           moving car. A tile not painted yet at this resolution borrows the
+           other one; only a tile never painted shows the plain ground colour.
 
            Roads are painted from their own geometry — corners and lane offsets
            along the road (Road.getCorners / paramToWorld) — so a diagonal or
@@ -33669,41 +33728,77 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             constructor(game) {
                 this.game = game;
                 this.S = 512;                 // tile size (world px, painted 1:1)
-                this.max = 40;                // tiles kept (≈ 40 MB at most)
+                this.max = 40;                // full-size tiles' worth kept (≈ 40 MB at most; a half-res tile counts ¼)
+                this.lod = 0;
+                this.weight = 0;
                 this.cache = new Map();
                 this.mapId = null;
-                this.budget = 0;
             }
 
             /** Only the city is baked (other maps keep their own ground). */
             activeFor(map) { return !!(map && map.id === 'hub_949' && this.game.traffic && this.game.traffic.network && this.game.traffic.network.roads.length); }
 
-            invalidate() { this.cache.clear(); }
+            invalidate() { this.cache.clear(); this.weight = 0; }
 
-            /** Blit the tiles under the view (painting at most two new ones this frame). */
+            /**
+             * Blit the tiles under the view. Missing tiles are painted within a small
+             * time budget; until one is ready, the same tile at the other resolution
+             * stands in (scaled), and only a tile never painted at all shows the plain
+             * ground. Spare budget paints ahead of the car, so fast driving meets
+             * tiles that are already there. stats: this frame's counts (tests read it).
+             */
             draw(ctx, view) {
-                const map = this.game.activeMap;
+                const map = this.game.activeMap, G = CONFIG.GROUND_BAKE;
                 if (map.id !== this.mapId) { this.invalidate(); this.mapId = map.id; }
-                this.lod = (this.game.camera.zoom || 1) < 0.6 ? 1 : 0;         // zoomed out: half-resolution tiles (much cheaper to blit)
-                const S = this.S, i0 = Math.max(0, Math.floor(view.left / S)), j0 = Math.max(0, Math.floor(view.top / S));
-                const i1 = Math.min(Math.ceil(map.width / S) - 1, Math.floor(view.right / S)), j1 = Math.min(Math.ceil(map.height / S) - 1, Math.floor(view.bottom / S));
-                this.budget = 2;
+                const z = this.game.camera.zoom || 1;                            // zoomed out: half-resolution tiles (much cheaper to blit)
+                if (this.lod === 0 && z < G.HALF_RES_BELOW) this.lod = 1;         // with a band, so a wobbling zoom doesn't
+                else if (this.lod === 1 && z > G.FULL_RES_ABOVE) this.lod = 0;    // flip every tile back and forth
+                const S = this.S, cols = Math.ceil(map.width / S) - 1, rows = Math.ceil(map.height / S) - 1;
+                const range = (v) => [Math.max(0, Math.floor(v.left / S)), Math.max(0, Math.floor(v.top / S)),
+                                      Math.min(cols, Math.floor(v.right / S)), Math.min(rows, Math.floor(v.bottom / S))];
+                const [i0, j0, i1, j1] = range(view);
+                this.t0 = performance.now(); this.baked = 0;
+                this.stats = { flat: 0, stand: 0, baked: 0 };
                 for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-                    const t = this._tile(i, j);
+                    let t = this._tile(i, j, this.lod);
+                    if (!t) { t = this.cache.get(i + ',' + j + ',' + (1 - this.lod)); if (t) this.stats.stand++; }
                     if (t) ctx.drawImage(t, i * S, j * S, S, S);
-                    else { ctx.fillStyle = GROUND_LOOK.lot; ctx.fillRect(i * S, j * S, S, S); }
+                    else { this.stats.flat++; ctx.fillStyle = GROUND_LOOK.lot; ctx.fillRect(i * S, j * S, S, S); }
                 }
+                // Ahead of the car: the tiles it's about to reach, while there's time left
+                const car = this.game.isDriving && this.game.car;
+                if (car && (car.vx || car.vy)) {
+                    const lx = car.vx * G.AHEAD_TICKS, ly = car.vy * G.AHEAD_TICKS;
+                    const [a0, b0, a1, b1] = range({ left: view.left + Math.min(0, lx), right: view.right + Math.max(0, lx),
+                                                     top: view.top + Math.min(0, ly), bottom: view.bottom + Math.max(0, ly) });
+                    for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) {
+                        if (i >= i0 && i <= i1 && j >= j0 && j <= j1) continue;
+                        if (!this._canBake()) break;
+                        this._tile(i, j, this.lod);
+                    }
+                }
+                this.stats.baked = this.baked;
             }
 
-            _tile(i, j) {
-                const key = i + ',' + j + ',' + this.lod;
+            /** Room to paint another tile this frame: a couple always, more while the frame has time. */
+            _canBake() {
+                const G = CONFIG.GROUND_BAKE;
+                return this.baked < G.MIN_PER_FRAME || (this.baked < G.MAX_PER_FRAME && performance.now() - this.t0 < G.FRAME_MS);
+            }
+
+            _tile(i, j, lod) {
+                const key = i + ',' + j + ',' + lod;
                 const hit = this.cache.get(key);
                 if (hit) { this.cache.delete(key); this.cache.set(key, hit); return hit; }   // most recent last
-                if (this.budget <= 0) return null;
-                this.budget--;
-                const cv = this._bake(i, j, this.lod);
-                this.cache.set(key, cv);
-                while (this.cache.size > this.max) this.cache.delete(this.cache.keys().next().value);
+                if (!this._canBake()) return null;
+                this.baked++;
+                const cv = this._bake(i, j, lod);
+                cv._w = lod ? 0.25 : 1;                                          // memory, in full-size tiles
+                this.cache.set(key, cv); this.weight = (this.weight || 0) + cv._w;
+                while (this.weight > this.max && this.cache.size > 1) {         // the oldest go first
+                    const k0 = this.cache.keys().next().value;
+                    this.weight -= this.cache.get(k0)._w || 1; this.cache.delete(k0);
+                }
                 return cv;
             }
 
@@ -52544,8 +52639,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         if (F.active) {
                             aimAngle = Math.atan2(F.dy, F.dx);
                         } else {
-                            const worldX = this.player.x + (this.mouseX - this.canvas.width/2) / this.camera.zoom;
-                            const worldY = this.player.y + (this.mouseY - this.canvas.height/2) / this.camera.zoom;
+                            const { x: worldX, y: worldY } = this.viewToWorld(this.mouseX, this.mouseY);   // through the view: look-ahead and lean included
                             aimAngle = Math.atan2(worldY - this.player.y, worldX - this.player.x);
                         }
                         this.player.angle = clampToWindow(aimAngle);
@@ -52579,8 +52673,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // cooldown already counted down once this tick (step 1)
                         if (F.firing && this.shootCooldown <= 0) { this.fireWeapon(); }
                     } else if (this.mouseDown && this.mouseX) {
-                        const worldX = this.player.x + (this.mouseX - this.canvas.width/2) / this.camera.zoom;
-                        const worldY = this.player.y + (this.mouseY - this.canvas.height/2) / this.camera.zoom;
+                        const { x: worldX, y: worldY } = this.viewToWorld(this.mouseX, this.mouseY);   // through the view: look-ahead and lean included
                         this.player.angle = Math.atan2(worldY - this.player.y, worldX - this.player.x);
                         this.player._aimPoint = { x: worldX, y: worldY };   // shots and the laser converge here
                         // Cooldown already counted down once this tick (step 1)
@@ -52768,9 +52861,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!this.cutscene || !this.cutscene.active) {
                 let targetZoom = 1.0;
                 if (this.isDriving) { 
-                    const speedRatio = Math.abs(this.car.speed) / this.car.maxSpeed; 
-                    targetZoom = 1.0 - (speedRatio * 0.65); 
-                    if (targetZoom < 0.35) targetZoom = 0.35; 
+                    // Pulls back with speed, down to a floor: the look-ahead already shows the road in front
+                    const speedRatio = Math.abs(this.car.speed) / this.car.maxSpeed, CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
+                    targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
                 } else if (nearInteractable) { targetZoom = 1.4; }
                 if (this.isLandscape) targetZoom *= 0.9;          // a short screen: a little more ground above and below her
                 
@@ -52898,6 +52991,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // GameEngine — The frame renderer (draw).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /* THE VIEW — where the camera actually is this frame (draw() resolves it once:
+               the cutscene camera, or her position plus the scope lean and the drive
+               look-ahead). Everything that maps world <-> screen reads it — the world, both
+               lighting passes, mouse aim — so no pass re-derives the camera and drifts. */
+            viewTransform(ctx) {
+                const v = this.view || { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom, shakeX: 0, shakeY: 0 };
+                ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+                ctx.scale(v.zoom, v.zoom);
+                ctx.translate(-v.x + v.shakeX, -v.y + v.shakeY);
+                return v;
+            },
+
+            /** A point on the canvas (backing-store px) -> the world, through this frame's view. */
+            viewToWorld(sx, sy) {
+                const v = this.view || { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom };
+                return { x: v.x + (sx - this.canvas.width / 2) / v.zoom, y: v.y + (sy - this.canvas.height / 2) / v.zoom };
+            },
+
             /* =====================================================================
                MAIN RENDER LOOP (DRAW)
                ---------------------------------------------------------------------
@@ -52948,6 +53059,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
+                this.view = { x: camX, y: camY, zoom: this.camera.zoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
                 
                 this.ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
                 // World → screen matrix for this frame: lets the hair physics work out any
@@ -52959,7 +53071,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Uses AABB (rectangular) instead of radial distance for better screen coverage
                 // cullZoom clamps the zoom used for cull bounds, preventing the cull rect from
                 // exploding at low zoom (driving at speed). Margins stay unscaled as pop-in buffer.
-                const cullZoom = Math.max(CONFIG.CULLING.ZOOM_MIN, Math.min(CONFIG.CULLING.ZOOM_MAX, this.camera.zoom));
+                const cullZoom = Math.min(this.camera.zoom, Math.max(CONFIG.CULLING.ZOOM_MIN, Math.min(CONFIG.CULLING.ZOOM_MAX, this.camera.zoom)));   // never tighter than the screen
                 const cullHalfW = (this.canvas.width / 2) / cullZoom;
                 const cullHalfH = (this.canvas.height / 2) / cullZoom;
                 const cullBounds = {
@@ -52978,10 +53090,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
                 // --- DYNAMIC LOD (Zoom-Aware) ---
                 // Progressive quality reduction as camera zooms out.
-                // At zoom 1.0: full detail. At 0.35: minimal detail.
-                // zoomLOD 0 = full quality, 1 = reduced, 2 = minimal
-                const zoom = this.camera.zoom;
-                _zoomLOD = zoom > 0.7 ? 0 : (zoom > 0.5 ? 1 : 2);
+                // zoomLOD 0 = full quality, 1 = reduced, 2 = minimal. Each step has a band
+                // (CONFIG.LOD_ZOOM: drop below `in`, come back above `out`), so the small zoom
+                // wobble of a car cruising near a threshold doesn't flicker detail on and off.
+                const zoom = this.camera.zoom, LZ = CONFIG.LOD_ZOOM;
+                let lodNow = this._zoomLOD || 0;
+                while (lodNow < 2 && zoom < LZ[lodNow].in) lodNow++;
+                while (lodNow > 0 && zoom > LZ[lodNow - 1].out) lodNow--;
+                _zoomLOD = lodNow;
                 
                 // Vehicle LOD threshold scales with zoom — entities that are small on screen skip effects
                 const _vehicleLODThreshSq = Math.pow(300 / Math.max(0.35, zoom), 2);
@@ -56308,12 +56424,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 lc.scale(LS, LS);
             
                 // 2. CAMERA TRANSFORM (SYNCED WITH MAIN RENDERER)
-                lc.translate(this.canvas.width/2, this.canvas.height/2);
-                lc.scale(this.camera.zoom, this.camera.zoom);
-                let camX, camY;
-                if (this.cutscene && this.cutscene.active) { camX = this.camera.x; camY = this.camera.y; }
-                else { camX = this.player.x + (this.scopeLeanX || 0); camY = this.player.y + (this.scopeLeanY || 0); }   // same camera as draw.js (scope lean included)
-                lc.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
+                const V = this.viewTransform(lc), camX = V.x, camY = V.y;   // the frame's one view (draw.js)
                 
                 // The view, at the actual zoom (lights are culled by their own reach)
                 const halfW = (this.canvas.width / 2) / this.camera.zoom, halfH = (this.canvas.height / 2) / this.camera.zoom;
@@ -56684,12 +56795,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const ambient = this.getAmbientDarkness();
                 if (ambient < 0.2) return; // No reflections in daylight
                 ctx.save();
-                ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
-                ctx.scale(this.camera.zoom, this.camera.zoom);
-                let camX, camY;
-                if (this.cutscene && this.cutscene.active) { camX = this.camera.x; camY = this.camera.y; }
-                else { camX = this.player.x + (this.scopeLeanX || 0); camY = this.player.y + (this.scopeLeanY || 0); }   // same camera as draw.js (scope lean included)
-                ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
+                const V = this.viewTransform(ctx), camX = V.x, camY = V.y;   // the frame's one view (draw.js)
                 ctx.globalCompositeOperation = 'lighter';
                 const halfW = (this.canvas.width / 2) / this.camera.zoom;
                 const halfH = (this.canvas.height / 2) / this.camera.zoom;

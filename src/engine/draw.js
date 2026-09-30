@@ -1,6 +1,24 @@
         // GameEngine — The frame renderer (draw).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /* THE VIEW — where the camera actually is this frame (draw() resolves it once:
+               the cutscene camera, or her position plus the scope lean and the drive
+               look-ahead). Everything that maps world <-> screen reads it — the world, both
+               lighting passes, mouse aim — so no pass re-derives the camera and drifts. */
+            viewTransform(ctx) {
+                const v = this.view || { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom, shakeX: 0, shakeY: 0 };
+                ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+                ctx.scale(v.zoom, v.zoom);
+                ctx.translate(-v.x + v.shakeX, -v.y + v.shakeY);
+                return v;
+            },
+
+            /** A point on the canvas (backing-store px) -> the world, through this frame's view. */
+            viewToWorld(sx, sy) {
+                const v = this.view || { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom };
+                return { x: v.x + (sx - this.canvas.width / 2) / v.zoom, y: v.y + (sy - this.canvas.height / 2) / v.zoom };
+            },
+
             /* =====================================================================
                MAIN RENDER LOOP (DRAW)
                ---------------------------------------------------------------------
@@ -51,6 +69,7 @@
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
+                this.view = { x: camX, y: camY, zoom: this.camera.zoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
                 
                 this.ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
                 // World → screen matrix for this frame: lets the hair physics work out any
@@ -62,7 +81,7 @@
                 // Uses AABB (rectangular) instead of radial distance for better screen coverage
                 // cullZoom clamps the zoom used for cull bounds, preventing the cull rect from
                 // exploding at low zoom (driving at speed). Margins stay unscaled as pop-in buffer.
-                const cullZoom = Math.max(CONFIG.CULLING.ZOOM_MIN, Math.min(CONFIG.CULLING.ZOOM_MAX, this.camera.zoom));
+                const cullZoom = Math.min(this.camera.zoom, Math.max(CONFIG.CULLING.ZOOM_MIN, Math.min(CONFIG.CULLING.ZOOM_MAX, this.camera.zoom)));   // never tighter than the screen
                 const cullHalfW = (this.canvas.width / 2) / cullZoom;
                 const cullHalfH = (this.canvas.height / 2) / cullZoom;
                 const cullBounds = {
@@ -81,10 +100,14 @@
             
                 // --- DYNAMIC LOD (Zoom-Aware) ---
                 // Progressive quality reduction as camera zooms out.
-                // At zoom 1.0: full detail. At 0.35: minimal detail.
-                // zoomLOD 0 = full quality, 1 = reduced, 2 = minimal
-                const zoom = this.camera.zoom;
-                _zoomLOD = zoom > 0.7 ? 0 : (zoom > 0.5 ? 1 : 2);
+                // zoomLOD 0 = full quality, 1 = reduced, 2 = minimal. Each step has a band
+                // (CONFIG.LOD_ZOOM: drop below `in`, come back above `out`), so the small zoom
+                // wobble of a car cruising near a threshold doesn't flicker detail on and off.
+                const zoom = this.camera.zoom, LZ = CONFIG.LOD_ZOOM;
+                let lodNow = this._zoomLOD || 0;
+                while (lodNow < 2 && zoom < LZ[lodNow].in) lodNow++;
+                while (lodNow > 0 && zoom > LZ[lodNow - 1].out) lodNow--;
+                _zoomLOD = lodNow;
                 
                 // Vehicle LOD threshold scales with zoom — entities that are small on screen skip effects
                 const _vehicleLODThreshSq = Math.pow(300 / Math.max(0.35, zoom), 2);

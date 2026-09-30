@@ -146,10 +146,16 @@
             // The cull area is always sized for the max zoom-out, so no pop-in.
             // Tuning: Lower both toward 0.35 for wider cull (safer, more entities drawn).
             //         Raise both toward 1.0 for tighter cull (better perf, risk of edge pop-in at low zoom).
+            // The city's baked ground tiles (world/ground-baker.js)
+            GROUND_BAKE: { HALF_RES_BELOW: 0.55, FULL_RES_ABOVE: 0.65, MIN_PER_FRAME: 2, MAX_PER_FRAME: 6, FRAME_MS: 3, AHEAD_TICKS: 45 },
+
+            // Zoom detail steps (engine/draw.js _zoomLOD): below `in` drop a step, above `out` come back
+            LOD_ZOOM: [{ in: 0.68, out: 0.74 }, { in: 0.48, out: 0.54 }],
+
             CULLING: {
                 // Zoom clamp for culling viewport (locked = fixed cull rect regardless of camera zoom)
-                ZOOM_MIN: 0.35,                 // Locked: matches actual minimum camera zoom (max speed)
-                ZOOM_MAX: 0.35,                 // Locked: same value = cull rect never changes size
+                ZOOM_MIN: 0.45,                 // The driving floor (VEHICLE_DRIVE.CAM_ZOOM, landscape); draw.js
+                ZOOM_MAX: 0.45,                 //   also never culls tighter than the actual zoom
                 
                 // Rendering margins (added to cull viewport half-dimensions as pop-in buffer)
                 BUILDINGS: 400,                 // Building bodies
@@ -441,6 +447,7 @@
                 HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
                 REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
+                CAM_ZOOM: { SPAN: 0.5, FLOOR: 0.5 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
                 STICK_YAW_DAMP: 5,
                 IMPACT_YAW: 0.9,                // Twist from an off-centre knock (onImpact)              // Touch stick unwinds by this × yawRate (no overshoot)
                 COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)

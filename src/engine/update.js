@@ -1164,8 +1164,7 @@
                         if (F.active) {
                             aimAngle = Math.atan2(F.dy, F.dx);
                         } else {
-                            const worldX = this.player.x + (this.mouseX - this.canvas.width/2) / this.camera.zoom;
-                            const worldY = this.player.y + (this.mouseY - this.canvas.height/2) / this.camera.zoom;
+                            const { x: worldX, y: worldY } = this.viewToWorld(this.mouseX, this.mouseY);   // through the view: look-ahead and lean included
                             aimAngle = Math.atan2(worldY - this.player.y, worldX - this.player.x);
                         }
                         this.player.angle = clampToWindow(aimAngle);
@@ -1199,8 +1198,7 @@
                         // cooldown already counted down once this tick (step 1)
                         if (F.firing && this.shootCooldown <= 0) { this.fireWeapon(); }
                     } else if (this.mouseDown && this.mouseX) {
-                        const worldX = this.player.x + (this.mouseX - this.canvas.width/2) / this.camera.zoom;
-                        const worldY = this.player.y + (this.mouseY - this.canvas.height/2) / this.camera.zoom;
+                        const { x: worldX, y: worldY } = this.viewToWorld(this.mouseX, this.mouseY);   // through the view: look-ahead and lean included
                         this.player.angle = Math.atan2(worldY - this.player.y, worldX - this.player.x);
                         this.player._aimPoint = { x: worldX, y: worldY };   // shots and the laser converge here
                         // Cooldown already counted down once this tick (step 1)
@@ -1388,9 +1386,9 @@
                 if (!this.cutscene || !this.cutscene.active) {
                 let targetZoom = 1.0;
                 if (this.isDriving) { 
-                    const speedRatio = Math.abs(this.car.speed) / this.car.maxSpeed; 
-                    targetZoom = 1.0 - (speedRatio * 0.65); 
-                    if (targetZoom < 0.35) targetZoom = 0.35; 
+                    // Pulls back with speed, down to a floor: the look-ahead already shows the road in front
+                    const speedRatio = Math.abs(this.car.speed) / this.car.maxSpeed, CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
+                    targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
                 } else if (nearInteractable) { targetZoom = 1.4; }
                 if (this.isLandscape) targetZoom *= 0.9;          // a short screen: a little more ground above and below her
                 

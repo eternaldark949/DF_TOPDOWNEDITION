@@ -132,12 +132,7 @@
                 lc.scale(LS, LS);
             
                 // 2. CAMERA TRANSFORM (SYNCED WITH MAIN RENDERER)
-                lc.translate(this.canvas.width/2, this.canvas.height/2);
-                lc.scale(this.camera.zoom, this.camera.zoom);
-                let camX, camY;
-                if (this.cutscene && this.cutscene.active) { camX = this.camera.x; camY = this.camera.y; }
-                else { camX = this.player.x + (this.scopeLeanX || 0); camY = this.player.y + (this.scopeLeanY || 0); }   // same camera as draw.js (scope lean included)
-                lc.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
+                const V = this.viewTransform(lc), camX = V.x, camY = V.y;   // the frame's one view (draw.js)
                 
                 // The view, at the actual zoom (lights are culled by their own reach)
                 const halfW = (this.canvas.width / 2) / this.camera.zoom, halfH = (this.canvas.height / 2) / this.camera.zoom;
@@ -508,12 +503,7 @@
                 const ambient = this.getAmbientDarkness();
                 if (ambient < 0.2) return; // No reflections in daylight
                 ctx.save();
-                ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
-                ctx.scale(this.camera.zoom, this.camera.zoom);
-                let camX, camY;
-                if (this.cutscene && this.cutscene.active) { camX = this.camera.x; camY = this.camera.y; }
-                else { camX = this.player.x + (this.scopeLeanX || 0); camY = this.player.y + (this.scopeLeanY || 0); }   // same camera as draw.js (scope lean included)
-                ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
+                const V = this.viewTransform(ctx), camX = V.x, camY = V.y;   // the frame's one view (draw.js)
                 ctx.globalCompositeOperation = 'lighter';
                 const halfW = (this.canvas.width / 2) / this.camera.zoom;
                 const halfH = (this.canvas.height / 2) / this.camera.zoom;
