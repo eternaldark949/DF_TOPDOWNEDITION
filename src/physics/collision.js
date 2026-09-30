@@ -714,87 +714,11 @@
              * Resolve vehicle collision (uses speed property).
              */
             static _resolveVehicleCollision(v1, v2, packet) {
-                const { nx, ny, depth } = packet;
-                
-                const obb1 = v1.getOBB();
-                const obb2 = v2.getOBB();
-                
-                const m1 = obb1.mass || 1000;
-                const m2 = obb2.mass || 1000;
-                
-                // Handle infinite mass (static objects) to avoid NaN from Infinity/Infinity
-                let ratio1, ratio2;
-                if (!isFinite(m2)) {
-                    // m2 is static/immovable (wall/building), only m1 moves
-                    ratio1 = 1;
-                    ratio2 = 0;
-                } else if (!isFinite(m1)) {
-                    // m1 is static/immovable, only m2 moves
-                    ratio1 = 0;
-                    ratio2 = 1;
-                } else {
-                    const totalMass = m1 + m2;
-                    ratio1 = m2 / totalMass;
-                    ratio2 = m1 / totalMass;
-                }
-                
-                // Position separation
-                if (!v1.isStatic && ratio1 > 0) {
-                    obb1.x += nx * depth * ratio1;
-                    obb1.y += ny * depth * ratio1;
-                    if (v1.x !== undefined) { v1.x = obb1.x; v1.y = obb1.y; }
-                }
-                if (!v2.isStatic && ratio2 > 0) {
-                    obb2.x -= nx * depth * ratio2;
-                    obb2.y -= ny * depth * ratio2;
-                    if (v2.x !== undefined) { v2.x = obb2.x; v2.y = obb2.y; }
-                }
-                
-                // Speed-based velocity
-                const v1x = Math.cos(obb1.angle) * (obb1.speed || 0);
-                const v1y = Math.sin(obb1.angle) * (obb1.speed || 0);
-                const v2x = Math.cos(obb2.angle) * (obb2.speed || 0);
-                const v2y = Math.sin(obb2.angle) * (obb2.speed || 0);
-                
-                const relVel = (v1x - v2x) * nx + (v1y - v2y) * ny;
-                
-                if (relVel >= 0) return; // Separating
-                
-                const restitution = 0.4;
-                const j = -(1 + restitution) * relVel * 0.5;
-                
-                // Apply speed changes only to non-static objects
-                if (obb1.speed !== undefined && ratio1 > 0) {
-                    obb1.speed += j * ratio1;
-                    // Write back speed to vehicle
-                    if (v1.speed !== undefined) v1.speed = obb1.speed;
-                }
-                if (obb2.speed !== undefined && ratio2 > 0) {
-                    obb2.speed -= j * ratio2;
-                    if (v2.speed !== undefined) v2.speed = obb2.speed;
-                }
-                
-                // Angular spin (only for non-static)
-                if (obb1.angle !== undefined && ratio1 > 0) {
-                    const spin = (Math.random() - 0.5) * 0.1 * Math.abs(j);
-                    obb1.angle += spin;
-                    if (v1.angle !== undefined) v1.angle = obb1.angle;
-                }
-                if (obb2.angle !== undefined && ratio2 > 0) {
-                    const spin = (Math.random() - 0.5) * 0.1 * Math.abs(j);
-                    obb2.angle -= spin;
-                    if (v2.angle !== undefined) v2.angle = obb2.angle;
-                }
-                
-                // Friction slowdown
-                if (obb1.speed !== undefined && ratio1 > 0) {
-                    obb1.speed *= 0.9;
-                    if (v1.speed !== undefined) v1.speed = obb1.speed;
-                }
-                if (obb2.speed !== undefined && ratio2 > 0) {
-                    obb2.speed *= 0.9;
-                    if (v2.speed !== undefined) v2.speed = obb2.speed;
-                }
+                // The car on either side is the entity itself (a wall arrives as a static stand-in)
+                const body = (v) => v.isStatic ? Object.assign(v.getOBB(), { isStatic: true }) : v;
+                const b1 = body(v1), b2 = body(v2);
+                if (b1.mass === undefined && v1.getOBB) b1.mass = v1.getOBB().mass;
+                PhysicsSystem.carContact(b1, b2, packet.nx, packet.ny, packet.depth);
             }
             
             /**

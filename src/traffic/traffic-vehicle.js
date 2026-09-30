@@ -56,6 +56,7 @@
                 this.maxSpeed = brandData.baseStats.maxSpeed * modelData.speedMod + (Math.random() * 1 - 0.5);
                 this.acceleration = brandData.baseStats.acceleration;
                 this.handling = brandData.baseStats.handling;
+                this.brake = brandData.baseStats.brake || 0.3;        // px/tick² at full brake
                 this.seats = modelData.seats || brandData.baseStats.seats || 4;
                 this.seatLayout = TrafficVehicle.generateSeatLayout(this.seats, this.length, this.width);
                 this.seatOccupants = new Array(this.seats).fill(null); // Entity refs per seat
@@ -260,9 +261,12 @@
                     ctx.fillText('AMBER DELIVERY', 0, -this.width/2 - (16 * scale));
                 }
                 
-                // Status Shadows - LOD: skip for distant vehicles
+                // Status Shadows (AI state: red pushing through, orange waiting at a box, yellow nudging) —
+                // a debug view now that queues are real; underglow and the rest stay
                 if (!farLOD) {
-                    if (this.isAggressive) {
+                    const showState = typeof game !== 'undefined' && game.debugMode;
+                    if (!showState) { /* no state halos */ }
+                    else if (this.isAggressive) {
                         const pulse = (Math.sin(_frameTime / 150) + 1) / 2; 
                         ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 20 + (pulse * 10); 
                         ctx.fillStyle = `rgba(255, 0, 0, ${0.3 + pulse * 0.2})`; 
@@ -644,12 +648,108 @@
                 if (!this.currentLane || !this.currentLane.intersectingZones) return null;
                 const myProgress = this.getDistanceAlongLane();
                 for (let zone of this.currentLane.intersectingZones) {
+                    // A lane that starts at an intersection touches it at 0: that's where we came from, not where
+                    // we're going — without this a car just out of the box queued for it again and stopped on the exit
+                    if (zone.entryDist < 5) continue;
                     const distToEntry = zone.entryDist - myProgress;
                     if (distToEntry > -50 && distToEntry < approachDistance) return zone;
                 }
                 return null;
             }
             
+            // --- SENSING ALONG THE ROUTE (T1) ---
+            /** Distance it takes to stop from `v` at full brake. */
+            stoppingDistance(v = Math.abs(this.speed)) { return v * v / (2 * (this.brake || 0.3)); }
+
+            /**
+             * Probe points along where the car is about to drive, from its front bumper out to `range`
+             * (flat array x, y, s — s is distance from the car's centre): down the lane and through the
+             * planned turn onto the exit lane, or along the rest of the turn it's in; straight ahead
+             * while changing lanes. Cached per decision.
+             */
+            _routeProbe(range) {
+                const L = this.length, step = 14, out = [];
+                const poly = [{ x: this.x, y: this.y }];
+                const tail = (ln) => { if (ln && ln.start) poly.push({ x: ln.start.x + ln.ux * range, y: ln.start.y + ln.uy * range }); };
+                if (this.laneChangeState !== 'NONE' || (!this.currentLane && !this.currentTurnPath)) {
+                    poly.push({ x: this.x + Math.cos(this.angle) * range, y: this.y + Math.sin(this.angle) * range });
+                } else if (this.currentTurnPath) {
+                    const tp = this.currentTurnPath, t0 = Math.min(1, this.turnProgress || 0);
+                    for (let i = 1; i <= 8; i++) poly.push(tp.getPoint(t0 + (1 - t0) * i / 8));
+                    tail(tp.toLane);
+                } else {
+                    const ln = this.currentLane, pt = this.plannedTurn;
+                    // Rejoin the lane's centre line within a car length, so a car that came out of a turn a little
+                    // wide looks down its own lane rather than diagonally across the next one
+                    const my = (this.x - ln.start.x) * ln.ux + (this.y - ln.start.y) * ln.uy;
+                    const back = Math.min(ln.length, my + this.length);
+                    poly.push({ x: ln.start.x + ln.ux * back, y: ln.start.y + ln.uy * back });
+                    if (pt) {
+                        for (let i = 0; i <= 8; i++) poly.push(pt.getPoint(i / 8));
+                        tail(pt.toLane);
+                    } else poly.push({ x: ln.end.x + ln.ux * 40, y: ln.end.y + ln.uy * 40 });
+                }
+                let s = 0, want = L / 2;
+                for (let i = 1; i < poly.length && want <= range; i++) {
+                    const a = poly[i - 1], b = poly[i], seg = Math.hypot(b.x - a.x, b.y - a.y);
+                    while (want <= s + seg && want <= range) {
+                        const t = seg > 0 ? (want - s) / seg : 0;
+                        out.push(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, want);
+                        want += step;
+                    }
+                    s += seg;
+                }
+                return out;
+            }
+
+            /** Bumper gap to `v` along the probe (Infinity if it isn't in the way). */
+            _probeGap(v, pts) {
+                const c = Math.cos(v.angle), sn = Math.sin(v.angle);
+                const hl = v.length / 2 + 2, hw = (v.width + this.width) / 2 + 1;
+                for (let i = 0; i < pts.length; i += 3) {
+                    const dx = pts[i] - v.x, dy = pts[i + 1] - v.y;
+                    const lx = dx * c + dy * sn, ly = -dx * sn + dy * c;
+                    if (lx < hl && lx > -hl && ly < hw && ly > -hw) return Math.max(0, pts[i + 2] - this.length / 2 - 7);
+                }
+                return Infinity;
+            }
+
+            /** Where a point falls on a lane's centre line. */
+            _laneProject(lane, x, y) {
+                const d = (x - lane.start.x) * lane.ux + (y - lane.start.y) * lane.uy;
+                return { x: lane.start.x + lane.ux * d, y: lane.start.y + lane.uy * d, d };
+            }
+
+            /** Another car is ahead of us in our lane (between us and its end) — we're not first in line. */
+            _carAheadInLane() {
+                const ln = this.currentLane;
+                if (!ln || !this._allVehicles) return false;
+                const my = (this.x - ln.start.x) * ln.ux + (this.y - ln.start.y) * ln.uy;
+                for (const v of this._allVehicles) {
+                    if (v === this || v.dead || !v.length) continue;
+                    const dx = v.x - ln.start.x, dy = v.y - ln.start.y;
+                    const along = dx * ln.ux + dy * ln.uy;
+                    if (along <= my || along > ln.length + 10) continue;
+                    if (Math.abs(-dx * ln.uy + dy * ln.ux) > 26) continue;
+                    if (Math.cos((v.angle || 0) - ln.angle) < 0.5) continue;
+                    return true;
+                }
+                return false;
+            }
+
+            /** The lane we're about to turn onto has no room for us yet (a car sits near its start). */
+            _exitBlocked() {
+                const pt = this.plannedTurn, tl = pt && pt.toLane;
+                if (!tl || !tl.start || !this._allVehicles) return false;
+                for (const v of this._allVehicles) {
+                    if (v === this || v.dead || !v.length) continue;
+                    const dx = v.x - tl.start.x, dy = v.y - tl.start.y;
+                    const along = dx * tl.ux + dy * tl.uy, lat = Math.abs(-dx * tl.uy + dy * tl.ux);
+                    if (lat < 30 && along > -20 && along - v.length / 2 < this.length + 24 && Math.abs(v.speed || 0) < 3) return true;
+                }
+                return false;
+            }
+
             findAdjacentLane() {
                 if (!this.currentLane || !this.currentLane.road) return null;
                 const road = this.currentLane.road;
@@ -673,34 +773,33 @@
                 return null;
             }
             
+            /**
+             * Room to move into `targetLane` here: nobody in it from a closing car's worth behind us (its
+             * speed toward us × ~40 ticks, plus our length) to our stopping distance ahead. Oncoming lanes
+             * want far more room ahead. Measured along the lane, so it works on any road direction.
+             */
             isLaneClear(targetLane, checkDistance) {
-                const lookAhead = 40; 
-                let targetX, targetY;
-                if (targetLane.road.orientation === 'H') {
-                    targetX = this.x + Math.cos(targetLane.angle) * lookAhead;
-                    targetY = targetLane.start.y; 
-                } else {
-                    targetX = targetLane.start.x;
-                    targetY = this.y + Math.sin(targetLane.angle) * lookAhead;
+                const dir = this.currentLane || targetLane;
+                const ux = dir.ux, uy = dir.uy, mySpeed = Math.max(0, Math.abs(this.speed));
+                const isOpposing = !!this.currentLane && (targetLane.isOpposing !== this.currentLane.isOpposing);
+                const ahead = isOpposing ? 260 + (mySpeed + 9) * 70 : Math.max(checkDistance || 0, this.stoppingDistance() + this.length);
+                const cands = (this._allVehicles || []).slice();
+                if (this._playerCar && this._playerCar.visible && !cands.includes(this._playerCar)) cands.push(this._playerCar);
+                for (const v of cands) {
+                    if (v === this || v.dead || !v.length) continue;
+                    const dx = v.x - this.x, dy = v.y - this.y;
+                    if (dx * dx + dy * dy > 700 * 700) continue;
+                    const lat = Math.abs(-(v.x - targetLane.start.x) * targetLane.uy + (v.y - targetLane.start.y) * targetLane.ux);
+                    if (lat > 30 + v.width / 2) continue;                          // not in that lane
+                    const along = dx * ux + dy * uy;                               // + ahead of us, - behind
+                    const vAlong = v.vx !== undefined ? v.vx * ux + v.vy * uy : (v.speed || 0) * Math.cos((v.angle || 0) - Math.atan2(uy, ux));
+                    const closing = Math.max(0, vAlong - mySpeed);                 // gaining on us from behind
+                    const behind = this.length + v.length / 2 + closing * 40 + 20;
+                    if (along > -behind && along < ahead + v.length / 2) return false;
                 }
-                const isOpposing = (targetLane.isOpposing !== this.currentLane.isOpposing);
-                const safetyRadius = isOpposing ? 150 : 55;
-                if (this._allVehicles) {
-                    for (let v of this._allVehicles) {
-                        if (v === this) continue;
-                        // PERFORMANCE: Quick distance reject — lane change only cares about nearby
-                        const dvx = v.x - targetX;
-                        const dvy = v.y - targetY;
-                        if (dvx * dvx + dvy * dvy > safetyRadius * safetyRadius * 4) continue;
-                        if (Math.hypot(dvx, dvy) < safetyRadius) return false;
-                    }
-                }
-                if (this._playerCar && this._playerCar.visible) {
-                    if (Math.hypot(this._playerCar.x - targetX, this._playerCar.y - targetY) < safetyRadius) return false;
-                }
-                return true; 
+                return true;
             }
-        
+
             // --- AUTO-DRIVE LOGIC ---
             enableAutoDrive(roadNetwork, walls) {
                 if (!roadNetwork || !roadNetwork.allLanes || roadNetwork.allLanes.length === 0) return false;
@@ -930,10 +1029,19 @@
                                 * direction * reverseSteerFactor * authority;
                 }
 
-                // --- THROTTLE ---
+                // --- THROTTLE / BRAKE ---
+                // Gas against the direction of travel is the brake (this.brake, px/tick²), taken off
+                // the car's motion and never past a stop; only once (nearly) stopped does it reverse.
                 if (Math.abs(this.manualGas) > 0.1) {
-                    this.vx += Math.cos(this.angle) * this.manualGas * acceleration;
-                    this.vy += Math.sin(this.angle) * this.manualGas * acceleration;
+                    const fwd0 = this.vx * Math.cos(this.angle) + this.vy * Math.sin(this.angle);
+                    if (fwd0 * this.manualGas < 0 && Math.abs(fwd0) > 0.25) {
+                        const sp = Math.hypot(this.vx, this.vy);
+                        const dec = Math.min(sp, Math.abs(this.manualGas) * (this.brake || 0.3));
+                        if (sp > 0) { this.vx -= this.vx / sp * dec; this.vy -= this.vy / sp * dec; }
+                    } else {
+                        this.vx += Math.cos(this.angle) * this.manualGas * acceleration;
+                        this.vy += Math.sin(this.angle) * this.manualGas * acceleration;
+                    }
                 }
 
                 // --- DRIFT DECOMPOSITION ---
@@ -1179,8 +1287,12 @@
                 let waitingForIntersection = false;
                 let nearestIntersection = null;
                 
+                // How far ahead to look for the next intersection: far enough to stop at its line from this speed
+                const icRange = 80 + this.length / 2 + this.stoppingDistance() + 80;
                 if (this.currentIntersection) {
-                    const isInside = this.currentIntersection.isVehicleInside(this);
+                    // Inside until the rear bumper has cleared the box too (not just the centre)
+                    const isInside = this.currentIntersection.isVehicleInside(this) || (this.wasInIntersection &&
+                        this.currentIntersection.containsPoint(this.x - Math.cos(this.angle) * this.length / 2, this.y - Math.sin(this.angle) * this.length / 2));
                     if (isInside) {
                         nearestIntersection = this.currentIntersection;
                         if (!this.wasInIntersection) {
@@ -1206,7 +1318,7 @@
                         // release the stale reference so we don't stop in the middle of a lane.
                         let stillApproaching = false;
                         if (this.currentLane) {
-                            const nextZone = this.getNextIntersection(200);
+                            const nextZone = this.getNextIntersection(Math.max(200, icRange));
                             if (nextZone && nextZone.intersection === this.currentIntersection) {
                                 stillApproaching = true;
                             }
@@ -1233,12 +1345,21 @@
                 }
                 
                 if (!this.currentIntersection && this.currentLane) {
-                    const nextZone = this.getNextIntersection(150);
+                    const nextZone = this.getNextIntersection(icRange);
                     if (nextZone) nearestIntersection = nextZone.intersection;
                 }
                 
+                // Only the car at the front of its lane may claim the intersection: a fast car further back would
+                // otherwise take the access and sit behind the slower car it belongs to, which waits for it forever
+                const beforeBox = nearestIntersection && !this.wasInIntersection && !this.currentTurnPath;
+                // Nor while the lane out has no room for it (it waits at the line without holding the box)
+                const notFirst = beforeBox && (this._carAheadInLane() || this._exitBlocked());
+                if (notFirst) {
+                    nearestIntersection.releaseEntry(this);
+                    this.hasIntersectionAccess = false;
+                }
                 if (nearestIntersection) {
-                    this.hasIntersectionAccess = nearestIntersection.requestEntry(this);
+                    this.hasIntersectionAccess = notFirst ? false : nearestIntersection.requestEntry(this);
                     this.currentIntersection = nearestIntersection;
                     
                     // Cancel lane change near intersections
@@ -1384,21 +1505,29 @@
                     });
                 }
                 
+                // Cars to queue behind are found along the route itself (lane, planned turn, exit lane),
+                // as a bumper-to-bumper gap; parked ones still come from the heading tunnel (swerve targets)
+                const probeRange = Math.max(this.length * 3, this.stoppingDistance() + this.length * 2 + 60);
+                const probe = this._routeProbe(probeRange);
+                const probeReach = (probeRange + 120) * (probeRange + 120);
+                const senseQueue = (v) => {
+                    const dx = v.x - this.x, dy = v.y - this.y;
+                    if (dx * dx + dy * dy > probeReach) return;
+                    const gap = this._probeGap(v, probe);
+                    if (gap < trafficObstacleDist) { trafficObstacle = v; trafficObstacleDist = gap; }
+                };
+
                 // Check for player car
                 if (playerCar && (playerCar.x !== 0 || playerCar.y !== 0)) {
                     const result = checkTunnelEx(playerCar.x, playerCar.y, lookAheadDist, dynamicTunnelWidth);
+                    const parkedEmpty = !playerCar.hasDriver && playerCar.controlMode === 'PARKED';
+                    if (!parkedEmpty && !(this.currentTurnPath && playerCar.isWaiting && !playerCar.wasInIntersection)) senseQueue(playerCar);
                     if (result) {
                         // TURN PATH FILTER: Skip if we're mid-turn and player car is waiting outside
                         const playerWaiting = this.currentTurnPath && playerCar.isWaiting && !playerCar.wasInIntersection;
                         
                         if (playerWaiting) {
                             // Ignore — player car is queued at intersection entry
-                        } else if (playerCar.controlMode === 'AI') {
-                            // Autodrive active - always queue behind
-                            if (result.dist < trafficObstacleDist) {
-                                trafficObstacle = playerCar;
-                                trafficObstacleDist = result.dist;
-                            }
                         } else if (!playerCar.hasDriver && playerCar.controlMode === 'PARKED') {
                             // Truly parked and empty - can swerve around
                             swerveObstacles.push({
@@ -1410,19 +1539,13 @@
                                 lateral: result.lateral,
                                 width: playerCar.width + 15
                             });
-                        } else {
-                            // Has driver or player-controlled - queue behind
-                            if (result.dist < trafficObstacleDist) {
-                                trafficObstacle = playerCar;
-                                trafficObstacleDist = result.dist;
-                            }
                         }
                     }
                 }
                 
                 // Check for other traffic vehicles
                 // PERFORMANCE: Pre-filter by distance — skip vehicles beyond look-ahead range
-                const lookAheadSq = (lookAheadDist + 100) * (lookAheadDist + 100);
+                const lookAheadSq = Math.max((lookAheadDist + 100) * (lookAheadDist + 100), probeReach);
                 for (let v of allVehicles) { 
                     if (v === this || v === playerCar) continue;
                     
@@ -1431,38 +1554,22 @@
                     const dvy = v.y - this.y;
                     if (dvx * dvx + dvy * dvy > lookAheadSq) continue;
                     
+                    // TURN PATH FILTER: when turning through an intersection, ignore cars queued at its other entries
+                    if (this.currentTurnPath && v.isWaiting && !v.wasInIntersection) continue;
+                    const parkedEmpty = !v.hasDriver && v.controlMode === 'PARKED';
+                    if (!parkedEmpty) { senseQueue(v); continue; }
                     const result = checkTunnelEx(v.x, v.y, lookAheadDist, dynamicTunnelWidth);
                     if (result) {
-                        // TURN PATH FILTER: When actively turning through an intersection,
-                        // ignore vehicles waiting/queued at other intersection entries
-                        if (this.currentTurnPath && v.isWaiting && !v.wasInIntersection) {
-                            continue;
-                        }
-                        
-                        // SIMPLE RULE: If it's autodrive, queue behind
-                        if (v.controlMode === 'AI') {
-                            if (result.dist < trafficObstacleDist) {
-                                trafficObstacle = v;
-                                trafficObstacleDist = result.dist;
-                            }
-                        } else if (!v.hasDriver && v.controlMode === 'PARKED') {
-                            // Empty parked vehicle - can swerve
-                            swerveObstacles.push({
-                                type: 'vehicle',
-                                entity: v,
-                                x: v.x,
-                                y: v.y,
-                                dist: result.dist,
-                                lateral: result.lateral,
-                                width: v.width + 10
-                            });
-                        } else {
-                            // Default - queue behind
-                            if (result.dist < trafficObstacleDist) {
-                                trafficObstacle = v;
-                                trafficObstacleDist = result.dist;
-                            }
-                        }
+                        // Empty parked vehicle - can swerve
+                        swerveObstacles.push({
+                            type: 'vehicle',
+                            entity: v,
+                            x: v.x,
+                            y: v.y,
+                            dist: result.dist,
+                            lateral: result.lateral,
+                            width: v.width + 10
+                        });
                     }
                 }
 
@@ -1659,9 +1766,10 @@
                 }
                 
                 // --- INTERSECTION APPROACH SLOWDOWN ---
+                let stopLineCap = Infinity;
                 if (waitingForIntersection && this.postIntersectionGraceTimer <= 0) {
                     // Don't stop immediately - drive TO the queue position first
-                    const nextZone = this.currentLane ? this.getNextIntersection(200) : null;
+                    const nextZone = this.currentLane ? this.getNextIntersection(Math.max(200, icRange)) : null;
                     if (nextZone) {
                         const distToEntry = nextZone.entryDist - this.getDistanceAlongLane();
                         // Stop position must clear the crosswalk (one pavement width = 75px)
@@ -1669,23 +1777,9 @@
                         // so the front bumper sits *behind* the crosswalk's outer stripe.
                         const stopDistance = 75 + this.length / 2 + 5;
                         
-                        if (distToEntry <= stopDistance) {
-                            // At queue position - full stop
-                            targetSpeed = 0;
-                        } else {
-                            // Approach queue position with gradual slowdown
-                            const approachDist = distToEntry - stopDistance;
-                            const slowdownRange = CONFIG.VEHICLE_AI.INTERSECTION_APPROACH_SLOWDOWN;
-                            
-                            if (approachDist < slowdownRange) {
-                                // Close: 20-60% speed based on distance
-                                const approachMod = 0.20 + (approachDist / slowdownRange) * 0.40;
-                                targetSpeed = Math.min(targetSpeed, this.maxSpeed * approachMod);
-                            } else {
-                                // Far: cruise at 60% toward queue position
-                                targetSpeed = Math.min(targetSpeed, this.maxSpeed * 0.60);
-                            }
-                        }
+                        // Brake so the car comes to rest on its stop line (applied after the boosts, below)
+                        stopLineCap = distToEntry - stopDistance < 2 ? 0
+                            : Math.sqrt(2 * (this.brake || 0.3) * 0.8 * (distToEntry - stopDistance));
                     } else {
                         // No zone data available — intersection is behind us or stale.
                         // Release and continue instead of stopping in the middle of the lane.
@@ -1710,20 +1804,22 @@
                     }
                 }
                 
-                // --- TRAFFIC QUEUE SLOWDOWN ---
-                // When behind another vehicle, match their speed with safe following distance
-                // SKIP during active turn paths — the intersection queue guarantees safe passage
-                if (hasTrafficAhead && !this.currentTurnPath) {
-                    const safeFollowDist = this.length * 2 + currentSpeed * 3;
-                    if (trafficObstacleDist < safeFollowDist) {
-                        // Match traffic speed or slower
-                        const trafficSpeed = trafficObstacle ? Math.abs(trafficObstacle.speed) : 0;
-                        const followFactor = trafficObstacleDist / safeFollowDist;
-                        targetSpeed = Math.min(targetSpeed, trafficSpeed * 1.1 * followFactor);
-                        if (trafficObstacleDist < this.length * 1.5) {
-                            targetSpeed = 0; // Too close, stop
-                        }
-                    }
+                // --- TRAFFIC QUEUE: FOLLOW BY STOPPING DISTANCE ---
+                // The fastest we can go and still stop behind the car ahead if it brakes hard now: the bumper
+                // gap less a standing gap and a few ticks of reaction, plus the leader's own stopping distance.
+                // Applies in turns too, and after the aggressive-mode boosts (below), so nothing pushes past it.
+                let followCap = Infinity;
+                if (hasTrafficAhead) {
+                    const b = (this.brake || 0.3) * 0.85, bl = trafficObstacle.brake || 0.3;
+                    const minGap = 12 + this.length * 0.18;
+                    const lead = trafficObstacle.vx !== undefined
+                        ? trafficObstacle.vx * cos + trafficObstacle.vy * sin
+                        : (trafficObstacle.speed || 0) * Math.cos((trafficObstacle.angle || 0) - this.angle);
+                    const vl = Math.max(0, lead);
+                    const room = trafficObstacleDist - minGap - currentSpeed * 4;
+                    if (trafficObstacleDist < minGap) followCap = 0;
+                    else if (room <= 0) followCap = vl * 0.85;
+                    else followCap = Math.sqrt(vl * vl * (b / bl) + 2 * b * room);
                 }
                 
                 // --- SWERVE OBSTACLE SLOWDOWN ---
@@ -1820,6 +1916,9 @@
                     if (this.lightAggressiveDuration <= 0) this.isLightAggressive = false;
                 }
                 
+                // Safety caps come last, so no boost or nudge can push a car into the one ahead or over its line
+                targetSpeed = Math.min(targetSpeed, followCap, stopLineCap);
+                
                 // Calculate throttle to achieve target speed
                 targetThrottle = AIDriverSolver.calculateThrottle(this, targetSpeed, 0.6);
                 
@@ -1834,7 +1933,8 @@
                 // reverse briefly so the car can reorient and try again on the next pass.
                 // The existing turnProgress force-advance (intersectionTimer > 360) is the
                 // ultimate fallback; this is the lighter intervention that fires first.
-                if (this.wasInIntersection && this.currentTurnPath) {
+                if ((this.wasInIntersection && this.currentTurnPath) || (this._stuckRecovery > 0) ||
+                    (trafficObstacle && trafficObstacleDist <= 0 && !waitingForIntersection)) {
                     if (this._stuckRecovery > 0) {
                         // Active reverse phase — override AI throttle, ease steering
                         this._stuckRecovery--;
@@ -1842,7 +1942,7 @@
                         this.manualTurn *= 0.3;
                     } else {
                         const contactStuck = trafficObstacle 
-                            && trafficObstacleDist < this.length * 1.2 
+                            && trafficObstacleDist < 6                      // bumper to bumper (or overlapping)
                             && Math.abs(this.speed) < 0.5;
                         if (contactStuck) {
                             this._stuckContactFrames++;
@@ -1865,9 +1965,8 @@
                 this.isDriving = Math.abs(this.speed) >= 1.0 || this.laneChangeState !== 'NONE';
                 if (this.turnSignalTimer > 0) this.turnSignalTimer--;
                 
-                // Reset manual inputs
-                this.manualGas = 0;
-                this.manualTurn = 0;
+                // The controls persist until the next decision, so cars that think every few steps (far
+                // from the player) keep braking and steering in between rather than coasting blind
             }
             
             // --- PHYSICS-BASED STEERING CALCULATIONS ---
@@ -2118,10 +2217,18 @@
             updateTurnPlanning() {
                 if (this.plannedTurn || !this.currentLane.turnPaths || this.currentLane.turnPaths.length === 0) return;
                 
-                const relevantPaths = this.currentLane.turnPaths.filter(p => {
+                // Plan early enough to see where we're going from the stop line (and to check the exit has room)
+                const planReach = 200 + this.length / 2 + this.stoppingDistance();
+                const isAutodrive = this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib');
+                let relevantPaths = this.currentLane.turnPaths.filter(p => {
                     const start = p.controlPoints[0];
-                    return Math.hypot(start.x - this.x, start.y - this.y) < 120;
+                    return Math.hypot(start.x - this.x, start.y - this.y) < planReach;
                 });
+                // Traffic doesn't U-turn in the box (too tight: it ends up across both lanes)
+                if (!isAutodrive) {
+                    const noU = relevantPaths.filter(p => !p.toLane || Math.abs(normalizeAngle(p.toLane.angle - this.currentLane.angle)) < 2.5);
+                    if (noU.length) relevantPaths = noU;
+                }
 
                 if (relevantPaths.length === 0) return;
                 
@@ -2384,19 +2491,10 @@
                     this.laneChangeStartX = this.x;
                     this.laneChangeStartY = this.y;
                     
-                    const road = this.originalLane.road;
-                    const originalLaneCenter = road.orientation === 'H' 
-                        ? (road.y + (this.originalLane.laneIndex * 60) + 30) 
-                        : (road.x + (this.originalLane.laneIndex * 60) + 30);
-                    const forwardDist = this.length * 3;
-                    
-                    if (road.orientation === 'H') {
-                        this.laneChangeEndX = this.x + Math.cos(this.originalLane.angle) * forwardDist;
-                        this.laneChangeEndY = originalLaneCenter;
-                    } else {
-                        this.laneChangeEndX = originalLaneCenter;
-                        this.laneChangeEndY = this.y + Math.sin(this.originalLane.angle) * forwardDist;
-                    }
+                    const forwardDist = this.length * 3, ol = this.originalLane;
+                    const onOrig = this._laneProject(ol, this.x + ol.ux * forwardDist, this.y + ol.uy * forwardDist);
+                    this.laneChangeEndX = onOrig.x;
+                    this.laneChangeEndY = onOrig.y;
                     
                     this.laneChangeTargetAngle = this.originalLane.angle;
                 }
@@ -2413,7 +2511,8 @@
                     return 0;
                 }
                 
-                // Wait period before returning
+                // Wait period before returning — and keep waiting until the lane we're cutting back into is clear
+                if (this.stateTimer <= 0 && this.laneChangeProgress === 0 && !this.isLaneClear(this.originalLane, this.length * 2)) this.stateTimer = 10;
                 if (this.stateTimer > 0) {
                     this.stateTimer--;
                     // Just follow lane during wait
@@ -2464,17 +2563,11 @@
                 this.laneChangeStartX = this.x;
                 this.laneChangeStartY = this.y;
                 
-                const road = this.currentLane.road;
-                const targetLaneCenter = road.orientation === 'H' ? (road.y + (targetLane.laneIndex * 60) + (30)) : (road.x + (targetLane.laneIndex * 60) + (30));
-                const forwardDist = this.length * 1.0;
-                
-                if (road.orientation === 'H') {
-                    this.laneChangeEndX = this.x + Math.cos(this.currentLane.angle) * forwardDist;
-                    this.laneChangeEndY = targetLaneCenter;
-                } else {
-                    this.laneChangeEndX = targetLaneCenter;
-                    this.laneChangeEndY = this.y + Math.sin(this.currentLane.angle) * forwardDist;
-                }
+                // End point: on the target lane's centre line, a car and a half ahead (any road direction)
+                const forwardDist = this.length * 1.5;
+                const onTarget = this._laneProject(targetLane, this.x + this.currentLane.ux * forwardDist, this.y + this.currentLane.uy * forwardDist);
+                this.laneChangeEndX = onTarget.x;
+                this.laneChangeEndY = onTarget.y;
                 
                 this.laneChangeDiagonalAngle = Math.atan2(this.laneChangeEndY - this.laneChangeStartY, this.laneChangeEndX - this.laneChangeStartX);
                 this.laneChangeTargetAngle = this.currentLane.angle;
@@ -2492,17 +2585,10 @@
                 this.laneChangeStartX = this.x;
                 this.laneChangeStartY = this.y;
                 
-                const road = this.currentLane.road;
-                const targetLaneCenter = road.orientation === 'H' ? (road.y + (opposingLane.laneIndex * 60) + (30)) : (road.x + (opposingLane.laneIndex * 60) + (30));
-                const forwardDist = this.length * 1.0;
-                
-                if (road.orientation === 'H') {
-                    this.laneChangeEndX = this.x + Math.cos(this.currentLane.angle) * forwardDist;
-                    this.laneChangeEndY = targetLaneCenter;
-                } else {
-                    this.laneChangeEndX = targetLaneCenter;
-                    this.laneChangeEndY = this.y + Math.sin(this.currentLane.angle) * forwardDist;
-                }
+                const forwardDist = this.length * 1.5;
+                const onTarget = this._laneProject(opposingLane, this.x + this.currentLane.ux * forwardDist, this.y + this.currentLane.uy * forwardDist);
+                this.laneChangeEndX = onTarget.x;
+                this.laneChangeEndY = onTarget.y;
                 
                 this.laneChangeDiagonalAngle = Math.atan2(this.laneChangeEndY - this.laneChangeStartY, this.laneChangeEndX - this.laneChangeStartX);
                 this.laneChangeTargetAngle = this.currentLane.angle;

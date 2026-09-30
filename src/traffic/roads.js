@@ -455,7 +455,17 @@
             requestEntry(vehicle) {
                 if (this.occupants.includes(vehicle)) return true;
                 if (this.occupants.length < this.maxOccupancy) {
-                    this.occupants.push(vehicle);
+                    this._grant(vehicle);
+                    return true;
+                }
+                // Movements that can't cross share the box: a car right behind one from the same lane
+                // (a platoon), or straight-through traffic from opposite directions of the same road.
+                // Only when nobody incompatible is already waiting, so the queue can't be starved.
+                if (this.occupants.length < 3 && this.occupants.every(o => this._compatible(o, vehicle)) &&
+                    this.queue.every(q => q === vehicle || this._compatible(q, vehicle))) {
+                    const qi = this.queue.indexOf(vehicle);
+                    if (qi !== -1) this.queue.splice(qi, 1);
+                    this._grant(vehicle);
                     return true;
                 }
                 if (!this.queue.includes(vehicle)) {
@@ -464,13 +474,28 @@
                 return false;
             }
             
+            _grant(vehicle) {
+                vehicle._entryLane = vehicle.currentLane || null;
+                vehicle._entryMove = vehicle.plannedTurn ? vehicle.plannedTurn.turnType : null;
+                this.occupants.push(vehicle);
+            }
+
+            /** Can `a` (in or granted) and `b` be in the box together without their paths crossing? */
+            _compatible(a, b) {
+                const la = a._entryLane || a.currentLane, lb = b.currentLane;
+                if (!la || !lb) return false;
+                const mb = b.plannedTurn ? b.plannedTurn.turnType : null, ma = a._entryMove;
+                if (la === lb) return ma && ma === mb;                                      // platoon, same way out
+                return la.roadId === lb.roadId && la.isOpposing !== lb.isOpposing && ma === 'straight' && mb === 'straight';
+            }
+
             releaseEntry(vehicle) {
                 const occupantIndex = this.occupants.indexOf(vehicle);
                 if (occupantIndex !== -1) {
                     this.occupants.splice(occupantIndex, 1);
                     while (this.occupants.length < this.maxOccupancy && this.queue.length > 0) {
                         const nextVehicle = this.queue.shift();
-                        this.occupants.push(nextVehicle);
+                        this._grant(nextVehicle);
                     }
                 }
                 const queueIndex = this.queue.indexOf(vehicle);

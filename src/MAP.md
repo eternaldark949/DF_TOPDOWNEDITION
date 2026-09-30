@@ -52,7 +52,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## physics/
 | File | What's in it |
 |---|---|
-| `physics/spatial.js` | `PhysicsSystem`, spatial hash, render/transition grids |
+| `physics/spatial.js` | `PhysicsSystem` (`carContact`: car hits push apart by mass and take the closing speed out of `vx`/`vy`, a little bounce, no spin — both collision passes use it), spatial hash, render/transition grids |
 | `physics/game-entity.js` | `GameEntity`, the base class for everything that moves or collides |
 | `physics/collision.js` | `CollisionSystem`: circles, boxes, rotated boxes, pushing, hinged-door hook |
 
@@ -83,11 +83,11 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## traffic/
 | File | What's in it |
 |---|---|
-| `traffic/roads.js` | Lanes, segments, intersections, `RoadNetwork` |
-| `traffic/garage-zib.js` | Vehicle brands and prices, your garage, Zib rides, AI driving solver |
+| `traffic/roads.js` | Lanes, segments, intersections (one car at a time, except movements that can't cross: a platoon from one lane, opposite straight-throughs), `RoadNetwork` |
+| `traffic/garage-zib.js` | Vehicle brands (incl. `brake`, px/tick²) and prices, your garage, Zib rides, AI driving solver (`calculateThrottle` brakes to its target, no dead zone) |
 | `traffic/car-art.js` | **How cars look**: `carSprite` (each body painted once per brand, model, paint: contact shadow, tyres and rims, paint shaded round its curve, glass greenhouse, mirrors, lamp housings; LADY BlackMark lacquer, gold pinstripe and rims, pearl hearse cap or panoramic black roof; Zenxera facets and cyan flank line; Gelfash bumpers, roof rails, pickup bed); `drawCarSheen` (the sun on the paint by day, street light sliding along the roof by night); `drawCarLamps`; `drawCarGlow` (tail, brake, head and signal lamps in the dark, after lighting); `drawCarUnderglow` |
-| `traffic/traffic-vehicle.js` | `TrafficVehicle`: every car on the road |
-| `traffic/traffic-manager.js` | Spawning and managing traffic |
+| `traffic/traffic-vehicle.js` | `TrafficVehicle`: every car on the road. AI: senses cars along its route (`_routeProbe` down the lane, through the planned turn, onto the exit lane; `_probeGap` bumper to bumper) and follows by stopping distance; stops on the line by stopping distance; claims a box only when first in its lane with room on the way out; releases it when the tail clears; gap-checked lane changes and overtakes. Physics: `applyDrivePhysics` (gas against motion is the brake) |
+| `traffic/traffic-manager.js` | Spawning (clear of cars that couldn't stop for it) and managing traffic; cars frozen 15 s out of sight are despawned (gridlock relief) |
 
 ## story/
 | File | What's in it |
