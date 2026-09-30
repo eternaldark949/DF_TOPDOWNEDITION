@@ -116,7 +116,7 @@
                 transitions: [ { x: 50, y: 400, w: 50, h: 200, target: 'hotel_lobby', label: 'Elevator' }, { x: 1120, y: 50, w: 120, h: 200, target: 'church_boss', label: 'Strange Portal' } ],
                 landmarks: [
                     { id: 'suite_elevator', x: 75, y: 500 }, { id: 'suite_portal', x: 1180, y: 150 },
-                    { id: 'suite_bathroom', x: 1200, y: 150 }, { id: 'suite_balcony', x: 1050, y: 900 }
+                    { id: 'suite_bathroom', x: 1200, y: 150 }, { id: 'suite_balcony', x: 1050, y: 900 }, { id: 'dark_maker_note', x: 1096, y: 959 }
                 ]
             },
             'medbay_sw': {

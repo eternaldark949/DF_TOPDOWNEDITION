@@ -398,7 +398,8 @@
                 
                 // Teammates & Companions (Unified loop)
                 // Skip during bumper car minigame — teammates are in bumper cars
-                if (!(this.bumperMinigame && this.bumperMinigame.active)) {
+                // (and while a scene plays the crew with its own actors: meta.hideCrew)
+                if (!(this.bumperMinigame && this.bumperMinigame.active) && !(this.scenes && this.scenes.crewOffstage)) {
 
                 // ── FORMATION SLOTS ──
                 // Build the active list and assign each member a stable slot around

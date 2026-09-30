@@ -498,7 +498,7 @@
                     this._game.questState.suiteAmbushTriggered = false;
                     // Reset story step so ambush can re-trigger on return
                     const st = this._game.story;
-                    if (st && !st.isBefore('SEARCH_SUITE') && st.isBefore('REPORT_BACK')) st.goTo('ENTER_SUITE');
+                    if (st && !st.isBefore('SEARCH_SUITE') && st.isBefore('FIND_NOTE')) st.goTo('TAKE_ELEVATOR');
                     // Reset optional sanctum quest if active (boss respawns on re-entry)
                     if (this._game.story && this._game.story.activeOptional && this._game.story.activeOptional.id === 'sanctum') {
                         this._game.story.activeOptional = null;

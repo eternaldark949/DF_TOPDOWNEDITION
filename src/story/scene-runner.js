@@ -96,6 +96,8 @@
                 this.vision = new SceneVision();
             }
             get running() { return !!this.active; }
+            /** The scene plays the crew itself (meta.hideCrew): the real teammates neither move nor draw. */
+            get crewOffstage() { return !!(this.active && this.active.meta.hideCrew); }
 
             /** Play a scene by name. Resolves when it ends (or is skipped). */
             play(name, opts = {}) {
@@ -298,10 +300,10 @@
                     /** n knocks on the partition, spaced like a fist would. */
                     knock(n = 5, gap = 13) {
                         let k = 0, f = 0;
-                        return { done: () => { if (k < n && f++ % gap === 0) { k++; if (typeof audioSys !== 'undefined') audioSys.sfx('knock'); g.triggerShake && g.triggerShake(1.2); } return k >= n && f > (n - 1) * gap + 8; } };
+                        return { done: () => { if (k < n && f % gap === 0) { k++; if (typeof audioSys !== 'undefined') audioSys.sfx('knock'); g.triggerShake && g.triggerShake(1.2); } f++; return k >= n && f > (n - 1) * gap + 8; } };
                     },
                     /** The flashback's look: cooler, softer, a vignette and grain (0..1 over frames). */
-                    memory(on, frames = 40) { ui.memory(on ? 1 : 0, frames); return { done: () => !ui.memoryEasing() }; },
+                    memory(on, frames = 40) { ui.memory(on === true ? 1 : on === false ? 0 : +on || 0, frames); return { done: () => !ui.memoryEasing() }; },
                     /** Reveal a part of the HUD (ui/hud-reveal.js); with a title/text the coach points at it. */
                     hud(key, opts = {}) { return g.hud ? g.hud.reveal(key, opts) : null; },
                     /** Point at any element (ui/coach.js). */
