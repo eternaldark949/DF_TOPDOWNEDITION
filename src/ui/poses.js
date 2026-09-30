@@ -39,6 +39,22 @@
                     };
                 },
                 breathe(t) { const b = breath(t); return { bounce: b * 0.35, torso: b * 0.01 }; },
+                // Seated (drawn over a chair or couch): feet out in front, hands in the lap, leaning back a little
+                sit(t, o) {
+                    const b = breath(t);
+                    return { l: [7.5, -4.5], r: [7.5, 4.5], le: [2, -10], re: [2, 10], lf: [9, 1], rf: [9, -1], bounce: -1.6 + b * 0.25,
+                             turn: Math.sin(t * TAU / 16 + o.seed) * 0.12, hint: 'neutral' };
+                },
+                // Seated, pulling a robe tighter round her: hands to the opposite shoulders
+                sit_wrap(t) {
+                    const b = breath(t);
+                    return { l: [4, 6.5], r: [4.5, -6.5], le: [5, -6], re: [5, 6], lf: [9, 1.5], rf: [8, -1.5], bounce: -0.8 + b * 0.25, head: [0.6, 0], hint: 'neutral' };
+                },
+                // Seated, leaning in: elbows on the knees, hands together in front
+                sit_lean(t) {
+                    const b = breath(t);
+                    return { l: [10.5, -2.5], r: [10.5, 2.5], le: [6, -8], re: [6, 8], lf: [9, 2], rf: [9, -2], bounce: 1.8 + b * 0.2, head: [1.4, 0], hint: 'curious' };
+                },
                 arms_crossed(t, o) {
                     const b = breath(t);
                     return { l: [5.5, 3], r: [6.5, -3], le: [1, -11], re: [1.5, 11], bounce: b * 0.3,

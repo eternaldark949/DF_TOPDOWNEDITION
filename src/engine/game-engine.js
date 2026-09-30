@@ -179,6 +179,7 @@
                 this.bonding = new BondingSystem();
                 this.dialogueSeq = new DialogueSequence(this);
                 this.transcript = new DialogueTranscript();
+                this.scenes = new ScenePlayer(this);            // story/scene-runner.js: the story's scenes
                 // Universal capture: any write to the NPC text element gets transcribed,
                 // regardless of which code path produced it (DialogueSequence, single-line
                 // shop greetings, recruit prompts, story handler). Pulls the speaker from

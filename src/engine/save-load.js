@@ -384,6 +384,7 @@
             },
 
             saveGame() {
+                if (this.scenes && this.scenes.running) { showMessage("Can't save during a scene"); return; }
                 // Build save data from schema (captures current game state)
                 const saveData = this.getSaveSchema();
                 

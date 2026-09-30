@@ -249,6 +249,7 @@
                 if (this.activeMap.id === 'hotel_lobby') this.drawLobbyInterior(this.ctx);
                 if (this.activeMap.id === 'hotel_suite') this.drawSuiteInterior(this.ctx);
                 if (this.activeMap.id === 'church_boss') this.drawSanctumInterior(this.ctx);
+                if (this.activeMap.id.startsWith('keepers_')) this.drawKeeperInterior(this.ctx);   // the prologue's fireside (engine/keeper-art.js)
                 if (this.activeMap.id === 'moon_city_nightclub') { this.drawClubInterior(this.ctx); this.drawClubFloorLights(this.ctx); }
                 
                 // Indoor V2: Room floors, windows, and doors
@@ -637,6 +638,7 @@
                         if (n.x < cbE.left || n.x > cbE.right || n.y < cbE.top || n.y > cbE.bottom) return;
                         n.draw(this.ctx);
                     });
+                    if (this.scenes && this.scenes.actors.length) this.scenes.drawActors(this.ctx);   // a scene's cast
                     this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
                     this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
                     this.teammates.forEach(tm => {
@@ -1174,7 +1176,10 @@
                         filterChain = `grayscale(80%) brightness(${(1.4 * ggBright * ggExposure).toFixed(2)}) contrast(${(1.2 * ggContrast).toFixed(2)}) sepia(0.3) hue-rotate(300deg) saturate(${(1.5 * ggSaturate).toFixed(2)})`;
                     }
                 } else {
-                    if (this.player.visibility !== undefined) {
+                    if (this.scenes && this.scenes.running) {
+                        // A scene has the stage: Stella is off-camera, so her stealth doesn't grey the story out
+                        this.targetGrayscale = 0; this.visualGrayscale = 0;
+                    } else if (this.player.visibility !== undefined) {
                         this.targetGrayscale = (1.0 - this.player.visibility) * 100;
                         this.visualGrayscale += (this.targetGrayscale - this.visualGrayscale) * 0.05;
                         if (this.visualGrayscale < 0.5) this.visualGrayscale = 0;
@@ -1202,8 +1207,9 @@
                     
                     const RADAR_RADIUS = 60;
                     const RADAR_RANGE = 600;  // world-px detection radius
-                    const cx = this.canvas.width - RADAR_RADIUS - 16;
-                    const cy = this.canvas.height - RADAR_RADIUS - 60;
+                    // Landscape: top-left under the bars, clear of the fire cluster
+                    const cx = this.isLandscape ? RADAR_RADIUS + 16 : this.canvas.width - RADAR_RADIUS - 16;
+                    const cy = this.isLandscape ? RADAR_RADIUS + 150 : this.canvas.height - RADAR_RADIUS - 60;
                     const playerX = this.isDriving && this.car ? this.car.x : this.player.x;
                     const playerY = this.isDriving && this.car ? this.car.y : this.player.y;
                     const scale = RADAR_RADIUS / RADAR_RANGE;

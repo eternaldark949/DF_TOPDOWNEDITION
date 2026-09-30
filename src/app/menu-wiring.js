@@ -54,8 +54,8 @@
                 // SHOW the Game Canvas
                 document.getElementById('game-container').style.display = 'block';
                 
-                // Start the Engine & Story
-                game.story.startPrologue(); 
+                // Start the Engine & Story: the prologue (story/scenes/prologue.js), then chapter 1
+                game.scenes.play('prologue').then(() => game.story.startPrologue());
                 game.running = true;
                 game.loop();
             }, 500); 

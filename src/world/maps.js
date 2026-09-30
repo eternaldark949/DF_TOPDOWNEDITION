@@ -86,6 +86,17 @@
             // mirror rift he left through: drawSuiteGlow.
             //   Living room (elevator, pit, piano, bar, dining for two) | Bedroom (L) | Bath (the rift)
             //                                                           | Balcony (pool) — the breach wall
+            // The prologue's fireside (engine/keeper-art.js paints both; story/scenes/prologue.js plays them)
+            'keepers_hill': {
+                id: 'keepers_hill', width: 1800, height: 2800, type: 'indoor', label: 'Somewhere between the realms', floorColor: '#140a26',
+                ambientDarkness: 0.4, zones: [], walls: [], transitions: [], spawn: { x: 900, y: 2450 },
+                landmarks: [ { id: 'hill_foot', x: 900, y: 2330 }, { id: 'hill_mid', x: 900, y: 1500 }, { id: 'keeper_house', x: 900, y: 600 }, { id: 'keeper_porch', x: 900, y: 760 } ]
+            },
+            'keepers_parlor': {
+                id: 'keepers_parlor', width: 900, height: 700, type: 'indoor', label: "The Keeper's parlor", floorColor: '#140c10',
+                ambientDarkness: 0.78, zones: [], walls: [], transitions: [], spawn: { x: 450, y: 600 },
+                landmarks: [ { id: 'hearth', x: 450, y: 70 }, { id: 'parlor_mid', x: 520, y: 260 }, { id: 'keeper_seat', x: 450, y: 262 }, { id: 'traveler_seat', x: 648, y: 306 }, { id: 'parlor_window', x: 450, y: 20 } ]
+            },
             'hotel_suite': {
                 id: 'hotel_suite', width: 1400, height: 1000, type: 'indoor',
                 label: 'Penthouse Suite', floorColor: '#0c0a0e',

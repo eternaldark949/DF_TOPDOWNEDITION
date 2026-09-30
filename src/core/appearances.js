@@ -123,6 +123,14 @@
             // Voices on the line (no body in the world yet)
             'Contractor': { skinColor: '#c9a87c', gender: 'male', eyeColor: '#2a2a2a', accent: '#cc4444',
                             hair: { type: 'short', color: '#111' }, top: { type: 'suit', color: '#222' } },
+            // The prologue's fireside: the Keeper of the Elements (an old seer, red robe) and her visitor
+            'Keeper':     { skinColor: '#c9a488', gender: 'female', eyeColor: '#b88a3a', accent: '#d4485a', build: 'slim', age: 0.85,
+                            hair: { type: 'ponytail', color: '#b9b2c4' }, top: { type: 'lab_coat', color: '#8a1224' },
+                            bottom: { type: 'skirt', color: '#5a0a18' }, shoes: { type: 'heels', color: '#2a0a10' },
+                            jewelry: [{ type: 'necklace', color: '#e8c27a' }] },
+            'Traveler':   { skinColor: '#b98a66', gender: 'male', eyeColor: '#e0b45a', accent: '#c9b48a',   // the glint
+                            hair: { type: 'short', color: '#2a1d14' }, top: { type: 'coat', color: '#3b2f27' },
+                            bottom: { type: 'pants', color: '#231c17' }, shoes: { type: 'boots', color: '#1c1410' } },
             // "dripped with professionalism in a white suit"
             'Larissa':    { skinColor: '#c8a882', gender: 'female', eyeColor: '#4a5a6a', accent: '#8888cc',
                             hair: { type: 'ponytail', color: '#2b2118' }, top: { type: 'suit', color: '#ece8e0' } },
@@ -318,7 +326,7 @@
             const A = look.body && look.body.kind === 'android' ? (ANDROID_FINISHES[look.body.finish] || ANDROID_FINISHES.silver) : null;
             const cfg = { skinColor: look.skinColor, hair: look.hair || null, gender: look.gender || 'androgynous',
                           eyeColor: look.eyeColor || (A ? (look.body.glow || A.glow) : PALETTE.eyeDefault) };
-            for (const k of ['top', 'hat', 'jewelry', 'build', 'body', 'expression']) if (look[k]) cfg[k] = look[k];
+            for (const k of ['top', 'hat', 'jewelry', 'build', 'body', 'expression', 'age']) if (look[k]) cfg[k] = look[k];
             return extra ? { ...cfg, ...extra } : cfg;
         }
 

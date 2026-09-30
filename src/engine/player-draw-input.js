@@ -285,7 +285,7 @@
                     e.preventDefault(); if (J.active) return;
                     const touch = e.changedTouches[0];
                     // Keep the whole ring on screen: shift the stick's centre in from the edges
-                    const ox = Math.max(EDGE, Math.min(window.innerWidth - EDGE, touch.clientX)), oy = Math.max(EDGE, Math.min(window.innerHeight - EDGE, touch.clientY));
+                    const ox = Math.max(EDGE, Math.min(window.innerWidth - EDGE, touch.clientX)), EY = Math.min(EDGE, window.innerHeight * 0.24), oy = Math.max(EY, Math.min(window.innerHeight - EY, touch.clientY));   // a short (landscape) screen: less margin top and bottom
                     J.id = touch.identifier; J.active = true; J.originX = ox; J.originY = oy; J.dx = 0; J.dy = 0; J.armed = true;
                     J.landX = touch.clientX; J.landY = touch.clientY;      // drags count from where the thumb landed
                     J.trail = [{ x: 0, y: 0, t: performance.now() }];

@@ -10,6 +10,8 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `styles/base.css` | Core colour variables, film grain, map-transition fade |
 | `styles/hud-menus.css` | HUD, main menu, overlays, notes, dialogue, shop screens |
 | `styles/panels-phone.css` | Pause/settings panel, touch controls, colour-grade panel, phone and message apps |
+| `styles/landscape.css` | **Landscape** (a phone on its side): every rule is under `body.landscape`, which `resize()` (`engine/combat-effects.js`) sets when the window is wider than tall and ≤540px tall. It covers the HUD (the cat's paw dropped 90px, the action dock beside it, the ⚙ dock opening sideways), the move-stick zone, dialogue, letterbox and boss title, the phone scaled by `--phone-scale`, the collapsed sidebars, two-column pause, and short-screen menus. Portrait never sees it. |
+| `styles/cinematic.css` | The cinematic dialogue: subtitles over a scrim, portrait cameos, choices, title cards, the place/time marker, hold to skip, narration |
 
 ## core/ (loaded first)
 | File | What's in it |
@@ -22,7 +24,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `core/utils.js` | Maths helpers, humanoid gait/animation helpers, weapon muzzle helpers, `RenderInterp` |
 | `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs, glow sprites (`glowSprite`, `drawGlow`), `lampFlicker` |
 | `core/appearances.js` | **Every character's look in one place**: `APPEARANCES` (949, the crew, staff, the city's cast), `ROLE_LOOKS` (medics, dancers, androids, pedestrians, gangers, spirits, ghosts), `PALETTE`, `ANDROID_FINISHES`; `lookFor(entity)`, `portraitOf(look)` |
-| `core/settings.js` | `FullscreenManager`, `GameSettings`, object pools, perf utilities, `showMessage` |
+| `core/settings.js` | `FullscreenManager`, `OrientationManager` (Settings → Screen Orientation: Auto / Portrait / Landscape; locks in fullscreen where supported, saved as `dfab_orientation`), `GameSettings`, object pools, perf utilities, `showMessage` |
 
 ## world/
 | File | What's in it |
@@ -90,6 +92,11 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `story/narrative-cutscenes.js` | Cutscene manager, narrative state machine, `StoryManager` |
 | `story/missions.js` | Mission types, `MissionSystem`, crafting schematics |
 | `story/dialogue-bonding.js` | Bonding dialogues, companion idle spots, speaker colours, dialogue transcript/sequence, `BondingSystem` |
+| `story/scene-vision.js` | `SceneVision`: full-screen painted sequences a scene steps through with `beat()` (`vanoga`: the flames, the dark, the golden egg, the burst, the pink orb of the Empereal Lord) |
+| `ui/cinematic-dialogue.js` | `CinematicDialogue`: how scenes look — `say` (typed subtitle, speaker colour, living cameo, dimmed listener), `choose` (keys/taps, timed, weighty ◆), `card`, `marker`, the black layer, hold to skip. Paced by sim ticks |
+| `story/scene-runner.js` | **The story's director.** `defineScene(name, meta, function* (s) {...})` and `ScenePlayer` (`game.scenes.play(name) → Promise`): scripts are generators that `yield` on ticks, lines, camera moves, choices. Verbs: `wait`, `fade`, `card`, `marker`, `map`/`cut`, `cam.to/cut/shake`, `actor` (walk, face, `setPose`), `say`/`narrate`/`choose`, `vision`, `flag`. Locks input, blocks saves and toasts, freezes with pause |
+| `story/scenes/cast.js` | `SCENE_CAST`: each speaker's subtitle name, colour, look and side (949 left) |
+| `story/scenes/prologue.js` | **The prologue**: the epigraph, the climb up the Keeper's hill ("Somewhere between the realms… 6125"), the parlor by the fire, the vision of Vanoga. New Game plays it, then chapter 1 (`questState.prologueSeen`) |
 
 ## ui/
 | File | What's in it |
@@ -129,6 +136,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/update.js` | `update()`: the per-tick simulation |
 | `engine/draw.js` | `draw()`: the frame renderer |
 | `engine/interiors.js` | Apartment, clinic, House of Death, Double Nights lobby and penthouse (the mirror rift), the Sanctum (rose window, sigil runes), and Moon City Nightclub interiors (floors, glows; the club's light show in time with its track), the graveyard's candle flames, the city seen from the veranda |
+| `engine/keeper-art.js` | The prologue's places: `keepers_hill` (the island above the clouds, the path, flowers, the house with its floating gable, portals and planets) and `keepers_parlor` (checkerboard tiles, the red wingback and burgundy chesterfield, the fire and its embers, the window above it); `keeperEmberPop` |
 | `engine/lighting.js` | Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, wet reflections, atmosphere |
 | `engine/player-draw-input.js` | Drawing the player, emotes, timers, joysticks — the touch sticks: the move stick's flit ring (and flick / two-finger flit settings), the fire stick's threshold ring (aim inside, fire past it; sniper fire-on-release) and aim memory |
 | `engine/loop.js` | `start`, `stop`, `resetGameState`, the main loop |

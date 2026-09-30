@@ -317,6 +317,20 @@
                     break;
                 }
 
+                case 'keepers_hill': {
+                    // Night on the hill: moonlight over the field, the house's windows warm on the lawn
+                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    e.softLights = [ A(900, 1500, 1100, 2500, '#b0c0e8', 0.16), A(900, 600, 760, 520, '#ffb070', 0.12), S(900, 740, 150, '#ffc080', 0.7, 3), S(790, 640, 80, '#ffb070', 0.5), S(1010, 640, 80, '#ffb070', 0.5) ];
+                    break;
+                }
+                case 'keepers_parlor': {
+                    // Firelit: the hearth, the candles, the cool window light
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    e.softLights = [ S(450, 140, 420, '#ff8a40', 0.45, 6), S(500, 290, 260, '#ff9a60', 0.22, 4), S(374, 44, 50, '#ffc080', 0.35, 4), S(526, 44, 50, '#ffc080', 0.35, 4),
+                                     S(96, 620, 80, '#ffc080', 0.35, 4), S(564, 204, 56, '#ffc080', 0.35, 4), S(850, 300, 150, '#8898ff', 0.2) ];
+                    break;
+                }
                 case 'church_boss': {
                     // The Sanctum: the altar and ruined organ on the dais, two colonnades of pillars (cover),
                     // broken pews, a fallen pillar, candle stands and braziers. Art: drawSanctumDecorProp.

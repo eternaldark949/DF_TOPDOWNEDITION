@@ -1,0 +1,80 @@
+        /* =========================================
+           LANDSCAPE (a phone on its side)
+           body.landscape is set by resize() (engine/combat-effects.js) when the window is wider
+           than tall and at most 540px tall. Portrait never sees these rules.
+           ========================================= */
+
+        /* --- Top-left: bars and phone stay; the location name sits under them --- */
+        body.landscape #ui-location { top: 110px; bottom: auto; left: 22px; right: auto; font-size: 1.1rem; }
+
+        /* --- Top-right: pause, the stats under it (tighter), the ⚙ dock to its left opening sideways --- */
+        body.landscape #btn-pause { top: 12px; right: 16px; }
+        body.landscape #ui-stats { top: 64px; right: 18px; }
+        body.landscape #ui-time { font-size: 1rem; margin-bottom: 2px; }
+        body.landscape #ui-currency, body.landscape #ui-scrap { font-size: 0.78rem; }
+        body.landscape #utility-dock { top: 16px; right: 72px; flex-direction: row-reverse; align-items: flex-start; }
+        body.landscape #dock-buttons { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; max-width: 56vw; max-height: 70vh; overflow-y: auto; }
+        body.landscape #game-grade-panel { top: 64px; right: 120px; max-height: 80vh; overflow-y: auto; }
+
+        /* --- The cat's paw: the same arc, dropped 90px so it fits a short screen --- */
+        body.landscape #btn-fire, body.landscape #btn-emote { bottom: 50px; right: 60px; }
+        body.landscape #btn-heal, body.landscape #emote-smile { bottom: 145px; }
+        body.landscape #btn-nv, body.landscape #emote-zany { bottom: 125px; }
+        body.landscape #btn-flit, body.landscape #emote-cry { bottom: 65px; }
+        body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
+        body.landscape #btn-holster, body.landscape #emote-frown { bottom: 120px; }
+
+        /* --- The action dock: beside the arc, not above it --- */
+        body.landscape #action-dock { right: 212px; bottom: 18px; }
+        body.landscape #action-dock .action-pill { height: 42px; min-width: 112px; max-width: 34vw; }
+        body.landscape #action-dock .ap-name { max-width: 20vw; }
+
+        /* --- The move stick: the left of the screen, below the bars --- */
+        body.landscape #input-zone-left { top: 22%; height: 78%; width: 45%; }
+
+        /* --- Dialogue: narrower and lower, so the scene stays in view --- */
+        body.landscape #dialogue-box { bottom: 8px; width: 62%; max-width: 640px; }
+        body.landscape .dialogue-inner { padding: 10px 16px 10px 20px; gap: 12px; }
+        body.landscape #dialogue-portrait { width: 48px; height: 48px; min-width: 48px; }
+        body.landscape #npc-text { margin-bottom: 8px; line-height: 1.45; }
+        body.landscape #dialogue-caption { bottom: 70px; }
+        body.landscape #message-modal { bottom: 60px; }
+
+        /* --- Top-centre notices, clear of the corners --- */
+        body.landscape #comms-bar { left: 22%; right: 22%; height: 54px; }
+        body.landscape #comms-bar.active { top: 10px; }
+        body.landscape #ui-stealth-indicator { top: 30px; font-size: 0.95rem; }
+
+        /* --- Cinema --- */
+        body.landscape #cinematic-bars.active .cine-bar { height: 9vh; }
+        body.landscape #boss-title { bottom: 13%; }
+        body.landscape #boss-title .bt-main { font-size: clamp(1.4rem, 4.4vw, 2.3rem); }
+
+        /* --- Panels on a short screen --- */
+        body.landscape #phone-container { transform: scale(var(--phone-scale, 1)); flex-shrink: 0; }
+        /* Inventory and map sidebars: collapsed behind their diamond handles, as on a narrow phone */
+        body.landscape .screen-sidebar-left { overflow-y: auto; padding: 16px 20px; }
+        body.landscape .screen-sidebar-left.auto-collapse { transform: translateX(-100%); }
+        body.landscape .screen-sidebar-right.auto-collapse { transform: translateX(100%); }
+        body.landscape .screen-main-content { margin-left: 44px; margin-right: 44px; padding: 14px 20px; }
+        body.landscape .sidebar-handle.mobile-visible { opacity: 1; pointer-events: auto; }
+        body.landscape #sleep-menu, body.landscape #vending-menu { max-height: 94vh; overflow-y: auto; box-sizing: border-box; padding: 16px 24px !important; }
+        body.landscape #augment-shop { overflow-y: auto; justify-content: flex-start; }
+        body.landscape .save-slot-panel { max-height: 92vh; overflow-y: auto; }
+        body.landscape #main-menu { margin-top: 5vh; padding-bottom: 20px; }
+        body.landscape .title-script { font-size: 3.6rem; }
+        body.landscape .title-sub { font-size: 1.05rem; letter-spacing: 0.8rem; margin-bottom: 24px; }
+        body.landscape .menu-list-container { gap: 6px; min-height: 0; }
+        body.landscape .menu-item-row { min-height: 34px; padding: 2px 0; }
+        body.landscape .death-text { font-size: 3.6rem; letter-spacing: 12px; }
+
+        /* --- Pause: two columns — the title and objectives on the left, the menu (or settings) on the right --- */
+        body.landscape .pause-content {
+            display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr;
+            column-gap: 5vw; align-items: start; align-content: center; padding: 16px 6vw;
+        }
+        body.landscape .pause-header { grid-column: 1; grid-row: 1; justify-self: end; }
+        body.landscape .pause-mission { grid-column: 1; grid-row: 2; justify-self: end; }
+        body.landscape .pause-menu-list, body.landscape .pause-settings-panel { grid-column: 2; grid-row: 1 / span 2; align-self: center; max-height: calc(100vh - 32px); overflow-y: auto; }
+        body.landscape .pause-header { margin-bottom: 14px; }
+        body.landscape .pause-title { font-size: 2.6rem; }

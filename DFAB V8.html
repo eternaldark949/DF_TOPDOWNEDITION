@@ -2379,6 +2379,181 @@
             margin-top: 8px; font-family: Georgia, serif; font-style: italic; font-size: clamp(0.62rem, 2.8vw, 0.9rem);
             color: #e8c9b8; letter-spacing: 0.08em; text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
         }
+        /* =========================================
+           CINEMATIC DIALOGUE (ui/cinematic-dialogue.js)
+           Subtitles over a soft scrim, portrait cameos, choices on the right,
+           title cards on black, the place/time marker, hold to skip.
+           ========================================= */
+        #cine { position: fixed; inset: 0; pointer-events: none; z-index: 1150; font-family: 'Montserrat', sans-serif; --bar: 12vh; }
+        body.landscape #cine { --bar: 9vh; }
+        #cine-black { position: absolute; inset: 0; background: #000; opacity: 0; }
+        #cine-tap { position: absolute; inset: 0; }
+        #cine-tap.on { pointer-events: auto; }
+
+        #cine-scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 42vh; opacity: 0; transition: opacity 0.5s ease;
+            background: radial-gradient(120% 70% at 50% 100%, rgba(22, 8, 34, 0.82) 0%, rgba(22, 8, 34, 0.45) 45%, transparent 75%); }
+        #cine-scrim.show { opacity: 1; }
+
+        /* Subtitle */
+        #cine-sub { position: absolute; left: 50%; bottom: calc(var(--bar) + 18px); transform: translate(-50%, 8px); width: min(88vw, 640px);
+            text-align: center; opacity: 0; transition: opacity 0.3s ease, transform 0.35s ease; pointer-events: none; }
+        #cine-sub.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+        .cine-name { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 8px; padding-bottom: 5px; font-size: 0.66rem; font-weight: 600;
+            letter-spacing: 0.32em; text-transform: uppercase; border-bottom: 1px solid rgba(232, 194, 122, 0.55); }
+        .cine-name span { text-shadow: 0 0 10px color-mix(in srgb, var(--who, #e8c27a) 60%, transparent); }
+        .cine-name em { font-style: normal; font-size: 0.52rem; letter-spacing: 0.3em; color: rgba(232, 194, 122, 0.8); padding: 1px 6px; border: 1px solid rgba(232, 194, 122, 0.4); border-radius: 2px; }
+        .cine-text { color: #f4eefc; font-size: 1.02rem; line-height: 1.55; font-weight: 400; min-height: 1.55em;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 18px rgba(20, 6, 30, 0.9); }
+        .cine-next { margin-top: 6px; font-size: 0.6rem; color: #e8c27a; opacity: 0; transition: opacity 0.3s; animation: cineNext 1.4s ease-in-out infinite; }
+        #cine-sub.done .cine-next { opacity: 0.85; }
+        @keyframes cineNext { 50% { transform: translateY(2px); opacity: 0.4; } }
+
+        /* Portrait cameos */
+        .cine-cameo { position: absolute; bottom: calc(var(--bar) + 128px); width: 92px; height: 118px; overflow: hidden; border-radius: 3px;
+            background: linear-gradient(180deg, #1c1030 0%, #0a0612 100%); opacity: 0; transition: opacity 0.35s ease, transform 0.35s ease, filter 0.35s;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 22px color-mix(in srgb, var(--who, #a469ff) 30%, transparent); }
+        .cine-cameo.left { left: 16px; transform: translateX(-10px); }
+        .cine-cameo.right { right: 16px; transform: translateX(10px); }
+        .cine-cameo.show { opacity: 1; transform: none; }
+        .cine-cameo.dim { opacity: 0.38; filter: saturate(0.5) brightness(0.8); transform: scale(0.92); }
+        .cine-cameo canvas { position: absolute; left: 50%; bottom: -6px; width: 150px; height: 150px; transform: translateX(-50%); }
+        .cine-cameo-rim { position: absolute; inset: 0; border-radius: 3px; pointer-events: none;
+            border: 1px solid rgba(232, 194, 122, 0.5); box-shadow: inset 0 0 18px rgba(164, 105, 255, 0.25), inset 0 -28px 30px -18px color-mix(in srgb, var(--who, #a469ff) 45%, transparent); }
+        .cine-cameo-rim::after { content: ''; position: absolute; left: 10%; right: 10%; top: 0; height: 1px; background: linear-gradient(90deg, transparent, #e8c27a, transparent); }
+        body.landscape .cine-cameo { bottom: calc(var(--bar) + 12px); width: 88px; height: 112px; }
+        body.landscape .cine-cameo.left { left: 5vw; }
+        body.landscape .cine-cameo.right { right: 5vw; }
+        body.landscape #cine-sub { width: min(58vw, 640px); bottom: calc(var(--bar) + 10px); }
+
+        /* Choices */
+        #cine-choices { position: absolute; right: 5vw; bottom: calc(var(--bar) + 262px); display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+            min-width: min(78vw, 300px); max-width: 88vw; opacity: 0; transform: translateX(12px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; }
+        #cine-choices.show { opacity: 1; transform: none; pointer-events: auto; }
+        body.landscape #cine-choices { bottom: calc(var(--bar) + 16px); right: calc(5vw + 104px); min-width: 260px; max-width: 40vw; }
+        .cine-choice { display: flex; align-items: center; gap: 12px; padding: 10px 16px 10px 12px; text-align: left; cursor: pointer;
+            background: linear-gradient(90deg, rgba(14, 7, 24, 0.86), rgba(14, 7, 24, 0.6)); border: none; border-left: 2px solid rgba(232, 194, 122, 0.25);
+            color: #efe6fb; font-family: 'Montserrat', sans-serif; font-size: 0.86rem; letter-spacing: 0.02em; transition: background 0.15s, border-color 0.15s, opacity 0.25s;
+            -webkit-tap-highlight-color: transparent; }
+        .cine-choice b { font-family: 'Orbitron', sans-serif; font-size: 0.62rem; color: #e8c27a; width: 14px; }
+        .cine-choice span { flex: 1; }
+        .cine-choice i { font-style: normal; color: #e8c27a; font-size: 0.7rem; text-shadow: 0 0 8px rgba(232, 194, 122, 0.8); }
+        .cine-choice:hover, .cine-choice:active, .cine-choice.picked { border-left-color: #e8c27a; background: linear-gradient(90deg, rgba(164, 105, 255, 0.42), rgba(14, 7, 24, 0.7)); }
+        .cine-choice.gone { opacity: 0.15; }
+        .cine-timer { height: 2px; background: rgba(232, 194, 122, 0.15); margin-top: 2px; }
+        .cine-timer i { display: block; height: 100%; background: #e8c27a; transform-origin: left; }
+
+        /* Title cards */
+        #cine-card { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8vh 10vw;
+            background: #000; color: #e6dbf5; font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: clamp(0.92rem, 3.6vw, 1.15rem); text-align: center; }
+        #cine-card.show { display: flex; pointer-events: auto; }
+        #cine-card.out { opacity: 0; transition: opacity 0.65s ease; }
+        #cine-card .ln { opacity: 0; transform: translateY(6px); transition: opacity 1.1s ease, transform 1.1s ease; line-height: 1.7; text-shadow: 0 0 14px rgba(164, 105, 255, 0.35); }
+        #cine-card .gap { height: 0.9em; }
+        #cine-card .ln.on, #cine-card .sign.on { opacity: 1; transform: none; }
+        #cine-card .sign { margin-top: 18px; opacity: 0; transition: opacity 1.4s ease; font-family: 'Great Vibes', cursive; font-style: normal; font-size: 1.7rem; color: #e8c27a;
+            text-shadow: 0 0 14px rgba(232, 194, 122, 0.45); }
+        #cine-card .hint { position: absolute; bottom: 5vh; font-family: 'Montserrat', sans-serif; font-style: normal; font-size: 0.55rem; letter-spacing: 0.4em; text-transform: uppercase;
+            color: rgba(232, 194, 122, 0.55); opacity: 0; transition: opacity 1s; }
+        #cine-card .hint.on { opacity: 1; animation: cineNext 2.4s ease-in-out infinite; }
+        body.landscape #cine-card { padding: 4vh 12vw; font-size: 0.95rem; }
+        body.landscape #cine-card .ln { line-height: 1.5; }
+
+        /* Place and time */
+        #cine-marker { position: absolute; left: 7vw; top: calc(var(--bar) + 26px); opacity: 0; transform: translateY(6px); transition: opacity 1.6s ease, transform 1.6s ease; }
+        #cine-marker.show { opacity: 1; transform: none; }
+        #cine-marker .pl { font-family: 'Great Vibes', cursive; font-size: clamp(1.6rem, 6.5vw, 2.3rem); color: #efe4ff; text-shadow: 0 0 16px rgba(164, 105, 255, 0.7), 0 2px 4px rgba(0, 0, 0, 0.8); }
+        #cine-marker i { display: block; width: 120px; height: 1px; margin: 6px 0 7px; background: linear-gradient(90deg, #e8c27a, transparent); }
+        #cine-marker .tm { font-size: 0.7rem; letter-spacing: 0.6em; color: #e8c27a; font-weight: 600; text-shadow: 0 0 10px rgba(232, 194, 122, 0.5); }
+
+        /* Hold to skip */
+        #cine-skip { position: absolute; top: calc(var(--bar) + 12px); right: 14px; display: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 14px;
+            background: rgba(10, 5, 16, 0.55); border: 1px solid rgba(232, 194, 122, 0.3); color: rgba(243, 230, 200, 0.75); font-size: 0.55rem; letter-spacing: 0.25em;
+            pointer-events: auto; user-select: none; -webkit-user-select: none; touch-action: none; overflow: hidden; --k: 0; }
+        #cine-skip.show { display: flex; }
+        #cine-skip i { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: #e8c27a; transform: scaleX(var(--k)); transform-origin: left; }
+        /* Narration: the novel's voice — no name, italic serif */
+        #cine-sub.narr .cine-name { display: none; }
+        #cine-sub.narr .cine-text { font-family: Georgia, 'Times New Roman', serif; font-style: italic; color: #e6daf6; font-size: 0.98rem; }
+        /* =========================================
+           LANDSCAPE (a phone on its side)
+           body.landscape is set by resize() (engine/combat-effects.js) when the window is wider
+           than tall and at most 540px tall. Portrait never sees these rules.
+           ========================================= */
+
+        /* --- Top-left: bars and phone stay; the location name sits under them --- */
+        body.landscape #ui-location { top: 110px; bottom: auto; left: 22px; right: auto; font-size: 1.1rem; }
+
+        /* --- Top-right: pause, the stats under it (tighter), the ⚙ dock to its left opening sideways --- */
+        body.landscape #btn-pause { top: 12px; right: 16px; }
+        body.landscape #ui-stats { top: 64px; right: 18px; }
+        body.landscape #ui-time { font-size: 1rem; margin-bottom: 2px; }
+        body.landscape #ui-currency, body.landscape #ui-scrap { font-size: 0.78rem; }
+        body.landscape #utility-dock { top: 16px; right: 72px; flex-direction: row-reverse; align-items: flex-start; }
+        body.landscape #dock-buttons { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; max-width: 56vw; max-height: 70vh; overflow-y: auto; }
+        body.landscape #game-grade-panel { top: 64px; right: 120px; max-height: 80vh; overflow-y: auto; }
+
+        /* --- The cat's paw: the same arc, dropped 90px so it fits a short screen --- */
+        body.landscape #btn-fire, body.landscape #btn-emote { bottom: 50px; right: 60px; }
+        body.landscape #btn-heal, body.landscape #emote-smile { bottom: 145px; }
+        body.landscape #btn-nv, body.landscape #emote-zany { bottom: 125px; }
+        body.landscape #btn-flit, body.landscape #emote-cry { bottom: 65px; }
+        body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
+        body.landscape #btn-holster, body.landscape #emote-frown { bottom: 120px; }
+
+        /* --- The action dock: beside the arc, not above it --- */
+        body.landscape #action-dock { right: 212px; bottom: 18px; }
+        body.landscape #action-dock .action-pill { height: 42px; min-width: 112px; max-width: 34vw; }
+        body.landscape #action-dock .ap-name { max-width: 20vw; }
+
+        /* --- The move stick: the left of the screen, below the bars --- */
+        body.landscape #input-zone-left { top: 22%; height: 78%; width: 45%; }
+
+        /* --- Dialogue: narrower and lower, so the scene stays in view --- */
+        body.landscape #dialogue-box { bottom: 8px; width: 62%; max-width: 640px; }
+        body.landscape .dialogue-inner { padding: 10px 16px 10px 20px; gap: 12px; }
+        body.landscape #dialogue-portrait { width: 48px; height: 48px; min-width: 48px; }
+        body.landscape #npc-text { margin-bottom: 8px; line-height: 1.45; }
+        body.landscape #dialogue-caption { bottom: 70px; }
+        body.landscape #message-modal { bottom: 60px; }
+
+        /* --- Top-centre notices, clear of the corners --- */
+        body.landscape #comms-bar { left: 22%; right: 22%; height: 54px; }
+        body.landscape #comms-bar.active { top: 10px; }
+        body.landscape #ui-stealth-indicator { top: 30px; font-size: 0.95rem; }
+
+        /* --- Cinema --- */
+        body.landscape #cinematic-bars.active .cine-bar { height: 9vh; }
+        body.landscape #boss-title { bottom: 13%; }
+        body.landscape #boss-title .bt-main { font-size: clamp(1.4rem, 4.4vw, 2.3rem); }
+
+        /* --- Panels on a short screen --- */
+        body.landscape #phone-container { transform: scale(var(--phone-scale, 1)); flex-shrink: 0; }
+        /* Inventory and map sidebars: collapsed behind their diamond handles, as on a narrow phone */
+        body.landscape .screen-sidebar-left { overflow-y: auto; padding: 16px 20px; }
+        body.landscape .screen-sidebar-left.auto-collapse { transform: translateX(-100%); }
+        body.landscape .screen-sidebar-right.auto-collapse { transform: translateX(100%); }
+        body.landscape .screen-main-content { margin-left: 44px; margin-right: 44px; padding: 14px 20px; }
+        body.landscape .sidebar-handle.mobile-visible { opacity: 1; pointer-events: auto; }
+        body.landscape #sleep-menu, body.landscape #vending-menu { max-height: 94vh; overflow-y: auto; box-sizing: border-box; padding: 16px 24px !important; }
+        body.landscape #augment-shop { overflow-y: auto; justify-content: flex-start; }
+        body.landscape .save-slot-panel { max-height: 92vh; overflow-y: auto; }
+        body.landscape #main-menu { margin-top: 5vh; padding-bottom: 20px; }
+        body.landscape .title-script { font-size: 3.6rem; }
+        body.landscape .title-sub { font-size: 1.05rem; letter-spacing: 0.8rem; margin-bottom: 24px; }
+        body.landscape .menu-list-container { gap: 6px; min-height: 0; }
+        body.landscape .menu-item-row { min-height: 34px; padding: 2px 0; }
+        body.landscape .death-text { font-size: 3.6rem; letter-spacing: 12px; }
+
+        /* --- Pause: two columns — the title and objectives on the left, the menu (or settings) on the right --- */
+        body.landscape .pause-content {
+            display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr;
+            column-gap: 5vw; align-items: start; align-content: center; padding: 16px 6vw;
+        }
+        body.landscape .pause-header { grid-column: 1; grid-row: 1; justify-self: end; }
+        body.landscape .pause-mission { grid-column: 1; grid-row: 2; justify-self: end; }
+        body.landscape .pause-menu-list, body.landscape .pause-settings-panel { grid-column: 2; grid-row: 1 / span 2; align-self: center; max-height: calc(100vh - 32px); overflow-y: auto; }
+        body.landscape .pause-header { margin-bottom: 14px; }
+        body.landscape .pause-title { font-size: 2.6rem; }
     </style>
 </head>
 <body>
@@ -3351,6 +3526,10 @@
                 <div class="settings-row">
                     <span class="settings-label">Fullscreen</span>
                     <span class="settings-value val-high" id="set-fullscreen" data-key="fullscreen">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Screen Orientation</span>
+                    <span class="settings-value" id="set-orientation" data-key="orientation">AUTO</span>
                 </div>
                 
                 <div class="settings-section-label">Audio</div>
@@ -5853,6 +6032,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Voices on the line (no body in the world yet)
             'Contractor': { skinColor: '#c9a87c', gender: 'male', eyeColor: '#2a2a2a', accent: '#cc4444',
                             hair: { type: 'short', color: '#111' }, top: { type: 'suit', color: '#222' } },
+            // The prologue's fireside: the Keeper of the Elements (an old seer, red robe) and her visitor
+            'Keeper':     { skinColor: '#c9a488', gender: 'female', eyeColor: '#b88a3a', accent: '#d4485a', build: 'slim', age: 0.85,
+                            hair: { type: 'ponytail', color: '#b9b2c4' }, top: { type: 'lab_coat', color: '#8a1224' },
+                            bottom: { type: 'skirt', color: '#5a0a18' }, shoes: { type: 'heels', color: '#2a0a10' },
+                            jewelry: [{ type: 'necklace', color: '#e8c27a' }] },
+            'Traveler':   { skinColor: '#b98a66', gender: 'male', eyeColor: '#e0b45a', accent: '#c9b48a',   // the glint
+                            hair: { type: 'short', color: '#2a1d14' }, top: { type: 'coat', color: '#3b2f27' },
+                            bottom: { type: 'pants', color: '#231c17' }, shoes: { type: 'boots', color: '#1c1410' } },
             // "dripped with professionalism in a white suit"
             'Larissa':    { skinColor: '#c8a882', gender: 'female', eyeColor: '#4a5a6a', accent: '#8888cc',
                             hair: { type: 'ponytail', color: '#2b2118' }, top: { type: 'suit', color: '#ece8e0' } },
@@ -6048,7 +6235,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const A = look.body && look.body.kind === 'android' ? (ANDROID_FINISHES[look.body.finish] || ANDROID_FINISHES.silver) : null;
             const cfg = { skinColor: look.skinColor, hair: look.hair || null, gender: look.gender || 'androgynous',
                           eyeColor: look.eyeColor || (A ? (look.body.glow || A.glow) : PALETTE.eyeDefault) };
-            for (const k of ['top', 'hat', 'jewelry', 'build', 'body', 'expression']) if (look[k]) cfg[k] = look[k];
+            for (const k of ['top', 'hat', 'jewelry', 'build', 'body', 'expression', 'age']) if (look[k]) cfg[k] = look[k];
             return extra ? { ...cfg, ...extra } : cfg;
         }
 
@@ -6127,6 +6314,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     document.addEventListener(ev, () => {
                         GameSettings.fullscreen = this.isActive();
                         this._persist();
+                        if (GameSettings.fullscreen) OrientationManager.apply();   // a lock only holds in fullscreen
                         // The viewport just changed size; the canvas is sized from
                         // window.innerWidth/Height so it has to be told.
                         if (typeof game !== 'undefined' && game && game.resize) game.resize();
@@ -6138,6 +6326,33 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     });
                 });
             }
+        };
+
+        /* ============================================================================
+           SCREEN ORIENTATION
+           Auto follows the phone (the layout switches with it: body.landscape, set in resize()).
+           Portrait / Landscape lock the screen — the browser only allows that in fullscreen, so
+           it is applied on every fullscreen entry too. Where lock() doesn't exist (iPhone Safari)
+           supported() is false and the setting row reads "AUTO (PHONE)".
+           ============================================================================ */
+        const OrientationManager = {
+            supported() { return !!(screen.orientation && screen.orientation.lock); },
+            apply() {
+                const o = GameSettings.orientation;
+                if (!this.supported()) return;
+                try {
+                    if (o === 'auto') { screen.orientation.unlock && screen.orientation.unlock(); return; }
+                    const r = screen.orientation.lock(o);
+                    if (r && r.catch) r.catch(() => {});        // not fullscreen yet, or refused: stays as is
+                } catch (e) { /* ignore */ }
+            },
+            cycle() {
+                const order = ['auto', 'portrait', 'landscape'];
+                GameSettings.orientation = order[(order.indexOf(GameSettings.orientation) + 1) % order.length];
+                try { localStorage.setItem('dfab_orientation', GameSettings.orientation); } catch (e) { /* private mode */ }
+                this.apply();
+            },
+            label() { return this.supported() ? GameSettings.orientation : 'auto (phone)'; }
         };
 
         const GameSettings = {
@@ -6202,6 +6417,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return true;
             })(),
             
+            // 'auto' follows the phone; 'portrait' / 'landscape' lock it (OrientationManager)
+            orientation: (() => {
+                try { const s = localStorage.getItem('dfab_orientation'); if (s === 'portrait' || s === 'landscape') return s; } catch (e) { /* private mode */ }
+                return 'auto';
+            })(),
+
             // --- AUTO-DETECT ---
             _isMobile: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent),
             
@@ -6438,6 +6659,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         const messageModal = document.getElementById('message-modal');
         function showMessage(text) {
+            try { if (game && game.scenes && game.scenes.running) return; } catch (e) { /* game not built yet (boot) */ }   // a scene has the screen
             messageModal.textContent = text;
             messageModal.classList.add('show');
             setTimeout(() => { messageModal.classList.remove('show'); }, 2000);
@@ -7523,20 +7745,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const map = game.activeMap; if (!map) return;
                 const now = a.ctx.currentTime, w = game.weather, rs = game.roomSystem;
                 const indoorMap = map.type === 'indoor', veranda = !!(rs && rs.active && rs.isPlayerOutdoor());
-                const outside = !indoorMap || veranda, apt = map.id === 'apt_949';
+                const realm = map.id.startsWith('keepers_');                  // the prologue's hill and parlor: no city out there
+                const outside = !indoorMap || veranda || map.id === 'keepers_hill', apt = map.id === 'apt_949';
                 const thresh = (CONFIG.WEATHER && CONFIG.WEATHER.SCHED_RAIN_THRESHOLD) || 0.15;
                 const rain = w && w.intensity > thresh ? Math.min(1, w.intensity) : 0;
                 const wind = w ? Math.min(1, w.wind || 0) : 0;
                 const hour = ((game.worldMinutes || 0) % 1440) / 60, day = Math.max(0, 1 - Math.abs(13 - hour) / 7);
-                const p = game.player, fireD = apt && p ? Math.hypot(p.x - 580, p.y - 432) : 1e9, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
+                const p = game.player, cam = game.camera;
+                const fireD = apt && p ? Math.hypot(p.x - 580, p.y - 432) : map.id === 'keepers_parlor' ? Math.hypot(cam.x - 450, cam.y - 70) * 0.6 : 1e9, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
                 const paused = !!game.paused;
                 const vol = GameSettings.ambienceVolume ?? 0.7;
 
                 this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
-                this._set(this.L.rain, outside ? 0.3 * rain : 0, 0.8);
+                this._set(this.L.rain, outside && !realm ? 0.3 * rain : 0, 0.8);
                 this._set(this.L.rainIn, outside ? 0 : 0.22 * rain, 0.8);
                 this._set(this.L.wind, outside ? 0.04 + 0.12 * wind : 0.015 * wind, 1.2);
-                this._set(this.L.city, !indoorMap ? 0.1 + 0.07 * day : veranda ? 0.09 : apt ? 0.025 : 0.015, 1.0);
+                this._set(this.L.city, realm ? 0 : !indoorMap ? 0.1 + 0.07 * day : veranda ? 0.09 : apt ? 0.025 : 0.015, 1.0);
                 this._set(this.L.room, apt && !veranda ? 0.035 : 0, 1.0);
                 this._set(this.L.fire, 0.22 * fire, 0.5);
                 this._music(game, paused);
@@ -7544,8 +7768,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // Sparse one-shots
                 if (fire > 0.02 && Math.random() < 0.09) this._crackle(0.35 * fire);
-                if (outside && now > this.next.car) { this._carPass(indoorMap ? 0.05 : 0.08); this.next.car = now + 6 + Math.random() * 9; }
-                if (outside && now > this.next.horn) { if (this.next.horn) this._horn(indoorMap ? 0.012 : 0.02); this.next.horn = now + 20 + Math.random() * 30; }
+                if (outside && !realm && now > this.next.car) { this._carPass(indoorMap ? 0.05 : 0.08); this.next.car = now + 6 + Math.random() * 9; }
+                if (outside && !realm && now > this.next.horn) { if (this.next.horn) this._horn(indoorMap ? 0.012 : 0.02); this.next.horn = now + 20 + Math.random() * 30; }
                 if (!outside && rain > 0 && now > this.next.drip) { this._drip(0.02 * rain); this.next.drip = now + 0.6 + Math.random() * 2.4; }
             }
 
@@ -10836,6 +11060,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // mirror rift he left through: drawSuiteGlow.
             //   Living room (elevator, pit, piano, bar, dining for two) | Bedroom (L) | Bath (the rift)
             //                                                           | Balcony (pool) — the breach wall
+            // The prologue's fireside (engine/keeper-art.js paints both; story/scenes/prologue.js plays them)
+            'keepers_hill': {
+                id: 'keepers_hill', width: 1800, height: 2800, type: 'indoor', label: 'Somewhere between the realms', floorColor: '#140a26',
+                ambientDarkness: 0.4, zones: [], walls: [], transitions: [], spawn: { x: 900, y: 2450 },
+                landmarks: [ { id: 'hill_foot', x: 900, y: 2330 }, { id: 'hill_mid', x: 900, y: 1500 }, { id: 'keeper_house', x: 900, y: 600 }, { id: 'keeper_porch', x: 900, y: 760 } ]
+            },
+            'keepers_parlor': {
+                id: 'keepers_parlor', width: 900, height: 700, type: 'indoor', label: "The Keeper's parlor", floorColor: '#140c10',
+                ambientDarkness: 0.78, zones: [], walls: [], transitions: [], spawn: { x: 450, y: 600 },
+                landmarks: [ { id: 'hearth', x: 450, y: 70 }, { id: 'parlor_mid', x: 520, y: 260 }, { id: 'keeper_seat', x: 450, y: 262 }, { id: 'traveler_seat', x: 648, y: 306 }, { id: 'parlor_window', x: 450, y: 20 } ]
+            },
             'hotel_suite': {
                 id: 'hotel_suite', width: 1400, height: 1000, type: 'indoor',
                 label: 'Penthouse Suite', floorColor: '#0c0a0e',
@@ -11486,6 +11721,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
 
+                case 'keepers_hill': {
+                    // Night on the hill: moonlight over the field, the house's windows warm on the lawn
+                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    e.softLights = [ A(900, 1500, 1100, 2500, '#b0c0e8', 0.16), A(900, 600, 760, 520, '#ffb070', 0.12), S(900, 740, 150, '#ffc080', 0.7, 3), S(790, 640, 80, '#ffb070', 0.5), S(1010, 640, 80, '#ffb070', 0.5) ];
+                    break;
+                }
+                case 'keepers_parlor': {
+                    // Firelit: the hearth, the candles, the cool window light
+                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    e.softLights = [ S(450, 140, 420, '#ff8a40', 0.45, 6), S(500, 290, 260, '#ff9a60', 0.22, 4), S(374, 44, 50, '#ffc080', 0.35, 4), S(526, 44, 50, '#ffc080', 0.35, 4),
+                                     S(96, 620, 80, '#ffc080', 0.35, 4), S(564, 204, 56, '#ffc080', 0.35, 4), S(850, 300, 150, '#8898ff', 0.2) ];
+                    break;
+                }
                 case 'church_boss': {
                     // The Sanctum: the altar and ruined organ on the dais, two colonnades of pillars (cover),
                     // broken pews, a fallen pillar, candle stands and braziers. Art: drawSanctumDecorProp.
@@ -34647,6 +34896,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         
             update() {
+                if (this.game.scenes && this.game.scenes.running) return;   // the story waits while a scene plays
                 if (this.state.part === 1) {
                     this.checkOverrides(); 
                 }
@@ -35020,6 +35270,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     };
                 },
                 breathe(t) { const b = breath(t); return { bounce: b * 0.35, torso: b * 0.01 }; },
+                // Seated (drawn over a chair or couch): feet out in front, hands in the lap, leaning back a little
+                sit(t, o) {
+                    const b = breath(t);
+                    return { l: [7.5, -4.5], r: [7.5, 4.5], le: [2, -10], re: [2, 10], lf: [9, 1], rf: [9, -1], bounce: -1.6 + b * 0.25,
+                             turn: Math.sin(t * TAU / 16 + o.seed) * 0.12, hint: 'neutral' };
+                },
+                // Seated, pulling a robe tighter round her: hands to the opposite shoulders
+                sit_wrap(t) {
+                    const b = breath(t);
+                    return { l: [4, 6.5], r: [4.5, -6.5], le: [5, -6], re: [5, 6], lf: [9, 1.5], rf: [8, -1.5], bounce: -0.8 + b * 0.25, head: [0.6, 0], hint: 'neutral' };
+                },
+                // Seated, leaning in: elbows on the knees, hands together in front
+                sit_lean(t) {
+                    const b = breath(t);
+                    return { l: [10.5, -2.5], r: [10.5, 2.5], le: [6, -8], re: [6, 8], lf: [9, 2], rf: [9, -2], bounce: 1.8 + b * 0.2, head: [1.4, 0], hint: 'curious' };
+                },
                 arms_crossed(t, o) {
                     const b = breath(t);
                     return { l: [5.5, 3], r: [6.5, -3], le: [1, -11], re: [1.5, 11], bounce: b * 0.3,
@@ -36596,6 +36862,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (X.blush > 0) {
                 ctx.fillStyle = `rgba(214, 72, 104, ${0.2 * X.blush})`;
                 for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + side * fw * 0.5, cy + fh * 0.2, fw * 0.28, fh * 0.13, side * 0.15, 0, Math.PI * 2); ctx.fill(); }
+            }
+
+            // Age (config.age 0..1): fine lines at the eyes, the brow and round the mouth
+            if (config.age && !A) {
+                const k = Math.min(1, config.age);
+                ctx.strokeStyle = `rgba(${Math.max(0, skinRGB.r - 60)}, ${Math.max(0, skinRGB.g - 55)}, ${Math.max(0, skinRGB.b - 45)}, ${0.35 * k})`;
+                ctx.lineWidth = Math.max(0.6, fw * 0.025); ctx.lineCap = 'round';
+                for (const side of [-1, 1]) {
+                    const ex = cx + side * fw * 0.38, ey = cy - fh * 0.15;
+                    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(ex + side * fw * 0.2, ey + i * fh * 0.04); ctx.lineTo(ex + side * fw * 0.3, ey + i * fh * 0.07); ctx.stroke(); }   // crow's feet
+                    ctx.beginPath(); ctx.moveTo(ex - side * fw * 0.08, ey + fh * 0.09); ctx.quadraticCurveTo(ex, ey + fh * 0.14, ex + side * fw * 0.12, ey + fh * 0.08); ctx.stroke();   // under the eye
+                    ctx.beginPath(); ctx.moveTo(cx + side * fw * 0.2, cy + fh * 0.12); ctx.quadraticCurveTo(cx + side * fw * 0.3, cy + fh * 0.3, cx + side * fw * 0.24, cy + fh * 0.44); ctx.stroke();   // nose to mouth
+                }
+                for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.moveTo(cx - fw * 0.28, cy - fh * (0.46 + i * 0.07)); ctx.quadraticCurveTo(cx, cy - fh * (0.49 + i * 0.07), cx + fw * 0.28, cy - fh * (0.46 + i * 0.07)); ctx.stroke(); }   // the brow
             }
 
             // Androids get a plated face and visor instead of human features
@@ -40688,6 +40968,828 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
         
+        /* =====================================================================
+           SCENE VISIONS — full-screen painted sequences a scene steps through
+           ---------------------------------------------------------------------
+           For what the top-down world can't show: the Keeper's trance. A vision
+           is a canvas over the world (under the letterbox and the subtitles) whose
+           look eases between states the script sets with beat():
+
+               s.vision.show('vanoga', 60);     // fade in over 60 ticks
+               s.vision.beat('pinprick');       // …then 'pulse', 'burst', 'orb'
+               s.vision.hide(60);
+
+           Painted every tick from the state, so it pauses with the game.
+           ===================================================================== */
+        class SceneVision {
+            constructor() {
+                this.cv = null; this.name = null; this.alpha = 0; this.alphaTo = 0; this.alphaStep = 0; this.t = 0;
+                this.S = {}; this.T = {};
+            }
+            _build() {
+                if (this.cv) return;
+                this.cv = document.createElement('canvas'); this.cv.id = 'scene-vision';
+                Object.assign(this.cv.style, { position: 'fixed', inset: '0', width: '100%', height: '100%', zIndex: 1090, pointerEvents: 'none', opacity: 0 });
+                document.body.appendChild(this.cv);
+            }
+            /** Fade a vision in. Showing the same one again resumes it where it was (a cut away and back). */
+            show(name, frames = 60) {
+                this._build();
+                if (this._last !== name) {
+                    this.t = 0; this.shards = null;
+                    this.S = { flames: 1, speed: 1, dark: 0, egg: 0, pulse: 0, burst: 0, orb: 0 };   // current
+                    this.T = { ...this.S };                                                              // targets
+                }
+                this.name = this._last = name;
+                this.alphaTo = 1; this.alphaStep = 1 / Math.max(1, frames);
+                return { done: () => this.alpha >= 1 };
+            }
+            hide(frames = 60) {
+                this.alphaTo = 0; this.alphaStep = frames ? 1 / frames : 1;
+                if (!frames) { this.alpha = 0; if (this.cv) this.cv.style.opacity = 0; this.name = null; }
+                return { done: () => this.alpha <= 0 };
+            }
+            /** Move toward a named state. Returns a waitable that's done once it has (about) arrived. */
+            beat(name) {
+                const B = SCENE_VISION_BEATS[this.name] && SCENE_VISION_BEATS[this.name][name];
+                if (B) Object.assign(this.T, B);
+                if (name === 'burst') this.burstT = 0;
+                return { done: () => Object.keys(B || {}).every(k => Math.abs(this.S[k] - this.T[k]) < 0.02) };
+            }
+            tick() {
+                if (!this.cv || (!this.name && this.alpha <= 0)) return;
+                this.t++;
+                if (this.alpha !== this.alphaTo) {
+                    this.alpha += Math.sign(this.alphaTo - this.alpha) * Math.min(this.alphaStep, Math.abs(this.alphaTo - this.alpha));
+                    this.cv.style.opacity = this.alpha;
+                    if (this.alpha <= 0 && this.alphaTo === 0) { this.name = null; return; }
+                }
+                // Ease every quantity toward its target (the burst runs on its own clock)
+                for (const k in this.T) { const r = k === 'burst' ? 0.012 : k === 'egg' ? 0.01 : 0.025; this.S[k] += (this.T[k] - this.S[k]) * r; }
+                if (this.T.burst > 0) this.S.burst = Math.min(this.T.burst, (this.burstT = (this.burstT || 0) + 1) / 150);
+                const P = SCENE_VISION_PAINT[this.name];
+                if (P) {
+                    const cv = this.cv, k = Math.min(1.5, window.devicePixelRatio || 1), w = Math.round(innerWidth * k), h = Math.round(innerHeight * k);
+                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    P.call(this, cv.getContext('2d'), w, h, this.t, this.S);
+                }
+            }
+        }
+
+        const SCENE_VISION_BEATS = {
+            vanoga: {
+                streams:  { flames: 1, speed: 1, dark: 0 },
+                slow:     { flames: 0.15, speed: 0.12, dark: 1 },
+                pinprick: { flames: 0, dark: 1, egg: 0.3, pulse: 0.15 },
+                near:     { egg: 0.62, pulse: 0.55 },
+                pulse:    { egg: 0.8, pulse: 1 },
+                burst:    { burst: 1, egg: 0, pulse: 0 },
+                orb:      { orb: 1 }
+            }
+        };
+
+        const SCENE_VISION_PAINT = {
+            /** The trance: flames streaming past like time running backwards, the dark, Vanoga, the burst, the Lord. */
+            vanoga(c, w, h, t, S) {
+                const cx = w / 2, cy = h / 2, m = Math.min(w, h), TAU = Math.PI * 2;
+                // Ground: fire orange going to the dark of space
+                const warm = 1 - S.dark;
+                c.fillStyle = `rgb(${Math.round(4 + 60 * warm)},${Math.round(2 + 18 * warm)},${Math.round(10 + 4 * warm)})`; c.fillRect(0, 0, w, h);
+                // Stars, once the dark comes
+                if (S.dark > 0.05) {
+                    const R = seededRandom(6125);
+                    for (let i = 0; i < 180; i++) {
+                        const x = R() * w, y = R() * h, tw = 0.5 + 0.5 * Math.sin(t * 0.03 + i);
+                        c.globalAlpha = S.dark * (0.15 + 0.5 * R()) * tw; c.fillStyle = i % 9 ? '#d9ccff' : '#ffd8a8';
+                        c.fillRect(x, y, 1 + (i % 13 === 0), 1 + (i % 13 === 0));
+                    }
+                    c.globalAlpha = 1;
+                }
+                // The flames: tongues and half-seen shapes (faces, arches, towers) streaming out from the centre
+                if (S.flames > 0.01) {
+                    c.save(); c.globalCompositeOperation = 'lighter';
+                    const R = seededRandom(949), N = 70, clock = t * 0.004 * (0.3 + S.speed * 2.2);
+                    for (let i = 0; i < N; i++) {
+                        const a = R() * TAU, ph = (R() + clock * (0.6 + R())) % 1, d = ph * ph * m * 0.85, sz = (0.02 + ph * 0.12) * m * (0.6 + R());
+                        const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d, al = S.flames * Math.sin(ph * Math.PI) * 0.55;
+                        const g = c.createRadialGradient(x, y, 0, x, y, sz);
+                        g.addColorStop(0, `rgba(255,${170 + (i % 5) * 12},90,${al})`); g.addColorStop(0.5, `rgba(230,90,40,${al * 0.5})`); g.addColorStop(1, 'rgba(120,20,10,0)');
+                        c.fillStyle = g; c.beginPath(); c.ellipse(x, y, sz * 0.55, sz, a + Math.PI / 2, 0, TAU); c.fill();
+                        // Every few: a shape in the fire — a face, an arch, a spire
+                        if (i % 6 === 0 && ph > 0.2 && ph < 0.8) {
+                            c.strokeStyle = `rgba(255,225,170,${al * 0.9})`; c.lineWidth = Math.max(1, sz * 0.05); c.beginPath();
+                            const kind = i % 18;
+                            if (kind === 0) { c.arc(x, y - sz * 0.12, sz * 0.16, 0, TAU); c.moveTo(x - sz * 0.34, y + sz * 0.38); c.quadraticCurveTo(x - sz * 0.3, y + sz * 0.06, x, y + sz * 0.06); c.quadraticCurveTo(x + sz * 0.3, y + sz * 0.06, x + sz * 0.34, y + sz * 0.38); }   // someone, head and shoulders
+                            else if (kind === 6) { c.moveTo(x - sz * 0.3, y + sz * 0.3); c.lineTo(x - sz * 0.3, y - sz * 0.05); c.arc(x, y - sz * 0.05, sz * 0.3, Math.PI, 0); c.lineTo(x + sz * 0.3, y + sz * 0.3); }
+                            else { c.moveTo(x - sz * 0.25, y + sz * 0.35); c.lineTo(x - sz * 0.1, y - sz * 0.1); c.lineTo(x, y - sz * 0.45); c.lineTo(x + sz * 0.1, y - sz * 0.1); c.lineTo(x + sz * 0.25, y + sz * 0.35); }
+                            c.stroke();
+                        }
+                    }
+                    c.restore();
+                }
+                // Vanoga: a pinprick of gold easing closer, pulsing brighter
+                if (S.egg > 0.01) {
+                    const pulse = 0.5 + 0.5 * Math.sin(t * (0.05 + S.pulse * 0.07));
+                    const r = m * (0.004 + S.egg * S.egg * 0.07), aura = r * (3 + S.pulse * 6 + pulse * S.pulse * 3);
+                    c.save(); c.globalCompositeOperation = 'lighter';
+                    const g = c.createRadialGradient(cx, cy, 0, cx, cy, aura);
+                    g.addColorStop(0, `rgba(255,236,170,${0.5 + 0.4 * pulse * S.pulse})`); g.addColorStop(0.25, `rgba(232,194,122,${0.25 + 0.2 * S.pulse})`); g.addColorStop(1, 'rgba(232,194,122,0)');
+                    c.fillStyle = g; c.beginPath(); c.arc(cx, cy, aura, 0, TAU); c.fill();
+                    c.restore();
+                    c.fillStyle = '#fff4d6'; c.beginPath(); c.ellipse(cx, cy, r * 0.82, r, 0, 0, TAU); c.fill();       // an egg, not a ball
+                    c.strokeStyle = `rgba(232,194,122,${0.6})`; c.lineWidth = Math.max(1, r * 0.08); c.stroke();
+                }
+                // The burst: gold splattered across the dark, shards flying, a nebula left behind
+                if (S.burst > 0.001) {
+                    if (!this.shards) { const R = seededRandom(1); this.shards = Array.from({ length: 160 }, () => ({ a: R() * TAU, v: 0.25 + R() * 0.9, s: 1 + R() * 4, k: R() })); }
+                    const b = S.burst, e = 1 - Math.pow(1 - b, 3);
+                    c.save(); c.globalCompositeOperation = 'lighter';
+                    const flash = Math.max(0, 1 - b * 4);
+                    if (flash > 0) { c.fillStyle = `rgba(255,240,200,${flash * 0.85})`; c.fillRect(0, 0, w, h); }
+                    for (let i = 0; i < 7; i++) {                                // the splatter: soft gold lobes
+                        const a = i * 0.9 + 0.3, d = e * m * (0.18 + (i % 3) * 0.09), R = m * (0.12 + (i % 2) * 0.08) * e;
+                        const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d * 0.8;
+                        const g = c.createRadialGradient(x, y, 0, x, y, R);
+                        g.addColorStop(0, `rgba(255,205,110,${0.5 * (1 - b * 0.35)})`); g.addColorStop(0.5, `rgba(240,160,70,${0.22 * (1 - b * 0.35)})`); g.addColorStop(1, 'rgba(232,150,60,0)');
+                        c.fillStyle = g; c.beginPath(); c.arc(x, y, R, 0, TAU); c.fill();
+                    }
+                    for (const q of this.shards) {
+                        const d = e * q.v * m * 0.75, x = cx + Math.cos(q.a) * d, y = cy + Math.sin(q.a) * d;
+                        const sz = q.s * (1.1 - b * 0.4) * (m / 480);
+                        c.fillStyle = q.k > 0.82 ? `rgba(255,170,215,${0.95 - b * 0.35})` : `rgba(255,${205 + (q.k * 40 | 0)},120,${0.95 - b * 0.4})`;
+                        c.beginPath(); c.arc(x, y, sz, 0, TAU); c.fill();
+                        c.strokeStyle = `rgba(255,215,140,${0.5 * (1 - b * 0.7)})`; c.lineWidth = Math.max(1, sz * 0.5); c.beginPath(); c.moveTo(x, y); c.lineTo(x - Math.cos(q.a) * 40 * (1 - b * 0.6), y - Math.sin(q.a) * 40 * (1 - b * 0.6)); c.stroke();
+                    }
+                    c.restore();
+                }
+                // The Empereal Lord: a pink orb wafting out from the centre, among Vanoga's shards
+                if (S.orb > 0.01) {
+                    const o = S.orb, x = cx + Math.sin(t * 0.012) * m * 0.03 * o, y = cy - o * m * 0.05 + Math.cos(t * 0.017) * m * 0.015, r = m * 0.035 * (0.4 + 0.6 * o);
+                    c.save(); c.globalCompositeOperation = 'lighter';
+                    const g = c.createRadialGradient(x, y, 0, x, y, r * 5);
+                    g.addColorStop(0, `rgba(255,170,215,${0.55 * o})`); g.addColorStop(0.3, `rgba(230,110,190,${0.25 * o})`); g.addColorStop(1, 'rgba(160,60,160,0)');
+                    c.fillStyle = g; c.beginPath(); c.arc(x, y, r * 5, 0, TAU); c.fill();
+                    c.restore();
+                    const core = c.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+                    core.addColorStop(0, `rgba(255,236,246,${o})`); core.addColorStop(0.6, `rgba(246,150,205,${o})`); core.addColorStop(1, `rgba(200,80,160,${o * 0.9})`);
+                    c.fillStyle = core; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+                }
+                // Vignette
+                const v = c.createRadialGradient(cx, cy, m * 0.3, cx, cy, Math.hypot(w, h) * 0.6);
+                v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.75)');
+                c.fillStyle = v; c.fillRect(0, 0, w, h);
+            }
+        };
+        /* =====================================================================
+           CINEMATIC DIALOGUE — how scenes look (styles/cinematic.css)
+           ---------------------------------------------------------------------
+           No box: subtitles in a lower third over a soft scrim, the speaker's name
+           in their colour, a living portrait cameo on their side (the listener's
+           dimmed opposite), choices stacked on the right, title cards on black,
+           a place-and-time marker, and a hold-to-skip chip.
+
+           Everything here is paced by tick() (one sim tick), so a paused game
+           freezes it too. The scene runner (story/scene-runner.js) is the only
+           caller; it gets back waitables ({ done(), value() }) to yield on.
+           ===================================================================== */
+        class CinematicDialogue {
+            constructor(game) {
+                this.game = game;
+                this.root = null;
+                this.tapped = false;          // a tap since the last tick
+                this.blackT = 0; this.blackTo = 0; this.blackStep = 0;
+                this.line = null; this.choice = null; this.cardS = null; this.markerS = null;
+                this.cast = { left: null, right: null };
+                this.skipHold = 0; this.skipHeld = false; this.onSkip = null;
+            }
+
+            _build() {
+                if (this.root) return;
+                const el = (tag, id, cls, parent) => { const e = document.createElement(tag); if (id) e.id = id; if (cls) e.className = cls; (parent || this.root).appendChild(e); return e; };
+                this.root = document.createElement('div'); this.root.id = 'cine'; document.body.appendChild(this.root);
+                this.blackEl = el('div', 'cine-black');
+                this.tapEl = el('div', 'cine-tap');
+                this.scrim = el('div', 'cine-scrim');
+                this.cams = {};
+                for (const side of ['left', 'right']) {
+                    const c = el('div', null, 'cine-cameo ' + side); const cv = el('canvas', null, null, c); cv.width = cv.height = 220;
+                    el('div', null, 'cine-cameo-rim', c);
+                    this.cams[side] = { el: c, canvas: cv, who: null, face: null, last: '' };
+                }
+                this.sub = el('div', 'cine-sub');
+                this.nameEl = el('div', null, 'cine-name', this.sub);
+                this.textEl = el('div', null, 'cine-text', this.sub);
+                this.nextEl = el('div', null, 'cine-next', this.sub); this.nextEl.textContent = '◆';
+                this.choicesEl = el('div', 'cine-choices');
+                this.cardEl = el('div', 'cine-card');
+                this.markerEl = el('div', 'cine-marker');
+                this.skipEl = el('div', 'cine-skip'); this.skipEl.innerHTML = '<span>HOLD TO SKIP</span><i></i>';
+                const tap = e => { e.preventDefault(); e.stopPropagation(); this.tapped = true; };
+                this.tapEl.addEventListener('pointerdown', tap); this.cardEl.addEventListener('pointerdown', tap); this.sub.addEventListener('pointerdown', tap);
+                window.addEventListener('keydown', e => {
+                    if (!this.game.scenes || !this.game.scenes.running) return;
+                    if (this.choice && /^[1-9]$/.test(e.key)) { this._pick(+e.key - 1); return; }
+                    if (e.key === ' ' || e.key === 'Enter' || e.key === 'e' || e.key === 'E') this.tapped = true;
+                });
+                const hold = on => e => { e.preventDefault(); e.stopPropagation(); this.skipHeld = on; };
+                this.skipEl.addEventListener('pointerdown', hold(true));
+                for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) this.skipEl.addEventListener(ev, hold(false));
+            }
+
+            // ── Black ────────────────────────────────────────────────────────
+            /** Fade the black layer to `to` (0..1) over `frames` ticks (0 = at once). */
+            black(to, frames) {
+                this._build();
+                this.blackEl.style.transition = 'none';
+                this.blackTo = to; this.blackStep = frames ? Math.abs(to - this.blackT) / frames : 1;
+                if (!frames) this.blackT = to;
+                this.blackEl.style.opacity = this.blackT;
+            }
+            fading() { return Math.abs(this.blackT - this.blackTo) > 0.001; }
+            /** After a scene: let the black go by itself (real time), whatever the game does next. */
+            releaseBlack(frames) {
+                this._build();
+                const ms = frames * 16.7;
+                this.blackTo = this.blackT = 0;
+                this.blackEl.style.transition = `opacity ${ms}ms ease ${Math.round(ms * 0.6)}ms`;
+                this.blackEl.style.opacity = 0;
+            }
+
+            // ── Lines ────────────────────────────────────────────────────────
+            /** A line: typed out; a tap completes it, the next tap moves on (or it moves on by itself with auto). */
+            say(who, text, opts = {}) {
+                this._build();
+                if (who === null) opts = { ...opts, noCameo: true };                 // narration: the novel's own voice, no name
+                const C = who === null ? { name: '', look: null, color: '#e8c27a', side: 'right' }
+                        : SCENE_CAST[who] || { name: String(who).toUpperCase(), look: who, color: '#e8c27a', side: 'right' };
+                this.sub.classList.toggle('narr', who === null);
+                const side = opts.side || C.side || 'right', other = side === 'left' ? 'right' : 'left';
+                this.nameEl.innerHTML = '';
+                const n = document.createElement('span'); n.textContent = C.name; n.style.color = C.color; this.nameEl.appendChild(n);
+                if (opts.offscreen) { const v = document.createElement('em'); v.textContent = 'VOICE'; this.nameEl.appendChild(v); }
+                this.sub.style.setProperty('--who', C.color);
+                this.sub.classList.add('show'); this.scrim.classList.add('show'); this.sub.classList.remove('done');
+                this.tapEl.classList.add('on');
+                // Cameos: the speaker lit on their side; whoever spoke last on the other side stays, dimmed
+                if (opts.offscreen || opts.noCameo) { this._cameo(side, null); }
+                else {
+                    this._cameo(side, C, opts.mood, text);
+                    const L = opts.with ? { id: opts.with, C: SCENE_CAST[opts.with] } : this.cast[other];   // the listener: named, or whoever spoke last
+                    if (L && L.C && L.id !== who && !opts.alone) this._cameo(other, L.C, null, null, true); else this._cameo(other, null);
+                }
+                this.textEl.textContent = '';
+                const line = this.line = { text: String(text), shown: 0, speed: opts.speed || 1.35, auto: opts.auto, hold: 0, done: false };
+                if (this.game.transcript && C.name) this.game.transcript.add(C.name, line.text, this.game.worldMinutes);
+                this.tapped = false;
+                return { done: () => line.done };
+            }
+
+            _cameo(side, C, mood, text, dim) {
+                const cam = this.cams[side];
+                if (!C) { cam.el.classList.remove('show', 'dim'); cam.who = null; this.cast[side] = null; return; }
+                const changed = cam.who !== C.look;
+                cam.who = C.look; this.cast[side] = { id: Object.keys(SCENE_CAST).find(k => SCENE_CAST[k] === C), C };
+                cam.el.classList.add('show'); cam.el.classList.toggle('dim', !!dim);
+                cam.el.style.setProperty('--who', C.color);
+                if (!dim) {
+                    let seed = 0; for (const ch of String(C.look)) seed = (seed * 31 + ch.charCodeAt(0)) % 997;
+                    const expr = mood || (text ? inferMood(text, C.look) : 'neutral');
+                    cam.face = { seed, expression: expr, talkUntil: _gameTimeSec + (text ? Math.min(3.5, 0.35 + text.length * 0.045) : 0) };
+                    cam.last = '';
+                } else if (changed || !cam.face) { cam.face = { seed: 3, expression: 'neutral', talkUntil: 0 }; cam.last = ''; }
+                else cam.face.talkUntil = 0;
+                this._paintCameo(cam);
+            }
+
+            _paintCameo(cam) {
+                if (!cam.who || !cam.face) return;
+                const t = _gameTimeSec, f = cam.face;
+                const blink = Math.round(blinkAmount(t, f.seed) * 4) / 4;
+                const talk = t < f.talkUntil ? Math.round(Math.abs(Math.sin(t * Math.PI * 5.5)) * 4) / 4 * 0.55 : 0;
+                const key = cam.who + '|' + blink + '|' + talk + '|' + f.expression;
+                if (key === cam.last) return;
+                cam.last = key;
+                if (this.game.paintPortraitTo) this.game.paintPortraitTo(cam.canvas, cam.who, null, { expression: f.expression, blink, talk });
+            }
+
+            // ── Choices ──────────────────────────────────────────────────────
+            /** Options on the right; returns the index picked. opts: { timer (ticks), def, weighty: [indices] } */
+            choose(options, opts = {}) {
+                this._build();
+                const ch = this.choice = { picked: -1, timer: opts.timer || 0, left: opts.timer || 0, def: opts.def ?? 0 };
+                this.choicesEl.innerHTML = '';
+                options.forEach((o, i) => {
+                    const row = document.createElement('button'); row.className = 'cine-choice';
+                    const weighty = (opts.weighty || []).includes(i);
+                    row.innerHTML = `<b>${i + 1}</b><span></span>${weighty ? '<i>◆</i>' : ''}`;
+                    row.querySelector('span').textContent = o;
+                    row.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); this._pick(i); });
+                    this.choicesEl.appendChild(row);
+                });
+                if (ch.timer) { const bar = document.createElement('div'); bar.className = 'cine-timer'; bar.innerHTML = '<i></i>'; this.choicesEl.appendChild(bar); ch.bar = bar.firstChild; }
+                this.choicesEl.classList.add('show');
+                this.tapEl.classList.remove('on');
+                return { done: () => ch.picked >= 0, value: () => ch.picked };
+            }
+            _pick(i) {
+                const ch = this.choice; if (!ch || ch.picked >= 0) return;
+                ch.picked = i; this.choice = null;
+                const rows = this.choicesEl.querySelectorAll('.cine-choice');
+                rows.forEach((r, k) => r.classList.toggle(k === i ? 'picked' : 'gone', true));
+                setTimeout(() => this.choicesEl.classList.remove('show'), 260);
+            }
+
+            // ── Cards and the marker ─────────────────────────────────────────
+            /** Lines on black, one after another; then a tap (or its hold time) and it fades. */
+            card(lines, opts = {}) {
+                this._build();
+                this.cardEl.innerHTML = '';
+                this.cardEl.className = opts.style ? 'show ' + opts.style : 'show';
+                const els = lines.map(t => { const d = document.createElement('div'); d.className = t === '' ? 'gap' : 'ln'; d.textContent = t; this.cardEl.appendChild(d); return d; });
+                if (opts.sign) { const s = document.createElement('div'); s.className = 'sign'; s.textContent = opts.sign; this.cardEl.appendChild(s); els.push(s); }
+                const hint = document.createElement('div'); hint.className = 'hint'; hint.textContent = 'tap to continue'; this.cardEl.appendChild(hint);
+                const S = this.cardS = { els, i: 0, t: 0, every: opts.every || 70, hold: opts.hold || 0, held: 0, out: 0, done: false, hint };
+                this.tapped = false;
+                return { done: () => S.done };
+            }
+
+            marker(place, time, opts = {}) {
+                this._build();
+                this.markerEl.innerHTML = '<div class="pl"></div><i></i><div class="tm"></div>';
+                this.markerEl.querySelector('.pl').textContent = place; this.markerEl.querySelector('.tm').textContent = time || '';
+                this.markerS = { t: 0, hold: opts.hold || 360 };
+            }
+
+            /** The next tap anywhere. */
+            waitTap() { this._build(); this.tapped = false; this.tapEl.classList.add('on'); return { done: () => { if (this.tapped) { this.tapped = false; return true; } return false; } }; }
+
+            showSkip(on, cb) { this._build(); this.skipEl.classList.toggle('show', !!on); this.onSkip = cb || null; this.skipHold = 0; this.skipHeld = false; }
+
+            clear() {
+                if (!this.root) return;
+                this.sub.classList.remove('show'); this.scrim.classList.remove('show');
+                this._cameo('left', null); this._cameo('right', null);
+                this.choicesEl.classList.remove('show'); this.choice = null;
+                this.cardEl.className = ''; this.cardS = null;
+                this.markerEl.classList.remove('show'); this.markerS = null;
+                this.tapEl.classList.remove('on'); this.line = null;
+            }
+
+            /** Dismiss the subtitle (between beats, when a scene wants the frame clean). */
+            hideLine() { if (!this.root) return; this.sub.classList.remove('show'); this.scrim.classList.remove('show'); this._cameo('left', null); this._cameo('right', null); this.tapEl.classList.remove('on'); }
+
+            // ── One tick ────────────────────────────────────────────────────
+            tick() {
+                if (!this.root) return;
+                const tap = this.tapped; this.tapped = false;
+                // Black
+                if (this.fading()) {
+                    this.blackT += Math.sign(this.blackTo - this.blackT) * Math.min(this.blackStep, Math.abs(this.blackTo - this.blackT));
+                    this.blackEl.style.opacity = this.blackT;
+                }
+                // The line
+                const L = this.line;
+                if (L && !L.done) {
+                    if (L.shown < L.text.length) {
+                        if (tap) L.shown = L.text.length; else L.shown = Math.min(L.text.length, L.shown + L.speed);
+                        this.textEl.textContent = L.text.slice(0, Math.floor(L.shown));
+                        if (L.shown >= L.text.length) this.sub.classList.add('done');
+                    } else {
+                        L.hold++;
+                        const auto = L.auto && L.hold > (typeof L.auto === 'number' ? L.auto : 50 + L.text.length * 1.6);
+                        if ((tap && L.hold > 3) || auto) { L.done = true; this.tapEl.classList.remove('on'); }
+                    }
+                }
+                for (const side of ['left', 'right']) this._paintCameo(this.cams[side]);
+                // Choice timer
+                const ch = this.choice;
+                if (ch && ch.timer) { ch.left--; if (ch.bar) ch.bar.style.transform = `scaleX(${Math.max(0, ch.left / ch.timer)})`; if (ch.left <= 0) this._pick(ch.def); }
+                // Card
+                const S = this.cardS;
+                if (S && !S.done) {
+                    S.t++;
+                    if (S.out) { if (++S.out > 40) { S.done = true; this.cardEl.className = ''; } }
+                    else if (S.i < S.els.length) {
+                        if (S.t >= S.every || (tap && S.t > 8)) { S.els[S.i].classList.add('on'); S.i++; S.t = 0; }
+                    } else {
+                        S.held++; if (S.held === 40) S.hint.classList.add('on');
+                        if ((tap && S.held > 10) || (S.hold && S.held > S.hold)) { S.out = 1; this.cardEl.classList.add('out'); }
+                    }
+                }
+                // Marker: in, hold, out
+                const M = this.markerS;
+                if (M) { M.t++; if (M.t === 2) this.markerEl.classList.add('show'); if (M.t === M.hold) this.markerEl.classList.remove('show'); if (M.t > M.hold + 90) this.markerS = null; }
+                // Hold to skip
+                if (this.skipHeld && this.onSkip) {
+                    this.skipHold++; this.skipEl.style.setProperty('--k', Math.min(1, this.skipHold / 48));
+                    if (this.skipHold >= 48) { const cb = this.onSkip; this.onSkip = null; this.skipHeld = false; cb(); }
+                } else if (this.skipHold) { this.skipHold = Math.max(0, this.skipHold - 3); this.skipEl.style.setProperty('--k', this.skipHold / 48); }
+            }
+        }
+        /* =====================================================================
+           SCENES — the story's director
+           ---------------------------------------------------------------------
+           A scene is a generator function: a screenplay the engine plays one sim
+           tick at a time. Each `yield` waits on something — frames, a line being
+           read, a camera move, a choice — and the script reads top to bottom:
+
+               defineScene('prologue', { startMap: {...}, onSkip(game) {...} }, function* (s) {
+                   yield s.card(POEM, { sign: '~ Unknown' });
+                   s.cam.to('keeper_house', { zoom: 0.8, frames: 900 });
+                   yield s.say('traveler', 'So, tell me what happened.');
+                   const pick = yield s.choose(['Yes', 'No']);
+               });
+
+           Scripts live in story/scenes/; the look lives in ui/cinematic-dialogue.js.
+           Running on sim ticks (not setTimeout) means a scene pauses with the game,
+           plays the same every time, and can be tested headless.
+
+           What a script may yield:
+             nothing          wait one tick
+             a number         wait that many ticks
+             a waitable       { done(): bool, value?(): any } — what the verbs return
+           ===================================================================== */
+        const SCENES = {};
+        function defineScene(name, meta, script) { SCENES[name] = { meta: meta || {}, script }; }
+
+        const SCENE_EASE = {
+            linear: t => t,
+            smooth: t => t * t * (3 - 2 * t),
+            inOut: t => 0.5 - Math.cos(Math.PI * t) / 2,
+            out: t => 1 - (1 - t) * (1 - t)
+        };
+
+        /** Someone the scene moves and poses: drawn as a procedural humanoid in the world. */
+        class SceneActor {
+            constructor(id, look, x, y, angle = 0) {
+                this.id = id; this.look = look; this.x = x; this.y = y; this.angle = angle;
+                this.pose = null; this.path = null; this.speed = 1.6; this.visible = true;
+                this.prop = null;          // something in their hands the scene draws (e.g. 'notepad')
+                this.facing = null;        // eased turning target (radians)
+            }
+            /** Walk a list of points at `speed` px/tick; done when they arrive. */
+            walk(points, speed) {
+                this.path = points.map(p => ({ x: p.x, y: p.y })); if (speed) this.speed = speed;
+                return { done: () => !this.path };
+            }
+            face(target, frames = 20) {
+                const t = typeof target === 'number' ? target : Math.atan2(target.y - this.y, target.x - this.x);
+                this.facing = { to: t, left: frames };
+                return { done: () => !this.facing };
+            }
+            /** Hold a pose from ui/poses.js. Seeded as already settled, so a seated actor starts seated. */
+            setPose(name) {
+                this.pose = name;
+                if (!this._pose) this._pose = { still: 5, t: 0, name, w: 1, last: _gameTimeSec, seed: 7 };
+                return this;
+            }
+            tick() {
+                if (this.path) {
+                    const p = this.path[0], dx = p.x - this.x, dy = p.y - this.y, d = Math.hypot(dx, dy);
+                    if (d <= this.speed) { this.x = p.x; this.y = p.y; this.path.shift(); if (!this.path.length) this.path = null; }
+                    else { this.x += dx / d * this.speed; this.y += dy / d * this.speed; this.angle = Math.atan2(dy, dx); }
+                }
+                if (this.facing) {
+                    const f = this.facing, diff = normalizeAngle(f.to - this.angle);
+                    this.angle += diff / Math.max(1, f.left); if (--f.left <= 0) { this.angle = f.to; this.facing = null; }
+                }
+            }
+            draw(ctx) {
+                if (!this.visible) return;
+                syncHumanoidGait(this);
+                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+                drawProceduralHumanoid(ctx, this, { stance: 'idle', ...this.look, pose: this.path ? undefined : (this.pose || undefined) });
+                if (this.prop === 'notepad') {                     // a small leather notebook in both hands, open
+                    ctx.fillStyle = '#3a2418'; ctx.fillRect(7, -4.5, 6, 9);
+                    ctx.fillStyle = '#efe6d2'; ctx.fillRect(7.6, -4, 4.8, 8); ctx.strokeStyle = 'rgba(60,40,30,0.5)'; ctx.lineWidth = 0.4;
+                    ctx.beginPath(); for (let k = 0; k < 4; k++) { ctx.moveTo(8.2, -2.8 + k * 1.8); ctx.lineTo(11.8, -2.8 + k * 1.8); } ctx.moveTo(10, -4); ctx.lineTo(10, 4); ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        class ScenePlayer {
+            constructor(game) {
+                this.game = game;
+                this.active = null;           // the running scene
+                this.actors = [];
+                this.ui = new CinematicDialogue(game);
+                this.vision = new SceneVision();
+            }
+            get running() { return !!this.active; }
+
+            /** Play a scene by name. Resolves when it ends (or is skipped). */
+            play(name, opts = {}) {
+                const def = SCENES[name];
+                if (!def) { console.warn('No scene', name); return Promise.resolve(); }
+                if (this.active) this._finish(true);
+                const g = this.game, meta = def.meta;
+                return new Promise(resolve => {
+                    const A = this.active = { name, meta, opts, resolve, frame: 0, wait: null, value: undefined, cam: null, skipHold: 0 };
+                    this.actors = [];
+                    this.ui.black(1, 0);                                    // scenes open on black
+                    if (meta.startMap) this._loadMap(meta.startMap.id, meta.startMap.at);
+                    g.cutscene.start();
+                    if (g.player) g.player.visible = meta.showPlayer !== false ? g.player.visible : false;
+                    this.ui.showSkip(!meta.noSkip, () => this.skip());
+                    A.gen = def.script(this._verbs());
+                });
+            }
+
+            /** One sim tick (from update.js). */
+            update() {
+                const A = this.active;
+                if (!A) return;
+                this._lockInput();
+                A.frame++;
+                this._tickCam();
+                for (const a of this.actors) a.tick();
+                this.ui.tick();
+                this.vision.tick();
+                // Run the script until it waits on something that isn't done
+                for (let guard = 0; guard < 64 && this.active === A; guard++) {
+                    if (A.wait) {
+                        if (!A.wait.done()) return;
+                        A.value = A.wait.value ? A.wait.value() : undefined; A.wait = null;
+                    }
+                    let r;
+                    try { r = A.gen.next(A.value); }
+                    catch (e) { console.error('Scene', A.name, e); this._finish(false); return; }
+                    A.value = undefined;
+                    if (r.done) { this._finish(false); return; }
+                    A.wait = this._toWait(r.value);
+                }
+            }
+
+            /** Actors, in the world pass (under the lighting, like any NPC). */
+            drawActors(ctx) { for (const a of this.actors) a.draw(ctx); }
+
+            skip() {
+                const A = this.active;
+                if (!A) return;
+                try { if (A.meta.onSkip) A.meta.onSkip(this.game); } catch (e) { console.error(e); }
+                this._finish(true);
+            }
+
+            _finish(skipped) {
+                const A = this.active;
+                if (!A) return;
+                this.active = null;
+                this.ui.clear(); this.vision.hide(0); this.ui.showSkip(false);
+                this.actors = [];
+                const g = this.game;
+                g.cutscene.end();
+                if (A.meta.flag) g.questState[A.meta.flag] = true;
+                this.ui.black(1, 0); this.ui.releaseBlack(A.meta.releaseFrames || 50);   // the next scene/map fades itself in under this
+                A.resolve({ skipped });
+            }
+
+            _toWait(v) {
+                if (v === undefined || v === null) return { done: () => true };
+                if (typeof v === 'number') { let n = v; return { done: () => --n <= 0 }; }
+                if (typeof v.done === 'function') return v;
+                return { done: () => true };
+            }
+
+            _lockInput() {
+                const g = this.game;
+                if (g.joystick) { g.joystick.active = false; g.joystick.dx = 0; g.joystick.dy = 0; }
+                if (g.fireJoystick) { g.fireJoystick.active = false; g.fireJoystick.firing = false; }
+                g.mouseDown = false;
+                if (g.keys) for (const k in g.keys) g.keys[k] = false;
+            }
+
+            _loadMap(id, at) {
+                const g = this.game;
+                g._doLoadMap(id, at || null);
+                g.bakeStaticLighting();
+                g.player.visible = false;                   // she isn't in the story's frame yet
+                g.player.x = at ? at.x : g.player.x; g.player.y = at ? at.y : g.player.y;
+            }
+
+            _landmark(t) {
+                if (typeof t === 'string') { const L = this.game.getLandmark(t); return { x: L.x, y: L.y }; }
+                if (t instanceof SceneActor) return { x: t.x, y: t.y };
+                return t;
+            }
+
+            _tickCam() {
+                const A = this.active, g = this.game, C = A.cam, cs = g.cutscene;
+                if (C) {
+                    C.t = Math.min(1, C.t + 1 / C.frames);
+                    const k = (SCENE_EASE[C.ease] || SCENE_EASE.inOut)(C.t);
+                    g.camera.x = C.x0 + (C.x1 - C.x0) * k; g.camera.y = C.y0 + (C.y1 - C.y0) * k;
+                    g.camera.zoom = C.z0 + (C.z1 - C.z0) * k;
+                    if (C.t >= 1) A.cam = null;
+                }
+                cs.camTargetX = g.camera.x; cs.camTargetY = g.camera.y; cs.camZoomTarget = g.camera.zoom;   // hold still between moves
+            }
+
+            /** The verbs a script is handed. */
+            _verbs() {
+                const self = this, g = this.game, ui = this.ui;
+                const s = {
+                    game: g,
+                    frame: () => self.active ? self.active.frame : 0,
+                    wait: n => n,
+                    waitTap: () => ui.waitTap(),
+                    fade(dir, frames = 45) { ui.black(dir === 'out' ? 1 : 0, frames); return { done: () => !ui.fading() }; },
+                    card(lines, opts = {}) { return ui.card(lines, opts); },
+                    marker(place, time, opts) { ui.marker(place, time, opts); },
+                    map(id, opts = {}) {
+                        if (g.activeMap && g.activeMap.id !== id) self.actors = [];
+                        if (!g.activeMap || g.activeMap.id !== id) self._loadMap(id, opts.at);
+                        const L = opts.cam ? self._landmark(opts.cam) : { x: g.player.x, y: g.player.y };
+                        g.camera.x = L.x; g.camera.y = L.y; g.camera.zoom = opts.zoom || 1; self.active.cam = null;
+                        return null;
+                    },
+                    /** Fade out, change map, fade in. */
+                    cut(id, opts = {}) {
+                        let stage = 0;
+                        ui.black(1, opts.out ?? 30);
+                        return { done: () => {
+                            if (stage === 0 && !ui.fading()) { s.map(id, opts); if (opts.then) opts.then(); ui.black(0, opts.in ?? 40); stage = 1; }
+                            return stage === 1 && !ui.fading();
+                        } };
+                    },
+                    cam: {
+                        to(target, opts = {}) {
+                            const L = self._landmark(target);
+                            self.active.cam = { x0: g.camera.x, y0: g.camera.y, z0: g.camera.zoom, x1: L.x + (opts.dx || 0), y1: L.y + (opts.dy || 0),
+                                                z1: opts.zoom ?? g.camera.zoom, frames: Math.max(1, opts.frames || 90), ease: opts.ease || 'inOut', t: 0 };
+                            const me = self.active.cam;
+                            return { done: () => !self.active || self.active.cam !== me };
+                        },
+                        cut(target, zoom) { const L = self._landmark(target); g.camera.x = L.x; g.camera.y = L.y; if (zoom) g.camera.zoom = zoom; self.active.cam = null; },
+                        shake(n = 4) { g.triggerShake && g.triggerShake(n); }
+                    },
+                    actor(id, look, x, y, angle) {
+                        let a = self.actors.find(q => q.id === id);
+                        if (!a) { a = new SceneActor(id, typeof look === 'string' ? APPEARANCES[look] : look, x, y, angle); self.actors.push(a); }
+                        return a;
+                    },
+                    /** A line. Waits until it's been read (tap) or, with auto, for its reading time. */
+                    say(speaker, text, opts = {}) { return ui.say(speaker, text, opts); },
+                    /** The novel's narration, in italics, no name. */
+                    narrate(text, opts = {}) { return ui.say(null, text, opts); },
+                    clearLine() { ui.hideLine(); },
+                    choose(options, opts = {}) { return ui.choose(options, opts); },
+                    music(track, vol) { if (typeof audioSys !== 'undefined' && audioSys.playTrack) audioSys.playTrack(track, vol); },
+                    sfx(name) { if (typeof audioSys !== 'undefined') audioSys.sfx(name); },
+                    flag(key, v = true) { g.questState[key] = v; },
+                    vision: self.vision,
+                    /** Wait for several waitables at once. */
+                    all(...ws) { const W = ws.map(w => self._toWait(w)); return { done: () => W.every(w => w.done()) }; }
+                };
+                return s;
+            }
+        }
+        /* =====================================================================
+           THE CAST — who can speak in a scene: the name on their subtitle, their
+           colour, whose face their cameo wears (core/appearances.js), and which
+           side of the screen they stand on (949 on the left, others on the right).
+           ===================================================================== */
+        const SCENE_CAST = {
+            '949':     { name: '949', look: '949', color: '#e8c27a', side: 'left' },
+            '747':     { name: '747', look: '747', color: '#b9a6ff', side: 'right' },
+            keeper:    { name: 'The Keeper', look: 'Keeper', color: '#ef6a7e', side: 'right' },
+            traveler:  { name: 'The Traveller', look: 'Traveler', color: '#d8c49a', side: 'left' },
+            larissa:   { name: 'Larissa', look: 'Larissa', color: '#b8b8ee', side: 'right' },
+            mirabel:   { name: 'Mirabel', look: 'Mirabel', color: '#e0667e', side: 'right' },
+            yenna:     { name: 'Yenna', look: 'Yenna', color: '#7fb87f', side: 'right' },
+            sabrina:   { name: 'Sabrina', look: 'Sabrina', color: '#b98cff', side: 'right' },
+            max:       { name: 'Max', look: 'Max', color: '#6aa8ff', side: 'right' },
+            josh:      { name: 'Josh', look: 'Josh', color: '#b4c0d0', side: 'right' },
+            victoria:  { name: 'Victoria', look: 'Victoria', color: '#ff86c0', side: 'right' }
+        };
+        /* =====================================================================
+           PROLOGUE — Story of 949
+           ---------------------------------------------------------------------
+           The epigraph on black. Then somewhere between the realms, in the year
+           6125: the camera climbs a flowering hill above a sea of clouds toward
+           a strange country house, while two voices begin. Inside, before the
+           fire, the Keeper of the Elements (a mystery to the player yet) and her
+           visitor, the Traveller. She looks into the flames, and the flames show
+           her the beginning: Vanoga, and the Empereal Lord.
+
+           Timing is in ticks (60 a second). s.say waits for a tap; { auto: true }
+           lets a line go by itself after its reading time.
+           ===================================================================== */
+        const PROLOGUE_EPIGRAPH = [
+            'You, 747,',
+            'You with so much courage,',
+            'You come alone? Who do you think you are?',
+            '',
+            'You’re an old collection of screws and wire,',
+            'Complete with low grade ditanium plating,',
+            'Nothing but a façade of a person,',
+            '',
+            'Where’s your crew? Your parade of bickering kids?',
+            'They will suffer 747.',
+            'And what will you do?',
+            '',
+            'Your group of so-called Freelancers… ha…',
+            'You’re nothing but a pawn… a pawn in a game, ages old.'
+        ];
+
+        defineScene('prologue', {
+            startMap: { id: 'keepers_hill', at: { x: 900, y: 2450 } },
+            flag: 'prologueSeen',
+            releaseFrames: 40
+        }, function* (s) {
+            const g = s.game;
+
+            // ── The epigraph ───────────────────────────────────────────────
+            yield 40;
+            yield s.card(PROLOGUE_EPIGRAPH, { sign: '~ Unknown', every: 52 });
+            yield 30;
+
+            // ── The hill: fade up at its foot, climb toward the house while they talk ──
+            s.map('keepers_hill', { cam: 'hill_foot', zoom: 0.9 });
+            const climb = s.cam.to('keeper_house', { zoom: 0.7, frames: 1260, ease: 'inOut', dy: 40 });
+            yield s.fade('in', 150);
+            s.marker('Somewhere between the realms…', '6125', { hold: 460 });
+            yield 200;
+            yield s.say('traveler', 'So, tell me what happened. All the way from the beginning.', { offscreen: true, auto: true });
+            yield 40;
+            yield s.say('keeper', 'It’s a long story.', { offscreen: true, auto: true });
+            yield 30;
+            yield s.say('traveler', 'I love long stories.', { offscreen: true, auto: true });
+            s.clearLine();
+            yield climb;
+            yield 50;
+
+            // ── Inside, before the fire ────────────────────────────────────
+            let keeper, trav;
+            yield s.cut('keepers_parlor', {
+                cam: { x: 535, y: 215 }, zoom: 1.15, out: 50, in: 60,
+                then() {
+                    keeper = s.actor('keeper', 'Keeper', 450, 262, -Math.PI / 2).setPose('sit');
+                    trav = s.actor('traveler', 'Traveler', 648, 306, Math.atan2(262 - 306, 450 - 648)).setPose('sit');
+                    trav.prop = 'notepad';
+                }
+            });
+            s.cam.to({ x: 515, y: 228 }, { zoom: 1.4, frames: 700 });
+            yield 110;
+            g.keeperEmberPop();                                          // an ember pops, a smattering of sparks
+            yield 40;
+            yield s.narrate('It’d been a long while since she’d had a visitor.', { auto: true });
+            keeper.setPose('sit_wrap');                                  // the red robe, pulled tighter against the cold
+            yield 70;
+            g.keeperEmberPop(8);
+            yield 50;
+            keeper.setPose('sit');
+            s.clearLine();
+
+            // A glance to the window above the fire: the deep pinkish-purple sky, the stars
+            yield s.cam.to({ x: 450, y: 70 }, { zoom: 2.3, frames: 170 });
+            yield s.narrate('Beyond the glass, portals and planets turned about the hill — shards from every corner of the universe, all in the same space.', { auto: true });
+            s.clearLine();
+            yield s.cam.to({ x: 470, y: 190 }, { zoom: 2.1, frames: 150 });
+            yield s.narrate('It wasn’t often that she told the story of the beginning. But every time she did, the world’s magic bloomed once more.', { auto: true });
+            s.clearLine();
+            yield 30;
+
+            // ── The trance: into the flames ────────────────────────────────
+            trav.setPose('sit');
+            yield s.narrate('The flames began to warp — into faces, places, events.', { auto: 150 });
+            s.clearLine();
+            s.cam.to('hearth', { zoom: 5, frames: 220, ease: 'smooth' });
+            yield 90;
+            yield s.vision.show('vanoga', 110);
+            s.vision.beat('streams');
+            yield 200;
+            s.vision.beat('slow');
+            yield 170;
+            s.vision.beat('pinprick');
+            yield 130;
+            yield s.say('keeper', 'Vanoga… the star that began it all.', { with: 'traveler', mood: 'curious' });
+            s.clearLine();
+
+            // The couch springs creak: the Traveller leans in
+            yield s.vision.hide(24);
+            s.cam.cut({ x: 545, y: 262 }, 2.1);
+            trav.setPose('sit_lean'); trav.prop = null;
+            yield 70;
+            yield s.vision.show('vanoga', 24);
+
+            s.vision.beat('near');
+            yield s.say('keeper', 'The very existence that we have been granted, the reality that we partake in, was started from this unassuming dot of a seed, planted within the sea of blackness that we know as space.', { with: 'traveler' });
+            s.clearLine();
+            s.vision.beat('pulse');
+            yield 170;
+            s.vision.beat('burst');
+            s.cam.shake(3);
+            yield 170;
+            s.vision.beat('orb');
+            yield 110;
+            yield s.say('keeper', 'And so did our Empereal Lord…', { with: 'traveler', mood: 'smile' });
+            s.clearLine();
+            yield 60;
+            yield s.fade('out', 140);
+            s.vision.hide(0);
+            yield 30;
+        });
         /**
          * PauseSystem — token-based pause registry.
          *
@@ -40955,6 +42057,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.bonding = new BondingSystem();
                 this.dialogueSeq = new DialogueSequence(this);
                 this.transcript = new DialogueTranscript();
+                this.scenes = new ScenePlayer(this);            // story/scene-runner.js: the story's scenes
                 // Universal capture: any write to the NPC text element gets transcribed,
                 // regardless of which code path produced it (DialogueSequence, single-line
                 // shop greetings, recruit prompts, story handler). Pulls the speaker from
@@ -41870,6 +42973,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.weather.resize(bufW, bufH);
                 
                 // (Lamp shadow shapes are in world space: no rebake needed on resize.)
+
+                // A phone on its side: short and wide. Everything landscape keys off this one class
+                // (styles/landscape.css); portrait never sees it.
+                const land = cssW > cssH && cssH <= 540;
+                this.isLandscape = land;
+                document.body.classList.toggle('landscape', land);
+                document.documentElement.style.setProperty('--phone-scale', land ? Math.min(1, (cssH - 24) / 600).toFixed(3) : '1');
             },
 
             fireWeapon() {
@@ -45911,6 +47021,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
 
             saveGame() {
+                if (this.scenes && this.scenes.running) { showMessage("Can't save during a scene"); return; }
                 // Build save data from schema (captures current game state)
                 const saveData = this.getSaveSchema();
                 
@@ -47754,6 +48865,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.activeMap.id === 'hotel_suite') this.drawSuiteGlow(ctx);
                 if (this.activeMap.id === 'church_boss') { this.drawSanctumGlow(ctx); this.drawBossGlow(ctx); }   // the Sanctum, then the Triumvirate's eyes
                 if (this.activeMap.id === 'moon_city_nightclub') this.drawClubGlow(ctx);
+                if (this.activeMap.id.startsWith('keepers_')) this.drawKeeperGlow(ctx);
                 if (this.activeMap.id === 'hub_949') this.drawGraveyardGlow(ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const z = this.camera.zoom || 1;
@@ -48544,6 +49656,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Pausable systems — must tick before any logic that might
                 // schedule new timers or read playerEmote state.
                 this._tickPausableTimers();
+                if (this.scenes && this.scenes.running) this.scenes._lockInput();   // a scene has the stage: no walking or firing
                 this.tickPlayerEmote();
                 
                 // PERFORMANCE: Use globally cached frame time (set once in loop())
@@ -48716,6 +49829,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
                 this.profiler.start('Logic:Story');
                 this.cutscene.update();
+                if (this.scenes && this.scenes.running) this.scenes.update();                     // story/scene-runner.js
                 if (this._bossIntros && this._bossIntros.length) this.updateBossIntro();          // engine/boss-intro.js
                 this.story.update();
                 this.profiler.stop('Logic:Story');
@@ -49915,6 +51029,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     targetZoom = 1.0 - (speedRatio * 0.65); 
                     if (targetZoom < 0.35) targetZoom = 0.35; 
                 } else if (nearInteractable) { targetZoom = 1.4; }
+                if (this.isLandscape) targetZoom *= 0.9;          // a short screen: a little more ground above and below her
                 
                 const diff = targetZoom - this.camera.zoom;
                 if (Math.abs(diff) > 0.005) this.camera.zoom += diff * 0.05;
@@ -50305,6 +51420,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.activeMap.id === 'hotel_lobby') this.drawLobbyInterior(this.ctx);
                 if (this.activeMap.id === 'hotel_suite') this.drawSuiteInterior(this.ctx);
                 if (this.activeMap.id === 'church_boss') this.drawSanctumInterior(this.ctx);
+                if (this.activeMap.id.startsWith('keepers_')) this.drawKeeperInterior(this.ctx);   // the prologue's fireside (engine/keeper-art.js)
                 if (this.activeMap.id === 'moon_city_nightclub') { this.drawClubInterior(this.ctx); this.drawClubFloorLights(this.ctx); }
                 
                 // Indoor V2: Room floors, windows, and doors
@@ -50693,6 +51809,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         if (n.x < cbE.left || n.x > cbE.right || n.y < cbE.top || n.y > cbE.bottom) return;
                         n.draw(this.ctx);
                     });
+                    if (this.scenes && this.scenes.actors.length) this.scenes.drawActors(this.ctx);   // a scene's cast
                     this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
                     this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
                     this.teammates.forEach(tm => {
@@ -51230,7 +52347,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         filterChain = `grayscale(80%) brightness(${(1.4 * ggBright * ggExposure).toFixed(2)}) contrast(${(1.2 * ggContrast).toFixed(2)}) sepia(0.3) hue-rotate(300deg) saturate(${(1.5 * ggSaturate).toFixed(2)})`;
                     }
                 } else {
-                    if (this.player.visibility !== undefined) {
+                    if (this.scenes && this.scenes.running) {
+                        // A scene has the stage: Stella is off-camera, so her stealth doesn't grey the story out
+                        this.targetGrayscale = 0; this.visualGrayscale = 0;
+                    } else if (this.player.visibility !== undefined) {
                         this.targetGrayscale = (1.0 - this.player.visibility) * 100;
                         this.visualGrayscale += (this.targetGrayscale - this.visualGrayscale) * 0.05;
                         if (this.visualGrayscale < 0.5) this.visualGrayscale = 0;
@@ -51258,8 +52378,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     const RADAR_RADIUS = 60;
                     const RADAR_RANGE = 600;  // world-px detection radius
-                    const cx = this.canvas.width - RADAR_RADIUS - 16;
-                    const cy = this.canvas.height - RADAR_RADIUS - 60;
+                    // Landscape: top-left under the bars, clear of the fire cluster
+                    const cx = this.isLandscape ? RADAR_RADIUS + 16 : this.canvas.width - RADAR_RADIUS - 16;
+                    const cy = this.isLandscape ? RADAR_RADIUS + 150 : this.canvas.height - RADAR_RADIUS - 60;
                     const playerX = this.isDriving && this.car ? this.car.x : this.player.x;
                     const playerY = this.isDriving && this.car ? this.car.y : this.player.y;
                     const scale = RADAR_RADIUS / RADAR_RANGE;
@@ -52766,6 +53887,370 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         });
 
+        // GameEngine — the Keeper's hill and parlor (the prologue's fireside). Scene-only places:
+        // everything is painted here, with no props to bump into.
+        //   keepers_hill   a lone hill above a sea of clouds, deep green with pink flowers, the house at the top
+        //   keepers_parlor checkerboard tiles, red and burgundy seats, the fire, the window above it
+        // Floors: drawKeeperInterior (draw.js, under the lighting). Light: drawKeeperGlow (world-state.js).
+        // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        const KEEPER = {
+            HILL: { w: 1800, h: 2800, house: { x: 900, y: 560 } },
+            // The island's rim, clockwise from the top (x, y)
+            ISLAND: [[900, 250], [1120, 280], [1290, 380], [1360, 560], [1330, 780], [1260, 980], [1240, 1250], [1230, 1550], [1200, 1850], [1150, 2150], [1080, 2380], [960, 2500],
+                     [840, 2500], [720, 2390], [650, 2160], [600, 1860], [570, 1560], [560, 1260], [540, 980], [470, 780], [440, 560], [510, 380], [680, 280]],
+            PATH: [[900, 2470], [860, 2280], [960, 2080], [850, 1880], [955, 1680], [865, 1470], [935, 1260], [875, 1060], [905, 880], [900, 740]],
+            PARLOR: { w: 900, h: 700, fire: { x: 450, y: 62 }, keeper: { x: 450, y: 262 }, traveler: { x: 648, y: 306 } }
+        };
+
+        engineMixin({
+            /** Under the lighting: the painted place, plus what moves in it (clouds, flowers, the floating gable). */
+            drawKeeperInterior(ctx) {
+                const id = this.activeMap.id;
+                if (id === 'keepers_hill') {
+                    if (!this._keeperHill) { this._keeperHill = this._paintKeeperHill(); this._keeperHouse = this._paintKeeperHouse(); }
+                    ctx.drawImage(this._keeperHill, 0, 0, KEEPER.HILL.w, KEEPER.HILL.h);
+                    this._drawHillLife(ctx);
+                    ctx.drawImage(this._keeperHouse, 540, 320);
+                    this._drawFloatingGable(ctx);
+                } else if (id === 'keepers_parlor') {
+                    if (!this._keeperParlor) this._keeperParlor = this._paintKeeperParlor();
+                    ctx.drawImage(this._keeperParlor, 0, 0);
+                }
+            },
+
+            /** The visible world rect (for drawing only what's on screen). */
+            _keeperView(pad = 80) {
+                const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z + pad, hh = this.canvas.height / 2 / z + pad;
+                return { x0: this.camera.x - hw, x1: this.camera.x + hw, y0: this.camera.y - hh, y1: this.camera.y + hh };
+            },
+
+            _paintKeeperHill() {
+                const W = KEEPER.HILL.w, H = KEEPER.HILL.h, k = 0.5;                 // painted at half size, drawn at full
+                const cv = document.createElement('canvas'); cv.width = W * k; cv.height = H * k;
+                const c = cv.getContext('2d'), r = seededRandom(6125);
+                c.scale(k, k);
+                // The sea of clouds far below: deep violet, rolling bands of lighter mist
+                const sky = c.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#140a26'); sky.addColorStop(0.5, '#1c0f33'); sky.addColorStop(1, '#241238'); c.fillStyle = sky; c.fillRect(0, 0, W, H);
+                for (let i = 0; i < 260; i++) {
+                    const x = r() * W, y = r() * H, rr = 60 + r() * 180, a = 0.04 + r() * 0.07, pink = r() < 0.3;
+                    const g = c.createRadialGradient(x, y, 0, x, y, rr);
+                    g.addColorStop(0, pink ? `rgba(220,140,210,${a})` : `rgba(170,150,230,${a})`); g.addColorStop(1, 'rgba(120,90,180,0)');
+                    c.fillStyle = g; c.beginPath(); c.ellipse(x, y, rr * 1.6, rr, (r() - 0.5) * 0.4, 0, Math.PI * 2); c.fill();
+                }
+                // The island: a drop shadow onto the clouds, the cliff rim, then the grass
+                const island = () => { c.beginPath(); KEEPER.ISLAND.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); };
+                c.save(); c.translate(26, 60); c.filter = 'blur(30px)'; island(); c.fillStyle = 'rgba(6,2,12,0.75)'; c.fill(); c.restore();
+                island(); c.fillStyle = '#1e1a1c'; c.fill();                                       // the rock lip
+                c.save(); island(); c.clip();
+                c.save(); c.translate(0, -14); island(); c.fillStyle = '#1b4a26'; c.fill(); c.restore();
+                // Grass: a deep green, darker in the hollows, lighter where the moon catches the slope
+                for (let i = 0; i < 900; i++) {
+                    const x = 420 + r() * 960, y = 240 + r() * 2280, rr = 20 + r() * 70, v = r();
+                    c.fillStyle = v < 0.5 ? `rgba(10,38,18,${0.2 + r() * 0.25})` : `rgba(60,120,62,${0.1 + r() * 0.14})`;
+                    c.beginPath(); c.ellipse(x, y, rr * 1.4, rr, r() * 3, 0, Math.PI * 2); c.fill();
+                }
+                c.strokeStyle = 'rgba(90,160,86,0.28)'; c.lineWidth = 1.2;                                // blades
+                for (let i = 0; i < 9000; i++) { const x = 420 + r() * 960, y = 240 + r() * 2280, a = -1.2 - r() * 0.7; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * 6, y + Math.sin(a) * 9); c.stroke(); }
+                // The path up: worn earth, flat stones set into it
+                c.lineCap = 'round'; c.lineJoin = 'round';
+                const path = () => { c.beginPath(); KEEPER.PATH.forEach(([x, y], i) => { if (!i) c.moveTo(x, y); else { const [px, py] = KEEPER.PATH[i - 1]; c.quadraticCurveTo(px, (py + y) / 2, (px + x) / 2, (py + y) / 2); } }); c.lineTo(900, 740); };
+                c.strokeStyle = '#2a2016'; c.lineWidth = 44; path(); c.stroke();
+                c.strokeStyle = '#4a3a28'; c.lineWidth = 32; path(); c.stroke();
+                for (let i = 0; i < KEEPER.PATH.length - 1; i++) {
+                    const [x0, y0] = KEEPER.PATH[i], [x1, y1] = KEEPER.PATH[i + 1];
+                    for (let s = 0; s < 1; s += 0.14) { const x = x0 + (x1 - x0) * s + (r() - 0.5) * 16, y = y0 + (y1 - y0) * s; c.fillStyle = `rgb(${96 + r() * 20 | 0},${88 + r() * 16 | 0},${80 + r() * 14 | 0})`; c.beginPath(); c.ellipse(x, y, 9 + r() * 5, 6 + r() * 3, r() * 3, 0, Math.PI * 2); c.fill(); }
+                }
+                // The garden plateau round the house: a little lawn, a low stone wall, a gate
+                c.fillStyle = 'rgba(30,70,36,0.35)'; c.beginPath(); c.ellipse(900, 600, 330, 250, 0, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = '#4a4450'; c.lineWidth = 10; c.setLineDash([14, 5]); c.beginPath(); c.ellipse(900, 610, 360, 280, 0, Math.PI * 0.56, Math.PI * 2.44); c.stroke(); c.setLineDash([]);
+                c.fillStyle = '#5a5060'; c.fillRect(858, 880, 12, 22); c.fillRect(930, 880, 12, 22);                           // gateposts
+                c.restore();
+                // The cliff edge: a lighter rim where the grass breaks, rocks below it
+                island(); c.strokeStyle = 'rgba(160,150,190,0.25)'; c.lineWidth = 3; c.stroke();
+                for (let i = 0; i < KEEPER.ISLAND.length; i++) {
+                    const [x0, y0] = KEEPER.ISLAND[i], [x1, y1] = KEEPER.ISLAND[(i + 1) % KEEPER.ISLAND.length];
+                    for (let s = 0; s < 1; s += 0.2) { const x = x0 + (x1 - x0) * s, y = y0 + (y1 - y0) * s + 10; c.fillStyle = `rgba(${40 + r() * 30 | 0},${36 + r() * 20 | 0},${50 + r() * 30 | 0},0.9)`; c.beginPath(); c.ellipse(x, y, 10 + r() * 14, 7 + r() * 8, r() * 3, 0, Math.PI * 2); c.fill(); }
+                }
+                return cv;
+            },
+
+            /** The house, from above: a country home made strange. Canvas origin = world (540, 320). */
+            _paintKeeperHouse() {
+                const cv = document.createElement('canvas'); cv.width = 720; cv.height = 560;
+                const c = cv.getContext('2d'), r = seededRandom(747), O = { x: 540, y: 320 };
+                c.translate(-O.x, -O.y);
+                // Shadow on the lawn
+                c.fillStyle = 'rgba(4,2,10,0.55)'; c.fillRect(708, 452, 450, 250);
+                // Porch: boards, two posts, steps down to the path
+                c.fillStyle = '#3a2a22'; c.fillRect(800, 668, 200, 70);
+                c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 1; for (let x = 806; x < 1000; x += 10) { c.beginPath(); c.moveTo(x, 668); c.lineTo(x, 738); c.stroke(); }
+                c.fillStyle = '#4a3a30'; c.fillRect(860, 738, 80, 10); c.fillRect(868, 748, 64, 10);
+                c.fillStyle = '#e8dcc8'; c.fillRect(804, 726, 8, 8); c.fillRect(988, 726, 8, 8);
+                // Main roof: plum shingles in rows, a ridge along the middle; hipped ends
+                const roof = (x, y, w, h, ridgeY) => {
+                    c.fillStyle = '#3a1a3a'; c.fillRect(x, y, w, h);
+                    for (let yy = y; yy < y + h; yy += 9) {
+                        const up = yy < ridgeY; c.fillStyle = up ? '#4a2448' : '#2e1430';
+                        for (let xx = x + ((yy / 9) % 2) * 7; xx < x + w; xx += 14) { const v = r() * 12 | 0; c.fillStyle = up ? `rgb(${70 + v},${34 + v / 2},${68 + v})` : `rgb(${46 + v},${20 + v / 2},${48 + v})`; c.fillRect(xx, yy, 13, 8); }
+                    }
+                    const g = c.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, 'rgba(255,220,255,0.10)'); g.addColorStop((ridgeY - y) / h, 'rgba(255,220,255,0.02)'); g.addColorStop((ridgeY - y) / h + 0.001, 'rgba(0,0,0,0.25)'); g.addColorStop(1, 'rgba(0,0,0,0.35)');
+                    c.fillStyle = g; c.fillRect(x, y, w, h);
+                    c.strokeStyle = '#1a0a1c'; c.lineWidth = 2; c.strokeRect(x, y, w, h);
+                };
+                roof(690, 440, 440, 230, 555);
+                // The ridge: dark caps carved with runes (they glow in the glow pass)
+                c.fillStyle = '#231226'; c.fillRect(690, 549, 440, 12);
+                // A dormer each side of the porch, a wing to the east with its own little roof
+                roof(1060, 470, 110, 170, 555);
+                for (const dx of [760, 980]) { c.fillStyle = '#2a1230'; c.fillRect(dx, 600, 60, 52); c.fillStyle = '#4a2448'; c.fillRect(dx + 4, 600, 52, 20); c.fillStyle = '#1a0a18'; c.fillRect(dx + 12, 626, 36, 22); }
+                // The chimney, a little crooked, brick
+                c.save(); c.translate(1046, 494); c.rotate(0.12); c.fillStyle = '#5a2e2a'; c.fillRect(-20, -26, 40, 50);
+                c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 1; for (let y = -26; y < 24; y += 7) { c.beginPath(); c.moveTo(-20, y); c.lineTo(20, y); c.stroke(); }
+                c.fillStyle = '#0a0406'; c.fillRect(-12, -18, 24, 24); c.restore();
+                // Ivy up the walls and over the eaves, pale blossoms in it
+                for (let i = 0; i < 70; i++) {
+                    const side = r(), x = side < 0.5 ? 690 + r() * 30 : 1100 + r() * 30, y = 450 + r() * 210;
+                    c.fillStyle = `rgba(${30 + r() * 20 | 0},${80 + r() * 40 | 0},${50 + r() * 20 | 0},0.85)`; c.beginPath(); c.ellipse(x, y, 5 + r() * 5, 3 + r() * 3, r() * 3, 0, Math.PI * 2); c.fill();
+                }
+                // A weathervane on the ridge: a crescent
+                c.strokeStyle = '#c8b070'; c.lineWidth = 2; c.beginPath(); c.moveTo(930, 555); c.lineTo(930, 536); c.stroke();
+                c.fillStyle = '#e8c27a'; c.beginPath(); c.arc(930, 530, 8, 0.6, Math.PI * 2 - 0.6); c.arc(934, 530, 6, Math.PI * 2 - 0.8, 0.8, true); c.fill();
+                return cv;
+            },
+
+            /** The west gable: floating an inch off the house, turning ever so slightly. */
+            _drawFloatingGable(ctx) {
+                const t = _gameTimeSec, bob = Math.sin(t * 0.8) * 3, tilt = Math.sin(t * 0.37) * 0.035;
+                ctx.save();
+                ctx.fillStyle = 'rgba(4,2,10,0.6)'; ctx.fillRect(594, 488, 110, 146);                   // its shadow, where it should sit
+                ctx.translate(626, 522 + bob); ctx.rotate(-0.07 + tilt);                                 // lifted clear of the house, a little askew
+                ctx.fillStyle = '#3a1a3a'; ctx.fillRect(-60, -70, 110, 140);
+                for (let y = -70; y < 70; y += 9) for (let x = -60 + ((y / 9 + 8) % 2) * 7; x < 50; x += 14) { ctx.fillStyle = y < 0 ? '#4e2a4c' : '#301632'; ctx.fillRect(x, y, 13, 8); }
+                ctx.fillStyle = '#231226'; ctx.fillRect(-60, -6, 110, 12);
+                ctx.strokeStyle = 'rgba(232,194,122,0.5)'; ctx.lineWidth = 1; ctx.strokeRect(-60, -70, 110, 140);
+                ctx.restore();
+                // Stones circling the house, slowly
+                for (let i = 0; i < 5; i++) {
+                    const a = t * 0.12 + i * 1.26, x = 900 + Math.cos(a) * 330, y = 560 + Math.sin(a) * 220, s = 6 + (i % 3) * 3;
+                    ctx.fillStyle = 'rgba(4,2,10,0.4)'; ctx.beginPath(); ctx.ellipse(x + 8, y + 18, s, s * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#6a6278'; ctx.beginPath(); ctx.ellipse(x, y + Math.sin(t + i) * 3, s, s * 0.8, a, 0, Math.PI * 2); ctx.fill();
+                }
+            },
+
+            /** What moves on the hill: the clouds drifting, flowers swaying (only what's on screen). */
+            _drawHillLife(ctx) {
+                const V = this._keeperView(), t = _gameTimeSec;
+                // Clouds drifting past below the island's edges
+                if (!this._keeperClouds) { const r = seededRandom(3); this._keeperClouds = Array.from({ length: 22 }, () => ({ x: r() * 1800, y: r() * 2800, s: 160 + r() * 260, v: 4 + r() * 10, pink: r() < 0.35 })); }
+                ctx.save();
+                for (const q of this._keeperClouds) {
+                    const x = ((q.x + t * q.v) % 2200) - 200;
+                    if (x < V.x0 - q.s || x > V.x1 + q.s || q.y < V.y0 - q.s || q.y > V.y1 + q.s) continue;
+                    ctx.globalAlpha = 0.09; drawGlow(ctx, x, q.y, q.s, q.pink ? '230, 150, 215' : '180, 160, 240', 0);
+                }
+                ctx.restore();
+                // Pink flowers across the field, nodding in the breeze
+                if (!this._keeperFlowers) {
+                    const r = seededRandom(19), F = [];
+                    const inside = (x, y) => { let c = false; const P = KEEPER.ISLAND; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+                    const drifts = Array.from({ length: 34 }, () => ({ x: 460 + r() * 880, y: 280 + r() * 2200, R: 60 + r() * 130 }));
+                    while (F.length < 1100) {
+                        const d = drifts[r() * drifts.length | 0], a = r() * Math.PI * 2, q = Math.sqrt(r());
+                        const loose = r() < 0.2, x = loose ? 440 + r() * 920 : d.x + Math.cos(a) * d.R * q, y = loose ? 260 + r() * 2240 : d.y + Math.sin(a) * d.R * q * 0.8;
+                        if (!inside(x, y - 20)) continue;
+                        if (x > 640 && x < 1180 && y > 400 && y < 760) continue;             // not on the house
+                        if (y > 740 && Math.abs(x - this._pathX(y)) < 34) continue;                // not on the path
+                        F.push({ x, y, s: 1.3 + r() * 1.3, ph: r() * 6, c: r() < 0.6 ? '#ff7fbf' : r() < 0.7 ? '#ffb6da' : '#f3e2ff', cl: 1 + (r() * 3 | 0) });
+                    }
+                    this._keeperFlowers = F;
+                }
+                for (const f of this._keeperFlowers) {
+                    if (f.x < V.x0 || f.x > V.x1 || f.y < V.y0 || f.y > V.y1) continue;
+                    const sway = Math.sin(t * 1.4 + f.ph + f.y * 0.004) * 1.6;
+                    ctx.strokeStyle = '#2e5a30'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(f.x, f.y + 5); ctx.lineTo(f.x + sway, f.y); ctx.stroke();
+                    for (let k = 0; k < f.cl; k++) {
+                        const x = f.x + sway + (k - 1) * 3.2, y = f.y - (k % 2) * 2.4;
+                        ctx.fillStyle = f.c; ctx.beginPath(); ctx.arc(x, y, f.s, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#fff2c0'; ctx.beginPath(); ctx.arc(x, y, f.s * 0.35, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+            },
+
+            _pathX(y) {
+                const P = KEEPER.PATH;
+                for (let i = 0; i < P.length - 1; i++) { const [x0, y0] = P[i], [x1, y1] = P[i + 1]; if (y <= y0 && y >= y1) return x0 + (x1 - x0) * (y0 - y) / (y0 - y1); }
+                return 900;
+            },
+
+            _paintKeeperParlor() {
+                const { w: W, h: H } = KEEPER.PARLOR;
+                const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+                const c = cv.getContext('2d'), r = seededRandom(212), GOLD = '#e8c27a';
+                // Checkerboard tiles, black and ivory, a soft sheen across them
+                const T = 44;
+                for (let y = 0; y < H; y += T) for (let x = 0; x < W; x += T) {
+                    const dark = ((x / T) + (y / T)) % 2 === 0, v = r() * 8 | 0;
+                    c.fillStyle = dark ? `rgb(${16 + v},${13 + v},${18 + v})` : `rgb(${178 + v},${168 + v},${152 + v})`; c.fillRect(x, y, T, T);
+                }
+                c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 1;
+                for (let x = 0; x <= W; x += T) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); } for (let y = 0; y <= H; y += T) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+                const sheen = c.createLinearGradient(0, 0, W, H); sheen.addColorStop(0, 'rgba(255,255,255,0.05)'); sheen.addColorStop(0.5, 'rgba(255,255,255,0)'); sheen.addColorStop(1, 'rgba(0,0,0,0.12)'); c.fillStyle = sheen; c.fillRect(0, 0, W, H);
+                // The rug under the seats: burgundy, a gold border, a medallion
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(284, 164, 400, 330);
+                c.fillStyle = '#4a0c1a'; c.fillRect(280, 160, 400, 330);
+                c.strokeStyle = GOLD; c.lineWidth = 2; c.strokeRect(290, 170, 380, 310); c.lineWidth = 1; c.strokeRect(298, 178, 364, 294);
+                c.strokeStyle = 'rgba(232,194,122,0.45)'; c.beginPath(); c.ellipse(480, 325, 90, 70, 0, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.ellipse(480, 325, 60, 46, 0, 0, Math.PI * 2); c.stroke();
+                for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8; c.beginPath(); c.moveTo(480 + Math.cos(a) * 60, 325 + Math.sin(a) * 46); c.lineTo(480 + Math.cos(a) * 90, 325 + Math.sin(a) * 70); c.stroke(); }
+                // Walls: dark panelled wood, a band of wallpaper, a gold picture rail
+                const wall = (x, y, w, h) => { c.fillStyle = '#1a0e10'; c.fillRect(x, y, w, h); c.fillStyle = '#2a1418'; c.fillRect(x + 3, y + 3, w - 6, h - 6); };
+                wall(0, 0, W, 40); wall(0, H - 30, W, 30); wall(0, 0, 30, H); wall(W - 30, 0, 30, H);
+                c.fillStyle = 'rgba(232,194,122,0.5)'; c.fillRect(30, 38, W - 60, 2); c.fillRect(28, 40, 2, H - 70); c.fillRect(W - 30, 40, 2, H - 70); c.fillRect(30, H - 32, W - 60, 2);
+                // The window in the chimney breast, above the fire: the pink-violet sky (stars painted in the glow pass)
+                c.fillStyle = '#3a2a36'; c.fillRect(356, 0, 188, 98);                                       // stone breast
+                for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(${90 + r() * 40 | 0},${76 + r() * 30 | 0},${90 + r() * 30 | 0},0.6)`; c.fillRect(356 + r() * 176, r() * 90, 10 + r() * 14, 7 + r() * 6); }
+                const sk = c.createLinearGradient(0, 4, 0, 34); sk.addColorStop(0, '#5a2a6a'); sk.addColorStop(1, '#b0508a'); c.fillStyle = sk; c.fillRect(392, 4, 116, 30);
+                c.strokeStyle = GOLD; c.lineWidth = 2; c.strokeRect(392, 4, 116, 30); c.beginPath(); c.moveTo(450, 4); c.lineTo(450, 34); c.stroke();
+                // The mantle and the firebox
+                c.fillStyle = '#5a4a44'; c.fillRect(366, 38, 168, 12);
+                c.fillStyle = '#0c0606'; c.fillRect(398, 50, 104, 44);
+                c.fillStyle = '#2a1a16'; c.fillRect(410, 80, 80, 8);                                          // the grate
+                c.fillStyle = '#4a3a34'; c.fillRect(380, 94, 140, 16);                                        // the hearthstone
+                // The Keeper's wingback: red velvet, facing the fire
+                const K = KEEPER.PARLOR.keeper;
+                c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(K.x - 34, K.y - 26, 74, 66);
+                c.fillStyle = '#8a1424'; c.fillRect(K.x - 32, K.y - 30, 64, 60);
+                c.fillStyle = '#6a0c1a'; c.fillRect(K.x - 36, K.y + 18, 72, 16);                                // the high back, behind her
+                c.fillRect(K.x - 38, K.y - 30, 12, 54); c.fillRect(K.x + 26, K.y - 30, 12, 54);                // the wings/arms
+                c.strokeStyle = 'rgba(232,194,122,0.35)'; c.lineWidth = 1; c.strokeRect(K.x - 32, K.y - 30, 64, 60);
+                for (const [bx, by] of [[-18, -10], [0, -10], [18, -10], [-9, 6], [9, 6]]) { c.fillStyle = '#5a0a16'; c.beginPath(); c.arc(K.x + bx, K.y + by, 1.6, 0, Math.PI * 2); c.fill(); }
+                // The Traveller's chesterfield, burgundy, a little off to her right, turned toward her and the fire
+                const Tr = KEEPER.PARLOR.traveler;
+                c.save(); c.translate(Tr.x, Tr.y); c.rotate(-0.45);
+                c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(-34, -58, 74, 124);
+                c.fillStyle = '#5a1020'; c.fillRect(-30, -60, 62, 120);
+                c.fillStyle = '#420a18'; c.fillRect(22, -62, 16, 124); c.fillRect(-32, -66, 70, 12); c.fillRect(-32, 54, 70, 12);
+                c.fillStyle = '#6a1628'; c.fillRect(-26, -54, 46, 52); c.fillRect(-26, 2, 46, 52);
+                for (let y = -54; y < 56; y += 12) for (const x of [26, 32]) { c.fillStyle = '#2a0610'; c.beginPath(); c.arc(x, y, 1.3, 0, Math.PI * 2); c.fill(); }
+                c.restore();
+                // The side table between them: tea for two, a candle
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.arc(563, 214, 22, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#3a2418'; c.beginPath(); c.arc(560, 210, 22, 0, Math.PI * 2); c.fill(); c.strokeStyle = GOLD; c.lineWidth = 1; c.stroke();
+                for (const [x, y] of [[552, 204], [569, 216]]) { c.fillStyle = '#f0e8e0'; c.beginPath(); c.arc(x, y, 5, 0, Math.PI * 2); c.fill(); c.fillStyle = '#7a4a2a'; c.beginPath(); c.arc(x, y, 3.2, 0, Math.PI * 2); c.fill(); }
+                c.fillStyle = '#e8dcc0'; c.fillRect(562, 198, 4, 4);
+                // Bookshelves along the west wall, spines of every colour
+                for (let y = 90; y < 560; y += 70) {
+                    c.fillStyle = '#2a1810'; c.fillRect(32, y, 38, 64);
+                    for (let x = 34; x < 68; x += 4 + (r() * 3 | 0)) { c.fillStyle = ['#6a1a24', '#2a3a5a', '#3a5a3a', '#6a5a2a', '#4a2a5a', '#8a6a3a'][r() * 6 | 0]; c.fillRect(34, y + 2 + (x - 34) * 1.8, 34, 1.6); }
+                }
+                // Trinkets from other realms: a brass orrery on a stand, a stack of old maps, a sleeping crystal
+                c.fillStyle = '#2a1810'; c.beginPath(); c.arc(170, 600, 24, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = GOLD; c.lineWidth = 1; for (const rr of [8, 14, 20]) { c.beginPath(); c.arc(170, 600, rr, 0, Math.PI * 2); c.stroke(); }
+                c.fillStyle = '#d9c9a0'; c.fillRect(760, 560, 60, 44); c.strokeStyle = 'rgba(80,60,40,0.6)'; c.strokeRect(760, 560, 60, 44); c.fillStyle = '#c9b890'; c.fillRect(766, 552, 52, 40);
+                // A side window on the east wall (the cool draught comes from here)
+                c.fillStyle = '#3a2a4a'; c.fillRect(W - 30, 210, 30, 180); c.fillStyle = '#6a3a7a'; c.fillRect(W - 24, 216, 18, 168);
+                c.strokeStyle = GOLD; c.strokeRect(W - 24, 216, 18, 168); c.beginPath(); c.moveTo(W - 24, 300); c.lineTo(W - 6, 300); c.stroke();
+                // Candles on the mantle and a tall stand by the shelves
+                for (const [x, y] of [[374, 42], [526, 42], [96, 620]]) { c.fillStyle = '#efe4cc'; c.fillRect(x - 2, y - 2, 4, 6); }
+                // The door, south, closed
+                c.fillStyle = '#2a1a14'; c.fillRect(410, H - 30, 80, 30); c.fillStyle = GOLD; c.fillRect(478, H - 18, 3, 3);
+                return cv;
+            },
+
+            /** An ember pops in the parlor fire: a burst of sparks and a surge of warmth (the scene calls this). */
+            keeperEmberPop(n = 14) {
+                const F = KEEPER.PARLOR.fire;
+                this._keeperSurge = 1;
+                const S = this._keeperSparks || (this._keeperSparks = []);
+                for (let i = 0; i < n; i++) S.push({ x: F.x + (Math.random() - 0.5) * 50, y: F.y + 10, vx: (Math.random() - 0.5) * 2.6, vy: 0.6 + Math.random() * 2.4, life: 30 + Math.random() * 40 });
+            },
+
+            /** After the darkness: the glowing things. */
+            drawKeeperGlow(ctx) {
+                const id = this.activeMap.id, t = _gameTimeSec;
+                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                if (id === 'keepers_hill') {
+                    const V = this._keeperView(200);
+                    // Portals breathing over the cloud sea, planets turning round the hill
+                    const P = [[300, 700, 70, '190, 120, 255'], [1560, 1150, 90, '232, 194, 122'], [260, 1900, 60, '255, 120, 200'], [1520, 2350, 80, '160, 140, 255'], [1600, 380, 50, '255, 170, 220']];
+                    for (const [x0, y0, R, rgb] of P) {
+                        const x = x0 + Math.sin(t * 0.1 + y0) * 20, y = y0 + Math.cos(t * 0.13 + x0) * 14;
+                        if (x < V.x0 || x > V.x1 || y < V.y0 || y > V.y1) continue;
+                        const br = 0.75 + 0.25 * Math.sin(t * 0.9 + x0);
+                        glow(x, y, R * 2.2, rgb, 0.18 * br);
+                        ctx.globalAlpha = 0.7 * br; ctx.strokeStyle = `rgb(${rgb})`; ctx.lineWidth = 3;
+                        ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.55, Math.sin(t * 0.05 + x0) * 0.4, 0, Math.PI * 2); ctx.stroke();
+                        ctx.globalAlpha = 0.35 * br; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y, R * 0.8, R * 0.42, Math.sin(t * 0.05 + x0) * 0.4 + 0.2, t * 0.5, t * 0.5 + 4.5); ctx.stroke();
+                    }
+                    ctx.globalCompositeOperation = 'source-over';
+                    const PL = [[1450, 1600, 64, '#6a4ab0', '#c9a8ff', 0.05], [360, 1200, 40, '#b0506a', '#ffb0c8', 0.08], [1380, 520, 28, '#4a8a9a', '#a8f0ff', 0.11], [480, 2500, 52, '#8a6a3a', '#ffe0a0', 0.04]];
+                    for (const [cx, cy, R, base, rim, sp] of PL) {
+                        const a = t * sp, x = cx + Math.cos(a) * 40, y = cy + Math.sin(a) * 26;
+                        if (x < V.x0 - R || x > V.x1 + R || y < V.y0 - R || y > V.y1 + R) continue;
+                        ctx.globalAlpha = 0.9;
+                        const g = ctx.createRadialGradient(x - R * 0.35, y - R * 0.35, R * 0.1, x, y, R);
+                        g.addColorStop(0, rim); g.addColorStop(0.55, base); g.addColorStop(1, '#0a0614');
+                        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+                        if (R > 50) { ctx.strokeStyle = 'rgba(232,210,255,0.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y, R * 1.6, R * 0.35, -0.3, 0, Math.PI * 2); ctx.stroke(); }
+                    }
+                    ctx.globalCompositeOperation = 'lighter';
+                    // The house: warm windows in the dormers, the porch lantern, the runes along the ridge, the blossoms
+                    for (const dx of [760, 980]) glow(dx + 30, 637, 34, '255, 190, 120', 0.55 + 0.05 * Math.sin(t * 3 + dx));
+                    for (const [x, y] of [[700, 600], [700, 520], [1130, 600], [1130, 520], [900, 668]]) glow(x, y, 46, '255, 180, 110', 0.22);
+                    glow(900, 732, 60, '255, 200, 130', 0.5 + 0.06 * Math.sin(t * 7));
+                    for (let i = 0; i < 12; i++) { const x = 710 + i * 36, a = 0.35 + 0.3 * Math.sin(t * 1.3 + i * 0.9); glow(x, 555, 9, '232, 194, 122', a); }
+                    glow(640, 560, 80, '190, 140, 255', 0.22 + 0.06 * Math.sin(t * 0.8));        // light leaking from under the floating gable
+                    const R = seededRandom(33);
+                    for (let i = 0; i < 26; i++) { const side = R() < 0.5, x = side ? 690 + R() * 30 : 1100 + R() * 30, y = 450 + R() * 210; glow(x, y, 5, '230, 220, 255', 0.3 + 0.2 * Math.sin(t * 2 + i)); }
+                    // Chimney smoke, faintly lit from below
+                    for (let i = 0; i < 7; i++) { const ph = ((t * 0.12 + i / 7) % 1), x = 1046 + ph * 90 + Math.sin(t + i) * 8, y = 480 - ph * 160; glow(x, y, 14 + ph * 40, '200, 150, 230', 0.16 * (1 - ph)); }
+                    // Fireflies over the field
+                    for (let i = 0; i < 40; i++) {
+                        const bx = 480 + ((i * 97) % 880), by = 300 + ((i * 241) % 2150), x = bx + Math.sin(t * 0.6 + i) * 30, y = by + Math.cos(t * 0.45 + i * 1.7) * 22;
+                        if (x < V.x0 || x > V.x1 || y < V.y0 || y > V.y1) continue;
+                        glow(x, y, 7, '220, 255, 170', 0.5 * Math.max(0, Math.sin(t * 1.7 + i * 2.1)));
+                    }
+                } else if (id === 'keepers_parlor') {
+                    const F = KEEPER.PARLOR.fire, s = (this._keeperSurge || 0);
+                    const flick = 0.82 + 0.1 * Math.sin(t * 7.3) * Math.sin(t * 3.1) + 0.08 * Math.sin(t * 13.7);
+                    // The fire's light on the tiles and the room, and a surge when an ember pops
+                    glow(F.x, F.y + 30, 480, '255, 120, 50', (0.06 + 0.08 * s) * flick);
+                    glow(F.x, F.y + 20, 150, '255, 150, 70', (0.14 + 0.2 * s) * flick);
+                    // The flames themselves
+                    for (let i = 0; i < 9; i++) {
+                        const x = 414 + i * 9 + Math.sin(t * 5 + i) * 2, h = 9 + 7 * Math.abs(Math.sin(t * (3 + i * 0.4) + i));
+                        ctx.globalAlpha = 0.5; const g = ctx.createRadialGradient(x, 84 - h * 0.5, 0.5, x, 84 - h * 0.5, h);
+                        g.addColorStop(0, 'rgba(255,230,160,0.8)'); g.addColorStop(0.45, 'rgba(255,130,50,0.45)'); g.addColorStop(1, 'rgba(200,40,10,0)');
+                        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, 84 - h * 0.45, 4, h * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+                    }
+                    glow(450, 84, 26, '255, 90, 30', 0.35);
+                    // Sparks from a popped ember
+                    const S = this._keeperSparks || [];
+                    for (let i = S.length - 1; i >= 0; i--) {
+                        const p = S[i]; p.x += p.vx; p.y += p.vy; p.vy *= 0.97; p.vx *= 0.98; p.life--;
+                        if (p.life <= 0) { S.splice(i, 1); continue; }
+                        glow(p.x, p.y, 4, '255, 200, 110', Math.min(1, p.life / 25));
+                    }
+                    if (this._keeperSurge) this._keeperSurge = Math.max(0, this._keeperSurge - 0.012);
+                    // Candles
+                    for (const [x, y] of [[374, 40], [526, 40], [96, 618], [564, 200]]) glow(x, y, 16, '255, 200, 130', 0.35 * (0.85 + 0.15 * Math.sin(t * 9 + x)));
+                    // The window above the fire: stars, a portal ring, and the deep pink-violet night
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.save(); ctx.beginPath(); ctx.rect(392, 4, 116, 30); ctx.clip();
+                    const R = seededRandom(51);
+                    for (let i = 0; i < 26; i++) { ctx.globalAlpha = 0.4 + 0.5 * Math.abs(Math.sin(t * 1.3 + i)); ctx.fillStyle = '#fff4ff'; ctx.fillRect(392 + R() * 116, 4 + R() * 30, 1, 1); }
+                    ctx.globalAlpha = 0.7; ctx.strokeStyle = '#ffc0e8'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(482, 16, 9, 5, 0.3, 0, Math.PI * 2); ctx.stroke();
+                    ctx.fillStyle = '#e8c0ff'; ctx.beginPath(); ctx.arc(412, 22 + Math.sin(t * 0.2) * 2, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                    ctx.globalCompositeOperation = 'lighter';
+                    glow(450, 20, 70, '200, 110, 200', 0.08);
+                    glow(870, 300, 110, '120, 150, 255', 0.07);
+                    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.fillStyle = '#000';   // nothing beyond the room's walls
+                    const { w: PW, h: PH } = KEEPER.PARLOR; ctx.fillRect(-3000, -3000, PW + 6000, 3000); ctx.fillRect(-3000, PH, PW + 6000, 3000); ctx.fillRect(-3000, 0, 3000, PH); ctx.fillRect(PW, 0, 3000, PH);                   // the cool draught at the east window
+                }
+                ctx.restore();
+            }
+        });
         // GameEngine — Lighting, bloom, wet reflections, atmosphere.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -53612,7 +55097,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     e.preventDefault(); if (J.active) return;
                     const touch = e.changedTouches[0];
                     // Keep the whole ring on screen: shift the stick's centre in from the edges
-                    const ox = Math.max(EDGE, Math.min(window.innerWidth - EDGE, touch.clientX)), oy = Math.max(EDGE, Math.min(window.innerHeight - EDGE, touch.clientY));
+                    const ox = Math.max(EDGE, Math.min(window.innerWidth - EDGE, touch.clientX)), EY = Math.min(EDGE, window.innerHeight * 0.24), oy = Math.max(EY, Math.min(window.innerHeight - EY, touch.clientY));   // a short (landscape) screen: less margin top and bottom
                     J.id = touch.identifier; J.active = true; J.originX = ox; J.originY = oy; J.dx = 0; J.dy = 0; J.armed = true;
                     J.landX = touch.clientX; J.landY = touch.clientY;      // drags count from where the thumb landed
                     J.trail = [{ x: 0, y: 0, t: performance.now() }];
@@ -54084,8 +55569,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // SHOW the Game Canvas
                 document.getElementById('game-container').style.display = 'block';
                 
-                // Start the Engine & Story
-                game.story.startPrologue(); 
+                // Start the Engine & Story: the prologue (story/scenes/prologue.js), then chapter 1
+                game.scenes.play('prologue').then(() => game.story.startPrologue());
                 game.running = true;
                 game.loop();
             }, 500); 
@@ -54123,12 +55608,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         
             initMapControls() { 
                 const canvas = this.mapCanvas;
+                // In landscape the phone is drawn scaled down (--phone-scale): pan by what the finger covered on the phone
+                const k = () => document.body.classList.contains('landscape') ? 1 / (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--phone-scale')) || 1) : 1;
                 canvas.addEventListener('wheel', (e) => { e.preventDefault(); const zoomSpeed = 0.1; const direction = e.deltaY > 0 ? -1 : 1; let newZoom = this.mapView.zoom + (direction * zoomSpeed * this.mapView.zoom); newZoom = Math.max(0.5, Math.min(newZoom, 8.0)); this.mapView.zoom = newZoom; this.drawMap(); });
                 canvas.addEventListener('mousedown', (e) => { this.mapView.isDragging = true; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; canvas.style.cursor = 'grabbing'; });
-                window.addEventListener('mousemove', (e) => { if (!this.mapView.isDragging || this.overlay.style.display === 'none') return; const dx = e.clientX - this.mapView.lastX; const dy = e.clientY - this.mapView.lastY; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; this.mapView.offsetX += dx; this.mapView.offsetY += dy; this.drawMap(); });
+                window.addEventListener('mousemove', (e) => { if (!this.mapView.isDragging || this.overlay.style.display === 'none') return; const dx = e.clientX - this.mapView.lastX; const dy = e.clientY - this.mapView.lastY; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; this.mapView.offsetX += dx * k(); this.mapView.offsetY += dy * k(); this.drawMap(); });
                 window.addEventListener('mouseup', () => { this.mapView.isDragging = false; canvas.style.cursor = 'default'; });
                 canvas.addEventListener('touchstart', (e) => { if (e.touches.length === 1) { this.mapView.isDragging = true; this.mapView.lastX = e.touches[0].clientX; this.mapView.lastY = e.touches[0].clientY; } else if (e.touches.length === 2) { this.mapView.isDragging = false; const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; this.mapView.lastPinchDist = Math.hypot(dx, dy); } });
-                canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (e.touches.length === 1 && this.mapView.isDragging) { const dx = e.touches[0].clientX - this.mapView.lastX; const dy = e.touches[0].clientY - this.mapView.lastY; this.mapView.lastX = e.touches[0].clientX; this.mapView.lastY = e.touches[0].clientY; this.mapView.offsetX += dx; this.mapView.offsetY += dy; this.drawMap(); } else if (e.touches.length === 2) { const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; const currentDist = Math.hypot(dx, dy); if (this.mapView.lastPinchDist > 0) { const zoomFactor = currentDist / this.mapView.lastPinchDist; let newZoom = this.mapView.zoom * zoomFactor; newZoom = Math.max(0.5, Math.min(newZoom, 8.0)); this.mapView.zoom = newZoom; this.drawMap(); } this.mapView.lastPinchDist = currentDist; } });
+                canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (e.touches.length === 1 && this.mapView.isDragging) { const dx = e.touches[0].clientX - this.mapView.lastX; const dy = e.touches[0].clientY - this.mapView.lastY; this.mapView.lastX = e.touches[0].clientX; this.mapView.lastY = e.touches[0].clientY; this.mapView.offsetX += dx * k(); this.mapView.offsetY += dy * k(); this.drawMap(); } else if (e.touches.length === 2) { const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; const currentDist = Math.hypot(dx, dy); if (this.mapView.lastPinchDist > 0) { const zoomFactor = currentDist / this.mapView.lastPinchDist; let newZoom = this.mapView.zoom * zoomFactor; newZoom = Math.max(0.5, Math.min(newZoom, 8.0)); this.mapView.zoom = newZoom; this.drawMap(); } this.mapView.lastPinchDist = currentDist; } });
                 canvas.addEventListener('touchend', (e) => { if (e.touches.length < 2) this.mapView.lastPinchDist = 0; if (e.touches.length === 0) this.mapView.isDragging = false; if (e.touches.length === 1) { this.mapView.isDragging = true; this.mapView.lastX = e.touches[0].clientX; this.mapView.lastY = e.touches[0].clientY; } });
             },
         
@@ -55906,7 +57393,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             checkMobile() {
-                const isMobile = window.innerWidth <= this.mobileBreakpoint;
+                const isMobile = window.innerWidth <= this.mobileBreakpoint || (window.innerWidth > window.innerHeight && window.innerHeight <= 540);   // or a phone on its side
                 
                 if (isMobile) {
                     // Auto-collapse on mobile
@@ -56680,6 +58167,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 syncAmbienceSliders();
                 this._updateValueEl('set-fullscreen', !FullscreenManager.supported()
                     ? 'n/a' : (FullscreenManager.isActive() ? 'on' : 'off'));
+                this._updateValueEl('set-orientation', OrientationManager.label());
                 this._updateValueEl('set-fps', GameSettings.fpsLimit === 0 ? 'none' : String(GameSettings.fpsLimit));
             }
             
@@ -56734,6 +58222,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (FullscreenManager.isActive()) FullscreenManager.exit();
                     else FullscreenManager.enter();
                     
+                } else if (key === 'orientation') {
+                    // Inside the tap: if we're fullscreen the lock takes at once, otherwise on the next fullscreen
+                    if (OrientationManager.supported()) OrientationManager.cycle();
+                    this._updateValueEl(el.id, OrientationManager.label());
+
                 } else if (key === 'audioEnabled') {
                     audioSys.setEnabled(!GameSettings.audioEnabled);
                     this._updateValueEl(el.id, GameSettings.audioEnabled ? 'on' : 'off');

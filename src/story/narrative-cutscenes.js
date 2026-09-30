@@ -303,6 +303,7 @@
             }
         
             update() {
+                if (this.game.scenes && this.game.scenes.running) return;   // the story waits while a scene plays
                 if (this.state.part === 1) {
                     this.checkOverrides(); 
                 }
