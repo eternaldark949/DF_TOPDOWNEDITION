@@ -101,7 +101,7 @@
                 });
             },
 
-            _dnK(z) { const C = leanCamHeight(); return C / (C - Math.min(z, C * 0.86)); },
+            _dnK(z) { return LandmarkKit.k(z); },
             _dnP(x, y, z) { const cam = game.camera, k = this._dnK(z); return [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k]; },
             _dnH() { return DN.FLOORS * CONFIG.BUILDINGS.FLOOR_HEIGHT; },
 
@@ -224,145 +224,190 @@
             },
 
             // ── Top pass (over the entities) ─────────────────────────────────
-            /** Draw an extruded shape: the walls that face the camera (far first), then the roof. */
-            _dnExtrude(ctx, sh, z0, z1, wallPaint, roofPaint) {
-                const cam = game.camera, P = (p, z) => z ? this._dnP(p[0], p[1], z) : p;
-                const vis = sh.edges.filter(e => (cam.x - e.mx) * e.nx + (cam.y - e.my) * e.ny > 0)
-                    .sort((a, b) => Math.hypot(b.mx - cam.x, b.my - cam.y) - Math.hypot(a.mx - cam.x, a.my - cam.y));
-                for (const e of vis) wallPaint(ctx, e, P(e.a, z0), P(e.b, z0), P(e.b, z1), P(e.a, z1));
-                if (roofPaint) {
-                    ctx.beginPath(); sh.pts.forEach((p, i) => { const q = P(p, z1); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.closePath();
-                    roofPaint(ctx);
-                }
-                return vis;
+            // Built on the landmark kit (buildings/landmark-kit.js): the roofs, the atrium's
+            // glass and the canopy slab draw in their height's plane from cached paths and gradients;
+            // floor lines are one path stroked per floor; fins, ledges, the plinth and the
+            // penthouse verandas are batched; the lean is only projected where it must be.
+
+            /** The walls facing the camera, far first (and each edge's outward normal). */
+            _dnVisible(sh) {
+                const cam = game.camera;
+                return sh.edges.filter(e => (cam.x - e.mx) * e.nx + (cam.y - e.my) * e.ny > 0)
+                    .sort((a, b) => ((b.mx - cam.x) ** 2 + (b.my - cam.y) ** 2) - ((a.mx - cam.x) ** 2 + (a.my - cam.y) ** 2));
             },
 
-            _dnTowerWalls(ctx, sh, H) {
-                const C = DN.C, FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, cam = game.camera;
-                const floors = [];
-                const vis = this._dnExtrude(ctx, sh, 0, H, (c, e, a, b, bT, aT) => {
-                    const lit = 0.5 + 0.5 * Math.max(0, e.ny * 0.6 - e.nx * 0.4);                  // a little lighter where it faces south-west
-                    const g = c.createLinearGradient(a[0], a[1], aT[0], aT[1]);
-                    g.addColorStop(0, C.lacquer); g.addColorStop(1, lit > 0.7 ? C.lacquerHi : '#1a0c14');
-                    c.fillStyle = g; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(bT[0], bT[1]); c.lineTo(aT[0], aT[1]); c.closePath(); c.fill();
-                }, null);
-                // Spandrels (crimson bands with a gold lip) every floor, mullions at each facet: one path each
-                ctx.save();
-                ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(160, 24, 58, 0.55)'; ctx.beginPath();
-                for (const e of vis) for (let f = 1; f < DN.FLOORS; f++) { const p = this._dnP(e.a[0], e.a[1], f * FH), q = this._dnP(e.b[0], e.b[1], f * FH); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); }
-                ctx.stroke();
-                ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(232, 194, 122, 0.45)'; ctx.beginPath();
-                for (const e of vis) { const p = e.a, t = this._dnP(p[0], p[1], H); ctx.moveTo(p[0], p[1]); ctx.lineTo(t[0], t[1]); }
-                ctx.stroke();
-                ctx.restore();
-                return vis;
+            /** Flat-shaded walls from z0 to z1 (one colour per facet by where it faces), then one height shade over them all. */
+            _dnWalls(ctx, sh, vis, z0, z1, base, lit, shadeTop) {
+                const K = LandmarkKit, k0 = K.k(z0), k1 = K.k(z1), q = [0, 0, 0, 0, 0, 0, 0, 0], all = new Path2D();
+                for (const e of vis) {
+                    K._p(q, 0, e.a[0], e.a[1], k0); K._p(q, 2, e.b[0], e.b[1], k0); K._p(q, 4, e.b[0], e.b[1], k1); K._p(q, 6, e.a[0], e.a[1], k1);
+                    const p = new Path2D(); p.moveTo(q[0], q[1]); p.lineTo(q[2], q[3]); p.lineTo(q[4], q[5]); p.lineTo(q[6], q[7]); p.closePath();
+                    ctx.fillStyle = lit && (0.5 + 0.5 * Math.max(0, e.ny * 0.6 - e.nx * 0.4)) > 0.7 ? lit : base; ctx.fill(p);
+                    all.addPath(p);
+                }
+                if (shadeTop && vis.length) {                                                   // darker at the foot, the colour at the top
+                    const c = game.camera, cx = sh.cx, cy = sh.cy, t = [c.x + (cx - c.x) * k1, c.y + (cy - c.y) * k1];
+                    const g = ctx.createLinearGradient(cx, cy, t[0], t[1]);
+                    g.addColorStop(0, 'rgba(8, 3, 6, 0.55)'); g.addColorStop(1, shadeTop);
+                    ctx.fillStyle = g; ctx.fill(all);
+                }
+                return all;
+            },
+
+            /** Wall anchors for fins: every other facet corner of the visible walls. */
+            _dnAnchors(vis) {
+                const out = [];
+                vis.forEach((e, i) => { if (i % 2 === 0) out.push({ x: e.a[0], y: e.a[1], nx: e.nx, ny: e.ny }); });
+                return out;
+            },
+
+            _dnTowerWalls(ctx, sh, key, H) {
+                const K = LandmarkKit, C = DN.C, FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, vis = this._dnVisible(sh);
+                const faceLit = (e) => e.ny * 0.6 - e.nx * 0.4 > 0.2;
+                // The plinth: the two lowest floors stand 6 px proud, dark stone with a gold lip
+                K.ledge(ctx, vis, 2 * FH, 6, 2 * FH, C.stone, '#221b1e', 'rgba(232, 194, 122, 0.45)');
+                // The walls: lacquer, lighter where they face south-west (the plinth darkens the foot)
+                this._dnWalls(ctx, sh, vis, 2 * FH, H, '#1a0c14', C.lacquerHi, null);
+                // Spandrels: one path of the visible edges, stroked at every floor
+                const edgesPath = new Path2D();
+                for (const e of vis) { edgesPath.moveTo(e.a[0], e.a[1]); edgesPath.lineTo(e.b[0], e.b[1]); }
+                const floorKs = [];
+                for (let f = 3; f < DN.FLOORS; f++) if (f % 3) floorKs.push(K.k(f * FH));
+                K.rings(ctx, edgesPath, floorKs, 1.1, 'rgba(160, 24, 58, 0.55)');
+                // Fins: gilt-edged lacquer plates standing out at the facet corners, the full height
+                K.fins(ctx, this._dnAnchors(vis), 2 * FH, H, 2.2, 2.5, C.lacquerHi, 'rgba(232, 194, 122, 0.35)', a => faceLit(a) ? 1 : 0);
+                // Ledges every third floor: a crimson band with a gold lip
+                const lips = [];
+                for (let f = 3; f < DN.FLOORS; f += 3) lips.push(K.ledge(ctx, vis, f * FH, 3.5, 1.6, '#241019', '#4a0a1c', 'rgba(232, 194, 122, 0.3)'));
+                // The penthouse floors of the east tower: verandas along the south faces
+                let rails = null;
+                if (key === 'e') {
+                    const south = vis.filter(e => e.ny > 0.35);
+                    rails = K.veranda(ctx, south, (DN.FLOORS - 2) * FH, 7, 5, 4, '#3a1a2c', '#1c0c16', 'rgba(232, 194, 122, 0.75)');
+                }
+                return { vis, lips, rails, edgesPath };
+            },
+
+            /** A tower's roof in its plane: lacquer, gold parapet, art-deco fins, the crimson band; the helipad on the west. */
+            _dnRoof(ctx, sh, key, k) {
+                const K = LandmarkKit, C = DN.C, G = this._dnGeo();
+                const outline = K.path(this, 'roof_' + key, p => { sh.pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; });
+                const fins = K.path(this, 'fins_' + key, p => {
+                    const n = sh.outer.length, inner = sh.pts.slice(n).reverse();
+                    for (let i = 2; i < n - 2; i += 2) {
+                        const o = sh.outer[i], j = Math.round(i / (n - 1) * (inner.length - 1)), q = inner[Math.max(0, Math.min(inner.length - 1, j))];
+                        p.moveTo(o[0], o[1]); p.lineTo(o[0] + (q[0] - o[0]) * 0.8, o[1] + (q[1] - o[1]) * 0.8);
+                    }
+                    return p;
+                });
+                const band = K.path(this, 'band_' + key, p => { sh.outer.forEach((q, i) => { const x = sh.cx + (q[0] - sh.cx) * 0.95, y = sh.cy + (q[1] - sh.cy) * 0.95; i ? p.lineTo(x, y) : p.moveTo(x, y); }); return p; });
+                const g = K.grad(this, 'roof_' + key, () => { const g = ctx.createRadialGradient(sh.cx, sh.cy, 10, sh.cx, sh.cy, 220); g.addColorStop(0, '#3a1a2c'); g.addColorStop(0.7, '#1c0c16'); g.addColorStop(1, '#12080e'); return g; });
+                K.flat(ctx, k, (c) => {
+                    c.fillStyle = g; c.fill(outline);
+                    c.strokeStyle = C.gold; c.lineWidth = 2.2; c.stroke(outline);
+                    c.strokeStyle = 'rgba(232, 194, 122, 0.28)'; c.lineWidth = 1; c.stroke(fins);
+                    c.strokeStyle = 'rgba(160, 20, 56, 0.6)'; c.lineWidth = 2; c.stroke(band);
+                    if (key === 'w') {                                                         // the helipad
+                        const [hx, hy] = G.helipad;
+                        c.fillStyle = '#1d1419'; c.beginPath(); c.arc(hx, hy, 40, 0, Math.PI * 2); c.fill();
+                        c.strokeStyle = C.gold; c.lineWidth = 2; c.stroke();
+                        c.font = '600 26px Montserrat, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(232,194,122,0.85)'; c.fillText('H', hx, hy + 1);
+                    }
+                });
+            },
+
+            /** The atrium's glass roof in its plane (by day; and lit, for the night pass). */
+            _dnAtriumRoof(ctx, lit) {
+                const K = LandmarkKit, C = DN.C, L = this._dnGeo().lens;
+                const outline = K.path(this, 'lens', p => { L.pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; });
+                const ribs = K.path(this, 'ribs', p => { for (let i = 0; i < L.pts.length; i += 2) { p.moveTo(L.cx, L.cy); p.lineTo(L.pts[i][0], L.pts[i][1]); } return p; });
+                const emblem = K.path(this, 'emblem', p => { for (const s of [-1, 1]) { const a0 = s < 0 ? Math.PI * 0.35 : -Math.PI * 0.65; p.moveTo(L.cx + s * 8 + Math.cos(a0) * 26, L.cy + Math.sin(a0) * 26); p.arc(L.cx + s * 8, L.cy, 26, a0, s < 0 ? Math.PI * 1.65 : Math.PI * 0.65); } return p; });
+                const g = lit ? K.grad(this, 'lens_lit', () => { const g = ctx.createRadialGradient(L.cx, L.cy, 6, L.cx, L.cy, 170); g.addColorStop(0, 'rgba(255, 206, 140, 0.3)'); g.addColorStop(0.6, 'rgba(255, 160, 110, 0.1)'); g.addColorStop(1, 'rgba(255,150,100,0)'); return g; })
+                              : K.grad(this, 'lens', () => { const g = ctx.createRadialGradient(L.cx, L.cy, 10, L.cx, L.cy, 190); g.addColorStop(0, '#3a2530'); g.addColorStop(1, C.glass); return g; });
+                K.flat(ctx, K.k(DN.ATRIUM_Z), (c) => {
+                    c.fillStyle = g; c.fill(outline);
+                    if (!lit) { c.strokeStyle = C.gold; c.lineWidth = 1.6; c.stroke(outline); }
+                    c.strokeStyle = lit ? 'rgba(255,225,170,0.22)' : 'rgba(232,194,122,0.3)'; c.lineWidth = 0.8; c.stroke(ribs);
+                    c.lineWidth = 2; c.strokeStyle = lit ? 'rgba(255,236,190,0.9)' : C.gold; c.stroke(emblem);
+                });
             },
 
             _dnDrawTop(ctx) {
-                const G = this._dnGeo(), C = DN.C, H = this._dnH();
+                const G = this._dnGeo(), C = DN.C, H = this._dnH(), K = LandmarkKit;
                 ctx.save();
                 // The atrium first (low), then the towers over it
-                this._dnExtrude(ctx, G.lens, 0, DN.ATRIUM_Z, (c, e, a, b, bT, aT) => {
-                    c.fillStyle = '#1b1017'; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(bT[0], bT[1]); c.lineTo(aT[0], aT[1]); c.closePath(); c.fill();
-                    c.strokeStyle = 'rgba(232,194,122,0.35)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(aT[0], aT[1]); c.lineTo(bT[0], bT[1]); c.stroke();
-                }, (c) => {
-                    const cp = this._dnP(G.lens.cx, G.lens.cy, DN.ATRIUM_Z);
-                    const g = c.createRadialGradient(cp[0], cp[1], 10, cp[0], cp[1], 190);
-                    g.addColorStop(0, '#3a2530'); g.addColorStop(1, C.glass); c.fillStyle = g; c.fill();
-                    c.strokeStyle = C.gold; c.lineWidth = 1.6; c.stroke();
-                });
-                this._dnAtriumRibs(ctx, G, false);
+                const lv = this._dnVisible(G.lens);
+                const aw = this._dnWalls(ctx, G.lens, lv, 0, DN.ATRIUM_Z, '#1b1017', null, null);
+                K.rings(ctx, (() => { const p = new Path2D(); for (const e of lv) { p.moveTo(e.a[0], e.a[1]); p.lineTo(e.b[0], e.b[1]); } return p; })(), [K.k(DN.ATRIUM_Z)], 0.8, 'rgba(232,194,122,0.35)');
+                this._dnAtriumRoof(ctx, false);
                 this._dnCanopy(ctx, G, false);
+                this._dnTop = {};
                 for (const [sh, key] of [[G.west, 'w'], [G.east, 'e']]) {
-                    this._dnTowerWalls(ctx, sh, H);
-                    // The roof: lacquer with a gold parapet and a crimson inner band
-                    ctx.beginPath(); sh.pts.forEach((p, i) => { const q = this._dnP(p[0], p[1], H); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.closePath();
-                    const cp = this._dnP(sh.cx, sh.cy, H), g = ctx.createRadialGradient(cp[0], cp[1], 10, cp[0], cp[1], 220);
-                    g.addColorStop(0, '#3a1a2c'); g.addColorStop(0.7, '#1c0c16'); g.addColorStop(1, '#12080e'); ctx.fillStyle = g; ctx.fill();
-                    ctx.strokeStyle = C.gold; ctx.lineWidth = 2.2; ctx.stroke();
-                    // Art-deco fins across the crown, outer arc to inner arc, and a crimson band just inside the parapet
-                    const n = sh.outer.length, inner = sh.pts.slice(n).reverse();
-                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.28)'; ctx.lineWidth = 1; ctx.beginPath();
-                    for (let i = 2; i < n - 2; i += 2) {
-                        const o = sh.outer[i], j = Math.round(i / (n - 1) * (inner.length - 1)), q = inner[Math.max(0, Math.min(inner.length - 1, j))];
-                        const a = this._dnP(o[0], o[1], H), b = this._dnP(o[0] + (q[0] - o[0]) * 0.8, o[1] + (q[1] - o[1]) * 0.8, H);
-                        ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
-                    }
-                    ctx.stroke();
-                    ctx.beginPath(); sh.outer.forEach((p, i) => { const q = this._dnP(sh.cx + (p[0] - sh.cx) * 0.95, sh.cy + (p[1] - sh.cy) * 0.95, H); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
-                    ctx.strokeStyle = 'rgba(160, 20, 56, 0.6)'; ctx.lineWidth = 2; ctx.stroke();
+                    this._dnTop[key] = this._dnTowerWalls(ctx, sh, key, H);
+                    this._dnRoof(ctx, sh, key, K.k(H));
                     this._dnCrown(ctx, sh, key, H, false);
                 }
                 ctx.restore();
             },
 
-            /** Ribs of the atrium's glass roof, fanning from the emblem at its centre. */
-            _dnAtriumRibs(ctx, G, emissive) {
-                const z = DN.ATRIUM_Z, c0 = this._dnP(G.lens.cx, G.lens.cy, z);
-                ctx.save();
-                ctx.strokeStyle = emissive ? 'rgba(255,225,170,0.22)' : 'rgba(232,194,122,0.3)'; ctx.lineWidth = 0.8; ctx.beginPath();
-                const pts = G.lens.pts;
-                for (let i = 0; i < pts.length; i += 2) { const q = this._dnP(pts[i][0], pts[i][1], z); ctx.moveTo(c0[0], c0[1]); ctx.lineTo(q[0], q[1]); }
-                ctx.stroke();
-                // The emblem inlaid at the centre: two overlapping crescents
-                const k = this._dnK(z), r = 26 * k;
-                ctx.lineWidth = 2; ctx.strokeStyle = emissive ? 'rgba(255,236,190,0.9)' : DN.C.gold;
-                for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(c0[0] + s * 8 * k, c0[1], r, s < 0 ? Math.PI * 0.35 : -Math.PI * 0.65, s < 0 ? Math.PI * 1.65 : Math.PI * 0.65); ctx.stroke(); }
-                ctx.restore();
+            /** The canopy slab and its skylight, in the canopy's plane. */
+            _dnCanopySlab(ctx, k) {
+                const K = LandmarkKit, C = DN.C, Cn = this._dnGeo().canopy, rad = 46;
+                const slab = K.path(this, 'canopy', p => { p.roundRect(Cn.x0, Cn.y0, Cn.x1 - Cn.x0, Cn.y1 - Cn.y0, [6, 6, rad, rad]); return p; });
+                const inner = K.path(this, 'canopy_in', p => { p.roundRect(Cn.x0 + 5, Cn.y0 + 5, Cn.x1 - Cn.x0 - 10, Cn.y1 - Cn.y0 - 10, [4, 4, rad - 5, rad - 5]); return p; });
+                const g = K.grad(this, 'canopy', () => { const g = ctx.createLinearGradient(Cn.x0, Cn.y0, Cn.x0, Cn.y1); g.addColorStop(0, '#1d0c16'); g.addColorStop(1, '#2c1220'); return g; });
+                K.flat(ctx, k, (c) => {
+                    c.fillStyle = g; c.fill(slab); c.strokeStyle = C.gold; c.lineWidth = 2; c.stroke(slab);
+                    c.strokeStyle = 'rgba(160, 20, 56, 0.7)'; c.lineWidth = 1.2; c.stroke(inner);
+                    const mx = (Cn.x0 + Cn.x1) / 2; c.fillStyle = '#2a1a24'; c.fillRect(mx - 12, Cn.y0 + 14, 24, Cn.y1 - Cn.y0 - 28);
+                });
             },
 
             /** The porte-cochère: a lacquer slab on four gilt columns, a skylight down its middle. */
             _dnCanopy(ctx, G, emissive) {
-                const z = DN.CANOPY_Z, Cn = G.canopy, C = DN.C;
-                const q = [[Cn.x0, Cn.y0], [Cn.x1, Cn.y0], [Cn.x1, Cn.y1], [Cn.x0, Cn.y1]].map(([x, y]) => this._dnP(x, y, z));
+                const K = LandmarkKit, z = DN.CANOPY_Z, Cn = G.canopy, C = DN.C, kz = K.k(z);
                 // Someone under it (her, or anyone the camera follows): the slab thins to a veil so they stay in view
                 const p = game.player, cam = game.camera, fx = p && p.visible ? p.x : cam.x, fy = p && p.visible ? p.y : cam.y;
                 const under = fx > Cn.x0 - 20 && fx < Cn.x1 + 20 && fy > Cn.y0 - 10 && fy < Cn.y1 + 40;
                 this._dnFade = (this._dnFade == null ? 1 : this._dnFade) + ((under ? 0.3 : 1) - (this._dnFade == null ? 1 : this._dnFade)) * 0.12;
                 ctx.save();
-                ctx.globalAlpha *= this._dnFade;
+                ctx.globalAlpha *= this._dnFade == null ? 1 : this._dnFade;
                 if (!emissive) {
-                    ctx.strokeStyle = C.gold; ctx.lineWidth = 3.2 * this._dnK(z * 0.5);          // columns, ground to slab
-                    for (const [x, y] of G.cols) { const t = this._dnP(x, y, z); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(t[0], t[1]); ctx.stroke(); }
-                    const kz = this._dnK(z), rad = 46 * kz;
-                    ctx.beginPath(); ctx.roundRect(q[0][0], q[0][1], q[1][0] - q[0][0], q[3][1] - q[0][1], [6 * kz, 6 * kz, rad, rad]);
-                    const cg = ctx.createLinearGradient(q[0][0], q[0][1], q[0][0], q[3][1]); cg.addColorStop(0, '#1d0c16'); cg.addColorStop(1, '#2c1220');
-                    ctx.fillStyle = cg; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 2; ctx.stroke();
-                    ctx.strokeStyle = 'rgba(160, 20, 56, 0.7)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.roundRect(q[0][0] + 5 * kz, q[0][1] + 5 * kz, q[1][0] - q[0][0] - 10 * kz, q[3][1] - q[0][1] - 10 * kz, [4 * kz, 4 * kz, rad - 5 * kz, rad - 5 * kz]); ctx.stroke();
+                    K.columns(ctx, G.cols, 2.6, 0, z, C.gold, C.goldHi);                      // gilt columns, ground to slab
+                    this._dnCanopySlab(ctx, kz);
+                } else {
+                    const mx = (Cn.x0 + Cn.x1) / 2, [ax, ay] = this._dnP(mx - 12, Cn.y0 + 14, z), [bx, by] = this._dnP(mx + 12, Cn.y1 - 14, z);
+                    ctx.fillStyle = 'rgba(255, 214, 150, 0.22)'; ctx.fillRect(ax, ay, bx - ax, by - ay);
                 }
-                const s0 = this._dnP(390, Cn.y0 + 12, z), s1 = this._dnP(410, Cn.y1 - 12, z);   // the skylight strip
-                const [ax, ay] = this._dnP((Cn.x0 + Cn.x1) / 2 - 12, Cn.y0 + 14, z), [bx, by] = this._dnP((Cn.x0 + Cn.x1) / 2 + 12, Cn.y1 - 14, z);
-                ctx.fillStyle = emissive ? 'rgba(255, 214, 150, 0.22)' : '#2a1a24'; ctx.fillRect(ax, ay, bx - ax, by - ay);
                 ctx.restore();
             },
 
-            /** A tower's crown: the crimson halo, a gilt finial; the helipad (west) or the penthouse and its pool (east). */
+            /** A tower's crown: the crimson halo, and on the east the penthouse pavilion and its pool (the helipad is in the roof sprite). */
             _dnCrown(ctx, sh, key, H, emissive) {
-                const C = DN.C, G = this._dnGeo(), t = _gameTimeSec, zc = H + DN.CROWN_Z;
+                const C = DN.C, G = this._dnGeo(), t = _gameTimeSec, zc = H + DN.CROWN_Z, K = LandmarkKit;
                 ctx.save();
-                // The halo: the outer arc of the crescent, lifted and inset
-                const outer = sh.outer;
-                const inset = (p) => [sh.cx + (p[0] - sh.cx) * 0.9, sh.cy + (p[1] - sh.cy) * 0.9];
-                ctx.beginPath(); outer.forEach((p, i) => { const q = this._dnP(...inset(p), zc); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
+                // The halo: the outer arc of the crescent, lifted and inset — one world path in the crown's plane
+                if (!this['_dnHalo' + key]) {
+                    const p = new Path2D();
+                    sh.outer.forEach((q, i) => { const x = sh.cx + (q[0] - sh.cx) * 0.9, y = sh.cy + (q[1] - sh.cy) * 0.9; i ? p.lineTo(x, y) : p.moveTo(x, y); });
+                    this['_dnHalo' + key] = p;
+                }
+                const halo = this['_dnHalo' + key], kc = K.k(zc);
                 if (emissive) {
                     const br = 0.65 + 0.35 * Math.sin(t * 1.3 + (key === 'w' ? 0 : 1.7));
                     ctx.globalCompositeOperation = 'lighter';
-                    ctx.strokeStyle = `rgba(209, 30, 76, ${0.35 * br})`; ctx.lineWidth = 9; ctx.stroke();
-                    ctx.strokeStyle = `rgba(255, 90, 130, ${0.8 * br})`; ctx.lineWidth = 2.5; ctx.stroke();
-                } else { ctx.strokeStyle = '#3a0c1c'; ctx.lineWidth = 3; ctx.stroke(); }
+                    K.rings(ctx, halo, [kc], 9, `rgba(209, 30, 76, ${0.35 * br})`);
+                    K.rings(ctx, halo, [kc], 2.5, `rgba(255, 90, 130, ${0.8 * br})`);
+                } else K.rings(ctx, halo, [kc], 3, '#3a0c1c');
                 ctx.globalCompositeOperation = 'source-over';
-                if (key === 'w') {                                                             // the helipad
-                    const [hx, hy] = G.helipad, p = this._dnP(hx, hy, H + 1), k = this._dnK(H);
-                    if (!emissive) {
-                        ctx.fillStyle = '#1d1419'; ctx.beginPath(); ctx.arc(p[0], p[1], 40 * k, 0, Math.PI * 2); ctx.fill();
-                        ctx.strokeStyle = C.gold; ctx.lineWidth = 2; ctx.stroke();
-                        ctx.font = `600 ${26 * k}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(232,194,122,0.85)'; ctx.fillText('H', p[0], p[1] + 1);
-                    } else {
+                if (key === 'w') {                                                             // the helipad's lights
+                    if (emissive) {
+                        const [hx, hy] = G.helipad, p = this._dnP(hx, hy, H + 1), k = this._dnK(H);
                         ctx.globalCompositeOperation = 'lighter';
                         for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, on = Math.sin(t * 3 - i * 0.8) > 0.2; ctx.fillStyle = on ? 'rgba(255,220,150,0.9)' : 'rgba(255,220,150,0.25)'; ctx.beginPath(); ctx.arc(p[0] + Math.cos(a) * 40 * k, p[1] + Math.sin(a) * 40 * k, 1.8 * k, 0, Math.PI * 2); ctx.fill(); }
                     }
                 } else {                                                                       // the penthouse: a glass pavilion, the pool balcony
-                    const [px, py] = G.penthouse, k = this._dnK(H + 10);
+                    const [px, py] = G.penthouse;
                     const pc = this._dnP(px + 6, py, H + 1), kp = this._dnK(H + 1);
                     const pool = { x: pc[0] - 11 * kp, y: pc[1] - 58 * kp, w: 22 * kp, h: 116 * kp };
                     const vc = this._dnP(px - 26, py, H + 10), kv = this._dnK(H + 10);
@@ -386,45 +431,49 @@
 
             // ── Emissive pass (after the darkness) ───────────────────────────
             _dnDrawEmissive(ctx, dark) {
-                const G = this._dnGeo(), H = this._dnH(), FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, t = _gameTimeSec, cam = game.camera;
+                const G = this._dnGeo(), H = this._dnH(), FH = CONFIG.BUILDINGS.FLOOR_HEIGHT, t = _gameTimeSec, K = LandmarkKit;
                 const glow = Math.max(0.15, Math.min(1, dark * 1.1));
                 ctx.save();
                 ctx.globalAlpha = glow;
                 ctx.globalCompositeOperation = 'lighter';
-                // Atrium: the chandelier's warmth through the glass
-                const ap = this._dnP(G.lens.cx, G.lens.cy, DN.ATRIUM_Z), ag = ctx.createRadialGradient(ap[0], ap[1], 6, ap[0], ap[1], 170);
-                ag.addColorStop(0, 'rgba(255, 206, 140, 0.3)'); ag.addColorStop(0.6, 'rgba(255, 160, 110, 0.1)'); ag.addColorStop(1, 'rgba(255,150,100,0)');
-                ctx.beginPath(); G.lens.pts.forEach((p, i) => { const q = this._dnP(p[0], p[1], DN.ATRIUM_Z); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.closePath();
-                ctx.fillStyle = ag; ctx.fill();
-                this._dnAtriumRibs(ctx, G, true);
+                // Atrium: the chandelier's warmth through the glass, and its ribs and emblem, lit
+                this._dnAtriumRoof(ctx, true);
                 this._dnCanopy(ctx, G, true);
+                // The details catch the building's lamp colour: ledge lips, fin edges, the verandas' rails
+                const rim = K.rim(this, dark), top = this._dnTop || {};
                 for (const [sh, key] of [[G.west, 'w'], [G.east, 'e']]) {
-                    const vis = sh.edges.filter(e => (cam.x - e.mx) * e.nx + (cam.y - e.my) * e.ny > 0);
+                    const T = top[key], vis = T ? T.vis : this._dnVisible(sh), q = [0, 0, 0, 0, 0, 0, 0, 0];
                     // Lit rooms: a curated scatter, the top floors of the east tower always on
-                    ctx.fillStyle = 'rgba(255, 214, 150, 0.85)';
-                    ctx.beginPath();
-                    vis.forEach((e, ei) => {
+                    const rooms = new Path2D();
+                    for (const e of vis) {
                         const idx = sh.edges.indexOf(e);
+                        const A = [e.a[0] + (e.b[0] - e.a[0]) * 0.18, e.a[1] + (e.b[1] - e.a[1]) * 0.18], B = [e.a[0] + (e.b[0] - e.a[0]) * 0.82, e.a[1] + (e.b[1] - e.a[1]) * 0.82];
                         for (let f = 0; f < DN.FLOORS; f++) {
                             const on = (key === 'e' && f >= DN.FLOORS - 2) || _bldHash(this._seed || 7, idx * 31 + f * 7 + (key === 'e' ? 500 : 0)) < 0.34;
                             if (!on) continue;
-                            const z0 = f * FH + 2, z1 = f * FH + FH - 2, u0 = 0.18, u1 = 0.82;
-                            const A = [e.a[0] + (e.b[0] - e.a[0]) * u0, e.a[1] + (e.b[1] - e.a[1]) * u0], B = [e.a[0] + (e.b[0] - e.a[0]) * u1, e.a[1] + (e.b[1] - e.a[1]) * u1];
-                            const p0 = this._dnP(A[0], A[1], z0), p1 = this._dnP(B[0], B[1], z0), p2 = this._dnP(B[0], B[1], z1), p3 = this._dnP(A[0], A[1], z1);
-                            ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]); ctx.closePath();
+                            const k0 = K.k(f * FH + 2), k1 = K.k(f * FH + FH - 2);
+                            K._p(q, 0, A[0], A[1], k0); K._p(q, 2, B[0], B[1], k0); K._p(q, 4, B[0], B[1], k1); K._p(q, 6, A[0], A[1], k1);
+                            rooms.moveTo(q[0], q[1]); rooms.lineTo(q[2], q[3]); rooms.lineTo(q[4], q[5]); rooms.lineTo(q[6], q[7]); rooms.closePath();
                         }
-                    });
-                    ctx.fill();
-                    // Gold uplights climbing the faces from the ground
-                    for (const e of vis) {
-                        const a = e.a, b = e.b, aT = this._dnP(a[0], a[1], H * 0.55), bT = this._dnP(b[0], b[1], H * 0.55);
-                        const g = ctx.createLinearGradient(e.mx, e.my, (aT[0] + bT[0]) / 2, (aT[1] + bT[1]) / 2);
-                        g.addColorStop(0, 'rgba(255, 196, 110, 0.32)'); g.addColorStop(1, 'rgba(255, 196, 110, 0)');
-                        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(bT[0], bT[1]); ctx.lineTo(aT[0], aT[1]); ctx.closePath(); ctx.fill();
                     }
+                    ctx.fillStyle = 'rgba(255, 214, 150, 0.85)'; ctx.fill(rooms);
+                    // Gold uplights climbing the faces from the ground: one gradient per tower
+                    const kU = K.k(H * 0.55), c = game.camera, ups = new Path2D();
+                    for (const e of vis) {
+                        K._p(q, 0, e.a[0], e.a[1], kU); K._p(q, 2, e.b[0], e.b[1], kU);
+                        ups.moveTo(e.a[0], e.a[1]); ups.lineTo(e.b[0], e.b[1]); ups.lineTo(q[2], q[3]); ups.lineTo(q[0], q[1]); ups.closePath();
+                    }
+                    const tc = [c.x + (sh.cx - c.x) * kU, c.y + (sh.cy - c.y) * kU], g = ctx.createLinearGradient(sh.cx, sh.cy, tc[0], tc[1]);
+                    g.addColorStop(0, 'rgba(255, 196, 110, 0.32)'); g.addColorStop(1, 'rgba(255, 196, 110, 0)');
+                    ctx.fillStyle = g; ctx.fill(ups);
                     // The parapet glints
-                    ctx.beginPath(); sh.pts.forEach((p, i) => { const q = this._dnP(p[0], p[1], H); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.closePath();
-                    ctx.strokeStyle = 'rgba(255, 220, 160, 0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+                    if (!this['_dnOutline' + key]) { const p = new Path2D(); sh.pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); this['_dnOutline' + key] = p; }
+                    K.rings(ctx, this['_dnOutline' + key], [K.k(H)], 1.5, 'rgba(255, 220, 160, 0.35)');
+                    if (rim.a > 0.01 && T) {
+                        ctx.lineWidth = 1.1; ctx.strokeStyle = `rgba(${rim.rgb}, ${0.55 * rim.a})`;
+                        for (const lp of T.lips) if (lp) ctx.stroke(lp);
+                        if (T.rails) ctx.stroke(T.rails);
+                    }
                     ctx.globalCompositeOperation = 'source-over';
                     this._dnCrown(ctx, sh, key, H, true);
                     ctx.globalCompositeOperation = 'lighter';
@@ -448,7 +497,6 @@
                 }
                 ctx.restore();
             },
-
             /** "Double Nights" in script on the canopy's fascia, in the canopy's height plane. */
             _dnDrawSign(ctx) {
                 const G = this._dnGeo(), z = DN.CANOPY_Z, cam = game.camera, k = this._dnK(z);

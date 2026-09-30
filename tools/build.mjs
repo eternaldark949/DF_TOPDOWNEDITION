@@ -64,6 +64,7 @@ const SCRIPTS = [
     'entities/enemies.js',
     'buildings/building-v1.js',
     'buildings/building-v2.js',
+    'buildings/landmark-kit.js',
     'buildings/silver-queen.js',
     'buildings/double-nights.js',
     'buildings/sky-layer.js',
