@@ -938,9 +938,20 @@
             if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);
         }
 
-        /* ── Shading ── Seen from above, limbs are cylinders and the head a dome: their shine runs
-           down the middle whichever way the body faces, nudged toward the sun. humanShade() works out
-           the light once per body (null = flat, as before); the passes read it. */
+        /* ── Shading ── Matte by default: seen from above, limbs are cylinders and the head a dome, so
+           each gets a smooth, wide gradient of light on the side toward the sun (a soft sprite, no
+           hard edge) and, on named characters, a soft shade on the far side. Only glossy fabric
+           (a piece or item with finish: 'gloss', e.g. leggings) keeps a crisp sheen; jewelry shines
+           on its own. humanShade() works out the light once per body (null = flat); the passes read it. */
+        /** A soft light or shade (a radial sprite stretched to w×h, centred at x, y) at alpha a. */
+        function _softSpot(ctx, x, y, w, h, rgb, a) {
+            if (a <= 0.004) return;
+            const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * a;
+            ctx.drawImage(glowSprite(rgb, 0), x - w / 2, y - h / 2, w, h);
+            ctx.globalAlpha = a0;
+        }
+        /** Is this piece of clothing glossy? The item's own finish wins, else the wardrobe piece's. */
+        function _glossy(piece, item) { return !!item && (item.finish ? item.finish === 'gloss' : !!(piece && piece.finish === 'gloss')); }
         let _shadeFrame = -1, _shadeRims = 0, _lampGrid = null, _shadeCols = null, _bodyRot = 0;
         const _SHADOW_RGB = '12, 6, 28';
 
@@ -984,11 +995,12 @@
             let K = _shadeCols.get(W);
             if (!K) {
                 const a = (d > 0 ? C.HL_DAY * (0.5 + 0.5 * d) : C.HL_NIGHT) + W * C.HL_RAIN, rgb = d > 0 ? sun.rgb : '214, 204, 255';
-                K = { a, rgb, hl: `rgba(${rgb}, ${a.toFixed(3)})`, hl2: `rgba(${rgb}, ${(a * 1.25).toFixed(3)})`,
-                      sh: `rgba(${_SHADOW_RGB}, ${(C.SHADE * (0.4 + 0.6 * d)).toFixed(3)})` };
+                const shA = C.SHADE * (0.4 + 0.6 * d);
+                K = { a, rgb, shA, hl: `rgba(${rgb}, ${a.toFixed(3)})`, hl2: `rgba(${rgb}, ${(a * 1.25).toFixed(3)})`,
+                      sh: `rgba(${_SHADOW_RGB}, ${shA.toFixed(3)})` };
                 _shadeCols.set(W, K);
             }
-            const S = { level, body: level > 1 && !ped, lx, ly, a: K.a, rgb: K.rgb, hl: K.hl, hl2: K.hl2, sh: K.sh, rim: null };
+            const S = { level, body: level > 1 && !ped, lx, ly, a: K.a, m: Math.min(1, K.a * 1.7), shA: K.shA, rgb: K.rgb, hl: K.hl, hl2: K.hl2, sh: K.sh, rim: null };
             // Night: the nearest burning street lamp rims them in its colour (the block's lamp colour)
             if (level === 2 && sun.night > 0.3 && entity.x !== undefined && (!ped || _shadeRims < C.RIM_PEDS)) {
                 const n = _lampNear(entity.x, entity.y, C.RIM_R);
@@ -1430,16 +1442,21 @@
                 }
             }
             
-            const drawLimb = (x1, y1, x2, y2, width, color) => {
+            const drawLimb = (x1, y1, x2, y2, width, color, gloss) => {
                 const len = Math.hypot(x2-x1, y2-y1)/2 + 2;
                 const ang = Math.atan2(y2-y1, x2-x1);
                 ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
                 ctx.fillStyle = color;
                 ctx.beginPath(); ctx.ellipse(0, 0, len, width, 0, 0, Math.PI*2); ctx.fill();
-                if (SH) {                                                   // the shine down the limb, toward the light
-                    const c = Math.cos(ang), s = Math.sin(ang), oy = (-s * SH.lx + c * SH.ly) * width * 0.4;
-                    ctx.fillStyle = SH.hl;
-                    ctx.beginPath(); ctx.ellipse((c * SH.lx + s * SH.ly) * len * 0.12, oy, len * 0.78, width * 0.42, 0, 0, Math.PI*2); ctx.fill();
+                if (SH) {                                                   // light across the limb, toward the sun
+                    const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;
+                    if (gloss) {                                            // glossy fabric: a crisp sheen
+                        ctx.fillStyle = SH.hl2;
+                        ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.36, 0, 0, Math.PI*2); ctx.fill();
+                    } else {                                                // matte: a smooth gradient, lit side to shaded side
+                        _softSpot(ctx, lx, ly * width * 0.55, len * 1.7, width * 1.7, SH.rgb, SH.m);
+                        if (SH.body && (SH.lx || SH.ly)) _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.2);
+                    }
                 }
                 ctx.restore();
             };
@@ -1521,6 +1538,7 @@
             // Sleeves can come from the shirt under a vest; legs from trousers under an apron
             const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : clothes.top.color) : null;
             const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
+            const topGloss = _glossy(topP, clothes.top), botGloss = _glossy(botP, clothes.bottom);
             const jewelryAt = (where) => (clothes.jewelry || []).filter(j => WD && WD.jewelry[j.type] && WD.jewelry[j.type].at === where);
             const headX0 = bounce - bodyRecoil;
             const clothDyn = { wind: W ? W.wind : null };                 // the weather blows on hems and trains
@@ -1639,8 +1657,8 @@
             const thighColor = legs !== 'bare' ? darken(legCol, 0.35) : darken(skinColor, 0.05);
         
             // 2. Calves
-            drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor); 
-            drawLimb(rKneeX, rKneeY, rFootX, rFootY, 3, legColor);
+            drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor, legs === 'full' && botGloss);
+            drawLimb(rKneeX, rKneeY, rFootX, rFootY, 3, legColor, legs === 'full' && botGloss);
             if (shoeP && shoeP.calf) {                                   // boots come up the calf
                 const bootColor = darken(clothes.shoes.color, 0.45), c = shoeP.calf;
                 drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, 3.4, bootColor);
@@ -1648,8 +1666,8 @@
             }
         
             // 3. Thighs
-            drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor);
-            drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor);
+            drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor, legs !== 'bare' && botGloss);
+            drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor, legs !== 'bare' && botGloss);
             if (A && legs !== 'full') {                                     // android knees
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
@@ -1704,21 +1722,21 @@
             ctx.fillStyle = darken(skinColor, 0.4);
             ctx.beginPath(); ctx.ellipse(lFistX, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
             ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
-            if (SH && SH.body) {                                            // knuckle shine (named characters)
-                const ox = SH.lx * 1.2, oy = SH.ly * 1.2; ctx.fillStyle = SH.hl; ctx.beginPath();
-                ctx.ellipse(lFistX + ox, lFistY + oy, 2, 1.4, 0, 0, Math.PI*2); ctx.ellipse(rFistX + ox, rFistY + oy, 2, 1.4, 0, 0, Math.PI*2); ctx.fill();
+            if (SH && SH.body) {                                            // soft light on the hands (named characters)
+                const ox = SH.lx * 1.2, oy = SH.ly * 1.2;
+                _softSpot(ctx, lFistX + ox, lFistY + oy, 7, 5.5, SH.rgb, SH.m); _softSpot(ctx, rFistX + ox, rFistY + oy, 7, 5.5, SH.rgb, SH.m);
             }
         
             // 7. Forearms (fabric only under long sleeves)
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
-            drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor);
-            drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor);
+            drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor, sleeve === 'long' && topGloss);
+            drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor, sleeve === 'long' && topGloss);
             for (const j of jewelryAt('wrists')) WD.jewelry[j.type].draw(ctx, g, j);
         
             // 8. Upper Arms (fabric under short or long sleeves)
             const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
-            drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor);
-            drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor);
+            drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor, sleeve !== 'none' && topGloss);
+            drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor, sleeve !== 'none' && topGloss);
             if (A) {                                                        // android joints: seam rings at elbows and wrists
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY], [lFistX, lFistY], [rFistX, rFistY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
@@ -1748,12 +1766,13 @@
                 if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
             }
             for (const j of jewelryAt('neck')) WD.jewelry[j.type].draw(ctx, g, j);
-            if (SH && SH.body) {                                            // the torso's form: a ridge of light across the shoulders, the far side in shade
-                ctx.fillStyle = SH.hl;
-                ctx.beginPath(); ctx.roundRect(torsoXOff + torsoWidth * 0.5 - 1.8 + SH.lx * 1.5, -8 + SH.ly * 1.5, 3.6, 16, 1.8); ctx.fill();
-                if (Math.abs(SH.ly) > 0.15 || !SH.lx) {
-                    ctx.fillStyle = SH.sh;
-                    ctx.beginPath(); ctx.roundRect(torsoXOff + 0.5, SH.ly > 0 ? -10 : 5.5, torsoWidth - 1, 4.5, 2); ctx.fill();
+            if (SH && SH.body) {                                            // the torso's form: soft light on the sun's side, soft shade on the other
+                const cx = torsoXOff + torsoWidth * 0.5;
+                _softSpot(ctx, cx + SH.lx * 2, SH.ly * 5, torsoWidth * 1.6, 22, SH.rgb, SH.m);
+                if (SH.lx || SH.ly) _softSpot(ctx, cx - SH.lx * 2.5, -SH.ly * 7, torsoWidth * 1.5, 16, _SHADOW_RGB, SH.shA * 1.3);
+                if (topGloss) {                                             // glossy fabric: a crisp ridge across the shoulders too
+                    ctx.fillStyle = SH.hl2;
+                    ctx.beginPath(); ctx.roundRect(cx - 1.4 + SH.lx * 1.5, -8 + SH.ly * 1.5, 2.8, 16, 1.4); ctx.fill();
                 }
             }
             if (A && !clothes.top) {                                        // bare plating: chest panel seams and the Double Nights mark
@@ -1782,14 +1801,9 @@
             withHead(headX, hx => {
                 if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }
                 drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
-                if (SH && SH.level > 1) {                                   // the crown's shine: a soft spot and a sheen arc toward the light
-                    const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * Math.min(1, SH.a * 2.2);
-                    drawGlow(ctx, hx + SH.lx * 2.6, SH.ly * 2.6, 4.2, SH.rgb, 0);
-                    ctx.globalAlpha = a0;
-                    if (SH.lx || SH.ly) {
-                        const la = Math.atan2(SH.ly, SH.lx);
-                        ctx.strokeStyle = SH.hl2; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(hx, 0, 6.2, la - 0.6, la + 0.6); ctx.stroke();
-                    }
+                if (SH && SH.level > 1) {                                   // the head as a matte dome: light toward the sun, shade away
+                    _softSpot(ctx, hx + SH.lx * 2.8, SH.ly * 2.8, 13, 13, SH.rgb, SH.m);
+                    if (SH.body && (SH.lx || SH.ly)) _softSpot(ctx, hx - SH.lx * 3.5, -SH.ly * 3.5, 13, 13, _SHADOW_RGB, SH.shA * 1.3);
                 }
                 if (turning) ctx.restore();
             });

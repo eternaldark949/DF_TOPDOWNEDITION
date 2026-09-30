@@ -7,6 +7,8 @@
              { skinColor, gender: 'female'|'male'|'androgynous', hair: { type, color },
                top:    { type, color, trim?, inner? },   // inner = colour under an open jacket/coat
                bottom: { type, color, trim? },
+               (any piece can carry finish: 'gloss' | 'matte' — shading is matte unless the item
+                or its WARDROBE piece says gloss, e.g. leggings)
                shoes:  { type, color },
                hat:    { type, color, trim? } | null,
                jewelry: [ { type, color? }, ... ],
@@ -292,7 +294,7 @@
                     ctx.moveTo(g.hip.x + 1, -2); ctx.lineTo(g.hip.x - 2, -3.5); ctx.moveTo(g.hip.x + 1, 2); ctx.lineTo(g.hip.x - 2, 3.5);   // bow at the back
                     ctx.stroke();
                 } },
-                leggings: { legs: 'full', shade: 0.5, detail(ctx, g, c) { ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.6; for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.moveTo(g.hipPt[i][0], g.hipPt[i][1]); ctx.lineTo(g.feet[i][0], g.feet[i][1]); ctx.stroke(); } } },
+                leggings: { legs: 'full', shade: 0.5, finish: 'gloss', detail(ctx, g, c) { ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.6; for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.moveTo(g.hipPt[i][0], g.hipPt[i][1]); ctx.lineTo(g.feet[i][0], g.feet[i][1]); ctx.stroke(); } } },
                 joggers:  { legs: 'full', detail(ctx, g, c) {
                     ctx.fillStyle = g.darken(c.color, 0.6);                 // cuffs at the ankles
                     for (let i = 0; i < 2; i++) { const [kx, ky] = g.knees[i], [fx, fy] = g.feet[i]; ctx.beginPath(); ctx.arc(kx + (fx - kx) * 0.82, ky + (fy - ky) * 0.82, 2.8, 0, Math.PI * 2); ctx.fill(); }
