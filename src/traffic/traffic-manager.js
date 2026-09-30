@@ -19,10 +19,11 @@
         
             add(client) {
                 // Determine grid cells the vehicle overlaps
-                const minCol = Math.floor((client.x - client.length/2) / this.cellSize);
-                const maxCol = Math.floor((client.x + client.length/2) / this.cellSize);
-                const minRow = Math.floor((client.y - client.width/2) / this.cellSize);
-                const maxRow = Math.floor((client.y + client.width/2) / this.cellSize);
+                const r = Math.max(client.length, client.width) / 2;          // any heading
+                const minCol = Math.floor((client.x - r) / this.cellSize);
+                const maxCol = Math.floor((client.x + r) / this.cellSize);
+                const minRow = Math.floor((client.y - r) / this.cellSize);
+                const maxRow = Math.floor((client.y + r) / this.cellSize);
         
                 for (let c = minCol; c <= maxCol; c++) {
                     for (let r = minRow; r <= maxRow; r++) {
@@ -36,10 +37,11 @@
             }
         
             getNearby(client) {
-                const minCol = Math.floor((client.x - client.length/2) / this.cellSize);
-                const maxCol = Math.floor((client.x + client.length/2) / this.cellSize);
-                const minRow = Math.floor((client.y - client.width/2) / this.cellSize);
-                const maxRow = Math.floor((client.y + client.width/2) / this.cellSize);
+                const r = Math.max(client.length, client.width) / 2;          // any heading
+                const minCol = Math.floor((client.x - r) / this.cellSize);
+                const maxCol = Math.floor((client.x + r) / this.cellSize);
+                const minRow = Math.floor((client.y - r) / this.cellSize);
+                const maxRow = Math.floor((client.y + r) / this.cellSize);
         
                 const nearby = new Set();
                 for (let c = minCol; c <= maxCol; c++) {
@@ -145,7 +147,11 @@
                         }
                     }
                     
-                    if (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd) { 
+                    // Gridlock relief: a car frozen for 15 s somewhere the player can't see quietly goes away
+                    if (v.controlMode === 'AI' && Math.abs(v.speed || 0) < 0.2) v._frozen = (v._frozen || 0) + 1; else v._frozen = 0;
+                    const frozenOut = v._frozen > 900 && v.driverType !== 'player' && v.driverType !== 'zib' && !v.isOwnedCar &&
+                        !v.isDeliveryVehicle && distToPlayer > 900;
+                    if (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd || frozenOut) { 
                         if (v.currentIntersection) v.currentIntersection.releaseEntry(v);
                         // Properly destroy entity to unregister from collision system
                         if (!v.markedForDestroy) v.destroy();
@@ -172,23 +178,30 @@
                     if (this.network.allLanes.length > 0) {
                         for(let k=0; k<8; k++) { 
                             const spawnLane = this.network.allLanes[Math.floor(Math.random() * this.network.allLanes.length)];
+                            // Choose the car first, so the check is made where it will actually appear
+                            const brand = TrafficVehicle._selectRandomBrand(), model = TrafficVehicle._selectRandomModel(brand);
+                            const md = VEHICLE_BRANDS[brand].models[model], len = md.length;
                             let clear = true;
-                            // Calculate actual spawn position (2 car lengths into lane)
-                            const spawnOffset = 140; // ~2 car lengths
-                            const spawnX = spawnLane.start.x + Math.cos(spawnLane.angle) * spawnOffset;
-                            const spawnY = spawnLane.start.y + Math.sin(spawnLane.angle) * spawnOffset;
+                            const spawnOffset = len * 2;              // TrafficVehicle places it two lengths in
+                            const spawnX = spawnLane.start.x + spawnLane.ux * spawnOffset;
+                            const spawnY = spawnLane.start.y + spawnLane.uy * spawnOffset;
                             const distToP = Math.hypot(player.x - spawnX, player.y - spawnY);
                             if (distToP < CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN || distToP > CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX) clear = false; 
                             if (clear) {
-                                const dummy = { x: spawnX, y: spawnY, length: 100, width: 50 };
-                                const nearby = this.grid.getNearby(dummy);
-                                for(let v of nearby) { 
-                                    if (Math.hypot(v.x - spawnX, v.y - spawnY) < CONFIG.VEHICLE_AI.SPAWN_SEPARATION) { clear = false; break; } 
+                                // Nobody within the separation, and nobody coming up the lane who couldn't stop for it
+                                const cars = this.vehicles.concat(playerCar && playerCar.visible ? [playerCar] : []);
+                                for (const v of cars) {
+                                    const dx = v.x - spawnX, dy = v.y - spawnY;
+                                    if (Math.hypot(dx, dy) < CONFIG.VEHICLE_AI.SPAWN_SEPARATION) { clear = false; break; }
+                                    const along = dx * spawnLane.ux + dy * spawnLane.uy, lat = Math.abs(-dx * spawnLane.uy + dy * spawnLane.ux);
+                                    if (lat > 34) continue;
+                                    const sp = Math.abs(v.speed || 0), stop = sp * sp / (2 * (v.brake || 0.3));
+                                    if (along < len + 40 && along > -(stop + len + v.length / 2 + 40)) { clear = false; break; }
                                 }
                             }
                             if (clear) {
                                 // Spawn new vehicle - it auto-registers via GameEntity queue
-                                const newVehicle = new TrafficVehicle(spawnLane);
+                                const newVehicle = new TrafficVehicle(spawnLane, brand, model);
                                 this.vehicles.push(newVehicle);
                                 break; 
                             }
@@ -199,14 +212,19 @@
             
             // Optimized Collision Resolution with DEBRIS
             resolveCollisions(playerCar, player, weather, audioSys, ownedCar, decalSystem) {
-                // 1. GATHER ALL PHYSICAL VEHICLES
-                const allVehicles = [...this.vehicles];
+                // 1. GATHER ALL PHYSICAL VEHICLES (and re-grid them where they are now, after moving)
+                const allVehicles = this.vehicles.filter(v => !v.dead);
+                this.grid.clear();
+                for (const v of allVehicles) this.grid.add(v);
+                if (playerCar && playerCar.visible && !allVehicles.includes(playerCar)) this.grid.add(playerCar);
+                if (ownedCar && ownedCar.visible && ownedCar !== playerCar && !allVehicles.includes(ownedCar)) this.grid.add(ownedCar);
+                const seen = new Set();
                 
-                if (playerCar && playerCar.visible) {
+                if (playerCar && playerCar.visible && !allVehicles.includes(playerCar)) {
                     allVehicles.push(playerCar);
                 }
                 
-                if (ownedCar && ownedCar.visible && ownedCar !== playerCar) {
+                if (ownedCar && ownedCar.visible && ownedCar !== playerCar && !allVehicles.includes(ownedCar)) {
                     allVehicles.push(ownedCar);
                 }
             
@@ -216,6 +234,9 @@
                     
                     for (let v2 of neighbors) {
                         if (v1 === v2) continue; 
+                        const key = v1.id < v2.id ? v1.id + ':' + v2.id : v2.id + ':' + v1.id;   // each pair once
+                        if (seen.has(key)) continue;
+                        seen.add(key);
                         
                         // 3. NARROW PHASE: SAT RESOLUTION
                         const collided = PhysicsSystem.resolveOBBCollision(v1, v2);

@@ -5,7 +5,8 @@
                 tier: 'ultra-luxury',
                 baseStats: { 
                     maxSpeed: 12.5, acceleration: 0.35, handling: 0.08, friction: 0.98, 
-                    mass: 2500, lightRange: 100, seats: 6 // SUV = 6 seats
+                    mass: 2500, lightRange: 100, seats: 6, // SUV = 6 seats
+                    brake: 0.42     // px/tick² at full brake (traffic/traffic-vehicle.js applyDrivePhysics)
                 },
                 colors: ['#050505', '#1a0b1a', '#0b1a1a', '#1a1a0b', '#2b0000'],
                 glowColor: '#ffffff', headlightColor: '#ffffff', visualStyle: 'blackmark',
@@ -16,7 +17,7 @@
             },
             Zenxera: {
                 tier: 'mid-luxury',
-                baseStats: { maxSpeed: 9.5, acceleration: 0.12, handling: 0.055, friction: 0.96, mass: 1200, seats: 4 },
+                baseStats: { maxSpeed: 9.5, acceleration: 0.12, handling: 0.055, friction: 0.96, mass: 1200, seats: 4, brake: 0.30 },
                 // NEW PALETTE: Lavender, Periwinkle, Silver, Bronze
                 colors: ['#E6E6FA', '#CCCCFF', '#C0C0C0', '#cd7f32', '#9370DB'],
                 glowColor: '#00f3ff', headlightColor: '#ccddff', // Cool blue-white
@@ -30,7 +31,7 @@
             },
             Gelfash: {
                 tier: 'economy',
-                baseStats: { maxSpeed: 8.5, acceleration: 0.1, handling: 0.05, friction: 0.96, mass: 1000, seats: 4 },
+                baseStats: { maxSpeed: 8.5, acceleration: 0.1, handling: 0.05, friction: 0.96, mass: 1000, seats: 4, brake: 0.26 },
                 colors: ['#fff', '#aaa', '#555', '#a469ff', '#00f3ff'],
                 glowColor: null, headlightColor: '#ffffaa', visualStyle: 'boxy',
                 models: {
@@ -624,6 +625,13 @@
             static calculateThrottle(vehicle, targetSpeed, urgency = 0.5) {
                 const currentSpeed = vehicle.speed || 0;
                 const speedDiff = targetSpeed - currentSpeed;
+                
+                // Slowing while rolling forward: brake (vehicle.brake, px/tick²) to close the gap to the
+                // target over about two ticks — no dead zone, so a car told to stop actually stops
+                if (currentSpeed > 0.05 && (speedDiff < -0.3 || (targetSpeed < 0.5 && speedDiff < -0.05))) {
+                    const b = vehicle.brake || 0.3;
+                    return Math.max(-1, Math.min(-0.12, speedDiff / (b * 2)));
+                }
                 
                 // Calculate throttle based on speed difference
                 if (speedDiff > 0.5) {

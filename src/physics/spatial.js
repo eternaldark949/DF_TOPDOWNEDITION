@@ -92,47 +92,39 @@
                 // Use CollisionSystem's SAT solver
                 const packet = CollisionSystem._satCollision(c1, c2);
                 if (!packet) return false;
-                
-                const { nx, ny, depth } = packet;
-                
-                // Mass-based separation
-                const m1 = c1.mass || 1000;
-                const m2 = c2.mass || 1000;
-                const totalMass = m1 + m2;
-                const t1 = m2 / totalMass;
-                const t2 = m1 / totalMass;
-                
-                // Position separation
-                c1.x += nx * depth * t1;
-                c1.y += ny * depth * t1;
-                c2.x -= nx * depth * t2;
-                c2.y -= ny * depth * t2;
-                
-                // Speed-based velocity
-                const v1x = Math.cos(c1.angle) * (c1.speed || 0);
-                const v1y = Math.sin(c1.angle) * (c1.speed || 0);
-                const v2x = Math.cos(c2.angle) * (c2.speed || 0);
-                const v2y = Math.sin(c2.angle) * (c2.speed || 0);
-                
-                const relVel = (v1x - v2x) * nx + (v1y - v2y) * ny;
-                
-                if (relVel < 0) {
-                    const restitution = 0.4;
-                    const j = -(1 + restitution) * relVel * 0.5;
-                    
-                    if (c1.speed !== undefined) c1.speed += j * t1;
-                    if (c2.speed !== undefined) c2.speed -= j * t2;
-                    
-                    // Angular spin
-                    if (c1.angle !== undefined) c1.angle += (Math.random() - 0.5) * 0.1 * Math.abs(j);
-                    if (c2.angle !== undefined) c2.angle -= (Math.random() - 0.5) * 0.1 * Math.abs(j);
-                }
-                
-                // Friction slowdown
-                if (c1.speed !== undefined) c1.speed *= 0.9;
-                if (c2.speed !== undefined) c2.speed *= 0.9;
-                
+                PhysicsSystem.carContact(c1, c2, packet.nx, packet.ny, packet.depth);
                 return true;
+            }
+
+            /**
+             * Two cars (or a car and something immovable: mass Infinity) touching along normal (nx, ny),
+             * pointing from c2 to c1, overlapping by depth. Pushes them apart by mass, then takes the
+             * closing speed out of their real velocities (vx/vy — `speed` is only read back from those),
+             * with a little bounce and some scrub along the contact. No random spin.
+             */
+            static carContact(c1, c2, nx, ny, depth) {
+                const m1 = c1.isStatic ? Infinity : (c1.mass || 1000), m2 = c2.isStatic ? Infinity : (c2.mass || 1000);
+                const w1 = isFinite(m1) ? (isFinite(m2) ? m2 / (m1 + m2) : 1) : 0;
+                const w2 = isFinite(m2) ? (isFinite(m1) ? m1 / (m1 + m2) : 1) : 0;
+                c1.x += nx * depth * w1; c1.y += ny * depth * w1;
+                c2.x -= nx * depth * w2; c2.y -= ny * depth * w2;
+                const vel = (c) => c.vx !== undefined ? [c.vx, c.vy] : [Math.cos(c.angle || 0) * (c.speed || 0), Math.sin(c.angle || 0) * (c.speed || 0)];
+                const [ax, ay] = w1 > 0 ? vel(c1) : [0, 0], [bx, by] = w2 > 0 ? vel(c2) : [0, 0];
+                const rvx = ax - bx, rvy = ay - by, rn = rvx * nx + rvy * ny;
+                if (rn >= 0) return;                                   // already separating
+                const e = 0.2, jn = -(1 + e) * rn;                      // normal impulse (as a velocity change)
+                const tx = -ny, ty = nx, rt = rvx * tx + rvy * ty, jt = -rt * 0.15;   // scrub along the contact
+                const apply = (c, w, sgn) => {
+                    if (w <= 0) return;
+                    const dvx = sgn * w * (jn * nx + jt * tx), dvy = sgn * w * (jn * ny + jt * ty);
+                    if (c.vx !== undefined) {
+                        c.vx += dvx; c.vy += dvy;
+                        c.speed = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
+                    } else if (c.speed !== undefined) c.speed += dvx * Math.cos(c.angle || 0) + dvy * Math.sin(c.angle || 0);
+                };
+                apply(c1, w1, 1); apply(c2, w2, -1);
+                c1._lastContact = c2; c2._lastContact = c1;
+                return jn;
             }
             
             /**
