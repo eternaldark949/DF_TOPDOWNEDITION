@@ -1,5 +1,20 @@
         // GameEngine — The per-tick simulation (update) and traffic collision helpers.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        /** Props you can use, and what the action pill says for them: type → [verb, name, name from the prop's own label].
+         *  A prop whose interactionType isn't here is scenery (the sofa, the bedside tables…): no pill, no action.
+         *  What each one does is engine/events.js interact(). */
+        const PROP_ACTIONS = {
+            medbay_refill:     ['Refill', 'Health station'],
+            lost_luggage:      ['Search', 'Lost luggage', true],
+            vending_machine:   ['Buy', 'MiniSpree'],
+            bed_sleep:         ['Rest', 'Bed'],
+            crafting_table:    ['Craft', 'Workbench'],
+            auto_shop_counter: ['Shop', 'Counter'],
+            armory:            ['Loadout', 'Armory'],
+            read_note:         ['Read', 'Note', true],
+            light_switch:      ['Lights', 'Light switch']
+        };
+
         engineMixin({
             /* =====================================================================
                MAIN GAME LOOP (UPDATE)
@@ -1302,7 +1317,7 @@
                     if (!tm.recruited && inApt) continue; // Skip unrecruited in apartment
                     let d = Math.hypot(this.player.x - tm.x, this.player.y - tm.y); if(d < 50) { nearInteractable = tm; } 
                 }
-                for(let p of this.props) { if (p.interactionType) { let d = Math.hypot(this.player.x - (p.x + p.w/2), this.player.y - (p.y + p.h/2)); if (d < 60) nearInteractable = p; } }
+                for(let p of this.props) { if (PROP_ACTIONS[p.interactionType]) { let d = Math.hypot(this.player.x - (p.x + p.w/2), this.player.y - (p.y + p.h/2)); if (d < 60) nearInteractable = p; } }   // only props that do something
                 
                 // Discoverable Velvet Cat
                 if (this.velvetCat && this.velvetCat._discoverable && !this.questState.hasVelvetCat) {
@@ -1343,15 +1358,8 @@
                 else if (nearInteractable) { 
                     this.interactBtn.style.display = 'flex'; this.activeInteraction = nearInteractable; 
                     if (nearInteractable instanceof PropEntity) {
-                        if (nearInteractable.interactionType === 'medbay_refill') this.setInteract('Refill', 'Health station');
-                        else if (nearInteractable.interactionType === 'lost_luggage') this.setInteract('Search', nearInteractable.label || 'Lost luggage');
-                        if (nearInteractable.interactionType === 'vending_machine') this.setInteract('Buy', 'MiniSpree');
-                        if (nearInteractable.interactionType === 'bed_sleep') this.setInteract('Rest', 'Bed');
-                        if (nearInteractable.interactionType === 'crafting_table') this.setInteract('Craft', 'Workbench');
-                        if (nearInteractable.interactionType === 'auto_shop_counter') this.setInteract('Shop', 'Counter');
-                        if (nearInteractable.interactionType === 'armory') this.setInteract('Loadout', 'Armory');
-                        if (nearInteractable.interactionType === 'read_note') this.setInteract('Read', nearInteractable.label || 'Note');
-                        if (nearInteractable.interactionType === 'light_switch') this.setInteract('Lights', 'Light switch');
+                        const [verb, name, useLabel] = PROP_ACTIONS[nearInteractable.interactionType];
+                        this.setInteract(verb, (useLabel && nearInteractable.label) || name);
                     } else if (nearInteractable.interactionType === 'delivery_pickup') {
                         this.setInteract('Pick Up', 'Delivery');
                     } else if (nearInteractable.interactionType === 'adopt_cat') {
