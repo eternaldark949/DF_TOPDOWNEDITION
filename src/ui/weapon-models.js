@@ -119,23 +119,24 @@
                 glow: [[-7, 0.5, 2.4, '#ff6a1a'], [13, 0.5, 3.2, '#ff7a24'], [16.6, 0.5, 3, '#ff6a1a'], [21.2, 0.5, 3, '#ff6a1a'], [38, 0.5, 3, '#ff5a12']],
                 run: [24.5, 50, 0.5, '#ffd09a']
             },
-            sniper_sr86: {                                                                      // SR-86: obsidian, crimson and pearl (catalog sketch)
-                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 2.8], brass: '#ff4d68',
+            sniper_sr86: {                                                                      // SR-86: obsidian, crimson and pearl (catalog sketch): one width, stock to muzzle
+                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 3.9], brass: '#ff4d68',
                 parts: [
-                    _cap(-12, -2, 0.5, 5.4, 'abyss'),                                          // the thumb-hump rear
+                    _r(-12, -2, 0.5, 5, 'abyss', [2.5, 0.4, 0.4, 2.5]),                         // the thumb-hump rear, rounded at the back
                     _r(-9.6, -4, 0.5, 1, 'crimson'),
-                    _r(-2.6, 14.2, 0.5, 5.6, 'pearl', 1.2),                                    // the receiver
-                    _c(6, 3.8, 1.3, 'pearl'),                                                   // the side knob
+                    _r(-2, 14.2, 0.5, 5, 'pearl', 0.5),                                         // the receiver
+                    _c(6, 3.6, 1.3, 'pearl'),                                                   // the side knob
                     _e(4.4, 7.6, 0.5, 0.6, '#ff2448'), _e(5.7, 6.3, 0.5, 2.6, '#ff2448'),        // the cross emblem
-                    _r(14.6, 18.6, 0.5, 4.8, 'abyss', 0.4), ..._slots(15.2, 18, 0.5, '#ff2448'), // the two slotted collars
-                    _r(19.2, 23.2, 0.5, 4.8, 'abyss', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff2448'),
-                    _cap(23.2, 54.2, 0.5, 3, 'abyss'),                                          // the long smooth barrel
-                    _e(25, 50, 0.5, 0.35, '#ff2448'), _g(24.6, 50.4, 0.5, 1.4),                 // a hairline of red down it, under glass
-                    _hole(51.4, 0.5, 0.6),                                                      // its bore hole
-                    _cap(53.2, 55.2, 0.5, 2, 'crimson')                                         // the muzzle nub
+                    _r(14.6, 18.6, 0.5, 5, 'abyss', 0.4), ..._slots(15.2, 18, 0.5, '#ff2448'),   // the two slotted collars
+                    _r(19.2, 23.2, 0.5, 5, 'abyss', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff2448'),
+                    _r(23.2, 55.2, 0.5, 5, 'abyss', [0.4, 1.2, 1.2, 0.4]),                      // the long smooth barrel, the same width to the muzzle
+                    _e(25, 50, -0.7, 0.35, '#ff2448'), _e(25, 50, 1.7, 0.35, '#ff2448'),         // two hairlines of red down it, under glass
+                    _g(24.6, 50.4, 0.5, 3.6),
+                    _hole(51.6, 0.5, 0.9),                                                      // its bore hole
+                    _r(53.6, 55.2, 0.5, 5, 'crimson', [0.4, 1.2, 1.2, 0.4])                     // the crimson muzzle band
                 ],
-                glow: [[6, 0.5, 3.2, '#ff2448'], [16.6, 0.5, 3, '#ff2448'], [21.2, 0.5, 3, '#ff2448'], [54.2, 0.5, 2, '#ff2448']],
-                run: [25, 50, 0.5, '#ff9aae']
+                glow: [[6, 0.5, 3.2, '#ff2448'], [16.6, 0.5, 3, '#ff2448'], [21.2, 0.5, 3, '#ff2448'], [54.4, 0.5, 2.4, '#ff2448']],
+                run: [25, 50, 1.7, '#ff9aae']
             },
             golden_child: {                                                                     // gold and champagne, a light in its heart
                 stance: 'pistol', muzzle: [20, 1], rail: [13, 5.8], brass: null,

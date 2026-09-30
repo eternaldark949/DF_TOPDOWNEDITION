@@ -1462,7 +1462,20 @@
                 }
                 html += `</div></div>`;
             }
+            // M.A.S.K: her field mask: Auto (on in the field, off at home), always On, or Off
+            const mm = game.cosmetics.maskMode || 'auto';
+            html += `<div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,0,255,0.15); border-radius:6px; padding:8px 10px;">`;
+            html += `<div style="font-family:Orbitron,sans-serif; font-size:0.5rem; color:#ff00ff; letter-spacing:2px; margin-bottom:4px;">M.A.S.K</div><div style="display:flex; gap:4px; flex-wrap:wrap;">`;
+            for (const [mode, label, dot] of [['auto', 'Auto', 'linear-gradient(90deg,#6a2a7a 50%,#888 50%)'], ['on', 'On', '#6a2a7a'], ['off', 'Off', '#555']]) {
+                const on = mm === mode;
+                html += `<div class="neume-mask" data-mode="${mode}" style="display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:12px; border:${on ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${on ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><div style="width:10px;height:10px;border-radius:50%;background:${dot};flex-shrink:0;"></div><span style="font-size:0.5rem; color:${on ? '#fff' : '#999'};">${label}</span></div>`;
+            }
+            html += `</div></div>`;
             loadout.innerHTML = html;
+
+            loadout.querySelectorAll('.neume-mask').forEach(chip => {
+                chip.addEventListener('click', () => { game.cosmetics.maskMode = chip.dataset.mode; triggerSequencingEffect(); });
+            });
 
             // Bind chip clicks
             loadout.querySelectorAll('.neume-chip').forEach(chip => {

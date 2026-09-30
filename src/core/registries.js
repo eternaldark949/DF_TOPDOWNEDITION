@@ -223,6 +223,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedHat = null;            // optional slot (null = none)
                 this.equippedJewelry = [];          // any number at once
                 this.accessoryOptions = {};         // per-accessory choices, e.g. { acc_glass: { drink: 'red_wine' } }
+                this.maskMode = 'auto';             // 949's field mask (Neu.Me): 'auto' (in the field, off at home) | 'on' | 'off'
                 // Grant defaults
                 this._grantDefaults();
             }
@@ -343,7 +344,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     equippedAccessory: this.equippedAccessory,
                     equippedHat: this.equippedHat,
                     equippedJewelry: [...this.equippedJewelry],
-                    accessoryOptions: JSON.parse(JSON.stringify(this.accessoryOptions))
+                    accessoryOptions: JSON.parse(JSON.stringify(this.accessoryOptions)),
+                    maskMode: this.maskMode
                 };
             }
 
@@ -355,6 +357,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedVocal = data.equippedVocal || null;
                 this.equippedOutfit = data.equippedOutfit || null;
                 this.accessoryOptions = data.accessoryOptions || {};
+                this.maskMode = ['auto', 'on', 'off'].includes(data.maskMode) ? data.maskMode : 'auto';
                 // Saves from before hats and jewelry simply have none on
                 this.equippedHat = COSMETICS_REGISTRY[data.equippedHat] ? data.equippedHat : null;
                 this.equippedJewelry = (data.equippedJewelry || []).filter(id => COSMETICS_REGISTRY[id]);
