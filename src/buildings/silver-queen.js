@@ -110,74 +110,90 @@
                 return (f._sqBal = out);
             },
 
-            /** Per-face facade: pilasters, belt course, crown cornice, arched window; emissive: uplights and crown glow. */
+            /**
+             * Per-face facade, on the landmark kit: the pilasters stand proud of the wall (fins),
+             * the base course, the belt course at the portico's roof line and the crown cornice are
+             * real ledges; capitals, plinths, fluting and dentils go out one path each. Emissive:
+             * the uplights grazing the pilasters and the crown's downwash, one path per face, and the
+             * ledges' lips catching the lamps' violet (LandmarkKit.rim).
+             */
             _sqFace(ctx, f, P, emissive) {
                 const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
                 const depth = Math.hypot(dx - ax, dy - ay);
                 if (depth < 4) return;
-                const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
-                const sub = (u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); };
-                const quad = (u0, u1, v0, v1) => { ctx.beginPath(); sub(u0, u1, v0, v1); };
-                const line = (p, q) => { ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
-                const pil = this._sqPilasters(f), H = this._sqH(), lod = _zoomLOD;
+                const ex = bx - ax, ey = by - ay, tx = cx - dx, ty = cy - dy, ux = dx - ax, uy = dy - ay;
+                const at = (u, v) => [ax + ex * u + (ux + tx * u - ex * u) * v, ay + ey * u + (uy + ty * u - ey * u) * v];
+                const sub = (p, u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); p.moveTo(a[0], a[1]); p.lineTo(b[0], b[1]); p.lineTo(c[0], c[1]); p.lineTo(d[0], d[1]); p.closePath(); };
+                const pil = this._sqPilasters(f), H = this._sqH(), lod = _zoomLOD, K = LandmarkKit, T = SQ_THEME;
                 const vBelt = SQ_PORTICO.floors * CONFIG.BUILDINGS.FLOOR_HEIGHT / H;
+                const nx = f.side === 'E' ? 1 : f.side === 'W' ? -1 : 0, ny = f.side === 'S' ? 1 : f.side === 'N' ? -1 : 0;
+                const edge = [{ a: [ax, ay], b: [bx, by], nx, ny }];
                 ctx.save();
                 ctx.globalAlpha *= Math.min(1, (depth - 4) / 14);
-                if (!emissive) {
-                    ctx.fillStyle = SQ_THEME.ground; quad(0, 1, 0, 0.025); ctx.fill();                   // base course
-                    ctx.fillStyle = SQ_THEME.roof; quad(0, 1, vBelt - 0.01, vBelt + 0.012); ctx.fill();      // belt course at the portico roof line
-                    for (const u of pil.us) {
-                        const [u0, u1] = this._sqSpan(pil, u), l = at(u0, 0.5), r = at(u1, 0.5);
-                        const g = ctx.createLinearGradient(l[0], l[1], r[0], r[1]);
-                        g.addColorStop(0, SQ_THEME.silverLo); g.addColorStop(0.42, SQ_THEME.silverHi); g.addColorStop(0.7, SQ_THEME.silver); g.addColorStop(1, SQ_THEME.silverDk);
-                        ctx.fillStyle = g; quad(u0, u1, 0.02, 0.95); ctx.fill();
-                        if (lod === 0) {                                                                     // fluting
-                            ctx.strokeStyle = 'rgba(40,30,62,0.4)'; ctx.lineWidth = 0.6;
-                            for (const t of [0.28, 0.72]) { const uu = u0 + (u1 - u0) * t; line(at(uu, 0.05), at(uu, 0.92)); }
+                K.using(z => this._sqK(z), () => {
+                    if (!emissive) {
+                        const lips = [];
+                        lips.push(K.ledge(ctx, edge, 0.025 * H, 2.5, 0.025 * H, '#3a2f5c', T.ground, 'rgba(217, 191, 134, 0.35)'));     // base course
+                        // Pilasters: silver plates 3 px proud of the wall, a bright edge toward the light
+                        const anchors = pil.us.map(u => ({ x: ax + ex * u, y: ay + ey * u, nx, ny }));
+                        K.fins(ctx, anchors, 0.02 * H, 0.95 * H, 8, 3, T.silver, T.silverHi, null);
+                        const caps = new Path2D(), plinths = new Path2D(), flutes = new Path2D();
+                        for (const u of pil.us) {
+                            const [u0, u1] = this._sqSpan(pil, u), cw = pil.w * 0.3;
+                            sub(caps, Math.max(0, u0 - cw), Math.min(1, u1 + cw), 0.92, 0.955);
+                            sub(plinths, Math.max(0, u0 - cw), Math.min(1, u1 + cw), 0, 0.03);
+                            if (lod === 0) for (const tt of [0.28, 0.72]) { const uu = u0 + (u1 - u0) * tt, p0 = at(uu, 0.05), p1 = at(uu, 0.92); flutes.moveTo(p0[0], p0[1]); flutes.lineTo(p1[0], p1[1]); }
                         }
-                        const cw = pil.w * 0.3;
-                        ctx.fillStyle = SQ_THEME.silverHi; quad(Math.max(0, u0 - cw), Math.min(1, u1 + cw), 0.92, 0.955); ctx.fill();   // capital
-                        ctx.fillStyle = '#8a82a8'; quad(Math.max(0, u0 - cw), Math.min(1, u1 + cw), 0, 0.03); ctx.fill();              // plinth
-                    }
-                    ctx.fillStyle = '#9d95bd'; quad(0, 1, 0.955, 1); ctx.fill();                            // crown cornice
-                    ctx.fillStyle = '#ddd8ee'; quad(0, 1, 0.986, 1); ctx.fill();
-                    if (lod === 0) {                                                                         // dentils
-                        const n = Math.floor(pil.len / 6);
-                        ctx.fillStyle = 'rgba(38,28,58,0.55)'; ctx.beginPath();
-                        for (let i = 0; i < n; i++) { const u = (i + 0.3) / n; sub(u, u + 0.4 / n, 0.958, 0.976); }
-                        ctx.fill();
-                    }
-                    if (f._sqEntrance) this._sqArch(ctx, f, at, false);
-                } else if ((this._sqDark || 0) > 0.05) {
-                    ctx.globalCompositeOperation = 'lighter';
-                    const pulse = 0.82 + 0.18 * Math.sin(_gameTimeSec * 0.7 + (this._seed || 0));
-                    const v0 = f._sqEntrance ? vBelt : 0;                                                   // entrance face is lit from the portico roof
-                    if (f._sqEntrance) {                                                                     // violet wash rising from the portico
-                        const um = (this._sqPortico().dx - f.x1) / (f.x2 - f.x1), c0 = at(um, vBelt), rr = Math.max(60, pil.len * 0.55);
-                        const g = ctx.createRadialGradient(c0[0], c0[1], 0, c0[0], c0[1], rr);
-                        g.addColorStop(0, 'rgba(164,105,255,0.42)'); g.addColorStop(1, 'rgba(164,105,255,0)');
-                        ctx.fillStyle = g; quad(0, 1, vBelt, 1); ctx.fill();
-                    }
-                    for (const u of pil.us) {
-                        const [u0, u1] = this._sqSpan(pil, u), um = (u0 + u1) / 2, w = u1 - u0;
-                        const b0 = at(um, v0), t0 = at(um, Math.min(1, v0 + 0.62));
+                        if (lod === 0) { ctx.strokeStyle = 'rgba(40,30,62,0.4)'; ctx.lineWidth = 0.6; ctx.stroke(flutes); }
+                        ctx.fillStyle = T.silverHi; ctx.fill(caps);
+                        ctx.fillStyle = '#8a82a8'; ctx.fill(plinths);
+                        // Belt course at the portico's roof line, the crown cornice at the top
+                        lips.push(K.ledge(ctx, edge, (vBelt + 0.012) * H, 3, 0.022 * H, '#6b5cae', T.roof, 'rgba(236, 226, 255, 0.55)'));
+                        lips.push(K.ledge(ctx, edge, H, 4, 0.045 * H, '#ddd8ee', '#9d95bd', 'rgba(255, 250, 255, 0.7)'));
+                        if (lod === 0) {                                                                         // dentils under the cornice
+                            const n = Math.floor(pil.len / 6), den = new Path2D();
+                            for (let i = 0; i < n; i++) { const u = (i + 0.3) / n; sub(den, u, u + 0.4 / n, 0.935, 0.952); }
+                            ctx.fillStyle = 'rgba(38,28,58,0.55)'; ctx.fill(den);
+                        }
+                        f._sqLips = lips;
+                        if (f._sqEntrance) this._sqArch(ctx, f, at, false);
+                    } else if ((this._sqDark || 0) > 0.05) {
+                        ctx.globalCompositeOperation = 'lighter';
+                        const pulse = 0.82 + 0.18 * Math.sin(_gameTimeSec * 0.7 + (this._seed || 0));
+                        const v0 = f._sqEntrance ? vBelt : 0, v1 = Math.min(1, v0 + 0.62);                     // entrance face is lit from the portico roof
+                        if (f._sqEntrance) {                                                                     // violet wash rising from the portico
+                            const um = (this._sqPortico().dx - f.x1) / (f.x2 - f.x1), c0 = at(um, vBelt), rr = Math.max(60, pil.len * 0.55);
+                            const g = ctx.createRadialGradient(c0[0], c0[1], 0, c0[0], c0[1], rr);
+                            g.addColorStop(0, 'rgba(164,105,255,0.42)'); g.addColorStop(1, 'rgba(164,105,255,0)');
+                            const w = new Path2D(); sub(w, 0, 1, vBelt, 1); ctx.fillStyle = g; ctx.fill(w);
+                        }
+                        // Uplights: a cone grazing up each pilaster and spilling onto the wall, and a hot stripe — one path each, one gradient each
+                        const cones = new Path2D(), stripes = new Path2D();
+                        for (const u of pil.us) {
+                            const [u0, u1] = this._sqSpan(pil, u), um = (u0 + u1) / 2, w = u1 - u0;
+                            const a = at(um - w * 0.7, v0), b = at(um + w * 0.7, v0), c = at(Math.min(1, um + w * 2.8), v1), d = at(Math.max(0, um - w * 2.8), v1);
+                            cones.moveTo(a[0], a[1]); cones.lineTo(b[0], b[1]); cones.lineTo(c[0], c[1]); cones.lineTo(d[0], d[1]); cones.closePath();
+                            sub(stripes, um - w * 0.2, um + w * 0.2, v0, v1);
+                        }
+                        const b0 = at(0.5, v0), t0 = at(0.5, v1);
                         const g = ctx.createLinearGradient(b0[0], b0[1], t0[0], t0[1]);
                         g.addColorStop(0, 'rgba(196,160,255,0.6)'); g.addColorStop(0.35, 'rgba(164,105,255,0.24)'); g.addColorStop(1, 'rgba(164,105,255,0)');
-                        ctx.fillStyle = g;                                                                   // cone grazing up the pilaster, spilling onto the wall
-                        const a = at(um - w * 0.7, v0), b = at(um + w * 0.7, v0), c = at(Math.min(1, um + w * 2.8), Math.min(1, v0 + 0.62)), d = at(Math.max(0, um - w * 2.8), Math.min(1, v0 + 0.62));
-                        ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); ctx.fill();
+                        ctx.fillStyle = g; ctx.fill(cones);
                         const g2 = ctx.createLinearGradient(b0[0], b0[1], t0[0], t0[1]);
                         g2.addColorStop(0, 'rgba(255,240,255,0.55)'); g2.addColorStop(0.5, 'rgba(255,240,255,0)');
-                        ctx.fillStyle = g2; quad(um - w * 0.2, um + w * 0.2, v0, Math.min(1, v0 + 0.62)); ctx.fill();
+                        ctx.fillStyle = g2; ctx.fill(stripes);
+                        const top = at(0.5, 1), low = at(0.5, 0.84);                                            // crown: downwash under the cornice
+                        const g3 = ctx.createLinearGradient(top[0], top[1], low[0], low[1]);
+                        g3.addColorStop(0, `rgba(200,168,255,${0.5 * pulse})`); g3.addColorStop(1, 'rgba(164,105,255,0)');
+                        const dw = new Path2D(); sub(dw, 0, 1, 0.84, 1); ctx.fillStyle = g3; ctx.fill(dw);
+                        const l0 = at(0, 0.99), l1 = at(1, 0.99);
+                        ctx.strokeStyle = `rgba(236,226,255,${0.95 * pulse})`; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(l0[0], l0[1]); ctx.lineTo(l1[0], l1[1]); ctx.stroke();
+                        const rim = K.rim(this, this._sqDark);                                                   // the ledges catch the lamps' violet
+                        if (rim.a > 0.01 && f._sqLips) { ctx.strokeStyle = `rgba(${rim.rgb}, ${0.6 * rim.a})`; ctx.lineWidth = 1.2; for (const lp of f._sqLips) if (lp) ctx.stroke(lp); }
+                        if (f._sqEntrance) this._sqArch(ctx, f, at, true);
                     }
-                    const top = at(0.5, 1), low = at(0.5, 0.84);                                            // crown: downwash under the cornice
-                    const g3 = ctx.createLinearGradient(top[0], top[1], low[0], low[1]);
-                    g3.addColorStop(0, `rgba(200,168,255,${0.5 * pulse})`); g3.addColorStop(1, 'rgba(164,105,255,0)');
-                    ctx.fillStyle = g3; quad(0, 1, 0.84, 1); ctx.fill();
-                    ctx.strokeStyle = `rgba(236,226,255,${0.95 * pulse})`; ctx.lineWidth = 1.4; line(at(0, 0.99), at(1, 0.99));
-                    if (f._sqEntrance) this._sqArch(ctx, f, at, true);
-                }
+                });
                 ctx.restore();
             },
 
@@ -245,23 +261,31 @@
                 const rgb = (r, g, b) => `rgb(${Math.round(r * s)},${Math.round(g * s)},${Math.round(b * s)})`;
                 const slab = rgb(60, 50, 88), glass = rgb(150, 140, 190), rail = rgb(228, 224, 244);
                 const E = (u, o, z) => this._sqP(ax + (bx - ax) * u + n[0] * o, ay + (by - ay) * u + n[1] * o, z);
-                const poly = (pts, close) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); if (close) ctx.closePath(); };
                 const lit = dark > 0.05;
-                ctx.save();
-                this._sqClipOtherRoofs(ctx, f.section);
+                // All the face's verandas batched: slabs, glass fronts and rails one path each (drawn in
+                // order of height they'd overlap the same way; they never overlap on one face)
+                const slabs = new Path2D(), fronts = new Path2D(), rails = new Path2D(), warm = new Path2D(), tops = new Path2D();
+                const add = (P2, pts, close) => { P2.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) P2.lineTo(pts[i][0], pts[i][1]); if (close) P2.closePath(); };
                 for (const b of bals) {
                     const z = (b.fl + 0.1) * FH, zr = z + RH;
                     const A = E(b.u0, 0, z), B = E(b.u1, 0, z), C = E(b.u1, D, z), Dd = E(b.u0, D, z);
                     const At = E(b.u0, 0, zr), Bt = E(b.u1, 0, zr), Ct = E(b.u1, D, zr), Dt = E(b.u0, D, zr);
-                    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = fade;
-                    ctx.fillStyle = slab; poly([A, B, C, Dd], true); ctx.fill();
-                    ctx.globalAlpha = fade * 0.3; ctx.fillStyle = glass; poly([Dd, C, Ct, Dt], true); ctx.fill();
-                    ctx.globalAlpha = fade; ctx.strokeStyle = rail; ctx.lineWidth = 0.9; poly([At, Dt, Ct, Bt]); ctx.stroke();
-                    if (lit) {
-                        ctx.globalCompositeOperation = 'lighter';
-                        if (b.lit) { ctx.globalAlpha = fade * glow; ctx.fillStyle = 'rgba(255,196,140,0.22)'; poly([A, B, C, Dd], true); ctx.fill(); }
-                        ctx.globalAlpha = fade * Math.min(1, glow * 1.4); ctx.strokeStyle = 'rgba(200,168,255,0.9)'; ctx.lineWidth = 1.1; poly([Dt, Ct]); ctx.stroke();
-                    }
+                    add(slabs, [A, B, C, Dd], true); add(fronts, [Dd, C, Ct, Dt], true); add(rails, [At, Dt, Ct, Bt], false);
+                    add(tops, [Dt, Ct], false);
+                    if (b.lit) add(warm, [A, B, C, Dd], true);
+                }
+                ctx.save();
+                this._sqClipOtherRoofs(ctx, f.section);
+                ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = fade;
+                ctx.fillStyle = slab; ctx.fill(slabs);
+                ctx.globalAlpha = fade * 0.3; ctx.fillStyle = glass; ctx.fill(fronts);
+                ctx.globalAlpha = fade; ctx.strokeStyle = rail; ctx.lineWidth = 0.9; ctx.stroke(rails);
+                if (lit) {
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.globalAlpha = fade * glow; ctx.fillStyle = 'rgba(255,196,140,0.22)'; ctx.fill(warm);
+                    ctx.globalAlpha = fade * Math.min(1, glow * 1.4); ctx.strokeStyle = 'rgba(200,168,255,0.9)'; ctx.lineWidth = 1.1; ctx.stroke(tops);
+                    const rim = LandmarkKit.rim(this, dark);                                                 // the rails catch the lamps' violet
+                    if (rim.a > 0.01) { ctx.globalAlpha = fade * rim.a; ctx.strokeStyle = `rgba(${rim.rgb}, 0.45)`; ctx.lineWidth = 0.9; ctx.stroke(rails); }
                 }
                 ctx.restore();
             },
@@ -316,22 +340,27 @@
                 const hex = (x, y, rr) => { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.closePath(); };
                 const kT = this._sqK(g.zCol), kC = this._sqK(g.z);
                 ctx.save();
+                // All eight columns batched: plinths, shafts (silver, a bright line down the lit side, a dark one down the other), collars, lanterns
+                const plin = new Path2D(), shafts = new Path2D(), hiL = new Path2D(), loL = new Path2D(), collars = new Path2D(), lanO = new Path2D(), lanI = new Path2D();
+                const hexP = (P2, x, y, rr) => { for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; P2[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr, y + Math.sin(a) * rr); } P2.closePath(); };
                 for (const c of g.cols) {
-                    hex(c.x, c.y, r + 2.8); ctx.fillStyle = '#4c4468'; ctx.fill(); ctx.strokeStyle = '#a49cc6'; ctx.lineWidth = 1; ctx.stroke();
+                    hexP(plin, c.x, c.y, r + 2.8);
                     const t0 = P3(c.x, c.y, g.zCol);
                     const vx = t0[0] - c.x, vy = t0[1] - c.y, L = Math.hypot(vx, vy) || 1, px = -vy / L, py = vx / L;
-                    const gr = ctx.createLinearGradient(c.x - px * r, c.y - py * r, c.x + px * r, c.y + py * r);
-                    gr.addColorStop(0, T.silverLo); gr.addColorStop(0.4, T.silverHi); gr.addColorStop(0.68, T.silver); gr.addColorStop(1, T.silverDk);
-                    ctx.fillStyle = gr;
-                    ctx.beginPath(); ctx.moveTo(c.x - px * r, c.y - py * r); ctx.lineTo(t0[0] - px * r * kT, t0[1] - py * r * kT);
-                    ctx.lineTo(t0[0] + px * r * kT, t0[1] + py * r * kT); ctx.lineTo(c.x + px * r, c.y + py * r); ctx.closePath(); ctx.fill();
-                    ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill();
+                    shafts.moveTo(c.x - px * r, c.y - py * r); shafts.lineTo(t0[0] - px * r * kT, t0[1] - py * r * kT);
+                    shafts.lineTo(t0[0] + px * r * kT, t0[1] + py * r * kT); shafts.lineTo(c.x + px * r, c.y + py * r); shafts.closePath();
+                    shafts.moveTo(c.x + r, c.y); shafts.arc(c.x, c.y, r, 0, Math.PI * 2);
+                    hiL.moveTo(c.x - px * r * 0.2, c.y - py * r * 0.2); hiL.lineTo(t0[0] - px * r * 0.2 * kT, t0[1] - py * r * 0.2 * kT);
+                    loL.moveTo(c.x + px * r * 0.75, c.y + py * r * 0.75); loL.lineTo(t0[0] + px * r * 0.75 * kT, t0[1] + py * r * 0.75 * kT);
                     const cc = P3(c.x, c.y, g.z);                                                          // collar where the canopy ties in
-                    ctx.strokeStyle = '#d9bf86'; ctx.lineWidth = 1.6;
-                    ctx.beginPath(); ctx.moveTo(cc[0] - px * r * kC * 1.15, cc[1] - py * r * kC * 1.15); ctx.lineTo(cc[0] + px * r * kC * 1.15, cc[1] + py * r * kC * 1.15); ctx.stroke();
-                    hex(t0[0], t0[1], (r + 3.2) * kT); ctx.fillStyle = '#e4e0f2'; ctx.fill();                  // lantern: silver frame, violet glass
-                    hex(t0[0], t0[1], (r + 0.6) * kT); ctx.fillStyle = '#5b4d86'; ctx.fill();
+                    collars.moveTo(cc[0] - px * r * kC * 1.15, cc[1] - py * r * kC * 1.15); collars.lineTo(cc[0] + px * r * kC * 1.15, cc[1] + py * r * kC * 1.15);
+                    hexP(lanO, t0[0], t0[1], (r + 3.2) * kT); hexP(lanI, t0[0], t0[1], (r + 0.6) * kT);  // lantern: silver frame, violet glass
                 }
+                ctx.fillStyle = '#4c4468'; ctx.fill(plin); ctx.strokeStyle = '#a49cc6'; ctx.lineWidth = 1; ctx.stroke(plin);
+                ctx.fillStyle = T.silver; ctx.fill(shafts);
+                ctx.lineWidth = r * 0.7; ctx.strokeStyle = T.silverHi; ctx.stroke(hiL); ctx.strokeStyle = T.silverDk; ctx.lineWidth = r * 0.45; ctx.stroke(loL);
+                ctx.strokeStyle = '#d9bf86'; ctx.lineWidth = 1.6; ctx.stroke(collars);
+                ctx.fillStyle = '#e4e0f2'; ctx.fill(lanO); ctx.fillStyle = '#5b4d86'; ctx.fill(lanI);
                 for (const [ox, oy] of SQ_ENTRY.posts) {                                                    // triple-globe lamp posts
                     const x = g.dx + ox, y = g.yf + oy, top = P3(x, y, 26), kk = this._sqK(26);
                     ctx.strokeStyle = '#3a2a6e'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(top[0], top[1]); ctx.stroke();
@@ -449,10 +478,10 @@
                 const kT = this._sqK(g.zCol);
                 for (const c of g.cols) {
                     const p = P3(c.x, c.y, g.zCol), near = Math.abs(c.x - g.dx) < 100, flick = 0.92 + 0.08 * Math.sin(t * 2.7 + c.x);
-                    const rr = (near ? 20 : 15) * kT, rg = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], rr);
-                    rg.addColorStop(0, near ? `rgba(255,236,220,${0.75 * a * flick})` : `rgba(214,186,255,${0.6 * a * flick})`);
-                    rg.addColorStop(0.35, `rgba(180,130,255,${0.3 * a * flick})`); rg.addColorStop(1, 'rgba(164,105,255,0)');
-                    ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(p[0], p[1], rr, 0, Math.PI * 2); ctx.fill();
+                    const rr = (near ? 20 : 15) * kT, a0 = ctx.globalAlpha;                                      // glow sprites, violet halo round a warm core
+                    ctx.globalAlpha = a0 * 0.3 * a * flick; drawGlow(ctx, p[0], p[1], rr, '180, 130, 255', 0);
+                    ctx.globalAlpha = a0 * (near ? 0.75 : 0.6) * a * flick; drawGlow(ctx, p[0], p[1], rr * 0.4, near ? '255, 236, 220' : '214, 186, 255', 0);
+                    ctx.globalAlpha = a0;
                     ctx.beginPath(); for (let i = 0; i < 6; i++) { const an = i * Math.PI / 3; ctx[i ? 'lineTo' : 'moveTo'](p[0] + Math.cos(an) * 5.6 * kT, p[1] + Math.sin(an) * 5.6 * kT); } ctx.closePath();
                     ctx.fillStyle = near ? `rgba(255,244,236,${0.95 * a})` : `rgba(232,218,255,${0.9 * a})`; ctx.fill();
                 }
@@ -562,9 +591,16 @@
             ctx.closePath();
         }
         function sqGlint(ctx, x, y, s) { ctx.fillRect(x - s, y - 0.5, s * 2, 1); ctx.fillRect(x - 0.5, y - s, 1, s * 2); }
-        function sqGlow(ctx, x, y, r, c0, c1) {
-            const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c0); g.addColorStop(1, c1);
-            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        /** A soft round glow from colour c0 at the centre to nothing at r — a stamped glow sprite
+            (core/draw-helpers.js), not a new gradient per call. c0 is 'rgba(r,g,b,a)'. */
+        const _sqGlowParse = new Map();
+        function sqGlow(ctx, x, y, r, c0) {
+            let q = _sqGlowParse.get(c0);
+            if (!q) { const m = c0.match(/[\d.]+/g); q = [m[0] + ', ' + m[1] + ', ' + m[2], m[3] == null ? 1 : +m[3]]; if (_sqGlowParse.size > 400) _sqGlowParse.clear(); _sqGlowParse.set(c0, q); }
+            if (q[1] <= 0.003 || r <= 0) return;
+            const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * Math.min(1, q[1]);
+            drawGlow(ctx, x, y, r, q[0], 0);
+            ctx.globalAlpha = a0;
         }
 
         Object.assign(BuildingV2.prototype, {
@@ -681,9 +717,8 @@
                     ctx.fillStyle = '#b8acdc'; ctx.beginPath(); ctx.roundRect(x - 9, y - 9, w + 18, h + 18, 6); ctx.fill();   // pearl marble deck
                     ctx.strokeStyle = 'rgba(217,191,134,0.6)'; ctx.lineWidth = 1; ctx.stroke();
                     ctx.strokeStyle = 'rgba(118,100,206,0.4)'; ctx.lineWidth = 1; ctx.strokeRect(x - 4.5, y - 4.5, w + 9, h + 9);
-                    const water = ctx.createLinearGradient(x, y, x + w, y + h);
-                    water.addColorStop(0, '#3b2c9e'); water.addColorStop(0.55, '#1f0f70'); water.addColorStop(1, T.glass);
-                    ctx.fillStyle = water; ctx.fillRect(x, y, w, h);
+                    ctx.fillStyle = LandmarkKit.grad(this, 'pool', () => { const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#3b2c9e'); g.addColorStop(0.55, '#1f0f70'); g.addColorStop(1, T.glass); return g; });
+                    ctx.fillRect(x, y, w, h);
                     ctx.strokeStyle = 'rgba(210,200,255,0.16)'; ctx.lineWidth = 1;                           // slow ripples of sky
                     for (let i = 0; i < 3; i++) {
                         const yy = y + h * (0.25 + i * 0.25) + Math.sin(t * 0.8 + i) * 2;
@@ -877,17 +912,25 @@
                 const t = _gameTimeSec;
                 ctx.save();
                 if (!emissive) {
-                    ctx.fillStyle = '#e9e4fb';
-                    for (const [x, y] of this._sqBulbs) { ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill(); }
+                    if (!this._sqBulbPath) { const p = new Path2D(); for (const [x, y] of this._sqBulbs) { p.moveTo(x + 1.6, y); p.arc(x, y, 1.6, 0, Math.PI * 2); } this._sqBulbPath = p; }
+                    ctx.fillStyle = '#e9e4fb'; ctx.fill(this._sqBulbPath);
                 } else {
                     ctx.globalCompositeOperation = 'lighter';
+                    // Each bulb shimmers on its own; the cores go out in a few brightness bands (8 fills, not one per bulb)
+                    const bands = [[], [], [], [], [], [], [], []], a0 = ctx.globalAlpha;
                     this._sqBulbs.forEach(([x, y], i) => {
                         const h = _bldHash(5151, i), on = 0.55 + 0.45 * Math.pow(Math.max(0, Math.sin(t * (1.1 + h) + h * 20)), 4);
                         const warm = i % 2 === 0;
-                        if (lod === 0) sqGlow(ctx, x, y, 7, warm ? `rgba(255,217,160,${0.45 * on})` : `rgba(217,194,255,${0.45 * on})`, 'rgba(255,217,160,0)');
-                        ctx.fillStyle = warm ? `rgba(255,236,205,${on})` : `rgba(236,224,255,${on})`;
-                        ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
+                        if (lod === 0) { ctx.globalAlpha = a0 * 0.45 * on; drawGlow(ctx, x, y, 7, warm ? '255, 217, 160' : '217, 194, 255', 0); }
+                        bands[(warm ? 0 : 4) + Math.min(3, Math.floor((on - 0.55) / 0.45 * 4))].push(x, y);
                     });
+                    bands.forEach((pts, bi) => {
+                        if (!pts.length) return;
+                        const on = 0.55 + 0.45 * ((bi % 4) + 0.5) / 4, p = new Path2D();
+                        for (let j = 0; j < pts.length; j += 2) { p.moveTo(pts[j] + 1.5, pts[j + 1]); p.arc(pts[j], pts[j + 1], 1.5, 0, Math.PI * 2); }
+                        ctx.globalAlpha = a0 * on; ctx.fillStyle = bi < 4 ? 'rgb(255,236,205)' : 'rgb(236,224,255)'; ctx.fill(p);
+                    });
+                    ctx.globalAlpha = a0;
                 }
                 ctx.restore();
             }
