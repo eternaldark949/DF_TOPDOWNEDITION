@@ -227,6 +227,22 @@
          * A faulty street lamp, now and then: about one outdoor lamp in ten stutters for
          * a moment every several seconds. Returns a light multiplier (1 = steady).
          */
+        /**
+         * Street lamps under the open sky wake one by one at dusk (17:45–18:15, each at its own
+         * minute), stuttering for a couple of minutes before they settle, and go out one by one
+         * after dawn. 0 = off, 1 = burning. Indoors, and for candles, always 1.
+         */
+        function lampWake(l) {
+            if (l.candle || typeof game === 'undefined' || !game.activeMap || game.activeMap.type !== 'outdoor') return 1;
+            if (l._wake === undefined) l._wake = Math.abs(Math.sin(l.x * 3.137 + l.y * 7.713) * 9173.13) % 1;
+            const m = game.worldMinutes % 1440, on = 17 * 60 + 45 + l._wake * 30, off = 6 * 60 + 5 + l._wake * 25;
+            if (m >= off && m < on) return 0;
+            const since = m >= on ? m - on : Infinity;
+            if (since >= 2.5) return 1;
+            const ph = since / 2.5, step = Math.floor(_frameTime / 70) + Math.floor(l._wake * 997);
+            const n = Math.abs(Math.sin(step * 12.9898 + l._wake * 78.233) * 43758.5453) % 1;
+            return n < 0.35 + 0.55 * ph ? 0.4 + 0.6 * ph : 0.04;
+        }
         function lampFlicker(l) {
             if (l.candle) {                                           // candle flames breathe (the House's candelabras)
                 const t = _frameTime / 1000, o = l.animOffset || 0;

@@ -23,7 +23,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `core/registries.js` | Notes, consumables, drinks, cosmetics (wigs, skins, outfits, hats, jewelry…); `CosmeticsSystem`, `BuffSystem` |
 | `core/resonance.js` | `ResonanceSystem`: 949's progression — earning (style-weighted), Dr. Yin's tuning, the Flit / Frame / Arms trees |
 | `core/utils.js` | Maths helpers, humanoid gait/animation helpers, weapon muzzle helpers, `RenderInterp` |
-| `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs, glow sprites (`glowSprite`, `drawGlow`), `lampFlicker`, `glowA` (a glow at an alpha: the interiors' light passes) |
+| `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs, glow sprites (`glowSprite`, `drawGlow`), `lampFlicker`, `lampWake` (street lamps wake one by one at dusk, stuttering on, and go out one by one after dawn), `glowA` (a glow at an alpha: the interiors' light passes) |
 | `core/appearances.js` | **Every character's look in one place**: `APPEARANCES` (949, the crew, staff, the city's cast), `ROLE_LOOKS` (medics, dancers, androids, pedestrians, gangers, spirits, ghosts), `PALETTE`, `ANDROID_FINISHES`; `lookFor(entity)`, `portraitOf(look)`; 747's look; the field mask rule (`withFieldMask`: 949 masked away from home) |
 | `core/settings.js` | `FullscreenManager`, `OrientationManager` (Settings → Screen Orientation: Auto / Portrait / Landscape; locks in fullscreen where supported, saved as `dfab_orientation`), `GameSettings`, object pools, perf utilities, `showMessage` |
 
@@ -73,7 +73,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | File | What's in it |
 |---|---|
 | `buildings/building-v1.js` | Original `Building` class, lane width constants |
-| `buildings/building-v2.js` | `BuildingV2` (leaning perspective walls, roofs, windows, signs) and generic apartment styling |
+| `buildings/building-v2.js` | `BuildingV2` (leaning perspective walls, roofs, windows, signs) and generic apartment styling; by day the window glass holds the sky, with a sun sheen sliding along the faces turned to it |
 | `buildings/silver-queen.js` | **The Silver Queen**: palette, portico, facade, verandas, roof garden, pool, eclipse pad, crown, entrance, roof lights |
 | `buildings/double-nights.js` | **Double Nights Hotel** (style `double_nights`): twin crescent towers (its emblem) extruded with the lean projection round a lens-shaped glass atrium; helipad and penthouse pool crowns with crimson halos; porte-cochère (fades when someone is under it), circular drive, double-crescent fountain, carpet (`_dnDrawGround`, baked); night: lit rooms, gold uplights, searchlights; the canopy script sign. Sections are collision bands (`doubleNightsSections`) |
 | `buildings/sky-layer.js` | Ad airships and floating shards in the sky |
@@ -85,6 +85,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `traffic/roads.js` | Lanes, segments, intersections, `RoadNetwork` |
 | `traffic/garage-zib.js` | Vehicle brands and prices, your garage, Zib rides, AI driving solver |
+| `traffic/car-art.js` | **How cars look**: `carSprite` (each body painted once per brand, model, paint: contact shadow, tyres and rims, paint shaded round its curve, glass greenhouse, mirrors, lamp housings; LADY BlackMark lacquer, gold pinstripe and rims, pearl hearse cap or panoramic black roof; Zenxera facets and cyan flank line; Gelfash bumpers, roof rails, pickup bed); `drawCarSheen` (the sun on the paint by day, street light sliding along the roof by night); `drawCarLamps`; `drawCarGlow` (tail, brake, head and signal lamps in the dark, after lighting); `drawCarUnderglow` |
 | `traffic/traffic-vehicle.js` | `TrafficVehicle`: every car on the road |
 | `traffic/traffic-manager.js` | Spawning and managing traffic |
 
@@ -147,7 +148,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/van-art.js` | Chapter 1's van: `van_interior` (roof off, nose up: the cab, the partition, benches of violet webbing, the road going by beneath, passing neon), `VAN.SEATS`, and `drawVanExterior` for the street (rear doors open) |
 | `engine/keeper-art.js` | The prologue's places: `keepers_hill` (the island above the clouds, the path, flowers, the house with its floating gable, portals and planets) and `keepers_parlor` (checkerboard tiles, the red wingback and burgundy chesterfield, the fire and its embers, the window above it); `keeperEmberPop` |
 | `engine/lighting.js` | Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, wet reflections, atmosphere |
-| `engine/daylight.js` | **Daylight**: `sunState()` (the sun's direction, shadow length, colour, golden hour, from `dayCycle`); `drawCastShadows` (buildings swept along the sun and tree canopies, one soft lavender multiply layer; drifting cloud shadows; `_sunShadow` tells foliage to skip its night pool); `drawDaylight` (warm sun wash, golden-hour haze, violet vignette). Outdoors and the veranda only |
+| `engine/daylight.js` | **Daylight**: `sunState()` (the sun's direction, shadow length, colour, golden hour, from `dayCycle`); `drawCastShadows` (buildings swept along the sun and tree canopies, one soft lavender multiply layer; drifting cloud shadows; `_sunShadow` tells foliage to skip its night pool; cars cast short shadows too); `sunNow()` (the light this frame, for paint and glass); `drawDaylight` (warm sun wash, golden-hour haze, violet vignette). Outdoors and the veranda only |
 | `engine/player-draw-input.js` | Drawing the player, emotes, `addPausableTimeout` (game-time timers: they pause with the game and clear on new game/load — use these, not `setTimeout`, for anything in the story or world), joysticks — the touch sticks: the move stick's flit ring (and flick / two-finger flit settings), the fire stick's threshold ring (aim inside, fire past it; sniper fire-on-release) and aim memory |
 | `engine/loop.js` | `enterWorld` (menu → world), `stop`, `resetGameState`, the main loop |
 
