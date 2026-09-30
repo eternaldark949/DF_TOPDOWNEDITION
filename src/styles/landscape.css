@@ -65,6 +65,8 @@
         body.landscape #main-menu { margin-top: 5vh; padding-bottom: 20px; }
         body.landscape .title-script { font-size: 3.6rem; }
         body.landscape .title-sub { font-size: 1.05rem; letter-spacing: 0.8rem; margin-bottom: 24px; }
+        body.landscape #tap-to-begin .title-sub { margin-bottom: 30px; }
+        body.landscape #tap-to-begin .ttb-cta { font-size: 1.3rem; }
         body.landscape .menu-list-container { gap: 6px; min-height: 0; }
         body.landscape .menu-item-row { min-height: 34px; padding: 2px 0; }
         body.landscape .death-text { font-size: 3.6rem; letter-spacing: 12px; }

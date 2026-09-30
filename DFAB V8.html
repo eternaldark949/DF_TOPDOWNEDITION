@@ -1310,6 +1310,21 @@
 .tun-foot { margin-top: 14px; text-align: right; }
 .tun-respec { font-size: 0.65rem; color: #ff8aa0; letter-spacing: 1px; cursor: pointer; }
 .tun-close { margin-top: 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.15); padding: 10px; border-radius: 6px; cursor: pointer; font-family: Orbitron, sans-serif; letter-spacing: 3px; font-size: 0.7rem; }
+
+        /* Tap to begin — the veil before the menu; its one tap goes fullscreen, locks landscape, wakes the sound */
+        #tap-to-begin { position: fixed; inset: 0; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; cursor: pointer; overflow: hidden;
+            background: radial-gradient(ellipse at 50% 42%, rgba(74, 44, 120, 0.55), rgba(10, 5, 20, 0.97) 70%), #07030e; transition: opacity 0.6s ease; -webkit-tap-highlight-color: transparent; user-select: none; }
+        #tap-to-begin.gone { opacity: 0; }   /* still catches taps while it fades, so none fall through to the menu */
+        #tap-to-begin .title-script { font-size: min(6rem, 17vw); left: 0; }
+        #tap-to-begin .title-sub { margin-bottom: 56px; font-size: min(1.5rem, 4.6vw); letter-spacing: min(1.2rem, 3.4vw); }
+        #tap-to-begin .ttb-cta { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 1.6rem; letter-spacing: 0.35rem; color: #e8c27a; text-shadow: 0 0 12px rgba(232, 194, 122, 0.55); animation: ttbBreathe 2.8s ease-in-out infinite; }
+        #tap-to-begin .ttb-hint { margin-top: 14px; font-family: var(--font-ui); font-size: 0.7rem; letter-spacing: 0.4rem; text-transform: uppercase; color: rgba(214, 200, 240, 0.4); }
+        #tap-to-begin .ttb-motes { position: absolute; inset: -50% 0 0 0; pointer-events: none; opacity: 0.7; animation: dlgMotes 22s linear infinite;
+            background-image: radial-gradient(1.5px 1.5px at 12% 20%, rgba(232, 194, 122, 0.8), transparent), radial-gradient(1px 1px at 30% 65%, rgba(214, 190, 255, 0.7), transparent),
+                radial-gradient(1.5px 1.5px at 55% 35%, rgba(232, 194, 122, 0.6), transparent), radial-gradient(1px 1px at 72% 80%, rgba(214, 190, 255, 0.6), transparent),
+                radial-gradient(2px 2px at 88% 15%, rgba(232, 194, 122, 0.5), transparent), radial-gradient(1px 1px at 45% 90%, rgba(232, 194, 122, 0.6), transparent);
+            background-size: 100% 50%; }
+        @keyframes ttbBreathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
         /* =========================================
            PAUSE SETTINGS PANEL
            ========================================= */
@@ -2694,6 +2709,8 @@
         body.landscape #main-menu { margin-top: 5vh; padding-bottom: 20px; }
         body.landscape .title-script { font-size: 3.6rem; }
         body.landscape .title-sub { font-size: 1.05rem; letter-spacing: 0.8rem; margin-bottom: 24px; }
+        body.landscape #tap-to-begin .title-sub { margin-bottom: 30px; }
+        body.landscape #tap-to-begin .ttb-cta { font-size: 1.3rem; }
         body.landscape .menu-list-container { gap: 6px; min-height: 0; }
         body.landscape .menu-item-row { min-height: 34px; padding: 2px 0; }
         body.landscape .death-text { font-size: 3.6rem; letter-spacing: 12px; }
@@ -2836,6 +2853,17 @@
     </div>
             
     <!-- Legacy audio-input removed - MusicWidgetSystem handles all music upload -->
+
+    <!-- Tap to begin: the one tap browsers need before fullscreen, the landscape lock and sound (app/menu-wiring.js) -->
+    <div id="tap-to-begin" role="button" tabindex="0" aria-label="Tap to begin">
+        <div class="ttb-motes"></div>
+        <div class="title-container">
+            <h1 class="title-script">Dimensions</h1>
+            <div class="title-sub">Freelancer</div>
+        </div>
+        <div class="ttb-cta">tap to begin</div>
+        <div class="ttb-hint">best in landscape</div>
+    </div>
 
     <div id="ui-layer">
         <div id="main-menu">
@@ -6470,8 +6498,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            FULLSCREEN
            ----------------------------------------------------------------------------
            The API only grants fullscreen from inside a user gesture, so this can
-           never be requested on load — enter() is called from the menu taps that
-           start or resume a game, and from the settings toggle. Vendor prefixes are
+           never be requested on load — the game goes fullscreen (and locks to its
+           orientation) on the tap-to-begin screen (app/menu-wiring.js), or failing
+           that the first tap or key press anywhere (armFirstGesture),
+           and again from the menu taps that start or resume a game and from the
+           settings toggle. The preference changes only when the player flips the
+           toggle: leaving by Esc or the back gesture doesn't turn it off for good. Vendor prefixes are
            still required for older WebKit. On iPhone Safari the element API doesn't
            exist at all (only <video> can go fullscreen); supported() reports false
            and the settings row reads N/A rather than offering a button that no-ops.
@@ -6519,25 +6551,42 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
 
             _persist() {
-                try { localStorage.setItem('dfab_fullscreen', GameSettings.fullscreen ? '1' : '0'); }
+                try { localStorage.setItem('dfab_fullscreen_pref', GameSettings.fullscreen ? '1' : '0'); }
                 catch (e) { /* private mode */ }
+            },
+
+            /** The player's toggle: remember the choice, then enter or leave. Call inside the tap. */
+            toggle() {
+                GameSettings.fullscreen = !this.isActive();
+                this._persist();
+                if (GameSettings.fullscreen) this.enter(); else this.exit();
+            },
+
+            /** The first tap or key press anywhere starts fullscreen and the orientation lock. */
+            armFirstGesture() {
+                const evs = ['pointerup', 'touchend', 'keydown'];
+                const go = () => {
+                    evs.forEach(ev => document.removeEventListener(ev, go, true));
+                    this.requestIfEnabled();
+                    OrientationManager.apply();
+                };
+                evs.forEach(ev => document.addEventListener(ev, go, true));
             },
 
             init() {
                 if (!this.supported()) return;
+                this.armFirstGesture();
                 ['fullscreenchange', 'webkitfullscreenchange',
                  'mozfullscreenchange', 'MSFullscreenChange'].forEach(ev => {
                     document.addEventListener(ev, () => {
-                        GameSettings.fullscreen = this.isActive();
-                        this._persist();
-                        if (GameSettings.fullscreen) OrientationManager.apply();   // a lock only holds in fullscreen
+                        const on = this.isActive();
+                        if (on) OrientationManager.apply();                         // a lock only holds in fullscreen
                         // The viewport just changed size; the canvas is sized from
                         // window.innerWidth/Height so it has to be told.
                         if (typeof game !== 'undefined' && game && game.resize) game.resize();
                         const row = document.getElementById('set-fullscreen');
                         if (row && window.pauseMenuController) {
-                            window.pauseMenuController._updateValueEl('set-fullscreen',
-                                GameSettings.fullscreen ? 'on' : 'off');
+                            window.pauseMenuController._updateValueEl('set-fullscreen', on ? 'on' : 'off');
                         }
                     });
                 });
@@ -6546,8 +6595,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         /* ============================================================================
            SCREEN ORIENTATION
-           Auto follows the phone (the layout switches with it: body.landscape, set in resize()).
-           Portrait / Landscape lock the screen — the browser only allows that in fullscreen, so
+           Landscape by default. Auto follows the phone (the layout switches with it: body.landscape,
+           set in resize()). Portrait / Landscape lock the screen — the browser only allows that in fullscreen, so
            it is applied on every fullscreen entry too. Where lock() doesn't exist (iPhone Safari)
            supported() is false and the setting row reads "AUTO (PHONE)".
            ============================================================================ */
@@ -6625,18 +6674,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Preference, not live state. FullscreenManager syncs it back down
             // when the player leaves fullscreen by Esc or the system back gesture,
             // so the settings row never claims to be on while the browser is off.
+            // Only the settings toggle writes it (dfab_fullscreen_pref). The old dfab_fullscreen key
+            // recorded every exit from fullscreen as "off", so it is dropped: everyone starts on.
             fullscreen: (() => {
                 try {
-                    const stored = localStorage.getItem('dfab_fullscreen');
+                    localStorage.removeItem('dfab_fullscreen');
+                    const stored = localStorage.getItem('dfab_fullscreen_pref');
                     if (stored !== null) return stored === '1';
                 } catch (e) { /* private mode */ }
                 return true;
             })(),
             
-            // 'auto' follows the phone; 'portrait' / 'landscape' lock it (OrientationManager)
+            // 'landscape' (default) / 'portrait' lock it; 'auto' follows the phone (OrientationManager)
             orientation: (() => {
-                try { const s = localStorage.getItem('dfab_orientation'); if (s === 'portrait' || s === 'landscape') return s; } catch (e) { /* private mode */ }
-                return 'auto';
+                try { const s = localStorage.getItem('dfab_orientation'); if (s === 'portrait' || s === 'landscape' || s === 'auto') return s; } catch (e) { /* private mode */ }
+                return 'landscape';
             })(),
 
             // --- AUTO-DETECT ---
@@ -56946,6 +56998,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         engineMixin({
             /** From the menu into the world: hide the menu layer, show the canvas, start the loop. */
             enterWorld() {
+                const ttb = document.getElementById('tap-to-begin'); if (ttb) ttb.remove();
                 document.getElementById('ui-layer').style.display = 'none';
                 document.getElementById('game-container').style.display = 'block';
                 this.running = true;
@@ -57260,6 +57313,25 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const mainMenuList = document.getElementById('main-menu-list');
         const storyModeList = document.getElementById('story-mode-list');
         const mainMenuDiv = document.getElementById('main-menu');
+
+        // Tap to begin: the one gesture the browser needs — fullscreen, the landscape lock, the sound — then the menu
+        (() => {
+            const ttb = document.getElementById('tap-to-begin');
+            if (!ttb) return;
+            const evs = ['pointerup', 'touchend', 'keydown'];
+            const begin = (e) => {
+                evs.forEach(ev => ttb.removeEventListener(ev, begin));
+                document.removeEventListener('keydown', begin);
+                FullscreenManager.requestIfEnabled();
+                OrientationManager.apply();
+                try { audioSys.init(); } catch (err) { /* sound can wait for the next tap */ }
+                if (typeof game !== 'undefined' && game && game.resize) game.resize();
+                ttb.classList.add('gone');
+                setTimeout(() => ttb.remove(), 650);
+            };
+            evs.forEach(ev => ttb.addEventListener(ev, begin));
+            document.addEventListener('keydown', begin);
+        })();
 
         document.getElementById('btn-new-game').addEventListener('click', () => { FullscreenManager.requestIfEnabled(); mainMenuList.classList.add('hidden'); storyModeList.classList.remove('hidden'); });
         document.getElementById('btn-story-949').addEventListener('click', () => { 
@@ -59919,10 +59991,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         return;
                     }
                     // This runs inside the tap, which is the only moment the browser
-                    // will grant the request. The fullscreenchange listener writes
-                    // the setting back and repaints this row.
-                    if (FullscreenManager.isActive()) FullscreenManager.exit();
-                    else FullscreenManager.enter();
+                    // will grant the request. The choice is remembered; the
+                    // fullscreenchange listener repaints this row.
+                    FullscreenManager.toggle();
                     
                 } else if (key === 'orientation') {
                     // Inside the tap: if we're fullscreen the lock takes at once, otherwise on the next fullscreen

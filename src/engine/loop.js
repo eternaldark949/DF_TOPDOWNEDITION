@@ -3,6 +3,7 @@
         engineMixin({
             /** From the menu into the world: hide the menu layer, show the canvas, start the loop. */
             enterWorld() {
+                const ttb = document.getElementById('tap-to-begin'); if (ttb) ttb.remove();
                 document.getElementById('ui-layer').style.display = 'none';
                 document.getElementById('game-container').style.display = 'block';
                 this.running = true;
