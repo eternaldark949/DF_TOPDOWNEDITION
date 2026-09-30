@@ -160,6 +160,7 @@
             }
             
             _setupSign(signConfig) {
+                if (this.style === 'double_nights') { this.attachedSign = null; return; }   // its script sign is on the canopy (_dnDrawSign)
                 const mainSection = this.sections[0];
                 const titleCase = (str) => str.replace(/\w\S*/g, (txt) => 
                     txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
@@ -176,6 +177,7 @@
             }
             
             _setupDoor(doorConfig) {
+                if (this.style === 'double_nights') { this._dnDoor(doorConfig); return; }   // the door is under the porte-cochère
                 this._doorLightColor = doorConfig.lightColor || null;
                 // Find the southernmost section for entrance
                 let entranceSection = this.sections[0];
@@ -255,7 +257,7 @@
                 this.attachedLights = [];
                 this._generateLights();
                 // Recreate door light if applicable (Silver Queen has its own entrance rig)
-                if (this._doorLightColor && this.style !== 'silver_queen') {
+                if (this._doorLightColor && this.style !== 'silver_queen' && this.style !== 'double_nights') {
                     let entranceSection = this.sections[0];
                     let maxY = entranceSection.y + entranceSection.h;
                     this.sections.forEach(s => { if (s.y + s.h > maxY) { entranceSection = s; maxY = s.y + s.h; } });
@@ -268,6 +270,7 @@
              * Draw base layer (under player): shadow, ground floor, entrance.
              */
             drawBase(ctx) {
+                if (this.style === 'double_nights') { this._dnDrawBase(ctx); return; }   // buildings/double-nights.js
                 ctx.save();
                 
                 // Draw shadow for each section
@@ -296,6 +299,7 @@
              * Draw top layer (over player): roof, facades, windows, details.
              */
             drawTop(ctx, worldMinutes = 1260) {
+                if (this.style === 'double_nights' && typeof game !== 'undefined' && game.camera) { this._dnDrawTop(ctx); return; }
                 if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) { this._drawLeanTop(ctx); return; }
                 ctx.save();
                 
@@ -348,6 +352,7 @@
              * so the player can see it while approaching the transition point.
              */
             drawSign(ctx) {
+                if (this.style === 'double_nights') { if (typeof game !== 'undefined' && game.camera) this._dnDrawSign(ctx); return; }
                 if (!this.attachedSign || !this.attachedTransition) return;
                 
                 ctx.save();
@@ -498,6 +503,7 @@
                 if (this.style === 'silver_queen' && this._sqPortico()) {
                     for (const c of this._sqPortico().cols) shapes.push({ x: c.x - 5, y: c.y - 5, w: 10, h: 10 });
                 }
+                if (this.style === 'double_nights') for (const [x, y] of this._dnGeo().cols) shapes.push({ x: x - 5, y: y - 5, w: 10, h: 10 });   // the canopy's columns
                 return shapes;
             }
         }
@@ -548,6 +554,8 @@
                     }
                     this.roofFeatures = ['stair', ...picked];
                     this.facadeFeature = r(4) < 0.55 ? 'balconies' : 'fire_escape';
+                } else if (this.style === 'double_nights') {
+                    this.floors = DN.FLOORS; this.roofFeatures = []; this.emissiveReach = 950;   // crowns, beams (buildings/double-nights.js)
                 } else if (this.style === 'silver_queen') {
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
@@ -559,6 +567,7 @@
                 const t = this.attachedTransition;
                 const accent = this.colors.accent;
                 if (this.style === 'silver_queen' && t) { this._sqLights(); return; }
+                if (this.style === 'double_nights') { this._dnLights(); return; }
                 if (t) {
                     const cx = t.x + t.w / 2, cy = t.y - 10;
                     // Entrance pair, warm pool at the door — purposeful light instead of a bulb grid
@@ -617,7 +626,7 @@
             _leanScale(extraFloors = 0) {
                 const B = CONFIG.BUILDINGS;
                 const h = (Math.min(this.floors, B.MAX_FLOORS) + extraFloors) * B.FLOOR_HEIGHT;
-                return h / (B.CAM_HEIGHT - h);             // roof = cam + (p - cam) * (1 + s)
+                return h / (leanCamHeight() - h);          // roof = cam + (p - cam) * (1 + s)
             },
 
             /** Faces the camera can see (outward side toward the camera). */
@@ -658,7 +667,12 @@
                         g.addColorStop(0, SQ_THEME.roof); g.addColorStop(1, SQ_THEME.roofLo); ctx.fillStyle = g;
                     } else ctx.fillStyle = this.colors.roof;
                     ctx.fillRect(sx, sy, section.w, section.h);
-                    ctx.strokeStyle = sq ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;          // tar seams
+                    if (sq) {                                                                  // a pearl sheen pooled toward the north-west corner
+                        const pg = ctx.createRadialGradient(sx + section.w * 0.25, sy + section.h * 0.2, 10, sx + section.w * 0.25, sy + section.h * 0.2, Math.max(section.w, section.h) * 0.8);
+                        pg.addColorStop(0, 'rgba(214,200,255,0.18)'); pg.addColorStop(1, 'rgba(214,200,255,0)');
+                        ctx.fillStyle = pg; ctx.fillRect(sx, sy, section.w, section.h);
+                    }
+                    ctx.strokeStyle = sq ? 'rgba(217,191,134,0.08)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;          // tar seams
                     for (let gx = 36; gx < section.w; gx += 36) { ctx.beginPath(); ctx.moveTo(sx + gx, sy); ctx.lineTo(sx + gx, sy + section.h); ctx.stroke(); }
                     ctx.strokeStyle = sq ? SQ_THEME.trim : lightenHex(this.colors.roof, 22); ctx.lineWidth = sq ? 4 : 5;       // parapet
                     ctx.strokeRect(sx + 2.5, sy + 2.5, section.w - 5, section.h - 5);
@@ -674,6 +688,7 @@
             /** Emissive layer (after lighting): lit windows, neon trim, rooftop lights. dark = ambient darkness 0..1 */
             drawEmissive(ctx, dark) {
                 if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
+                if (this.style === 'double_nights') { this._dnDrawEmissive(ctx, dark); return; }
                 const cam = game.camera, s = this._leanScale(), k = 1 + s;
                 const P = (x, y) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
                 const glow = Math.max(0.15, Math.min(1, dark * 1.1));
@@ -695,7 +710,7 @@
                 if (this.style === 'silver_queen') this._sqRoofEdgeLights(ctx, true);
                 if (this.style) this._drawRoofFeatures(ctx, true);
                 ctx.restore();
-                if (this.style === 'silver_queen') { this._sqDrawCrown(ctx, true); this._sqDrawBeams(ctx, dark); }
+                if (this.style === 'silver_queen') { this._sqVeil(ctx, dark); this._sqDrawCrown(ctx, true); this._sqDrawBeams(ctx, dark); }
             },
 
             /** Floodlight wash up the front face from the entrance lamps (accent-tinted). */

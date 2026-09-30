@@ -285,7 +285,7 @@
             /** After the ambush the BlackMark waits at the hotel curb. */
             placeCarAtHotel() {
                 const c = this.game.ownedCar; if (!c) return;
-                c.x = 1790; c.y = 905; c.angle = 0; c.vx = 0; c.vy = 0; if ('speed' in c) c.speed = 0;
+                c.x = 1764; c.y = 960; c.angle = Math.PI / 2;   // on the Double Nights drive (buildings/double-nights.js) c.vx = 0; c.vy = 0; if ('speed' in c) c.speed = 0;
             }
 
             /** Seven holds the lobby while the crew goes up (chapter 1). */

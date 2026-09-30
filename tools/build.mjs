@@ -65,6 +65,7 @@ const SCRIPTS = [
     'buildings/building-v1.js',
     'buildings/building-v2.js',
     'buildings/silver-queen.js',
+    'buildings/double-nights.js',
     'buildings/sky-layer.js',
     'buildings/factories.js',
     'buildings/registry-v3.js',

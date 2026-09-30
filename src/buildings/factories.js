@@ -191,8 +191,8 @@
         }
 
         /**
-         * Factory function to create Double Nights Hotel.
-         * Flat lowercase 'n' shape: connecting bridge at north, two towers south.
+         * Double Nights Hotel: twin crescent towers round a glass atrium (buildings/double-nights.js).
+         * The sections are collision/shadow bands; the building draws its own curves.
          */
         function createDoubleNightsHotel(x, y, config = {}) {
             return new BuildingV2({
@@ -201,67 +201,18 @@
                 y: y,
                 label: 'Double Nights Hotel',
                 type: 'hotel',
-                floors: 12,
-                
-                // Flat lowercase 'n': top bridge + two legs
-                sections: [
-                    { x: 0, y: 0, w: 800, h: 150 },       // North bridge (connecting bar)
-                    { x: 0, y: 150, w: 200, h: 300 },      // West tower (left leg)
-                    { x: 600, y: 150, w: 200, h: 300 },     // East tower (right leg)
-                ],
-                
-                // Tall elegant windows
-                windowWidth: 14,
-                windowHeight: 22,
-                windowSpacingX: 32,
-                windowSpacingY: 28,
-                windowMarginX: 22,
-                windowMarginY: 16,
-                
-                // Colors - dark luxurious crimson hotel theme
-                roofColor: '#2e1420',           // Rich burgundy roof
-                roofLightColor: '#3a1a28',      // Lighter burgundy
-                wallColor: '#281414',           // Very dark crimson-black walls
-                wallLightColor: '#361e1e',      // Dark warm brown
-                accentColor: '#ff0055',         // Crimson neon accent
-                windowColor: '#1a0a08',         // Dark warm glass
-                windowLitColor: '#ffdf80',      // Warm golden glow (hotel room lights)
-                windowFrameColor: '#1a0f0a',    // Dark wood frames
-                balconyColor: '#2a1018',        // Deep burgundy railings
-                
-                // Grand balconies on each section
-                balconies: [
-                    // Bridge entrance canopy (center)
-                    { section: 0, side: 'south', startX: 300, width: 200, floors: [1] },
-                    // West tower balconies
-                    { section: 1, side: 'south', startX: 30, width: 140, floors: [2, 5, 8, 11] },
-                    // East tower balconies
-                    { section: 2, side: 'south', startX: 30, width: 140, floors: [3, 6, 9, 12] },
-                ],
-                
-                // Rooftop details
-                roofProps: [
-                    // Helipad on the bridge (accessible rooftop)
-                    { type: 'helipad', section: 0, x: 400, y: 75, r: 55 },
-                    // AC units on towers
-                    { type: 'ac_unit', section: 1, x: 20, y: 20, w: 50, h: 35 },
-                    { type: 'ac_unit', section: 2, x: 130, y: 20, w: 50, h: 35 },
-                    // Water tanks
-                    { type: 'water_tank', section: 1, x: 150, y: 250, r: 25 },
-                    { type: 'water_tank', section: 2, x: 30, y: 250, r: 25 },
-                    // Vents
-                    { type: 'vent', section: 0, x: 50, y: 40, w: 30, h: 25 },
-                    { type: 'vent', section: 0, x: 720, y: 40, w: 30, h: 25 },
-                ],
-                
-                // Attachments
-                sign: { text: 'Double Nights', color: '#ff0055', size: 32 },
+                style: 'double_nights',
+                floors: 14,
+                sections: doubleNightsSections(),
+                roofColor: '#1a0c14', roofLightColor: '#2a1320', wallColor: '#0e070c', wallLightColor: '#2b1422',
+                accentColor: '#ffcf8a', windowColor: '#140a14', windowLitColor: '#ffd696', windowFrameColor: '#1a0f0a', balconyColor: '#2a1018',
+                roofProps: [{ type: 'none' }],
+                sign: { text: 'Double Nights', color: '#ff1a55', size: 32 },
                 door: {
                     target: config.doorTarget || 'hotel_lobby',
                     label: 'Enter Hotel',
                     lightColor: '#ffdf80'
                 },
-                
                 ...config
             });
         }

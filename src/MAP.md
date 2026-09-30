@@ -17,7 +17,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## core/ (loaded first)
 | File | What's in it |
 |---|---|
-| `core/config.js` | Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…). `HEARTHS`: where each fireplace is (art and ambience share it). `console.log` is silent unless `localStorage.dfab_debug = '1'` |
+| `core/config.js` | Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…). `HEARTHS`: where each fireplace is (art and ambience share it). `console.log` is silent unless `localStorage.dfab_debug = '1'`; `leanCamHeight()` (the building lean's camera height, normalised to zoom) |
 | *(generated)* | `ASSETS`: your images and audio from `assets/`, built automatically |
 | `core/assets.js` | `getImage`, `drawAsset`, `playSound` / `loadSound` for your assets |
 | `core/registries.js` | Notes, consumables, drinks, cosmetics (wigs, skins, outfits, hats, jewelry…); `CosmeticsSystem`, `BuffSystem` |
@@ -73,6 +73,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `buildings/building-v1.js` | Original `Building` class, lane width constants |
 | `buildings/building-v2.js` | `BuildingV2` (leaning perspective walls, roofs, windows, signs) and generic apartment styling |
 | `buildings/silver-queen.js` | **The Silver Queen**: palette, portico, facade, verandas, roof garden, pool, eclipse pad, crown, entrance, roof lights |
+| `buildings/double-nights.js` | **Double Nights Hotel** (style `double_nights`): twin crescent towers (its emblem) extruded with the lean projection round a lens-shaped glass atrium; helipad and penthouse pool crowns with crimson halos; porte-cochère (fades when someone is under it), circular drive, double-crescent fountain, carpet (`_dnDrawGround`, baked); night: lit rooms, gold uplights, searchlights; the canopy script sign. Sections are collision bands (`doubleNightsSections`) |
 | `buildings/sky-layer.js` | Ad airships and floating shards in the sky |
 | `buildings/factories.js` | `create…` functions for each named building (Silver Queen, Enni Cole, cafe, hotel, club, clinic…) |
 | `buildings/registry-v3.js` | `BuildingV3` (editor-exported buildings), the building registry, Biggs amusement park |
