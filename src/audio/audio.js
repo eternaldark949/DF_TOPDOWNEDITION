@@ -18,6 +18,7 @@
            - 'flit'    : Rising warp for teleport (triangle wave, 200Hz → 600Hz)
            - 'crunch'  : A car hit (thump + metal noise + glass), opts.gain by impact
            - tyres(l)  : Looped tyre squeal for the driven car, level 0..1
+           - engine(s) : The driven car's electric hum (ENGINE_HUM per brand)
            ===================================================================== */
         class AudioSystem {
             constructor() {
@@ -215,6 +216,45 @@
                 }
             }
 
+            /**
+             * The driven car's motor: a low, smooth, many-voiced electric hum. A detuned pair
+             * (the body) with a slow chorus, a quiet fifth (warmth), a filtered saw that opens
+             * with the throttle (shimmer), and a faint high whine past half speed. Pitch glides
+             * with speed — no gears. Each brand has its own root (ENGINE_HUM). Built on first
+             * use; `on` swells it in and out.
+             *   engine({ on, speed01, throttle, brand })
+             */
+            engine(st) {
+                const on = !!(st && st.on);
+                if (!this._eng) {
+                    if (!on) return;
+                    const c = this.ctx, bus = c.createGain(); bus.gain.value = 0; bus.connect(this.masterGain);
+                    const osc = (type, g0) => { const o = c.createOscillator(), g = c.createGain(); o.type = type; g.gain.value = g0; o.connect(g); o.start(); return { o, g }; };
+                    const body1 = osc('sine', 0.5), body2 = osc('sine', 0.3), fifth = osc('triangle', 0.09), whine = osc('sine', 0);
+                    const saw = osc('sawtooth', 0.07), lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.8; lp.frequency.value = 300;
+                    saw.g.connect(lp);
+                    const tone = c.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 2600;   // rounds off the whole bank
+                    for (const n of [body1.g, body2.g, fifth.g, whine.g, lp]) n.connect(tone);
+                    tone.connect(bus);
+                    const chorus = c.createOscillator(), cg = c.createGain(); chorus.frequency.value = 0.23; cg.gain.value = 5;   // ±5 cents, slowly
+                    chorus.connect(cg); cg.connect(body2.o.detune); chorus.start();
+                    body1.o.detune.value = -4; body2.o.detune.value = 4;
+                    this._eng = { bus, body1, body2, fifth, whine, saw, lp };
+                }
+                const E = this._eng, now = this.ctx.currentTime, H = ENGINE_HUM[st && st.brand] || ENGINE_HUM.Gelfash;
+                const v = Math.max(0, Math.min(1, (st && st.speed01) || 0)), thr = Math.max(0, Math.min(1, (st && st.throttle) || 0));
+                const f = H.root * (1 + 1.1 * v);                                  // one smooth glide, idle to top speed
+                const glide = (p, x) => p.setTargetAtTime(x, now, 0.12);
+                glide(E.body1.o.frequency, f); glide(E.body2.o.frequency, f * 2);
+                glide(E.fifth.o.frequency, f * 1.5); glide(E.saw.o.frequency, f * 3); glide(E.whine.o.frequency, f * 8);
+                glide(E.lp.frequency, 250 + 1250 * Math.max(thr, v * 0.6) * H.shimmer);
+                glide(E.whine.g.gain, H.whine * Math.max(0, v - 0.5) * 2 * 0.06);
+                glide(E.body1.g.gain, 0.5 * H.body);
+                const level = on ? H.level * (0.72 + 0.18 * v + 0.1 * thr) : 0;
+                E.bus.gain.setTargetAtTime(level, now, on ? (this._engOn ? 0.1 : 0.2) : 0.27);   // swells in over ~0.6 s, out over ~0.8 s
+                this._engOn = on;
+            }
+
             /** One second of white noise, made once. */
             _noise() {
                 if (this._noiseBuf) return this._noiseBuf;
@@ -247,6 +287,13 @@
                 this._tyreL = L;
             }
         }
+        /** Each brand's motor (AudioSystem.engine): root pitch in Hz and how the voices sit. */
+        const ENGINE_HUM = {
+            LADY:    { root: 44, body: 1.15, shimmer: 0.8, whine: 0.8, level: 0.11 },   // darkest, most body
+            Zenxera: { root: 55, body: 1.0,  shimmer: 1.2, whine: 1.0, level: 0.1 },    // brighter, more shimmer
+            Gelfash: { root: 62, body: 0.85, shimmer: 0.9, whine: 0.5, level: 0.09 }    // thinner, little whine
+        };
+
         // Global audio system instance
         const audioSys = new AudioSystem();
 
@@ -333,6 +380,9 @@
                 const vol = GameSettings.ambienceVolume ?? 0.7;
                 const drv = !paused && game.isDriving && game.car && game.car.controlMode === 'PLAYER';
                 a.tyres(drv ? Math.min(1, (game.car.tyreSlip || 0) * 0.45) : 0);   // the driven car's tyres, however hard they're sliding
+                const car = game.car, inCar = !paused && game.isDriving && car && (car.controlMode === 'PLAYER' || car.controlMode === 'AI');
+                a.engine({ on: inCar, brand: car && car.brand, speed01: car ? Math.abs(car.speed || 0) / (car.maxSpeed || 10) : 0,
+                           throttle: car ? Math.abs(car.controlMode === 'PLAYER' ? (car.pedal || 0) : (car.manualGas || 0)) : 0 });   // her motor (auto-drive too)
 
                 this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
                 const van = map.id === 'van_interior', rolling = van && game.vanMoving !== false;   // the crew's van: rain drums on the roof, the road hums underneath

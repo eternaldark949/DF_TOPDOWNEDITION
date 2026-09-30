@@ -5,8 +5,10 @@
            pavements and crossings are painted into 512 px tiles the first time
            they come into view, and after that the frame just blits them (it used
            to redraw every road in full every frame). Tiles are kept in a small
-           LRU; at most a couple are painted per frame (a tile still being
-           painted shows the plain ground colour for that frame).
+           LRU (sized by memory: a half-res tile counts a quarter); a couple are
+           painted per frame, more while the frame has time, and ahead of a
+           moving car. A tile not painted yet at this resolution borrows the
+           other one; only a tile never painted shows the plain ground colour.
 
            Roads are painted from their own geometry — corners and lane offsets
            along the road (Road.getCorners / paramToWorld) — so a diagonal or
@@ -27,41 +29,77 @@
             constructor(game) {
                 this.game = game;
                 this.S = 512;                 // tile size (world px, painted 1:1)
-                this.max = 40;                // tiles kept (≈ 40 MB at most)
+                this.max = 40;                // full-size tiles' worth kept (≈ 40 MB at most; a half-res tile counts ¼)
+                this.lod = 0;
+                this.weight = 0;
                 this.cache = new Map();
                 this.mapId = null;
-                this.budget = 0;
             }
 
             /** Only the city is baked (other maps keep their own ground). */
             activeFor(map) { return !!(map && map.id === 'hub_949' && this.game.traffic && this.game.traffic.network && this.game.traffic.network.roads.length); }
 
-            invalidate() { this.cache.clear(); }
+            invalidate() { this.cache.clear(); this.weight = 0; }
 
-            /** Blit the tiles under the view (painting at most two new ones this frame). */
+            /**
+             * Blit the tiles under the view. Missing tiles are painted within a small
+             * time budget; until one is ready, the same tile at the other resolution
+             * stands in (scaled), and only a tile never painted at all shows the plain
+             * ground. Spare budget paints ahead of the car, so fast driving meets
+             * tiles that are already there. stats: this frame's counts (tests read it).
+             */
             draw(ctx, view) {
-                const map = this.game.activeMap;
+                const map = this.game.activeMap, G = CONFIG.GROUND_BAKE;
                 if (map.id !== this.mapId) { this.invalidate(); this.mapId = map.id; }
-                this.lod = (this.game.camera.zoom || 1) < 0.6 ? 1 : 0;         // zoomed out: half-resolution tiles (much cheaper to blit)
-                const S = this.S, i0 = Math.max(0, Math.floor(view.left / S)), j0 = Math.max(0, Math.floor(view.top / S));
-                const i1 = Math.min(Math.ceil(map.width / S) - 1, Math.floor(view.right / S)), j1 = Math.min(Math.ceil(map.height / S) - 1, Math.floor(view.bottom / S));
-                this.budget = 2;
+                const z = this.game.camera.zoom || 1;                            // zoomed out: half-resolution tiles (much cheaper to blit)
+                if (this.lod === 0 && z < G.HALF_RES_BELOW) this.lod = 1;         // with a band, so a wobbling zoom doesn't
+                else if (this.lod === 1 && z > G.FULL_RES_ABOVE) this.lod = 0;    // flip every tile back and forth
+                const S = this.S, cols = Math.ceil(map.width / S) - 1, rows = Math.ceil(map.height / S) - 1;
+                const range = (v) => [Math.max(0, Math.floor(v.left / S)), Math.max(0, Math.floor(v.top / S)),
+                                      Math.min(cols, Math.floor(v.right / S)), Math.min(rows, Math.floor(v.bottom / S))];
+                const [i0, j0, i1, j1] = range(view);
+                this.t0 = performance.now(); this.baked = 0;
+                this.stats = { flat: 0, stand: 0, baked: 0 };
                 for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-                    const t = this._tile(i, j);
+                    let t = this._tile(i, j, this.lod);
+                    if (!t) { t = this.cache.get(i + ',' + j + ',' + (1 - this.lod)); if (t) this.stats.stand++; }
                     if (t) ctx.drawImage(t, i * S, j * S, S, S);
-                    else { ctx.fillStyle = GROUND_LOOK.lot; ctx.fillRect(i * S, j * S, S, S); }
+                    else { this.stats.flat++; ctx.fillStyle = GROUND_LOOK.lot; ctx.fillRect(i * S, j * S, S, S); }
                 }
+                // Ahead of the car: the tiles it's about to reach, while there's time left
+                const car = this.game.isDriving && this.game.car;
+                if (car && (car.vx || car.vy)) {
+                    const lx = car.vx * G.AHEAD_TICKS, ly = car.vy * G.AHEAD_TICKS;
+                    const [a0, b0, a1, b1] = range({ left: view.left + Math.min(0, lx), right: view.right + Math.max(0, lx),
+                                                     top: view.top + Math.min(0, ly), bottom: view.bottom + Math.max(0, ly) });
+                    for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) {
+                        if (i >= i0 && i <= i1 && j >= j0 && j <= j1) continue;
+                        if (!this._canBake()) break;
+                        this._tile(i, j, this.lod);
+                    }
+                }
+                this.stats.baked = this.baked;
             }
 
-            _tile(i, j) {
-                const key = i + ',' + j + ',' + this.lod;
+            /** Room to paint another tile this frame: a couple always, more while the frame has time. */
+            _canBake() {
+                const G = CONFIG.GROUND_BAKE;
+                return this.baked < G.MIN_PER_FRAME || (this.baked < G.MAX_PER_FRAME && performance.now() - this.t0 < G.FRAME_MS);
+            }
+
+            _tile(i, j, lod) {
+                const key = i + ',' + j + ',' + lod;
                 const hit = this.cache.get(key);
                 if (hit) { this.cache.delete(key); this.cache.set(key, hit); return hit; }   // most recent last
-                if (this.budget <= 0) return null;
-                this.budget--;
-                const cv = this._bake(i, j, this.lod);
-                this.cache.set(key, cv);
-                while (this.cache.size > this.max) this.cache.delete(this.cache.keys().next().value);
+                if (!this._canBake()) return null;
+                this.baked++;
+                const cv = this._bake(i, j, lod);
+                cv._w = lod ? 0.25 : 1;                                          // memory, in full-size tiles
+                this.cache.set(key, cv); this.weight = (this.weight || 0) + cv._w;
+                while (this.weight > this.max && this.cache.size > 1) {         // the oldest go first
+                    const k0 = this.cache.keys().next().value;
+                    this.weight -= this.cache.get(k0)._w || 1; this.cache.delete(k0);
+                }
                 return cv;
             }
 
