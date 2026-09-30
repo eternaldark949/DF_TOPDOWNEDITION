@@ -6,8 +6,11 @@
            FULLSCREEN
            ----------------------------------------------------------------------------
            The API only grants fullscreen from inside a user gesture, so this can
-           never be requested on load — enter() is called from the menu taps that
-           start or resume a game, and from the settings toggle. Vendor prefixes are
+           never be requested on load — the game goes fullscreen (and locks to its
+           orientation) on the first tap or key press anywhere (armFirstGesture),
+           and again from the menu taps that start or resume a game and from the
+           settings toggle. The preference changes only when the player flips the
+           toggle: leaving by Esc or the back gesture doesn't turn it off for good. Vendor prefixes are
            still required for older WebKit. On iPhone Safari the element API doesn't
            exist at all (only <video> can go fullscreen); supported() reports false
            and the settings row reads N/A rather than offering a button that no-ops.
@@ -59,21 +62,38 @@
                 catch (e) { /* private mode */ }
             },
 
+            /** The player's toggle: remember the choice, then enter or leave. Call inside the tap. */
+            toggle() {
+                GameSettings.fullscreen = !this.isActive();
+                this._persist();
+                if (GameSettings.fullscreen) this.enter(); else this.exit();
+            },
+
+            /** The first tap or key press anywhere starts fullscreen and the orientation lock. */
+            armFirstGesture() {
+                const evs = ['pointerup', 'touchend', 'keydown'];
+                const go = () => {
+                    evs.forEach(ev => document.removeEventListener(ev, go, true));
+                    this.requestIfEnabled();
+                    OrientationManager.apply();
+                };
+                evs.forEach(ev => document.addEventListener(ev, go, true));
+            },
+
             init() {
                 if (!this.supported()) return;
+                this.armFirstGesture();
                 ['fullscreenchange', 'webkitfullscreenchange',
                  'mozfullscreenchange', 'MSFullscreenChange'].forEach(ev => {
                     document.addEventListener(ev, () => {
-                        GameSettings.fullscreen = this.isActive();
-                        this._persist();
-                        if (GameSettings.fullscreen) OrientationManager.apply();   // a lock only holds in fullscreen
+                        const on = this.isActive();
+                        if (on) OrientationManager.apply();                         // a lock only holds in fullscreen
                         // The viewport just changed size; the canvas is sized from
                         // window.innerWidth/Height so it has to be told.
                         if (typeof game !== 'undefined' && game && game.resize) game.resize();
                         const row = document.getElementById('set-fullscreen');
                         if (row && window.pauseMenuController) {
-                            window.pauseMenuController._updateValueEl('set-fullscreen',
-                                GameSettings.fullscreen ? 'on' : 'off');
+                            window.pauseMenuController._updateValueEl('set-fullscreen', on ? 'on' : 'off');
                         }
                     });
                 });
@@ -82,8 +102,8 @@
 
         /* ============================================================================
            SCREEN ORIENTATION
-           Auto follows the phone (the layout switches with it: body.landscape, set in resize()).
-           Portrait / Landscape lock the screen — the browser only allows that in fullscreen, so
+           Landscape by default. Auto follows the phone (the layout switches with it: body.landscape,
+           set in resize()). Portrait / Landscape lock the screen — the browser only allows that in fullscreen, so
            it is applied on every fullscreen entry too. Where lock() doesn't exist (iPhone Safari)
            supported() is false and the setting row reads "AUTO (PHONE)".
            ============================================================================ */
@@ -169,10 +189,10 @@
                 return true;
             })(),
             
-            // 'auto' follows the phone; 'portrait' / 'landscape' lock it (OrientationManager)
+            // 'landscape' (default) / 'portrait' lock it; 'auto' follows the phone (OrientationManager)
             orientation: (() => {
-                try { const s = localStorage.getItem('dfab_orientation'); if (s === 'portrait' || s === 'landscape') return s; } catch (e) { /* private mode */ }
-                return 'auto';
+                try { const s = localStorage.getItem('dfab_orientation'); if (s === 'portrait' || s === 'landscape' || s === 'auto') return s; } catch (e) { /* private mode */ }
+                return 'landscape';
             })(),
 
             // --- AUTO-DETECT ---

@@ -723,10 +723,9 @@
                         return;
                     }
                     // This runs inside the tap, which is the only moment the browser
-                    // will grant the request. The fullscreenchange listener writes
-                    // the setting back and repaints this row.
-                    if (FullscreenManager.isActive()) FullscreenManager.exit();
-                    else FullscreenManager.enter();
+                    // will grant the request. The choice is remembered; the
+                    // fullscreenchange listener repaints this row.
+                    FullscreenManager.toggle();
                     
                 } else if (key === 'orientation') {
                     // Inside the tap: if we're fullscreen the lock takes at once, otherwise on the next fullscreen
