@@ -52347,7 +52347,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         filterChain = `grayscale(80%) brightness(${(1.4 * ggBright * ggExposure).toFixed(2)}) contrast(${(1.2 * ggContrast).toFixed(2)}) sepia(0.3) hue-rotate(300deg) saturate(${(1.5 * ggSaturate).toFixed(2)})`;
                     }
                 } else {
-                    if (this.player.visibility !== undefined) {
+                    if (this.scenes && this.scenes.running) {
+                        // A scene has the stage: Stella is off-camera, so her stealth doesn't grey the story out
+                        this.targetGrayscale = 0; this.visualGrayscale = 0;
+                    } else if (this.player.visibility !== undefined) {
                         this.targetGrayscale = (1.0 - this.player.visibility) * 100;
                         this.visualGrayscale += (this.targetGrayscale - this.visualGrayscale) * 0.05;
                         if (this.visualGrayscale < 0.5) this.visualGrayscale = 0;
