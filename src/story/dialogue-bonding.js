@@ -359,12 +359,12 @@
                 const peeking = this._isPeeking();
                 const g = this.game;
 
+                // Name and colour before the text: the text write is what the
+                // transcript and the box tint (screens-ui.js observers) react to.
                 g.npcNameEl.textContent = line.speaker;
-                g.npcTextEl.textContent = line.text;
-
-                // Speaker color (options override, then SPEAKER_COLORS fallback)
                 const colors = options.speakerColors || {};
                 g.npcNameEl.style.color = colors[line.speaker] || SPEAKER_COLORS[line.speaker] || '#ccc';
+                g.npcTextEl.textContent = line.text;
 
                 // Render portrait for current speaker
                 if (g.renderDialoguePortrait) g.renderDialoguePortrait(line.speaker, line.mood, line.text);

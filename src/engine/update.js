@@ -1141,43 +1141,40 @@
                     const driverSeatPos = this.car.getSeatWorldPos(0);
                     this.player.x = driverSeatPos.x; this.player.y = driverSeatPos.y;
             
-                    // Drive-By Shooting Logic
-                    const isShooting = (this.fireJoystick.active && this.fireJoystick.firing) || (this.mouseDown && this.mouseX);
-                    this.isShootingFromCar = isShooting; // Store for drawing
-                    
-                    if (isShooting) {
-                        // Get raw aim angle
+                    // Drive-By Shooting Logic: from the driver's window, so the aim is held
+                    // to the car's left half. A sniper on Fire on Release arms past the ring
+                    // and takes the shot when the thumb lifts, same as on foot.
+                    const F = this.fireJoystick;
+                    const clampToWindow = (aimAngle) => {
+                        let rel = aimAngle - this.car.angle;
+                        while (rel > Math.PI) rel -= Math.PI * 2;
+                        while (rel < -Math.PI) rel += Math.PI * 2;
+                        // Left side is -PI..0 relative to the car's facing; the right snaps to the nearer edge
+                        if (rel > 0 && rel < Math.PI) rel = rel < Math.PI / 2 ? 0 : -Math.PI;
+                        return this.car.angle + rel;
+                    };
+                    const releasing = this._releaseShot !== null && this._releaseShot !== undefined;
+                    const isShooting = (F.active && F.firing) || (this.mouseDown && this.mouseX);
+                    const armed = F.active && F.armed;
+                    this.isShootingFromCar = isShooting || armed || releasing; // Store for drawing
+
+                    if (releasing) {
+                        this.player.angle = clampToWindow(this._releaseShot);
+                        if (this.shootCooldown <= 0) { this.fireWeapon(); this._releaseShot = null; }
+                        else if (++this._releaseWait > 30) this._releaseShot = null;
+                        if (this._releaseShot === null) this._releaseWait = 0;
+                    } else if (isShooting || armed) {
                         let aimAngle;
-                        if (this.fireJoystick.active) {
-                            aimAngle = Math.atan2(this.fireJoystick.dy, this.fireJoystick.dx);
+                        if (F.active) {
+                            aimAngle = Math.atan2(F.dy, F.dx);
                         } else {
                             const worldX = this.player.x + (this.mouseX - this.canvas.width/2) / this.camera.zoom;
                             const worldY = this.player.y + (this.mouseY - this.canvas.height/2) / this.camera.zoom;
                             aimAngle = Math.atan2(worldY - this.player.y, worldX - this.player.x);
                         }
-                        
-                        // Clamp aim angle to LEFT side of car (driver's window)
-                        // Valid range: car.angle - PI to car.angle (the left 180 degrees)
-                        let relativeAngle = aimAngle - this.car.angle;
-                        // Normalize to -PI to PI
-                        while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2;
-                        while (relativeAngle < -Math.PI) relativeAngle += Math.PI * 2;
-                        
-                        // Left side is from -PI to 0 (relative to car facing)
-                        // If aiming to right side (0 to PI), clamp to nearest edge
-                        if (relativeAngle > 0 && relativeAngle < Math.PI) {
-                            // Aiming to right side - clamp to nearest valid edge
-                            if (relativeAngle < Math.PI / 2) {
-                                relativeAngle = 0; // Clamp to forward
-                            } else {
-                                relativeAngle = -Math.PI; // Clamp to backward
-                            }
-                        }
-                        
-                        this.player.angle = this.car.angle + relativeAngle;
-                        
-                        // Cooldown already counted down once this tick (step 1)
-                        if (this.shootCooldown <= 0) { this.fireWeapon(); }
+                        this.player.angle = clampToWindow(aimAngle);
+                        // Cooldown already counted down once this tick (step 1); armed only aims
+                        if (isShooting && this.shootCooldown <= 0) { this.fireWeapon(); }
                     } else {
                         // Not shooting - face car direction
                         this.player.angle = this.car.angle;
