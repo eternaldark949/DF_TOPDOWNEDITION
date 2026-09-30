@@ -2021,9 +2021,22 @@
             if (scale !== 1) ctx.scale(scale, scale);
             ctx.drawImage(sp.cv, sp.x, sp.y, sp.w, sp.h);
             if (M.glow.length && _zoomLOD < 2) {
-                const a0 = ctx.globalAlpha, pulse = 0.8 + 0.2 * Math.sin(_frameTime / 260 + x);
+                // The lights breathe slowly (~3.6 s), each a beat behind the one before, so a soft wave
+                // travels down the gun; a spark glides along its light line every few seconds.
+                const a0 = ctx.globalAlpha, t = _frameTime / 1000;
                 ctx.globalCompositeOperation = 'lighter';
-                for (const g of M.glow) { ctx.globalAlpha = a0 * 0.55 * pulse; drawGlow(ctx, g[0], g[1], g[2], g[3], 0.2); }
+                M.glow.forEach((g, i) => {
+                    const br = 0.5 + 0.5 * Math.sin(t * 1.75 - i * 0.7);
+                    ctx.globalAlpha = a0 * (0.22 + 0.5 * br);
+                    drawGlow(ctx, g[0], g[1], g[2] * (0.85 + 0.25 * br), g[3], 0.2);
+                });
+                if (M.run && _zoomLOD === 0) {
+                    const u = (t / 3.2) % 1, k = Math.sin(Math.min(1, u / 0.7) * Math.PI);   // glides for 70% of the cycle, then rests
+                    if (u < 0.7) {
+                        ctx.globalAlpha = a0 * 0.9 * k;
+                        drawGlow(ctx, M.run[0] + (M.run[1] - M.run[0]) * (u / 0.7), M.run[2], 1.8, M.run[3], 0.35);
+                    }
+                }
                 ctx.globalAlpha = a0;
             }
             ctx.restore();

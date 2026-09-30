@@ -38066,135 +38066,165 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
            the barrel, the grip hand near 0,0, +y to the holder's right), each in a
            material. A model is painted once into a sprite (bakeWeapon) and stamped
-           by drawWeapon (ui/humanoid-render.js); only its glows are drawn live.
-           Drawn from straight above: square-cut slabs in deep colours with lines of light.
-           A slab's sheen runs down its middle whichever way the holder turns, so the
-           baked shading never needs relighting.
+           by drawWeapon (ui/humanoid-render.js); only its lights are drawn live.
+           Ethereal, elegant sci-fi seen from straight above, in the shapes of
+           ETERNAL's catalog sketches, shaded as angular metallic glass: hard bevel
+           facets, slanted glass glints, faceted gem knobs, glass sleeves over the
+           lines of light. The shading runs along the gun, so it holds whichever
+           way the holder turns and never needs relighting.
              muzzle   barrel tip (shots and the laser leave from here: weaponMuzzleLocal)
-             rail     where an under-barrel laser module sits (its front end)
+             rail     where the laser module sits (its front end)
              brass    the glitter colour of the spent casings each shot throws (null: an energy gun)
-             glow     live emitters [x, y, r, colour]
+             glow     live lights [x, y, r, colour], breathing slowly in a wave down the gun
+             run      a spark that glides down a light line [x0, x1, y, colour]
            ===================================================================== */
-        const GUN_MATERIALS = {             // base, edge (dark rim), hi (the sheen down the middle) — deep, saturated, a little lacquered
-            abyss:      ['#0d0b16', '#000000', '#2e2a48'],
-            midnight:   ['#0f1a52', '#030620', '#34489c'],
-            lavender:   ['#a58ee6', '#4a3790', '#e6dcff'],
-            periwinkle: ['#7d8cf5', '#2e3796', '#d6dcff'],
-            pearl:      ['#e9e6f6', '#8a84a8', '#ffffff'],
-            crimson:    ['#b00c28', '#44020c', '#ff4d68'],
-            teal:       ['#0a9e8c', '#023d36', '#6ff5e2'],
-            bronze:     ['#8a4a1c', '#2e1406', '#d98a4a'],
-            molten:     ['#ff5a12', '#7a1c00', '#ffc080'],
-            gold:       ['#c9942a', '#5a3a06', '#ffe08a'],
-            champagne:  ['#e8d3a4', '#8e7446', '#fff6dc'],
-            pink:       ['#e0147a', '#5e0430', '#ff8ac4']
+        const GUN_MATERIALS = {             // base, edge (the dark facet), hi (the bright bevel) — jewel tones, pearl, tinted obsidian glass
+            abyss:      ['#1a1436', '#06030f', '#5c4fa0'],      // obsidian glass, violet in its depths
+            midnight:   ['#172a86', '#050a30', '#6f8cff'],
+            lavender:   ['#a891ec', '#4a3790', '#f0e8ff'],
+            periwinkle: ['#8392f7', '#2e3796', '#e2e6ff'],
+            pearl:      ['#ece8fb', '#8f86b8', '#ffffff'],
+            crimson:    ['#c0143e', '#48031a', '#ff7a98'],
+            teal:       ['#12b8a4', '#034a42', '#9cfff2'],
+            bronze:     ['#a0602e', '#3a1606', '#f6b477'],       // rose bronze
+            molten:     ['#ff6418', '#7a1c00', '#ffd09a'],
+            gold:       ['#d2a038', '#5a3a06', '#fff0b0'],
+            champagne:  ['#eddcb2', '#8e7446', '#fffaea'],
+            pink:       ['#e81c84', '#5e0430', '#ffa0d0'],
+            violet:     ['#4a24a0', '#14063a', '#b596ff']
         };
 
-        // Seen from straight above: every gun is a stack of square-cut slabs along its axis (+x down the
-        // barrel), its width across. _r: a slab from x0 to x1, centred on cy, w wide, in a material.
-        // _e: an emitter (baked with its own halo; the brightest also glow live, see `glow`).
+        // Shapes (from the sketches): a rounded knob at the rear where the hand sits, a band that bulges out
+        // both sides (the side view's big ring), a long rounded slide or barrel, square collars with slots of
+        // light, a side knob and emblem, a nub at the muzzle.
+        // _r slab x0→x1 centred on cy, w wide · _cap the same, fully rounded · _c a knob (a faceted gem) ·
+        // _e/_ce lights (baked with a halo) · _g a glass sleeve over a light · _hole a bore · _slots three slots.
         const _r = (x0, x1, cy, w, m, r = 0.3) => ({ rr: [x0, cy - w / 2, x1 - x0, w, r], m });
+        const _cap = (x0, x1, cy, w, m) => _r(x0, x1, cy, w, m, w / 2);
+        const _c = (x, y, r, m) => ({ dot: [x, y, r], m });
         const _e = (x0, x1, cy, w, c) => ({ rr: [x0, cy - w / 2, x1 - x0, w, 0.2], c, emit: true });
+        const _ce = (x, y, r, c) => ({ dot: [x, y, r], c, emit: true });
+        const _g = (x0, x1, cy, w) => ({ rr: [x0, cy - w / 2, x1 - x0, w, w / 2], glass: true });
+        const _hole = (x, y, r) => ({ dot: [x, y, r], c: '#020104' });
+        const _slots = (x0, x1, cy, c) => [-1.3, 0, 1.3].map(o => _e(x0, x1, cy + o, 0.42, c));
 
         const WEAPON_MODELS = {
-            pistol_fpx: {                                                                       // black, with deep-blue light
-                stance: 'pistol', muzzle: [13.4, 1], rail: [11, 3.6], brass: '#6f8cff',
+            pistol_fpx: {                                                                       // obsidian glass with deep-blue light (catalog sketch)
+                stance: 'pistol', muzzle: [13.4, 1], rail: [10.5, 4.3], brass: '#6f8cff',
                 parts: [
-                    _r(-3, 12.2, 1, 4.6, 'abyss', 0.5),
-                    _r(-2.4, 1.4, 1, 3.2, 'midnight'),                                          // rear plate
-                    _e(0.4, 10.6, -0.55, 0.45, '#3d6bff'), _e(0.4, 10.6, 2.55, 0.45, '#3d6bff'),   // the two light lines down the slide
-                    _r(2.6, 6.2, 1, 1.4, 'midnight'),                                           // the port
-                    _r(12.2, 13.4, 1, 2.4, 'abyss'),
-                    _e(10.8, 11.8, 1, 1, '#6f9bff')                                              // front sight
+                    _c(-2, 1, 2.4, 'abyss'), _c(-2.2, 1, 1.05, 'midnight'),                     // the rear knob
+                    _r(1, 12.2, 1, 4.4, 'abyss', 1.2),                                         // the slide
+                    _e(3.4, 9.6, 1, 0.45, '#4a78ff'), _g(3, 10, 1, 1.5),                        // a light down its spine, under glass
+                    _r(10.3, 11.9, 1, 1, 'midnight', 0.2), _e(10.6, 11.6, 1, 0.45, '#8fb0ff'),  // the sight notch
+                    _cap(11.6, 13.4, 1, 2.6, 'midnight'),                                       // the muzzle nub
+                    _cap(-1.4, 2.2, 1, 6.8, 'midnight'),                                        // the ring band, bulging both sides
+                    _cap(-0.6, 1.4, 1, 5.2, 'abyss'),
+                    _ce(0.4, -1.8, 0.75, '#4a78ff'), _ce(0.4, 3.8, 0.75, '#4a78ff')             // the ring's light at each side
                 ],
-                glow: [[11.3, 1, 3.2, '#3d6bff'], [5.5, -0.55, 2.4, '#3d6bff'], [5.5, 2.55, 2.4, '#3d6bff']]
+                glow: [[0.4, -1.8, 2.6, '#4a78ff'], [0.4, 3.8, 2.6, '#4a78ff'], [6.5, 1, 2.6, '#4a78ff'], [11.1, 1, 2.2, '#8fb0ff']],
+                run: [3.4, 9.6, 1, '#9fbaff']
             },
             pistol_anavia: {                                                                    // periwinkle and lavender, a light for a core
-                stance: 'pistol', muzzle: [13.4, 1], rail: [11, 3.8], brass: null,
+                stance: 'pistol', muzzle: [13.4, 1], rail: [10, 4.5], brass: null,
                 parts: [
-                    _r(2.4, 4, 1, 7.2, 'lavender'), _r(6.6, 8.2, 1, 7.2, 'lavender'),             // the square fins
-                    _r(-3, 11.2, 1, 4.8, 'lavender', 0.6),
-                    _r(-2.4, 0.6, 1, 3.4, 'periwinkle'),
-                    _e(0.8, 10.6, 1, 1.1, '#9aa6ff'),                                             // the core
-                    _r(11.2, 13.4, 1, 3.4, 'periwinkle'),
-                    _e(12.4, 13.4, 1, 2.2, '#b9c2ff')
+                    _c(-1.8, 1, 2.3, 'lavender'), _c(-2, 1, 1, 'periwinkle'),
+                    _r(0.6, 11.4, 1, 4.8, 'lavender', 2),
+                    _e(4, 10.2, 1, 0.9, '#9aa6ff'), _g(3.6, 10.6, 1, 2),                        // the core, under glass
+                    _c(12.2, 1, 2, 'periwinkle'), _ce(12.5, 1, 0.9, '#c4cbff'),                 // the front orb
+                    _cap(0.6, 3.4, 1, 7, 'periwinkle'),
+                    _ce(2, -2, 0.7, '#9fb0ff'), _ce(2, 4, 0.7, '#9fb0ff')
                 ],
-                glow: [[13, 1, 3.4, '#8c9cff'], [5.5, 1, 2.8, '#a58ee6'], [3.2, 1, 2, '#9fb0ff'], [7.4, 1, 2, '#9fb0ff']]
+                glow: [[2, -2, 2.2, '#9fb0ff'], [2, 4, 2.2, '#9fb0ff'], [7, 1, 2.8, '#a58ee6'], [12.5, 1, 3.2, '#8c9cff']],
+                run: [4, 10.2, 1, '#e4e0ff']
             },
-            pistol_ganger: {                                                                    // the hot pink pistol
-                stance: 'pistol', muzzle: [12.9, 1], rail: [10.5, 3.6], brass: '#ff6ab8',
+            pistol_ganger: {                                                                    // the hot pink pistol: the FP-X's shape
+                stance: 'pistol', muzzle: [12.9, 1], rail: [10, 4.2], brass: '#ff6ab8',
                 parts: [
-                    _r(-3, 11.6, 1, 4.4, 'pink', 0.5),
-                    _r(-2.4, 1, 1, 3, 'abyss'),
-                    _r(2.6, 6, 1, 1.3, 'abyss'),
-                    _r(11.6, 12.9, 1, 2.2, 'abyss'),
-                    _e(0.6, 10.2, 2.35, 0.4, '#ff9ad2')
+                    _c(-2, 1, 2.3, 'pink'),
+                    _r(1, 11.6, 1, 4.2, 'pink', 1.2),
+                    _cap(11.2, 12.9, 1, 2.4, 'abyss'),
+                    _cap(-1.4, 2, 1, 6.4, 'abyss'),
+                    _e(0.3, 1, 1, 5.4, '#ff9ad2')
                 ],
-                glow: []
+                glow: [[0.65, 1, 2.6, '#ff6ab8']]
             },
-            rifle_rb98: {                                                                       // teal and white
-                stance: 'rifle', muzzle: [29.3, 1.5], rail: [22, 4.6], brass: '#6ff5e2',
+            rifle_rb98: {                                                                       // pearl and teal
+                stance: 'rifle', muzzle: [29.3, 1.5], rail: [21, 4.3], brass: '#6ff5e2',
                 parts: [
-                    _r(-9.8, -1, 1.5, 4, 'pearl'),
-                    _r(-9.8, -8.6, 1.5, 4.6, 'abyss'),                                           // butt pad
-                    _e(-8, -2, 1.5, 0.6, '#3dffe0'),
-                    _r(-1, 14, 1.5, 5.6, 'pearl', 0.5),
-                    _r(2, 12, 1.5, 1.6, 'abyss'),                                                // top rail
-                    _r(2.6, 3.6, 1.5, 2.4, 'teal'), _r(5, 6, 1.5, 2.4, 'teal'), _r(7.4, 8.4, 1.5, 2.4, 'teal'), _r(9.8, 10.8, 1.5, 2.4, 'teal'),
-                    _r(13, 23, 1.5, 5, 'teal', 0.4),
-                    _e(14.2, 21.8, -0.45, 0.45, '#3dffe0'), _e(14.2, 21.8, 3.45, 0.45, '#3dffe0'),
-                    _r(15, 16, 1.5, 3, 'pearl'), _r(17.5, 18.5, 1.5, 3, 'pearl'), _r(20, 21, 1.5, 3, 'pearl'),
-                    _r(23, 27.2, 1.5, 1.8, 'abyss'),
-                    _r(27, 29.3, 1.5, 3, 'pearl')
+                    _cap(-10, -4.6, 1.5, 4.6, 'pearl'),                                         // the rear pad
+                    _r(-5.6, 13.2, 1.5, 5.8, 'pearl', 2.2),                                    // the body
+                    _e(-3.4, 11.4, 1.5, 0.5, '#3dffe0'), _g(-3.8, 11.8, 1.5, 1.7),
+                    _r(13, 19, 1.5, 5, 'teal', 0.6), ..._slots(13.8, 18.2, 1.5, '#3dffe0'),      // the vent collar
+                    _cap(19, 27.4, 1.5, 2.2, 'abyss'),
+                    _cap(26.4, 29.3, 1.5, 3.2, 'pearl'),                                        // the muzzle cap
+                    _cap(3.2, 6.4, 1.5, 7.4, 'teal'),                                           // the ring band
+                    _ce(4.8, -1.9, 0.7, '#3dffe0'), _ce(4.8, 4.9, 0.7, '#3dffe0')
                 ],
-                glow: [[18, -0.45, 3, '#3dffe0'], [18, 3.45, 3, '#3dffe0'], [-5, 1.5, 2.4, '#3dffe0']]
+                glow: [[-1, 1.5, 2.2, '#3dffe0'], [4.8, -1.9, 2.4, '#3dffe0'], [4.8, 4.9, 2.4, '#3dffe0'], [16, 1.5, 3.2, '#3dffe0']],
+                run: [-3.4, 11.4, 1.5, '#c8fff6']
             },
-            sniper_sara: {                                                                      // YourGirlSara: molten orange, bronze and black
-                stance: 'sniper', muzzle: [55.2, 0.5], rail: [44, 3], brass: '#ff9a3c',
+            sniper_sara: {                                                                      // YourGirlSara: molten orange, rose bronze and obsidian
+                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 2.9], brass: '#ff9a3c',
                 parts: [
-                    _r(-12, -1, 0.5, 4.8, 'abyss', 0.5),
-                    _e(-10.5, -2.5, 0.5, 0.7, '#ff6a1a'),
-                    _r(-1, 25, 0.5, 5.2, 'bronze', 0.5),
-                    _e(0.5, 23.5, -1.7, 0.45, '#ff7a24'), _e(0.5, 23.5, 2.7, 0.45, '#ff7a24'),
-                    _r(25, 51, 0.5, 2.4, 'abyss'),
-                    _e(26, 50, 0.5, 0.5, '#ff5a12'),                                            // the barrel's heat line
-                    _r(51, 55.2, 0.5, 4.2, 'bronze'),
-                    _r(52, 52.8, 0.5, 4.2, 'abyss'), _r(53.6, 54.4, 0.5, 4.2, 'abyss'),
-                    _r(3, 20, 0.5, 3.2, 'abyss', 0.4),                                          // the scope, on top
-                    _r(6.5, 8, 0.5, 3.8, 'bronze'), _r(14, 15.5, 0.5, 3.8, 'bronze'),
-                    _e(19.2, 20.4, 0.5, 2.4, '#ffb060')
+                    _cap(-12, -2, 0.5, 5.4, 'abyss'),                                          // the rounded rear hump
+                    _e(-10, -4, 0.5, 0.7, '#ff6a1a'),
+                    _r(-2.6, 14.2, 0.5, 5.6, 'bronze', 1.2),                                   // the receiver
+                    _c(6, 3.8, 1.3, 'bronze'),                                                  // the side knob
+                    _r(14.6, 18.6, 0.5, 4.8, 'bronze', 0.4), ..._slots(15.2, 18, 0.5, '#ff7a24'),
+                    _r(19.2, 23.2, 0.5, 4.8, 'bronze', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff7a24'),
+                    _cap(23.2, 51.4, 0.5, 2.8, 'abyss'),
+                    _e(24.5, 50, 0.5, 0.5, '#ff5a12'), _g(24, 50.6, 0.5, 1.6),                  // the barrel's heat line, under glass
+                    _r(51, 55.2, 0.5, 4, 'bronze', 0.8),                                        // the brake
+                    _r(52.1, 52.7, 0.5, 4, 'abyss'), _r(53.5, 54.1, 0.5, 4, 'abyss'),
+                    _cap(0.4, 13.6, 0.5, 3, 'abyss'),                                           // the scope, on top
+                    _r(3.4, 4.6, 0.5, 3.6, 'bronze'), _r(9.4, 10.6, 0.5, 3.6, 'bronze'),
+                    _ce(13, 0.5, 0.95, '#ffb060')
                 ],
-                glow: [[19.8, 0.5, 3.6, '#ff7a24'], [12, -1.7, 3, '#ff6a1a'], [12, 2.7, 3, '#ff6a1a'], [40, 0.5, 3, '#ff5a12']]
+                glow: [[-7, 0.5, 2.4, '#ff6a1a'], [13, 0.5, 3.2, '#ff7a24'], [16.6, 0.5, 3, '#ff6a1a'], [21.2, 0.5, 3, '#ff6a1a'], [38, 0.5, 3, '#ff5a12']],
+                run: [24.5, 50, 0.5, '#ffd09a']
             },
-            sniper_sr86: {                                                                      // SR-86: black, red and white
-                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 3.4], brass: '#ff4d68',
+            sniper_sr86: {                                                                      // SR-86: obsidian, crimson and pearl (catalog sketch)
+                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 2.8], brass: '#ff4d68',
                 parts: [
-                    _r(-12, -1, 0.5, 4.4, 'abyss', 0.5),
-                    _r(-9, -3, 0.5, 1.2, 'crimson'),
-                    _r(-1, 23, 0.5, 4.4, 'pearl', 0.5),
-                    _r(12, 26, 0.5, 4.8, 'abyss', 0.4),
-                    _e(13, 25, -1.45, 0.45, '#ff2448'), _e(13, 25, 2.45, 0.45, '#ff2448'),
-                    _r(26, 49, 0.5, 2, 'abyss'),
-                    _r(49, 55.2, 0.5, 3.6, 'crimson', 0.5),
-                    _r(50.5, 51.1, 0.5, 3.6, 'abyss'), _r(52.3, 52.9, 0.5, 3.6, 'abyss'),
-                    _r(2, 17, 0.5, 2.8, 'abyss', 0.4),
-                    _r(5.5, 6.7, 0.5, 3.4, 'pearl'), _r(11.5, 12.7, 0.5, 3.4, 'pearl'),
-                    _e(16.2, 17.4, 0.5, 2, '#ff2448')
+                    _cap(-12, -2, 0.5, 5.4, 'abyss'),                                          // the thumb-hump rear
+                    _r(-9.6, -4, 0.5, 1, 'crimson'),
+                    _r(-2.6, 14.2, 0.5, 5.6, 'pearl', 1.2),                                    // the receiver
+                    _c(6, 3.8, 1.3, 'pearl'),                                                   // the side knob
+                    _e(4.4, 7.6, 0.5, 0.6, '#ff2448'), _e(5.7, 6.3, 0.5, 2.6, '#ff2448'),        // the cross emblem
+                    _r(14.6, 18.6, 0.5, 4.8, 'abyss', 0.4), ..._slots(15.2, 18, 0.5, '#ff2448'), // the two slotted collars
+                    _r(19.2, 23.2, 0.5, 4.8, 'abyss', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff2448'),
+                    _cap(23.2, 54.2, 0.5, 3, 'abyss'),                                          // the long smooth barrel
+                    _e(25, 50, 0.5, 0.35, '#ff2448'), _g(24.6, 50.4, 0.5, 1.4),                 // a hairline of red down it, under glass
+                    _hole(51.4, 0.5, 0.6),                                                      // its bore hole
+                    _cap(53.2, 55.2, 0.5, 2, 'crimson')                                         // the muzzle nub
                 ],
-                glow: [[16.8, 0.5, 3.4, '#ff2448'], [19, -1.45, 2.6, '#ff2448'], [19, 2.45, 2.6, '#ff2448']]
+                glow: [[6, 0.5, 3.2, '#ff2448'], [16.6, 0.5, 3, '#ff2448'], [21.2, 0.5, 3, '#ff2448'], [54.2, 0.5, 2, '#ff2448']],
+                run: [25, 50, 0.5, '#ff9aae']
             },
-            golden_child: {                                                                     // gold and champagne, a light in a square
-                stance: 'pistol', muzzle: [20, 1], rail: [14, 5.6], brass: null,
+            golden_child: {                                                                     // gold and champagne, a light in its heart
+                stance: 'pistol', muzzle: [20, 1], rail: [13, 5.8], brass: null,
                 parts: [
-                    _r(-3, 14, 1, 8, 'gold', 0.8),
-                    _r(-1.6, 1.4, -1.4, 2, 'champagne'), _r(-1.6, 1.4, 3.4, 2, 'champagne'),
-                    _r(9.6, 12.6, -1.4, 2, 'champagne'), _r(9.6, 12.6, 3.4, 2, 'champagne'),
-                    _r(3.4, 8.6, 1, 5.2, 'champagne'),
-                    _e(4.4, 7.6, 1, 3.2, '#fff1c4'),                                              // the core
-                    _r(14, 20, 1, 6, 'champagne', 0.6),
-                    _e(17, 19.4, 1, 2.4, '#ffd76a')
+                    _cap(-3.6, 14, 1, 8.4, 'gold'),
+                    _e(-1.6, 12, 1, 0.5, '#ffe7a0'), _g(-2, 12.4, 1, 2),
+                    _cap(3.8, 7.4, 1, 9.6, 'champagne'),                                        // the ring band
+                    _ce(5.6, 1, 1.7, '#fff1c4'),                                                // the core
+                    _c(16.6, 1, 3.3, 'champagne'), _ce(17.6, 1, 1.35, '#ffd76a')                // the front orb and its bore
                 ],
-                glow: [[6, 1, 4.4, '#ffd76a'], [18.4, 1, 3.8, '#ffe7a0']]
+                glow: [[5.6, 1, 4.2, '#ffd76a'], [17.6, 1, 3.6, '#ffe7a0']],
+                run: [-1.6, 12, 1, '#fffaea']
+            },
+            empg: {                                                                             // the EMP blaster (catalog): a bulbous body, twin orbs at the front
+                stance: 'pistol', muzzle: [14.6, 1], rail: [9, 5.4], brass: null,
+                parts: [
+                    _c(-2, 1, 2.4, 'abyss'),
+                    _cap(-1.2, 12.4, 1, 7.4, 'violet'),
+                    _ce(1, 1, 0.75, '#c9a6ff'),                                                 // the port
+                    _e(3.6, 10, 1, 0.5, '#b48cff'), _g(3.2, 10.4, 1, 2.2),
+                    _c(12.6, -1.5, 1.6, 'pearl'), _ce(13, -1.5, 0.7, '#dcc6ff'),                 // the twin orbs
+                    _c(12.6, 3.5, 1.6, 'pearl'), _ce(13, 3.5, 0.7, '#dcc6ff')
+                ],
+                glow: [[1, 1, 2, '#c9a6ff'], [13, -1.5, 2.8, '#b48cff'], [13, 3.5, 2.8, '#b48cff']],
+                run: [3.6, 10, 1, '#efe4ff']
             }
         };
         const LASER_MODULE = [                                                                  // under-barrel laser: body, then emitter at its front
@@ -38205,7 +38235,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function weaponModel(id) {
             id = id || '';
             return WEAPON_MODELS[id] || (id.includes('sniper') ? WEAPON_MODELS.sniper_sara : id.includes('rifle') ? WEAPON_MODELS.rifle_rb98
-                : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
+                : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
         }
 
         const _weaponSprites = new Map();
@@ -38228,36 +38258,59 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return [0, 0, 0, 0];
         }
 
+        /** 'r, g, b' of a mix of two '#rrggbb' colours. */
+        function _gunMix(a, b, t) {
+            const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16), m = (s) => Math.round(((A >> s) & 255) * (1 - t) + ((B >> s) & 255) * t);
+            return `rgb(${m(16)}, ${m(8)}, ${m(0)})`;
+        }
+
         /**
-         * Paint one part: a cylinder across its width (dark rims, the body, a shine a little
-         * above the middle, a 1-sprite-px specular line), or plain colour for glass and emitters.
+         * Paint one part as angular metallic glass: a slab or capsule gets hard facets across its width
+         * (a bright bevel, the body, a darker lower facet, the dark edge) and slanted glass glints; a
+         * knob is a faceted gem split on the diagonal; a glass sleeve is a clear tinted pane with a
+         * bright edge; bores and lights are plain colour (lights with a baked halo).
          */
         function _paintGunPart(c, p) {
-            const [x0, y0, x1, y1] = _gunPartBox(p);
-            if (p.lines) {
-                c.strokeStyle = p.c; c.lineWidth = p.w || 0.4; c.lineCap = 'round'; c.beginPath();
-                for (const l of p.lines) { c.moveTo(l[0], l[1]); c.lineTo(l[2], l[3]); }
-                c.stroke(); return;
-            }
-            const path = _gunPartPath(p);
-            if (p.ring) {
-                const M = GUN_MATERIALS[p.m];
-                c.strokeStyle = M[1]; c.lineWidth = 1.1; c.stroke(path);
-                c.strokeStyle = M[0]; c.lineWidth = 0.6; c.stroke(path); return;
+            const [x0, y0, x1, y1] = _gunPartBox(p), path = _gunPartPath(p);
+            if (p.glass) {
+                c.fillStyle = 'rgba(226, 218, 255, 0.16)'; c.fill(path);
+                c.save(); c.clip(path);
+                c.strokeStyle = 'rgba(255, 255, 255, 0.55)'; c.lineWidth = 0.22;
+                c.beginPath(); c.moveTo(x0, y0 + 0.2); c.lineTo(x1, y0 + 0.2); c.stroke();
+                _gunGlints(c, x0, y0, x1, y1, 0.3);
+                c.restore(); return;
             }
             if (!p.m) {
                 c.fillStyle = p.c;
                 if (p.emit) { c.save(); c.shadowColor = p.c; c.shadowBlur = 2.2 * WEAPON_BAKE; c.fill(path); c.fill(path); c.restore(); }
                 c.fill(path); return;
             }
-            const M = GUN_MATERIALS[p.m], g = c.createLinearGradient(0, y0, 0, y1);
-            g.addColorStop(0, M[1]); g.addColorStop(0.16, M[0]); g.addColorStop(0.38, M[2]); g.addColorStop(0.6, M[0]); g.addColorStop(1, M[1]);
+            const M = GUN_MATERIALS[p.m];
+            if (p.dot) {                                                                        // a faceted gem: lit half, shaded half, a glint
+                const [x, y, r] = p.dot, g = c.createLinearGradient(x - r, y - r, x + r, y + r);
+                g.addColorStop(0, M[2]); g.addColorStop(0.46, _gunMix(M[2], M[0], 0.55)); g.addColorStop(0.46, M[0]);
+                g.addColorStop(0.8, _gunMix(M[0], M[1], 0.5)); g.addColorStop(1, M[1]);
+                c.fillStyle = g; c.fill(path);
+                c.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                c.beginPath(); c.moveTo(x - r * 0.55, y - r * 0.2); c.lineTo(x - r * 0.2, y - r * 0.55); c.lineTo(x - r * 0.05, y - r * 0.4); c.lineTo(x - r * 0.4, y - r * 0.05); c.closePath(); c.fill();
+                return;
+            }
+            const g = c.createLinearGradient(0, y0, 0, y1);                                     // hard facets across the width
+            g.addColorStop(0, M[1]); g.addColorStop(0.08, M[1]);
+            g.addColorStop(0.08, M[2]); g.addColorStop(0.26, _gunMix(M[2], M[0], 0.5));
+            g.addColorStop(0.26, M[0]); g.addColorStop(0.6, M[0]);
+            g.addColorStop(0.6, _gunMix(M[0], M[1], 0.45)); g.addColorStop(0.9, _gunMix(M[0], M[1], 0.6));
+            g.addColorStop(0.9, M[1]); g.addColorStop(1, M[1]);
             c.fillStyle = g; c.fill(path);
-            if (y1 - y0 > 1.4 && x1 - x0 > 2.5) {                                               // the specular line along the shine
-                c.save(); c.clip(path);
-                c.strokeStyle = 'rgba(255, 255, 255, 0.55)'; c.lineWidth = 1 / WEAPON_BAKE;
-                const sy = y0 + (y1 - y0) * 0.36; c.beginPath(); c.moveTo(x0 + 0.6, sy); c.lineTo(x1 - 0.6, sy); c.stroke();
-                c.restore();
+            if (x1 - x0 > 3 && y1 - y0 > 1.6) { c.save(); c.clip(path); _gunGlints(c, x0, y0, x1, y1, 0.2); c.restore(); }
+        }
+        /** Slanted glass glints across a part (clipped by the caller): a broad one and a thin one. */
+        function _gunGlints(c, x0, y0, x1, y1, a) {
+            const h = y1 - y0, L = x1 - x0, sk = h * 0.7;
+            for (const [f, w, k] of [[0.3, Math.min(1.6, L * 0.08), 1], [0.3, 0.35, 0.8], [0.72, 0.5, 0.6]]) {
+                const sx = x0 + L * f + (k === 0.8 ? Math.min(1.6, L * 0.08) + 0.5 : 0);
+                c.fillStyle = `rgba(255, 255, 255, ${a * k})`;
+                c.beginPath(); c.moveTo(sx + sk, y0); c.lineTo(sx + sk + w, y0); c.lineTo(sx + w, y1); c.lineTo(sx, y1); c.closePath(); c.fill();
             }
         }
 
@@ -40313,9 +40366,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (scale !== 1) ctx.scale(scale, scale);
             ctx.drawImage(sp.cv, sp.x, sp.y, sp.w, sp.h);
             if (M.glow.length && _zoomLOD < 2) {
-                const a0 = ctx.globalAlpha, pulse = 0.8 + 0.2 * Math.sin(_frameTime / 260 + x);
+                // The lights breathe slowly (~3.6 s), each a beat behind the one before, so a soft wave
+                // travels down the gun; a spark glides along its light line every few seconds.
+                const a0 = ctx.globalAlpha, t = _frameTime / 1000;
                 ctx.globalCompositeOperation = 'lighter';
-                for (const g of M.glow) { ctx.globalAlpha = a0 * 0.55 * pulse; drawGlow(ctx, g[0], g[1], g[2], g[3], 0.2); }
+                M.glow.forEach((g, i) => {
+                    const br = 0.5 + 0.5 * Math.sin(t * 1.75 - i * 0.7);
+                    ctx.globalAlpha = a0 * (0.22 + 0.5 * br);
+                    drawGlow(ctx, g[0], g[1], g[2] * (0.85 + 0.25 * br), g[3], 0.2);
+                });
+                if (M.run && _zoomLOD === 0) {
+                    const u = (t / 3.2) % 1, k = Math.sin(Math.min(1, u / 0.7) * Math.PI);   // glides for 70% of the cycle, then rests
+                    if (u < 0.7) {
+                        ctx.globalAlpha = a0 * 0.9 * k;
+                        drawGlow(ctx, M.run[0] + (M.run[1] - M.run[0]) * (u / 0.7), M.run[2], 1.8, M.run[3], 0.35);
+                    }
+                }
                 ctx.globalAlpha = a0;
             }
             ctx.restore();
