@@ -43,6 +43,16 @@
                         b.drawEmissive(ctx, dark);
                     }
                 }
+                // Car lamps in the dark: tail and brake lights, headlights, signals (traffic/car-art.js)
+                if (dark > 0.04) {
+                    const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z + 60, hh = this.canvas.height / 2 / z + 60, c = this.camera;
+                    const cars = new Set(this.traffic ? this.traffic.vehicles : []);
+                    for (const v of [this.car, this.ownedCar, this.deliveryVehicle]) if (v && v.draw === TrafficVehicle.prototype.draw) cars.add(v);
+                    for (const v of cars) {
+                        if (!v.visible || v.dead || v.x < c.x - hw || v.x > c.x + hw || v.y < c.y - hh || v.y > c.y + hh) continue;
+                        drawCarGlow(ctx, v, dark);
+                    }
+                }
                 if (this.activeMap.billboards) {
                     const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z + 250, hh = this.canvas.height / 2 / z + 250, c = this.camera;
                     for (const bb of this.activeMap.billboards) if (bb.inView({ left: c.x - hw, right: c.x + hw, top: c.y - hh, bottom: c.y + hh })) bb.drawEmissive(ctx, dark);

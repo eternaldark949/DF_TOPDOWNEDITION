@@ -9,6 +9,25 @@
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         let _sunShadow = { on: false, dx: 0, dy: 0, len: 0, k: 0 };   // read by Foliage.draw (its shadow follows the sun)
 
+        /**
+         * The light right now, read once a frame for anything that catches it (car paint, glass):
+         * day (0…1 sun reaching here, dimmed by cloud), dx/dy (unit vector toward the sun),
+         * rgb (the sun's colour), night (0…1, outdoors).
+         */
+        let _sunNowAt = -1, _sunNow = null;
+        function sunNow() {
+            if (_sunNowAt === _frameTime && _sunNow) return _sunNow;
+            _sunNowAt = _frameTime;
+            let day = 0, dx = 0, dy = 0, rgb = '255, 248, 234';
+            try {
+                const S = game.sunState(), reach = game._sunReach();
+                day = S.k * reach * (1 - 0.6 * S.overcast); rgb = S.colRGB;
+                const n = Math.hypot(S.dx, S.dy) || 1; dx = -S.dx / n; dy = -S.dy / n;
+            } catch (e) { }
+            const outdoor = typeof game !== 'undefined' && game.activeMap && game.activeMap.type === 'outdoor';
+            return (_sunNow = { day, dx, dy, rgb, night: outdoor ? 1 - day : 0.5 });
+        }
+
         engineMixin({
             /**
              * The sun now: k (how much it's day, 0…1, fading through dawn and dusk), the direction
@@ -75,6 +94,18 @@
                         const h = hull([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0 + ox, y0 + oy], [x1 + ox, y0 + oy], [x1 + ox, y1 + oy], [x0 + ox, y1 + oy]]);
                         h.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath();
                     }
+                }
+                const cars = new Set(this.traffic ? this.traffic.vehicles : []);                // cars, low and long
+                for (const v of [this.car, this.ownedCar, this.deliveryVehicle]) if (v) cars.add(v);
+                for (const v of cars) {
+                    if (!v.visible || !v.length || v.x < cull.left - 60 || v.x > cull.right + 60 || v.y < cull.top - 60 || v.y > cull.bottom + 60) continue;
+                    const ht = v.model === 'truck' || /suv/.test(v.model) ? 17 : 13, ca = Math.cos(v.angle), sa = Math.sin(v.angle);
+                    const hl = v.length / 2 - 3, hw = v.width / 2 - 2, pts = [];
+                    for (const [a, b] of [[hl, hw], [hl, -hw], [-hl, -hw], [-hl, hw]]) {
+                        const x = v.x + a * ca - b * sa, y = v.y + a * sa + b * ca;
+                        pts.push([x, y], [x + dx * ht, y + dy * ht]);
+                    }
+                    hull(pts).forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath();
                 }
                 for (const f of map.foliage || []) {                                             // canopies, thrown along the sun
                     if (f.x < cull.left - 120 || f.x > cull.right + 120 || f.y < cull.top - 120 || f.y > cull.bottom + 120) continue;

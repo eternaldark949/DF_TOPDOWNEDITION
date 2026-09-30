@@ -281,24 +281,16 @@
                         ctx.beginPath(); ctx.rect(-this.length/2 - 5, -this.width/2 - 5, this.length + 10, this.width + 10); ctx.fill(); ctx.shadowBlur = 0;
                     }
                     
-                    // Brand Underglow
-                    if (this.glowColor) {
-                        const pulse = (Math.sin(_frameTime / 800) + 1) / 2;
-                        const alpha = 0.3 + (pulse * 0.3);
-                        ctx.shadowColor = this.glowColor; ctx.shadowBlur = 15 + (pulse * 10);
-                        ctx.fillStyle = `rgba(${this.hexToRgb(this.glowColor)}, ${alpha})`;
-                        ctx.beginPath(); ctx.roundRect(-this.length/2 - 2, -this.width/2 - 2, this.length + 4, this.width + 4, 8); ctx.fill(); ctx.shadowBlur = 0;
-                    }
+                    // Brand underglow (traffic/car-art.js)
+                    drawCarUnderglow(ctx, this);
                 }
                 
-                // Brand Body (always draw - it's the car itself)
-                if (this.visualStyle === 'blackmark') this.drawBlackMark(ctx);
-                else if (this.visualStyle === 'sleek') this.drawSleekBody(ctx);
-                else if (this.visualStyle === 'angular') this.drawAngularBody(ctx);
-                else this.drawBoxyBody(ctx);
-                
-                // Unified lights (signals, brake, headlights)
-                this.drawLights(ctx, farLOD);
+                // The body: painted once per look, light sliding over it (traffic/car-art.js).
+                // The car you're driving is drawn once, over its occupants (drawOccupantOverlay).
+                if (!(typeof game !== 'undefined' && game.isDriving && game.car === this && this.hasDriver)) {
+                    drawCarBody(ctx, this, farLOD);
+                    this.drawLights(ctx, farLOD);
+                }
                 
                 ctx.restore();
             }
@@ -309,65 +301,11 @@
              * @param {CanvasRenderingContext2D} ctx - Already translated/rotated to vehicle center
              * @param {boolean} farLOD - Skip expensive shadow effects when distant
              */
-            drawLights(ctx, farLOD) {
-                // Turn signals
-                if (this.turnSignal && this.turnSignalTimer > 0) {
-                    const blinkOn = Math.floor(this.turnSignalTimer / 10) % 2 === 0;
-                    if (blinkOn) {
-                        if (!farLOD) { ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 10; }
-                        ctx.fillStyle = '#ffaa00';
-                        if (this.turnSignal === 'left') { 
-                            ctx.fillRect(this.length/2 - 4, -this.width/2, 3, 6); 
-                            ctx.fillRect(-this.length/2 + 1, -this.width/2, 3, 6); 
-                        } else { 
-                            ctx.fillRect(this.length/2 - 4, this.width/2 - 6, 3, 6); 
-                            ctx.fillRect(-this.length/2 + 1, this.width/2 - 6, 3, 6); 
-                        }
-                        ctx.shadowBlur = 0;
-                    }
-                }
-                
-                // Tail / brake lights
-                const isBraking = this.speed < 0.5 || this.state === 'REVERSING';
-                if (!farLOD && isBraking) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 15; }
-                ctx.fillStyle = this.state === 'REVERSING' ? '#fff' : (isBraking ? '#ff0000' : '#550000');
-                ctx.fillRect(-this.length/2, -this.width/2 + 2, 4, 10); 
-                ctx.fillRect(-this.length/2, this.width/2 - 12, 4, 10); 
-                ctx.shadowBlur = 0;
-                
-                // Headlights (uses vehicle's custom color)
-                const hlCol = this.headlightColor || '#ffffaa';
-                if (!farLOD) { ctx.shadowColor = hlCol; ctx.shadowBlur = 12; }
-                ctx.fillStyle = hlCol; 
-                ctx.fillRect(this.length/2 - 2, -this.width/2 + 2, 2, 8); 
-                ctx.fillRect(this.length/2 - 2, this.width/2 - 10, 2, 8);
-                ctx.shadowBlur = 0;
-            }
+            drawLights(ctx, farLOD) { drawCarLamps(ctx, this, farLOD); }
         
-            // --- DRAW HELPERS (Keep existing drawBoxyBody, drawSleekBody, drawAngularBody, drawBlackMark, hexToRgb, darkenColor) ---
-            // [Assuming these are already in your code, or paste them from previous turns if needed]
+            // --- DRAW HELPERS (the bodies themselves: traffic/car-art.js) ---
             hexToRgb(hex) { const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255, 255, 255'; }
             darkenColor(hex, amount) { return darkenHex(hex, Math.floor(255 * amount)); }
-            drawBoxyBody(ctx) { if (!this._lod) { ctx.shadowColor = this.color; ctx.shadowBlur = 15; } ctx.fillStyle = this.color; ctx.beginPath(); ctx.rect(-this.length/2 + 5, -this.width/2 + 5, this.length - 10, this.width - 10); ctx.fill(); ctx.shadowBlur = 0; ctx.fillStyle = this.color; ctx.beginPath(); ctx.roundRect(-this.length/2, -this.width/2, this.length, this.width, 4); ctx.fill(); ctx.fillStyle = '#111'; ctx.fillRect(-this.length/2 + 10, -this.width/2 + 4, this.length - 20, this.width - 8); if (this.model === 'truck') { ctx.fillStyle = '#222'; ctx.fillRect(-this.length/2 + 2, -this.width/2 + 2, 40, this.width - 4); } }
-            drawSleekBody(ctx) { ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-this.length/2 + 5, -this.width/2 + 5, this.length, this.width); ctx.fillStyle = this.color; ctx.beginPath(); ctx.roundRect(-this.length/2, -this.width/2, this.length, this.width, 6); ctx.fill(); ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = this.darkenColor(this.color, 0.3); ctx.beginPath(); ctx.rect(0, -this.width/2 + 2, this.length/2 - 2, this.width - 4); ctx.fill(); ctx.fillStyle = '#0f0f15'; ctx.beginPath(); ctx.roundRect(-this.length/2 + 8, -this.width/2 + 5, this.length/2 + 5, this.width - 10, 4); ctx.fill(); ctx.strokeStyle = '#444'; ctx.stroke(); ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(-this.length/2 + 12, -this.width/2, 6, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(-this.length/2 + 12, this.width/2, 6, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(this.length/2 - 12, -this.width/2, 6, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(this.length/2 - 12, this.width/2, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#aaa'; ctx.fillRect(this.length/2 - 2, -6, 2, 12); ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.moveTo(-5, -12); ctx.lineTo(-5, 12); ctx.stroke(); }
-            drawAngularBody(ctx) { if (!this._lod) { ctx.shadowColor = this.glowColor || '#00f3ff'; ctx.shadowBlur = 10; } ctx.fillStyle = this.color; ctx.beginPath(); ctx.moveTo(this.length/2, 0); ctx.lineTo(this.length/2 - 10, this.width/2); ctx.lineTo(-this.length/2 + 5, this.width/2 - 2); ctx.lineTo(-this.length/2, 10); ctx.lineTo(-this.length/2, -10); ctx.lineTo(-this.length/2 + 5, -this.width/2 + 2); ctx.lineTo(this.length/2 - 10, -this.width/2); ctx.closePath(); ctx.fill(); ctx.strokeStyle = this.darkenColor(this.color, 0.4); ctx.lineWidth = 1; ctx.stroke(); ctx.shadowBlur = 0; ctx.fillStyle = '#0a0a12'; ctx.beginPath(); ctx.moveTo(this.length/4, 0); ctx.lineTo(0, this.width/2 - 6); ctx.lineTo(-this.length/4, this.width/2 - 8); ctx.lineTo(-this.length/4 - 5, 0); ctx.lineTo(-this.length/4, -this.width/2 + 8); ctx.lineTo(0, -this.width/2 + 6); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.moveTo(-this.length/4, 10); ctx.lineTo(-this.length/2 + 8, 12); ctx.lineTo(-this.length/2 + 8, 4); ctx.fill(); ctx.beginPath(); ctx.moveTo(-this.length/4, -10); ctx.lineTo(-this.length/2 + 8, -12); ctx.lineTo(-this.length/2 + 8, -4); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(-this.length/2 + 5, -2, this.length - 15, 4); }
-            drawBlackMark(ctx) { 
-                if (!this._lod) { ctx.shadowColor = this.color; ctx.shadowBlur = 15; } ctx.fillStyle = this.color; 
-                ctx.beginPath(); ctx.rect(-this.length/2 + 5, -this.width/2 + 5, this.length - 10, this.width - 10); ctx.fill(); 
-                ctx.shadowBlur = 0; ctx.fillStyle = this.color; 
-                ctx.beginPath(); ctx.roundRect(-this.length/2, -this.width/2, this.length, this.width, 4); ctx.fill(); 
-                ctx.fillStyle = '#111'; ctx.fillRect(-this.length/2 + 10, -this.width/2 + 4, this.length - 20, this.width - 8); 
-                
-                // Hearse Cap (V1 only - skip for V3)
-                if (!this.noHearseCap) {
-                    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#000000'; ctx.lineWidth = 1; 
-                    const capStart = this.length / 6; const capLen = (this.length / 2) + capStart - 2; 
-                    ctx.beginPath(); ctx.roundRect(-this.length/2 + 2, -this.width/2 + 3, capLen, this.width - 6, 4); ctx.fill(); ctx.stroke(); 
-                }
-                
-                // Headlights handled by drawLights() — no longer drawn here
-            }
-            
             /**
              * Draw car body overlay on top of occupants.
              * Creates the illusion of characters being INSIDE the car.
@@ -503,10 +441,7 @@
                 ctx.rotate(this.angle);
                 
                 // Redraw the car body (same as in draw())
-                if (this.visualStyle === 'blackmark') this.drawBlackMark(ctx);
-                else if (this.visualStyle === 'sleek') this.drawSleekBody(ctx);
-                else if (this.visualStyle === 'angular') this.drawAngularBody(ctx);
-                else this.drawBoxyBody(ctx);
+                drawCarBody(ctx, this, false);
                 
                 // Unified lights (same function as draw() — ensures headlight color consistency)
                 this.drawLights(ctx, false);

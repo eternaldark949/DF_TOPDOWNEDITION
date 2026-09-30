@@ -926,11 +926,13 @@
                 this.lamps.forEach(l => {
                     if (l.x < cbLamps.left || l.x > cbLamps.right || l.y < cbLamps.top || l.y > cbLamps.bottom) return;
                     // Room light switches fade the lamp (and a faulty one flickers)
-                    l._lightK = rsys.lampLight(l) * lampFlicker(l);
+                    // Under the open sky each lamp wakes at its own minute of dusk (lampWake)
+                    const wake = this.activeMap.type === 'outdoor' ? lampWake(l) : 1;
+                    l._lightK = rsys.lampLight(l) * lampFlicker(l) * (wake > 0 ? wake : 1);
                     l._forcedOff = l._lightK < 0.02;
                     const lr = rsys.active && l._roomId ? rsys.rooms[l._roomId] : null;
                     const outdoorRoom = !!lr && lr.type === 'outdoor';
-                    l.draw(this.ctx, outdoorRoom ? skyLampDay : daylight);
+                    l.draw(this.ctx, this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight);
                 }); 
             
                 // 3. Draw projectiles and weather effects

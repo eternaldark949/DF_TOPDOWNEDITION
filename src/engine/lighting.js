@@ -179,7 +179,7 @@
                         if (!inView(lamp.x, lamp.y, lamp.radius)) continue;
                         if (!lamp._shadowPoly || lamp._shadowPoly.length === 0) continue;
                         // Room switches fade lamps; a faulty street lamp stutters now and then
-                        const k = (rsOn ? rs.lampLight(lamp) : 1) * lampFlicker(lamp) * (lamp.intensity ?? 1);
+                        const k = (rsOn ? rs.lampLight(lamp) : 1) * lampFlicker(lamp) * lampWake(lamp) * (lamp.intensity ?? 1);
                         if (k < 0.01) continue;
                         lamp._litK = k;
                         const dx = lamp.x - camX, dy = lamp.y - camY;
@@ -251,6 +251,18 @@
                     }
                 }
                 for (const b of beams) this._drawBeam(b);
+                // Underglow: each pool lights its own patch of street
+                if (this.traffic) {
+                    const soft = glowSprite('255, 255, 255', 0.5), cars = new Set(this.traffic.vehicles);
+                    if (this.car) cars.add(this.car); if (this.ownedCar) cars.add(this.ownedCar);
+                    lc.globalAlpha = 0.55;
+                    for (const v of cars) {
+                        if (!v.glowColor || !v.visible || v.dead || !v.length || !inView(v.x, v.y, 80)) continue;
+                        lc.save(); lc.translate(v.x, v.y); lc.rotate(v.angle);
+                        lc.drawImage(soft, -v.length / 2 - 16, -v.width / 2 - 16, v.length + 32, v.width + 32); lc.restore();
+                    }
+                    lc.globalAlpha = 1;
+                }
                 
                 // Indoor V2: Window daylight projections (cut light through shadow)
                 if (rsOn) rs.drawWindowLightProjections(lc, this._windowDaylight || 0);

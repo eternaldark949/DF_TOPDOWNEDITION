@@ -750,6 +750,16 @@
                 const t = Math.floor(_gameTimeSec / 7);             // lights change every few seconds
                 const lit = this.colors.windowLit || '#ffe2a8';
                 const mask = this.facadeFeature === 'silver_queen' ? this._sqWindowMask(f) : null;
+                // By day the glass holds the sky, brightest on faces turned to the sun, a sheen sliding along with it
+                const sun = emissive ? null : sunNow(), day = sun ? sun.day : 0;
+                let skyA = 0, sheenA = 0, uc = 0.5;
+                if (day > 0.03) {
+                    const nx = f.side === 'E' ? 1 : f.side === 'W' ? -1 : 0, ny = f.side === 'S' ? 1 : f.side === 'N' ? -1 : 0;
+                    const facing = Math.max(0, nx * sun.dx + ny * sun.dy);
+                    skyA = day * (0.3 + 0.34 * facing); sheenA = day * (0.18 + 0.6 * facing);
+                    uc = 0.5 + 0.55 * (ny ? sun.dx : sun.dy);
+                }
+                const sq = this.style === 'silver_queen', glassRGB = sq ? '176, 158, 236' : '168, 172, 226';
                 for (let fl = 0; fl < floors; fl++) {
                     const v0 = (fl + 0.28) / floors, v1 = (fl + 0.78) / floors;
                     for (let c = 0; c < cols; c++) {
@@ -766,7 +776,12 @@
                             ctx.fillStyle = tv ? (Math.sin(_gameTimeSec * 9 + c) > 0 ? '#9ec8ff' : '#6f9fe8') : lav ? '#d9c2ff' : lit;
                             ctx.fill();
                         } else {
-                            ctx.fillStyle = this.style === 'silver_queen' ? 'rgba(23,0,92,0.9)' : 'rgba(20,28,48,0.9)'; ctx.fill();
+                            ctx.fillStyle = sq ? 'rgba(23,0,92,0.9)' : 'rgba(20,28,48,0.9)'; ctx.fill();
+                            if (skyA > 0) {
+                                const du = Math.abs((u0 + u1) / 2 - uc), sh = sheenA * Math.max(0, 1 - du / 0.16) * (0.7 + 0.3 * (fl % 2));
+                                ctx.fillStyle = `rgba(${glassRGB}, ${skyA})`; ctx.fill();
+                                if (sh > 0.01) { ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; ctx.fill(); }
+                            }
                         }
                     }
                 }

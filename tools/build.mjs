@@ -71,6 +71,7 @@ const SCRIPTS = [
     'buildings/registry-v3.js',
     'traffic/roads.js',
     'traffic/garage-zib.js',
+    'traffic/car-art.js',
     'traffic/traffic-vehicle.js',
     'traffic/traffic-manager.js',
     'world/parks.js',
