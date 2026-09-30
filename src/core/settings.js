@@ -273,12 +273,6 @@
                 }
             }
             
-            releaseAll(activeArray) {
-                for (let i = activeArray.length - 1; i >= 0; i--) {
-                    this.release(activeArray[i]);
-                }
-                activeArray.length = 0;
-            }
             
             get activeCount() { return this._activeCount; }
             get poolSize() { return this._pool.length; }
@@ -297,16 +291,7 @@
             // DOM element cache
             _domCache: new Map(),
             
-            getElement(id) {
-                if (!this._domCache.has(id)) {
-                    this._domCache.set(id, document.getElementById(id));
-                }
-                return this._domCache.get(id);
-            },
             
-            clearDomCache() {
-                this._domCache.clear();
-            },
             
             // Fast distance check (no sqrt)
             distSq(x1, y1, x2, y2) {
@@ -341,35 +326,8 @@
         // ARRAY UTILITIES - O(1) operations for hot paths
         // ============================================================================
         const ArrayUtils = {
-            // Remove by swapping with last element (O(1) instead of O(n))
-            swapRemove(arr, index) {
-                if (index < 0 || index >= arr.length) return false;
-                arr[index] = arr[arr.length - 1];
-                arr.pop();
-                return true;
-            },
             
-            // Remove value by swap
-            swapRemoveValue(arr, value) {
-                const idx = arr.indexOf(value);
-                if (idx !== -1) {
-                    arr[idx] = arr[arr.length - 1];
-                    arr.pop();
-                    return true;
-                }
-                return false;
-            },
             
-            // Filter in-place without allocation
-            filterInPlace(arr, predicate) {
-                let writeIdx = 0;
-                for (let i = 0; i < arr.length; i++) {
-                    if (predicate(arr[i])) {
-                        arr[writeIdx++] = arr[i];
-                    }
-                }
-                arr.length = writeIdx;
-            },
             
             // Fast clear
             clear(arr) {
@@ -398,10 +356,6 @@
                 return this._delta / this.TARGET_FRAME_TIME;
             },
             
-            // For batching non-critical updates
-            shouldUpdate(frequency) {
-                return this._frameCount % frequency === 0;
-            },
             
             get frameCount() { return this._frameCount; },
             get delta() { return this._delta; }

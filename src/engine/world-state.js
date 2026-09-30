@@ -521,11 +521,6 @@
                 this.toggleVehicle();
             },
 
-            checkRectCollision(cx, cy, cw, ch, angle, walls) {
-                const cos = Math.cos(angle); const sin = Math.sin(angle); const hw = cw / 2; const hh = ch / 2;
-                const corners = [ { x: cx + (hw * cos - hh * sin), y: cy + (hw * sin + hh * cos) }, { x: cx + (hw * cos + hh * sin), y: cy + (hw * sin - hh * cos) }, { x: cx + (-hw * cos + hh * sin), y: cy + (-hw * sin - hh * cos) }, { x: cx + (-hw * cos - hh * sin), y: cy + (-hw * sin + hh * cos) } ];
-                for (let w of walls) { if (cx + cw < w.x || cx - cw > w.x + w.w || cy + ch < w.y || cy - ch > w.y + w.h) continue; for(let p of corners) { if(p.x > w.x && p.x < w.x + w.w && p.y > w.y && p.y < w.y + w.h) return true; } } return false;
-            },
             
             // Raycast check for Light Occlusion (Shadows)
             checkLineOfSight(x1, y1, x2, y2) {

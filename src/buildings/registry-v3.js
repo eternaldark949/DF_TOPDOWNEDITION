@@ -425,13 +425,6 @@
                 return { w: entry.w, h: entry.h };
             },
             
-            /**
-             * Get building accent color (for lamp colors).
-             */
-            getAccentColor(id) {
-                const entry = this._registry[id];
-                return entry ? entry.accentColor : null;
-            },
             
             /**
              * Create a building instance.
@@ -452,29 +445,6 @@
                 return Object.keys(this._registry);
             },
             
-            /**
-             * Generate a CityLayout-compatible template from registry entry.
-             * This bridges V2 buildings with the existing template system.
-             */
-            toTemplate(id) {
-                const entry = this._registry[id];
-                if (!entry) return null;
-                
-                return {
-                    w: entry.w,
-                    h: entry.h,
-                    type: entry.type,
-                    label: entry.label,
-                    color: entry.accentColor,  // Use accent as base color
-                    unique: entry.unique,
-                    category: entry.category,
-                    mapCategory: entry.mapCategory || null,
-                    sign: entry.sign,
-                    door: entry.door,
-                    isV2: true,  // Flag for CityLayout
-                    v2Id: id    // Reference back to registry
-                };
-            }
         };
 
         // =====================================================================

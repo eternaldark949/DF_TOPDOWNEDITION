@@ -48,16 +48,9 @@
             
             // 4. Wait for fade (500ms), then Swap Layers & Start
             setTimeout(() => { 
-                // HIDE the Menu Layer completely
-                document.getElementById('ui-layer').style.display = 'none';
-                
-                // SHOW the Game Canvas
-                document.getElementById('game-container').style.display = 'block';
-                
-                // Start the Engine & Story: the prologue (story/scenes/prologue.js), then chapter 1
+                // The prologue (story/scenes/prologue.js), then chapter 1
                 game.scenes.play('prologue').then(() => game.story.startPrologue());
-                game.running = true;
-                game.loop();
+                game.enterWorld();
             }, 500); 
         });
         document.getElementById('btn-story-747').addEventListener('click', () => { showMessage("TIMELINE 747 LOCKED."); });

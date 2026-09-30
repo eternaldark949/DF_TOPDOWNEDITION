@@ -136,10 +136,10 @@
             },
 
             /**
-             * Schedule a callback to fire after `ms` of in-game time. Unlike
-             * setTimeout, these timers freeze when the game is paused — they
-             * advance only when update() runs. Returns a token that can be
-             * passed to cancelPausableTimeout.
+             * Schedule a callback to fire after `ms` of in-game time (counted in sim ticks). Unlike
+             * setTimeout, these timers freeze when the game is paused — they advance only when
+             * update() runs — and a new game or a load clears them, so no stale story beat fires.
+             * Returns a token that can be passed to cancelPausableTimeout.
              */
             addPausableTimeout(callback, ms) {
                 const timer = { msRemaining: ms, cb: callback };
@@ -151,11 +151,8 @@
                 if (idx !== -1) this.pausableTimers.splice(idx, 1);
             },
             _tickPausableTimers() {
-                const now = performance.now();
-                if (this._lastPausableTimerTick === undefined) this._lastPausableTimerTick = now;
-                // Clamp dt to avoid post-pause/tab-blur spikes firing every queued timer at once.
-                const dt = Math.min(50, now - this._lastPausableTimerTick);
-                this._lastPausableTimerTick = now;
+                // Game time, not wall time: one sim tick per call (update() runs only while unpaused)
+                const dt = CONFIG.LOOP.STEP_MS;
                 for (let i = this.pausableTimers.length - 1; i >= 0; i--) {
                     const t = this.pausableTimers[i];
                     t.msRemaining -= dt;

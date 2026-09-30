@@ -2005,9 +2005,4 @@
             });
         }
         
-        function createDiagonalRoad(x1, y1, x2, y2, name = '', lanes = 2, symmetrical = true, hasPavements = false) {
-            return new Road({
-                x1, y1, x2, y2, name, lanes, symmetrical, hasPavements
-            });
-        }
 

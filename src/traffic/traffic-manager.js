@@ -245,29 +245,6 @@
                 }
             }
         
-            checkIntersect(c1, c2) {
-                const getCorners = (c) => {
-                    const cos = Math.cos(c.angle), sin = Math.sin(c.angle);
-                    const hw = c.length/2, hh = c.width/2;
-                    return [
-                        { x: c.x + (hw*cos - hh*sin), y: c.y + (hw*sin + hh*cos) },
-                        { x: c.x + (hw*cos + hh*sin), y: c.y + (hw*sin - hh*cos) },
-                        { x: c.x + (-hw*cos + hh*sin), y: c.y + (-hw*sin - hh*cos) },
-                        { x: c.x + (-hw*cos - hh*sin), y: c.y + (-hw*sin + hh*cos) }
-                    ];
-                };
-                const isPointIn = (p, r) => {
-                    const dx = p.x - r.x, dy = p.y - r.y;
-                    const cos = Math.cos(-r.angle), sin = Math.sin(-r.angle);
-                    const lx = dx*cos - dy*sin, ly = dx*sin + dy*cos;
-                    return (Math.abs(lx) < r.length/2 && Math.abs(ly) < r.width/2);
-                };
-                const c1Points = getCorners(c1);
-                for(let p of c1Points) if(isPointIn(p, c2)) return true;
-                const c2Points = getCorners(c2);
-                for(let p of c2Points) if(isPointIn(p, c1)) return true;
-                return false;
-            }
         
             drawNetwork(ctx, debug) { this.network.draw(ctx, debug); }
             getNearest(px, py, range) {

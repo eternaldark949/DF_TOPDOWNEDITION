@@ -3573,6 +3573,10 @@
     </svg>
     <script>
 
+        // Console chatter (the ~100 [SAVE] / STORY / roads logs) is quiet unless you turn it on:
+        // run  localStorage.dfab_debug = '1'  in the console and reload. Warnings and errors always show.
+        (() => { let on = false; try { on = localStorage.getItem('dfab_debug') === '1'; } catch (e) { /* private mode */ } if (!on) console.log = () => {}; })();
+
         // ╔════════════════════════════════════════════════════════════════════════════╗
         // ║     DIMENSIONS: FREELANCER - PERFORMANCE INFRASTRUCTURE                    ║
         // ║     Version: 4.5.30 - Performance & Architecture Refactor                  ║
@@ -6521,12 +6525,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
-            releaseAll(activeArray) {
-                for (let i = activeArray.length - 1; i >= 0; i--) {
-                    this.release(activeArray[i]);
-                }
-                activeArray.length = 0;
-            }
             
             get activeCount() { return this._activeCount; }
             get poolSize() { return this._pool.length; }
@@ -6545,16 +6543,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // DOM element cache
             _domCache: new Map(),
             
-            getElement(id) {
-                if (!this._domCache.has(id)) {
-                    this._domCache.set(id, document.getElementById(id));
-                }
-                return this._domCache.get(id);
-            },
             
-            clearDomCache() {
-                this._domCache.clear();
-            },
             
             // Fast distance check (no sqrt)
             distSq(x1, y1, x2, y2) {
@@ -6589,35 +6578,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // ARRAY UTILITIES - O(1) operations for hot paths
         // ============================================================================
         const ArrayUtils = {
-            // Remove by swapping with last element (O(1) instead of O(n))
-            swapRemove(arr, index) {
-                if (index < 0 || index >= arr.length) return false;
-                arr[index] = arr[arr.length - 1];
-                arr.pop();
-                return true;
-            },
             
-            // Remove value by swap
-            swapRemoveValue(arr, value) {
-                const idx = arr.indexOf(value);
-                if (idx !== -1) {
-                    arr[idx] = arr[arr.length - 1];
-                    arr.pop();
-                    return true;
-                }
-                return false;
-            },
             
-            // Filter in-place without allocation
-            filterInPlace(arr, predicate) {
-                let writeIdx = 0;
-                for (let i = 0; i < arr.length; i++) {
-                    if (predicate(arr[i])) {
-                        arr[writeIdx++] = arr[i];
-                    }
-                }
-                arr.length = writeIdx;
-            },
             
             // Fast clear
             clear(arr) {
@@ -6646,10 +6608,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return this._delta / this.TARGET_FRAME_TIME;
             },
             
-            // For batching non-critical updates
-            shouldUpdate(frequency) {
-                return this._frameCount % frequency === 0;
-            },
             
             get frameCount() { return this._frameCount; },
             get delta() { return this._delta; }
@@ -6699,7 +6657,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                 locationDesc: "Melting pot of cultures traveling to this location.",
                                 completionTime: "1HR",
                                 target: "THE DARK MAKER",
-                                totalSteps: 15,
                                 steps: {
                                     // STEP 0: The Awakening (Cutscene)
                                     0: {
@@ -6716,12 +6673,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                             game.cutscene.camTargetY = game.player.y;
                                             
                                             // Phase 1: Hold the close-up for a beat (1s), then begin zoom out
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.cutscene.camZoomTarget = 1.0; // Zoom out to normal
                                             }, 1000);
                                             
                                             // Phase 2: Show title cards mid-zoom (1.5s in)
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.cutscene.showTitle(4000);
                                             }, 1500);
                                         }
@@ -6772,17 +6729,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                             if(game.ownedCar) game.ownedCar.forceLights = true;
                                             
                                             // Cinematic Sequence
-                                            setTimeout(() => game.story.triggerComms("747", "Nine. Be careful out there.", 4000), 500);
+                                            game.addPausableTimeout(() => game.story.triggerComms("747", "Nine. Be careful out there.", 4000), 500);
                                             
                                             // --- MODULAR PAN COMMANDS ---
                                             // 1. Pan to Car (at 1s) — dynamic position
-                                            setTimeout(() => game.cutscene.panTo('player_car', 0.8), 1000); 
+                                            game.addPausableTimeout(() => game.cutscene.panTo('player_car', 0.8), 1000); 
                                             
                                             // 2. Pan to Club (at 4s)
-                                            setTimeout(() => game.cutscene.panTo('club_entrance', 0.7), 4000); 
+                                            game.addPausableTimeout(() => game.cutscene.panTo('club_entrance', 0.7), 4000); 
                                             
                                             // 3. Pan back to Player (at 7s)
-                                            setTimeout(() => game.cutscene.panTo('player', 1.0), 7000);
+                                            game.addPausableTimeout(() => game.cutscene.panTo('player', 1.0), 7000);
                                         }
                                     },
                                     // STEP 4: Enter Vehicle
@@ -6809,15 +6766,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                         condition: "LOC_NIGHTCLUB",
                                         onStart: (game) => {
                                             // Sibling Banter while driving
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "I can't shake the feeling Nine. This hunt reeks.", 4000);
                                             }, 2000);
         
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("949", "I know, Seven. We don't know what we're getting involved in.", 4000);
                                             }, 7000);
         
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "*Sigh* Mirabel for goodness sake. Keep me updated.", 4000);
                                             }, 12000);
                                         }
@@ -6882,7 +6839,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                         target: "suite_elevator",
                                         condition: "LOC_HOTEL_SUITE",
                                         onStart: (game) => {
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "Well, welcome to the Penthouse. Watch your corners, Nine.", 4000);
                                             }, 1500);
                                         }
@@ -6907,22 +6864,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                             showMessage("BREACH DETECTED!");
                                             game.triggerShake(25);
                                             // Break the back wall
-                                            const wallIdx = game.activeMap.walls.findIndex(w => w.breach || (w.y === 1000 && w.w === 500));
-                                            if (wallIdx !== -1) {
-                                                const w = game.activeMap.walls[wallIdx];
+                                            const w = game.activeMap.walls.find(w => w.breach);   // tagged in world/maps.js
+                                            if (w) {
                                                 for (let ex = w.x; ex < w.x + w.w; ex += 40) {
                                                     game.weather.spawnExplosion(ex, w.y, '#ff8800');
                                                     game.weather.spawnExplosion(ex + 20, w.y + 10, '#ff4500');
                                                 }
-                                                game.activeMap.walls.splice(wallIdx, 1);
-                                                game._renderGridWalls.build(game.activeMap.walls);
+                                                game.removeWall(w);
                                             }
                                             // Spawn Drones
                                             game.enemies.push(new Drone(900, 1100));
                                             game.enemies.push(new Drone(1000, 1150));
                                             game.enemies.push(new Drone(1100, 1100));
                                             
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "Nine! Multiple contacts! Drones — they're breaching!", 4000);
                                             }, 500);
                                         }
@@ -6937,7 +6892,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                         onStart: (game) => {
                                             game.questState.ambushCleared = true;
                                             showMessage("AREA SECURE. RETURN TO MIRABEL.");
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "You good? Get back to Mirabel. Debrief.", 4000);
                                             }, 2000);
                                         }
@@ -6951,10 +6906,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                         condition: null, // Terminal — no auto-advance
                                         onStart: (game) => {
                                             game.ui.showMissionBanner("CHAPTER 1 COMPLETE — THE AWAKENING", "gold", "COMPLETED");
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "He slipped through. But we rattled him. Rest up, Nine. This isn't over.", 6000);
                                             }, 3000);
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("LARISSA", "949. I received news of what went down. I say it's time for a meeting.", 6000);
                                             }, 16000);
                                         }
@@ -6996,7 +6951,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                                     showMessage("THE TRIUMVIRATE DESTROYED! REWARD: 1000 PERSONICS, 50 SCRAP");
                                                     game.triggerShake(30);
                                                     for (let i = 0; i < 20; i++) {
-                                                        setTimeout(() => {
+                                                        game.addPausableTimeout(() => {
                                                             const rx = 400 + Math.random() * 400;
                                                             const ry = 300 + Math.random() * 600;
                                                             game.weather.spawnExplosion(rx, ry, '#ff3300');
@@ -7413,16 +7368,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             },
             
-            // Legacy alias
-            victoriaCombatQuip() { this.teammateCombatQuip('Victoria'); },
             
-            // Trigger dancer reaction during combat
-            dancerCombatReaction(dancerName) {
-                if (Math.random() < 0.08) { // 8% chance
-                    const line = this.getRandomLine('dancers', 'combat');
-                    if (line) this.show(dancerName, line, 2500);
-                }
-            },
             
             // Check for NPC proximity greetings
             checkProximityGreetings(player, npcs, teammates) {
@@ -8248,10 +8194,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return WEATHER_CONDITIONS[this.condition] || WEATHER_CONDITIONS.rain;
             }
 
-            /** Human-readable state for the phone HUD and debug overlay. */
-            getConditionLabel() { return this.getCondition().label; }
             getConditionIcon()  { return this.getCondition().icon; }
-            getConditionTemp()  { return this.getCondition().temp; }
 
             /**
              * Effective rain strength for renderers, 0 when indoors.
@@ -9590,7 +9533,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // Resize/clear are no-ops now — no canvas to manage
             resize() {}
-            clearAndResize() { this.decals = []; }
             clear() { this.decals = []; }
             getDimensions() { return { count: this.decals.length }; }
             
@@ -10668,8 +10610,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             }
 
-            /** Old name, kept for callers. */
-            drawRoofOcclusion(ctx) { this.drawVeil(ctx); }
 
             /**
              * Outdoor rooms carry the sky's light: on the light layer (darkness `ambient`),
@@ -12060,7 +12000,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const olloTransition = olloBuilding.getTransition('ollo_interior', 'Enter OllO');
                     if (olloTransition) {
                         const md = MAP_DATA['ollo_test'];
-                        if (md && md.transitions) md.transitions.push(olloTransition);
+                        // Once: MAP_DATA outlives the visit, so a second push would stack a second door
+                        if (md && md.transitions && !md.transitions.some(t => t._ollo)) md.transitions.push(Object.assign(olloTransition, { _ollo: true }));
                     }
                     break;
                 }
@@ -15403,28 +15344,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.h = this.height;
             }
             
-            /**
-             * Handle player pushing this prop
-             */
-            handlePlayerPush(player) {
-                const center = this.getCenter();
-                const dist = Math.hypot(center.x - player.x, center.y - player.y);
-                const pushRadius = Math.max(this.width, this.height) / 2 - 5;
-                
-                if (dist < pushRadius) {
-                    const dx = center.x - player.x;
-                    const dy = center.y - player.y;
-                    const len = Math.hypot(dx, dy) || 1;
-                    
-                    // FIX: Define a push force (e.g., 20) and divide by mass
-                    // Heavier objects (mass 50,000) will result in tiny, imperceptible velocity
-                    const pushForce = 20; 
-                    const acceleration = pushForce / (this.mass || 1); 
-            
-                    this.vx += (dx / len) * acceleration;
-                    this.vy += (dy / len) * acceleration;
-                }
-            }
             
             draw(ctx) {
                 if (!this.visible) return;
@@ -17282,13 +17201,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return this.hp - oldHp;
             }
             
-            /**
-             * Check if actor is alive.
-             * @returns {boolean}
-             */
-            isAlive() {
-                return !this.dead && this.hp > 0;
-            }
             
             /**
              * Set movement direction (for AI or input).
@@ -17381,17 +17293,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 };
             }
             
-            /**
-             * Check circle collision with another actor.
-             * @param {ActorEntity} other 
-             * @returns {boolean}
-             */
-            collidesWith(other) {
-                const dx = this.x - other.x;
-                const dy = this.y - other.y;
-                const dist = Math.hypot(dx, dy);
-                return dist < this.radius + other.radius;
-            }
             
             /**
              * Default draw - override in subclasses.
@@ -17424,16 +17325,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
-            /**
-             * Called when this actor collides with a wall.
-             * Override for custom wall collision behavior.
-             * 
-             * @param {Object} wall - The wall entity
-             * @param {Object} resolution - Collision resolution data
-             */
-            onWallCollision(wall, resolution) {
-                // Default: just stop at wall (handled by CollisionSystem)
-            }
             
             /**
              * Called when this actor is hit by a projectile.
@@ -17640,7 +17531,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Half the unsettled Resonance scatters on the way back to Dr. Yin
                     if (this._game.resonance) {
                         const lost = this._game.resonance.onDeath();
-                        if (lost > 0) setTimeout(() => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 1800);
+                        if (lost > 0) this._game.addPausableTimeout(() => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 1800);
                     }
                     
                     // Clear all active buffs (restores maxHP if Stellar Lemonade was active, etc.)
@@ -17653,11 +17544,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this._game.boosterCount = this._game.getEffectiveMaxBoosters();
                     this._game.questState.suiteAmbushTriggered = false;
                     // Reset story step so ambush can re-trigger on return
-                    if (this._game.story && this._game.story.state.step >= 12 && this._game.story.state.step <= 13) {
-                        this._game.story.state.step = 11;
-                        this._game.story.currentStepData = null;
-                        this._game.story.initializedStep = false;
-                    }
+                    const st = this._game.story;
+                    if (st && !st.isBefore('SEARCH_SUITE') && st.isBefore('REPORT_BACK')) st.goTo('ENTER_SUITE');
                     // Reset optional sanctum quest if active (boss respawns on re-entry)
                     if (this._game.story && this._game.story.activeOptional && this._game.story.activeOptional.id === 'sanctum') {
                         this._game.story.activeOptional = null;
@@ -18144,26 +18032,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                        center.y >= bb.y && center.y <= bb.y + bb.h;
             }
             
-            checkOverlaps(entities) {
-                const nowInside = new Set();
-                
-                for (let entity of entities) {
-                    if (this.containsEntity(entity)) {
-                        nowInside.add(entity);
-                        if (!this.entitiesInside.has(entity)) {
-                            if (this.onEnter) this.onEnter(entity, this);
-                        }
-                    }
-                }
-                
-                for (let entity of this.entitiesInside) {
-                    if (!nowInside.has(entity)) {
-                        if (this.onExit) this.onExit(entity, this);
-                    }
-                }
-                
-                this.entitiesInside = nowInside;
-            }
             
             draw(ctx) {
                 if (!this.visible) return;
@@ -19720,8 +19588,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             }
 
-            /** The look for this NPC (core/appearances.js); kept for callers that ask by this name. */
-            _staffLook() { return lookFor(this); }
 
             /**
              * Teammate renderer — uses config-driven appearance via drawProceduralHumanoid.
@@ -22961,8 +22827,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             get highestWave() { return Math.max(0, ...Object.values(this.highestWaves)); }
             set highestWave(v) { if (v > 0) this.highestWaves[GAUNTLET_MAPS[0].id] = Math.max(this.highestWaves[GAUNTLET_MAPS[0].id] || 0, v); }
 
-            /** Is this map one of the gauntlet's? */
-            static isGauntletMap(mapId) { return GAUNTLET_MAPS.some(g => g.mapId === mapId); }
 
             getWaveConfig(wave) {
                 const gangerCount = Math.min(5 + wave, 14);
@@ -23619,40 +23483,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
-            /**
-             * Update window lighting states based on time.
-             */
-            _updateWindowStates(worldMinutes) {
-                // Only update every few seconds for performance
-                if (this._windowStates && Date.now() - this._lastWindowUpdate < 5000) {
-                    return;
-                }
-                
-                this._lastWindowUpdate = Date.now();
-                this._windowStates = [];
-                
-                // worldMinutes is monotonic — derive hour-of-day with % 1440.
-                const hour = (worldMinutes % 1440) / 60;
-                const isNight = hour < 6 || hour > 20;
-                const litChance = isNight ? 0.7 : 0.1;
-                
-                const seed = this.x * 1000 + this.y;
-                let idx = 0;
-                
-                this.sections.forEach(section => {
-                    const cols = Math.floor((section.w - this.windowConfig.marginX * 2) / this.windowConfig.spacingX);
-                    const rows = Math.floor((section.h - this.windowConfig.marginY * 2) / this.windowConfig.spacingY);
-                    
-                    for (let row = 0; row < rows; row++) {
-                        for (let col = 0; col < cols; col++) {
-                            const rand = Math.sin(seed + idx * 127.1) * 43758.5453;
-                            const isLit = (rand - Math.floor(rand)) < litChance;
-                            this._windowStates.push(isLit);
-                            idx++;
-                        }
-                    }
-                });
-            }
             
             /**
              * Draw base layer (under player): shadow, ground floor, entrance.
@@ -23849,76 +23679,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.style === 'silver_queen' && CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) this._sqDrawColumns(ctx);
             }
             
-            /**
-             * Draw a rooftop skylight (circular dome style, clearly not a window).
-             */
-            _drawSkylight(ctx, x, y, w, h, isLit) {
-                const cx = x + w / 2;
-                const cy = y + h / 2;
-                const radius = Math.min(w, h) / 2;
-                
-                // Raised circular frame (dark metal)
-                ctx.fillStyle = '#1a1a22';
-                ctx.beginPath();
-                ctx.arc(cx, cy, radius + 3, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Glass dome
-                ctx.fillStyle = isLit ? 'rgba(255, 200, 120, 0.5)' : 'rgba(50, 70, 90, 0.7)';
-                ctx.beginPath();
-                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Dome highlight (reflection)
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.beginPath();
-                ctx.arc(cx - radius * 0.3, cy - radius * 0.3, radius * 0.4, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Glow for lit skylights
-                if (isLit) {
-                    ctx.fillStyle = 'rgba(255, 180, 100, 0.2)';
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, radius + 8, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
             
-            /**
-             * Lighten a hex color by amount.
-             */
-            _lightenColor(hex, amount) { try { return lightenHex(hex, amount); } catch(e) { return '#3a3a48'; } }
             
             /**
              * Helper: Convert hex color to RGB string.
              */
             _hexToRgb(hex) { return hexToRgb(hex); }
             
-            /**
-             * Draw windows on building facade (south/east walls).
-             */
-            _drawFacadeWindows(ctx, startX, startY, width, height, side) {
-                const windowW = 8;
-                const windowH = 10;
-                const spacing = 25;
-                const rows = Math.floor(height / 12);
-                const cols = Math.floor(width / spacing);
-                
-                for (let row = 0; row < rows; row++) {
-                    for (let col = 1; col < cols; col++) {
-                        const wx = startX + col * spacing;
-                        const wy = startY + 5 + row * 12;
-                        
-                        // Random lit state
-                        const seed = wx * 100 + wy;
-                        const rand = Math.sin(seed) * 43758.5453;
-                        const isLit = (rand - Math.floor(rand)) > 0.4;
-                        
-                        ctx.fillStyle = isLit ? 'rgba(255, 200, 120, 0.8)' : 'rgba(30, 50, 80, 0.6)';
-                        ctx.fillRect(wx, wy, windowW, windowH);
-                    }
-                }
-            }
             
             // Legacy compatibility
             draw(ctx, worldMinutes) {
@@ -26521,13 +26288,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return { w: entry.w, h: entry.h };
             },
             
-            /**
-             * Get building accent color (for lamp colors).
-             */
-            getAccentColor(id) {
-                const entry = this._registry[id];
-                return entry ? entry.accentColor : null;
-            },
             
             /**
              * Create a building instance.
@@ -26548,29 +26308,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return Object.keys(this._registry);
             },
             
-            /**
-             * Generate a CityLayout-compatible template from registry entry.
-             * This bridges V2 buildings with the existing template system.
-             */
-            toTemplate(id) {
-                const entry = this._registry[id];
-                if (!entry) return null;
-                
-                return {
-                    w: entry.w,
-                    h: entry.h,
-                    type: entry.type,
-                    label: entry.label,
-                    color: entry.accentColor,  // Use accent as base color
-                    unique: entry.unique,
-                    category: entry.category,
-                    mapCategory: entry.mapCategory || null,
-                    sign: entry.sign,
-                    door: entry.door,
-                    isV2: true,  // Flag for CityLayout
-                    v2Id: id    // Reference back to registry
-                };
-            }
         };
 
         // =====================================================================
@@ -28818,11 +28555,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             });
         }
         
-        function createDiagonalRoad(x1, y1, x2, y2, name = '', lanes = 2, symmetrical = true, hasPavements = false) {
-            return new Road({
-                x1, y1, x2, y2, name, lanes, symmetrical, hasPavements
-            });
-        }
 
         /* --- VEHICLE BRANDS DATA STRUCTURE --- */
         /* --- UPDATED VEHICLE DATA --- */
@@ -29499,33 +29231,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 };
             }
             
-            /**
-             * Calculate a look-ahead target point on a turn path (bezier curve).
-             * @param {TrafficVehicle} vehicle - The vehicle
-             * @param {Object} turnPath - The bezier turn path
-             * @param {number} currentProgress - Current progress along path (0-1)
-             * @param {number} lookAhead - Progress increment to look ahead
-             * @returns {{x: number, y: number, angle: number, progress: number}}
-             */
-            static getTurnPathTarget(vehicle, turnPath, currentProgress, lookAhead = 0.1) {
-                if (!turnPath) return null;
-                
-                // Adjust look-ahead based on speed
-                const speedMod = Math.max(0.5, Math.abs(vehicle.speed) / 5);
-                const adjustedLookAhead = lookAhead * speedMod;
-                
-                // Get target progress (don't overshoot)
-                const targetProgress = Math.min(currentProgress + adjustedLookAhead, 1.0);
-                const point = turnPath.getPoint(targetProgress);
-                const angle = turnPath.getAngle(targetProgress);
-                
-                return {
-                    x: point.x,
-                    y: point.y,
-                    angle: angle,
-                    progress: targetProgress
-                };
-            }
             
             /**
              * Calculate appropriate speed for a turn based on curvature.
@@ -30188,21 +29893,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return null;
             }
             
-            /**
-             * Get the next pre-determined turn path from navigation (V2 only).
-             * @returns {TurnPath|null} The next turn path to take
-             */
-            getNextNavTurnPath() {
-                if (this.navWaypoints && this.navWaypoints.length > 0) {
-                    for (let i = this.currentWaypointIndex; i < this.navWaypoints.length; i++) {
-                        const wp = this.navWaypoints[i];
-                        if (wp.type === 'TURN_PATH' && wp.turnPath) {
-                            return wp.turnPath;
-                        }
-                    }
-                }
-                return null;
-            }
             
             /**
              * Check if the car is on the correct road according to navigation.
@@ -30342,36 +30032,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
-            /**
-             * Get the next navigation target (current waypoint or final destination).
-             * @returns {Object|null} {x, y} of next target, or null if no navigation
-             */
-            getNextNavTarget() {
-                // First, advance past any waypoints we've already reached
-                this.advanceToRelevantWaypoint();
-                
-                // If we have waypoints, return the current one
-                if (this.navWaypoints && this.navWaypoints.length > 0) {
-                    if (this.currentWaypointIndex < this.navWaypoints.length) {
-                        return this.navWaypoints[this.currentWaypointIndex];
-                    }
-                }
-                
-                // Fall back to direct destination if no waypoints
-                if (this.navDestination) {
-                    return this.navDestination;
-                }
-                
-                return null;
-            }
             
-            /**
-             * Check if we have an active navigation route.
-             * @returns {boolean}
-             */
-            hasNavigation() {
-                return (this.navWaypoints && this.navWaypoints.length > 0) || this.navDestination != null;
-            }
             
             getNextIntersection(approachDistance = 100) {
                 if (!this.currentLane || !this.currentLane.intersectingZones) return null;
@@ -32493,29 +32154,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
         
-            checkIntersect(c1, c2) {
-                const getCorners = (c) => {
-                    const cos = Math.cos(c.angle), sin = Math.sin(c.angle);
-                    const hw = c.length/2, hh = c.width/2;
-                    return [
-                        { x: c.x + (hw*cos - hh*sin), y: c.y + (hw*sin + hh*cos) },
-                        { x: c.x + (hw*cos + hh*sin), y: c.y + (hw*sin - hh*cos) },
-                        { x: c.x + (-hw*cos + hh*sin), y: c.y + (-hw*sin - hh*cos) },
-                        { x: c.x + (-hw*cos - hh*sin), y: c.y + (-hw*sin + hh*cos) }
-                    ];
-                };
-                const isPointIn = (p, r) => {
-                    const dx = p.x - r.x, dy = p.y - r.y;
-                    const cos = Math.cos(-r.angle), sin = Math.sin(-r.angle);
-                    const lx = dx*cos - dy*sin, ly = dx*sin + dy*cos;
-                    return (Math.abs(lx) < r.length/2 && Math.abs(ly) < r.width/2);
-                };
-                const c1Points = getCorners(c1);
-                for(let p of c1Points) if(isPointIn(p, c2)) return true;
-                const c2Points = getCorners(c2);
-                for(let p of c2Points) if(isPointIn(p, c1)) return true;
-                return false;
-            }
         
             drawNetwork(ctx, debug) { this.network.draw(ctx, debug); }
             getNearest(px, py, range) {
@@ -32933,85 +32571,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.lastPlayerNavPos = { x: player.x, y: player.y };
             }
             
-            // --- DRAW NAVIGATION PATH (Glowing Purple Line with V2 Curves) ---
-            drawNavPath(ctx) {
-                if (!this.navPath || this.navPath.length < 2) return;
-                
-                const time = _frameTimeSec;
-                const dashOffset = time * 50;
-                
-                ctx.save();
-                
-                // === V2 PRECISE PATH WITH CURVES ===
-                if (this.drawablePathSegments && this.drawablePathSegments.length > 0) {
-                    // Outer glow
-                    ctx.strokeStyle = 'rgba(138, 43, 226, 0.4)';
-                    ctx.lineWidth = 24;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    ctx.shadowColor = '#8a2be2';
-                    ctx.shadowBlur = 30;
-                    this._drawPathSegments(ctx, this.drawablePathSegments);
-                    
-                    // Middle glow
-                    ctx.strokeStyle = 'rgba(148, 0, 211, 0.7)';
-                    ctx.lineWidth = 12;
-                    ctx.shadowBlur = 15;
-                    this._drawPathSegments(ctx, this.drawablePathSegments);
-                    
-                    // Core line with animated dash
-                    ctx.strokeStyle = '#da70d6';
-                    ctx.lineWidth = 4;
-                    ctx.shadowBlur = 10;
-                    ctx.setLineDash([20, 15]);
-                    ctx.lineDashOffset = -dashOffset;
-                    this._drawPathSegments(ctx, this.drawablePathSegments);
-                    
-                    ctx.restore();
-                    return;
-                }
-                
-                // === V1 FALLBACK: Simple line path ===
-                // Outer glow
-                ctx.strokeStyle = 'rgba(138, 43, 226, 0.4)';
-                ctx.lineWidth = 24;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.shadowColor = '#8a2be2';
-                ctx.shadowBlur = 30;
-                ctx.beginPath();
-                ctx.moveTo(this.navPath[0].x, this.navPath[0].y);
-                for (let i = 1; i < this.navPath.length; i++) {
-                    ctx.lineTo(this.navPath[i].x, this.navPath[i].y);
-                }
-                ctx.stroke();
-                
-                // Middle glow
-                ctx.strokeStyle = 'rgba(148, 0, 211, 0.7)';
-                ctx.lineWidth = 12;
-                ctx.shadowBlur = 15;
-                ctx.beginPath();
-                ctx.moveTo(this.navPath[0].x, this.navPath[0].y);
-                for (let i = 1; i < this.navPath.length; i++) {
-                    ctx.lineTo(this.navPath[i].x, this.navPath[i].y);
-                }
-                ctx.stroke();
-                
-                // Core line with animated dash
-                ctx.strokeStyle = '#da70d6';
-                ctx.lineWidth = 4;
-                ctx.shadowBlur = 10;
-                ctx.setLineDash([20, 15]);
-                ctx.lineDashOffset = -dashOffset;
-                ctx.beginPath();
-                ctx.moveTo(this.navPath[0].x, this.navPath[0].y);
-                for (let i = 1; i < this.navPath.length; i++) {
-                    ctx.lineTo(this.navPath[i].x, this.navPath[i].y);
-                }
-                ctx.stroke();
-                
-                ctx.restore();
-            }
             
             // Helper: Draw path segments (lines and curves)
             _drawPathSegments(ctx, segments) {
@@ -34207,48 +33766,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.iconCanvas.height = window.innerHeight;
             }
             
-            // ... (Keep your Control Node / Banner logic here) ...
-            // --- 1. CONTROL NODE GENERATOR ---
-            createItemPill(item) {
-                const pill = document.createElement('div');
-                pill.className = 'ui-pill';
-            
-                // Item Details Container
-                // 'overflow: hidden' ensures the description doesn't spill out
-                pill.innerHTML = `
-                    <div style="flex:1; overflow:hidden; padding-right:10px;">
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:2px;">
-                            <div style="font-family:'Orbitron'; font-size:0.9rem; color:#fff; white-space:nowrap;">
-                                ${item.name.toUpperCase()}
-                            </div>
-                            <div style="font-family:'Orbitron'; font-size:0.7rem; color:var(--gold-primary); opacity:0.8;">
-                                x${item.qty || 1}
-                            </div>
-                        </div>
-                        <div style="font-family:'Montserrat'; font-size:0.65rem; color:#bbb; line-height:1.2; font-style:italic; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-                            ${item.desc || "Standard issue gear."}
-                        </div>
-                    </div>
-                `;
-            
-                // The Control Node (Right Anchor)
-                const node = document.createElement('div');
-                node.className = 'control-node';
-            
-                // The Hidden Menu
-                const menu = document.createElement('div');
-                menu.className = 'node-menu';
-                menu.innerHTML = `
-                    <button class="node-btn" onclick="game.inventory.equipItem('${item.id}')">EQUIP</button>
-                    <button class="node-btn" style="color:#ff5555" onclick="game.inventory.dropItem('${item.id}')">DROP</button>
-                `;
-            
-                pill.appendChild(node);
-                pill.appendChild(menu);
-            
-                this.bindDragLogic(node, pill);
-                return pill;
-            }
         
             bindDragLogic(node, pill) {
                 node.addEventListener('mousedown', (e) => {
@@ -34595,8 +34112,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             constructor(game) {
                 this.game = game;
                 this.active = false;
-                this.timer = 0;
-                this.step = 0;
                 
                 // Camera control
                 this.camTargetX = 0;
@@ -34614,8 +34129,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // 1. Letterbox Effect
                 if (this.bars) this.bars.classList.add('active'); 
                 
-                // 2. Lock Player Input
-                if (this.game.player) this.game.player.locked = true; 
+                // 2. (Input is locked by the scene runner while a scene plays: ScenePlayer._lockInput)
                 
                 // 3. Hide HUD
                 const ui = document.getElementById('game-ui');
@@ -34634,8 +34148,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // 1. Remove Letterbox
                 if (this.bars) this.bars.classList.remove('active');
                 
-                // 2. Unlock Player
-                if (this.game.player) this.game.player.locked = false;
                 
                 // 3. Show HUD
                 const ui = document.getElementById('game-ui');
@@ -34648,7 +34160,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             showTitle(duration) {
                 if (this.overlay) {
                     this.overlay.style.opacity = '1';
-                    setTimeout(() => {
+                    this.game.addPausableTimeout(() => {
                         this.overlay.style.opacity = '0';
                     }, duration);
                 }
@@ -34795,12 +34307,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     case "LOC_HOTEL_LOBBY":
                         return g.activeMap.id === 'hotel_lobby';
         
-                    case "TIMER_60": return timerValue >= 60;
-                    case "TIMER_120": return timerValue >= 120;
-                    case "TIMER_300": return timerValue >= 300;
-                    case "TIMER_360": return timerValue >= 360;
-                    case "TIMER_600": return timerValue >=600;
-        
                     case "HAS_KEYCARD":
                         return g.questState.hasKeycard;
 
@@ -34822,8 +34328,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     case "CHURCH_BOSS_DEFEATED":
                         return g.activeMap.id === 'church_boss' && g.enemies.length === 0;
         
-                    default:
+                    default: {
+                        // TIMER_<ticks>, and LOC_<map id> for any map
+                        const m = /^TIMER_(\d+)$/.exec(conditionString);
+                        if (m) return timerValue >= +m[1];
+                        if (conditionString.startsWith('LOC_')) return g.activeMap.id === conditionString.slice(4).toLowerCase();
                         return false;
+                    }
                 }
             }
         }
@@ -34844,7 +34355,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.currentStepData = null;
                 this.stepTimer = 0; 
                 this.initializedStep = false;
-                this.commsTimeout = null;
 
                 // Optional quest state
                 this.activeOptional = null;       // { id, step, stepData, timer, initialized }
@@ -34888,8 +34398,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // Direct Event Handler
             onMessageRead(contactName) {
-                // Handle "Read Message" Step (Index 7)
-                if (this.state.step === 7 && contactName === 'Mirabel') {
+                if (this.isAt('READ_MESSAGE') && contactName === 'Mirabel') {
                     console.log("STORY EVENT: Mirabel message read.");
                     this.advanceStep();
                 }
@@ -34936,7 +34445,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         
                 // 4. Check Completion
                 if (this.currentStepData.condition) {
-                    const isComplete = this.nsm.checkCondition(this.currentStepData.condition, this.stepTimer);
+                    const c = this.currentStepData.condition;
+                    const isComplete = typeof c === 'function' ? c(this.game, this.stepTimer) : this.nsm.checkCondition(c, this.stepTimer);
                     if (isComplete) {
                         console.log(`STORY: Step ${this.state.step} Condition Met.`);
                         this.advanceStep();
@@ -34944,6 +34454,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
         
+            // ── Steps by name (story-db.js names every step): numbers shift when a chapter changes; names don't
+            _stepsOf(st = this.state) { const M = this.nsm.db[st.part]?.chapters[st.chapter]?.missions[st.mission]; return M ? M.steps : {}; }
+            stepIndex(name) {
+                const S = this._stepsOf();
+                for (const k in S) if (S[k].name === name) return +k;
+                throw new Error('No story step named ' + name);
+            }
+            isAt(name) { return this.state.step === this.stepIndex(name); }
+            isBefore(name) { return this.state.step < this.stepIndex(name); }
+            /** Jump to a named step (its onStart runs on the next update). */
+            goTo(name) {
+                this.state.step = this.stepIndex(name);
+                this.currentStepData = null; this.initializedStep = false;
+            }
+
             advanceStep() {
                 this.state.step++;
                 this.currentStepData = null; 
@@ -34956,48 +34481,42 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const qs = this.game.questState;
         
                 // 1. HUB ARRIVAL FAIL-SAFE
-                if (mapId === 'hub_949' && this.state.step < 3) {
+                if (mapId === 'hub_949' && this.isBefore('CAR_REVEAL')) {
                     console.log("STORY OVERRIDE: Player in Hub. Jumping to Step 3 (Car Reveal).");
-                    this.state.step = 3;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('CAR_REVEAL');
                     this.cleanupPhone();
                 }
 
                 // 2. KEYCARD OVERRIDE -> Step 9 (Leave Club)
-                if (qs.hasKeycard && this.state.step < 9) {
+                if (qs.hasKeycard && this.isBefore('LEAVE_CLUB')) {
                     console.log("STORY OVERRIDE: Keycard found. Jumping to Step 9.");
-                    this.state.step = 9;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('LEAVE_CLUB');
                     this.cleanupPhone();
                 }
         
                 // 3. EXIT OVERRIDE -> Step 10 (Arrive Hotel)
-                if (this.state.step === 9 && mapId === 'hub_949') {
+                if (this.isAt('LEAVE_CLUB') && mapId === 'hub_949') {
                     console.log("STORY OVERRIDE: Left club. Jumping to Step 10.");
-                    this.state.step = 10;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('ARRIVE_HOTEL');
                 }
         
                 // 4. ARRIVAL OVERRIDE -> Step 6 (Wait inside Club)
-                if (mapId === 'moon_city_nightclub' && this.state.step < 6) {
+                if (mapId === 'moon_city_nightclub' && this.isBefore('WAIT_FOR_TEXT')) {
                     console.log("STORY OVERRIDE: Arrived at Nightclub. Jumping to Step 6.");
-                    this.state.step = 6;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('WAIT_FOR_TEXT');
                 }
 
                 // 5. AMBUSH CLEARED OVERRIDE -> Step 14 (Report back)
                 // Handles old saves where ambushCleared was set by inline code
-                if (qs.ambushCleared && this.state.step < 14) {
+                if (qs.ambushCleared && this.isBefore('REPORT_BACK')) {
                     console.log("STORY OVERRIDE: Ambush already cleared. Jumping to Step 14.");
-                    this.state.step = 14;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('REPORT_BACK');
                 }
 
                 // 6. CONTRACTOR REWARDED -> Step 15 (Chapter complete)
-                if (qs.rewardClaimedContractor && this.state.step < 15) {
+                if (qs.rewardClaimedContractor && this.isBefore('CHAPTER_COMPLETE')) {
                     console.log("STORY OVERRIDE: Contractor rewarded. Jumping to Step 15.");
-                    this.state.step = 15;
-                    this.currentStepData = null; this.initializedStep = false;
+                    this.goTo('CHAPTER_COMPLETE');
                 }
 
                 // 7. CHURCH BOSS OVERRIDE — mark sanctum optional as complete
@@ -38234,14 +37753,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return this;
             }
             
-            setPark(blockName, options = {}) {
-                return this.setZoneType(blockName, CityLayout.ZONE.PARK, { name: options.name || 'Park', ...options });
-            }
-            
-            setPlaza(blockName, options = {}) {
-                return this.setZoneType(blockName, CityLayout.ZONE.PLAZA, { name: options.name || 'Plaza', ...options });
-            }
-            
             // === BLOCK LAMP COLORS ===
             
             setBlockLampColor(blockName, color, options = {}) {
@@ -38716,17 +38227,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return templates[0];
             }
             
-            _isInIntersection(x, y) {
-                for (let hRoad of this.horizontalRoads) {
-                    for (let vRoad of this.verticalRoads) {
-                        if (x >= vRoad.leftPavement && x <= vRoad.rightPavement + this.pavementWidth &&
-                            y >= hRoad.topPavement && y <= hRoad.bottomPavement + this.pavementWidth) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
             
             /**
              * Extract landmarks from placed buildings.
@@ -39518,9 +39018,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return this.equippedWeaponId === id || this.equippedAttachmentId === id;
             }
             
-            getEquippedWeapon() {
-                return this.equippedWeaponId ? this.items.find(i => i.id === this.equippedWeaponId) : null;
-            }
             
             getEquippedAttachment() {
                 return this.equippedAttachmentId ? this.items.find(i => i.id === this.equippedAttachmentId) : null;
@@ -39719,11 +39216,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 });
             }
         
-            getButtonLabel(item, isEquipped) {
-                const config = this.typeConfig[item.type] || {};
-                if (isEquipped && config.unequipLabel) return config.unequipLabel;
-                return config.equipLabel || 'USE';
-            }
         }
         
 // Initialization in GameEngine:
@@ -39796,25 +39288,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             isEquipped(id) { return this.equipped.includes(id); }
             isOwned(id) { return this.owned.includes(id); }
 
-            // Get stat modifier value
-            getModifier(modType) {
-                const mods = {
-                    auto_aim:     { aimAssist: 0.15 },
-                    speed_boost:  { vehicleSpeed: 1.2, vehicleAccel: 1.15 },
-                    armor_plate:  { damageReduction: 0.2 },
-                    radar_ext:    { radarRange: 1.5 },
-                    fast_reload:  { fireRate: 0.75 },
-                    flit_ext:     { flitCooldown: 0.7, flitRange: 1.3 },
-                    health_regen: { regenRate: 0.2 },
-                    scrap_magnet: { scrapRadius: 2.0, scrapBonus: 1.1 },
-                    vital_link:   { stimCapacity: 2, auraBoost: 1.75 },
-                };
-                let result = 0;
-                for (const id of this.equipped) {
-                    if (mods[id] && mods[id][modType] !== undefined) result = mods[id][modType];
-                }
-                return result;
-            }
 
             serialize() { return { owned: [...this.owned], equipped: [...this.equipped] }; }
             deserialize(data) {
@@ -39824,29 +39297,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
 
-            // Render the augments management screen in sidebar
-            renderScreen(container) {
-                let html = '<div style="padding: 15px; color: #ddd; font-family: Montserrat, sans-serif;">';
-                html += '<div style="font-family: Orbitron, sans-serif; font-size: 0.9rem; color: #00f3ff; margin-bottom: 10px; letter-spacing: 2px;">AUGMENTS</div>';
-                html += `<div style="font-size: 0.75rem; color: #888; margin-bottom: 15px;">SLOTS: ${this.equipped.length} / ${this.maxSlots}</div>`;
-                
-                if (this.owned.length === 0) {
-                    html += '<div style="font-size: 0.8rem; color: #555; font-style: italic;">No augments owned. Visit Dr. Yin\'s Clinic to purchase.</div>';
-                } else {
-                    for (const id of this.owned) {
-                        const aug = AUGMENT_CATALOG.find(a => a.id === id);
-                        if (!aug) continue;
-                        const isEq = this.isEquipped(id);
-                        html += `<div style="background: rgba(${isEq ? '0,243,255' : '255,255,255'},0.05); border: 1px solid rgba(${isEq ? '0,243,255' : '255,255,255'},0.15); border-radius: 6px; padding: 10px; margin-bottom: 8px;">`;
-                        html += `<div style="font-family: Orbitron, sans-serif; font-size: 0.75rem; color: ${isEq ? '#00f3ff' : '#aaa'};">${aug.icon} ${aug.name}</div>`;
-                        html += `<div style="font-size: 0.7rem; color: #777; margin: 4px 0;">${aug.desc}</div>`;
-                        html += `<button onclick="game.augments.${isEq ? 'unequip' : 'equip'}('${id}'); game.renderAugmentScreen();" style="background: transparent; border: 1px solid ${isEq ? '#ff5555' : '#00f3ff'}; color: ${isEq ? '#ff5555' : '#00f3ff'}; padding: 4px 12px; cursor: pointer; font-size: 0.7rem; font-family: Montserrat, sans-serif;">${isEq ? 'UNEQUIP' : 'EQUIP'}</button>`;
-                        html += '</div>';
-                    }
-                }
-                html += '</div>';
-                container.innerHTML = html;
-            }
         }
 
         /* The action dock: context buttons as glass pills above the right-hand cluster, clear of the
@@ -40339,7 +39789,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Anavia unlock notification
                 if (m.type === MISSION_TYPES.BOUNTY && this.completedBounties === 5) {
-                    setTimeout(() => showMessage('ANAVIA HAS NOTICED YOUR WORK. VISIT HER.'), 2000);
+                    game.addPausableTimeout(() => showMessage('ANAVIA HAS NOTICED YOUR WORK. VISIT HER.'), 2000);
                 }
                 
                 this.activeMission = null;
@@ -40876,9 +40326,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return tier;
             }
 
-            getTierName(relationship) {
-                return BONDING_TIERS[this.getTier(relationship)].name;
-            }
 
             canBond(teammate) {
                 if (!teammate.recruited) return false;
@@ -40944,7 +40391,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 audioSys.sfx('ui');
 
                 if (newTier > oldTier && BONDING_TIERS[newTier].message) {
-                    setTimeout(() => {
+                    game.addPausableTimeout(() => {
                         showMessage(`${teammate.name.toUpperCase()}: ${BONDING_TIERS[newTier].message}`);
                     }, 1500);
                 }
@@ -41856,10 +41303,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._sync();
             }
 
-            /** True if the world should currently be paused. */
-            isPaused() {
-                return this.tokens.size > 0;
-            }
 
             /** Diagnostic: returns array of currently-held tokens. */
             debug() {
@@ -42181,6 +41624,74 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // GameEngine — Input and UI event wiring (keyboard, touch, buttons).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /** Interact with whatever is in reach (the action pill, or E on a keyboard): talk, use, enter or leave the car. */
+            interact() {
+                if (this.activeInteraction) {
+                    if(this.activeInteraction.interactionType === 'medbay_refill') {
+                        this.refillStims();
+                    } else if(this.activeInteraction.interactionType === 'vending_machine') {
+                        this.buyBubbleTea();
+                    } else if(this.activeInteraction.interactionType === 'lost_luggage') {
+                        this.searchLostLuggage(this.activeInteraction);
+                    } else if(this.activeInteraction.interactionType === 'bed_sleep') {
+                        // NEW: Open Sleep UI
+                        this.openSleepMenu();
+                    } else if(this.activeInteraction.interactionType === 'crafting_table') {
+                        this.openCraftingTable();
+                    } else if(this.activeInteraction.interactionType === 'armory') {
+                        // Open inventory directly to weapons/equipment screen
+                        this.inventory.toggleMenu();
+                        requestAnimationFrame(() => {
+                            const invNav = document.querySelector('#freelancer-menu .sidebar-nav-item[data-screen="inventory"]');
+                            if (invNav) invNav.click();
+                        });
+                        audioSys.sfx('ui');
+                    } else if(this.activeInteraction.interactionType === 'auto_shop_counter') {
+                        this.openAutoShop();
+                    } else if(this.activeInteraction.interactionType === 'light_switch') {
+                        // Toggle room lights on/off
+                        const switchProp = this.activeInteraction;
+                        if (switchProp.roomId && this.roomSystem.active) {
+                            const nowDark = this.roomSystem.toggleRoomLights(switchProp.roomId);
+                            switchProp._switchState = !nowDark;
+                            const roomLabel = this.roomSystem.rooms[switchProp.roomId]?.label || switchProp.roomId;
+                            showMessage(nowDark ? `${roomLabel} — LIGHTS OFF` : `${roomLabel} — LIGHTS ON`);
+                            audioSys.sfx('ui');
+                        }
+                    } else if(this.activeInteraction.interactionType === 'delivery_pickup') {
+                        // Delivery mission: pick up package from vehicle
+                        if (this.missions.activeMission && !this.missions.activeMission.pickedUp) {
+                            this.missions.activeMission.pickedUp = true;
+                            showMessage('PACKAGE SECURED. DELIVER TO THE TARGET LOCATION.');
+                            if (this.ui && this.ui.showMissionBanner) {
+                                this.ui.showMissionBanner(this.missions.activeMission.banner, 'gold', 'IN PROGRESS');
+                            }
+                            audioSys.sfx('ui');
+                        }
+                    } else if(this.activeInteraction.interactionType === 'adopt_cat') {
+                        this.questState.hasVelvetCat = true;
+                        if (this.velvetCat) {
+                            this.velvetCat._discoverable = false;
+                            this.velvetCat.state = 'following';
+                            this.velvetCat.idleBehavior = null;
+                        }
+                        showMessage('VELVET HAS JOINED YOU.');
+                        audioSys.sfx('ui');
+                    } else if(this.activeInteraction.interactionType === 'read_note') {
+                        const noteId = this.activeInteraction.noteId;
+                        if (noteId) this.openNote(noteId);
+                    } else if(this.activeInteraction.type === 'hail_zib') {
+                        this.openZibMenu(this.activeInteraction.target);
+                    } else if(this.activeInteraction.type === 'hijack') {
+                        this.hijackVehicle(this.activeInteraction.target);
+                    } else if(this.activeInteraction instanceof NPC) {
+                        this.startDialogue(this.activeInteraction);
+                    }
+                } else {
+                    this.toggleVehicle();
+                }
+            },
+
             initEvents() {
                 window.addEventListener('resize', () => { this.resize(); });
                 window.addEventListener('keydown', (e) => { 
@@ -42230,73 +41741,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.mouseDown = false;
                 });
                 
-                const toggleAction = (e) => {
-                    e.preventDefault();
-                    if (this.activeInteraction) {
-                        if(this.activeInteraction.interactionType === 'medbay_refill') {
-                            this.refillStims();
-                        } else if(this.activeInteraction.interactionType === 'vending_machine') {
-                            this.buyBubbleTea();
-                        } else if(this.activeInteraction.interactionType === 'lost_luggage') {
-                            this.searchLostLuggage(this.activeInteraction);
-                        } else if(this.activeInteraction.interactionType === 'bed_sleep') {
-                            // NEW: Open Sleep UI
-                            this.openSleepMenu();
-                        } else if(this.activeInteraction.interactionType === 'crafting_table') {
-                            this.openCraftingTable();
-                        } else if(this.activeInteraction.interactionType === 'armory') {
-                            // Open inventory directly to weapons/equipment screen
-                            this.inventory.toggleMenu();
-                            requestAnimationFrame(() => {
-                                const invNav = document.querySelector('#freelancer-menu .sidebar-nav-item[data-screen="inventory"]');
-                                if (invNav) invNav.click();
-                            });
-                            audioSys.sfx('ui');
-                        } else if(this.activeInteraction.interactionType === 'auto_shop_counter') {
-                            this.openAutoShop();
-                        } else if(this.activeInteraction.interactionType === 'light_switch') {
-                            // Toggle room lights on/off
-                            const switchProp = this.activeInteraction;
-                            if (switchProp.roomId && this.roomSystem.active) {
-                                const nowDark = this.roomSystem.toggleRoomLights(switchProp.roomId);
-                                switchProp._switchState = !nowDark;
-                                const roomLabel = this.roomSystem.rooms[switchProp.roomId]?.label || switchProp.roomId;
-                                showMessage(nowDark ? `${roomLabel} — LIGHTS OFF` : `${roomLabel} — LIGHTS ON`);
-                                audioSys.sfx('ui');
-                            }
-                        } else if(this.activeInteraction.interactionType === 'delivery_pickup') {
-                            // Delivery mission: pick up package from vehicle
-                            if (this.missions.activeMission && !this.missions.activeMission.pickedUp) {
-                                this.missions.activeMission.pickedUp = true;
-                                showMessage('PACKAGE SECURED. DELIVER TO THE TARGET LOCATION.');
-                                if (this.ui && this.ui.showMissionBanner) {
-                                    this.ui.showMissionBanner(this.missions.activeMission.banner, 'gold', 'IN PROGRESS');
-                                }
-                                audioSys.sfx('ui');
-                            }
-                        } else if(this.activeInteraction.interactionType === 'adopt_cat') {
-                            this.questState.hasVelvetCat = true;
-                            if (this.velvetCat) {
-                                this.velvetCat._discoverable = false;
-                                this.velvetCat.state = 'following';
-                                this.velvetCat.idleBehavior = null;
-                            }
-                            showMessage('VELVET HAS JOINED YOU.');
-                            audioSys.sfx('ui');
-                        } else if(this.activeInteraction.interactionType === 'read_note') {
-                            const noteId = this.activeInteraction.noteId;
-                            if (noteId) this.openNote(noteId);
-                        } else if(this.activeInteraction.type === 'hail_zib') {
-                            this.openZibMenu(this.activeInteraction.target);
-                        } else if(this.activeInteraction.type === 'hijack') {
-                            this.hijackVehicle(this.activeInteraction.target);
-                        } else if(this.activeInteraction instanceof NPC) {
-                            this.startDialogue(this.activeInteraction);
-                        }
-                    } else {
-                        this.toggleVehicle();
-                    }
-                };
+                const toggleAction = (e) => { e.preventDefault(); this.interact(); };
 
                 this.interactBtn.addEventListener('click', toggleAction); this.interactBtn.addEventListener('touchstart', toggleAction);
                 // Weather debug: cycles Clear → Drizzle → Rain → Storm → Auto.
@@ -42390,12 +41835,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         saveSlotManager.open('load', (success) => {
                             if (success) {
                                 document.getElementById('main-menu').style.opacity = '0';
-                                setTimeout(() => {
-                                    document.getElementById('ui-layer').style.display = 'none';
-                                    document.getElementById('game-container').style.display = 'block';
-                                    this.running = true;
-                                    this.loop();
-                                }, 500);
+                                setTimeout(() => this.enterWorld(), 500);
                             }
                         });
                     } else {
@@ -42769,8 +42209,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                 this.currency += 450; this.scrap += 10;
                                 this.questState.rewardClaimedLUVSH4D3 = true; 
                                 this.updateUI(); showMessage("REWARD: 450 PERSONICS, 10 SCRAP");
-                             } else if (!this.questState.hasKeycard) {
-                                showMessage("KEYCARD RECEIVED FROM CONTRACTOR (HUB)."); 
                              }
                         } 
                         else if (this.activeInteraction.name === "Ms. Jean") {
@@ -42784,7 +42222,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                 this.loadMap('ethereal_plane');
                             }
                         } 
-                        else {
+                        else if (this.activeInteraction.name === 'Mirabel') {
                             if (this.questState.ambushCleared && !this.questState.rewardClaimedContractor) {
                                 this.currency += 500; this.questState.rewardClaimedContractor = true;
                                 this.updateUI(); showMessage("PAYMENT RECEIVED: 500 PERSONICS");
@@ -42803,7 +42241,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.endDialogue();
                         // Teleport to church_boss and spawn the Triumvirate
                         this.loadMap('church_boss');
-                        setTimeout(() => {
+                        this.addPausableTimeout(() => {
                             if (!this.enemies.some(e => e.persona && !e.dead)) this.bossIntro([new GatlingGunner(360, 330, 0, { persona: 'vesper' }), new GatlingGunner(600, 290, 1, { persona: 'matins' }), new GatlingGunner(840, 330, 2, { persona: 'compline' })], { short: true });
                             showMessage("THE TRIUMVIRATE AWAKENS... (REPLAY)");
                             this.triggerShake(20);
@@ -42896,35 +42334,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return false;
             },
             
-            triggerDeathSequence() {
-                const ds = document.getElementById('death-screen');
-                const off = document.getElementById('death-text-off');
-                const on = document.getElementById('death-text-on');
-                
-                // 1. Show OFFLINE (Red/Gray on Black 80%)
-                ds.style.display = 'flex';
-                ds.classList.remove('respawn');
-                off.style.display = 'block';
-                on.style.display = 'none';
-                
-                // 2. Wait 1.5s -> Switch to ONLINE (Cyan/Black on White 50%)
-                setTimeout(() => {
-                    ds.classList.add('respawn'); // Turns BG white
-                    off.style.display = 'none';
-                    on.style.display = 'block';
-                    
-                    // 3. Respawn & Reset
-                    setTimeout(() => {
-                        ds.style.display = 'none';
-                        // Logic to teleport player to Ethereal Plane or Checkpoint goes here
-                        const rs = (MAP_DATA.medbay_sw && MAP_DATA.medbay_sw.respawn) || { x: 212, y: 328 };
-                        this.loadMap('medbay_sw', { x: rs.x, y: rs.y }); // Wake up in Dr. Yin's clinic
-                        this.playerHealth = 100;
-                        this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
-                        this.updateUI();
-                    }, 1000);
-                }, 1500);
-            },
 
 
             /**
@@ -43274,7 +42683,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const anyTelegraphing = this.enemies.some(e => e.isTelegraphing && !e.dead);
                     if (anyTelegraphing) {
                         this.questState.larissa_flit_hint = true;
-                        setTimeout(() => {
+                        this.addPausableTimeout(() => {
                             this.story.triggerComms("LARISSA", "You saw it coming. The flit is faster than they are.", 5000);
                         }, 1200);
                     }
@@ -45144,6 +44553,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                      } else {
                         this.npcTextEl.textContent = "Welcome to Double Nights. Please be aware, the Penthouse is currently... undergoing maintenance.";
                      }
+                     if (!(this.questState.ambushCleared && !this.questState.rewardClaimedLUVSH4D3)) { this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave'; }   // only the reward is accepted
                 } 
                 else if (entity.name === "Ms. Jean") {
                     if (!this.questState.etherealUnlocked) {
@@ -45165,8 +44575,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.npcTextEl.textContent = "Hmm, you're clearly worth your salt, 949. Keep making noise out there. I may have something for you yet."
                     }
                 }
-                else if (entity.role.includes("robot")) {
+                else if ((entity.role || '').includes("robot")) {
                     this.npcTextEl.textContent = "I work 24/7, 366 on leap years. Have you ever stopped to admire the moonrise? What? Backside?? No! Just the regular ol' moon."
+                    this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave';   // small talk, nothing to accept
                 }
                 else if (entity.role === 'teammate') {
                     if (entity.recruited) {
@@ -45190,8 +44601,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.npcTextEl.textContent = recruitLines[entity.name] || `You need heavy ordinance? Fine. Let's blow something up. (Recruit ${entity.name}?)`;
                     }
                 } 
-                else {
-                    // Default Quest Giver Logic (Mirabel/Contractor)
+                else if (entity.name === 'Mirabel') {
+                    // The chapter's client: the keycard, then her payment after the ambush
                     if (this.questState.ambushCleared && !this.questState.rewardClaimedContractor) { 
                         this.npcTextEl.textContent = "949, you're alive! He escaped?? Starry Heavens above... Well take this payment as promised, and be ready for my next call."; 
                     } 
@@ -45201,6 +44612,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     else { 
                         this.npcTextEl.textContent = "Starry heavens, 949! We finally meet in the flesh. We have no time to waste. The Dark Maker is in the Double Nights, get him before he escapes! The fucker. Take this keycard, for the Suite."; 
                     }
+                }
+                else {
+                    // Anyone without lines of their own: a word in passing, nothing to accept
+                    const PASSING = {
+                        'Chef Koda': "Kitchen's closed to Freelancers. But if Ren likes you, the Amber's on the house.",
+                        'Valentina': "The Enni Cole list is closed tonight, darling. Unless you're somebody.",
+                        spirit: "…the veil is thin here. Can you hear them too?",
+                        vip: "Not now. I'm expecting someone far more important."
+                    };
+                    this.npcTextEl.textContent = PASSING[entity.name] || PASSING[entity.role] || "Evening, Freelancer.";
+                    this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave';
                 }
                 
                 // 4. LOCK UI INTERACTIONS (Except Dialogue Box)
@@ -47026,7 +46448,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const saveData = this.getSaveSchema();
                 
                 // Serialize all companions (unified — permanent + contract)
-                saveData.dancers = []; // Keep empty for backwards compat
+                // (Old saves carried a `dancers` list; loadGame still reads it. New saves keep companions in `teammates`.)
                 saveData.teammates = this.teammates.map(t => ({ 
                     name: t.name, 
                     recruited: t.recruited,
@@ -47047,8 +46469,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     (typeof saveSlotManager !== 'undefined') ? saveSlotManager.getActiveKey() : 'dfab_save_slot_0',
                     JSON.stringify(saveData)
                 );
-                // Legacy compat key
-                localStorage.setItem('dimensions_save_data', JSON.stringify(saveData));
                 const slotLabel = (typeof saveSlotManager !== 'undefined') ? ` [SLOT ${saveSlotManager.activeSlot + 1}]` : '';
                 showMessage(`GAME SAVED TO DISK.${slotLabel}`);
                 audioSys.sfx('ui');
@@ -47062,8 +46482,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             loadGame() {
                 const slotKey = (typeof saveSlotManager !== 'undefined') ? saveSlotManager.getActiveKey() : 'dfab_save_slot_0';
                 let json = localStorage.getItem(slotKey);
-                // Fallback to legacy key
-                if (!json) json = localStorage.getItem('dimensions_save_data');
+                // (A pre-slots save was moved into slot 1 once, by saveSlotManager._migrateV1Save; an empty slot stays empty.)
+                if (json && this.pausableTimers) this.pausableTimers.length = 0;   // the loaded world starts with nothing pending
                 if (!json) {
                     showMessage("NO SAVE FILE FOUND.");
                     audioSys.sfx('ui');
@@ -47463,6 +46883,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (!inGate(x, y) && (!nav || nav.walkable(x, y))) return { x, y, angle: Math.atan2(dir[1], dir[0]) };
                 }
                 return { x: M.spawn.x, y: M.spawn.y, angle: -Math.PI / 2 };   // nothing clear: the map's own spawn
+            },
+
+            /** Take a wall out of the live map (the suite's breach): its collision body, the render grid,
+             *  the lamp shadows it cast, and (through its signature) the nav grid all follow. */
+            removeWall(w) {
+                const M = this.activeMap, i = M ? M.walls.indexOf(w) : -1;
+                if (i < 0) return false;
+                const bodies = this._staticWallEntities || [];
+                const body = bodies.length === M.walls.length ? bodies[i] : null;   // built from this array, in this order
+                M.walls.splice(i, 1);
+                if (body) { body.active = false; body.markedForDestroy = true; body._finalDestroy(); bodies.splice(i, 1); }
+                if (this._renderGridWalls) this._renderGridWalls.build(M.walls);
+                this.bakeStaticLighting();
+                return true;
             },
 
             _doLoadMap(mapId, spawnAt) {
@@ -48496,7 +47930,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.activeMap.id === 'hub_949' && this.missions && this.missions.activeMission) {
                     const m = this.missions.activeMission;
                     if (m.status === 'active') {
-                        setTimeout(() => {
+                        this.addPausableTimeout(() => {
                             if (this.ui && this.ui.showMissionBanner) {
                                 const text = this.missions.getObjectiveText();
                                 if (text) this.ui.showMissionBanner(text, 'gold', 'IN PROGRESS');
@@ -49349,11 +48783,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.toggleVehicle();
             },
 
-            checkRectCollision(cx, cy, cw, ch, angle, walls) {
-                const cos = Math.cos(angle); const sin = Math.sin(angle); const hw = cw / 2; const hh = ch / 2;
-                const corners = [ { x: cx + (hw * cos - hh * sin), y: cy + (hw * sin + hh * cos) }, { x: cx + (hw * cos + hh * sin), y: cy + (hw * sin - hh * cos) }, { x: cx + (-hw * cos + hh * sin), y: cy + (-hw * sin - hh * cos) }, { x: cx + (-hw * cos - hh * sin), y: cy + (-hw * sin + hh * cos) } ];
-                for (let w of walls) { if (cx + cw < w.x || cx - cw > w.x + w.w || cy + ch < w.y || cy - ch > w.y + w.h) continue; for(let p of corners) { if(p.x > w.x && p.x < w.x + w.w && p.y > w.y && p.y < w.y + w.h) return true; } } return false;
-            },
             
             // Raycast check for Light Occlusion (Shadows)
             checkLineOfSight(x1, y1, x2, y2) {
@@ -50240,7 +49669,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         for (const e of this.enemies) {
                             if (e.isTelegraphing && !e.dead) {
                                 this.questState.larissa_telegraph_hint = true;
-                                setTimeout(() => {
+                                this.addPausableTimeout(() => {
                                     this.story.triggerComms("LARISSA", "Watch the line, 949. That's your window.", 4500);
                                 }, 300);
                                 break;
@@ -50252,7 +49681,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         for (const e of this.enemies) {
                             if (e instanceof Ganger && e.state === 'ALERT' && !e.dead) {
                                 this.questState.larissa_stealth_hint = true;
-                                setTimeout(() => {
+                                this.addPausableTimeout(() => {
                                     this.story.triggerComms("LARISSA", "They can't see in the dark. Use it.", 4500);
                                 }, 4800); // Delayed so it doesn't overlap telegraph hint
                                 break;
@@ -50866,9 +50295,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const isMoving = (Math.abs(inputX) > 0 || Math.abs(inputY) > 0);
                         const bleedChance = this.playerHealth < 20 ? 0.3 : 0.1;
                         
-                        //if ((isMoving || Math.random() < 0.05) && Math.random() < bleedChance) {
+                        // Drops as she moves (now and then when still), more often when badly hurt
+                        if ((isMoving || Math.random() < 0.05) && Math.random() < bleedChance) {
                             this.decals.addBlood(this.player.x, this.player.y, 3 + Math.random() * 2, BLOOD_KINDS.wine.decal);   // Stella's own
-                        //}
+                        }
                     }
                 }
                 
@@ -51125,23 +50555,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.traffic.resolveCollisions(this.car, this.player, this.weather, audioSys, this.ownedCar, this.decals);
             },
 
-            // Helper: Checks if two rotated cars intersect
-            checkCarIntersect(c1, c2) {
-                // Get corners of Car 1
-                const corners1 = this.getOBBCorners(c1);
-                // Get corners of Car 2
-                const corners2 = this.getOBBCorners(c2);
-            
-                // Check if any corner of C1 is inside C2
-                for(let p of corners1) {
-                    if(this.isPointInRotatedRect(p.x, p.y, c2)) return true;
-                }
-                // Check if any corner of C2 is inside C1
-                for(let p of corners2) {
-                    if(this.isPointInRotatedRect(p.x, p.y, c1)) return true;
-                }
-                return false;
-            },
             
             getOBBCorners(c) {
                 const cos = Math.cos(c.angle); const sin = Math.sin(c.angle);
@@ -54948,10 +54361,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
 
             /**
-             * Schedule a callback to fire after `ms` of in-game time. Unlike
-             * setTimeout, these timers freeze when the game is paused — they
-             * advance only when update() runs. Returns a token that can be
-             * passed to cancelPausableTimeout.
+             * Schedule a callback to fire after `ms` of in-game time (counted in sim ticks). Unlike
+             * setTimeout, these timers freeze when the game is paused — they advance only when
+             * update() runs — and a new game or a load clears them, so no stale story beat fires.
+             * Returns a token that can be passed to cancelPausableTimeout.
              */
             addPausableTimeout(callback, ms) {
                 const timer = { msRemaining: ms, cb: callback };
@@ -54963,11 +54376,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (idx !== -1) this.pausableTimers.splice(idx, 1);
             },
             _tickPausableTimers() {
-                const now = performance.now();
-                if (this._lastPausableTimerTick === undefined) this._lastPausableTimerTick = now;
-                // Clamp dt to avoid post-pause/tab-blur spikes firing every queued timer at once.
-                const dt = Math.min(50, now - this._lastPausableTimerTick);
-                this._lastPausableTimerTick = now;
+                // Game time, not wall time: one sim tick per call (update() runs only while unpaused)
+                const dt = CONFIG.LOOP.STEP_MS;
                 for (let i = this.pausableTimers.length - 1; i >= 0; i--) {
                     const t = this.pausableTimers[i];
                     t.msRemaining -= dt;
@@ -55231,17 +54641,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // GameEngine — start / stop / reset and the main loop.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
-            start(mapId) { 
-                // Auto-detect mobile on first load (no saved settings override)
-                if (GameSettings._isMobile && !localStorage.getItem('dimensions_save_data') && !localStorage.getItem('dfab_save_slot_0')) {
-                    GameSettings.applyPreset('medium');
-                    this.lightingScale = 0.75;
-                    GameSettings.applyFilmGrain();
-                    GameSettings.applyControls();
-                    this.resize();
-                    console.log('[AUTO-DETECT] Mobile device — applied MEDIUM preset');
-                }
-                this.running = true; this.loadMap(mapId); document.getElementById('ui-layer').style.display = 'none'; document.getElementById('game-container').style.display = 'block'; if (this.ui) this.ui.showMissionBanner("WELCOME TO SOUTHERN DIMENSIONS CITY", "new", "WELCOME"); this.loop(); 
+            /** From the menu into the world: hide the menu layer, show the canvas, start the loop. */
+            enterWorld() {
+                document.getElementById('ui-layer').style.display = 'none';
+                document.getElementById('game-container').style.display = 'block';
+                this.running = true;
+                this.loop();
             },
             stop() {
                 this.running = false;
@@ -55264,6 +54669,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * Resets: inventory, quest progress, health, currency, driving, entities.
              */
             resetGameState() {
+                if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
                 // --- PLAYER STATE ---
                 this.currency = 100;
                 this.scrap = 0;
@@ -55563,16 +54969,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // 4. Wait for fade (500ms), then Swap Layers & Start
             setTimeout(() => { 
-                // HIDE the Menu Layer completely
-                document.getElementById('ui-layer').style.display = 'none';
-                
-                // SHOW the Game Canvas
-                document.getElementById('game-container').style.display = 'block';
-                
-                // Start the Engine & Story: the prologue (story/scenes/prologue.js), then chapter 1
+                // The prologue (story/scenes/prologue.js), then chapter 1
                 game.scenes.play('prologue').then(() => game.story.startPrologue());
-                game.running = true;
-                game.loop();
+                game.enterWorld();
             }, 500); 
         });
         document.getElementById('btn-story-747').addEventListener('click', () => { showMessage("TIMELINE 747 LOCKED."); });
@@ -57135,48 +56534,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             // 5. Handle 'E' Key (Interact - talk, enter car, etc.)
-            if ((e.key === 'e' || e.key === 'E') && game.running && !game.paused) {
-                if (game.activeInteraction) {
-                    if (game.activeInteraction.interactionType === 'medbay_refill') {
-                        game.refillStims();
-                    } else if (game.activeInteraction.interactionType === 'vending_machine') {
-                        game.buyBubbleTea();
-                    } else if (game.activeInteraction.interactionType === 'lost_luggage') {
-                        game.searchLostLuggage(game.activeInteraction);
-                    } else if (game.activeInteraction.interactionType === 'bed_sleep') {
-                        game.openSleepMenu();
-                    } else if (game.activeInteraction.interactionType === 'crafting_table') {
-                        game.openCraftingTable();
-                    } else if (game.activeInteraction.interactionType === 'delivery_pickup') {
-                        // Trigger delivery pickup through mission system
-                        if (game.missions.activeMission && !game.missions.activeMission.pickedUp) {
-                            game.missions.activeMission.pickedUp = true;
-                            showMessage('PACKAGE SECURED. DELIVER TO THE TARGET LOCATION.');
-                            if (game.ui && game.ui.showMissionBanner) {
-                                game.ui.showMissionBanner(game.missions.activeMission.banner, 'gold', 'IN PROGRESS');
-                            }
-                            audioSys.sfx('ui');
-                        }
-                    } else if (game.activeInteraction.interactionType === 'adopt_cat') {
-                        game.questState.hasVelvetCat = true;
-                        if (game.velvetCat) {
-                            game.velvetCat._discoverable = false;
-                            game.velvetCat.state = 'following';
-                            game.velvetCat.idleBehavior = null;
-                        }
-                        showMessage('VELVET HAS JOINED YOU.');
-                        audioSys.sfx('ui');
-                    } else if (game.activeInteraction.type === 'hail_zib') {
-                        game.openZibMenu(game.activeInteraction.target);
-                    } else if (game.activeInteraction.type === 'hijack') {
-                        game.hijackVehicle(game.activeInteraction.target);
-                    } else if (game.activeInteraction instanceof NPC) {
-                        game.startDialogue(game.activeInteraction);
-                    }
-                } else {
-                    game.toggleVehicle();
-                }
-            }
+            if ((e.key === 'e' || e.key === 'E') && game.running && !game.paused) game.interact();   // the same action as the pill (engine/events.js)
             
             // 6. Handle 'F' Key (Use Transition Point)
             if ((e.key === 'f' || e.key === 'F') && game.running && !game.paused) {
@@ -57621,13 +56979,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return `${mon} ${day}, ${hr}:${min}`;
             }
 
-            _formatPlayTime(totalMinutes) {
-                const h = Math.floor(totalMinutes / 60);
-                const m = totalMinutes % 60;
-                const period = h >= 12 ? 'PM' : 'AM';
-                const displayH = h % 12 || 12;
-                return `${displayH}:${String(m).padStart(2,'0')} ${period}`;
-            }
 
             _render() {
                 const title = this.mode === 'save' ? 'Save Game' : 'Load Game';

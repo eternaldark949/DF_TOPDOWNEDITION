@@ -258,10 +258,7 @@
                 return WEATHER_CONDITIONS[this.condition] || WEATHER_CONDITIONS.rain;
             }
 
-            /** Human-readable state for the phone HUD and debug overlay. */
-            getConditionLabel() { return this.getCondition().label; }
             getConditionIcon()  { return this.getCondition().icon; }
-            getConditionTemp()  { return this.getCondition().temp; }
 
             /**
              * Effective rain strength for renderers, 0 when indoors.

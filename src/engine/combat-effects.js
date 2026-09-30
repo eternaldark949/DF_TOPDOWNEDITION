@@ -78,35 +78,6 @@
                 return false;
             },
             
-            triggerDeathSequence() {
-                const ds = document.getElementById('death-screen');
-                const off = document.getElementById('death-text-off');
-                const on = document.getElementById('death-text-on');
-                
-                // 1. Show OFFLINE (Red/Gray on Black 80%)
-                ds.style.display = 'flex';
-                ds.classList.remove('respawn');
-                off.style.display = 'block';
-                on.style.display = 'none';
-                
-                // 2. Wait 1.5s -> Switch to ONLINE (Cyan/Black on White 50%)
-                setTimeout(() => {
-                    ds.classList.add('respawn'); // Turns BG white
-                    off.style.display = 'none';
-                    on.style.display = 'block';
-                    
-                    // 3. Respawn & Reset
-                    setTimeout(() => {
-                        ds.style.display = 'none';
-                        // Logic to teleport player to Ethereal Plane or Checkpoint goes here
-                        const rs = (MAP_DATA.medbay_sw && MAP_DATA.medbay_sw.respawn) || { x: 212, y: 328 };
-                        this.loadMap('medbay_sw', { x: rs.x, y: rs.y }); // Wake up in Dr. Yin's clinic
-                        this.playerHealth = 100;
-                        this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
-                        this.updateUI();
-                    }, 1000);
-                }, 1500);
-            },
 
 
             /**
@@ -456,7 +427,7 @@
                     const anyTelegraphing = this.enemies.some(e => e.isTelegraphing && !e.dead);
                     if (anyTelegraphing) {
                         this.questState.larissa_flit_hint = true;
-                        setTimeout(() => {
+                        this.addPausableTimeout(() => {
                             this.story.triggerComms("LARISSA", "You saw it coming. The flit is faster than they are.", 5000);
                         }, 1200);
                     }

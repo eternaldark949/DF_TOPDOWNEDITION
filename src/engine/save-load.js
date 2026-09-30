@@ -389,7 +389,7 @@
                 const saveData = this.getSaveSchema();
                 
                 // Serialize all companions (unified — permanent + contract)
-                saveData.dancers = []; // Keep empty for backwards compat
+                // (Old saves carried a `dancers` list; loadGame still reads it. New saves keep companions in `teammates`.)
                 saveData.teammates = this.teammates.map(t => ({ 
                     name: t.name, 
                     recruited: t.recruited,
@@ -410,8 +410,6 @@
                     (typeof saveSlotManager !== 'undefined') ? saveSlotManager.getActiveKey() : 'dfab_save_slot_0',
                     JSON.stringify(saveData)
                 );
-                // Legacy compat key
-                localStorage.setItem('dimensions_save_data', JSON.stringify(saveData));
                 const slotLabel = (typeof saveSlotManager !== 'undefined') ? ` [SLOT ${saveSlotManager.activeSlot + 1}]` : '';
                 showMessage(`GAME SAVED TO DISK.${slotLabel}`);
                 audioSys.sfx('ui');
@@ -425,8 +423,8 @@
             loadGame() {
                 const slotKey = (typeof saveSlotManager !== 'undefined') ? saveSlotManager.getActiveKey() : 'dfab_save_slot_0';
                 let json = localStorage.getItem(slotKey);
-                // Fallback to legacy key
-                if (!json) json = localStorage.getItem('dimensions_save_data');
+                // (A pre-slots save was moved into slot 1 once, by saveSlotManager._migrateV1Save; an empty slot stays empty.)
+                if (json && this.pausableTimers) this.pausableTimers.length = 0;   // the loaded world starts with nothing pending
                 if (!json) {
                     showMessage("NO SAVE FILE FOUND.");
                     audioSys.sfx('ui');

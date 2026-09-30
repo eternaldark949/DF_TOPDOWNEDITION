@@ -64,10 +64,6 @@
                 this._sync();
             }
 
-            /** True if the world should currently be paused. */
-            isPaused() {
-                return this.tokens.size > 0;
-            }
 
             /** Diagnostic: returns array of currently-held tokens. */
             debug() {

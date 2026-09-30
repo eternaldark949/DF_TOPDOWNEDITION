@@ -263,40 +263,6 @@
                 }
             }
             
-            /**
-             * Update window lighting states based on time.
-             */
-            _updateWindowStates(worldMinutes) {
-                // Only update every few seconds for performance
-                if (this._windowStates && Date.now() - this._lastWindowUpdate < 5000) {
-                    return;
-                }
-                
-                this._lastWindowUpdate = Date.now();
-                this._windowStates = [];
-                
-                // worldMinutes is monotonic — derive hour-of-day with % 1440.
-                const hour = (worldMinutes % 1440) / 60;
-                const isNight = hour < 6 || hour > 20;
-                const litChance = isNight ? 0.7 : 0.1;
-                
-                const seed = this.x * 1000 + this.y;
-                let idx = 0;
-                
-                this.sections.forEach(section => {
-                    const cols = Math.floor((section.w - this.windowConfig.marginX * 2) / this.windowConfig.spacingX);
-                    const rows = Math.floor((section.h - this.windowConfig.marginY * 2) / this.windowConfig.spacingY);
-                    
-                    for (let row = 0; row < rows; row++) {
-                        for (let col = 0; col < cols; col++) {
-                            const rand = Math.sin(seed + idx * 127.1) * 43758.5453;
-                            const isLit = (rand - Math.floor(rand)) < litChance;
-                            this._windowStates.push(isLit);
-                            idx++;
-                        }
-                    }
-                });
-            }
             
             /**
              * Draw base layer (under player): shadow, ground floor, entrance.
@@ -493,76 +459,13 @@
                 if (this.style === 'silver_queen' && CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) this._sqDrawColumns(ctx);
             }
             
-            /**
-             * Draw a rooftop skylight (circular dome style, clearly not a window).
-             */
-            _drawSkylight(ctx, x, y, w, h, isLit) {
-                const cx = x + w / 2;
-                const cy = y + h / 2;
-                const radius = Math.min(w, h) / 2;
-                
-                // Raised circular frame (dark metal)
-                ctx.fillStyle = '#1a1a22';
-                ctx.beginPath();
-                ctx.arc(cx, cy, radius + 3, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Glass dome
-                ctx.fillStyle = isLit ? 'rgba(255, 200, 120, 0.5)' : 'rgba(50, 70, 90, 0.7)';
-                ctx.beginPath();
-                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Dome highlight (reflection)
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.beginPath();
-                ctx.arc(cx - radius * 0.3, cy - radius * 0.3, radius * 0.4, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Glow for lit skylights
-                if (isLit) {
-                    ctx.fillStyle = 'rgba(255, 180, 100, 0.2)';
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, radius + 8, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
             
-            /**
-             * Lighten a hex color by amount.
-             */
-            _lightenColor(hex, amount) { try { return lightenHex(hex, amount); } catch(e) { return '#3a3a48'; } }
             
             /**
              * Helper: Convert hex color to RGB string.
              */
             _hexToRgb(hex) { return hexToRgb(hex); }
             
-            /**
-             * Draw windows on building facade (south/east walls).
-             */
-            _drawFacadeWindows(ctx, startX, startY, width, height, side) {
-                const windowW = 8;
-                const windowH = 10;
-                const spacing = 25;
-                const rows = Math.floor(height / 12);
-                const cols = Math.floor(width / spacing);
-                
-                for (let row = 0; row < rows; row++) {
-                    for (let col = 1; col < cols; col++) {
-                        const wx = startX + col * spacing;
-                        const wy = startY + 5 + row * 12;
-                        
-                        // Random lit state
-                        const seed = wx * 100 + wy;
-                        const rand = Math.sin(seed) * 43758.5453;
-                        const isLit = (rand - Math.floor(rand)) > 0.4;
-                        
-                        ctx.fillStyle = isLit ? 'rgba(255, 200, 120, 0.8)' : 'rgba(30, 50, 80, 0.6)';
-                        ctx.fillRect(wx, wy, windowW, windowH);
-                    }
-                }
-            }
             
             // Legacy compatibility
             draw(ctx, worldMinutes) {

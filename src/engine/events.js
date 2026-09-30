@@ -1,6 +1,74 @@
         // GameEngine — Input and UI event wiring (keyboard, touch, buttons).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /** Interact with whatever is in reach (the action pill, or E on a keyboard): talk, use, enter or leave the car. */
+            interact() {
+                if (this.activeInteraction) {
+                    if(this.activeInteraction.interactionType === 'medbay_refill') {
+                        this.refillStims();
+                    } else if(this.activeInteraction.interactionType === 'vending_machine') {
+                        this.buyBubbleTea();
+                    } else if(this.activeInteraction.interactionType === 'lost_luggage') {
+                        this.searchLostLuggage(this.activeInteraction);
+                    } else if(this.activeInteraction.interactionType === 'bed_sleep') {
+                        // NEW: Open Sleep UI
+                        this.openSleepMenu();
+                    } else if(this.activeInteraction.interactionType === 'crafting_table') {
+                        this.openCraftingTable();
+                    } else if(this.activeInteraction.interactionType === 'armory') {
+                        // Open inventory directly to weapons/equipment screen
+                        this.inventory.toggleMenu();
+                        requestAnimationFrame(() => {
+                            const invNav = document.querySelector('#freelancer-menu .sidebar-nav-item[data-screen="inventory"]');
+                            if (invNav) invNav.click();
+                        });
+                        audioSys.sfx('ui');
+                    } else if(this.activeInteraction.interactionType === 'auto_shop_counter') {
+                        this.openAutoShop();
+                    } else if(this.activeInteraction.interactionType === 'light_switch') {
+                        // Toggle room lights on/off
+                        const switchProp = this.activeInteraction;
+                        if (switchProp.roomId && this.roomSystem.active) {
+                            const nowDark = this.roomSystem.toggleRoomLights(switchProp.roomId);
+                            switchProp._switchState = !nowDark;
+                            const roomLabel = this.roomSystem.rooms[switchProp.roomId]?.label || switchProp.roomId;
+                            showMessage(nowDark ? `${roomLabel} — LIGHTS OFF` : `${roomLabel} — LIGHTS ON`);
+                            audioSys.sfx('ui');
+                        }
+                    } else if(this.activeInteraction.interactionType === 'delivery_pickup') {
+                        // Delivery mission: pick up package from vehicle
+                        if (this.missions.activeMission && !this.missions.activeMission.pickedUp) {
+                            this.missions.activeMission.pickedUp = true;
+                            showMessage('PACKAGE SECURED. DELIVER TO THE TARGET LOCATION.');
+                            if (this.ui && this.ui.showMissionBanner) {
+                                this.ui.showMissionBanner(this.missions.activeMission.banner, 'gold', 'IN PROGRESS');
+                            }
+                            audioSys.sfx('ui');
+                        }
+                    } else if(this.activeInteraction.interactionType === 'adopt_cat') {
+                        this.questState.hasVelvetCat = true;
+                        if (this.velvetCat) {
+                            this.velvetCat._discoverable = false;
+                            this.velvetCat.state = 'following';
+                            this.velvetCat.idleBehavior = null;
+                        }
+                        showMessage('VELVET HAS JOINED YOU.');
+                        audioSys.sfx('ui');
+                    } else if(this.activeInteraction.interactionType === 'read_note') {
+                        const noteId = this.activeInteraction.noteId;
+                        if (noteId) this.openNote(noteId);
+                    } else if(this.activeInteraction.type === 'hail_zib') {
+                        this.openZibMenu(this.activeInteraction.target);
+                    } else if(this.activeInteraction.type === 'hijack') {
+                        this.hijackVehicle(this.activeInteraction.target);
+                    } else if(this.activeInteraction instanceof NPC) {
+                        this.startDialogue(this.activeInteraction);
+                    }
+                } else {
+                    this.toggleVehicle();
+                }
+            },
+
             initEvents() {
                 window.addEventListener('resize', () => { this.resize(); });
                 window.addEventListener('keydown', (e) => { 
@@ -50,73 +118,7 @@
                     this.mouseDown = false;
                 });
                 
-                const toggleAction = (e) => {
-                    e.preventDefault();
-                    if (this.activeInteraction) {
-                        if(this.activeInteraction.interactionType === 'medbay_refill') {
-                            this.refillStims();
-                        } else if(this.activeInteraction.interactionType === 'vending_machine') {
-                            this.buyBubbleTea();
-                        } else if(this.activeInteraction.interactionType === 'lost_luggage') {
-                            this.searchLostLuggage(this.activeInteraction);
-                        } else if(this.activeInteraction.interactionType === 'bed_sleep') {
-                            // NEW: Open Sleep UI
-                            this.openSleepMenu();
-                        } else if(this.activeInteraction.interactionType === 'crafting_table') {
-                            this.openCraftingTable();
-                        } else if(this.activeInteraction.interactionType === 'armory') {
-                            // Open inventory directly to weapons/equipment screen
-                            this.inventory.toggleMenu();
-                            requestAnimationFrame(() => {
-                                const invNav = document.querySelector('#freelancer-menu .sidebar-nav-item[data-screen="inventory"]');
-                                if (invNav) invNav.click();
-                            });
-                            audioSys.sfx('ui');
-                        } else if(this.activeInteraction.interactionType === 'auto_shop_counter') {
-                            this.openAutoShop();
-                        } else if(this.activeInteraction.interactionType === 'light_switch') {
-                            // Toggle room lights on/off
-                            const switchProp = this.activeInteraction;
-                            if (switchProp.roomId && this.roomSystem.active) {
-                                const nowDark = this.roomSystem.toggleRoomLights(switchProp.roomId);
-                                switchProp._switchState = !nowDark;
-                                const roomLabel = this.roomSystem.rooms[switchProp.roomId]?.label || switchProp.roomId;
-                                showMessage(nowDark ? `${roomLabel} — LIGHTS OFF` : `${roomLabel} — LIGHTS ON`);
-                                audioSys.sfx('ui');
-                            }
-                        } else if(this.activeInteraction.interactionType === 'delivery_pickup') {
-                            // Delivery mission: pick up package from vehicle
-                            if (this.missions.activeMission && !this.missions.activeMission.pickedUp) {
-                                this.missions.activeMission.pickedUp = true;
-                                showMessage('PACKAGE SECURED. DELIVER TO THE TARGET LOCATION.');
-                                if (this.ui && this.ui.showMissionBanner) {
-                                    this.ui.showMissionBanner(this.missions.activeMission.banner, 'gold', 'IN PROGRESS');
-                                }
-                                audioSys.sfx('ui');
-                            }
-                        } else if(this.activeInteraction.interactionType === 'adopt_cat') {
-                            this.questState.hasVelvetCat = true;
-                            if (this.velvetCat) {
-                                this.velvetCat._discoverable = false;
-                                this.velvetCat.state = 'following';
-                                this.velvetCat.idleBehavior = null;
-                            }
-                            showMessage('VELVET HAS JOINED YOU.');
-                            audioSys.sfx('ui');
-                        } else if(this.activeInteraction.interactionType === 'read_note') {
-                            const noteId = this.activeInteraction.noteId;
-                            if (noteId) this.openNote(noteId);
-                        } else if(this.activeInteraction.type === 'hail_zib') {
-                            this.openZibMenu(this.activeInteraction.target);
-                        } else if(this.activeInteraction.type === 'hijack') {
-                            this.hijackVehicle(this.activeInteraction.target);
-                        } else if(this.activeInteraction instanceof NPC) {
-                            this.startDialogue(this.activeInteraction);
-                        }
-                    } else {
-                        this.toggleVehicle();
-                    }
-                };
+                const toggleAction = (e) => { e.preventDefault(); this.interact(); };
 
                 this.interactBtn.addEventListener('click', toggleAction); this.interactBtn.addEventListener('touchstart', toggleAction);
                 // Weather debug: cycles Clear → Drizzle → Rain → Storm → Auto.
@@ -210,12 +212,7 @@
                         saveSlotManager.open('load', (success) => {
                             if (success) {
                                 document.getElementById('main-menu').style.opacity = '0';
-                                setTimeout(() => {
-                                    document.getElementById('ui-layer').style.display = 'none';
-                                    document.getElementById('game-container').style.display = 'block';
-                                    this.running = true;
-                                    this.loop();
-                                }, 500);
+                                setTimeout(() => this.enterWorld(), 500);
                             }
                         });
                     } else {
@@ -589,8 +586,6 @@
                                 this.currency += 450; this.scrap += 10;
                                 this.questState.rewardClaimedLUVSH4D3 = true; 
                                 this.updateUI(); showMessage("REWARD: 450 PERSONICS, 10 SCRAP");
-                             } else if (!this.questState.hasKeycard) {
-                                showMessage("KEYCARD RECEIVED FROM CONTRACTOR (HUB)."); 
                              }
                         } 
                         else if (this.activeInteraction.name === "Ms. Jean") {
@@ -604,7 +599,7 @@
                                 this.loadMap('ethereal_plane');
                             }
                         } 
-                        else {
+                        else if (this.activeInteraction.name === 'Mirabel') {
                             if (this.questState.ambushCleared && !this.questState.rewardClaimedContractor) {
                                 this.currency += 500; this.questState.rewardClaimedContractor = true;
                                 this.updateUI(); showMessage("PAYMENT RECEIVED: 500 PERSONICS");
@@ -623,7 +618,7 @@
                         this.endDialogue();
                         // Teleport to church_boss and spawn the Triumvirate
                         this.loadMap('church_boss');
-                        setTimeout(() => {
+                        this.addPausableTimeout(() => {
                             if (!this.enemies.some(e => e.persona && !e.dead)) this.bossIntro([new GatlingGunner(360, 330, 0, { persona: 'vesper' }), new GatlingGunner(600, 290, 1, { persona: 'matins' }), new GatlingGunner(840, 330, 2, { persona: 'compline' })], { short: true });
                             showMessage("THE TRIUMVIRATE AWAKENS... (REPLAY)");
                             this.triggerShake(20);

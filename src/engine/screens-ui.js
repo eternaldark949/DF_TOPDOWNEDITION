@@ -183,6 +183,7 @@
                      } else {
                         this.npcTextEl.textContent = "Welcome to Double Nights. Please be aware, the Penthouse is currently... undergoing maintenance.";
                      }
+                     if (!(this.questState.ambushCleared && !this.questState.rewardClaimedLUVSH4D3)) { this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave'; }   // only the reward is accepted
                 } 
                 else if (entity.name === "Ms. Jean") {
                     if (!this.questState.etherealUnlocked) {
@@ -204,8 +205,9 @@
                         this.npcTextEl.textContent = "Hmm, you're clearly worth your salt, 949. Keep making noise out there. I may have something for you yet."
                     }
                 }
-                else if (entity.role.includes("robot")) {
+                else if ((entity.role || '').includes("robot")) {
                     this.npcTextEl.textContent = "I work 24/7, 366 on leap years. Have you ever stopped to admire the moonrise? What? Backside?? No! Just the regular ol' moon."
+                    this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave';   // small talk, nothing to accept
                 }
                 else if (entity.role === 'teammate') {
                     if (entity.recruited) {
@@ -229,8 +231,8 @@
                         this.npcTextEl.textContent = recruitLines[entity.name] || `You need heavy ordinance? Fine. Let's blow something up. (Recruit ${entity.name}?)`;
                     }
                 } 
-                else {
-                    // Default Quest Giver Logic (Mirabel/Contractor)
+                else if (entity.name === 'Mirabel') {
+                    // The chapter's client: the keycard, then her payment after the ambush
                     if (this.questState.ambushCleared && !this.questState.rewardClaimedContractor) { 
                         this.npcTextEl.textContent = "949, you're alive! He escaped?? Starry Heavens above... Well take this payment as promised, and be ready for my next call."; 
                     } 
@@ -240,6 +242,17 @@
                     else { 
                         this.npcTextEl.textContent = "Starry heavens, 949! We finally meet in the flesh. We have no time to waste. The Dark Maker is in the Double Nights, get him before he escapes! The fucker. Take this keycard, for the Suite."; 
                     }
+                }
+                else {
+                    // Anyone without lines of their own: a word in passing, nothing to accept
+                    const PASSING = {
+                        'Chef Koda': "Kitchen's closed to Freelancers. But if Ren likes you, the Amber's on the house.",
+                        'Valentina': "The Enni Cole list is closed tonight, darling. Unless you're somebody.",
+                        spirit: "…the veil is thin here. Can you hear them too?",
+                        vip: "Not now. I'm expecting someone far more important."
+                    };
+                    this.npcTextEl.textContent = PASSING[entity.name] || PASSING[entity.role] || "Evening, Freelancer.";
+                    this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave';
                 }
                 
                 // 4. LOCK UI INTERACTIONS (Except Dialogue Box)

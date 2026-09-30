@@ -564,21 +564,6 @@
                 return null;
             }
             
-            /**
-             * Get the next pre-determined turn path from navigation (V2 only).
-             * @returns {TurnPath|null} The next turn path to take
-             */
-            getNextNavTurnPath() {
-                if (this.navWaypoints && this.navWaypoints.length > 0) {
-                    for (let i = this.currentWaypointIndex; i < this.navWaypoints.length; i++) {
-                        const wp = this.navWaypoints[i];
-                        if (wp.type === 'TURN_PATH' && wp.turnPath) {
-                            return wp.turnPath;
-                        }
-                    }
-                }
-                return null;
-            }
             
             /**
              * Check if the car is on the correct road according to navigation.
@@ -718,36 +703,7 @@
                 }
             }
             
-            /**
-             * Get the next navigation target (current waypoint or final destination).
-             * @returns {Object|null} {x, y} of next target, or null if no navigation
-             */
-            getNextNavTarget() {
-                // First, advance past any waypoints we've already reached
-                this.advanceToRelevantWaypoint();
-                
-                // If we have waypoints, return the current one
-                if (this.navWaypoints && this.navWaypoints.length > 0) {
-                    if (this.currentWaypointIndex < this.navWaypoints.length) {
-                        return this.navWaypoints[this.currentWaypointIndex];
-                    }
-                }
-                
-                // Fall back to direct destination if no waypoints
-                if (this.navDestination) {
-                    return this.navDestination;
-                }
-                
-                return null;
-            }
             
-            /**
-             * Check if we have an active navigation route.
-             * @returns {boolean}
-             */
-            hasNavigation() {
-                return (this.navWaypoints && this.navWaypoints.length > 0) || this.navDestination != null;
-            }
             
             getNextIntersection(approachDistance = 100) {
                 if (!this.currentLane || !this.currentLane.intersectingZones) return null;

@@ -360,7 +360,6 @@
             
             // Resize/clear are no-ops now — no canvas to manage
             resize() {}
-            clearAndResize() { this.decals = []; }
             clear() { this.decals = []; }
             getDimensions() { return { count: this.decals.length }; }
             

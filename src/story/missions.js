@@ -340,7 +340,7 @@
                 
                 // Anavia unlock notification
                 if (m.type === MISSION_TYPES.BOUNTY && this.completedBounties === 5) {
-                    setTimeout(() => showMessage('ANAVIA HAS NOTICED YOUR WORK. VISIT HER.'), 2000);
+                    game.addPausableTimeout(() => showMessage('ANAVIA HAS NOTICED YOUR WORK. VISIT HER.'), 2000);
                 }
                 
                 this.activeMission = null;

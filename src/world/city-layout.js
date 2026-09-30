@@ -85,14 +85,6 @@
                 return this;
             }
             
-            setPark(blockName, options = {}) {
-                return this.setZoneType(blockName, CityLayout.ZONE.PARK, { name: options.name || 'Park', ...options });
-            }
-            
-            setPlaza(blockName, options = {}) {
-                return this.setZoneType(blockName, CityLayout.ZONE.PLAZA, { name: options.name || 'Plaza', ...options });
-            }
-            
             // === BLOCK LAMP COLORS ===
             
             setBlockLampColor(blockName, color, options = {}) {
@@ -567,17 +559,6 @@
                 return templates[0];
             }
             
-            _isInIntersection(x, y) {
-                for (let hRoad of this.horizontalRoads) {
-                    for (let vRoad of this.verticalRoads) {
-                        if (x >= vRoad.leftPavement && x <= vRoad.rightPavement + this.pavementWidth &&
-                            y >= hRoad.topPavement && y <= hRoad.bottomPavement + this.pavementWidth) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
             
             /**
              * Extract landmarks from placed buildings.

@@ -154,13 +154,6 @@
                 return this.hp - oldHp;
             }
             
-            /**
-             * Check if actor is alive.
-             * @returns {boolean}
-             */
-            isAlive() {
-                return !this.dead && this.hp > 0;
-            }
             
             /**
              * Set movement direction (for AI or input).
@@ -253,17 +246,6 @@
                 };
             }
             
-            /**
-             * Check circle collision with another actor.
-             * @param {ActorEntity} other 
-             * @returns {boolean}
-             */
-            collidesWith(other) {
-                const dx = this.x - other.x;
-                const dy = this.y - other.y;
-                const dist = Math.hypot(dx, dy);
-                return dist < this.radius + other.radius;
-            }
             
             /**
              * Default draw - override in subclasses.
@@ -296,16 +278,6 @@
                 }
             }
             
-            /**
-             * Called when this actor collides with a wall.
-             * Override for custom wall collision behavior.
-             * 
-             * @param {Object} wall - The wall entity
-             * @param {Object} resolution - Collision resolution data
-             */
-            onWallCollision(wall, resolution) {
-                // Default: just stop at wall (handled by CollisionSystem)
-            }
             
             /**
              * Called when this actor is hit by a projectile.
@@ -512,7 +484,7 @@
                     // Half the unsettled Resonance scatters on the way back to Dr. Yin
                     if (this._game.resonance) {
                         const lost = this._game.resonance.onDeath();
-                        if (lost > 0) setTimeout(() => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 1800);
+                        if (lost > 0) this._game.addPausableTimeout(() => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 1800);
                     }
                     
                     // Clear all active buffs (restores maxHP if Stellar Lemonade was active, etc.)
@@ -525,11 +497,8 @@
                     this._game.boosterCount = this._game.getEffectiveMaxBoosters();
                     this._game.questState.suiteAmbushTriggered = false;
                     // Reset story step so ambush can re-trigger on return
-                    if (this._game.story && this._game.story.state.step >= 12 && this._game.story.state.step <= 13) {
-                        this._game.story.state.step = 11;
-                        this._game.story.currentStepData = null;
-                        this._game.story.initializedStep = false;
-                    }
+                    const st = this._game.story;
+                    if (st && !st.isBefore('SEARCH_SUITE') && st.isBefore('REPORT_BACK')) st.goTo('ENTER_SUITE');
                     // Reset optional sanctum quest if active (boss respawns on re-entry)
                     if (this._game.story && this._game.story.activeOptional && this._game.story.activeOptional.id === 'sanctum') {
                         this._game.story.activeOptional = null;
@@ -1016,26 +985,6 @@
                        center.y >= bb.y && center.y <= bb.y + bb.h;
             }
             
-            checkOverlaps(entities) {
-                const nowInside = new Set();
-                
-                for (let entity of entities) {
-                    if (this.containsEntity(entity)) {
-                        nowInside.add(entity);
-                        if (!this.entitiesInside.has(entity)) {
-                            if (this.onEnter) this.onEnter(entity, this);
-                        }
-                    }
-                }
-                
-                for (let entity of this.entitiesInside) {
-                    if (!nowInside.has(entity)) {
-                        if (this.onExit) this.onExit(entity, this);
-                    }
-                }
-                
-                this.entitiesInside = nowInside;
-            }
             
             draw(ctx) {
                 if (!this.visible) return;

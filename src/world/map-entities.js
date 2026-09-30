@@ -656,7 +656,8 @@
                     const olloTransition = olloBuilding.getTransition('ollo_interior', 'Enter OllO');
                     if (olloTransition) {
                         const md = MAP_DATA['ollo_test'];
-                        if (md && md.transitions) md.transitions.push(olloTransition);
+                        // Once: MAP_DATA outlives the visit, so a second push would stack a second door
+                        if (md && md.transitions && !md.transitions.some(t => t._ollo)) md.transitions.push(Object.assign(olloTransition, { _ollo: true }));
                     }
                     break;
                 }

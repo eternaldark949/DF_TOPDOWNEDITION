@@ -32,7 +32,6 @@
                                 locationDesc: "Melting pot of cultures traveling to this location.",
                                 completionTime: "1HR",
                                 target: "THE DARK MAKER",
-                                totalSteps: 15,
                                 steps: {
                                     // STEP 0: The Awakening (Cutscene)
                                     0: {
@@ -49,12 +48,12 @@
                                             game.cutscene.camTargetY = game.player.y;
                                             
                                             // Phase 1: Hold the close-up for a beat (1s), then begin zoom out
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.cutscene.camZoomTarget = 1.0; // Zoom out to normal
                                             }, 1000);
                                             
                                             // Phase 2: Show title cards mid-zoom (1.5s in)
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.cutscene.showTitle(4000);
                                             }, 1500);
                                         }
@@ -105,17 +104,17 @@
                                             if(game.ownedCar) game.ownedCar.forceLights = true;
                                             
                                             // Cinematic Sequence
-                                            setTimeout(() => game.story.triggerComms("747", "Nine. Be careful out there.", 4000), 500);
+                                            game.addPausableTimeout(() => game.story.triggerComms("747", "Nine. Be careful out there.", 4000), 500);
                                             
                                             // --- MODULAR PAN COMMANDS ---
                                             // 1. Pan to Car (at 1s) — dynamic position
-                                            setTimeout(() => game.cutscene.panTo('player_car', 0.8), 1000); 
+                                            game.addPausableTimeout(() => game.cutscene.panTo('player_car', 0.8), 1000); 
                                             
                                             // 2. Pan to Club (at 4s)
-                                            setTimeout(() => game.cutscene.panTo('club_entrance', 0.7), 4000); 
+                                            game.addPausableTimeout(() => game.cutscene.panTo('club_entrance', 0.7), 4000); 
                                             
                                             // 3. Pan back to Player (at 7s)
-                                            setTimeout(() => game.cutscene.panTo('player', 1.0), 7000);
+                                            game.addPausableTimeout(() => game.cutscene.panTo('player', 1.0), 7000);
                                         }
                                     },
                                     // STEP 4: Enter Vehicle
@@ -142,15 +141,15 @@
                                         condition: "LOC_NIGHTCLUB",
                                         onStart: (game) => {
                                             // Sibling Banter while driving
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "I can't shake the feeling Nine. This hunt reeks.", 4000);
                                             }, 2000);
         
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("949", "I know, Seven. We don't know what we're getting involved in.", 4000);
                                             }, 7000);
         
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "*Sigh* Mirabel for goodness sake. Keep me updated.", 4000);
                                             }, 12000);
                                         }
@@ -215,7 +214,7 @@
                                         target: "suite_elevator",
                                         condition: "LOC_HOTEL_SUITE",
                                         onStart: (game) => {
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "Well, welcome to the Penthouse. Watch your corners, Nine.", 4000);
                                             }, 1500);
                                         }
@@ -240,22 +239,20 @@
                                             showMessage("BREACH DETECTED!");
                                             game.triggerShake(25);
                                             // Break the back wall
-                                            const wallIdx = game.activeMap.walls.findIndex(w => w.breach || (w.y === 1000 && w.w === 500));
-                                            if (wallIdx !== -1) {
-                                                const w = game.activeMap.walls[wallIdx];
+                                            const w = game.activeMap.walls.find(w => w.breach);   // tagged in world/maps.js
+                                            if (w) {
                                                 for (let ex = w.x; ex < w.x + w.w; ex += 40) {
                                                     game.weather.spawnExplosion(ex, w.y, '#ff8800');
                                                     game.weather.spawnExplosion(ex + 20, w.y + 10, '#ff4500');
                                                 }
-                                                game.activeMap.walls.splice(wallIdx, 1);
-                                                game._renderGridWalls.build(game.activeMap.walls);
+                                                game.removeWall(w);
                                             }
                                             // Spawn Drones
                                             game.enemies.push(new Drone(900, 1100));
                                             game.enemies.push(new Drone(1000, 1150));
                                             game.enemies.push(new Drone(1100, 1100));
                                             
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "Nine! Multiple contacts! Drones — they're breaching!", 4000);
                                             }, 500);
                                         }
@@ -270,7 +267,7 @@
                                         onStart: (game) => {
                                             game.questState.ambushCleared = true;
                                             showMessage("AREA SECURE. RETURN TO MIRABEL.");
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "You good? Get back to Mirabel. Debrief.", 4000);
                                             }, 2000);
                                         }
@@ -284,10 +281,10 @@
                                         condition: null, // Terminal — no auto-advance
                                         onStart: (game) => {
                                             game.ui.showMissionBanner("CHAPTER 1 COMPLETE — THE AWAKENING", "gold", "COMPLETED");
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("747", "He slipped through. But we rattled him. Rest up, Nine. This isn't over.", 6000);
                                             }, 3000);
-                                            setTimeout(() => {
+                                            game.addPausableTimeout(() => {
                                                 game.story.triggerComms("LARISSA", "949. I received news of what went down. I say it's time for a meeting.", 6000);
                                             }, 16000);
                                         }
@@ -329,7 +326,7 @@
                                                     showMessage("THE TRIUMVIRATE DESTROYED! REWARD: 1000 PERSONICS, 50 SCRAP");
                                                     game.triggerShake(30);
                                                     for (let i = 0; i < 20; i++) {
-                                                        setTimeout(() => {
+                                                        game.addPausableTimeout(() => {
                                                             const rx = 400 + Math.random() * 400;
                                                             const ry = 300 + Math.random() * 600;
                                                             game.weather.spawnExplosion(rx, ry, '#ff3300');

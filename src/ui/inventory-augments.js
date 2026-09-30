@@ -304,9 +304,6 @@
                 return this.equippedWeaponId === id || this.equippedAttachmentId === id;
             }
             
-            getEquippedWeapon() {
-                return this.equippedWeaponId ? this.items.find(i => i.id === this.equippedWeaponId) : null;
-            }
             
             getEquippedAttachment() {
                 return this.equippedAttachmentId ? this.items.find(i => i.id === this.equippedAttachmentId) : null;
@@ -505,11 +502,6 @@
                 });
             }
         
-            getButtonLabel(item, isEquipped) {
-                const config = this.typeConfig[item.type] || {};
-                if (isEquipped && config.unequipLabel) return config.unequipLabel;
-                return config.equipLabel || 'USE';
-            }
         }
         
 // Initialization in GameEngine:
@@ -582,25 +574,6 @@
             isEquipped(id) { return this.equipped.includes(id); }
             isOwned(id) { return this.owned.includes(id); }
 
-            // Get stat modifier value
-            getModifier(modType) {
-                const mods = {
-                    auto_aim:     { aimAssist: 0.15 },
-                    speed_boost:  { vehicleSpeed: 1.2, vehicleAccel: 1.15 },
-                    armor_plate:  { damageReduction: 0.2 },
-                    radar_ext:    { radarRange: 1.5 },
-                    fast_reload:  { fireRate: 0.75 },
-                    flit_ext:     { flitCooldown: 0.7, flitRange: 1.3 },
-                    health_regen: { regenRate: 0.2 },
-                    scrap_magnet: { scrapRadius: 2.0, scrapBonus: 1.1 },
-                    vital_link:   { stimCapacity: 2, auraBoost: 1.75 },
-                };
-                let result = 0;
-                for (const id of this.equipped) {
-                    if (mods[id] && mods[id][modType] !== undefined) result = mods[id][modType];
-                }
-                return result;
-            }
 
             serialize() { return { owned: [...this.owned], equipped: [...this.equipped] }; }
             deserialize(data) {
@@ -610,28 +583,5 @@
                 }
             }
 
-            // Render the augments management screen in sidebar
-            renderScreen(container) {
-                let html = '<div style="padding: 15px; color: #ddd; font-family: Montserrat, sans-serif;">';
-                html += '<div style="font-family: Orbitron, sans-serif; font-size: 0.9rem; color: #00f3ff; margin-bottom: 10px; letter-spacing: 2px;">AUGMENTS</div>';
-                html += `<div style="font-size: 0.75rem; color: #888; margin-bottom: 15px;">SLOTS: ${this.equipped.length} / ${this.maxSlots}</div>`;
-                
-                if (this.owned.length === 0) {
-                    html += '<div style="font-size: 0.8rem; color: #555; font-style: italic;">No augments owned. Visit Dr. Yin\'s Clinic to purchase.</div>';
-                } else {
-                    for (const id of this.owned) {
-                        const aug = AUGMENT_CATALOG.find(a => a.id === id);
-                        if (!aug) continue;
-                        const isEq = this.isEquipped(id);
-                        html += `<div style="background: rgba(${isEq ? '0,243,255' : '255,255,255'},0.05); border: 1px solid rgba(${isEq ? '0,243,255' : '255,255,255'},0.15); border-radius: 6px; padding: 10px; margin-bottom: 8px;">`;
-                        html += `<div style="font-family: Orbitron, sans-serif; font-size: 0.75rem; color: ${isEq ? '#00f3ff' : '#aaa'};">${aug.icon} ${aug.name}</div>`;
-                        html += `<div style="font-size: 0.7rem; color: #777; margin: 4px 0;">${aug.desc}</div>`;
-                        html += `<button onclick="game.augments.${isEq ? 'unequip' : 'equip'}('${id}'); game.renderAugmentScreen();" style="background: transparent; border: 1px solid ${isEq ? '#ff5555' : '#00f3ff'}; color: ${isEq ? '#ff5555' : '#00f3ff'}; padding: 4px 12px; cursor: pointer; font-size: 0.7rem; font-family: Montserrat, sans-serif;">${isEq ? 'UNEQUIP' : 'EQUIP'}</button>`;
-                        html += '</div>';
-                    }
-                }
-                html += '</div>';
-                container.innerHTML = html;
-            }
         }
 
