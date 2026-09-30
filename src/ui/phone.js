@@ -1484,12 +1484,19 @@
                     return;
                 }
                 
-                // Close Cosmetics Shop if open
-                const cosmeticsShop = document.getElementById('cosmetics-shop-overlay');
-                if (cosmeticsShop.style.display === 'block') {
-                    cosmeticsShop.style.display = 'none';
-                    game.pauseSystem.release('cosmetics_shop');
-                    return;
+                // Close whichever shop or menu is open (each through its own close, so pauses are released)
+                const SHOPS = [
+                    ['cosmetics-shop-overlay', () => document.getElementById('cosmetics-shop-close').click()],
+                    ['auto-shop-overlay', () => game.closeAutoShop()],
+                    ['augment-shop', () => document.getElementById('aug-shop-close').click()],
+                    ['zib-menu', () => game.closeZibMenu()],
+                    ['gauntlet-menu', () => game.closeGauntletMenu()],
+                    ['tuning-overlay', () => game.closeTuning()],
+                    ['vending-menu', () => game.closeVendingMenu()]
+                ];
+                for (const [id, close] of SHOPS) {
+                    const el = document.getElementById(id);
+                    if (el && getComputedStyle(el).display !== 'none') { close(); return; }
                 }
                 
                 // Otherwise, toggle pause menu (if game is running)

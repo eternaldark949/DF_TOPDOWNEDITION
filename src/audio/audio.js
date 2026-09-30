@@ -242,7 +242,7 @@
                 const wind = w ? Math.min(1, w.wind || 0) : 0;
                 const hour = ((game.worldMinutes || 0) % 1440) / 60, day = Math.max(0, 1 - Math.abs(13 - hour) / 7);
                 const p = game.player, cam = game.camera;
-                const fireD = apt && p ? Math.hypot(p.x - 580, p.y - 432) : map.id === 'keepers_parlor' ? Math.hypot(cam.x - 450, cam.y - 70) * 0.6 : 1e9, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
+                const H = HEARTHS[map.id], fireD = !H ? 1e9 : apt ? (p ? Math.hypot(p.x - H.x, p.y - H.y) : 1e9) : Math.hypot(cam.x - H.x, cam.y - H.y) * 0.6, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
                 const paused = !!game.paused;
                 const vol = GameSettings.ambienceVolume ?? 0.7;
 

@@ -3,6 +3,9 @@
         // run  localStorage.dfab_debug = '1'  in the console and reload. Warnings and errors always show.
         (() => { let on = false; try { on = localStorage.getItem('dfab_debug') === '1'; } catch (e) { /* private mode */ } if (!on) console.log = () => {}; })();
 
+        // Fireplaces: where the art draws the fire, and where the ambience hears it crackle
+        const HEARTHS = { apt_949: { x: 580, y: 432 }, keepers_parlor: { x: 450, y: 62 } };
+
         // ╔════════════════════════════════════════════════════════════════════════════╗
         // ║     DIMENSIONS: FREELANCER - PERFORMANCE INFRASTRUCTURE                    ║
         // ║     Version: 4.5.30 - Performance & Architecture Refactor                  ║

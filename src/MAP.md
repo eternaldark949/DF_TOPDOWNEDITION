@@ -16,13 +16,13 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## core/ (loaded first)
 | File | What's in it |
 |---|---|
-| `core/config.js` | Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…). `console.log` is silent unless `localStorage.dfab_debug = '1'` |
+| `core/config.js` | Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…). `HEARTHS`: where each fireplace is (art and ambience share it). `console.log` is silent unless `localStorage.dfab_debug = '1'` |
 | *(generated)* | `ASSETS`: your images and audio from `assets/`, built automatically |
 | `core/assets.js` | `getImage`, `drawAsset`, `playSound` / `loadSound` for your assets |
 | `core/registries.js` | Notes, consumables, drinks, cosmetics (wigs, skins, outfits, hats, jewelry…); `CosmeticsSystem`, `BuffSystem` |
 | `core/resonance.js` | `ResonanceSystem`: 949's progression — earning (style-weighted), Dr. Yin's tuning, the Flit / Frame / Arms trees |
 | `core/utils.js` | Maths helpers, humanoid gait/animation helpers, weapon muzzle helpers, `RenderInterp` |
-| `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs, glow sprites (`glowSprite`, `drawGlow`), `lampFlicker` |
+| `core/draw-helpers.js` | Colour helpers (`darkenHex`, `lightenHex`, `hexToRgba`…), line-of-sight/raycast, `computeVisibilityPoly` (lamp shadows, vision cones, headlights), HP bars, enemy telegraphs, glow sprites (`glowSprite`, `drawGlow`), `lampFlicker`, `glowA` (a glow at an alpha: the interiors' light passes) |
 | `core/appearances.js` | **Every character's look in one place**: `APPEARANCES` (949, the crew, staff, the city's cast), `ROLE_LOOKS` (medics, dancers, androids, pedestrians, gangers, spirits, ghosts), `PALETTE`, `ANDROID_FINISHES`; `lookFor(entity)`, `portraitOf(look)` |
 | `core/settings.js` | `FullscreenManager`, `OrientationManager` (Settings → Screen Orientation: Auto / Portrait / Landscape; locks in fullscreen where supported, saved as `dfab_orientation`), `GameSettings`, object pools, perf utilities, `showMessage` |
 
@@ -36,7 +36,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `world/lobby-life.js` | The Double Nights lobby's crowd: guests (portals, the doors, the desk queue, lounges, elevators, rolling luggage) and AI staff (gold bellhops with carts, Blood Moon concierges, a silver valet) — ambient walkers, not NPCs |
 | `world/rooms.js` | Room System, the standard for indoor maps: per-room visibility (soft violet veil, gentle reveal, light spilling through open doors, dim-through-glass from outside), fading room lights, `outdoorness`, sky light on outdoor rooms; windows, doors (hinged doors with swing physics, sliding glass, open arches; bullets strike and push them — `hitDoors`; shut doors block sight — `doorBlocks`), rooms of several rects, silk linens, `RoomSystem`, `ROOM_DEFS` — every indoor map has rooms (arenas and the ethereal plane aside); the checklist for giving a map rooms is in its header |
 | `world/maps.js` | `MAP_DATA`: every map's size, floor zones, walls, transitions, landmarks (optional `wallStyle`, and `navProps` to route paths round big furniture) |
-| `world/map-entities.js` | `createMapEntities`: props, NPCs and lamps per map (the apartment suite's furniture is here) |
+| `world/map-entities.js` | `createMapEntities`: props, NPCs and lamps per map (the apartment suite's furniture is here). Shorthands shared by every map: `decorPropsIn(color)`, `softLight`, `areaLight`, `hiddenLamp` (each case aliases them F/S/A/L) |
 | `world/billboards.js` | `BILLBOARDS`: your artwork on tilted panels around the city. Add one by copying a line |
 | `world/city-layout.js` | `CityLayout`: blocks, roads and building placement for the city |
 | `world/bokeh.js` | Screen-space bokeh effect |
@@ -91,11 +91,12 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `story/captions.js` | Caption/subtitle system |
 | `story/narrative-cutscenes.js` | Cutscene manager, narrative state machine, `StoryManager`. Steps are addressed **by name**: `story.goTo('LEAVE_CLUB')`, `isAt`, `isBefore` (numbers shift when a chapter changes). Conditions: named strings, `TIMER_<ticks>`, `LOC_<map id>`, or a function `(game, ticks) => bool` |
 | `story/missions.js` | Mission types, `MissionSystem`, crafting schematics |
-| `story/dialogue-bonding.js` | Bonding dialogues, companion idle spots, speaker colours, dialogue transcript/sequence, `BondingSystem` |
+| `story/dialogue-bonding.js` | Bonding dialogues, companion idle spots, `SPEAKER_COLORS` (every speaker's colour, used everywhere incl. the cinematic cast), dialogue transcript/sequence, `BondingSystem` |
+| `story/npc-dialogue.js` | **`NPC_DIALOGUE`**: what everyone in the world says and what their buttons do — by name, then by role (`@dancer`, `@robot`, `@teammate`…), then `@passing`. `npcDialogueFor(npc)`; the box is `startDialogue` (engine/screens-ui.js) |
 | `story/scene-vision.js` | `SceneVision`: full-screen painted sequences a scene steps through with `beat()` (`vanoga`: the flames, the dark, the golden egg, the burst, the pink orb of the Empereal Lord) |
 | `ui/cinematic-dialogue.js` | `CinematicDialogue`: how scenes look — `say` (typed subtitle, speaker colour, living cameo, dimmed listener), `choose` (keys/taps, timed, weighty ◆), `card`, `marker`, the black layer, hold to skip. Paced by sim ticks |
 | `story/scene-runner.js` | **The story's director.** `defineScene(name, meta, function* (s) {...})` and `ScenePlayer` (`game.scenes.play(name) → Promise`): scripts are generators that `yield` on ticks, lines, camera moves, choices. Verbs: `wait`, `fade`, `card`, `marker`, `map`/`cut`, `cam.to/cut/shake`, `actor` (walk, face, `setPose`), `say`/`narrate`/`choose`, `vision`, `flag`. Locks input, blocks saves and toasts, freezes with pause |
-| `story/scenes/cast.js` | `SCENE_CAST`: each speaker's subtitle name, colour, look and side (949 left) |
+| `story/scenes/cast.js` | `SCENE_CAST`: each speaker's subtitle name, look and side (949 left); colours from `SPEAKER_COLORS` |
 | `story/scenes/prologue.js` | **The prologue**: the epigraph, the climb up the Keeper's hill ("Somewhere between the realms… 6125"), the parlor by the fire, the vision of Vanoga. New Game plays it, then chapter 1 (`questState.prologueSeen`) |
 
 ## ui/
@@ -125,7 +126,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/scope.js` | Scope view: with a sniper up to her eye, the world darkens to a lit lane along her line of fire (clipped at walls), the camera leans down it, the lane steadies; ambience quiets. Setting: Scope View |
 | `engine/noise.js` | Noise: `emitNoise` — gunshots, flits, punches, struck doors, shattered glass carry (`CONFIG.NOISE`), muffled by walls and shut doors; gangers in earshot hear roughly where and go to look; the ripple she sees |
 | `engine/combat-fx.js` | What a hit looks like: damage numbers, enemy health bars, blood in each character's own colour (`BLOOD_KINDS`), the hit flinch |
-| `engine/boss-intro.js` | Boss intros: `bossIntro` spawns the Sanctum's Triumvirate dormant (kneeling), films their awakening (the camera visits each as its eye ignites, frames all three under the title, pans back; skippable; a short version for replays), grace, then wakes them; `drawBossGlow` |
+| `engine/boss-intro.js` | Boss intros: `bossIntro` spawns the Sanctum's Triumvirate dormant (kneeling), films their awakening (the camera visits each as its eye ignites, frames all three under the title, pans back; skippable; a short version for replays), grace, then wakes them; `drawBossGlow`; `spawnTriumvirate(opts)` (the one place their spawn points live) |
 | `engine/tuning-ui.js` | Resonance on screen: HUD meter, Dr. Yin's tuning overlay, the SKILLS screen |
 | `engine/shops-menus.js` | Vending, garage, auto shop, Zib, sleep |
 | `engine/daytime-flit.js` | Daytime exposure, flit teleport, graveyard ghosts |
@@ -135,7 +136,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/world-state.js` | Emissive pass, debug views, transitions, vehicles, visibility, time of day (`dayCycle`: darkness, the colour of the dark, daylight, sun, lamps on), darkness |
 | `engine/update.js` | `update()`: the per-tick simulation |
 | `engine/draw.js` | `draw()`: the frame renderer |
-| `engine/interiors.js` | Apartment, clinic, House of Death, Double Nights lobby and penthouse (the mirror rift), the Sanctum (rose window, sigil runes), and Moon City Nightclub interiors (floors, glows; the club's light show in time with its track), the graveyard's candle flames, the city seen from the veranda |
+| `engine/interiors.js` | **`INTERIOR_ART`**: each painted place's `floor` and `glow` (one line per place; draw.js and drawEmissivePass look it up). Apartment, clinic, House of Death, Double Nights lobby and penthouse (the mirror rift), the Sanctum (rose window, sigil runes), and Moon City Nightclub interiors (floors, glows; the club's light show in time with its track), the graveyard's candle flames, the city seen from the veranda |
 | `engine/keeper-art.js` | The prologue's places: `keepers_hill` (the island above the clouds, the path, flowers, the house with its floating gable, portals and planets) and `keepers_parlor` (checkerboard tiles, the red wingback and burgundy chesterfield, the fire and its embers, the window above it); `keeperEmberPop` |
 | `engine/lighting.js` | Lighting (tinted darkness layer; cached lamp shapes and gradients, baked interior lights, headlight beam sprites, coloured shot light), bloom, wet reflections, atmosphere |
 | `engine/player-draw-input.js` | Drawing the player, emotes, `addPausableTimeout` (game-time timers: they pause with the game and clear on new game/load — use these, not `setTimeout`, for anything in the story or world), joysticks — the touch sticks: the move stick's flit ring (and flick / two-finger flit settings), the fire stick's threshold ring (aim inside, fire past it; sniper fire-on-release) and aim memory |

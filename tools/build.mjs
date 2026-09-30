@@ -87,6 +87,7 @@ const SCRIPTS = [
     'world/bokeh.js',
     'story/missions.js',
     'story/dialogue-bonding.js',
+    'story/npc-dialogue.js',
     'story/scene-vision.js',
     'ui/cinematic-dialogue.js',
     'story/scene-runner.js',

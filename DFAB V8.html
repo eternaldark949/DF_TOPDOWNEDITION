@@ -3577,6 +3577,9 @@
         // run  localStorage.dfab_debug = '1'  in the console and reload. Warnings and errors always show.
         (() => { let on = false; try { on = localStorage.getItem('dfab_debug') === '1'; } catch (e) { /* private mode */ } if (!on) console.log = () => {}; })();
 
+        // Fireplaces: where the art draws the fire, and where the ambience hears it crackle
+        const HEARTHS = { apt_949: { x: 580, y: 432 }, keepers_parlor: { x: 450, y: 62 } };
+
         // ╔════════════════════════════════════════════════════════════════════════════╗
         // ║     DIMENSIONS: FREELANCER - PERFORMANCE INFRASTRUCTURE                    ║
         // ║     Version: 4.5.30 - Performance & Architecture Refactor                  ║
@@ -5892,6 +5895,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function drawGlow(ctx, x, y, r, color, core) {
             ctx.drawImage(glowSprite(color, core), x - r, y - r, r * 2, r * 2);
         }
+        /** A glow at alpha `a` (skipped when it'd be invisible, capped at 1): the interiors' light pass helper. Sets globalAlpha. */
+        function glowA(ctx, x, y, r, rgb, a) {
+            if (a <= 0.003) return;
+            ctx.globalAlpha = Math.min(1, a);
+            drawGlow(ctx, x, y, r, rgb, 0);
+        }
 
         /**
          * A faulty street lamp, now and then: about one outdoor lamp in ten stutters for
@@ -6934,7 +6943,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                                 onStart: (game) => {
                                                     if (!game.questState.churchBossDefeated) {
                                                         // They kneel at the altar until the intro wakes them (engine/boss-intro.js)
-                                                        game.bossIntro([new GatlingGunner(360, 330, 0, { persona: 'vesper' }), new GatlingGunner(600, 290, 1, { persona: 'matins' }), new GatlingGunner(840, 330, 2, { persona: 'compline' })]);
+                                                        game.spawnTriumvirate();
                                                     }
                                                 }
                                             },
@@ -7698,7 +7707,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const wind = w ? Math.min(1, w.wind || 0) : 0;
                 const hour = ((game.worldMinutes || 0) % 1440) / 60, day = Math.max(0, 1 - Math.abs(13 - hour) / 7);
                 const p = game.player, cam = game.camera;
-                const fireD = apt && p ? Math.hypot(p.x - 580, p.y - 432) : map.id === 'keepers_parlor' ? Math.hypot(cam.x - 450, cam.y - 70) * 0.6 : 1e9, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
+                const H = HEARTHS[map.id], fireD = !H ? 1e9 : apt ? (p ? Math.hypot(p.x - H.x, p.y - H.y) : 1e9) : Math.hypot(cam.x - H.x, cam.y - H.y) * 0.6, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
                 const paused = !!game.paused;
                 const vol = GameSettings.ambienceVolume ?? 0.7;
 
@@ -11360,6 +11369,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const HUB_NPC_CLEARANCE = 90; // px half-extent kept building-free per anchor
 
         // ============================================================================
+        /* Map-building shorthands (each map's case aliases them as F, S, A, L) */
+        /** Decor that doesn't move (mass 1e7), drawn by its decorType; `color` is only the fallback fill. */
+        const decorPropsIn = color => (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color, decorType }, extra));
+        /** A round soft light (light pass only). */
+        const softLight = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+        /** A soft rounded-rectangle area light. */
+        const areaLight = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+        /** A fixture hidden in the ceiling: its light, no lamp drawn. */
+        const hiddenLamp = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
+
         function createMapEntities(mapId) {
             const e = { props: [], npcs: [], lamps: [] };
             switch (mapId) {
@@ -11380,7 +11399,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 case 'apt_949': {
                     // Cozy-modern suite. Furniture art lives in drawApartmentDecorProp, floor art
                     // (planks, tiles, rugs, deck) in drawApartmentInterior, glows in drawApartmentGlow.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#4a3a30', decorType }, extra));
+                    const F = decorPropsIn('#4a3a30');
                     e.props = [
                         new PropEntity({ x: 400, y: 500, width: 120, height: 70, color: '#4a2832', interactionType: 'couch_two_seater', decorType: 'apt_sofa' }),
                         new PropEntity({ x: 550, y: 420, width: 60, height: 25, color: '#ff6622', interactionType: 'tv_screen', decorType: 'apt_fireplace' }),
@@ -11449,7 +11468,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ];
                     // Shadowless soft lights: the light the decor casts on the floor around it.
                     // Round ones take a radius; area lights take w, h (optional `round` = corner size, `soft` = gentler edge).
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const S = softLight;
                     e.softLights = [
                         S(991, 232, 100, '#ffd2a8'), S(1115, 232, 100, '#ffd2a8'),                       // nightstand lamps
                         S(307, 439, 90, '#ffd9b0', 0.7), S(700, 700, 90, '#ffd9b0', 0.7), S(109, 463, 90, '#ffd9b0', 0.7),   // floor lamp halos
@@ -11471,7 +11490,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 case 'hotel_lobby': {
                     // Double Nights: furniture in drawLobbyDecorProp (dn_*), floor in drawLobbyInterior,
                     // glows and the motto in drawLobbyGlow, the crowd in world/lobby-life.js.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1216', decorType }, extra));
+                    const F = decorPropsIn('#1a1216');
                     const both = (x, y, w, h, t, extra) => [F(x, y, w, h, t, extra), F(1000 - x - w, y, w, h, t, extra)];   // mirrored east–west
                     e.props = [
                         F(445, 265, 110, 110, 'dn_fountain'),                                       // the rift fountain
@@ -11498,7 +11517,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         L(341, 771, '#ffcc88', 300), L(659, 771, '#ffcc88', 300),
                         L(500, 1146, '#ffd29a', 380, 5, -Math.PI / 2),
                     ];
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const S = softLight;
                     e.softLights = [
                         { x: 500, y: 620, w: 880, h: 1080, round: 220, soft: true, color: '#ffc890', intensity: 0.42 },   // the room's warm fill
                         { x: 500, y: 850, w: 380, h: 300, round: 150, soft: true, color: '#ffd9a0', intensity: 0.3 },   // under the chandelier
@@ -11514,7 +11533,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // The Double Nights penthouse, the Dark Maker's stay: furniture art in drawSuiteDecorProp
                     // (ps_*) and the lobby's (dn_*); floors in drawSuiteInterior; embers, candles, the pool,
                     // the skyline and the mirror rift he left through in drawSuiteGlow.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1216', decorType }, extra));
+                    const F = decorPropsIn('#1a1216');
                     e.props = [
                         // Living room: the console by the elevator, the conversation pit, the piano, the fireplace,
                         // the bar, dinner for two
@@ -11542,10 +11561,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new PropEntity({ x: 1086, y: 952, width: 20, height: 14, mass: 1e7, color: '#c8a870', interactionType: 'read_note', noteId: 'dark_maker_letter' })
                     ];
                     // Light fixtures hidden in the ceiling (light only), soft fills per room
-                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
+                    const L = hiddenLamp;
                     e.lamps = [ L(330, 480, '#ffcf8a', 520), L(330, 860, '#ff9a50', 320), L(900, 300, '#ff8a9a', 460), L(1230, 560, '#ffb0a0', 360), L(1235, 175, '#b8a0ff', 200), L(1040, 900, '#9ab0ff', 420) ];
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
-                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    const S = softLight;
+                    const A = areaLight;
                     e.softLights = [
                         A(375, 500, 620, 860, '#ffc890', 0.3), A(910, 425, 360, 730, '#ff9aa8', 0.22), A(1225, 560, 240, 460, '#ff9aa8', 0.2),
                         A(1235, 175, 220, 240, '#c8b8ff', 0.14), A(1035, 905, 620, 180, '#8aa0ff', 0.28),
@@ -11560,7 +11579,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // custom top-down art — see drawClinicDecorProp. Floor details (tiles,
                     // wayfinding stripe, the scanner platform, curtain tracks) are drawn by
                     // GameEngine.drawClinicInterior.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#ccc', decorType }, extra));
+                    const F = decorPropsIn('#ccc');
                     e.props = [
                         new PropEntity({ x: 200, y: 180, width: 40, height: 60, mass: 1e7, color: '#0f0', interactionType: 'medbay_refill' }),
                         // Recovery bay — beds with their heads against the side walls
@@ -11596,7 +11615,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 case 'moon_city_nightclub': {
                     // Moon City: furniture art in drawClubDecorProp (mc_*), floors in drawClubInterior,
                     // the light show (dance floor, beams, mirror ball, neon) in drawClubGlow.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a0e22', decorType }, extra));
+                    const F = decorPropsIn('#1a0e22');
                     const SUITES = [290, 594, 898];
                     const CLUTCH = ['LIPSTICK, A KEYCARD… AND PERSONICS', "SHE'LL CALL IT A NIGHT'S TIP", 'LEFT WITH THE LAST SONG'];
                     const COAT = ['CHECK YOUR POCKETS, DARLING', 'FOLDED BILLS IN THE LINING'];
@@ -11641,15 +11660,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new NPC(620, 680, "Male Dancer 3", 'dancer'), new NPC(980, 680, "Male Dancer 4", 'dancer'),
                         new NPC(760, 690, "Male Dancer 5", 'dancer'), new NPC(840, 690, "Male Dancer 6", 'dancer')
                     ];
-                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });   // hidden in the ceiling: light only
+                    const L = hiddenLamp;   // hidden in the ceiling: light only
                     e.lamps = [
                         L(800, 500, '#b48cff', 560), L(430, 500, '#ffb870', 300), L(800, 1090, '#ffc890', 360),
                         L(187, 300, '#ffc8e0', 360), L(187, 880, '#cfdcff', 380),
                         L(1413, 150, '#ff5a7a', 300), L(1285, 740, '#c080ff', 300),
                         ...SUITES.map(y0 => L(1465, y0 + 145, '#ff4a70', 260)),
                     ];
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
-                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    const S = softLight;
+                    const A = areaLight;
                     e.softLights = [
                         A(800, 500, 820, 940, '#9a6cff', 0.22), A(800, 500, 460, 420, '#d890ff', 0.16),     // the floor's violet, brighter over the dancing
                         A(800, 70, 340, 100, '#e0b0ff', 0.35), A(430, 500, 110, 560, '#ffb070', 0.22),     // the stage, the bar
@@ -11663,14 +11682,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 case 'keepers_hill': {
                     // Night on the hill: moonlight over the field, the house's windows warm on the lawn
-                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const A = areaLight;
+                    const S = softLight;
                     e.softLights = [ A(900, 1500, 1100, 2500, '#b0c0e8', 0.16), A(900, 600, 760, 520, '#ffb070', 0.12), S(900, 740, 150, '#ffc080', 0.7, 3), S(790, 640, 80, '#ffb070', 0.5), S(1010, 640, 80, '#ffb070', 0.5) ];
                     break;
                 }
                 case 'keepers_parlor': {
                     // Firelit: the hearth, the candles, the cool window light
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const S = softLight;
                     e.softLights = [ S(450, 140, 420, '#ff8a40', 0.45, 6), S(500, 290, 260, '#ff9a60', 0.22, 4), S(374, 44, 50, '#ffc080', 0.35, 4), S(526, 44, 50, '#ffc080', 0.35, 4),
                                      S(96, 620, 80, '#ffc080', 0.35, 4), S(564, 204, 56, '#ffc080', 0.35, 4), S(850, 300, 150, '#8898ff', 0.2) ];
                     break;
@@ -11678,7 +11697,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 case 'church_boss': {
                     // The Sanctum: the altar and ruined organ on the dais, two colonnades of pillars (cover),
                     // broken pews, a fallen pillar, candle stands and braziers. Art: drawSanctumDecorProp.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1418', decorType }, extra));
+                    const F = decorPropsIn('#1a1418');
                     const COLS = [420, 560, 700, 840, 980, 1120];
                     e.props = [
                         F(530, 140, 140, 56, 'sc_altar'), F(400, 58, 100, 40, 'sc_organ'), F(700, 58, 100, 40, 'sc_organ'),
@@ -11691,10 +11710,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ];
                     // No red wash any more: a storm-violet ambient; crimson from the rose window and braziers,
                     // warm from the candles (hidden fixtures, light only)
-                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
+                    const L = hiddenLamp;
                     e.lamps = [ L(600, 150, '#c060ff', 460), L(198, 1218, '#ff8a40', 320), L(1002, 1218, '#ff8a40', 320), L(600, 720, '#9a70ff', 520) ];
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
-                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    const S = softLight;
+                    const A = areaLight;
                     e.softLights = [
                         A(600, 700, 1060, 1280, '#8a78c8', 0.22), A(600, 170, 700, 280, '#ff5a8a', 0.12),
                         S(168, 248, 110, '#ff8a40', 0.8, 5), S(1032, 248, 110, '#ff8a40', 0.8, 5),
@@ -11878,7 +11897,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // The gauntlet's house: furniture art in drawHouseDecorProp (hod_*) and the
                     // apartment's pieces (apt_*); floor art in drawHouseInterior, glows in drawHouseGlow.
                     // Big pieces are cover, and enemies path round them (navProps on the map).
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#2a1a22', decorType }, extra));
+                    const F = decorPropsIn('#2a1a22');
                     const candelabra = (x, y) => F(x, y, 22, 22, 'hod_candelabra');
                     const pews = (x0) => [170, 240, 310].map(y => F(x0, y, 170, 22, 'hod_pew'));
                     const chairs = [];
@@ -11947,7 +11966,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         L(1400, 1020, '#ffd9a0', 300, 5, { angle: Math.PI / 2 }), L(1710, 1300, '#ffd9a0', 300, 5, { angle: Math.PI }),
                         L(1435, 1315, '#ff3355', 340), candle(1318, 1214, 180), candle(1558, 1458, 180),
                     ];
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const S = softLight;
                     e.softLights = [
                         S(101, 121, 70, '#ffb46a', 0.8, 10), S(481, 91, 70, '#ffb46a', 0.8, 10), S(811, 107, 70, '#ffb46a', 0.8, 10), S(989, 107, 70, '#ffb46a', 0.8, 10),
                         S(51, 471, 70, '#ffb46a', 0.8, 10), S(51, 971, 70, '#ffb46a', 0.8, 10), S(511, 971, 70, '#ffb46a', 0.8, 10),
@@ -40092,14 +40111,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'Josh':     { x: 700, y: 260, pose: 'typing' },        // Near terminal — always online
         };
 
+        /** Every speaker's colour, in one place: name tags, the dialogue box, captions, the phone and the
+         *  cinematic subtitles (story/scenes/cast.js reads it). */
         const SPEAKER_COLORS = {
-            '949': '#daa520', 'Victoria': '#ff69b4', 'Yenna': '#5a8a5a',
-            'Sabrina': '#a855f7', 'Max': '#3b82f6', 'Josh': '#94a3b8',
+            '949': '#e8c27a', '747': '#b9a6ff', 'Victoria': '#ff86c0', 'Yenna': '#7fb87f',
+            'Sabrina': '#b98cff', 'Max': '#6aa8ff', 'Josh': '#b4c0d0',
             'Biggs': '#ff8800', 'Dr. Yin': '#00f3ff', 'Prisma': '#b06aff',
             'Barista Ren': '#cd853f', 'Torque': '#e8972a', 'Bartender': '#ff2277',
-            'LUVSH4D3': '#ff44bb', 'Ms. Jean': '#ffd700', 'Larissa': '#8888cc',
+            'LUVSH4D3': '#ff44bb', 'Ms. Jean': '#ffd700', 'Larissa': '#b8b8ee',
             'Anavia': '#66ccaa', 'Contractor': '#cc4444', 'Grum North': '#aa5533',
-            'Mirabel': '#c4566e',
+            'Mirabel': '#e0667e', 'The Keeper': '#ef6a7e', 'The Traveller': '#d8c49a'
         };
 
         // (Portraits are drawn from each character's look: APPEARANCES / lookFor / portraitOf in core/appearances.js.)
@@ -40415,6 +40436,189 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
         
+        /* =====================================================================
+           NPC DIALOGUE — what everyone in the world says when you talk to them,
+           and what their buttons do. One entry per character (by name), with
+           fallbacks by role ('@dancer', '@robot', '@teammate'…) and '@passing'
+           for anyone without lines of their own.
+
+             text(g, npc)     the line (g is the game)
+             buttons(g, npc)  { accept: label | null (hidden), decline: label, extra: label }
+                              (default: Accept / Decline; `extra` is a third button that just leaves)
+             accept(g, npc)   what Accept does; the dialogue closes afterwards…
+             endFirst         …or before it, when Accept opens a menu of its own
+             decline(g, npc)  what Decline does, if more than closing (runs after the close)
+             noLock           leave the HUD's pointer lock alone (Grum's three-button menu)
+
+           The dialogue box itself is engine/screens-ui.js (startDialogue) and the
+           buttons are wired in engine/events.js.
+           ===================================================================== */
+        const NPC_DIALOGUE = {
+            'Dr. Yin': {
+                text: () => "Welcome to the Clinic. I have cybernetic augments if you have the personics. Neural implants, subdermal mesh, phase wires — all top-grade.",
+                endFirst: true, accept: g => g.openDrYinMenu()                        // tune Resonance, or augments
+            },
+            'Barista Ren': {
+                text: g => g.missions.activeMission
+                    ? "You've already got a job running. Finish that first, then come back for more work."
+                    : "Hey! We've got an Amber delivery that needs to go out. Want to run it? Good personics in it for you.",
+                accept(g) {
+                    if (g.missions.activeMission) { showMessage('FINISH YOUR CURRENT MISSION FIRST.'); return; }
+                    const delivery = g.missions.generateDelivery(g);
+                    if (delivery) { g.missions.acceptMission(delivery, g); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE OUTSIDE.'); }
+                    else showMessage('NO DELIVERIES AVAILABLE. TRY AGAIN LATER.');
+                }
+            },
+            'Bartender': {
+                text: g => g.missions.activeMission
+                    ? "Handle your current contract first, Freelancer. Then we'll talk bounties."
+                    : "Welcome to Moon City. We've got a bounty that needs handling — dangerous type, good payout. Interested?",
+                accept(g) { const bounty = g.missions.generateBounty(g); if (bounty) g.missions.acceptMission(bounty, g); }
+            },
+            'Torque': {
+                text: () => "Welcome to Torque Auto, Freelancer. Need a new ride, paint job, or some glow work? Step up to the counter.",
+                endFirst: true, accept: g => g.openAutoShop()
+            },
+            'Prisma': {
+                text: () => "Welcome to Neural Systems. Identity is a spectrum — we just help you find your frequency. Browse our W.I.G.s, S.K.I.N.s, and V.O.C.A.L.s.",
+                endFirst: true, accept: g => g.openCosmeticsShop()
+            },
+            'Biggs': {
+                text: g => `Welcome to Biggs Amusement Park! CRASH ROYALE is our flagship — 7 cars, 60 seconds, pure chaos. Entry: ${g.bumperMinigame.entryCost} personics. You in?`,
+                endFirst: true, accept: g => g.bumperMinigame.start(g)
+            },
+            'Grum North': {
+                text(g) {
+                    const highWave = g.hordeGauntlet ? g.hordeGauntlet.highestWave : 0;
+                    return "Freelancer. I run the Gauntlet — waves of hostiles, no mercy, good pay. "
+                        + (highWave > 0 ? `Your record: Wave ${highWave}. ` : '')
+                        + "I can also send you back to the Sanctum if you want another crack at the Triumvirate.";
+                },
+                buttons: () => ({ accept: 'GAUNTLET', decline: 'BOSS REPLAY', extra: 'LEAVE' }),
+                noLock: true,
+                endFirst: true, accept: g => { if (g.hordeGauntlet) g.openGauntletMenu(); },
+                decline(g) {                                                           // BOSS REPLAY: back to the Sanctum
+                    g.loadMap('church_boss');
+                    g.addPausableTimeout(() => {
+                        if (!g.enemies.some(e => e.persona && !e.dead)) g.spawnTriumvirate({ short: true });
+                        showMessage("THE TRIUMVIRATE AWAKENS... (REPLAY)");
+                        g.triggerShake(20);
+                    }, 500);
+                }
+            },
+            'LUVSH4D3': {
+                text: g => g.questState.ambushCleared && !g.questState.rewardClaimedLUVSH4D3
+                    ? "Oh, Freelancer! Thank you ever so much for dealing with those pesky intruders. Please, accept this as a token of Double Nights' gratitude."
+                    : g.questState.rewardClaimedLUVSH4D3
+                        ? "We hope you enjoy your stay here at Double Nights. Excellence is our guarantee."
+                        : "Welcome to Double Nights. Please be aware, the Penthouse is currently... undergoing maintenance.",
+                buttons: g => (g.questState.ambushCleared && !g.questState.rewardClaimedLUVSH4D3) ? {} : { accept: null, decline: 'Leave' },   // only the reward is accepted
+                accept(g) {
+                    if (g.questState.ambushCleared && !g.questState.rewardClaimedLUVSH4D3) {
+                        g.currency += 450; g.scrap += 10; g.questState.rewardClaimedLUVSH4D3 = true;
+                        g.updateUI(); showMessage("REWARD: 450 PERSONICS, 10 SCRAP");
+                    }
+                }
+            },
+            'Ms. Jean': {
+                text: g => !g.questState.etherealUnlocked
+                    ? "Yes, I am the face of 'Jean Soda'. But today I'm just paying respects. Tell me, Freelancer, do you see the ghosts here? Have you ever been curious about their stories?"
+                    : "The Ethereal Plane is close. Do you wish to cross over?",
+                accept(g) {
+                    if (!g.questState.etherealUnlocked) {
+                        g.questState.etherealUnlocked = true;
+                        showMessage("ETHEREAL PLANE UNLOCKED.");
+                        g.weather.spawnGhost(g.player.x + 50, g.player.y, 0);
+                        g.weather.spawnGhost(g.player.x - 50, g.player.y, Math.PI);
+                    } else { showMessage("CROSSING OVER..."); g.loadMap('ethereal_plane'); }
+                }
+            },
+            'Anavia': {
+                text(g) {
+                    if (g.missions.completedBounties >= 5) return g.missions.activeMission
+                        ? "Handle your current operation first, 949. I don't invest in distracted people."
+                        : "You've been making noise, 949. Good noise. I know where the real materials are — abandoned caches, forgotten freight. I'll mark it, you clear it. The scrap is yours. Interested?";
+                    return !g.questState.etherealUnlocked
+                        ? "Well, what a surprise visit. I'm curious to know if you work as good as you look. Come back later and I just might have something for you."
+                        : "Hmm, you're clearly worth your salt, 949. Keep making noise out there. I may have something for you yet.";
+                },
+                accept(g) {                                                            // salvage ops, after 5 bounties
+                    if (g.missions.completedBounties >= 5 && !g.missions.activeMission) {
+                        const salvage = g.missions.generateSalvage(g);
+                        if (salvage) { g.missions.acceptMission(salvage, g); showMessage('SALVAGE SITE MARKED. CLEAR THE HOSTILES, COLLECT THE CRATE.'); }
+                        else showMessage('NO SALVAGE OPS AVAILABLE RIGHT NOW.');
+                    }
+                }
+            },
+            'Mirabel': {                                                               // the chapter's client: the keycard, then her payment
+                text: g => g.questState.ambushCleared && !g.questState.rewardClaimedContractor
+                    ? "949, you're alive! He escaped?? Starry Heavens above... Well take this payment as promised, and be ready for my next call."
+                    : g.questState.rewardClaimedContractor
+                        ? "For the love of starry heavens! Fuck, he can't be far."
+                        : "Starry heavens, 949! We finally meet in the flesh. We have no time to waste. The Dark Maker is in the Double Nights, get him before he escapes! The fucker. Take this keycard, for the Suite.",
+                accept(g) {
+                    if (g.questState.ambushCleared && !g.questState.rewardClaimedContractor) {
+                        g.currency += 500; g.questState.rewardClaimedContractor = true;
+                        g.updateUI(); showMessage("PAYMENT RECEIVED: 500 PERSONICS");
+                    } else if (!g.questState.hasKeycard) {
+                        showMessage("MISSION ACCEPTED. RECEIVED: VIP KEYCARD."); g.questState.hasKeycard = true;
+                    }
+                }
+            },
+            'Chef Koda': { text: () => "Kitchen's closed to Freelancers. But if Ren likes you, the Amber's on the house.", buttons: () => ({ accept: null, decline: 'Leave' }) },
+            'Valentina': { text: () => "The Enni Cole list is closed tonight, darling. Unless you're somebody.", buttons: () => ({ accept: null, decline: 'Leave' }) },
+
+            // ── By role ──
+            '@dancer': {
+                text(g, n) {
+                    const C = CONFIG.COMPANION;
+                    if (n.hired) return `I'm already with you for ${Math.ceil((n.hireTime - g.worldMinutes) / 60)} more hours.`;
+                    if (g.contractCount >= C.MAX_CONTRACTS) return `You already have ${C.MAX_CONTRACTS} companions. That's the maximum!`;
+                    return `Hi, I'm ${n.name}. Want some company? ${C.DEFAULT_HIRE_COST} personics for ${Math.round(C.DEFAULT_HIRE_DURATION / 60)} hours.`;
+                },
+                accept(g, n) {                                                         // hire as a companion
+                    const C = CONFIG.COMPANION;
+                    if (n.hired || g.contractCount >= C.MAX_CONTRACTS) return;
+                    if (g.currency >= C.DEFAULT_HIRE_COST) {
+                        g.currency -= C.DEFAULT_HIRE_COST; g.hireCompanion(n, g.worldMinutes); g.updateUI();
+                        showMessage(`${n.name.toUpperCase()} HIRED FOR ${Math.round(C.DEFAULT_HIRE_DURATION / 60)} HOURS.`);
+                    } else showMessage(`INSUFFICIENT FUNDS. ${C.DEFAULT_HIRE_COST} PERSONICS REQUIRED.`);
+                }
+            },
+            '@robot': {
+                text: () => "I work 24/7, 366 on leap years. Have you ever stopped to admire the moonrise? What? Backside?? No! Just the regular ol' moon.",
+                buttons: () => ({ accept: null, decline: 'Leave' })                    // small talk, nothing to accept
+            },
+            '@teammate': {
+                text(g, n) {
+                    if (n.recruited) return ({
+                        'Victoria': "Let's cause some chaos, Freelancer.",
+                        'Yenna':    "Say the word. The SR-86 is ready.",
+                        'Sabrina':  "Still here. Still deadly. You're welcome.",
+                        'Max':      "Point me at something and let me shoot it.",
+                        'Josh':     "Intel is current. Awaiting orders."
+                    })[n.name] || "Ready to roll out.";
+                    return ({
+                        'Victoria': "Save me from these sad motherfuckers. Let's ride. (Recruit Victoria?)",
+                        'Yenna':    "I've been watching the perimeter. Could use a spotter though. (Recruit Yenna?)",
+                        'Sabrina':  "You look like you could use someone with actual talent. (Recruit Sabrina?)",
+                        'Max':      "I'm bored as hell. You need firepower? Fine. Let's blow something up. (Recruit Max?)",
+                        'Josh':     "I have tactical data that may be of use. Shall we proceed? (Recruit Josh?)"
+                    })[n.name] || `You need heavy ordinance? Fine. Let's blow something up. (Recruit ${n.name}?)`;
+                },
+                accept(g, n) { n.recruited = true; showMessage(`${n.name.toUpperCase()} RECRUITED.`); }
+            },
+            '@spirit':  { text: () => "…the veil is thin here. Can you hear them too?", buttons: () => ({ accept: null, decline: 'Leave' }) },
+            '@vip':     { text: () => "Not now. I'm expecting someone far more important.", buttons: () => ({ accept: null, decline: 'Leave' }) },
+            '@passing': { text: () => "Evening, Freelancer.", buttons: () => ({ accept: null, decline: 'Leave' }) }   // anyone without lines of their own
+        };
+        NPC_DIALOGUE['@red_demon_dancer'] = NPC_DIALOGUE['@dancer'];
+
+        /** The dialogue entry for an NPC: by name, then by role (any robot_* role is a robot), then a word in passing. */
+        function npcDialogueFor(npc) {
+            const role = npc.role || '';
+            return NPC_DIALOGUE[npc.name] || NPC_DIALOGUE['@' + role] || (role.includes('robot') ? NPC_DIALOGUE['@robot'] : null) || NPC_DIALOGUE['@passing'];
+        }
         /* =====================================================================
            SCENE VISIONS — full-screen painted sequences a scene steps through
            ---------------------------------------------------------------------
@@ -41093,21 +41297,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         /* =====================================================================
            THE CAST — who can speak in a scene: the name on their subtitle, their
-           colour, whose face their cameo wears (core/appearances.js), and which
+           colour (from SPEAKER_COLORS, story/dialogue-bonding.js), whose face their cameo wears (core/appearances.js), and which
            side of the screen they stand on (949 on the left, others on the right).
            ===================================================================== */
         const SCENE_CAST = {
-            '949':     { name: '949', look: '949', color: '#e8c27a', side: 'left' },
-            '747':     { name: '747', look: '747', color: '#b9a6ff', side: 'right' },
-            keeper:    { name: 'The Keeper', look: 'Keeper', color: '#ef6a7e', side: 'right' },
-            traveler:  { name: 'The Traveller', look: 'Traveler', color: '#d8c49a', side: 'left' },
-            larissa:   { name: 'Larissa', look: 'Larissa', color: '#b8b8ee', side: 'right' },
-            mirabel:   { name: 'Mirabel', look: 'Mirabel', color: '#e0667e', side: 'right' },
-            yenna:     { name: 'Yenna', look: 'Yenna', color: '#7fb87f', side: 'right' },
-            sabrina:   { name: 'Sabrina', look: 'Sabrina', color: '#b98cff', side: 'right' },
-            max:       { name: 'Max', look: 'Max', color: '#6aa8ff', side: 'right' },
-            josh:      { name: 'Josh', look: 'Josh', color: '#b4c0d0', side: 'right' },
-            victoria:  { name: 'Victoria', look: 'Victoria', color: '#ff86c0', side: 'right' }
+            '949':     { name: '949', look: '949', color: SPEAKER_COLORS['949'], side: 'left' },
+            '747':     { name: '747', look: '747', color: SPEAKER_COLORS['747'], side: 'right' },
+            keeper:    { name: 'The Keeper', look: 'Keeper', color: SPEAKER_COLORS['The Keeper'], side: 'right' },
+            traveler:  { name: 'The Traveller', look: 'Traveler', color: SPEAKER_COLORS['The Traveller'], side: 'left' },
+            larissa:   { name: 'Larissa', look: 'Larissa', color: SPEAKER_COLORS['Larissa'], side: 'right' },
+            mirabel:   { name: 'Mirabel', look: 'Mirabel', color: SPEAKER_COLORS['Mirabel'], side: 'right' },
+            yenna:     { name: 'Yenna', look: 'Yenna', color: SPEAKER_COLORS['Yenna'], side: 'right' },
+            sabrina:   { name: 'Sabrina', look: 'Sabrina', color: SPEAKER_COLORS['Sabrina'], side: 'right' },
+            max:       { name: 'Max', look: 'Max', color: SPEAKER_COLORS['Max'], side: 'right' },
+            josh:      { name: 'Josh', look: 'Josh', color: SPEAKER_COLORS['Josh'], side: 'right' },
+            victoria:  { name: 'Victoria', look: 'Victoria', color: SPEAKER_COLORS['Victoria'], side: 'right' }
         };
         /* =====================================================================
            PROLOGUE — Story of 949
@@ -42119,136 +42323,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 });
 
+                // Dialogue buttons: what each NPC's Accept and Decline do lives in story/npc-dialogue.js
                 this.btnAccept.addEventListener('click', () => {
                     // DialogueSequence intercept (bonding, story, briefings, etc.)
                     if (this.dialogueSeq && this.dialogueSeq.isActive()) {
                         this.dialogueSeq.advance();
                         return;
                     }
-                    if (this.activeInteraction instanceof NPC && this.activeInteraction.role === 'teammate') {
-                        this.activeInteraction.recruited = true; 
-                        showMessage(`${this.activeInteraction.name.toUpperCase()} RECRUITED.`);
-                    } 
-                    else if (this.activeInteraction instanceof NPC) {
-                        if (this.activeInteraction.name === "Dr. Yin") {
-                            this.endDialogue();
-                            this.openDrYinMenu();                         // tune Resonance, or augments
-                            return;
-                        }
-                        else if (this.activeInteraction.name === "Torque") {
-                            this.endDialogue();
-                            this.openAutoShop();
-                            return;
-                        }
-                        else if (this.activeInteraction.name === "Prisma") {
-                            this.endDialogue();
-                            this.openCosmeticsShop();
-                            return;
-                        }
-                        else if (this.activeInteraction.name === "Biggs") {
-                            this.endDialogue();
-                            this.bumperMinigame.start(this);
-                            return;
-                        }
-                        else if (this.activeInteraction.name === "Grum North") {
-                            // GAUNTLET button pressed — choose a map
-                            if (this._grumCancelBtn) this._grumCancelBtn.style.display = 'none';
-                            this.endDialogue();
-                            if (this.hordeGauntlet) this.openGauntletMenu();
-                            return;
-                        } 
-                        else if (this.activeInteraction.name === "Barista Ren") {
-                            // Offer delivery mission from the cafe
-                            if (!this.missions.activeMission) {
-                                const delivery = this.missions.generateDelivery(this);
-                                if (delivery) {
-                                    this.missions.acceptMission(delivery, this);
-                                    showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE OUTSIDE.');
-                                } else {
-                                    showMessage('NO DELIVERIES AVAILABLE. TRY AGAIN LATER.');
-                                }
-                            } else {
-                                showMessage('FINISH YOUR CURRENT MISSION FIRST.');
-                            }
-                        }
-                        else if (this.activeInteraction.name === "Bartender") {
-                            // Offer bounty mission from the club
-                            const bounty = this.missions.generateBounty(this);
-                            if (bounty) {
-                                this.missions.acceptMission(bounty, this);
-                            }
-                        }
-                        else if (this.activeInteraction.name === "Anavia") {
-                            // Anavia salvage missions (unlocked after 5 bounties)
-                            if (this.missions.completedBounties >= 5 && !this.missions.activeMission) {
-                                const salvage = this.missions.generateSalvage(this);
-                                if (salvage) {
-                                    this.missions.acceptMission(salvage, this);
-                                    showMessage('SALVAGE SITE MARKED. CLEAR THE HOSTILES, COLLECT THE CRATE.');
-                                } else {
-                                    showMessage('NO SALVAGE OPS AVAILABLE RIGHT NOW.');
-                                }
-                            }
-                        } 
-                        else if (this.activeInteraction.role === 'dancer' || this.activeInteraction.role === 'red_demon_dancer') {
-                            // Hire dancer logic (unified companion system)
-                            if (!this.activeInteraction.hired && this.contractCount < CONFIG.COMPANION.MAX_CONTRACTS) {
-                                if (this.currency >= CONFIG.COMPANION.DEFAULT_HIRE_COST) {
-                                    this.currency -= CONFIG.COMPANION.DEFAULT_HIRE_COST;
-                                    const dancer = this.activeInteraction;
-                                    this.hireCompanion(dancer, this.worldMinutes);
-                                    this.updateUI();
-                                    showMessage(`${dancer.name.toUpperCase()} HIRED FOR ${Math.round(CONFIG.COMPANION.DEFAULT_HIRE_DURATION / 60)} HOURS.`);
-                                } else {
-                                    showMessage(`INSUFFICIENT FUNDS. ${CONFIG.COMPANION.DEFAULT_HIRE_COST} PERSONICS REQUIRED.`);
-                                }
-                            }
-                        } 
-                        else if (this.activeInteraction.name === "LUVSH4D3") {
-                             if (this.questState.ambushCleared && !this.questState.rewardClaimedLUVSH4D3) {
-                                this.currency += 450; this.scrap += 10;
-                                this.questState.rewardClaimedLUVSH4D3 = true; 
-                                this.updateUI(); showMessage("REWARD: 450 PERSONICS, 10 SCRAP");
-                             }
-                        } 
-                        else if (this.activeInteraction.name === "Ms. Jean") {
-                            if (!this.questState.etherealUnlocked) {
-                                this.questState.etherealUnlocked = true;
-                                showMessage("ETHEREAL PLANE UNLOCKED.");
-                                this.weather.spawnGhost(this.player.x + 50, this.player.y, 0);
-                                this.weather.spawnGhost(this.player.x - 50, this.player.y, Math.PI);
-                            } else {
-                                showMessage("CROSSING OVER...");
-                                this.loadMap('ethereal_plane');
-                            }
-                        } 
-                        else if (this.activeInteraction.name === 'Mirabel') {
-                            if (this.questState.ambushCleared && !this.questState.rewardClaimedContractor) {
-                                this.currency += 500; this.questState.rewardClaimedContractor = true;
-                                this.updateUI(); showMessage("PAYMENT RECEIVED: 500 PERSONICS");
-                            } else if (!this.questState.hasKeycard) {
-                                showMessage("MISSION ACCEPTED. RECEIVED: VIP KEYCARD."); this.questState.hasKeycard = true;
-                            }
-                        }
+                    const npc = this.activeInteraction;
+                    if (npc instanceof NPC) {
+                        const D = npcDialogueFor(npc);
+                        if (this._extraDialogueBtn) this._extraDialogueBtn.style.display = 'none';
+                        if (D.endFirst) { this.endDialogue(); if (D.accept) D.accept(this, npc); return; }   // it opens a menu of its own
+                        if (D.accept) D.accept(this, npc);
                     }
                     this.endDialogue();
                 });
 
                 this.btnDecline.addEventListener('click', () => { 
-                    // Grum North — BOSS REPLAY (decline button repurposed)
-                    if (this.activeInteraction instanceof NPC && this.activeInteraction.name === 'Grum North') {
-                        if (this._grumCancelBtn) this._grumCancelBtn.style.display = 'none';
-                        this.endDialogue();
-                        // Teleport to church_boss and spawn the Triumvirate
-                        this.loadMap('church_boss');
-                        this.addPausableTimeout(() => {
-                            if (!this.enemies.some(e => e.persona && !e.dead)) this.bossIntro([new GatlingGunner(360, 330, 0, { persona: 'vesper' }), new GatlingGunner(600, 290, 1, { persona: 'matins' }), new GatlingGunner(840, 330, 2, { persona: 'compline' })], { short: true });
-                            showMessage("THE TRIUMVIRATE AWAKENS... (REPLAY)");
-                            this.triggerShake(20);
-                        }, 500);
-                        return;
-                    }
-                    this.endDialogue(); 
+                    const npc = this.activeInteraction;
+                    const D = npc instanceof NPC ? npcDialogueFor(npc) : null;
+                    if (this._extraDialogueBtn) this._extraDialogueBtn.style.display = 'none';
+                    this.endDialogue();
+                    if (D && D.decline) D.decline(this, npc);
                 });
             },
 
@@ -42838,7 +42935,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // back to 949, and after a breath of grace they wake one by one — and their first burst still
         // telegraphs. Replays (or once seen) get the short version: no pan, eyes and rising in place.
         // A tap or a key skips to the pan back. Runs on frames (updateBossIntro, from update.js).
+        /** The Sanctum's three wardens: where they kneel on the dais (x, y, id, persona). */
+        const TRIUMVIRATE = [[360, 330, 0, 'vesper'], [600, 290, 1, 'matins'], [840, 330, 2, 'compline']];
+
         engineMixin({
+            /** Spawn the Triumvirate dormant and play their awakening (the story's first visit, or Grum's replay). */
+            spawnTriumvirate(opts = {}) {
+                this.bossIntro(TRIUMVIRATE.map(([x, y, id, persona]) => new GatlingGunner(x, y, id, { persona })), opts);
+            },
+
             bossIntro(bosses, opts = {}) {
                 const qs = this.questState || {};
                 let short = !!(opts.short || qs.sanctumIntroSeen || qs.churchBossDefeated);
@@ -44482,148 +44587,26 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     phoneSystem.meetNPC(entity);
                 }
                 
-                // 3. SET DIALOGUE TEXT
-                if (entity.name === "Dr. Yin") {
-                    this.npcTextEl.textContent = "Welcome to the Clinic. I have cybernetic augments if you have the personics. Neural implants, subdermal mesh, phase wires — all top-grade.";
-                } 
-                else if (entity.name === "Barista Ren") {
-                    if (this.missions.activeMission) {
-                        this.npcTextEl.textContent = "You've already got a job running. Finish that first, then come back for more work.";
-                    } else {
-                        this.npcTextEl.textContent = "Hey! We've got an Amber delivery that needs to go out. Want to run it? Good personics in it for you.";
+                // 3. THE LINE AND THE BUTTONS (story/npc-dialogue.js)
+                const D = npcDialogueFor(entity);
+                this.npcTextEl.textContent = D.text(this, entity);
+                const B = D.buttons ? D.buttons(this, entity) : {};
+                if (B.accept === null) this.btnAccept.style.display = 'none';
+                else if (B.accept) this.btnAccept.textContent = B.accept;
+                if (B.decline) this.btnDecline.textContent = B.decline;
+                if (B.extra) {
+                    // A third button that just leaves (Grum's menu)
+                    if (!this._extraDialogueBtn) {
+                        this._extraDialogueBtn = document.createElement('button');
+                        this._extraDialogueBtn.className = 'dialogue-btn';
+                        this._extraDialogueBtn.style.opacity = '0.6';
+                        this.btnDecline.parentElement.appendChild(this._extraDialogueBtn);
+                        this._extraDialogueBtn.addEventListener('click', () => { this._extraDialogueBtn.style.display = 'none'; this.endDialogue(); });
                     }
+                    this._extraDialogueBtn.textContent = B.extra;
+                    this._extraDialogueBtn.style.display = '';
                 }
-                else if (entity.name === "Bartender") {
-                    if (this.missions.activeMission) {
-                        this.npcTextEl.textContent = "Handle your current contract first, Freelancer. Then we'll talk bounties.";
-                    } else {
-                        this.npcTextEl.textContent = "Welcome to Moon City. We've got a bounty that needs handling — dangerous type, good payout. Interested?";
-                    }
-                } 
-                else if (entity.name === "Torque") {
-                    this.npcTextEl.textContent = "Welcome to Torque Auto, Freelancer. Need a new ride, paint job, or some glow work? Step up to the counter.";
-                }
-                else if (entity.name === "Prisma") {
-                    this.npcTextEl.textContent = "Welcome to Neural Systems. Identity is a spectrum — we just help you find your frequency. Browse our W.I.G.s, S.K.I.N.s, and V.O.C.A.L.s.";
-                }
-                else if (entity.name === "Biggs") {
-                    this.npcTextEl.textContent = `Welcome to Biggs Amusement Park! CRASH ROYALE is our flagship — 7 cars, 60 seconds, pure chaos. Entry: ${this.bumperMinigame.entryCost} personics. You in?`;
-                }
-                else if (entity.name === "Grum North") {
-                    const highWave = this.hordeGauntlet ? this.hordeGauntlet.highestWave : 0;
-                    const bossStatus = this.questState.churchBossDefeated ? 'DEFEATED' : 'UNVISITED';
-                    let grumText = "Freelancer. I run the Gauntlet — waves of hostiles, no mercy, good pay. ";
-                    if (highWave > 0) grumText += `Your record: Wave ${highWave}. `;
-                    grumText += "I can also send you back to the Sanctum if you want another crack at the Triumvirate.";
-                    this.npcTextEl.textContent = grumText;
-                    // Show three-option menu
-                    this.btnAccept.textContent = 'GAUNTLET';
-                    this.btnDecline.textContent = 'BOSS REPLAY';
-                    // Create third button for cancel
-                    if (!this._grumCancelBtn) {
-                        this._grumCancelBtn = document.createElement('button');
-                        this._grumCancelBtn.className = 'dialogue-btn';
-                        this._grumCancelBtn.textContent = 'LEAVE';
-                        this._grumCancelBtn.style.opacity = '0.6';
-                        this.btnDecline.parentElement.appendChild(this._grumCancelBtn);
-                        this._grumCancelBtn.addEventListener('click', () => {
-                            this._grumCancelBtn.style.display = 'none';
-                            this.endDialogue();
-                        });
-                    }
-                    this._grumCancelBtn.style.display = '';
-                    this.btnAccept.style.display = '';
-                    this.btnDecline.style.display = '';
-                    return; // Skip default button setup
-                }
-                else if (entity.role === 'dancer' || entity.role === 'red_demon_dancer') {
-                    if (entity.hired) {
-                        this.npcTextEl.textContent = `I'm already with you for ${Math.ceil((entity.hireTime - this.worldMinutes) / 60)} more hours.`;
-                    } else if (this.contractCount >= CONFIG.COMPANION.MAX_CONTRACTS) {
-                        this.npcTextEl.textContent = "You already have 5 companions. That's the maximum!";
-                    } else {
-                        this.npcTextEl.textContent = `Hi, I'm ${entity.name}. Want some company? 400 personics for 8 hours.`;
-                    }
-                } 
-                else if (entity.name === "LUVSH4D3") {
-                     if (this.questState.ambushCleared && !this.questState.rewardClaimedLUVSH4D3) {
-                        this.npcTextEl.textContent = "Oh, Freelancer! Thank you ever so much for dealing with those pesky intruders. Please, accept this as a token of Double Nights' gratitude.";
-                     } else if (this.questState.rewardClaimedLUVSH4D3) {
-                        this.npcTextEl.textContent = "We hope you enjoy your stay here at Double Nights. Excellence is our guarantee.";
-                     } else {
-                        this.npcTextEl.textContent = "Welcome to Double Nights. Please be aware, the Penthouse is currently... undergoing maintenance.";
-                     }
-                     if (!(this.questState.ambushCleared && !this.questState.rewardClaimedLUVSH4D3)) { this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave'; }   // only the reward is accepted
-                } 
-                else if (entity.name === "Ms. Jean") {
-                    if (!this.questState.etherealUnlocked) {
-                        this.npcTextEl.textContent = "Yes, I am the face of 'Jean Soda'. But today I'm just paying respects. Tell me, Freelancer, do you see the ghosts here? Have you ever been curious about their stories?";
-                    } else {
-                        this.npcTextEl.textContent = "The Ethereal Plane is close. Do you wish to cross over?";
-                    }
-                }
-                else if (entity.name === "Anavia") {
-                    if (this.missions.completedBounties >= 5) {
-                        if (this.missions.activeMission) {
-                            this.npcTextEl.textContent = "Handle your current operation first, 949. I don't invest in distracted people.";
-                        } else {
-                            this.npcTextEl.textContent = "You've been making noise, 949. Good noise. I know where the real materials are — abandoned caches, forgotten freight. I'll mark it, you clear it. The scrap is yours. Interested?";
-                        }
-                    } else if (!this.questState.etherealUnlocked) {
-                        this.npcTextEl.textContent = "Well, what a surprise visit. I'm curious to know if you work as good as you look. Come back later and I just might have something for you."
-                    } else {
-                        this.npcTextEl.textContent = "Hmm, you're clearly worth your salt, 949. Keep making noise out there. I may have something for you yet."
-                    }
-                }
-                else if ((entity.role || '').includes("robot")) {
-                    this.npcTextEl.textContent = "I work 24/7, 366 on leap years. Have you ever stopped to admire the moonrise? What? Backside?? No! Just the regular ol' moon."
-                    this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave';   // small talk, nothing to accept
-                }
-                else if (entity.role === 'teammate') {
-                    if (entity.recruited) {
-                        // Per-character recruited lines
-                        const recruitedLines = {
-                            'Victoria': "Let's cause some chaos, Freelancer.",
-                            'Yenna':    "Say the word. The SR-86 is ready.",
-                            'Sabrina':  "Still here. Still deadly. You're welcome.",
-                            'Max':      "Point me at something and let me shoot it.",
-                            'Josh':     "Intel is current. Awaiting orders."
-                        };
-                        this.npcTextEl.textContent = recruitedLines[entity.name] || "Ready to roll out.";
-                    } else {
-                        const recruitLines = {
-                            'Victoria': "Save me from these sad motherfuckers. Let's ride. (Recruit Victoria?)",
-                            'Yenna':    "I've been watching the perimeter. Could use a spotter though. (Recruit Yenna?)",
-                            'Sabrina':  "You look like you could use someone with actual talent. (Recruit Sabrina?)",
-                            'Max':      "I'm bored as hell. You need firepower? Fine. Let's blow something up. (Recruit Max?)",
-                            'Josh':     "I have tactical data that may be of use. Shall we proceed? (Recruit Josh?)"
-                        };
-                        this.npcTextEl.textContent = recruitLines[entity.name] || `You need heavy ordinance? Fine. Let's blow something up. (Recruit ${entity.name}?)`;
-                    }
-                } 
-                else if (entity.name === 'Mirabel') {
-                    // The chapter's client: the keycard, then her payment after the ambush
-                    if (this.questState.ambushCleared && !this.questState.rewardClaimedContractor) { 
-                        this.npcTextEl.textContent = "949, you're alive! He escaped?? Starry Heavens above... Well take this payment as promised, and be ready for my next call."; 
-                    } 
-                    else if (this.questState.rewardClaimedContractor) { 
-                        this.npcTextEl.textContent = "For the love of starry heavens! Fuck, he can't be far."; 
-                    } 
-                    else { 
-                        this.npcTextEl.textContent = "Starry heavens, 949! We finally meet in the flesh. We have no time to waste. The Dark Maker is in the Double Nights, get him before he escapes! The fucker. Take this keycard, for the Suite."; 
-                    }
-                }
-                else {
-                    // Anyone without lines of their own: a word in passing, nothing to accept
-                    const PASSING = {
-                        'Chef Koda': "Kitchen's closed to Freelancers. But if Ren likes you, the Amber's on the house.",
-                        'Valentina': "The Enni Cole list is closed tonight, darling. Unless you're somebody.",
-                        spirit: "…the veil is thin here. Can you hear them too?",
-                        vip: "Not now. I'm expecting someone far more important."
-                    };
-                    this.npcTextEl.textContent = PASSING[entity.name] || PASSING[entity.role] || "Evening, Freelancer.";
-                    this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave';
-                }
+                if (D.noLock) return;
                 
                 // 4. LOCK UI INTERACTIONS (Except Dialogue Box)
                 document.getElementById('game-ui').style.pointerEvents = 'none'; 
@@ -44894,8 +44877,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.btnDecline.style.display = '';
                 this.npcNameEl.style.color = '';
                 
-                // 2b. Hide Grum's extra cancel button
-                if (this._grumCancelBtn) this._grumCancelBtn.style.display = 'none';
+                // 2b. Hide the third button (Grum's menu)
+                if (this._extraDialogueBtn) this._extraDialogueBtn.style.display = 'none';
                 
                 // 3. RESET POINTER EVENTS (Re-enable Buttons)
                 document.getElementById('game-ui').style.pointerEvents = 'none'; 
@@ -48293,14 +48276,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** After lighting: building windows/neon/rooftop lights, then the sky layer. */
             drawEmissivePass(ctx) {
                 const dark = this.getAmbientDarkness();
-                if (this.activeMap.id === 'apt_949') this.drawApartmentGlow(ctx);
-                if (this.activeMap.id === 'house_of_death') this.drawHouseGlow(ctx);
-                if (this.activeMap.id === 'hotel_lobby') this.drawLobbyGlow(ctx);
-                if (this.activeMap.id === 'hotel_suite') this.drawSuiteGlow(ctx);
-                if (this.activeMap.id === 'church_boss') { this.drawSanctumGlow(ctx); this.drawBossGlow(ctx); }   // the Sanctum, then the Triumvirate's eyes
-                if (this.activeMap.id === 'moon_city_nightclub') this.drawClubGlow(ctx);
-                if (this.activeMap.id.startsWith('keepers_')) this.drawKeeperGlow(ctx);
-                if (this.activeMap.id === 'hub_949') this.drawGraveyardGlow(ctx);
+                const art = INTERIOR_ART[this.activeMap.id];
+                if (art && art.glow) art.glow(this, ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const z = this.camera.zoom || 1;
                     const hw = this.canvas.width / 2 / z + 200, hh = this.canvas.height / 2 / z + 200;
@@ -49068,6 +49045,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         // GameEngine — The per-tick simulation (update) and traffic collision helpers.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        /** Props you can use, and what the action pill says for them: type → [verb, name, name from the prop's own label].
+         *  A prop whose interactionType isn't here is scenery (the sofa, the bedside tables…): no pill, no action.
+         *  What each one does is engine/events.js interact(). */
+        const PROP_ACTIONS = {
+            medbay_refill:     ['Refill', 'Health station'],
+            lost_luggage:      ['Search', 'Lost luggage', true],
+            vending_machine:   ['Buy', 'MiniSpree'],
+            bed_sleep:         ['Rest', 'Bed'],
+            crafting_table:    ['Craft', 'Workbench'],
+            auto_shop_counter: ['Shop', 'Counter'],
+            armory:            ['Loadout', 'Armory'],
+            read_note:         ['Read', 'Note', true],
+            light_switch:      ['Lights', 'Light switch']
+        };
+
         engineMixin({
             /* =====================================================================
                MAIN GAME LOOP (UPDATE)
@@ -50370,7 +50362,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (!tm.recruited && inApt) continue; // Skip unrecruited in apartment
                     let d = Math.hypot(this.player.x - tm.x, this.player.y - tm.y); if(d < 50) { nearInteractable = tm; } 
                 }
-                for(let p of this.props) { if (p.interactionType) { let d = Math.hypot(this.player.x - (p.x + p.w/2), this.player.y - (p.y + p.h/2)); if (d < 60) nearInteractable = p; } }
+                for(let p of this.props) { if (PROP_ACTIONS[p.interactionType]) { let d = Math.hypot(this.player.x - (p.x + p.w/2), this.player.y - (p.y + p.h/2)); if (d < 60) nearInteractable = p; } }   // only props that do something
                 
                 // Discoverable Velvet Cat
                 if (this.velvetCat && this.velvetCat._discoverable && !this.questState.hasVelvetCat) {
@@ -50411,15 +50403,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 else if (nearInteractable) { 
                     this.interactBtn.style.display = 'flex'; this.activeInteraction = nearInteractable; 
                     if (nearInteractable instanceof PropEntity) {
-                        if (nearInteractable.interactionType === 'medbay_refill') this.setInteract('Refill', 'Health station');
-                        else if (nearInteractable.interactionType === 'lost_luggage') this.setInteract('Search', nearInteractable.label || 'Lost luggage');
-                        if (nearInteractable.interactionType === 'vending_machine') this.setInteract('Buy', 'MiniSpree');
-                        if (nearInteractable.interactionType === 'bed_sleep') this.setInteract('Rest', 'Bed');
-                        if (nearInteractable.interactionType === 'crafting_table') this.setInteract('Craft', 'Workbench');
-                        if (nearInteractable.interactionType === 'auto_shop_counter') this.setInteract('Shop', 'Counter');
-                        if (nearInteractable.interactionType === 'armory') this.setInteract('Loadout', 'Armory');
-                        if (nearInteractable.interactionType === 'read_note') this.setInteract('Read', nearInteractable.label || 'Note');
-                        if (nearInteractable.interactionType === 'light_switch') this.setInteract('Lights', 'Light switch');
+                        const [verb, name, useLabel] = PROP_ACTIONS[nearInteractable.interactionType];
+                        this.setInteract(verb, (useLabel && nearInteractable.label) || name);
                     } else if (nearInteractable.interactionType === 'delivery_pickup') {
                         this.setInteract('Pick Up', 'Delivery');
                     } else if (nearInteractable.interactionType === 'adopt_cat') {
@@ -50820,21 +50805,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }); 
                 }
                 
-                // --- APARTMENT CITY BACKDROP ---
-                // Draw AFTER zones so it overwrites the veranda zone color with a living cityscape
-                if (this.activeMap.id === 'apt_949') {
-                    this.drawApartmentBackdrop(this.ctx);
-                    this.drawApartmentInterior(this.ctx);
-                }
-                if (this.activeMap.id === 'medbay_sw') {
-                    this.drawClinicInterior(this.ctx);
-                }
-                if (this.activeMap.id === 'house_of_death') this.drawHouseInterior(this.ctx);
-                if (this.activeMap.id === 'hotel_lobby') this.drawLobbyInterior(this.ctx);
-                if (this.activeMap.id === 'hotel_suite') this.drawSuiteInterior(this.ctx);
-                if (this.activeMap.id === 'church_boss') this.drawSanctumInterior(this.ctx);
-                if (this.activeMap.id.startsWith('keepers_')) this.drawKeeperInterior(this.ctx);   // the prologue's fireside (engine/keeper-art.js)
-                if (this.activeMap.id === 'moon_city_nightclub') { this.drawClubInterior(this.ctx); this.drawClubFloorLights(this.ctx); }
+                // Painted interiors (after the zones, so e.g. the apartment's city backdrop covers its veranda zone)
+                const art = INTERIOR_ART[this.activeMap.id];
+                if (art && art.floor) art.floor(this, this.ctx);
                 
                 // Indoor V2: Room floors, windows, and doors
                 if (this.roomSystem.active) {
@@ -51910,6 +51883,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         // GameEngine — Apartment and clinic interiors, the city backdrop from the veranda, mission marker.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        /* =====================================================================
+           INTERIOR_ART — each painted place: its floor (under the lighting, draw.js)
+           and its glow (after the darkness, world-state.js drawEmissivePass).
+           A new place adds one line here; the painters live below and in keeper-art.js.
+           ===================================================================== */
+        const INTERIOR_ART = {
+            apt_949:             { floor: (g, c) => { g.drawApartmentBackdrop(c); g.drawApartmentInterior(c); }, glow: (g, c) => g.drawApartmentGlow(c) },
+            medbay_sw:           { floor: (g, c) => g.drawClinicInterior(c) },
+            house_of_death:      { floor: (g, c) => g.drawHouseInterior(c),   glow: (g, c) => g.drawHouseGlow(c) },
+            hotel_lobby:         { floor: (g, c) => g.drawLobbyInterior(c),   glow: (g, c) => g.drawLobbyGlow(c) },
+            hotel_suite:         { floor: (g, c) => g.drawSuiteInterior(c),   glow: (g, c) => g.drawSuiteGlow(c) },
+            church_boss:         { floor: (g, c) => g.drawSanctumInterior(c), glow: (g, c) => { g.drawSanctumGlow(c); g.drawBossGlow(c); } },   // the Sanctum, then the Triumvirate's eyes
+            moon_city_nightclub: { floor: (g, c) => { g.drawClubInterior(c); g.drawClubFloorLights(c); }, glow: (g, c) => g.drawClubGlow(c) },
+            keepers_hill:        { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },   // the prologue's fireside (engine/keeper-art.js)
+            keepers_parlor:      { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },
+            hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) }
+        };
+
         engineMixin({
             /* =====================================================================
                APARTMENT CITY BACKDROP
@@ -52035,7 +52026,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              *  crystal, the coffin, holograms, stained glass. Room switches and the veil don't dim them. */
             drawHouseGlow(ctx) {
                 const t = _frameTime / 1000;
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 for (const p of this.props) {
                     if (!p.decorType || !p.decorType.startsWith('hod_')) continue;
@@ -52131,7 +52122,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              *  light strips, the elevator doors, the departures board, the motto banner, drifting stars. */
             drawLobbyGlow(ctx) {
                 const t = _frameTime / 1000;
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // The chandelier: three tiers of warm lights and crystal glints
                 glow(500, 850, 170, '255, 200, 130', 0.12);
@@ -52242,7 +52233,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              *  braziers and candles, and the sigil's runes — one ring per warden, going dark as each falls. */
             drawSanctumGlow(ctx) {
                 const t = _frameTime / 1000;
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 const W = (this.enemies || []).filter(e => e.persona);
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // The rose window's light pooled on the dais
@@ -52349,7 +52340,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             drawSuiteGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const seen = (x, y) => { const q = rs && rs.active ? rs.getRoomAt(x, y) : null; return q ? 0.25 + 0.75 * q.vis : 1; };
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 const flame = (x, y, k = 0) => { const f = 0.75 + 0.25 * Math.sin(t * 11 + x * 0.3 + k); glow(x, y, 14, '255, 190, 120', 0.5 * f * seen(x, y)); ctx.globalAlpha = seen(x, y); ctx.fillStyle = `rgb(255,${200 + 40 * f | 0},130)`; ctx.beginPath(); ctx.arc(x, y - 0.5, 1.5 * f, 0, Math.PI * 2); ctx.fill(); };
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // The fire, still burning low
@@ -52518,7 +52509,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const beatN = clubBeatN(), beat = ((beatN % 1) + 1) % 1, bar = Math.floor(beatN / 8), kick = Math.pow(1 - beat, 3);
                 const seen = (x, y) => { const r = rs && rs.active ? rs.getRoomAt(x, y) : null; return r ? 0.2 + 0.8 * r.vis : 1; };
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 const PAL = CLUB_PAL;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // (The dance floor's tiles and the pole uplights are on the floor: drawClubFloorLights,
@@ -52605,7 +52596,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these
                 // A glow sprite (core/draw-helpers.js) of colour `rgb`, alpha `a`
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 const dot = (x, y, r, rgba) => { ctx.globalAlpha = 1; ctx.fillStyle = rgba; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // Lamp shades and bar pendants (they follow the room switches)
@@ -52621,7 +52612,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 // Fireplace
                 const ff = 0.8 + 0.2 * Math.sin(t * 6.3) * Math.sin(t * 2.1);
-                glow(580, 432, 60, '255, 140, 60', 0.35 * ff);
+                glow(HEARTHS.apt_949.x, HEARTHS.apt_949.y, 60, '255, 140, 60', 0.35 * ff);
                 // Induction zones (warm red) and two gas burners (blue flame)
                 for (const [x, y] of [[433, 864], [460, 877]]) glow(x, y, 12, '255, 70, 40', 0.55);
                 for (const [x, y, r] of [[312, 859, 7], [329, 873, 5.5]]) {
@@ -53312,7 +53303,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ISLAND: [[900, 250], [1120, 280], [1290, 380], [1360, 560], [1330, 780], [1260, 980], [1240, 1250], [1230, 1550], [1200, 1850], [1150, 2150], [1080, 2380], [960, 2500],
                      [840, 2500], [720, 2390], [650, 2160], [600, 1860], [570, 1560], [560, 1260], [540, 980], [470, 780], [440, 560], [510, 380], [680, 280]],
             PATH: [[900, 2470], [860, 2280], [960, 2080], [850, 1880], [955, 1680], [865, 1470], [935, 1260], [875, 1060], [905, 880], [900, 740]],
-            PARLOR: { w: 900, h: 700, fire: { x: 450, y: 62 }, keeper: { x: 450, y: 262 }, traveler: { x: 648, y: 306 } }
+            PARLOR: { w: 900, h: 700, fire: HEARTHS.keepers_parlor, keeper: { x: 450, y: 262 }, traveler: { x: 648, y: 306 } }
         };
 
         engineMixin({
@@ -53580,7 +53571,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** After the darkness: the glowing things. */
             drawKeeperGlow(ctx) {
                 const id = this.activeMap.id, t = _gameTimeSec;
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 if (id === 'keepers_hill') {
                     const V = this._keeperView(200);
@@ -56465,12 +56456,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     return;
                 }
                 
-                // Close Cosmetics Shop if open
-                const cosmeticsShop = document.getElementById('cosmetics-shop-overlay');
-                if (cosmeticsShop.style.display === 'block') {
-                    cosmeticsShop.style.display = 'none';
-                    game.pauseSystem.release('cosmetics_shop');
-                    return;
+                // Close whichever shop or menu is open (each through its own close, so pauses are released)
+                const SHOPS = [
+                    ['cosmetics-shop-overlay', () => document.getElementById('cosmetics-shop-close').click()],
+                    ['auto-shop-overlay', () => game.closeAutoShop()],
+                    ['augment-shop', () => document.getElementById('aug-shop-close').click()],
+                    ['zib-menu', () => game.closeZibMenu()],
+                    ['gauntlet-menu', () => game.closeGauntletMenu()],
+                    ['tuning-overlay', () => game.closeTuning()],
+                    ['vending-menu', () => game.closeVendingMenu()]
+                ];
+                for (const [id, close] of SHOPS) {
+                    const el = document.getElementById(id);
+                    if (el && getComputedStyle(el).display !== 'none') { close(); return; }
                 }
                 
                 // Otherwise, toggle pause menu (if game is running)

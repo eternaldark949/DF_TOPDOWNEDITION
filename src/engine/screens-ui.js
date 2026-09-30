@@ -112,148 +112,26 @@
                     phoneSystem.meetNPC(entity);
                 }
                 
-                // 3. SET DIALOGUE TEXT
-                if (entity.name === "Dr. Yin") {
-                    this.npcTextEl.textContent = "Welcome to the Clinic. I have cybernetic augments if you have the personics. Neural implants, subdermal mesh, phase wires — all top-grade.";
-                } 
-                else if (entity.name === "Barista Ren") {
-                    if (this.missions.activeMission) {
-                        this.npcTextEl.textContent = "You've already got a job running. Finish that first, then come back for more work.";
-                    } else {
-                        this.npcTextEl.textContent = "Hey! We've got an Amber delivery that needs to go out. Want to run it? Good personics in it for you.";
+                // 3. THE LINE AND THE BUTTONS (story/npc-dialogue.js)
+                const D = npcDialogueFor(entity);
+                this.npcTextEl.textContent = D.text(this, entity);
+                const B = D.buttons ? D.buttons(this, entity) : {};
+                if (B.accept === null) this.btnAccept.style.display = 'none';
+                else if (B.accept) this.btnAccept.textContent = B.accept;
+                if (B.decline) this.btnDecline.textContent = B.decline;
+                if (B.extra) {
+                    // A third button that just leaves (Grum's menu)
+                    if (!this._extraDialogueBtn) {
+                        this._extraDialogueBtn = document.createElement('button');
+                        this._extraDialogueBtn.className = 'dialogue-btn';
+                        this._extraDialogueBtn.style.opacity = '0.6';
+                        this.btnDecline.parentElement.appendChild(this._extraDialogueBtn);
+                        this._extraDialogueBtn.addEventListener('click', () => { this._extraDialogueBtn.style.display = 'none'; this.endDialogue(); });
                     }
+                    this._extraDialogueBtn.textContent = B.extra;
+                    this._extraDialogueBtn.style.display = '';
                 }
-                else if (entity.name === "Bartender") {
-                    if (this.missions.activeMission) {
-                        this.npcTextEl.textContent = "Handle your current contract first, Freelancer. Then we'll talk bounties.";
-                    } else {
-                        this.npcTextEl.textContent = "Welcome to Moon City. We've got a bounty that needs handling — dangerous type, good payout. Interested?";
-                    }
-                } 
-                else if (entity.name === "Torque") {
-                    this.npcTextEl.textContent = "Welcome to Torque Auto, Freelancer. Need a new ride, paint job, or some glow work? Step up to the counter.";
-                }
-                else if (entity.name === "Prisma") {
-                    this.npcTextEl.textContent = "Welcome to Neural Systems. Identity is a spectrum — we just help you find your frequency. Browse our W.I.G.s, S.K.I.N.s, and V.O.C.A.L.s.";
-                }
-                else if (entity.name === "Biggs") {
-                    this.npcTextEl.textContent = `Welcome to Biggs Amusement Park! CRASH ROYALE is our flagship — 7 cars, 60 seconds, pure chaos. Entry: ${this.bumperMinigame.entryCost} personics. You in?`;
-                }
-                else if (entity.name === "Grum North") {
-                    const highWave = this.hordeGauntlet ? this.hordeGauntlet.highestWave : 0;
-                    const bossStatus = this.questState.churchBossDefeated ? 'DEFEATED' : 'UNVISITED';
-                    let grumText = "Freelancer. I run the Gauntlet — waves of hostiles, no mercy, good pay. ";
-                    if (highWave > 0) grumText += `Your record: Wave ${highWave}. `;
-                    grumText += "I can also send you back to the Sanctum if you want another crack at the Triumvirate.";
-                    this.npcTextEl.textContent = grumText;
-                    // Show three-option menu
-                    this.btnAccept.textContent = 'GAUNTLET';
-                    this.btnDecline.textContent = 'BOSS REPLAY';
-                    // Create third button for cancel
-                    if (!this._grumCancelBtn) {
-                        this._grumCancelBtn = document.createElement('button');
-                        this._grumCancelBtn.className = 'dialogue-btn';
-                        this._grumCancelBtn.textContent = 'LEAVE';
-                        this._grumCancelBtn.style.opacity = '0.6';
-                        this.btnDecline.parentElement.appendChild(this._grumCancelBtn);
-                        this._grumCancelBtn.addEventListener('click', () => {
-                            this._grumCancelBtn.style.display = 'none';
-                            this.endDialogue();
-                        });
-                    }
-                    this._grumCancelBtn.style.display = '';
-                    this.btnAccept.style.display = '';
-                    this.btnDecline.style.display = '';
-                    return; // Skip default button setup
-                }
-                else if (entity.role === 'dancer' || entity.role === 'red_demon_dancer') {
-                    if (entity.hired) {
-                        this.npcTextEl.textContent = `I'm already with you for ${Math.ceil((entity.hireTime - this.worldMinutes) / 60)} more hours.`;
-                    } else if (this.contractCount >= CONFIG.COMPANION.MAX_CONTRACTS) {
-                        this.npcTextEl.textContent = "You already have 5 companions. That's the maximum!";
-                    } else {
-                        this.npcTextEl.textContent = `Hi, I'm ${entity.name}. Want some company? 400 personics for 8 hours.`;
-                    }
-                } 
-                else if (entity.name === "LUVSH4D3") {
-                     if (this.questState.ambushCleared && !this.questState.rewardClaimedLUVSH4D3) {
-                        this.npcTextEl.textContent = "Oh, Freelancer! Thank you ever so much for dealing with those pesky intruders. Please, accept this as a token of Double Nights' gratitude.";
-                     } else if (this.questState.rewardClaimedLUVSH4D3) {
-                        this.npcTextEl.textContent = "We hope you enjoy your stay here at Double Nights. Excellence is our guarantee.";
-                     } else {
-                        this.npcTextEl.textContent = "Welcome to Double Nights. Please be aware, the Penthouse is currently... undergoing maintenance.";
-                     }
-                     if (!(this.questState.ambushCleared && !this.questState.rewardClaimedLUVSH4D3)) { this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave'; }   // only the reward is accepted
-                } 
-                else if (entity.name === "Ms. Jean") {
-                    if (!this.questState.etherealUnlocked) {
-                        this.npcTextEl.textContent = "Yes, I am the face of 'Jean Soda'. But today I'm just paying respects. Tell me, Freelancer, do you see the ghosts here? Have you ever been curious about their stories?";
-                    } else {
-                        this.npcTextEl.textContent = "The Ethereal Plane is close. Do you wish to cross over?";
-                    }
-                }
-                else if (entity.name === "Anavia") {
-                    if (this.missions.completedBounties >= 5) {
-                        if (this.missions.activeMission) {
-                            this.npcTextEl.textContent = "Handle your current operation first, 949. I don't invest in distracted people.";
-                        } else {
-                            this.npcTextEl.textContent = "You've been making noise, 949. Good noise. I know where the real materials are — abandoned caches, forgotten freight. I'll mark it, you clear it. The scrap is yours. Interested?";
-                        }
-                    } else if (!this.questState.etherealUnlocked) {
-                        this.npcTextEl.textContent = "Well, what a surprise visit. I'm curious to know if you work as good as you look. Come back later and I just might have something for you."
-                    } else {
-                        this.npcTextEl.textContent = "Hmm, you're clearly worth your salt, 949. Keep making noise out there. I may have something for you yet."
-                    }
-                }
-                else if ((entity.role || '').includes("robot")) {
-                    this.npcTextEl.textContent = "I work 24/7, 366 on leap years. Have you ever stopped to admire the moonrise? What? Backside?? No! Just the regular ol' moon."
-                    this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave';   // small talk, nothing to accept
-                }
-                else if (entity.role === 'teammate') {
-                    if (entity.recruited) {
-                        // Per-character recruited lines
-                        const recruitedLines = {
-                            'Victoria': "Let's cause some chaos, Freelancer.",
-                            'Yenna':    "Say the word. The SR-86 is ready.",
-                            'Sabrina':  "Still here. Still deadly. You're welcome.",
-                            'Max':      "Point me at something and let me shoot it.",
-                            'Josh':     "Intel is current. Awaiting orders."
-                        };
-                        this.npcTextEl.textContent = recruitedLines[entity.name] || "Ready to roll out.";
-                    } else {
-                        const recruitLines = {
-                            'Victoria': "Save me from these sad motherfuckers. Let's ride. (Recruit Victoria?)",
-                            'Yenna':    "I've been watching the perimeter. Could use a spotter though. (Recruit Yenna?)",
-                            'Sabrina':  "You look like you could use someone with actual talent. (Recruit Sabrina?)",
-                            'Max':      "I'm bored as hell. You need firepower? Fine. Let's blow something up. (Recruit Max?)",
-                            'Josh':     "I have tactical data that may be of use. Shall we proceed? (Recruit Josh?)"
-                        };
-                        this.npcTextEl.textContent = recruitLines[entity.name] || `You need heavy ordinance? Fine. Let's blow something up. (Recruit ${entity.name}?)`;
-                    }
-                } 
-                else if (entity.name === 'Mirabel') {
-                    // The chapter's client: the keycard, then her payment after the ambush
-                    if (this.questState.ambushCleared && !this.questState.rewardClaimedContractor) { 
-                        this.npcTextEl.textContent = "949, you're alive! He escaped?? Starry Heavens above... Well take this payment as promised, and be ready for my next call."; 
-                    } 
-                    else if (this.questState.rewardClaimedContractor) { 
-                        this.npcTextEl.textContent = "For the love of starry heavens! Fuck, he can't be far."; 
-                    } 
-                    else { 
-                        this.npcTextEl.textContent = "Starry heavens, 949! We finally meet in the flesh. We have no time to waste. The Dark Maker is in the Double Nights, get him before he escapes! The fucker. Take this keycard, for the Suite."; 
-                    }
-                }
-                else {
-                    // Anyone without lines of their own: a word in passing, nothing to accept
-                    const PASSING = {
-                        'Chef Koda': "Kitchen's closed to Freelancers. But if Ren likes you, the Amber's on the house.",
-                        'Valentina': "The Enni Cole list is closed tonight, darling. Unless you're somebody.",
-                        spirit: "…the veil is thin here. Can you hear them too?",
-                        vip: "Not now. I'm expecting someone far more important."
-                    };
-                    this.npcTextEl.textContent = PASSING[entity.name] || PASSING[entity.role] || "Evening, Freelancer.";
-                    this.btnAccept.style.display = 'none'; this.btnDecline.textContent = 'Leave';
-                }
+                if (D.noLock) return;
                 
                 // 4. LOCK UI INTERACTIONS (Except Dialogue Box)
                 document.getElementById('game-ui').style.pointerEvents = 'none'; 
@@ -524,8 +402,8 @@
                 this.btnDecline.style.display = '';
                 this.npcNameEl.style.color = '';
                 
-                // 2b. Hide Grum's extra cancel button
-                if (this._grumCancelBtn) this._grumCancelBtn.style.display = 'none';
+                // 2b. Hide the third button (Grum's menu)
+                if (this._extraDialogueBtn) this._extraDialogueBtn.style.display = 'none';
                 
                 // 3. RESET POINTER EVENTS (Re-enable Buttons)
                 document.getElementById('game-ui').style.pointerEvents = 'none'; 
