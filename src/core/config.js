@@ -415,7 +415,35 @@
                 GRIP_RAIN_PENALTY: 0.06,        // Subtracted at full rain intensity
                 GRIP_SLIDE_THRESHOLD: 2.5,      // Lateral speed at which grip starts breaking away
                 GRIP_SLIDE_PENALTY: 0.95,       // Grip multiplier once sliding
-                HANDLING_RAIN_PENALTY: 0.1      // Steering authority lost at full rain intensity
+                HANDLING_RAIN_PENALTY: 0.1,     // Steering authority lost at full rain intensity
+
+                /* --- WEIGHT (T2) ---
+                   The wheel, the pedals and the body all lag a little behind the
+                   driver: the wheel slews to the stick and self-centres when it's
+                   let go, the car's rotation (yawRate) builds and settles, and
+                   braking throws the load forward so the rear lets go. Per-brand
+                   numbers live in VEHICLE_BRANDS[brand].drive. */
+                DEFAULT_FEEL: { steerRate: 0.11, turnIn: 0.24, gripF: 1, gripR: 1, latAcc: 0.5, weight: 1 },
+                CENTER_RATE: 0.2,               // Wheel self-centring per tick (fraction of what's left)…
+                CENTER_RATE_SPEED: 0.018,       // …plus this per px/tick of speed (caster), up to…
+                CENTER_RATE_MAX: 0.42,
+                AI_STEER_RATE: 0.3,             // Traffic's drawn wheels (their steering itself is direct)
+                PEDAL_IN: 0.17,                 // Throttle travel per tick (about 0.2 s to the floor)
+                PEDAL_BRAKE_IN: 0.4,            // The brake bites over a few ticks
+                PEDAL_OUT: 0.3,                 // Lifting off
+                YAW_MAX: 0.13,                  // rad/tick, however wild the slide
+                OVERSTEER_COUPLE: 0.1,          // Rear/front grip imbalance (px/tick²) → yaw-rate offset
+                LOAD_FWD_GRIP: 0.3,             // Front grip gained per unit of forward load…
+                LOAD_REAR_GRIP: 0.55,           // …and rear grip lost
+                LOAD_RATE: 0.14,                // How fast the load shifts (÷ brand weight)
+                HANDBRAKE_REAR_GRIP: 0.3,       // Rear grip while the handbrake's up
+                HANDBRAKE_SWING: 2.5,           // …and the tail swings this much harder
+                HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
+                REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
+                CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
+                STICK_YAW_DAMP: 5,
+                IMPACT_YAW: 0.9,                // Twist from an off-centre knock (onImpact)              // Touch stick unwinds by this × yawRate (no overshoot)
+                COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)
             }
         });
 

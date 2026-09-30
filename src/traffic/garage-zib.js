@@ -8,6 +8,8 @@
                     mass: 2500, lightRange: 100, seats: 6, // SUV = 6 seats
                     brake: 0.42     // px/tick² at full brake (traffic/traffic-vehicle.js applyDrivePhysics)
                 },
+                // Handling character (applyDrivePhysics): heavy and floaty, lazy wheel, long catchable slide
+                drive: { steerRate: 0.085, turnIn: 0.3, gripF: 1.0, gripR: 0.86, latAcc: 0.60, weight: 1.35 },
                 colors: ['#050505', '#1a0b1a', '#0b1a1a', '#1a1a0b', '#2b0000'],
                 glowColor: '#ffffff', headlightColor: '#ffffff', visualStyle: 'blackmark',
                 models: { 
@@ -18,6 +20,7 @@
             Zenxera: {
                 tier: 'mid-luxury',
                 baseStats: { maxSpeed: 9.5, acceleration: 0.12, handling: 0.055, friction: 0.96, mass: 1200, seats: 4, brake: 0.30 },
+                drive: { steerRate: 0.15, turnIn: 0.45, gripF: 1.1, gripR: 0.9, latAcc: 0.55, weight: 0.85 },   // sharp, lively rear
                 // NEW PALETTE: Lavender, Periwinkle, Silver, Bronze
                 colors: ['#E6E6FA', '#CCCCFF', '#C0C0C0', '#cd7f32', '#9370DB'],
                 glowColor: '#00f3ff', headlightColor: '#ccddff', // Cool blue-white
@@ -32,6 +35,7 @@
             Gelfash: {
                 tier: 'economy',
                 baseStats: { maxSpeed: 8.5, acceleration: 0.1, handling: 0.05, friction: 0.96, mass: 1000, seats: 4, brake: 0.26 },
+                drive: { steerRate: 0.11, turnIn: 0.36, gripF: 0.88, gripR: 1.1, latAcc: 0.42, weight: 1.0 },    // soft, understeers
                 colors: ['#fff', '#aaa', '#555', '#a469ff', '#00f3ff'],
                 glowColor: null, headlightColor: '#ffffaa', visualStyle: 'boxy',
                 models: {

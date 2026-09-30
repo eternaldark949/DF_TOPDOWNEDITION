@@ -22,6 +22,7 @@
             dock:      ['utility-dock'],
             action:    ['action-dock'],
             autodrive: ['btn-autodrive'],
+            handbrake: ['btn-handbrake'],
         };
         const HUD_KEYS = Object.keys(HUD_PARTS);
 
@@ -79,6 +80,7 @@
             serialize() { return [...this.revealed]; }
             deserialize(list) {
                 this.revealed = Array.isArray(list) ? new Set(list.filter(k => HUD_PARTS[k])) : new Set(HUD_KEYS);
+                if (this.revealed.has('autodrive')) this.revealed.add('handbrake');   // saves from before the handbrake
                 this.apply();
             }
         }

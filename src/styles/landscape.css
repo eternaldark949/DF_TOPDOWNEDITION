@@ -21,6 +21,7 @@
         body.landscape #btn-heal, body.landscape #emote-smile { bottom: 145px; }
         body.landscape #btn-nv, body.landscape #emote-zany { bottom: 125px; }
         body.landscape #btn-flit, body.landscape #emote-cry { bottom: 65px; }
+        body.landscape #btn-handbrake { bottom: 30px; right: 6px; width: 50px; height: 50px; font-size: 0.5rem; }
         body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
         body.landscape #btn-holster, body.landscape #emote-frown { bottom: 120px; }
 

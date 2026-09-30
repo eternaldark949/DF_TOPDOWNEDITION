@@ -223,6 +223,8 @@
 
                     this.autodriveBtn.style.display = 'none';
                     this.autodriveBtn.classList.remove('engaged');
+                    if (this.handbrakeBtn) { this.handbrakeBtn.style.display = 'none'; this.handbrakeBtn.classList.remove('held'); }
+                    this.handbrakeHeld = false; this.car.handbrake = false;
                     this.holsterBtn.style.display = 'flex';
                     this.fireBtn.style.display = this.weaponHolstered ? 'none' : 'flex';
                     this.emoteBtn.style.display = this.weaponHolstered ? 'flex' : 'none';
@@ -315,6 +317,7 @@
                     if (this.car === this.ownedCar) this.ownedCar.markerTargetOpacity = 0;
 
                     this.autodriveBtn.style.display = 'flex';
+                    if (this.handbrakeBtn) this.handbrakeBtn.style.display = 'flex';
                     this.holsterBtn.style.display = 'none';
                     this.fireBtn.style.display = 'flex';
                     this.emoteBtn.style.display = 'none';

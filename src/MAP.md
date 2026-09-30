@@ -47,12 +47,12 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## audio/
 | File | What's in it |
 |---|---|
-| `audio/audio.js` | `AudioSystem` (sound effects, master bus, music bus for the Music slider), `AmbienceSystem` (rain, wind, city, room tone, fireplace, doors) and `MAP_MUSIC` — each map's soundtrack (the apartment plays the Silver Queen track, fullest in the living room) |
+| `audio/audio.js` | `AudioSystem` (sound effects, master bus, music bus for the Music slider), `AmbienceSystem` (rain, wind, city, room tone, fireplace, doors) and `MAP_MUSIC` — each map's soundtrack; `sfx('crunch')` for car hits and `tyres(level)`, the driven car's squeal (the apartment plays the Silver Queen track, fullest in the living room) |
 
 ## physics/
 | File | What's in it |
 |---|---|
-| `physics/spatial.js` | `PhysicsSystem` (`carContact`: car hits push apart by mass and take the closing speed out of `vx`/`vy`, a little bounce, no spin — both collision passes use it), spatial hash, render/transition grids |
+| `physics/spatial.js` | `PhysicsSystem` (`carContact`: car hits push apart by mass and take the closing speed out of `vx`/`vy`, a little bounce, no spin — both collision passes use it; the driven car gets `onImpact` with a twist by where it was hit), spatial hash, render/transition grids |
 | `physics/game-entity.js` | `GameEntity`, the base class for everything that moves or collides |
 | `physics/collision.js` | `CollisionSystem`: circles, boxes, rotated boxes, pushing, hinged-door hook |
 
@@ -84,10 +84,10 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | File | What's in it |
 |---|---|
 | `traffic/roads.js` | Lanes, segments, intersections (one car at a time, except movements that can't cross: a platoon from one lane, opposite straight-throughs), `RoadNetwork` |
-| `traffic/garage-zib.js` | Vehicle brands (incl. `brake`, px/tick²) and prices, your garage, Zib rides, AI driving solver (`calculateThrottle` brakes to its target, no dead zone) |
-| `traffic/car-art.js` | **How cars look**: `carSprite` (each body painted once per brand, model, paint: contact shadow, tyres and rims, paint shaded round its curve, glass greenhouse, mirrors, lamp housings; LADY BlackMark lacquer, gold pinstripe and rims, pearl hearse cap or panoramic black roof; Zenxera facets and cyan flank line; Gelfash bumpers, roof rails, pickup bed); `drawCarSheen` (the sun on the paint by day, street light sliding along the roof by night); `drawCarLamps`; `drawCarGlow` (tail, brake, head and signal lamps in the dark, after lighting); `drawCarUnderglow` |
-| `traffic/traffic-vehicle.js` | `TrafficVehicle`: every car on the road. AI: senses cars along its route (`_routeProbe` down the lane, through the planned turn, onto the exit lane; `_probeGap` bumper to bumper) and follows by stopping distance; stops on the line by stopping distance; claims a box only when first in its lane with room on the way out; releases it when the tail clears; gap-checked lane changes and overtakes. Physics: `applyDrivePhysics` (gas against motion is the brake) |
-| `traffic/traffic-manager.js` | Spawning (clear of cars that couldn't stop for it) and managing traffic; cars frozen 15 s out of sight are despawned (gridlock relief) |
+| `traffic/garage-zib.js` | Vehicle brands (incl. `brake`, px/tick², and `drive`: each brand's handling character — wheel speed, turn-in, front/rear grip, cornering limit, weight) and prices, your garage, Zib rides, AI driving solver (`calculateThrottle` brakes to its target, no dead zone) |
+| `traffic/car-art.js` | **How cars look**: `carSprite` (each body painted once per brand, model, paint: contact shadow, rear tyres and rims, paint shaded round its curve, glass greenhouse, mirrors, lamp housings; LADY BlackMark lacquer, gold pinstripe and rims, pearl hearse cap or panoramic black roof; Zenxera facets and cyan flank line; Gelfash bumpers, roof rails, pickup bed); `drawCarFrontTyres` (the front wheels, turned by `steer`); `drawCarBody` (the body rides its springs: out of a turn by `bodyRoll`, forward under braking by `load`); `drawCarSheen` (the sun on the paint by day, street light sliding along the roof by night); `drawCarLamps`; `drawCarGlow` (tail, brake, head and signal lamps in the dark, after lighting); `drawCarUnderglow` |
+| `traffic/traffic-vehicle.js` | `TrafficVehicle`: every car on the road. AI: senses cars along its route (`_routeProbe` down the lane, through the planned turn, onto the exit lane; `_probeGap` bumper to bumper) and follows by stopping distance; stops on the line by stopping distance; claims a box only when first in its lane with room on the way out; releases it when the tail clears; gap-checked lane changes and overtakes. Physics: `applyDrivePhysics` — the driven car's weighted model: the wheel (`steer`) lags the stick and self-centres when let go, pedals travel in (`pedal`), rotation builds and settles (`yawRate`), braking shifts the load forward (`load`) so the rear lets go, two axles that hold to their limit then slide, the handbrake (`handbrake`) swings the tail; traffic keeps direct steering and the single-grip model (its wheels only look lagged). `driverInput` (stick/keys → gas and turn; hauling back is the brake), `onImpact` (a knock: twist, crunch, shake) |
+| `traffic/traffic-manager.js` | Spawning (clear of cars that couldn't stop for it) and managing traffic; cars frozen 15 s out of sight are despawned (gridlock relief); car-to-car sparks, debris and `'crunch'` scale with the hit |
 
 ## story/
 | File | What's in it |
@@ -100,7 +100,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `story/npc-dialogue.js` | **`NPC_DIALOGUE`**: what everyone in the world says and what their buttons do — by name, then by role (`@dancer`, `@robot`, `@teammate`…), then `@passing`. `npcDialogueFor(npc)`; the box is `startDialogue` (engine/screens-ui.js) |
 | `story/scene-vision.js` | `SceneVision`: full-screen painted sequences a scene steps through with `beat()` (`vanoga`: the flames, the dark, the golden egg, the burst, the pink orb of the Empereal Lord) |
 | `ui/cinematic-dialogue.js` | `CinematicDialogue`: how scenes look — `say` (typed subtitle, speaker colour, living cameo, dimmed listener), `choose` (keys/taps, timed, weighty ◆), `card`, `marker`, the black layer, `memory` (vignette and grain; the colour grade is in draw.js), hold to skip. Paced by sim ticks |
-| `ui/hud-reveal.js` | **`HudReveal`** (`game.hud`): the HUD appears part by part as the story introduces it (`HUD_PARTS`; `.hud-veiled`). `reveal(key, {title, text})`, `startFresh`, `revealAll`; saved as `hudRevealed` |
+| `ui/hud-reveal.js` | **`HudReveal`** (`game.hud`): the HUD appears part by part as the story introduces it (`HUD_PARTS`; `.hud-veiled`). `reveal(key, {title, text})`, `startFresh`, `revealAll`; saved as `hudRevealed` (saves with auto-drive get the handbrake too) |
 | `ui/coach.js` | **`Coach`** (`game.coach`): points at a piece of UI — spotlight (dim, only the target tappable) the first time, a ring after; a caption card; a ghost thumb for drags. Scenes yield on it. Styles: `styles/coach.css` |
 | `story/scene-runner.js` | **The story's director.** `defineScene(name, meta, function* (s) {...})` and `ScenePlayer` (`game.scenes.play(name) → Promise`): scripts are generators that `yield` on ticks, lines, camera moves, choices. Verbs: `wait`, `fade`, `card`, `marker`, `map`/`cut`, `cam.to/cut/shake`, `actor` (walk, face, `setPose`), `prop` (anything drawn, e.g. the van), `tween`, `sway`, `bump`, `knock`, `say`/`narrate`/`choose`, `vision`, `memory` (a flashback's grade), `hud`/`coach`/`showHud` (the playable beats), `mask`, `flag`. Locks input, blocks saves and toasts, freezes with pause |
 | `story/scenes/cast.js` | `SCENE_CAST`: each speaker's subtitle name, look and side (949 left); colours from `SPEAKER_COLORS` |
@@ -129,7 +129,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `engine/pause-system.js` | `PauseSystem` |
 | `engine/game-engine.js` | `class GameEngine`: constructor, companions, and `engineMixin` (how the files below attach) |
-| `engine/events.js` | Input and UI event wiring; `interact()` — the one action for the pill and the E key |
+| `engine/events.js` | Input and UI event wiring; `interact()` — the one action for the pill and the E key; the handbrake button (held: `handbrakeHeld`); Space is the handbrake while driving |
 | `engine/combat-effects.js` | Screen shake, time slow, death, firing, boosters, player damage |
 | `engine/scope.js` | Scope view: with a sniper up to her eye, the world darkens to a lit lane along her line of fire (clipped at walls), the camera leans down it, the lane steadies; ambience quiets. Setting: Scope View |
 | `engine/noise.js` | Noise: `emitNoise` — gunshots, flits, punches, struck doors, shattered glass carry (`CONFIG.NOISE`), muffled by walls and shut doors; gangers in earshot hear roughly where and go to look; the ripple she sees |
@@ -143,7 +143,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `engine/map-loading.js` | `loadMap`: building each map when you enter it; baked lighting; `removeWall(w)` (collision, render grid and shadows follow) |
 | `engine/world-state.js` | Emissive pass, debug views, transitions, vehicles, visibility, time of day (`dayCycle`: darkness, the colour of the dark, daylight, sun, lamps on), darkness |
 | `engine/update.js` | `update()`: the per-tick simulation |
-| `engine/draw.js` | `draw()`: the frame renderer |
+| `engine/draw.js` | `draw()`: the frame renderer; the camera looks ahead down the road while driving (`driveLeanX/Y`) |
 | `engine/interiors.js` | **`INTERIOR_ART`**: each painted place's `floor` and `glow` (one line per place; draw.js and drawEmissivePass look it up). Apartment, clinic, House of Death, Double Nights lobby and penthouse (the mirror rift), the Sanctum (rose window, sigil runes), and Moon City Nightclub interiors (floors, glows; the club's light show in time with its track), the graveyard's candle flames, the city seen from the veranda |
 | `engine/van-art.js` | Chapter 1's van: `van_interior` (roof off, nose up: the cab, the partition, benches of violet webbing, the road going by beneath, passing neon), `VAN.SEATS`, and `drawVanExterior` for the street (rear doors open) |
 | `engine/keeper-art.js` | The prologue's places: `keepers_hill` (the island above the clouds, the path, flowers, the house with its floating gable, portals and planets) and `keepers_parlor` (checkerboard tiles, the red wingback and burgundy chesterfield, the fire and its embers, the window above it); `keeperEmberPop` |

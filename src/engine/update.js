@@ -1129,20 +1129,8 @@
                         this.car.update(this.player, null, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, getColliders(this.activeMap));
                         if (inputX !== 0 || inputY !== 0) { this.car.disableAutoDrive(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED"); }
                     } else {
-                        let gas = 0; let turn = 0;
-                        if (this.joystick.active) { 
-                            const carDirX = Math.cos(this.car.angle); const carDirY = Math.sin(this.car.angle); 
-                            gas = (inputX * carDirX + inputY * carDirY); 
-                            if (Math.abs(inputX) > 0.1 || Math.abs(inputY) > 0.1) { 
-                                const inputAngle = Math.atan2(inputY, inputX); let angleDiff = inputAngle - this.car.angle; 
-                                angleDiff = normalizeAngle(angleDiff); 
-                                turn = clamp(angleDiff * 2.0, -1, 1);
-                                if (Math.abs(turn) < 0.1) turn = 0;
-                            } 
-                        } else { 
-                            if (inputY < 0) gas = 1; if (inputY > 0) gas = -0.5; if (inputX < 0) turn = -1; if (inputX > 0) turn = 1; 
-                        }
-                        this.car.manualGas = gas; this.car.manualTurn = turn;
+                        this.car.driverInput(inputX, inputY, this.joystick.active);
+                        this.car.handbrake = !!(this.keys[' '] || this.handbrakeHeld);
                         this.car.updateManualDriving(this.activeMap.walls, getColliders(this.activeMap), this.weather, this.decals);
                     }
                     // Player sits at seat 0, not car center

@@ -427,7 +427,7 @@
                 
                 // 3. RESET POINTER EVENTS (Re-enable Buttons)
                 document.getElementById('game-ui').style.pointerEvents = 'none'; 
-                const buttons = document.querySelectorAll('.game-btn, #btn-fire, #btn-heal, #btn-flit, #btn-autodrive, #btn-nv, #btn-holster'); 
+                const buttons = document.querySelectorAll('.game-btn, #btn-fire, #btn-heal, #btn-flit, #btn-autodrive, #btn-handbrake, #btn-nv, #btn-holster'); 
                 buttons.forEach(b => b.style.pointerEvents = 'auto');
                 document.getElementById('input-zone-left').style.pointerEvents = 'auto';
             },

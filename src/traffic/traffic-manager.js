@@ -212,6 +212,7 @@
             
             // Optimized Collision Resolution with DEBRIS
             resolveCollisions(playerCar, player, weather, audioSys, ownedCar, decalSystem) {
+                if (this._crunchCd > 0) this._crunchCd--;
                 // 1. GATHER ALL PHYSICAL VEHICLES (and re-grid them where they are now, after moving)
                 const allVehicles = this.vehicles.filter(v => !v.dead);
                 this.grid.clear();
@@ -241,25 +242,26 @@
                         // 3. NARROW PHASE: SAT RESOLUTION
                         const collided = PhysicsSystem.resolveOBBCollision(v1, v2);
                         
-                        // 4. GAME FEEL (VISUALS/AUDIO)
-                        if (collided) {
-                            if (Math.random() < 0.1) {
-                                const midX = (v1.x + v2.x) / 2;
-                                const midY = (v1.y + v2.y) / 2;
-                                
-                                // Sparks (Temporary)
-                                weather.spawnSparks(midX, midY, 5);
-                                
-                                // Debris (Persistent)
-                                if (decalSystem) {
-                                    decalSystem.addDebris(midX, midY, '#aaddff', 4); // Glass
-                                    decalSystem.addDebris(midX, midY, v1.color, 3);  // Paint
-                                }
-                                
-                                // Sound
-                                if (Math.hypot(player.x - midX, player.y - midY) < 400) {
-                                    audioSys.sfx('explode'); 
-                                }
+                        // 4. GAME FEEL (VISUALS/AUDIO): scaled by how hard they met, not a coin flip
+                        const imp = collided ? (v1._lastImpact || 0) : 0;
+                        if (imp > 1.2) {
+                            const midX = (v1.x + v2.x) / 2;
+                            const midY = (v1.y + v2.y) / 2;
+                            
+                            // Sparks (Temporary)
+                            weather.spawnSparks(midX, midY, Math.min(12, Math.round(2 + imp * 2)));
+                            
+                            // Debris (Persistent)
+                            if (decalSystem && imp > 2) {
+                                decalSystem.addDebris(midX, midY, '#aaddff', 4); // Glass
+                                decalSystem.addDebris(midX, midY, v1.color, 3);  // Paint
+                            }
+                            
+                            // Sound (the driven car's own hits crunch in TrafficVehicle.onImpact)
+                            const pd = Math.hypot(player.x - midX, player.y - midY);
+                            if (v1.controlMode !== 'PLAYER' && v2.controlMode !== 'PLAYER' && pd < 500 && !(this._crunchCd > 0)) {
+                                this._crunchCd = 10;
+                                audioSys.sfx('crunch', { gain: Math.min(1, imp / 5) * (1 - pd / 600) });
                             }
                         }
                     }
