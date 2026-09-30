@@ -1,5 +1,23 @@
         // GameEngine — Apartment and clinic interiors, the city backdrop from the veranda, mission marker.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        /* =====================================================================
+           INTERIOR_ART — each painted place: its floor (under the lighting, draw.js)
+           and its glow (after the darkness, world-state.js drawEmissivePass).
+           A new place adds one line here; the painters live below and in keeper-art.js.
+           ===================================================================== */
+        const INTERIOR_ART = {
+            apt_949:             { floor: (g, c) => { g.drawApartmentBackdrop(c); g.drawApartmentInterior(c); }, glow: (g, c) => g.drawApartmentGlow(c) },
+            medbay_sw:           { floor: (g, c) => g.drawClinicInterior(c) },
+            house_of_death:      { floor: (g, c) => g.drawHouseInterior(c),   glow: (g, c) => g.drawHouseGlow(c) },
+            hotel_lobby:         { floor: (g, c) => g.drawLobbyInterior(c),   glow: (g, c) => g.drawLobbyGlow(c) },
+            hotel_suite:         { floor: (g, c) => g.drawSuiteInterior(c),   glow: (g, c) => g.drawSuiteGlow(c) },
+            church_boss:         { floor: (g, c) => g.drawSanctumInterior(c), glow: (g, c) => { g.drawSanctumGlow(c); g.drawBossGlow(c); } },   // the Sanctum, then the Triumvirate's eyes
+            moon_city_nightclub: { floor: (g, c) => { g.drawClubInterior(c); g.drawClubFloorLights(c); }, glow: (g, c) => g.drawClubGlow(c) },
+            keepers_hill:        { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },   // the prologue's fireside (engine/keeper-art.js)
+            keepers_parlor:      { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },
+            hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) }
+        };
+
         engineMixin({
             /* =====================================================================
                APARTMENT CITY BACKDROP
@@ -125,7 +143,7 @@
              *  crystal, the coffin, holograms, stained glass. Room switches and the veil don't dim them. */
             drawHouseGlow(ctx) {
                 const t = _frameTime / 1000;
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 for (const p of this.props) {
                     if (!p.decorType || !p.decorType.startsWith('hod_')) continue;
@@ -221,7 +239,7 @@
              *  light strips, the elevator doors, the departures board, the motto banner, drifting stars. */
             drawLobbyGlow(ctx) {
                 const t = _frameTime / 1000;
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // The chandelier: three tiers of warm lights and crystal glints
                 glow(500, 850, 170, '255, 200, 130', 0.12);
@@ -332,7 +350,7 @@
              *  braziers and candles, and the sigil's runes — one ring per warden, going dark as each falls. */
             drawSanctumGlow(ctx) {
                 const t = _frameTime / 1000;
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 const W = (this.enemies || []).filter(e => e.persona);
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // The rose window's light pooled on the dais
@@ -439,7 +457,7 @@
             drawSuiteGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const seen = (x, y) => { const q = rs && rs.active ? rs.getRoomAt(x, y) : null; return q ? 0.25 + 0.75 * q.vis : 1; };
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 const flame = (x, y, k = 0) => { const f = 0.75 + 0.25 * Math.sin(t * 11 + x * 0.3 + k); glow(x, y, 14, '255, 190, 120', 0.5 * f * seen(x, y)); ctx.globalAlpha = seen(x, y); ctx.fillStyle = `rgb(255,${200 + 40 * f | 0},130)`; ctx.beginPath(); ctx.arc(x, y - 0.5, 1.5 * f, 0, Math.PI * 2); ctx.fill(); };
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // The fire, still burning low
@@ -608,7 +626,7 @@
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const beatN = clubBeatN(), beat = ((beatN % 1) + 1) % 1, bar = Math.floor(beatN / 8), kick = Math.pow(1 - beat, 3);
                 const seen = (x, y) => { const r = rs && rs.active ? rs.getRoomAt(x, y) : null; return r ? 0.2 + 0.8 * r.vis : 1; };
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 const PAL = CLUB_PAL;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // (The dance floor's tiles and the pole uplights are on the floor: drawClubFloorLights,
@@ -695,7 +713,7 @@
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these
                 // A glow sprite (core/draw-helpers.js) of colour `rgb`, alpha `a`
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 const dot = (x, y, r, rgba) => { ctx.globalAlpha = 1; ctx.fillStyle = rgba; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // Lamp shades and bar pendants (they follow the room switches)
@@ -711,7 +729,7 @@
                 }
                 // Fireplace
                 const ff = 0.8 + 0.2 * Math.sin(t * 6.3) * Math.sin(t * 2.1);
-                glow(580, 432, 60, '255, 140, 60', 0.35 * ff);
+                glow(HEARTHS.apt_949.x, HEARTHS.apt_949.y, 60, '255, 140, 60', 0.35 * ff);
                 // Induction zones (warm red) and two gas burners (blue flame)
                 for (const [x, y] of [[433, 864], [460, 877]]) glow(x, y, 12, '255, 70, 40', 0.55);
                 for (const [x, y, r] of [[312, 859, 7], [329, 873, 5.5]]) {

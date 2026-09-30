@@ -31,14 +31,8 @@
             /** After lighting: building windows/neon/rooftop lights, then the sky layer. */
             drawEmissivePass(ctx) {
                 const dark = this.getAmbientDarkness();
-                if (this.activeMap.id === 'apt_949') this.drawApartmentGlow(ctx);
-                if (this.activeMap.id === 'house_of_death') this.drawHouseGlow(ctx);
-                if (this.activeMap.id === 'hotel_lobby') this.drawLobbyGlow(ctx);
-                if (this.activeMap.id === 'hotel_suite') this.drawSuiteGlow(ctx);
-                if (this.activeMap.id === 'church_boss') { this.drawSanctumGlow(ctx); this.drawBossGlow(ctx); }   // the Sanctum, then the Triumvirate's eyes
-                if (this.activeMap.id === 'moon_city_nightclub') this.drawClubGlow(ctx);
-                if (this.activeMap.id.startsWith('keepers_')) this.drawKeeperGlow(ctx);
-                if (this.activeMap.id === 'hub_949') this.drawGraveyardGlow(ctx);
+                const art = INTERIOR_ART[this.activeMap.id];
+                if (art && art.glow) art.glow(this, ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
                     const z = this.camera.zoom || 1;
                     const hw = this.canvas.width / 2 / z + 200, hh = this.canvas.height / 2 / z + 200;

@@ -496,136 +496,29 @@
                     }
                 });
 
+                // Dialogue buttons: what each NPC's Accept and Decline do lives in story/npc-dialogue.js
                 this.btnAccept.addEventListener('click', () => {
                     // DialogueSequence intercept (bonding, story, briefings, etc.)
                     if (this.dialogueSeq && this.dialogueSeq.isActive()) {
                         this.dialogueSeq.advance();
                         return;
                     }
-                    if (this.activeInteraction instanceof NPC && this.activeInteraction.role === 'teammate') {
-                        this.activeInteraction.recruited = true; 
-                        showMessage(`${this.activeInteraction.name.toUpperCase()} RECRUITED.`);
-                    } 
-                    else if (this.activeInteraction instanceof NPC) {
-                        if (this.activeInteraction.name === "Dr. Yin") {
-                            this.endDialogue();
-                            this.openDrYinMenu();                         // tune Resonance, or augments
-                            return;
-                        }
-                        else if (this.activeInteraction.name === "Torque") {
-                            this.endDialogue();
-                            this.openAutoShop();
-                            return;
-                        }
-                        else if (this.activeInteraction.name === "Prisma") {
-                            this.endDialogue();
-                            this.openCosmeticsShop();
-                            return;
-                        }
-                        else if (this.activeInteraction.name === "Biggs") {
-                            this.endDialogue();
-                            this.bumperMinigame.start(this);
-                            return;
-                        }
-                        else if (this.activeInteraction.name === "Grum North") {
-                            // GAUNTLET button pressed — choose a map
-                            if (this._grumCancelBtn) this._grumCancelBtn.style.display = 'none';
-                            this.endDialogue();
-                            if (this.hordeGauntlet) this.openGauntletMenu();
-                            return;
-                        } 
-                        else if (this.activeInteraction.name === "Barista Ren") {
-                            // Offer delivery mission from the cafe
-                            if (!this.missions.activeMission) {
-                                const delivery = this.missions.generateDelivery(this);
-                                if (delivery) {
-                                    this.missions.acceptMission(delivery, this);
-                                    showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE OUTSIDE.');
-                                } else {
-                                    showMessage('NO DELIVERIES AVAILABLE. TRY AGAIN LATER.');
-                                }
-                            } else {
-                                showMessage('FINISH YOUR CURRENT MISSION FIRST.');
-                            }
-                        }
-                        else if (this.activeInteraction.name === "Bartender") {
-                            // Offer bounty mission from the club
-                            const bounty = this.missions.generateBounty(this);
-                            if (bounty) {
-                                this.missions.acceptMission(bounty, this);
-                            }
-                        }
-                        else if (this.activeInteraction.name === "Anavia") {
-                            // Anavia salvage missions (unlocked after 5 bounties)
-                            if (this.missions.completedBounties >= 5 && !this.missions.activeMission) {
-                                const salvage = this.missions.generateSalvage(this);
-                                if (salvage) {
-                                    this.missions.acceptMission(salvage, this);
-                                    showMessage('SALVAGE SITE MARKED. CLEAR THE HOSTILES, COLLECT THE CRATE.');
-                                } else {
-                                    showMessage('NO SALVAGE OPS AVAILABLE RIGHT NOW.');
-                                }
-                            }
-                        } 
-                        else if (this.activeInteraction.role === 'dancer' || this.activeInteraction.role === 'red_demon_dancer') {
-                            // Hire dancer logic (unified companion system)
-                            if (!this.activeInteraction.hired && this.contractCount < CONFIG.COMPANION.MAX_CONTRACTS) {
-                                if (this.currency >= CONFIG.COMPANION.DEFAULT_HIRE_COST) {
-                                    this.currency -= CONFIG.COMPANION.DEFAULT_HIRE_COST;
-                                    const dancer = this.activeInteraction;
-                                    this.hireCompanion(dancer, this.worldMinutes);
-                                    this.updateUI();
-                                    showMessage(`${dancer.name.toUpperCase()} HIRED FOR ${Math.round(CONFIG.COMPANION.DEFAULT_HIRE_DURATION / 60)} HOURS.`);
-                                } else {
-                                    showMessage(`INSUFFICIENT FUNDS. ${CONFIG.COMPANION.DEFAULT_HIRE_COST} PERSONICS REQUIRED.`);
-                                }
-                            }
-                        } 
-                        else if (this.activeInteraction.name === "LUVSH4D3") {
-                             if (this.questState.ambushCleared && !this.questState.rewardClaimedLUVSH4D3) {
-                                this.currency += 450; this.scrap += 10;
-                                this.questState.rewardClaimedLUVSH4D3 = true; 
-                                this.updateUI(); showMessage("REWARD: 450 PERSONICS, 10 SCRAP");
-                             }
-                        } 
-                        else if (this.activeInteraction.name === "Ms. Jean") {
-                            if (!this.questState.etherealUnlocked) {
-                                this.questState.etherealUnlocked = true;
-                                showMessage("ETHEREAL PLANE UNLOCKED.");
-                                this.weather.spawnGhost(this.player.x + 50, this.player.y, 0);
-                                this.weather.spawnGhost(this.player.x - 50, this.player.y, Math.PI);
-                            } else {
-                                showMessage("CROSSING OVER...");
-                                this.loadMap('ethereal_plane');
-                            }
-                        } 
-                        else if (this.activeInteraction.name === 'Mirabel') {
-                            if (this.questState.ambushCleared && !this.questState.rewardClaimedContractor) {
-                                this.currency += 500; this.questState.rewardClaimedContractor = true;
-                                this.updateUI(); showMessage("PAYMENT RECEIVED: 500 PERSONICS");
-                            } else if (!this.questState.hasKeycard) {
-                                showMessage("MISSION ACCEPTED. RECEIVED: VIP KEYCARD."); this.questState.hasKeycard = true;
-                            }
-                        }
+                    const npc = this.activeInteraction;
+                    if (npc instanceof NPC) {
+                        const D = npcDialogueFor(npc);
+                        if (this._extraDialogueBtn) this._extraDialogueBtn.style.display = 'none';
+                        if (D.endFirst) { this.endDialogue(); if (D.accept) D.accept(this, npc); return; }   // it opens a menu of its own
+                        if (D.accept) D.accept(this, npc);
                     }
                     this.endDialogue();
                 });
 
                 this.btnDecline.addEventListener('click', () => { 
-                    // Grum North — BOSS REPLAY (decline button repurposed)
-                    if (this.activeInteraction instanceof NPC && this.activeInteraction.name === 'Grum North') {
-                        if (this._grumCancelBtn) this._grumCancelBtn.style.display = 'none';
-                        this.endDialogue();
-                        // Teleport to church_boss and spawn the Triumvirate
-                        this.loadMap('church_boss');
-                        this.addPausableTimeout(() => {
-                            if (!this.enemies.some(e => e.persona && !e.dead)) this.bossIntro([new GatlingGunner(360, 330, 0, { persona: 'vesper' }), new GatlingGunner(600, 290, 1, { persona: 'matins' }), new GatlingGunner(840, 330, 2, { persona: 'compline' })], { short: true });
-                            showMessage("THE TRIUMVIRATE AWAKENS... (REPLAY)");
-                            this.triggerShake(20);
-                        }, 500);
-                        return;
-                    }
-                    this.endDialogue(); 
+                    const npc = this.activeInteraction;
+                    const D = npc instanceof NPC ? npcDialogueFor(npc) : null;
+                    if (this._extraDialogueBtn) this._extraDialogueBtn.style.display = 'none';
+                    this.endDialogue();
+                    if (D && D.decline) D.decline(this, npc);
                 });
             },
 

@@ -222,14 +222,16 @@
             'Josh':     { x: 700, y: 260, pose: 'typing' },        // Near terminal — always online
         };
 
+        /** Every speaker's colour, in one place: name tags, the dialogue box, captions, the phone and the
+         *  cinematic subtitles (story/scenes/cast.js reads it). */
         const SPEAKER_COLORS = {
-            '949': '#daa520', 'Victoria': '#ff69b4', 'Yenna': '#5a8a5a',
-            'Sabrina': '#a855f7', 'Max': '#3b82f6', 'Josh': '#94a3b8',
+            '949': '#e8c27a', '747': '#b9a6ff', 'Victoria': '#ff86c0', 'Yenna': '#7fb87f',
+            'Sabrina': '#b98cff', 'Max': '#6aa8ff', 'Josh': '#b4c0d0',
             'Biggs': '#ff8800', 'Dr. Yin': '#00f3ff', 'Prisma': '#b06aff',
             'Barista Ren': '#cd853f', 'Torque': '#e8972a', 'Bartender': '#ff2277',
-            'LUVSH4D3': '#ff44bb', 'Ms. Jean': '#ffd700', 'Larissa': '#8888cc',
+            'LUVSH4D3': '#ff44bb', 'Ms. Jean': '#ffd700', 'Larissa': '#b8b8ee',
             'Anavia': '#66ccaa', 'Contractor': '#cc4444', 'Grum North': '#aa5533',
-            'Mirabel': '#c4566e',
+            'Mirabel': '#e0667e', 'The Keeper': '#ef6a7e', 'The Traveller': '#d8c49a'
         };
 
         // (Portraits are drawn from each character's look: APPEARANCES / lookFor / portraitOf in core/appearances.js.)

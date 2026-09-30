@@ -309,7 +309,7 @@
                                                 onStart: (game) => {
                                                     if (!game.questState.churchBossDefeated) {
                                                         // They kneel at the altar until the intro wakes them (engine/boss-intro.js)
-                                                        game.bossIntro([new GatlingGunner(360, 330, 0, { persona: 'vesper' }), new GatlingGunner(600, 290, 1, { persona: 'matins' }), new GatlingGunner(840, 330, 2, { persona: 'compline' })]);
+                                                        game.spawnTriumvirate();
                                                     }
                                                 }
                                             },

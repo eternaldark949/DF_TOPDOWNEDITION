@@ -16,6 +16,16 @@
         const HUB_NPC_CLEARANCE = 90; // px half-extent kept building-free per anchor
 
         // ============================================================================
+        /* Map-building shorthands (each map's case aliases them as F, S, A, L) */
+        /** Decor that doesn't move (mass 1e7), drawn by its decorType; `color` is only the fallback fill. */
+        const decorPropsIn = color => (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color, decorType }, extra));
+        /** A round soft light (light pass only). */
+        const softLight = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+        /** A soft rounded-rectangle area light. */
+        const areaLight = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+        /** A fixture hidden in the ceiling: its light, no lamp drawn. */
+        const hiddenLamp = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
+
         function createMapEntities(mapId) {
             const e = { props: [], npcs: [], lamps: [] };
             switch (mapId) {
@@ -36,7 +46,7 @@
                 case 'apt_949': {
                     // Cozy-modern suite. Furniture art lives in drawApartmentDecorProp, floor art
                     // (planks, tiles, rugs, deck) in drawApartmentInterior, glows in drawApartmentGlow.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#4a3a30', decorType }, extra));
+                    const F = decorPropsIn('#4a3a30');
                     e.props = [
                         new PropEntity({ x: 400, y: 500, width: 120, height: 70, color: '#4a2832', interactionType: 'couch_two_seater', decorType: 'apt_sofa' }),
                         new PropEntity({ x: 550, y: 420, width: 60, height: 25, color: '#ff6622', interactionType: 'tv_screen', decorType: 'apt_fireplace' }),
@@ -105,7 +115,7 @@
                     ];
                     // Shadowless soft lights: the light the decor casts on the floor around it.
                     // Round ones take a radius; area lights take w, h (optional `round` = corner size, `soft` = gentler edge).
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const S = softLight;
                     e.softLights = [
                         S(991, 232, 100, '#ffd2a8'), S(1115, 232, 100, '#ffd2a8'),                       // nightstand lamps
                         S(307, 439, 90, '#ffd9b0', 0.7), S(700, 700, 90, '#ffd9b0', 0.7), S(109, 463, 90, '#ffd9b0', 0.7),   // floor lamp halos
@@ -127,7 +137,7 @@
                 case 'hotel_lobby': {
                     // Double Nights: furniture in drawLobbyDecorProp (dn_*), floor in drawLobbyInterior,
                     // glows and the motto in drawLobbyGlow, the crowd in world/lobby-life.js.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1216', decorType }, extra));
+                    const F = decorPropsIn('#1a1216');
                     const both = (x, y, w, h, t, extra) => [F(x, y, w, h, t, extra), F(1000 - x - w, y, w, h, t, extra)];   // mirrored east–west
                     e.props = [
                         F(445, 265, 110, 110, 'dn_fountain'),                                       // the rift fountain
@@ -154,7 +164,7 @@
                         L(341, 771, '#ffcc88', 300), L(659, 771, '#ffcc88', 300),
                         L(500, 1146, '#ffd29a', 380, 5, -Math.PI / 2),
                     ];
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const S = softLight;
                     e.softLights = [
                         { x: 500, y: 620, w: 880, h: 1080, round: 220, soft: true, color: '#ffc890', intensity: 0.42 },   // the room's warm fill
                         { x: 500, y: 850, w: 380, h: 300, round: 150, soft: true, color: '#ffd9a0', intensity: 0.3 },   // under the chandelier
@@ -170,7 +180,7 @@
                     // The Double Nights penthouse, the Dark Maker's stay: furniture art in drawSuiteDecorProp
                     // (ps_*) and the lobby's (dn_*); floors in drawSuiteInterior; embers, candles, the pool,
                     // the skyline and the mirror rift he left through in drawSuiteGlow.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1216', decorType }, extra));
+                    const F = decorPropsIn('#1a1216');
                     e.props = [
                         // Living room: the console by the elevator, the conversation pit, the piano, the fireplace,
                         // the bar, dinner for two
@@ -198,10 +208,10 @@
                         new PropEntity({ x: 1086, y: 952, width: 20, height: 14, mass: 1e7, color: '#c8a870', interactionType: 'read_note', noteId: 'dark_maker_letter' })
                     ];
                     // Light fixtures hidden in the ceiling (light only), soft fills per room
-                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
+                    const L = hiddenLamp;
                     e.lamps = [ L(330, 480, '#ffcf8a', 520), L(330, 860, '#ff9a50', 320), L(900, 300, '#ff8a9a', 460), L(1230, 560, '#ffb0a0', 360), L(1235, 175, '#b8a0ff', 200), L(1040, 900, '#9ab0ff', 420) ];
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
-                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    const S = softLight;
+                    const A = areaLight;
                     e.softLights = [
                         A(375, 500, 620, 860, '#ffc890', 0.3), A(910, 425, 360, 730, '#ff9aa8', 0.22), A(1225, 560, 240, 460, '#ff9aa8', 0.2),
                         A(1235, 175, 220, 240, '#c8b8ff', 0.14), A(1035, 905, 620, 180, '#8aa0ff', 0.28),
@@ -216,7 +226,7 @@
                     // custom top-down art — see drawClinicDecorProp. Floor details (tiles,
                     // wayfinding stripe, the scanner platform, curtain tracks) are drawn by
                     // GameEngine.drawClinicInterior.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#ccc', decorType }, extra));
+                    const F = decorPropsIn('#ccc');
                     e.props = [
                         new PropEntity({ x: 200, y: 180, width: 40, height: 60, mass: 1e7, color: '#0f0', interactionType: 'medbay_refill' }),
                         // Recovery bay — beds with their heads against the side walls
@@ -252,7 +262,7 @@
                 case 'moon_city_nightclub': {
                     // Moon City: furniture art in drawClubDecorProp (mc_*), floors in drawClubInterior,
                     // the light show (dance floor, beams, mirror ball, neon) in drawClubGlow.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a0e22', decorType }, extra));
+                    const F = decorPropsIn('#1a0e22');
                     const SUITES = [290, 594, 898];
                     const CLUTCH = ['LIPSTICK, A KEYCARD… AND PERSONICS', "SHE'LL CALL IT A NIGHT'S TIP", 'LEFT WITH THE LAST SONG'];
                     const COAT = ['CHECK YOUR POCKETS, DARLING', 'FOLDED BILLS IN THE LINING'];
@@ -297,15 +307,15 @@
                         new NPC(620, 680, "Male Dancer 3", 'dancer'), new NPC(980, 680, "Male Dancer 4", 'dancer'),
                         new NPC(760, 690, "Male Dancer 5", 'dancer'), new NPC(840, 690, "Male Dancer 6", 'dancer')
                     ];
-                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });   // hidden in the ceiling: light only
+                    const L = hiddenLamp;   // hidden in the ceiling: light only
                     e.lamps = [
                         L(800, 500, '#b48cff', 560), L(430, 500, '#ffb870', 300), L(800, 1090, '#ffc890', 360),
                         L(187, 300, '#ffc8e0', 360), L(187, 880, '#cfdcff', 380),
                         L(1413, 150, '#ff5a7a', 300), L(1285, 740, '#c080ff', 300),
                         ...SUITES.map(y0 => L(1465, y0 + 145, '#ff4a70', 260)),
                     ];
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
-                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    const S = softLight;
+                    const A = areaLight;
                     e.softLights = [
                         A(800, 500, 820, 940, '#9a6cff', 0.22), A(800, 500, 460, 420, '#d890ff', 0.16),     // the floor's violet, brighter over the dancing
                         A(800, 70, 340, 100, '#e0b0ff', 0.35), A(430, 500, 110, 560, '#ffb070', 0.22),     // the stage, the bar
@@ -319,14 +329,14 @@
 
                 case 'keepers_hill': {
                     // Night on the hill: moonlight over the field, the house's windows warm on the lawn
-                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const A = areaLight;
+                    const S = softLight;
                     e.softLights = [ A(900, 1500, 1100, 2500, '#b0c0e8', 0.16), A(900, 600, 760, 520, '#ffb070', 0.12), S(900, 740, 150, '#ffc080', 0.7, 3), S(790, 640, 80, '#ffb070', 0.5), S(1010, 640, 80, '#ffb070', 0.5) ];
                     break;
                 }
                 case 'keepers_parlor': {
                     // Firelit: the hearth, the candles, the cool window light
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const S = softLight;
                     e.softLights = [ S(450, 140, 420, '#ff8a40', 0.45, 6), S(500, 290, 260, '#ff9a60', 0.22, 4), S(374, 44, 50, '#ffc080', 0.35, 4), S(526, 44, 50, '#ffc080', 0.35, 4),
                                      S(96, 620, 80, '#ffc080', 0.35, 4), S(564, 204, 56, '#ffc080', 0.35, 4), S(850, 300, 150, '#8898ff', 0.2) ];
                     break;
@@ -334,7 +344,7 @@
                 case 'church_boss': {
                     // The Sanctum: the altar and ruined organ on the dais, two colonnades of pillars (cover),
                     // broken pews, a fallen pillar, candle stands and braziers. Art: drawSanctumDecorProp.
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#1a1418', decorType }, extra));
+                    const F = decorPropsIn('#1a1418');
                     const COLS = [420, 560, 700, 840, 980, 1120];
                     e.props = [
                         F(530, 140, 140, 56, 'sc_altar'), F(400, 58, 100, 40, 'sc_organ'), F(700, 58, 100, 40, 'sc_organ'),
@@ -347,10 +357,10 @@
                     ];
                     // No red wash any more: a storm-violet ambient; crimson from the rose window and braziers,
                     // warm from the candles (hidden fixtures, light only)
-                    const L = (x, y, color, lightRadius) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius }), { visible: false });
+                    const L = hiddenLamp;
                     e.lamps = [ L(600, 150, '#c060ff', 460), L(198, 1218, '#ff8a40', 320), L(1002, 1218, '#ff8a40', 320), L(600, 720, '#9a70ff', 520) ];
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
-                    const A = (x, y, w, h, color, intensity) => ({ x, y, w, h, round: Math.min(w, h) / 4, soft: true, color, intensity });
+                    const S = softLight;
+                    const A = areaLight;
                     e.softLights = [
                         A(600, 700, 1060, 1280, '#8a78c8', 0.22), A(600, 170, 700, 280, '#ff5a8a', 0.12),
                         S(168, 248, 110, '#ff8a40', 0.8, 5), S(1032, 248, 110, '#ff8a40', 0.8, 5),
@@ -534,7 +544,7 @@
                     // The gauntlet's house: furniture art in drawHouseDecorProp (hod_*) and the
                     // apartment's pieces (apt_*); floor art in drawHouseInterior, glows in drawHouseGlow.
                     // Big pieces are cover, and enemies path round them (navProps on the map).
-                    const F = (x, y, w, h, decorType, extra = {}) => new PropEntity(Object.assign({ x, y, width: w, height: h, mass: 1e7, color: '#2a1a22', decorType }, extra));
+                    const F = decorPropsIn('#2a1a22');
                     const candelabra = (x, y) => F(x, y, 22, 22, 'hod_candelabra');
                     const pews = (x0) => [170, 240, 310].map(y => F(x0, y, 170, 22, 'hod_pew'));
                     const chairs = [];
@@ -603,7 +613,7 @@
                         L(1400, 1020, '#ffd9a0', 300, 5, { angle: Math.PI / 2 }), L(1710, 1300, '#ffd9a0', 300, 5, { angle: Math.PI }),
                         L(1435, 1315, '#ff3355', 340), candle(1318, 1214, 180), candle(1558, 1458, 180),
                     ];
-                    const S = (x, y, radius, color, intensity = 0.8, flicker = 0) => ({ x, y, radius, color, intensity, flicker });
+                    const S = softLight;
                     e.softLights = [
                         S(101, 121, 70, '#ffb46a', 0.8, 10), S(481, 91, 70, '#ffb46a', 0.8, 10), S(811, 107, 70, '#ffb46a', 0.8, 10), S(989, 107, 70, '#ffb46a', 0.8, 10),
                         S(51, 471, 70, '#ffb46a', 0.8, 10), S(51, 971, 70, '#ffb46a', 0.8, 10), S(511, 971, 70, '#ffb46a', 0.8, 10),

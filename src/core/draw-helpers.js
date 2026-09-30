@@ -216,6 +216,12 @@
         function drawGlow(ctx, x, y, r, color, core) {
             ctx.drawImage(glowSprite(color, core), x - r, y - r, r * 2, r * 2);
         }
+        /** A glow at alpha `a` (skipped when it'd be invisible, capped at 1): the interiors' light pass helper. Sets globalAlpha. */
+        function glowA(ctx, x, y, r, rgb, a) {
+            if (a <= 0.003) return;
+            ctx.globalAlpha = Math.min(1, a);
+            drawGlow(ctx, x, y, r, rgb, 0);
+        }
 
         /**
          * A faulty street lamp, now and then: about one outdoor lamp in ten stutters for

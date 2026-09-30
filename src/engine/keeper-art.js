@@ -10,7 +10,7 @@
             ISLAND: [[900, 250], [1120, 280], [1290, 380], [1360, 560], [1330, 780], [1260, 980], [1240, 1250], [1230, 1550], [1200, 1850], [1150, 2150], [1080, 2380], [960, 2500],
                      [840, 2500], [720, 2390], [650, 2160], [600, 1860], [570, 1560], [560, 1260], [540, 980], [470, 780], [440, 560], [510, 380], [680, 280]],
             PATH: [[900, 2470], [860, 2280], [960, 2080], [850, 1880], [955, 1680], [865, 1470], [935, 1260], [875, 1060], [905, 880], [900, 740]],
-            PARLOR: { w: 900, h: 700, fire: { x: 450, y: 62 }, keeper: { x: 450, y: 262 }, traveler: { x: 648, y: 306 } }
+            PARLOR: { w: 900, h: 700, fire: HEARTHS.keepers_parlor, keeper: { x: 450, y: 262 }, traveler: { x: 648, y: 306 } }
         };
 
         engineMixin({
@@ -278,7 +278,7 @@
             /** After the darkness: the glowing things. */
             drawKeeperGlow(ctx) {
                 const id = this.activeMap.id, t = _gameTimeSec;
-                const glow = (x, y, r, rgb, a) => { if (a <= 0.003) return; ctx.globalAlpha = Math.min(1, a); drawGlow(ctx, x, y, r, rgb, 0); };
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 if (id === 'keepers_hill') {
                     const V = this._keeperView(200);

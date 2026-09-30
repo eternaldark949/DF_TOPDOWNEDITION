@@ -236,21 +236,9 @@
                     }); 
                 }
                 
-                // --- APARTMENT CITY BACKDROP ---
-                // Draw AFTER zones so it overwrites the veranda zone color with a living cityscape
-                if (this.activeMap.id === 'apt_949') {
-                    this.drawApartmentBackdrop(this.ctx);
-                    this.drawApartmentInterior(this.ctx);
-                }
-                if (this.activeMap.id === 'medbay_sw') {
-                    this.drawClinicInterior(this.ctx);
-                }
-                if (this.activeMap.id === 'house_of_death') this.drawHouseInterior(this.ctx);
-                if (this.activeMap.id === 'hotel_lobby') this.drawLobbyInterior(this.ctx);
-                if (this.activeMap.id === 'hotel_suite') this.drawSuiteInterior(this.ctx);
-                if (this.activeMap.id === 'church_boss') this.drawSanctumInterior(this.ctx);
-                if (this.activeMap.id.startsWith('keepers_')) this.drawKeeperInterior(this.ctx);   // the prologue's fireside (engine/keeper-art.js)
-                if (this.activeMap.id === 'moon_city_nightclub') { this.drawClubInterior(this.ctx); this.drawClubFloorLights(this.ctx); }
+                // Painted interiors (after the zones, so e.g. the apartment's city backdrop covers its veranda zone)
+                const art = INTERIOR_ART[this.activeMap.id];
+                if (art && art.floor) art.floor(this, this.ctx);
                 
                 // Indoor V2: Room floors, windows, and doors
                 if (this.roomSystem.active) {

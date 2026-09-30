@@ -6,7 +6,15 @@
         // back to 949, and after a breath of grace they wake one by one — and their first burst still
         // telegraphs. Replays (or once seen) get the short version: no pan, eyes and rising in place.
         // A tap or a key skips to the pan back. Runs on frames (updateBossIntro, from update.js).
+        /** The Sanctum's three wardens: where they kneel on the dais (x, y, id, persona). */
+        const TRIUMVIRATE = [[360, 330, 0, 'vesper'], [600, 290, 1, 'matins'], [840, 330, 2, 'compline']];
+
         engineMixin({
+            /** Spawn the Triumvirate dormant and play their awakening (the story's first visit, or Grum's replay). */
+            spawnTriumvirate(opts = {}) {
+                this.bossIntro(TRIUMVIRATE.map(([x, y, id, persona]) => new GatlingGunner(x, y, id, { persona })), opts);
+            },
+
             bossIntro(bosses, opts = {}) {
                 const qs = this.questState || {};
                 let short = !!(opts.short || qs.sanctumIntroSeen || qs.churchBossDefeated);
