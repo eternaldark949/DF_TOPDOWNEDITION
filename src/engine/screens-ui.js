@@ -350,6 +350,26 @@
             },
 
             /**
+             * The talk box's mood follows the speaker: each new line tints the box
+             * halo (--who) with the name's colour and fades the words in.
+             */
+            _installDialogueStyle() {
+                if (!this.npcTextEl || this._dialogueStyleInstalled) return;
+                this._dialogueStyleInstalled = true;
+                let lastName = null;
+                const restyle = () => {
+                    if (!this.dialogueBox || this.dialogueBox.style.display === 'none') { lastName = null; return; }
+                    const c = this.npcNameEl && this.npcNameEl.style.color;
+                    if (c) this.dialogueBox.style.setProperty('--who', c);
+                    const els = [this.npcTextEl];
+                    const name = this.npcNameEl && this.npcNameEl.textContent;
+                    if (name !== lastName) { els.push(this.npcNameEl); lastName = name; }
+                    for (const el of els) { el.classList.remove('line-in'); void el.offsetWidth; el.classList.add('line-in'); }
+                };
+                new MutationObserver(restyle).observe(this.npcTextEl, { childList: true, characterData: true, subtree: true });
+            },
+
+            /**
              * Install a MutationObserver on npcTextEl so EVERY dialogue line ever
              * shown (DialogueSequence, single-line shop/quest greetings, recruit
              * prompts, story handler lines, anything future) is captured to the

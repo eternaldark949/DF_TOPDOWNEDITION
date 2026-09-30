@@ -185,6 +185,7 @@
                 // shop greetings, recruit prompts, story handler). Pulls the speaker from
                 // npcNameEl, which is set by every call site before the text write.
                 this._installDialogueCapture();
+                this._installDialogueStyle();
                 this.cosmetics = new CosmeticsSystem();
                 this.foundNotes = [];  // IDs of discovered notes (persists in save)
                 this.bokeh = new BokehSystem(18);
