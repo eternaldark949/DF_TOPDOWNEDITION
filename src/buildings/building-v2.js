@@ -423,8 +423,15 @@
                     ctx.shadowColor = '#ffffff';
                     ctx.fillStyle = `rgba(255, 255, 255, ${0.6 * alpha})`;
                     ctx.fillText(signText, textX, textY);
+                } else if (this._signSprites(signText, signFontSize, lampColor, rgb)) {
+                    // Full quality from the baked layers: the dark backdrop as is, the neon bloom with the flicker
+                    const S = this._signSpr, a0 = ctx.globalAlpha;
+                    ctx.drawImage(S.shadow, textX - S.w / 2, textY - S.h / 2 + 3, S.w, S.h);
+                    ctx.globalAlpha = a0 * alpha; ctx.drawImage(S.glow, textX - S.w / 2, textY - S.h / 2, S.w, S.h);
+                    ctx.globalAlpha = a0;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${0.6 * alpha})`; ctx.fillText(signText, textX, textY);   // the white-hot core, live
                 } else {
-                // Full quality: 5 glow layers
+                // Full quality: 5 glow layers (live, until the sign's font has loaded and its layers are baked)
                 
                 // Layer 0: Dark drop shadow (contrast backdrop)
                 const shadowOffY = 3;
@@ -466,6 +473,40 @@
             
             
             
+            /**
+             * The sign's blurred layers, baked once (the neon's shadowBlur passes were the costliest
+             * thing a building drew each frame): `shadow`, the dark backdrop, and `glow`, the wide,
+             * medium and core blooms at full strength. Stamped with the flicker as alpha. Only baked
+             * once the script font is ready, so a fallback face is never frozen in. Returns ready.
+             */
+            _signSprites(text, size, lampColor, rgb) {
+                const key = text + '|' + size + '|' + lampColor;
+                if (this._signSpr && this._signSpr.key === key) return true;
+                if (typeof document === 'undefined' || !document.fonts || !document.fonts.check(`${size}px "Great Vibes"`)) return false;
+                const R = 2, pad = 60, m = document.createElement('canvas').getContext('2d');
+                m.font = `${size}px "Great Vibes", cursive`;
+                const w = Math.ceil(m.measureText(text).width) + pad * 2, h = Math.ceil(size * 1.6) + pad * 2;
+                const layer = (paint) => {
+                    const cv = document.createElement('canvas'); cv.width = w * R; cv.height = h * R;
+                    const c = cv.getContext('2d'); c.scale(R, R);
+                    c.font = `${size}px "Great Vibes", cursive`; c.textAlign = 'center'; c.textBaseline = 'middle';
+                    paint(c, w / 2, h / 2); return cv;
+                };
+                const shadow = layer((c, x, y) => {
+                    c.shadowColor = '#000000'; c.shadowBlur = 18 * R; c.fillStyle = 'rgba(0, 0, 0, 0.85)'; c.fillText(text, x, y);
+                    c.shadowBlur = 8 * R; c.fillStyle = 'rgba(0, 0, 0, 0.6)'; c.fillText(text, x, y);
+                });
+                const glow = layer((c, x, y) => {
+                    c.shadowColor = lampColor;
+                    c.shadowBlur = 40 * R; c.fillStyle = `rgba(${rgb}, 0.3)`; c.fillText(text, x, y);
+                    c.shadowBlur = 20 * R; c.fillStyle = `rgba(${rgb}, 0.7)`; c.fillText(text, x, y);
+                    c.shadowBlur = 8 * R; c.fillStyle = `rgba(${rgb}, 1)`; c.fillText(text, x, y);
+                    c.shadowBlur = 4 * R; c.shadowColor = '#ffffff'; c.fillStyle = 'rgba(0, 0, 0, 0)'; c.fillText(text, x, y);
+                });
+                this._signSpr = { key, shadow, glow, w, h };
+                return true;
+            }
+
             /**
              * Helper: Convert hex color to RGB string.
              */
@@ -560,6 +601,7 @@
                 } else if (this.style === 'silver_queen') {
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
+                    this.sills = { lip: 'rgba(236, 232, 250, 0.75)', shade: 'rgba(20, 10, 48, 0.55)' };   // window sills (_drawFaceWindows)
                     this.emissiveReach = 700;                              // searchlight beams reach well past the footprint
                 }
             },
@@ -661,17 +703,17 @@
                 // --- Roofs (drawn in world coords under the scale-about-camera transform) ---
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const sq = this.style === 'silver_queen';
-                this.sections.forEach(section => {
+                this.sections.forEach((section, si) => {
                     const sx = this.x + section.x, sy = this.y + section.y;
-                    if (sq) {                                                                  // lavender slab with a soft sheen
-                        const g = ctx.createLinearGradient(sx, sy, sx + section.w, sy + section.h);
-                        g.addColorStop(0, SQ_THEME.roof); g.addColorStop(1, SQ_THEME.roofLo); ctx.fillStyle = g;
+                    if (sq) {                                                                  // lavender slab with a soft sheen (world-space gradients, made once)
+                        ctx.fillStyle = LandmarkKit.grad(this, 'roof' + si, () => { const g = ctx.createLinearGradient(sx, sy, sx + section.w, sy + section.h); g.addColorStop(0, SQ_THEME.roof); g.addColorStop(1, SQ_THEME.roofLo); return g; });
                     } else ctx.fillStyle = this.colors.roof;
                     ctx.fillRect(sx, sy, section.w, section.h);
                     if (sq) {                                                                  // a pearl sheen pooled toward the north-west corner
-                        const pg = ctx.createRadialGradient(sx + section.w * 0.25, sy + section.h * 0.2, 10, sx + section.w * 0.25, sy + section.h * 0.2, Math.max(section.w, section.h) * 0.8);
-                        pg.addColorStop(0, 'rgba(214,200,255,0.18)'); pg.addColorStop(1, 'rgba(214,200,255,0)');
-                        ctx.fillStyle = pg; ctx.fillRect(sx, sy, section.w, section.h);
+                        ctx.fillStyle = LandmarkKit.grad(this, 'sheen' + si, () => {
+                            const pg = ctx.createRadialGradient(sx + section.w * 0.25, sy + section.h * 0.2, 10, sx + section.w * 0.25, sy + section.h * 0.2, Math.max(section.w, section.h) * 0.8);
+                            pg.addColorStop(0, 'rgba(214,200,255,0.18)'); pg.addColorStop(1, 'rgba(214,200,255,0)'); return pg; });
+                        ctx.fillRect(sx, sy, section.w, section.h);
                     }
                     ctx.strokeStyle = sq ? 'rgba(217,191,134,0.08)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;          // tar seams
                     for (let gx = 36; gx < section.w; gx += 36) { ctx.beginPath(); ctx.moveTo(sx + gx, sy); ctx.lineTo(sx + gx, sy + section.h); ctx.stroke(); }
@@ -734,18 +776,23 @@
             },
 
             /** Window grid on a face. emissive=false: dark glass; true: only the lit windows, glowing. */
+            /**
+             * The windows of one face, batched: one path per colour (glass; the sky it holds by
+             * day; lit / lavender / TV-blue by night), so a face costs a handful of fills however
+             * many windows it has. Only the few in the sun's sheen band fill on their own. With
+             * this.sills (the landmarks), each window has a sill: a pale lip and its shadow, and
+             * at night the lips catch the building's lamp colour (LandmarkKit.rim).
+             */
             _drawFaceWindows(ctx, f, P, emissive) {
                 const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS);
-                const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
+                const ax = f.x1, ay = f.y1, bx = f.x2, by = f.y2;
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
                 const depth = Math.hypot(dx - ax, dy - ay);
                 if (depth < floors * 1.6) return;                   // too edge-on to read
                 const len = Math.hypot(bx - ax, by - ay);
                 const cols = Math.max(1, Math.floor(len / (this.style === 'silver_queen' ? 30 : 26)));
-                const at = (u, v) => {                                // u along edge, v up the wall
-                    const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u;
-                    return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v];
-                };
+                // at(u, v): u along the edge, v up the wall — inlined into the loops below
+                const ex = bx - ax, ey = by - ay, tx = cx - dx, ty = cy - dy, ux = dx - ax, uy = dy - ay;
                 const seed = this._seed || Math.round(this.x + this.y);
                 const t = Math.floor(_gameTimeSec / 7);             // lights change every few seconds
                 const lit = this.colors.windowLit || '#ffe2a8';
@@ -760,6 +807,12 @@
                     uc = 0.5 + 0.55 * (ny ? sun.dx : sun.dy);
                 }
                 const sq = this.style === 'silver_queen', glassRGB = sq ? '176, 158, 236' : '168, 172, 226';
+                const sills = this.sills && _zoomLOD < 2 && depth > floors * 2.4;
+                const rim = sills && emissive ? LandmarkKit.rim(this, this._sqDark != null ? this._sqDark : 0.6) : null;
+                const nxo = f.side === 'E' ? 1 : f.side === 'W' ? -1 : 0, nyo = f.side === 'S' ? 1 : f.side === 'N' ? -1 : 0;
+                const glass = new Path2D(), litP = new Path2D(), lavP = new Path2D(), tvA = new Path2D(), tvB = new Path2D();
+                const lipP = sills ? new Path2D() : null, shP = sills && !emissive ? new Path2D() : null, sheen = [];
+                const sOut = 1.6, sLo = 0.2 / floors, sSh = 0.5 / floors;
                 for (let fl = 0; fl < floors; fl++) {
                     const v0 = (fl + 0.28) / floors, v1 = (fl + 0.78) / floors;
                     for (let c = 0; c < cols; c++) {
@@ -767,23 +820,52 @@
                         const u0 = (c + 0.25) / cols, u1 = (c + 0.75) / cols;
                         const h = _bldHash(seed + f.section * 31 + (f.side.charCodeAt(0)), fl * 57 + c * 13 + (_bldHash(seed, fl + c) > 0.93 ? t : 0));
                         const isLit = h < (this.style ? 0.5 : 0.3);
-                        if (emissive && !isLit) continue;
-                        const q = [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)];
-                        ctx.beginPath(); ctx.moveTo(q[0][0], q[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(q[i][0], q[i][1]); ctx.closePath();
-                        if (emissive) {
-                            const tv = h < 0.06;                              // someone's watching TV
-                            const lav = this.facadeFeature === 'silver_queen' && h > 0.36;   // some rooms lit lavender
-                            ctx.fillStyle = tv ? (Math.sin(_gameTimeSec * 9 + c) > 0 ? '#9ec8ff' : '#6f9fe8') : lav ? '#d9c2ff' : lit;
-                            ctx.fill();
-                        } else {
-                            ctx.fillStyle = sq ? 'rgba(23,0,92,0.9)' : 'rgba(20,28,48,0.9)'; ctx.fill();
-                            if (skyA > 0) {
-                                const du = Math.abs((u0 + u1) / 2 - uc), sh = sheenA * Math.max(0, 1 - du / 0.16) * (0.7 + 0.3 * (fl % 2));
-                                ctx.fillStyle = `rgba(${glassRGB}, ${skyA})`; ctx.fill();
-                                if (sh > 0.01) { ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; ctx.fill(); }
+                        if (sills && (!emissive || rim.a > 0.01)) {                 // the sill: a lip just under the glass, a shadow under it
+                            const w0 = u0 - 0.06 / cols, w1 = u1 + 0.06 / cols;
+                            for (const [P2, vv] of emissive ? [[lipP, v0 - sLo]] : [[lipP, v0 - sLo], [shP, v0 - sSh]]) {
+                                const x0 = ax + ex * w0 + (ux + tx * w0 - ex * w0) * vv + nxo * sOut, y0 = ay + ey * w0 + (uy + ty * w0 - ey * w0) * vv + nyo * sOut;
+                                const x1 = ax + ex * w1 + (ux + tx * w1 - ex * w1) * vv + nxo * sOut, y1 = ay + ey * w1 + (uy + ty * w1 - ey * w1) * vv + nyo * sOut;
+                                P2.moveTo(x0, y0); P2.lineTo(x1, y1);
                             }
                         }
+                        if (emissive && !isLit) continue;
+                        const path = !emissive ? glass : h < 0.06 ? (Math.sin(_gameTimeSec * 9 + c) > 0 ? tvA : tvB)
+                                   : (this.facadeFeature === 'silver_queen' && h > 0.36) ? lavP : litP;   // someone's watching TV; some rooms lit lavender
+                        // the four corners: at(u0,v0), at(u1,v0), at(u1,v1), at(u0,v1)
+                        const q = (u, v) => path.lineTo(ax + ex * u + (ux + tx * u - ex * u) * v, ay + ey * u + (uy + ty * u - ey * u) * v);
+                        path.moveTo(ax + ex * u0 + (ux + tx * u0 - ex * u0) * v0, ay + ey * u0 + (uy + ty * u0 - ey * u0) * v0);
+                        q(u1, v0); q(u1, v1); q(u0, v1); path.closePath();
+                        if (!emissive && skyA > 0) {
+                            const du = Math.abs((u0 + u1) / 2 - uc), sh = sheenA * Math.max(0, 1 - du / 0.16) * (0.7 + 0.3 * (fl % 2));
+                            if (sh > 0.01) sheen.push([u0, u1, v0, v1, sh]);
+                        }
                     }
+                }
+                if (emissive) {
+                    ctx.fillStyle = lit; ctx.fill(litP);
+                    ctx.fillStyle = '#d9c2ff'; ctx.fill(lavP);
+                    ctx.fillStyle = '#9ec8ff'; ctx.fill(tvA);
+                    ctx.fillStyle = '#6f9fe8'; ctx.fill(tvB);
+                    if (rim && rim.a > 0.01) {
+                        const op = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
+                        ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${rim.rgb}, ${0.5 * rim.a})`; ctx.stroke(lipP);
+                        ctx.globalCompositeOperation = op;
+                    }
+                    return;
+                }
+                ctx.fillStyle = sq ? 'rgba(23,0,92,0.9)' : 'rgba(20,28,48,0.9)'; ctx.fill(glass);
+                if (skyA > 0) {
+                    ctx.fillStyle = `rgba(${glassRGB}, ${skyA})`; ctx.fill(glass);
+                    for (const [u0, u1, v0, v1, sh] of sheen) {
+                        const pt = (u, v) => [ax + ex * u + (ux + tx * u - ex * u) * v, ay + ey * u + (uy + ty * u - ey * u) * v];
+                        const a = pt(u0, v0), b = pt(u1, v0), c2 = pt(u1, v1), d = pt(u0, v1);
+                        ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c2[0], c2[1]); ctx.lineTo(d[0], d[1]); ctx.closePath();
+                        ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; ctx.fill();
+                    }
+                }
+                if (sills) {
+                    ctx.lineWidth = 1.2; ctx.strokeStyle = this.sills.shade; ctx.stroke(shP);
+                    ctx.lineWidth = 1; ctx.strokeStyle = this.sills.lip; ctx.stroke(lipP);
                 }
             },
 

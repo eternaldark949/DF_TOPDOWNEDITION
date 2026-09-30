@@ -25,8 +25,12 @@
            the block's lamp colours are exactly what they were.
            ===================================================================== */
         const LandmarkKit = {
-            /** The lean scale at height z — the same camera as every building's walls. */
-            k(z) { const C = leanCamHeight(); return C / (C - Math.min(z, C * 0.86)); },
+            /** The lean scale at height z — the same camera as every building's walls (or the lean the building drawing now uses: using()). */
+            k(z) { if (LandmarkKit._lean) return LandmarkKit._lean(z); const C = leanCamHeight(); return C / (C - Math.min(z, C * 0.86)); },
+
+            /** Draw with a building's own lean (e.g. the Silver Queen's, linear up to its roof so details sit on its window rows). */
+            using(kf, fn) { const prev = LandmarkKit._lean; LandmarkKit._lean = kf; try { return fn(); } finally { LandmarkKit._lean = prev; } },
+            _lean: null,
 
             /** Put ctx into the plane at scale k: world coordinates land where the lean draws them. */
             plane(ctx, k) { const c = game.camera; ctx.translate(c.x, c.y); ctx.scale(k, k); ctx.translate(-c.x, -c.y); },
