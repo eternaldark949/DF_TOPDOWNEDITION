@@ -37,9 +37,17 @@
                     camX = this.camera.x;
                     camY = this.camera.y;
                 } else {
+                    /* Behind the wheel the camera looks a little down the road, easing after the
+                       car's velocity (per frame, so it glides between ticks); on foot it drifts home. */
+                    const dtCam = Math.min(100, Math.max(0, _frameTime - (this._camLeanT || _frameTime)));
+                    this._camLeanT = _frameTime;
+                    const drv = this.isDriving && this.car, LA = CONFIG.VEHICLE_DRIVE.CAM_LOOK_AHEAD;
+                    const kCam = 1 - Math.exp(-dtCam / LA.TAU_MS);
+                    this.driveLeanX = (this.driveLeanX || 0) + ((drv ? (this.car.vx || 0) * LA.PER_SPEED : 0) - (this.driveLeanX || 0)) * kCam;
+                    this.driveLeanY = (this.driveLeanY || 0) + ((drv ? (this.car.vy || 0) * LA.PER_SPEED : 0) - (this.driveLeanY || 0)) * kCam;
                     // Scoped with a sniper, the camera leans down her line (engine/scope.js)
-                    camX = this.player.x + (this.scopeLeanX || 0);
-                    camY = this.player.y + (this.scopeLeanY || 0);
+                    camX = this.player.x + (this.scopeLeanX || 0) + this.driveLeanX;
+                    camY = this.player.y + (this.scopeLeanY || 0) + this.driveLeanY;
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }

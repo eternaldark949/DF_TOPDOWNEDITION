@@ -83,8 +83,8 @@
                     
                     if (e.key === ' ') {
                         e.preventDefault();
-                        // MODIFIED: Removed !this.isDriving check to allow shooting from car
-                        if (this.shootCooldown <= 0 && this.player.visible && !this.paused) {
+                        // Behind the wheel Space is the handbrake (update.js); the mouse still fires
+                        if (!this.isDriving && this.shootCooldown <= 0 && this.player.visible && !this.paused) {
                             this.fireWeapon();
                         }
                     }
@@ -339,6 +339,15 @@
                 this.flitBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.triggerFlit(); });
                 this.autodriveBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.toggleAutoDrive(); });
                 this.autodriveBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.toggleAutoDrive(); });
+                // Handbrake: held for as long as a finger (or the mouse) is on it
+                const hbBtn = document.getElementById('btn-handbrake');
+                if (hbBtn) {
+                    const hbSet = (on) => { this.handbrakeHeld = on; hbBtn.classList.toggle('held', on); };
+                    hbBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); try { hbBtn.setPointerCapture(e.pointerId); } catch (_) {} hbSet(true); });
+                    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) hbBtn.addEventListener(ev, () => hbSet(false));
+                    hbBtn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+                    this.handbrakeBtn = hbBtn;
+                }
 
                 this.zibSkipBtn.addEventListener('mousedown', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
                 this.zibSkipBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });

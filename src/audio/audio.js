@@ -16,6 +16,8 @@
            - 'explode' : Low rumble (sawtooth wave, 100Hz → 10Hz)
            - 'ui'      : High blip for menu interactions (sine wave, 1200Hz)
            - 'flit'    : Rising warp for teleport (triangle wave, 200Hz → 600Hz)
+           - 'crunch'  : A car hit (thump + metal noise + glass), opts.gain by impact
+           - tyres(l)  : Looped tyre squeal for the driven car, level 0..1
            ===================================================================== */
         class AudioSystem {
             constructor() {
@@ -167,6 +169,31 @@
                     rg.gain.setValueAtTime(0.0001, now); rg.gain.exponentialRampToValueAtTime(0.018, now + 0.06); rg.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
                     r.start(now + 0.04); r.stop(now + 0.22);
                 }
+                else if (type === 'crunch') {
+                    // CRUNCH: a car hit — a body thump under a short burst of torn metal and glass.
+                    // opts.gain (0..1) scales it with the impact.
+                    const v = Math.max(0.15, Math.min(1, opts.gain ?? 0.6));
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(120, now);
+                    osc.frequency.exponentialRampToValueAtTime(42, now + 0.22);
+                    gain.gain.setValueAtTime(0.0001, now);
+                    gain.gain.exponentialRampToValueAtTime(0.32 * v, now + 0.01);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                    const n = this.ctx.createBufferSource(); n.buffer = this._noise();
+                    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1400 + Math.random() * 900; bp.Q.value = 1.1;
+                    const ng = this.ctx.createGain(); n.connect(bp); bp.connect(ng); ng.connect(out);
+                    ng.gain.setValueAtTime(0.0001, now); ng.gain.exponentialRampToValueAtTime(0.22 * v, now + 0.006);
+                    ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.09 + 0.1 * v);
+                    n.start(now, Math.random() * 0.5, 0.25);
+                    if (v > 0.5) for (let i = 0; i < 3; i++) {             // glass settling
+                        const t = now + 0.05 + Math.random() * 0.12, o = this.ctx.createOscillator(), og = this.ctx.createGain();
+                        o.type = 'triangle'; o.frequency.value = 3200 + Math.random() * 2400; o.connect(og); og.connect(out);
+                        og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.03 * v, t + 0.004); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+                        o.start(t); o.stop(t + 0.06);
+                    }
+                }
                 else if (type === 'ui') {
                     // UI BLIP: Clean sine tone, short and high
                     osc.type = 'sine';
@@ -186,6 +213,38 @@
                     osc.start(now);
                     osc.stop(now + 0.2);
                 }
+            }
+
+            /** One second of white noise, made once. */
+            _noise() {
+                if (this._noiseBuf) return this._noiseBuf;
+                const sr = this.ctx.sampleRate, buf = this.ctx.createBuffer(1, sr, sr), d = buf.getChannelData(0);
+                for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                return (this._noiseBuf = buf);
+            }
+
+            /**
+             * The driven car's tyres: a looped squeal whose level (0..1) follows how hard they're
+             * sliding. Built on first use; pitch wanders a little so a long slide never drones.
+             */
+            tyres(level) {
+                const L = Math.max(0, Math.min(1, level || 0));
+                if (!this._tyre) {
+                    if (L <= 0) return;
+                    const c = this.ctx, src = c.createBufferSource(); src.buffer = this._noise(); src.loop = true;
+                    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 9;
+                    const bp2 = c.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 2250; bp2.Q.value = 6;
+                    const g = c.createGain(); g.gain.value = 0;
+                    const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 6.5; lg.gain.value = 90;
+                    lfo.connect(lg); lg.connect(bp.frequency); lfo.start();
+                    src.connect(bp); src.connect(bp2); bp.connect(g); bp2.connect(g); g.connect(this.masterGain);
+                    src.start();
+                    this._tyre = { g, bp };
+                }
+                const now = this.ctx.currentTime;
+                this._tyre.g.gain.setTargetAtTime(L * 0.5, now, L > this._tyreL ? 0.03 : 0.09);
+                this._tyre.bp.frequency.setTargetAtTime(1300 + 500 * L, now, 0.1);
+                this._tyreL = L;
             }
         }
         // Global audio system instance
@@ -272,6 +331,8 @@
                 const H = HEARTHS[map.id], fireD = !H ? 1e9 : apt ? (p ? Math.hypot(p.x - H.x, p.y - H.y) : 1e9) : Math.hypot(cam.x - H.x, cam.y - H.y) * 0.6, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
                 const paused = !!game.paused;
                 const vol = GameSettings.ambienceVolume ?? 0.7;
+                const drv = !paused && game.isDriving && game.car && game.car.controlMode === 'PLAYER';
+                a.tyres(drv ? Math.min(1, (game.car.tyreSlip || 0) * 0.45) : 0);   // the driven car's tyres, however hard they're sliding
 
                 this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
                 const van = map.id === 'van_interior', rolling = van && game.vanMoving !== false;   // the crew's van: rain drums on the roof, the road hums underneath

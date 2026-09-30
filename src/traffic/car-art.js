@@ -28,7 +28,10 @@
                 sports: [0.38, 0.52, 0.72, 0.84], truck: [0.17, 0.27, 0.41, 0.45], hearse: [0.22, 0.32, 0.93, 0.97]
             },
             GLOSS: { blackmark: 1.5, angular: 1.1, boxy: 0.8, sleek: 1 },
-            GOLD: '#d9bf86'
+            GOLD: '#d9bf86',
+            WHEEL_LOCK: 0.5,        // drawn front-wheel angle at full steer (rad)
+            ROLL_PX: 1.8,           // body shift out of a turn at full lean
+            PITCH_PX: 1.1           // body shift forward under full braking
         };
         const _carSprites = new Map();
         const _carColorCv = document.createElement('canvas').getContext('2d');
@@ -83,6 +86,21 @@
             return sp;
         }
 
+        const _carRim = v => v.visualStyle === 'blackmark' ? CAR_ART.GOLD : v.visualStyle === 'angular' ? (v.glowColor || '#7fe8ff') : '#b9b6c4';
+
+        /** The front tyres, turned to where the wheels point (v.steer, lagging the driver's hands).
+            Drawn under the body, so only their edges show past the flanks — more as they turn. */
+        function drawCarFrontTyres(ctx, v) {
+            const g = carGeo(v), W = g.W, tyreL = Math.max(10, g.L * 0.16), d = (v.steer || 0) * CAR_ART.WHEEL_LOCK;
+            const rim = _carRim(v);
+            for (const s of [-1, 1]) {
+                ctx.save(); ctx.translate(g.axleF, s * (W / 2 - 0.4)); if (d) ctx.rotate(d);
+                ctx.fillStyle = '#0b0a0e'; ctx.beginPath(); ctx.roundRect(-tyreL / 2, -2.4, tyreL, 4.8, 1.6); ctx.fill();
+                ctx.fillStyle = rim; ctx.globalAlpha = 0.9; ctx.fillRect(-tyreL * 0.36, s * 1.7 - 0.6, tyreL * 0.72, 1.2); ctx.globalAlpha = 1;
+                ctx.restore();
+            }
+        }
+
         function _paintCar(c, v, g) {
             const { L, W, st, si, x0, x1, x2, x3 } = g, col = _carRGB(v.color);
             const lum = (col[0] * 0.3 + col[1] * 0.59 + col[2] * 0.11) / 255;
@@ -91,9 +109,9 @@
             // Contact shadow: soft, a little wider than the car
             c.save(); c.filter = 'blur(3px)'; c.fillStyle = 'rgba(8, 4, 16, 0.55)';
             c.beginPath(); c.roundRect(-L / 2 - 1, -W / 2 - 1, L + 2, W + 2, 8); c.fill(); c.restore();
-            // Tyres peeking past the flanks, rims catching the light
-            const tyreL = Math.max(10, L * 0.16), rim = lady ? CAR_ART.GOLD : zen ? (v.glowColor || '#7fe8ff') : '#b9b6c4';
-            for (const ax of [g.axleF, g.axleR]) for (const s of [-1, 1]) {
+            // Rear tyres peeking past the flanks, rims catching the light (the fronts steer: drawCarFrontTyres)
+            const tyreL = Math.max(10, L * 0.16), rim = _carRim(v);
+            for (const ax of [g.axleR]) for (const s of [-1, 1]) {
                 c.fillStyle = '#0b0a0e'; c.beginPath(); c.roundRect(ax - tyreL / 2, s * W / 2 - (s > 0 ? 3.2 : -0.2) - 1.5, tyreL, 4.5, 1.5); c.fill();
                 c.fillStyle = rim; c.globalAlpha = 0.85; c.fillRect(ax - tyreL * 0.28, s * (W / 2 + 0.9) - 0.5, tyreL * 0.56, 1); c.globalAlpha = 1;
             }
@@ -220,8 +238,15 @@
         /** Stamp the body, then the light sliding over it. */
         function drawCarBody(ctx, v, farLOD) {
             const sp = carSprite(v), P = CAR_ART.PAD;
+            drawCarFrontTyres(ctx, v);
+            // The body rides on its springs: out of the turn (bodyRoll), forward under the brakes (load)
+            const lx = farLOD ? 0 : Math.max(-1, Math.min(1, v.load || 0)) * CAR_ART.PITCH_PX;
+            const ly = farLOD ? 0 : -(v.bodyRoll || 0) * CAR_ART.ROLL_PX;
+            const lean = Math.abs(lx) > 0.05 || Math.abs(ly) > 0.05;
+            if (lean) ctx.translate(lx, ly);
             ctx.drawImage(sp.cv, -sp.L / 2 - P, -sp.W / 2 - P, sp.L + P * 2, sp.W + P * 2);
             if (!farLOD) drawCarSheen(ctx, v);
+            if (lean) ctx.translate(-lx, -ly);
         }
 
         /** The light on the paint: the sun from its side by day; street light sliding along the roof by night. */

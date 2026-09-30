@@ -111,6 +111,7 @@
                 const vel = (c) => c.vx !== undefined ? [c.vx, c.vy] : [Math.cos(c.angle || 0) * (c.speed || 0), Math.sin(c.angle || 0) * (c.speed || 0)];
                 const [ax, ay] = w1 > 0 ? vel(c1) : [0, 0], [bx, by] = w2 > 0 ? vel(c2) : [0, 0];
                 const rvx = ax - bx, rvy = ay - by, rn = rvx * nx + rvy * ny;
+                c1._lastImpact = c2._lastImpact = 0;
                 if (rn >= 0) return;                                   // already separating
                 const e = 0.2, jn = -(1 + e) * rn;                      // normal impulse (as a velocity change)
                 const tx = -ny, ty = nx, rt = rvx * tx + rvy * ty, jt = -rt * 0.15;   // scrub along the contact
@@ -124,6 +125,15 @@
                 };
                 apply(c1, w1, 1); apply(c2, w2, -1);
                 c1._lastContact = c2; c2._lastContact = c1;
+                c1._lastImpact = c2._lastImpact = jn;
+                // The driven car feels it: a knock that twists it by where it was hit
+                for (const [c, o, w, sgn] of [[c1, c2, w1, 1], [c2, c1, w2, -1]]) {
+                    if (w <= 0 || c.controlMode !== 'PLAYER' || !c.onImpact) continue;
+                    const fx = Math.cos(c.angle), fy = Math.sin(c.angle), hl = (c.length || 60) / 2;
+                    const rf = Math.max(-hl, Math.min(hl, (o.x - c.x) * fx + (o.y - c.y) * fy));   // lever along the car
+                    const Jx = sgn * w * jn * nx, Jy = sgn * w * jn * ny;
+                    c.onImpact(w * jn, rf * (fx * Jy - fy * Jx) * CONFIG.VEHICLE_DRIVE.IMPACT_YAW / (hl * hl));
+                }
                 return jn;
             }
             

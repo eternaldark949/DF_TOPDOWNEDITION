@@ -184,6 +184,11 @@
                                                 g.hud.reveal('autodrive', { title: 'Auto-drive', text: 'Tap to let the BlackMark drive you to your marker.', mode: 'ring', timeout: 6000 });
                                                 return true;
                                             });
+                                            S.watch(g => {                           // once she's rolling, after the auto-drive tip
+                                                if (!g.isDriving || g.coach.cur || !g.hud.has('autodrive') || Math.abs(g.car.speed) < 3) return false;
+                                                g.hud.reveal('handbrake', { title: 'Handbrake', text: 'Hold to lock the rear wheels and swing the tail round. Space on a keyboard.', mode: 'ring', timeout: 6000 });
+                                                return true;
+                                            });
                                         }
                                     },
                                     // Mirabel, in person for the first time: the balance, and her favour
@@ -196,6 +201,7 @@
                                         onStart: (game) => {
                                             game.questState.ambushCleared = true;
                                             game.hud.reveal('autodrive');
+                                            game.hud.reveal('handbrake');
                                         }
                                     },
                                     // Chapter complete (terminal)

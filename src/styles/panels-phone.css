@@ -225,6 +225,20 @@
             color: #00ff64; 
             animation: autodrive-pulse 1.5s infinite; 
         }
+        /* Handbrake: under the thumb beside the fire stick, only while driving (world-state.js) */
+        #btn-handbrake {
+            position: absolute; bottom: 72px; right: 150px; width: 58px; height: 58px; border-radius: 50%;
+            display: none; justify-content: center; align-items: center; text-align: center;
+            background: rgba(20, 0, 10, 0.4); border: 2px solid rgba(217, 191, 134, 0.75);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(217, 191, 134, 0.15);
+            color: #d9bf86; font: bold 0.55rem/1.1 'Orbitron', sans-serif; letter-spacing: 0.04em;
+            z-index: 30; pointer-events: auto; cursor: pointer; user-select: none; -webkit-user-select: none;
+            touch-action: none; backdrop-filter: blur(2px); transition: transform 0.08s, background 0.08s, box-shadow 0.08s;
+        }
+        #btn-handbrake.held {
+            transform: scale(0.93); background: rgba(217, 191, 134, 0.28);
+            box-shadow: 0 0 16px rgba(217, 191, 134, 0.55), inset 0 0 12px rgba(217, 191, 134, 0.35); color: #fff4d8;
+        }
         #btn-zib-skip {
             position: absolute; bottom: 210px; right: 25px;
             color: #8a2be2; font-size: 0.6rem; font-weight: bold; text-align: center; line-height: 1.1;
@@ -1022,7 +1036,7 @@
         @keyframes fireRingArmed { 50% { box-shadow: 0 0 22px rgba(170, 130, 255, 1); } }
         /* While the fire stick is held, the other buttons step back */
         #game-ui.aiming #btn-heal, #game-ui.aiming #btn-nv, #game-ui.aiming #btn-flit,
-        #game-ui.aiming #btn-holster, #game-ui.aiming #btn-autodrive { opacity: 0.15 !important; pointer-events: none !important; transition: opacity 0.15s; }
+        #game-ui.aiming #btn-holster, #game-ui.aiming #btn-autodrive, #game-ui.aiming #btn-handbrake { opacity: 0.15 !important; pointer-events: none !important; transition: opacity 0.15s; }
 
         /* …and the fire line itself, a band like the flit ring (62 px): past it, she fires */
         #fire-band {

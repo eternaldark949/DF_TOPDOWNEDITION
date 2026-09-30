@@ -35,7 +35,7 @@
                     angle: startAngle,
                     length: vehicleLength,
                     width: vehicleWidth,
-                    mass: modelData.mass || 1200,
+                    mass: modelData.mass || brandData.baseStats.mass || 1200,
                     friction: brandData.baseStats.friction || 0.96
                 });
                 
@@ -57,6 +57,7 @@
                 this.acceleration = brandData.baseStats.acceleration;
                 this.handling = brandData.baseStats.handling;
                 this.brake = brandData.baseStats.brake || 0.3;        // px/tick² at full brake
+                this.drive = brandData.drive || CONFIG.VEHICLE_DRIVE.DEFAULT_FEEL;   // handling character
                 this.seats = modelData.seats || brandData.baseStats.seats || 4;
                 this.seatLayout = TrafficVehicle.generateSeatLayout(this.seats, this.length, this.width);
                 this.seatOccupants = new Array(this.seats).fill(null); // Entity refs per seat
@@ -893,9 +894,10 @@
                 this.prevX = this.x;
                 this.prevY = this.y;
         
-                // 2. Thresholds
-                // Lowered from 1.5 to 0.8 to make skids appear more easily during turns
-                const driftThreshold = 0.8; 
+                // 2. Thresholds: traffic marks easily in turns; the driven car only once
+                //    its tyres are past their limit (the weighted model holds a clean line)
+                const player = this.controlMode === 'PLAYER';
+                const driftThreshold = player ? 1.6 : 0.8;
                 
                 // 3. Physics Calculations
                 const fwdX = Math.cos(this.angle);
@@ -910,17 +912,10 @@
                 let isSkidding = Math.abs(slideVelocity) > driftThreshold;
                 let intensity = (Math.abs(slideVelocity) - driftThreshold) * 0.5; // Boosted intensity
                 
-                // Manual burnout/braking check
-                // If we are pressing gas but moving slowly, or direction opposes velocity
-                if (this.controlMode === 'PLAYER') {
-                    const movingBackwards = (this.vx * fwdX + this.vy * fwdY) < 0;
-                    const gasForward = this.manualGas > 0;
-                    
-                    // Burnout / Handbrake turn logic
-                    if ((Math.abs(this.speed) > 2 && Math.sign(this.manualGas) !== Math.sign(this.speed) && this.manualGas !== 0)) {
-                        isSkidding = true;
-                        intensity = Math.max(intensity, 0.6); // Hard skid
-                    }
+                // Locked wheels (handbrake, hard braking) mark the road too
+                if (player && this.tyreSlip > 0.3) {
+                    isSkidding = true;
+                    intensity = Math.max(intensity, Math.min(1, this.tyreSlip * 0.5));
                 }
         
                 // 5. Draw
@@ -986,19 +981,44 @@
                 const revTop = topSpeed * VD.REVERSE_TOP_FRACTION;
                 const reverseDrag = revTop / (acceleration + revTop);
 
-                // --- GRIP ---
+                const player = steerCurve;                    // the full weighted model is the driver's
+                const F = this.drive || VD.DEFAULT_FEEL;
+                const rain = (weather && weather.isRaining)
+                    ? Math.min(1, weather.getRainScale ? weather.getRainScale() : 1) : 0;
+                const absSpeed = Math.abs(this.speed);
+                const clampU = (x, m) => x < -m ? -m : x > m ? m : x;
+
+                // --- GRIP (traffic: the original single-number model) ---
                 let grip = VD.GRIP_BASE;
-                if (weather && weather.isRaining) {
-                    // Wet-road grip scales with how hard it's actually raining —
-                    // a drizzle barely costs you, a storm is genuinely slick.
-                    grip = VD.GRIP_BASE - VD.GRIP_RAIN_PENALTY *
-                        Math.min(1, weather.getRainScale ? weather.getRainScale() : 1);
-                }
+                if (rain) grip = VD.GRIP_BASE - VD.GRIP_RAIN_PENALTY * rain;
                 if (this.surfaceFriction) grip *= this.surfaceFriction;
                 if (gripFloor > 0) grip = Math.max(grip, gripFloor);
 
-                // --- STEERING ---
-                const absSpeed = Math.abs(this.speed);
+                /* --- THE WHEEL ---
+                   manualTurn is what the driver asks for; `steer` is where the front
+                   wheels actually point. They wind on at the brand's pace and, when the
+                   stick is let go, the caster pulls them home — quicker the faster the
+                   car rolls, easing in rather than stopping dead. Traffic's wheels only
+                   *look* like that (the drawn tyres follow `steer`): its path follower
+                   steers the car directly, since a lagging wheel under it doubled
+                   car-to-car contacts in the traffic sim. */
+                const req = clampU(this.manualTurn || 0, 1);
+                let st = this.steer || 0;
+                if (!player) {
+                    st += clampU(req - st, VD.AI_STEER_RATE);
+                } else if (Math.abs(req) > 0.02 && (Math.sign(req) !== Math.sign(st) || Math.abs(req) > Math.abs(st))) {
+                    const across = st !== 0 && Math.sign(req) !== Math.sign(st);
+                    const rate = F.steerRate * (across ? 1.6 : 1);     // crossing centre, the caster helps
+                    st += clampU(req - st, rate);
+                } else {
+                    const k = Math.min(VD.CENTER_RATE_MAX, VD.CENTER_RATE + VD.CENTER_RATE_SPEED * absSpeed);
+                    const d = (req - st) * k;
+                    st += Math.abs(d) < 0.006 ? req - st : d;
+                }
+                this.steer = st;
+
+                // --- STEERING → ROTATION ---
+                let yawTarget = 0;
                 if (absSpeed > VD.STEER_MIN_SPEED) {
                     // Latch steering direction — only flip when speed clearly
                     // crosses the dead zone. Prevents direction jitter that
@@ -1006,10 +1026,7 @@
                     if (this.speed > 1.0) this._steerDir = 1;
                     else if (this.speed < -1.0) this._steerDir = -1;
                     const direction = this._steerDir || 1;
-                    const handlingMod = (weather && weather.isRaining)
-                        ? (1.0 - VD.HANDLING_RAIN_PENALTY *
-                            Math.min(1, weather.getRainScale ? weather.getRainScale() : 1))
-                        : 1.0;
+                    const handlingMod = 1.0 - VD.HANDLING_RAIN_PENALTY * rain;
 
                     let authority = 1.0;
                     if (steerCurve) {
@@ -1025,24 +1042,66 @@
                             (1 - VD.STEER_HIGH_FLOOR) / (1 + over * VD.STEER_FALLOFF));
                     }
                     const reverseSteerFactor = direction < 0 ? VD.REVERSE_STEER_FACTOR : 1.0;
-                    this.angle += this.manualTurn * this.handling * handlingMod
-                                * direction * reverseSteerFactor * authority;
+                    yawTarget = (player ? st : req) * this.handling * handlingMod * direction * reverseSteerFactor * authority;
                 }
+                let yaw = this.yawRate || 0;
+                if (!player) yaw = yawTarget;
+                else {
+                    /* The body has inertia: rotation builds toward what the wheels ask
+                       (at the brand's turn-in) and settles when they straighten. Past what
+                       the tyres can hold (latAcc / speed) the nose pushes wide instead. */
+                    const wetGrip = (1 - 0.35 * rain) * (this.surfaceFriction || 1);
+                    if (absSpeed > 1 && !this.handbrake) yawTarget = clampU(yawTarget, F.latAcc * wetGrip / absSpeed);
+                    // last tick's rear/front grip imbalance: a light rear swings the tail out
+                    yaw += (yawTarget + (this._yawCouple || 0) - yaw) * F.turnIn;
+                    if (absSpeed < VD.STEER_MIN_SPEED) yaw *= 0.5;
+                    yaw = clampU(yaw, VD.YAW_MAX);
+                }
+                this.yawRate = yaw;
+                this.angle += yaw;
 
-                // --- THROTTLE / BRAKE ---
-                // Gas against the direction of travel is the brake (this.brake, px/tick²), taken off
-                // the car's motion and never past a stop; only once (nearly) stopped does it reverse.
-                if (Math.abs(this.manualGas) > 0.1) {
-                    const fwd0 = this.vx * Math.cos(this.angle) + this.vy * Math.sin(this.angle);
-                    if (fwd0 * this.manualGas < 0 && Math.abs(fwd0) > 0.25) {
+                /* --- PEDALS ---
+                   Gas against the direction of travel is the brake (this.brake, px/tick²),
+                   taken off the car's motion and never past a stop; only once (nearly)
+                   stopped does it reverse. The driver's throttle travels in over a few
+                   ticks and the brake bites progressively; the handbrake is instant. */
+                const fwdX0 = Math.cos(this.angle), fwdY0 = Math.sin(this.angle);
+                const fwd0 = this.vx * fwdX0 + this.vy * fwdY0;
+                const revBelow = player ? VD.REVERSE_BELOW : 0.25;
+                let gas = this.manualGas || 0;
+                if (player) {
+                    const p = this.pedal || 0;
+                    const braking = gas * fwd0 < 0 && Math.abs(fwd0) > revBelow;
+                    const rate = (p !== 0 && Math.sign(gas) !== Math.sign(p)) ? VD.PEDAL_OUT + VD.PEDAL_BRAKE_IN
+                        : Math.abs(gas) < Math.abs(p) ? VD.PEDAL_OUT
+                        : braking ? VD.PEDAL_BRAKE_IN : VD.PEDAL_IN;
+                    gas = this.pedal = p + clampU(gas - p, rate);
+                }
+                let decel = 0;
+                if (Math.abs(gas) > 0.1) {
+                    if (fwd0 * gas < 0 && Math.abs(fwd0) > revBelow) {
                         const sp = Math.hypot(this.vx, this.vy);
-                        const dec = Math.min(sp, Math.abs(this.manualGas) * (this.brake || 0.3));
-                        if (sp > 0) { this.vx -= this.vx / sp * dec; this.vy -= this.vy / sp * dec; }
+                        decel = Math.min(sp, Math.abs(gas) * (this.brake || 0.3));
+                        if (sp > 0) { this.vx -= this.vx / sp * decel; this.vy -= this.vy / sp * decel; }
                     } else {
-                        this.vx += Math.cos(this.angle) * this.manualGas * acceleration;
-                        this.vy += Math.sin(this.angle) * this.manualGas * acceleration;
+                        this.vx += fwdX0 * gas * acceleration;
+                        this.vy += fwdY0 * gas * acceleration;
                     }
                 }
+                const hb = player && this.handbrake && absSpeed > 0.05;
+                if (hb) {
+                    const sp = Math.hypot(this.vx, this.vy), dec = Math.min(sp, VD.HANDBRAKE_DECEL);
+                    if (sp > 0) { this.vx -= this.vx / sp * dec; this.vy -= this.vy / sp * dec; }
+                    decel += dec;
+                }
+
+                /* --- WEIGHT ---
+                   Braking pitches the load forward (the front bites, the rear goes
+                   light); throttle sits it back. It shifts at the brand's pace, so a
+                   heavy car settles slowly. */
+                const loadTarget = decel > 0 ? Math.min(1, decel / ((this.brake || 0.3) + 0.05))
+                    : gas > 0.1 ? -0.4 * gas * Math.min(1, acceleration / 0.2) : 0;
+                this.load = (this.load || 0) + (loadTarget - (this.load || 0)) * VD.LOAD_RATE / F.weight;
 
                 // --- DRIFT DECOMPOSITION ---
                 const fwdX = Math.cos(this.angle);
@@ -1055,9 +1114,9 @@
                 this.applySkids(decalSystem);
 
                 // --- RAIN SPRAY ---
-                if (weather && weather.isRaining && Math.abs(fwdVelocity) > 2.0) {
+                if (rain && Math.abs(fwdVelocity) > 2.0) {
                     // Spray frequency tracks rain strength — wet roads throw more water.
-                    const sprayChance = 0.7 * Math.min(1, weather.getRainScale ? weather.getRainScale() : 1);
+                    const sprayChance = 0.7 * rain;
                     if (Math.random() < sprayChance) {
                         const sprayColor = 'rgba(200, 200, 255, 0.4)';
                         const spraySpeed = Math.abs(fwdVelocity) * 0.5;
@@ -1070,12 +1129,13 @@
                     }
                 }
 
-                // --- DRIFT SMOKE + GRIP BREAKAWAY ---
-                if (Math.abs(slideVelocity) > VD.GRIP_SLIDE_THRESHOLD) {
-                    grip *= VD.GRIP_SLIDE_PENALTY;
+                // --- DRIFT SMOKE (+ traffic's grip breakaway) ---
+                const smoking = Math.abs(slideVelocity) > VD.GRIP_SLIDE_THRESHOLD || (hb && Math.abs(fwdVelocity) > 3);
+                if (smoking) {
+                    if (!player) grip *= VD.GRIP_SLIDE_PENALTY;
                     if (weather && Math.random() > 0.2) {
                         const smokeColor = 'rgba(30, 30, 30, 0.6)';
-                        const slipSpeed = Math.abs(slideVelocity);
+                        const slipSpeed = Math.max(Math.abs(slideVelocity), hb ? Math.abs(fwdVelocity) * 0.4 : 0);
                         const volume = 20.0;
                         const life = 10.0;
                         const blX = this.x - this.length/2 * fwdX + this.width/2 * rightX;
@@ -1087,14 +1147,41 @@
                     }
                 }
 
+                // --- TYRES ---
+                if (!player) {
+                    slideVelocity *= grip;
+                } else {
+                    /* Two axles, each a tyre that holds firmly up to its limit and then
+                       slides. Weight transfer and the handbrake move those limits apart;
+                       when the rear gives first, the difference swings the tail out
+                       (applied to next tick's rotation). */
+                    const wetGrip = (1 - 0.35 * rain) * (this.surfaceFriction || 1);
+                    const L = this.load;
+                    let gF = F.gripF * (1 + VD.LOAD_FWD_GRIP * L) * wetGrip;
+                    let gR = F.gripR * (1 - VD.LOAD_REAR_GRIP * L) * wetGrip;
+                    if (hb) gR *= VD.HANDBRAKE_REAR_GRIP;
+                    const s = Math.abs(slideVelocity);
+                    const remF = Math.min(s * 0.22 * gF, F.latAcc * gF);
+                    const remR = Math.min(s * 0.22 * gR, F.latAcc * gR);
+                    const rem = Math.min(s, (remF + remR) / 2);
+                    slideVelocity -= Math.sign(slideVelocity) * rem;
+                    const couple = (remF - remR) * VD.OVERSTEER_COUPLE * (hb ? VD.HANDBRAKE_SWING : 1) * (70 / this.length);
+                    this._yawCouple = -Math.sign(slideVelocity) * (couple < 0 ? couple * 0.5 : couple);   // understeer only half as strong
+                    this.tyreSlip = Math.max(0, s - F.latAcc * 1.6) + (hb ? Math.abs(fwdVelocity) * 0.25 : 0)
+                        + (decel > (this.brake || 0.3) * 0.8 && Math.abs(fwdVelocity) > 4 ? 0.8 : 0);
+                }
+
+                // --- BODY (visual): lean out of the turn, dip under the brakes ---
+                const latA = clampU(yaw * fwdVelocity / 0.6, 1);
+                this.bodyRoll = (this.bodyRoll || 0) + (latA - (this.bodyRoll || 0)) * 0.16 / F.weight;
+
                 // --- RECOMPOSE + DRAG ---
-                slideVelocity *= grip;
                 this.vx = fwdVelocity * fwdX + slideVelocity * rightX;
                 this.vy = fwdVelocity * fwdY + slideVelocity * rightY;
-                const dragNow = (fwdVelocity > 0 ? drag : reverseDrag);
+                let dragNow = (fwdVelocity > 0 ? drag : reverseDrag);
+                if (player && Math.abs(gas) < 0.1) dragNow *= 1 - (1 - (this.friction || 0.97)) * VD.COAST_DRAG;
                 this.vx *= dragNow;
                 this.vy *= dragNow;
-
                 // --- INTEGRATE + COLLIDE ---
                 const nextX = this.x + this.vx;
                 const nextY = this.y + this.vy;
@@ -1120,6 +1207,8 @@
                    only run on frames where something was actually hit. */
                 const w_ = walls || [], b_ = buildings || [];
                 const collided = this.checkEnvironmentCollision(nextX, nextY, this.angle, w_, b_);
+                if (player && this._crunchCd > 0) this._crunchCd--;
+                const vx0 = this.vx, vy0 = this.vy;
                 if (collided) {
                     const blockedX = this.checkEnvironmentCollision(nextX, this.y, this.angle, w_, b_);
                     const blockedY = this.checkEnvironmentCollision(this.x, nextY, this.angle, w_, b_);
@@ -1141,11 +1230,59 @@
                     // HUD, engine audio and skid logic agree with what the car is
                     // actually doing after the impact.
                     this.speed = this.vx * fwdX + this.vy * fwdY;
+                    if (player) this.onImpact(Math.hypot(this.vx - vx0, this.vy - vy0));
                 } else {
                     this.x = nextX;
                     this.y = nextY;
                 }
                 return collided;
+            }
+
+            /**
+             * A knock the driver feels (PhysicsSystem.carContact, walls in applyDrivePhysics):
+             * strength is the speed change it caused (px/tick), kick a twist to the car's
+             * rotation. Hard enough, it crunches and shakes the camera.
+             */
+            onImpact(strength, kick = 0) {
+                if (this.controlMode !== 'PLAYER') return;
+                this.yawRate = clamp((this.yawRate || 0) + kick, -CONFIG.VEHICLE_DRIVE.YAW_MAX, CONFIG.VEHICLE_DRIVE.YAW_MAX);
+                if (strength < 0.7 || this._crunchCd > 0) return;
+                this._crunchCd = 8;
+                audioSys.sfx('crunch', { gain: Math.min(1, strength / 5) });
+                if (typeof game !== 'undefined' && game.triggerShake) game.triggerShake(Math.min(12, 2 + strength * 1.8));
+            }
+
+            /**
+             * The driver's hands and feet: a move input → manualGas / manualTurn.
+             * analog (the touch stick) points where the car should go; keys are
+             * throttle/brake and left/right. Pulling back while rolling forward is
+             * the brake, straight; it only turns into reverse once nearly stopped.
+             * The stick also eases off as the car's rotation builds (yawRate), the
+             * way a driver unwinds before the car reaches the line they want.
+             */
+            driverInput(inputX, inputY, analog) {
+                const VD = CONFIG.VEHICLE_DRIVE;
+                const fwd = this.vx * Math.cos(this.angle) + this.vy * Math.sin(this.angle);
+                const rolling = fwd > VD.REVERSE_BELOW;
+                let gas = 0, turn = 0;
+                if (analog) {
+                    const carDirX = Math.cos(this.angle), carDirY = Math.sin(this.angle);
+                    gas = inputX * carDirX + inputY * carDirY;
+                    if (Math.abs(inputX) > 0.1 || Math.abs(inputY) > 0.1) {
+                        const angleDiff = normalizeAngle(Math.atan2(inputY, inputX) - this.angle);
+                        if (rolling && Math.abs(angleDiff) > 1.9) turn = 0;          // hauling back: brake, not a spin
+                        else {
+                            turn = clamp(angleDiff * 2.0 - (this.yawRate || 0) * VD.STICK_YAW_DAMP, -1, 1);
+                            if (Math.abs(turn) < 0.1 && Math.abs(angleDiff) < 0.05) turn = 0;
+                        }
+                    }
+                } else {
+                    if (inputY < 0) gas = 1;
+                    if (inputY > 0) gas = rolling ? -1 : -0.5;
+                    if (inputX < 0) turn = -1;
+                    if (inputX > 0) turn = 1;
+                }
+                this.manualGas = gas; this.manualTurn = turn;
             }
 
             // --- MANUAL UPDATE (With Physics & Skids) ---

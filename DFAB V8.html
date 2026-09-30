@@ -1552,6 +1552,20 @@
             color: #00ff64; 
             animation: autodrive-pulse 1.5s infinite; 
         }
+        /* Handbrake: under the thumb beside the fire stick, only while driving (world-state.js) */
+        #btn-handbrake {
+            position: absolute; bottom: 72px; right: 150px; width: 58px; height: 58px; border-radius: 50%;
+            display: none; justify-content: center; align-items: center; text-align: center;
+            background: rgba(20, 0, 10, 0.4); border: 2px solid rgba(217, 191, 134, 0.75);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(217, 191, 134, 0.15);
+            color: #d9bf86; font: bold 0.55rem/1.1 'Orbitron', sans-serif; letter-spacing: 0.04em;
+            z-index: 30; pointer-events: auto; cursor: pointer; user-select: none; -webkit-user-select: none;
+            touch-action: none; backdrop-filter: blur(2px); transition: transform 0.08s, background 0.08s, box-shadow 0.08s;
+        }
+        #btn-handbrake.held {
+            transform: scale(0.93); background: rgba(217, 191, 134, 0.28);
+            box-shadow: 0 0 16px rgba(217, 191, 134, 0.55), inset 0 0 12px rgba(217, 191, 134, 0.35); color: #fff4d8;
+        }
         #btn-zib-skip {
             position: absolute; bottom: 210px; right: 25px;
             color: #8a2be2; font-size: 0.6rem; font-weight: bold; text-align: center; line-height: 1.1;
@@ -2349,7 +2363,7 @@
         @keyframes fireRingArmed { 50% { box-shadow: 0 0 22px rgba(170, 130, 255, 1); } }
         /* While the fire stick is held, the other buttons step back */
         #game-ui.aiming #btn-heal, #game-ui.aiming #btn-nv, #game-ui.aiming #btn-flit,
-        #game-ui.aiming #btn-holster, #game-ui.aiming #btn-autodrive { opacity: 0.15 !important; pointer-events: none !important; transition: opacity 0.15s; }
+        #game-ui.aiming #btn-holster, #game-ui.aiming #btn-autodrive, #game-ui.aiming #btn-handbrake { opacity: 0.15 !important; pointer-events: none !important; transition: opacity 0.15s; }
 
         /* …and the fire line itself, a band like the flit ring (62 px): past it, she fires */
         #fire-band {
@@ -2665,6 +2679,7 @@
         body.landscape #btn-heal, body.landscape #emote-smile { bottom: 145px; }
         body.landscape #btn-nv, body.landscape #emote-zany { bottom: 125px; }
         body.landscape #btn-flit, body.landscape #emote-cry { bottom: 65px; }
+        body.landscape #btn-handbrake { bottom: 30px; right: 6px; width: 50px; height: 50px; font-size: 0.5rem; }
         body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
         body.landscape #btn-holster, body.landscape #emote-frown { bottom: 120px; }
 
@@ -3139,6 +3154,7 @@
             <div id="btn-heal">✚<br><span>4</span></div>
             <div id="btn-flit">⚡</div>
             <div id="btn-autodrive">AUTO<br>DRIVE</div>
+            <div id="btn-handbrake" aria-label="Handbrake"><span>HAND<br>BRAKE</span></div>
             <div id="btn-zib-skip" style="display:none;">SKIP<br><span style="font-size:0.5rem;opacity:0.7">(T)</span></div>
             <div id="btn-holster">HOLSTER</div>
             <div id="btn-nv">👁️</div>
@@ -4171,7 +4187,35 @@
                 GRIP_RAIN_PENALTY: 0.06,        // Subtracted at full rain intensity
                 GRIP_SLIDE_THRESHOLD: 2.5,      // Lateral speed at which grip starts breaking away
                 GRIP_SLIDE_PENALTY: 0.95,       // Grip multiplier once sliding
-                HANDLING_RAIN_PENALTY: 0.1      // Steering authority lost at full rain intensity
+                HANDLING_RAIN_PENALTY: 0.1,     // Steering authority lost at full rain intensity
+
+                /* --- WEIGHT (T2) ---
+                   The wheel, the pedals and the body all lag a little behind the
+                   driver: the wheel slews to the stick and self-centres when it's
+                   let go, the car's rotation (yawRate) builds and settles, and
+                   braking throws the load forward so the rear lets go. Per-brand
+                   numbers live in VEHICLE_BRANDS[brand].drive. */
+                DEFAULT_FEEL: { steerRate: 0.11, turnIn: 0.24, gripF: 1, gripR: 1, latAcc: 0.5, weight: 1 },
+                CENTER_RATE: 0.2,               // Wheel self-centring per tick (fraction of what's left)…
+                CENTER_RATE_SPEED: 0.018,       // …plus this per px/tick of speed (caster), up to…
+                CENTER_RATE_MAX: 0.42,
+                AI_STEER_RATE: 0.3,             // Traffic's drawn wheels (their steering itself is direct)
+                PEDAL_IN: 0.17,                 // Throttle travel per tick (about 0.2 s to the floor)
+                PEDAL_BRAKE_IN: 0.4,            // The brake bites over a few ticks
+                PEDAL_OUT: 0.3,                 // Lifting off
+                YAW_MAX: 0.13,                  // rad/tick, however wild the slide
+                OVERSTEER_COUPLE: 0.1,          // Rear/front grip imbalance (px/tick²) → yaw-rate offset
+                LOAD_FWD_GRIP: 0.3,             // Front grip gained per unit of forward load…
+                LOAD_REAR_GRIP: 0.55,           // …and rear grip lost
+                LOAD_RATE: 0.14,                // How fast the load shifts (÷ brand weight)
+                HANDBRAKE_REAR_GRIP: 0.3,       // Rear grip while the handbrake's up
+                HANDBRAKE_SWING: 2.5,           // …and the tail swings this much harder
+                HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
+                REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
+                CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
+                STICK_YAW_DAMP: 5,
+                IMPACT_YAW: 0.9,                // Twist from an off-centre knock (onImpact)              // Touch stick unwinds by this × yawRate (no overshoot)
+                COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)
             }
         });
 
@@ -7073,6 +7117,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                                 g.hud.reveal('autodrive', { title: 'Auto-drive', text: 'Tap to let the BlackMark drive you to your marker.', mode: 'ring', timeout: 6000 });
                                                 return true;
                                             });
+                                            S.watch(g => {                           // once she's rolling, after the auto-drive tip
+                                                if (!g.isDriving || g.coach.cur || !g.hud.has('autodrive') || Math.abs(g.car.speed) < 3) return false;
+                                                g.hud.reveal('handbrake', { title: 'Handbrake', text: 'Hold to lock the rear wheels and swing the tail round. Space on a keyboard.', mode: 'ring', timeout: 6000 });
+                                                return true;
+                                            });
                                         }
                                     },
                                     // Mirabel, in person for the first time: the balance, and her favour
@@ -7085,6 +7134,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                         onStart: (game) => {
                                             game.questState.ambushCleared = true;
                                             game.hud.reveal('autodrive');
+                                            game.hud.reveal('handbrake');
                                         }
                                     },
                                     // Chapter complete (terminal)
@@ -7663,6 +7713,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            - 'explode' : Low rumble (sawtooth wave, 100Hz → 10Hz)
            - 'ui'      : High blip for menu interactions (sine wave, 1200Hz)
            - 'flit'    : Rising warp for teleport (triangle wave, 200Hz → 600Hz)
+           - 'crunch'  : A car hit (thump + metal noise + glass), opts.gain by impact
+           - tyres(l)  : Looped tyre squeal for the driven car, level 0..1
            ===================================================================== */
         class AudioSystem {
             constructor() {
@@ -7814,6 +7866,31 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     rg.gain.setValueAtTime(0.0001, now); rg.gain.exponentialRampToValueAtTime(0.018, now + 0.06); rg.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
                     r.start(now + 0.04); r.stop(now + 0.22);
                 }
+                else if (type === 'crunch') {
+                    // CRUNCH: a car hit — a body thump under a short burst of torn metal and glass.
+                    // opts.gain (0..1) scales it with the impact.
+                    const v = Math.max(0.15, Math.min(1, opts.gain ?? 0.6));
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(120, now);
+                    osc.frequency.exponentialRampToValueAtTime(42, now + 0.22);
+                    gain.gain.setValueAtTime(0.0001, now);
+                    gain.gain.exponentialRampToValueAtTime(0.32 * v, now + 0.01);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                    const n = this.ctx.createBufferSource(); n.buffer = this._noise();
+                    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1400 + Math.random() * 900; bp.Q.value = 1.1;
+                    const ng = this.ctx.createGain(); n.connect(bp); bp.connect(ng); ng.connect(out);
+                    ng.gain.setValueAtTime(0.0001, now); ng.gain.exponentialRampToValueAtTime(0.22 * v, now + 0.006);
+                    ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.09 + 0.1 * v);
+                    n.start(now, Math.random() * 0.5, 0.25);
+                    if (v > 0.5) for (let i = 0; i < 3; i++) {             // glass settling
+                        const t = now + 0.05 + Math.random() * 0.12, o = this.ctx.createOscillator(), og = this.ctx.createGain();
+                        o.type = 'triangle'; o.frequency.value = 3200 + Math.random() * 2400; o.connect(og); og.connect(out);
+                        og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.03 * v, t + 0.004); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+                        o.start(t); o.stop(t + 0.06);
+                    }
+                }
                 else if (type === 'ui') {
                     // UI BLIP: Clean sine tone, short and high
                     osc.type = 'sine';
@@ -7833,6 +7910,38 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     osc.start(now);
                     osc.stop(now + 0.2);
                 }
+            }
+
+            /** One second of white noise, made once. */
+            _noise() {
+                if (this._noiseBuf) return this._noiseBuf;
+                const sr = this.ctx.sampleRate, buf = this.ctx.createBuffer(1, sr, sr), d = buf.getChannelData(0);
+                for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                return (this._noiseBuf = buf);
+            }
+
+            /**
+             * The driven car's tyres: a looped squeal whose level (0..1) follows how hard they're
+             * sliding. Built on first use; pitch wanders a little so a long slide never drones.
+             */
+            tyres(level) {
+                const L = Math.max(0, Math.min(1, level || 0));
+                if (!this._tyre) {
+                    if (L <= 0) return;
+                    const c = this.ctx, src = c.createBufferSource(); src.buffer = this._noise(); src.loop = true;
+                    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 9;
+                    const bp2 = c.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 2250; bp2.Q.value = 6;
+                    const g = c.createGain(); g.gain.value = 0;
+                    const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 6.5; lg.gain.value = 90;
+                    lfo.connect(lg); lg.connect(bp.frequency); lfo.start();
+                    src.connect(bp); src.connect(bp2); bp.connect(g); bp2.connect(g); g.connect(this.masterGain);
+                    src.start();
+                    this._tyre = { g, bp };
+                }
+                const now = this.ctx.currentTime;
+                this._tyre.g.gain.setTargetAtTime(L * 0.5, now, L > this._tyreL ? 0.03 : 0.09);
+                this._tyre.bp.frequency.setTargetAtTime(1300 + 500 * L, now, 0.1);
+                this._tyreL = L;
             }
         }
         // Global audio system instance
@@ -7919,6 +8028,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const H = HEARTHS[map.id], fireD = !H ? 1e9 : apt ? (p ? Math.hypot(p.x - H.x, p.y - H.y) : 1e9) : Math.hypot(cam.x - H.x, cam.y - H.y) * 0.6, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
                 const paused = !!game.paused;
                 const vol = GameSettings.ambienceVolume ?? 0.7;
+                const drv = !paused && game.isDriving && game.car && game.car.controlMode === 'PLAYER';
+                a.tyres(drv ? Math.min(1, (game.car.tyreSlip || 0) * 0.45) : 0);   // the driven car's tyres, however hard they're sliding
 
                 this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
                 const van = map.id === 'van_interior', rolling = van && game.vanMoving !== false;   // the crew's van: rain drums on the roof, the road hums underneath
@@ -12371,6 +12482,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const vel = (c) => c.vx !== undefined ? [c.vx, c.vy] : [Math.cos(c.angle || 0) * (c.speed || 0), Math.sin(c.angle || 0) * (c.speed || 0)];
                 const [ax, ay] = w1 > 0 ? vel(c1) : [0, 0], [bx, by] = w2 > 0 ? vel(c2) : [0, 0];
                 const rvx = ax - bx, rvy = ay - by, rn = rvx * nx + rvy * ny;
+                c1._lastImpact = c2._lastImpact = 0;
                 if (rn >= 0) return;                                   // already separating
                 const e = 0.2, jn = -(1 + e) * rn;                      // normal impulse (as a velocity change)
                 const tx = -ny, ty = nx, rt = rvx * tx + rvy * ty, jt = -rt * 0.15;   // scrub along the contact
@@ -12384,6 +12496,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 };
                 apply(c1, w1, 1); apply(c2, w2, -1);
                 c1._lastContact = c2; c2._lastContact = c1;
+                c1._lastImpact = c2._lastImpact = jn;
+                // The driven car feels it: a knock that twists it by where it was hit
+                for (const [c, o, w, sgn] of [[c1, c2, w1, 1], [c2, c1, w2, -1]]) {
+                    if (w <= 0 || c.controlMode !== 'PLAYER' || !c.onImpact) continue;
+                    const fx = Math.cos(c.angle), fy = Math.sin(c.angle), hl = (c.length || 60) / 2;
+                    const rf = Math.max(-hl, Math.min(hl, (o.x - c.x) * fx + (o.y - c.y) * fy));   // lever along the car
+                    const Jx = sgn * w * jn * nx, Jy = sgn * w * jn * ny;
+                    c.onImpact(w * jn, rf * (fx * Jy - fy * Jx) * CONFIG.VEHICLE_DRIVE.IMPACT_YAW / (hl * hl));
+                }
                 return jn;
             }
             
@@ -29296,6 +29417,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     mass: 2500, lightRange: 100, seats: 6, // SUV = 6 seats
                     brake: 0.42     // px/tick² at full brake (traffic/traffic-vehicle.js applyDrivePhysics)
                 },
+                // Handling character (applyDrivePhysics): heavy and floaty, lazy wheel, long catchable slide
+                drive: { steerRate: 0.085, turnIn: 0.3, gripF: 1.0, gripR: 0.86, latAcc: 0.60, weight: 1.35 },
                 colors: ['#050505', '#1a0b1a', '#0b1a1a', '#1a1a0b', '#2b0000'],
                 glowColor: '#ffffff', headlightColor: '#ffffff', visualStyle: 'blackmark',
                 models: { 
@@ -29306,6 +29429,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             Zenxera: {
                 tier: 'mid-luxury',
                 baseStats: { maxSpeed: 9.5, acceleration: 0.12, handling: 0.055, friction: 0.96, mass: 1200, seats: 4, brake: 0.30 },
+                drive: { steerRate: 0.15, turnIn: 0.45, gripF: 1.1, gripR: 0.9, latAcc: 0.55, weight: 0.85 },   // sharp, lively rear
                 // NEW PALETTE: Lavender, Periwinkle, Silver, Bronze
                 colors: ['#E6E6FA', '#CCCCFF', '#C0C0C0', '#cd7f32', '#9370DB'],
                 glowColor: '#00f3ff', headlightColor: '#ccddff', // Cool blue-white
@@ -29320,6 +29444,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             Gelfash: {
                 tier: 'economy',
                 baseStats: { maxSpeed: 8.5, acceleration: 0.1, handling: 0.05, friction: 0.96, mass: 1000, seats: 4, brake: 0.26 },
+                drive: { steerRate: 0.11, turnIn: 0.36, gripF: 0.88, gripR: 1.1, latAcc: 0.42, weight: 1.0 },    // soft, understeers
                 colors: ['#fff', '#aaa', '#555', '#a469ff', '#00f3ff'],
                 glowColor: null, headlightColor: '#ffffaa', visualStyle: 'boxy',
                 models: {
@@ -30095,7 +30220,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 sports: [0.38, 0.52, 0.72, 0.84], truck: [0.17, 0.27, 0.41, 0.45], hearse: [0.22, 0.32, 0.93, 0.97]
             },
             GLOSS: { blackmark: 1.5, angular: 1.1, boxy: 0.8, sleek: 1 },
-            GOLD: '#d9bf86'
+            GOLD: '#d9bf86',
+            WHEEL_LOCK: 0.5,        // drawn front-wheel angle at full steer (rad)
+            ROLL_PX: 1.8,           // body shift out of a turn at full lean
+            PITCH_PX: 1.1           // body shift forward under full braking
         };
         const _carSprites = new Map();
         const _carColorCv = document.createElement('canvas').getContext('2d');
@@ -30150,6 +30278,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return sp;
         }
 
+        const _carRim = v => v.visualStyle === 'blackmark' ? CAR_ART.GOLD : v.visualStyle === 'angular' ? (v.glowColor || '#7fe8ff') : '#b9b6c4';
+
+        /** The front tyres, turned to where the wheels point (v.steer, lagging the driver's hands).
+            Drawn under the body, so only their edges show past the flanks — more as they turn. */
+        function drawCarFrontTyres(ctx, v) {
+            const g = carGeo(v), W = g.W, tyreL = Math.max(10, g.L * 0.16), d = (v.steer || 0) * CAR_ART.WHEEL_LOCK;
+            const rim = _carRim(v);
+            for (const s of [-1, 1]) {
+                ctx.save(); ctx.translate(g.axleF, s * (W / 2 - 0.4)); if (d) ctx.rotate(d);
+                ctx.fillStyle = '#0b0a0e'; ctx.beginPath(); ctx.roundRect(-tyreL / 2, -2.4, tyreL, 4.8, 1.6); ctx.fill();
+                ctx.fillStyle = rim; ctx.globalAlpha = 0.9; ctx.fillRect(-tyreL * 0.36, s * 1.7 - 0.6, tyreL * 0.72, 1.2); ctx.globalAlpha = 1;
+                ctx.restore();
+            }
+        }
+
         function _paintCar(c, v, g) {
             const { L, W, st, si, x0, x1, x2, x3 } = g, col = _carRGB(v.color);
             const lum = (col[0] * 0.3 + col[1] * 0.59 + col[2] * 0.11) / 255;
@@ -30158,9 +30301,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Contact shadow: soft, a little wider than the car
             c.save(); c.filter = 'blur(3px)'; c.fillStyle = 'rgba(8, 4, 16, 0.55)';
             c.beginPath(); c.roundRect(-L / 2 - 1, -W / 2 - 1, L + 2, W + 2, 8); c.fill(); c.restore();
-            // Tyres peeking past the flanks, rims catching the light
-            const tyreL = Math.max(10, L * 0.16), rim = lady ? CAR_ART.GOLD : zen ? (v.glowColor || '#7fe8ff') : '#b9b6c4';
-            for (const ax of [g.axleF, g.axleR]) for (const s of [-1, 1]) {
+            // Rear tyres peeking past the flanks, rims catching the light (the fronts steer: drawCarFrontTyres)
+            const tyreL = Math.max(10, L * 0.16), rim = _carRim(v);
+            for (const ax of [g.axleR]) for (const s of [-1, 1]) {
                 c.fillStyle = '#0b0a0e'; c.beginPath(); c.roundRect(ax - tyreL / 2, s * W / 2 - (s > 0 ? 3.2 : -0.2) - 1.5, tyreL, 4.5, 1.5); c.fill();
                 c.fillStyle = rim; c.globalAlpha = 0.85; c.fillRect(ax - tyreL * 0.28, s * (W / 2 + 0.9) - 0.5, tyreL * 0.56, 1); c.globalAlpha = 1;
             }
@@ -30287,8 +30430,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         /** Stamp the body, then the light sliding over it. */
         function drawCarBody(ctx, v, farLOD) {
             const sp = carSprite(v), P = CAR_ART.PAD;
+            drawCarFrontTyres(ctx, v);
+            // The body rides on its springs: out of the turn (bodyRoll), forward under the brakes (load)
+            const lx = farLOD ? 0 : Math.max(-1, Math.min(1, v.load || 0)) * CAR_ART.PITCH_PX;
+            const ly = farLOD ? 0 : -(v.bodyRoll || 0) * CAR_ART.ROLL_PX;
+            const lean = Math.abs(lx) > 0.05 || Math.abs(ly) > 0.05;
+            if (lean) ctx.translate(lx, ly);
             ctx.drawImage(sp.cv, -sp.L / 2 - P, -sp.W / 2 - P, sp.L + P * 2, sp.W + P * 2);
             if (!farLOD) drawCarSheen(ctx, v);
+            if (lean) ctx.translate(-lx, -ly);
         }
 
         /** The light on the paint: the sun from its side by day; street light sliding along the roof by night. */
@@ -30404,7 +30554,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     angle: startAngle,
                     length: vehicleLength,
                     width: vehicleWidth,
-                    mass: modelData.mass || 1200,
+                    mass: modelData.mass || brandData.baseStats.mass || 1200,
                     friction: brandData.baseStats.friction || 0.96
                 });
                 
@@ -30426,6 +30576,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.acceleration = brandData.baseStats.acceleration;
                 this.handling = brandData.baseStats.handling;
                 this.brake = brandData.baseStats.brake || 0.3;        // px/tick² at full brake
+                this.drive = brandData.drive || CONFIG.VEHICLE_DRIVE.DEFAULT_FEEL;   // handling character
                 this.seats = modelData.seats || brandData.baseStats.seats || 4;
                 this.seatLayout = TrafficVehicle.generateSeatLayout(this.seats, this.length, this.width);
                 this.seatOccupants = new Array(this.seats).fill(null); // Entity refs per seat
@@ -31262,9 +31413,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.prevX = this.x;
                 this.prevY = this.y;
         
-                // 2. Thresholds
-                // Lowered from 1.5 to 0.8 to make skids appear more easily during turns
-                const driftThreshold = 0.8; 
+                // 2. Thresholds: traffic marks easily in turns; the driven car only once
+                //    its tyres are past their limit (the weighted model holds a clean line)
+                const player = this.controlMode === 'PLAYER';
+                const driftThreshold = player ? 1.6 : 0.8;
                 
                 // 3. Physics Calculations
                 const fwdX = Math.cos(this.angle);
@@ -31279,17 +31431,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let isSkidding = Math.abs(slideVelocity) > driftThreshold;
                 let intensity = (Math.abs(slideVelocity) - driftThreshold) * 0.5; // Boosted intensity
                 
-                // Manual burnout/braking check
-                // If we are pressing gas but moving slowly, or direction opposes velocity
-                if (this.controlMode === 'PLAYER') {
-                    const movingBackwards = (this.vx * fwdX + this.vy * fwdY) < 0;
-                    const gasForward = this.manualGas > 0;
-                    
-                    // Burnout / Handbrake turn logic
-                    if ((Math.abs(this.speed) > 2 && Math.sign(this.manualGas) !== Math.sign(this.speed) && this.manualGas !== 0)) {
-                        isSkidding = true;
-                        intensity = Math.max(intensity, 0.6); // Hard skid
-                    }
+                // Locked wheels (handbrake, hard braking) mark the road too
+                if (player && this.tyreSlip > 0.3) {
+                    isSkidding = true;
+                    intensity = Math.max(intensity, Math.min(1, this.tyreSlip * 0.5));
                 }
         
                 // 5. Draw
@@ -31355,19 +31500,44 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const revTop = topSpeed * VD.REVERSE_TOP_FRACTION;
                 const reverseDrag = revTop / (acceleration + revTop);
 
-                // --- GRIP ---
+                const player = steerCurve;                    // the full weighted model is the driver's
+                const F = this.drive || VD.DEFAULT_FEEL;
+                const rain = (weather && weather.isRaining)
+                    ? Math.min(1, weather.getRainScale ? weather.getRainScale() : 1) : 0;
+                const absSpeed = Math.abs(this.speed);
+                const clampU = (x, m) => x < -m ? -m : x > m ? m : x;
+
+                // --- GRIP (traffic: the original single-number model) ---
                 let grip = VD.GRIP_BASE;
-                if (weather && weather.isRaining) {
-                    // Wet-road grip scales with how hard it's actually raining —
-                    // a drizzle barely costs you, a storm is genuinely slick.
-                    grip = VD.GRIP_BASE - VD.GRIP_RAIN_PENALTY *
-                        Math.min(1, weather.getRainScale ? weather.getRainScale() : 1);
-                }
+                if (rain) grip = VD.GRIP_BASE - VD.GRIP_RAIN_PENALTY * rain;
                 if (this.surfaceFriction) grip *= this.surfaceFriction;
                 if (gripFloor > 0) grip = Math.max(grip, gripFloor);
 
-                // --- STEERING ---
-                const absSpeed = Math.abs(this.speed);
+                /* --- THE WHEEL ---
+                   manualTurn is what the driver asks for; `steer` is where the front
+                   wheels actually point. They wind on at the brand's pace and, when the
+                   stick is let go, the caster pulls them home — quicker the faster the
+                   car rolls, easing in rather than stopping dead. Traffic's wheels only
+                   *look* like that (the drawn tyres follow `steer`): its path follower
+                   steers the car directly, since a lagging wheel under it doubled
+                   car-to-car contacts in the traffic sim. */
+                const req = clampU(this.manualTurn || 0, 1);
+                let st = this.steer || 0;
+                if (!player) {
+                    st += clampU(req - st, VD.AI_STEER_RATE);
+                } else if (Math.abs(req) > 0.02 && (Math.sign(req) !== Math.sign(st) || Math.abs(req) > Math.abs(st))) {
+                    const across = st !== 0 && Math.sign(req) !== Math.sign(st);
+                    const rate = F.steerRate * (across ? 1.6 : 1);     // crossing centre, the caster helps
+                    st += clampU(req - st, rate);
+                } else {
+                    const k = Math.min(VD.CENTER_RATE_MAX, VD.CENTER_RATE + VD.CENTER_RATE_SPEED * absSpeed);
+                    const d = (req - st) * k;
+                    st += Math.abs(d) < 0.006 ? req - st : d;
+                }
+                this.steer = st;
+
+                // --- STEERING → ROTATION ---
+                let yawTarget = 0;
                 if (absSpeed > VD.STEER_MIN_SPEED) {
                     // Latch steering direction — only flip when speed clearly
                     // crosses the dead zone. Prevents direction jitter that
@@ -31375,10 +31545,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (this.speed > 1.0) this._steerDir = 1;
                     else if (this.speed < -1.0) this._steerDir = -1;
                     const direction = this._steerDir || 1;
-                    const handlingMod = (weather && weather.isRaining)
-                        ? (1.0 - VD.HANDLING_RAIN_PENALTY *
-                            Math.min(1, weather.getRainScale ? weather.getRainScale() : 1))
-                        : 1.0;
+                    const handlingMod = 1.0 - VD.HANDLING_RAIN_PENALTY * rain;
 
                     let authority = 1.0;
                     if (steerCurve) {
@@ -31394,24 +31561,66 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             (1 - VD.STEER_HIGH_FLOOR) / (1 + over * VD.STEER_FALLOFF));
                     }
                     const reverseSteerFactor = direction < 0 ? VD.REVERSE_STEER_FACTOR : 1.0;
-                    this.angle += this.manualTurn * this.handling * handlingMod
-                                * direction * reverseSteerFactor * authority;
+                    yawTarget = (player ? st : req) * this.handling * handlingMod * direction * reverseSteerFactor * authority;
                 }
+                let yaw = this.yawRate || 0;
+                if (!player) yaw = yawTarget;
+                else {
+                    /* The body has inertia: rotation builds toward what the wheels ask
+                       (at the brand's turn-in) and settles when they straighten. Past what
+                       the tyres can hold (latAcc / speed) the nose pushes wide instead. */
+                    const wetGrip = (1 - 0.35 * rain) * (this.surfaceFriction || 1);
+                    if (absSpeed > 1 && !this.handbrake) yawTarget = clampU(yawTarget, F.latAcc * wetGrip / absSpeed);
+                    // last tick's rear/front grip imbalance: a light rear swings the tail out
+                    yaw += (yawTarget + (this._yawCouple || 0) - yaw) * F.turnIn;
+                    if (absSpeed < VD.STEER_MIN_SPEED) yaw *= 0.5;
+                    yaw = clampU(yaw, VD.YAW_MAX);
+                }
+                this.yawRate = yaw;
+                this.angle += yaw;
 
-                // --- THROTTLE / BRAKE ---
-                // Gas against the direction of travel is the brake (this.brake, px/tick²), taken off
-                // the car's motion and never past a stop; only once (nearly) stopped does it reverse.
-                if (Math.abs(this.manualGas) > 0.1) {
-                    const fwd0 = this.vx * Math.cos(this.angle) + this.vy * Math.sin(this.angle);
-                    if (fwd0 * this.manualGas < 0 && Math.abs(fwd0) > 0.25) {
+                /* --- PEDALS ---
+                   Gas against the direction of travel is the brake (this.brake, px/tick²),
+                   taken off the car's motion and never past a stop; only once (nearly)
+                   stopped does it reverse. The driver's throttle travels in over a few
+                   ticks and the brake bites progressively; the handbrake is instant. */
+                const fwdX0 = Math.cos(this.angle), fwdY0 = Math.sin(this.angle);
+                const fwd0 = this.vx * fwdX0 + this.vy * fwdY0;
+                const revBelow = player ? VD.REVERSE_BELOW : 0.25;
+                let gas = this.manualGas || 0;
+                if (player) {
+                    const p = this.pedal || 0;
+                    const braking = gas * fwd0 < 0 && Math.abs(fwd0) > revBelow;
+                    const rate = (p !== 0 && Math.sign(gas) !== Math.sign(p)) ? VD.PEDAL_OUT + VD.PEDAL_BRAKE_IN
+                        : Math.abs(gas) < Math.abs(p) ? VD.PEDAL_OUT
+                        : braking ? VD.PEDAL_BRAKE_IN : VD.PEDAL_IN;
+                    gas = this.pedal = p + clampU(gas - p, rate);
+                }
+                let decel = 0;
+                if (Math.abs(gas) > 0.1) {
+                    if (fwd0 * gas < 0 && Math.abs(fwd0) > revBelow) {
                         const sp = Math.hypot(this.vx, this.vy);
-                        const dec = Math.min(sp, Math.abs(this.manualGas) * (this.brake || 0.3));
-                        if (sp > 0) { this.vx -= this.vx / sp * dec; this.vy -= this.vy / sp * dec; }
+                        decel = Math.min(sp, Math.abs(gas) * (this.brake || 0.3));
+                        if (sp > 0) { this.vx -= this.vx / sp * decel; this.vy -= this.vy / sp * decel; }
                     } else {
-                        this.vx += Math.cos(this.angle) * this.manualGas * acceleration;
-                        this.vy += Math.sin(this.angle) * this.manualGas * acceleration;
+                        this.vx += fwdX0 * gas * acceleration;
+                        this.vy += fwdY0 * gas * acceleration;
                     }
                 }
+                const hb = player && this.handbrake && absSpeed > 0.05;
+                if (hb) {
+                    const sp = Math.hypot(this.vx, this.vy), dec = Math.min(sp, VD.HANDBRAKE_DECEL);
+                    if (sp > 0) { this.vx -= this.vx / sp * dec; this.vy -= this.vy / sp * dec; }
+                    decel += dec;
+                }
+
+                /* --- WEIGHT ---
+                   Braking pitches the load forward (the front bites, the rear goes
+                   light); throttle sits it back. It shifts at the brand's pace, so a
+                   heavy car settles slowly. */
+                const loadTarget = decel > 0 ? Math.min(1, decel / ((this.brake || 0.3) + 0.05))
+                    : gas > 0.1 ? -0.4 * gas * Math.min(1, acceleration / 0.2) : 0;
+                this.load = (this.load || 0) + (loadTarget - (this.load || 0)) * VD.LOAD_RATE / F.weight;
 
                 // --- DRIFT DECOMPOSITION ---
                 const fwdX = Math.cos(this.angle);
@@ -31424,9 +31633,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.applySkids(decalSystem);
 
                 // --- RAIN SPRAY ---
-                if (weather && weather.isRaining && Math.abs(fwdVelocity) > 2.0) {
+                if (rain && Math.abs(fwdVelocity) > 2.0) {
                     // Spray frequency tracks rain strength — wet roads throw more water.
-                    const sprayChance = 0.7 * Math.min(1, weather.getRainScale ? weather.getRainScale() : 1);
+                    const sprayChance = 0.7 * rain;
                     if (Math.random() < sprayChance) {
                         const sprayColor = 'rgba(200, 200, 255, 0.4)';
                         const spraySpeed = Math.abs(fwdVelocity) * 0.5;
@@ -31439,12 +31648,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
 
-                // --- DRIFT SMOKE + GRIP BREAKAWAY ---
-                if (Math.abs(slideVelocity) > VD.GRIP_SLIDE_THRESHOLD) {
-                    grip *= VD.GRIP_SLIDE_PENALTY;
+                // --- DRIFT SMOKE (+ traffic's grip breakaway) ---
+                const smoking = Math.abs(slideVelocity) > VD.GRIP_SLIDE_THRESHOLD || (hb && Math.abs(fwdVelocity) > 3);
+                if (smoking) {
+                    if (!player) grip *= VD.GRIP_SLIDE_PENALTY;
                     if (weather && Math.random() > 0.2) {
                         const smokeColor = 'rgba(30, 30, 30, 0.6)';
-                        const slipSpeed = Math.abs(slideVelocity);
+                        const slipSpeed = Math.max(Math.abs(slideVelocity), hb ? Math.abs(fwdVelocity) * 0.4 : 0);
                         const volume = 20.0;
                         const life = 10.0;
                         const blX = this.x - this.length/2 * fwdX + this.width/2 * rightX;
@@ -31456,14 +31666,41 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
 
+                // --- TYRES ---
+                if (!player) {
+                    slideVelocity *= grip;
+                } else {
+                    /* Two axles, each a tyre that holds firmly up to its limit and then
+                       slides. Weight transfer and the handbrake move those limits apart;
+                       when the rear gives first, the difference swings the tail out
+                       (applied to next tick's rotation). */
+                    const wetGrip = (1 - 0.35 * rain) * (this.surfaceFriction || 1);
+                    const L = this.load;
+                    let gF = F.gripF * (1 + VD.LOAD_FWD_GRIP * L) * wetGrip;
+                    let gR = F.gripR * (1 - VD.LOAD_REAR_GRIP * L) * wetGrip;
+                    if (hb) gR *= VD.HANDBRAKE_REAR_GRIP;
+                    const s = Math.abs(slideVelocity);
+                    const remF = Math.min(s * 0.22 * gF, F.latAcc * gF);
+                    const remR = Math.min(s * 0.22 * gR, F.latAcc * gR);
+                    const rem = Math.min(s, (remF + remR) / 2);
+                    slideVelocity -= Math.sign(slideVelocity) * rem;
+                    const couple = (remF - remR) * VD.OVERSTEER_COUPLE * (hb ? VD.HANDBRAKE_SWING : 1) * (70 / this.length);
+                    this._yawCouple = -Math.sign(slideVelocity) * (couple < 0 ? couple * 0.5 : couple);   // understeer only half as strong
+                    this.tyreSlip = Math.max(0, s - F.latAcc * 1.6) + (hb ? Math.abs(fwdVelocity) * 0.25 : 0)
+                        + (decel > (this.brake || 0.3) * 0.8 && Math.abs(fwdVelocity) > 4 ? 0.8 : 0);
+                }
+
+                // --- BODY (visual): lean out of the turn, dip under the brakes ---
+                const latA = clampU(yaw * fwdVelocity / 0.6, 1);
+                this.bodyRoll = (this.bodyRoll || 0) + (latA - (this.bodyRoll || 0)) * 0.16 / F.weight;
+
                 // --- RECOMPOSE + DRAG ---
-                slideVelocity *= grip;
                 this.vx = fwdVelocity * fwdX + slideVelocity * rightX;
                 this.vy = fwdVelocity * fwdY + slideVelocity * rightY;
-                const dragNow = (fwdVelocity > 0 ? drag : reverseDrag);
+                let dragNow = (fwdVelocity > 0 ? drag : reverseDrag);
+                if (player && Math.abs(gas) < 0.1) dragNow *= 1 - (1 - (this.friction || 0.97)) * VD.COAST_DRAG;
                 this.vx *= dragNow;
                 this.vy *= dragNow;
-
                 // --- INTEGRATE + COLLIDE ---
                 const nextX = this.x + this.vx;
                 const nextY = this.y + this.vy;
@@ -31489,6 +31726,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                    only run on frames where something was actually hit. */
                 const w_ = walls || [], b_ = buildings || [];
                 const collided = this.checkEnvironmentCollision(nextX, nextY, this.angle, w_, b_);
+                if (player && this._crunchCd > 0) this._crunchCd--;
+                const vx0 = this.vx, vy0 = this.vy;
                 if (collided) {
                     const blockedX = this.checkEnvironmentCollision(nextX, this.y, this.angle, w_, b_);
                     const blockedY = this.checkEnvironmentCollision(this.x, nextY, this.angle, w_, b_);
@@ -31510,11 +31749,59 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // HUD, engine audio and skid logic agree with what the car is
                     // actually doing after the impact.
                     this.speed = this.vx * fwdX + this.vy * fwdY;
+                    if (player) this.onImpact(Math.hypot(this.vx - vx0, this.vy - vy0));
                 } else {
                     this.x = nextX;
                     this.y = nextY;
                 }
                 return collided;
+            }
+
+            /**
+             * A knock the driver feels (PhysicsSystem.carContact, walls in applyDrivePhysics):
+             * strength is the speed change it caused (px/tick), kick a twist to the car's
+             * rotation. Hard enough, it crunches and shakes the camera.
+             */
+            onImpact(strength, kick = 0) {
+                if (this.controlMode !== 'PLAYER') return;
+                this.yawRate = clamp((this.yawRate || 0) + kick, -CONFIG.VEHICLE_DRIVE.YAW_MAX, CONFIG.VEHICLE_DRIVE.YAW_MAX);
+                if (strength < 0.7 || this._crunchCd > 0) return;
+                this._crunchCd = 8;
+                audioSys.sfx('crunch', { gain: Math.min(1, strength / 5) });
+                if (typeof game !== 'undefined' && game.triggerShake) game.triggerShake(Math.min(12, 2 + strength * 1.8));
+            }
+
+            /**
+             * The driver's hands and feet: a move input → manualGas / manualTurn.
+             * analog (the touch stick) points where the car should go; keys are
+             * throttle/brake and left/right. Pulling back while rolling forward is
+             * the brake, straight; it only turns into reverse once nearly stopped.
+             * The stick also eases off as the car's rotation builds (yawRate), the
+             * way a driver unwinds before the car reaches the line they want.
+             */
+            driverInput(inputX, inputY, analog) {
+                const VD = CONFIG.VEHICLE_DRIVE;
+                const fwd = this.vx * Math.cos(this.angle) + this.vy * Math.sin(this.angle);
+                const rolling = fwd > VD.REVERSE_BELOW;
+                let gas = 0, turn = 0;
+                if (analog) {
+                    const carDirX = Math.cos(this.angle), carDirY = Math.sin(this.angle);
+                    gas = inputX * carDirX + inputY * carDirY;
+                    if (Math.abs(inputX) > 0.1 || Math.abs(inputY) > 0.1) {
+                        const angleDiff = normalizeAngle(Math.atan2(inputY, inputX) - this.angle);
+                        if (rolling && Math.abs(angleDiff) > 1.9) turn = 0;          // hauling back: brake, not a spin
+                        else {
+                            turn = clamp(angleDiff * 2.0 - (this.yawRate || 0) * VD.STICK_YAW_DAMP, -1, 1);
+                            if (Math.abs(turn) < 0.1 && Math.abs(angleDiff) < 0.05) turn = 0;
+                        }
+                    }
+                } else {
+                    if (inputY < 0) gas = 1;
+                    if (inputY > 0) gas = rolling ? -1 : -0.5;
+                    if (inputX < 0) turn = -1;
+                    if (inputX > 0) turn = 1;
+                }
+                this.manualGas = gas; this.manualTurn = turn;
             }
 
             // --- MANUAL UPDATE (With Physics & Skids) ---
@@ -33182,6 +33469,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // Optimized Collision Resolution with DEBRIS
             resolveCollisions(playerCar, player, weather, audioSys, ownedCar, decalSystem) {
+                if (this._crunchCd > 0) this._crunchCd--;
                 // 1. GATHER ALL PHYSICAL VEHICLES (and re-grid them where they are now, after moving)
                 const allVehicles = this.vehicles.filter(v => !v.dead);
                 this.grid.clear();
@@ -33211,25 +33499,26 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // 3. NARROW PHASE: SAT RESOLUTION
                         const collided = PhysicsSystem.resolveOBBCollision(v1, v2);
                         
-                        // 4. GAME FEEL (VISUALS/AUDIO)
-                        if (collided) {
-                            if (Math.random() < 0.1) {
-                                const midX = (v1.x + v2.x) / 2;
-                                const midY = (v1.y + v2.y) / 2;
-                                
-                                // Sparks (Temporary)
-                                weather.spawnSparks(midX, midY, 5);
-                                
-                                // Debris (Persistent)
-                                if (decalSystem) {
-                                    decalSystem.addDebris(midX, midY, '#aaddff', 4); // Glass
-                                    decalSystem.addDebris(midX, midY, v1.color, 3);  // Paint
-                                }
-                                
-                                // Sound
-                                if (Math.hypot(player.x - midX, player.y - midY) < 400) {
-                                    audioSys.sfx('explode'); 
-                                }
+                        // 4. GAME FEEL (VISUALS/AUDIO): scaled by how hard they met, not a coin flip
+                        const imp = collided ? (v1._lastImpact || 0) : 0;
+                        if (imp > 1.2) {
+                            const midX = (v1.x + v2.x) / 2;
+                            const midY = (v1.y + v2.y) / 2;
+                            
+                            // Sparks (Temporary)
+                            weather.spawnSparks(midX, midY, Math.min(12, Math.round(2 + imp * 2)));
+                            
+                            // Debris (Persistent)
+                            if (decalSystem && imp > 2) {
+                                decalSystem.addDebris(midX, midY, '#aaddff', 4); // Glass
+                                decalSystem.addDebris(midX, midY, v1.color, 3);  // Paint
+                            }
+                            
+                            // Sound (the driven car's own hits crunch in TrafficVehicle.onImpact)
+                            const pd = Math.hypot(player.x - midX, player.y - midY);
+                            if (v1.controlMode !== 'PLAYER' && v2.controlMode !== 'PLAYER' && pd < 500 && !(this._crunchCd > 0)) {
+                                this._crunchCd = 10;
+                                audioSys.sfx('crunch', { gain: Math.min(1, imp / 5) * (1 - pd / 600) });
                             }
                         }
                     }
@@ -42546,6 +42835,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             dock:      ['utility-dock'],
             action:    ['action-dock'],
             autodrive: ['btn-autodrive'],
+            handbrake: ['btn-handbrake'],
         };
         const HUD_KEYS = Object.keys(HUD_PARTS);
 
@@ -42603,6 +42893,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             serialize() { return [...this.revealed]; }
             deserialize(list) {
                 this.revealed = Array.isArray(list) ? new Set(list.filter(k => HUD_PARTS[k])) : new Set(HUD_KEYS);
+                if (this.revealed.has('autodrive')) this.revealed.add('handbrake');   // saves from before the handbrake
                 this.apply();
             }
         }
@@ -43892,8 +44183,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     if (e.key === ' ') {
                         e.preventDefault();
-                        // MODIFIED: Removed !this.isDriving check to allow shooting from car
-                        if (this.shootCooldown <= 0 && this.player.visible && !this.paused) {
+                        // Behind the wheel Space is the handbrake (update.js); the mouse still fires
+                        if (!this.isDriving && this.shootCooldown <= 0 && this.player.visible && !this.paused) {
                             this.fireWeapon();
                         }
                     }
@@ -44148,6 +44439,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.flitBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.triggerFlit(); });
                 this.autodriveBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.toggleAutoDrive(); });
                 this.autodriveBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.toggleAutoDrive(); });
+                // Handbrake: held for as long as a finger (or the mouse) is on it
+                const hbBtn = document.getElementById('btn-handbrake');
+                if (hbBtn) {
+                    const hbSet = (on) => { this.handbrakeHeld = on; hbBtn.classList.toggle('held', on); };
+                    hbBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); try { hbBtn.setPointerCapture(e.pointerId); } catch (_) {} hbSet(true); });
+                    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) hbBtn.addEventListener(ev, () => hbSet(false));
+                    hbBtn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+                    this.handbrakeBtn = hbBtn;
+                }
 
                 this.zibSkipBtn.addEventListener('mousedown', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
                 this.zibSkipBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
@@ -46883,7 +47183,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // 3. RESET POINTER EVENTS (Re-enable Buttons)
                 document.getElementById('game-ui').style.pointerEvents = 'none'; 
-                const buttons = document.querySelectorAll('.game-btn, #btn-fire, #btn-heal, #btn-flit, #btn-autodrive, #btn-nv, #btn-holster'); 
+                const buttons = document.querySelectorAll('.game-btn, #btn-fire, #btn-heal, #btn-flit, #btn-autodrive, #btn-handbrake, #btn-nv, #btn-holster'); 
                 buttons.forEach(b => b.style.pointerEvents = 'auto');
                 document.getElementById('input-zone-left').style.pointerEvents = 'auto';
             },
@@ -50490,6 +50790,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                     this.autodriveBtn.style.display = 'none';
                     this.autodriveBtn.classList.remove('engaged');
+                    if (this.handbrakeBtn) { this.handbrakeBtn.style.display = 'none'; this.handbrakeBtn.classList.remove('held'); }
+                    this.handbrakeHeld = false; this.car.handbrake = false;
                     this.holsterBtn.style.display = 'flex';
                     this.fireBtn.style.display = this.weaponHolstered ? 'none' : 'flex';
                     this.emoteBtn.style.display = this.weaponHolstered ? 'flex' : 'none';
@@ -50582,6 +50884,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (this.car === this.ownedCar) this.ownedCar.markerTargetOpacity = 0;
 
                     this.autodriveBtn.style.display = 'flex';
+                    if (this.handbrakeBtn) this.handbrakeBtn.style.display = 'flex';
                     this.holsterBtn.style.display = 'none';
                     this.fireBtn.style.display = 'flex';
                     this.emoteBtn.style.display = 'none';
@@ -52206,20 +52509,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.car.update(this.player, null, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, getColliders(this.activeMap));
                         if (inputX !== 0 || inputY !== 0) { this.car.disableAutoDrive(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED"); }
                     } else {
-                        let gas = 0; let turn = 0;
-                        if (this.joystick.active) { 
-                            const carDirX = Math.cos(this.car.angle); const carDirY = Math.sin(this.car.angle); 
-                            gas = (inputX * carDirX + inputY * carDirY); 
-                            if (Math.abs(inputX) > 0.1 || Math.abs(inputY) > 0.1) { 
-                                const inputAngle = Math.atan2(inputY, inputX); let angleDiff = inputAngle - this.car.angle; 
-                                angleDiff = normalizeAngle(angleDiff); 
-                                turn = clamp(angleDiff * 2.0, -1, 1);
-                                if (Math.abs(turn) < 0.1) turn = 0;
-                            } 
-                        } else { 
-                            if (inputY < 0) gas = 1; if (inputY > 0) gas = -0.5; if (inputX < 0) turn = -1; if (inputX > 0) turn = 1; 
-                        }
-                        this.car.manualGas = gas; this.car.manualTurn = turn;
+                        this.car.driverInput(inputX, inputY, this.joystick.active);
+                        this.car.handbrake = !!(this.keys[' '] || this.handbrakeHeld);
                         this.car.updateManualDriving(this.activeMap.walls, getColliders(this.activeMap), this.weather, this.decals);
                     }
                     // Player sits at seat 0, not car center
@@ -52643,9 +52934,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     camX = this.camera.x;
                     camY = this.camera.y;
                 } else {
+                    /* Behind the wheel the camera looks a little down the road, easing after the
+                       car's velocity (per frame, so it glides between ticks); on foot it drifts home. */
+                    const dtCam = Math.min(100, Math.max(0, _frameTime - (this._camLeanT || _frameTime)));
+                    this._camLeanT = _frameTime;
+                    const drv = this.isDriving && this.car, LA = CONFIG.VEHICLE_DRIVE.CAM_LOOK_AHEAD;
+                    const kCam = 1 - Math.exp(-dtCam / LA.TAU_MS);
+                    this.driveLeanX = (this.driveLeanX || 0) + ((drv ? (this.car.vx || 0) * LA.PER_SPEED : 0) - (this.driveLeanX || 0)) * kCam;
+                    this.driveLeanY = (this.driveLeanY || 0) + ((drv ? (this.car.vy || 0) * LA.PER_SPEED : 0) - (this.driveLeanY || 0)) * kCam;
                     // Scoped with a sniper, the camera leans down her line (engine/scope.js)
-                    camX = this.player.x + (this.scopeLeanX || 0);
-                    camY = this.player.y + (this.scopeLeanY || 0);
+                    camX = this.player.x + (this.scopeLeanX || 0) + this.driveLeanX;
+                    camY = this.player.y + (this.scopeLeanY || 0) + this.driveLeanY;
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
