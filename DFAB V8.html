@@ -4105,6 +4105,19 @@
                of phase = PI / w ticks). For the planted foot to stay put, that 2A
                sweep must equal the ground the body covers meanwhile (v * PI / w).
                With CADENCE 0.2: A ~ 7.85 * sqrt(v) -> 14.7px @3.5, 17.9px @5.2, 20.8px @7.0. */
+            // Humanoid shading (ui/humanoid-render.js humanShade): a shine down every limb, torso and
+            // head (they're cylinders and domes seen from above), a soft contact shadow cast along
+            // the sun, and at night a rim of the nearest street lamp's colour.
+            HUMAN_SHADE: {
+                HL_DAY: 0.24,           // shine alpha by day (tinted by the sun)
+                HL_NIGHT: 0.13,         // … and at night (lavender moonlight)
+                HL_RAIN: 0.12,          // extra shine when wet
+                SHADE: 0.22,            // the torso's side away from the light
+                SHADOW_DAY: 0.34, SHADOW_NIGHT: 0.3,    // contact shadow alphas
+                RIM_R: 180,             // a lamp this close (px) rims them in its colour
+                RIM_A: 0.6,
+                RIM_PEDS: 8             // pedestrians rimmed per frame (named characters always are)
+            },
             GAIT: {
                 CADENCE: 0.2,           // sqrt curve: within ~5% of the old 0.25 + 0.04v at speeds 3.5-7, but slows down at crawl speeds instead of shuffling
                 SLIP_FACTOR: 1.0,       // 1 = no slip. <1 = shorter strides (feet glide forward), >1 = longer (feet slip back)
@@ -4127,6 +4140,7 @@
                 CAM_HEIGHT: 700,        // virtual camera height (px) at REF_ZOOM; lower = stronger lean
                 REF_ZOOM: 1.0,          // zoomed out, the camera rises (leanCamHeight) so heights scale with footprints
                 FLOOR_HEIGHT: 9,        // px of height per floor
+                SQ_CORNER_R: 40,        // Silver Queen's rounded outer corners (px); 0 = square
                 MAX_FLOORS: 14          // taller buildings are capped so roofs don't swing too far
             },
 
@@ -5091,14 +5105,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return 'pistol';
         }
 
-        /** Barrel tip of a drawWeapon() shape in the weapon's own coords (scale 1).
-         *  Mirrors drawWeapon's shape order so the id resolves to the same model. */
+        /** Barrel tip of a weapon's drawn model in its own coords (scale 1): WEAPON_MODELS (ui/weapon-models.js). */
         function weaponMuzzleLocal(type) {
-            if (type.includes('pistol')) return { x: 12, y: 1 };
-            if (type.includes('sniper')) return { x: 55, y: 0.5 };
-            if (type.includes('rifle'))  return { x: 28, y: 1.5 };
-            if (type.includes('golden')) return { x: 20, y: 1 };
-            return { x: 12, y: 1 };
+            const m = weaponModel(type).muzzle;
+            return { x: m[0], y: m[1] };
         }
 
         /** World position of an actor's drawn muzzle if it faced `dirAngle` (falls back to its
@@ -21037,11 +21047,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (scaleX !== 1 || scaleY !== 1) ctx.scale(scaleX, scaleY);
                 if (bodyAlpha !== 1) ctx.globalAlpha = bodyAlpha;
                 
-                // Shadow (behind feet, which are at -X)
-                ctx.fillStyle = 'rgba(0,0,0,0.4)';
-                ctx.beginPath();
-                ctx.ellipse(-12, 0, 5, 10, 0, 0, Math.PI * 2);
-                ctx.fill();
+                // (their contact shadow is the renderer's: drawHumanContactShadow, cast along the sun)
                 
                 // Their own look (Pedestrian.makeLook) — hats, hair and all. Zoomed out (more of
                 // the crowd on screen, too small to read details) they get simple hair, no jewelry.
@@ -23909,11 +23915,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Draw shadow for each section
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                this.sections.forEach(section => {
+                if (this.roundR) this._leanFaces();                                // (rounded corners: the shadow follows them)
+                this.sections.forEach((section, si) => {
                     const sx = this.x + section.x;
                     const sy = this.y + section.y;
                     const shadowOffset = this.facadeDepth;
-                    ctx.fillRect(sx + shadowOffset, sy + shadowOffset, section.w, section.h);
+                    if (this._roundSec) { ctx.save(); ctx.translate(shadowOffset, shadowOffset); ctx.fill(this._roofPath(section, si)); ctx.restore(); }
+                    else ctx.fillRect(sx + shadowOffset, sy + shadowOffset, section.w, section.h);
                 });
                 
                 // Draw ground-level elements (entrance area, ground floor)
@@ -23982,10 +23990,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             /**
-             * Draw neon sign layer (ABOVE drawTop) - positioned over the entrance
-             * so the player can see it while approaching the transition point.
+             * The sign layer the engine draws after every building's top. With the lean on,
+             * each sign is drawn inside its own building's top pass instead (_paintSign, after
+             * the walls, before the roof), so a roof or a taller wall in front of it hides it —
+             * the perspective holds. Without the lean, it's drawn here as before.
              */
             drawSign(ctx) {
+                if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) return;
+                this._paintSign(ctx);
+            }
+
+            /**
+             * A neon sign over the entrance. Double Nights: script on the porte-cochère.
+             * Silver Queen: on the portico's roof, in its plane. Everyone else: on a small
+             * cantilevered awning two floors up over the door, in that plane (_signAwning).
+             */
+            _paintSign(ctx) {
                 if (this.style === 'double_nights') { if (typeof game !== 'undefined' && game.camera) this._dnDrawSign(ctx); return; }
                 if (!this.attachedSign || !this.attachedTransition) return;
                 
@@ -24009,6 +24029,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                     textY = sqG.yf + SQ_PORTICO.depth * 0.5;
                     ctx.globalAlpha = Math.max(0.45, this._sqFade == null ? 1 : this._sqFade);
+                } else if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) {
+                    const A = this._signAwning(ctx, signText, signFontSize);                 // the awning, then the sign lying on it
+                    LandmarkKit.plane(ctx, A.k);
+                    textY = A.y;
                 }
                 
                 // --- FLICKER ENGINE ---
@@ -24102,7 +24126,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 } // End full quality else block
                 
                 ctx.restore();
-                if (this.style === 'silver_queen' && CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) this._sqDrawColumns(ctx);
+            }
+
+            /**
+             * A cantilevered entrance awning for the sign: a slab two floors up, out from the wall
+             * over the door, as wide as the sign. Draws it (LandmarkKit.ledge) and returns the plane
+             * and the line the sign sits on.
+             */
+            _signAwning(ctx, text, size) {
+                if (!this._awn || this._awn.text !== text) {
+                    const m = document.createElement('canvas').getContext('2d'); m.font = `${size}px "Great Vibes", cursive`;
+                    const tw = Math.min(this.w - 20, m.measureText(text).width + 34), d = Math.round(size * 0.95);
+                    const cx = this.attachedTransition.x + this.attachedTransition.w / 2, wall = this.attachedTransition.y - 10;
+                    this._awn = { text, x0: cx - tw / 2, x1: cx + tw / 2, wall, d, z: 2 * CONFIG.BUILDINGS.FLOOR_HEIGHT };
+                }
+                const A = this._awn, K = LandmarkKit;
+                K.ledge(ctx, [{ a: [A.x0, A.wall], b: [A.x1, A.wall], nx: 0, ny: 1 }], A.z, A.d, 3,
+                        darkenHex(this.colors.wall || '#2a2436', 8), darkenHex(this.colors.wall || '#2a2436', 22), `rgba(${hexToRgb(this.colors.accent || '#a469ff')}, 0.55)`);
+                return { k: K.k(A.z + 0.5), y: A.wall + A.d / 2 };
             }
             
             
@@ -24236,6 +24277,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
                     this.sills = { lip: 'rgba(236, 232, 250, 0.75)', shade: 'rgba(20, 10, 48, 0.55)' };   // window sills (_drawFaceWindows)
+                    this.roundR = CONFIG.BUILDINGS.SQ_CORNER_R;                  // rounded outer corners (_roundCorners)
                     this.emissiveReach = 700;                              // searchlight beams reach well past the footprint
                 }
             },
@@ -24292,12 +24334,65 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         });
                         for (const [lo, hi] of segs) {
                             if (hi - lo < 2) continue;
-                            faces.push(e.horiz ? { side: e.side, section: i, x1: lo, y1: e.fixed, x2: hi, y2: e.fixed }
-                                               : { side: e.side, section: i, x1: e.fixed, y1: lo, x2: e.fixed, y2: hi });
+                            const nx = e.side === 'E' ? 1 : e.side === 'W' ? -1 : 0, ny = e.side === 'S' ? 1 : e.side === 'N' ? -1 : 0;
+                            faces.push(e.horiz ? { side: e.side, section: i, x1: lo, y1: e.fixed, x2: hi, y2: e.fixed, nx, ny }
+                                               : { side: e.side, section: i, x1: e.fixed, y1: lo, x2: e.fixed, y2: hi, nx, ny });
                         }
                     }
                 });
+                if (this.roundR) this._roundCorners(faces, S);
                 return (this._faces = faces);
+            },
+
+            /**
+             * Rounded outer corners (this.roundR, px): each straight face stops R short of an outer
+             * corner and the corner becomes an arc of short facets (side 'C', with their own outward
+             * normal). A corner where another section continues the wall stays square.
+             */
+            _roundCorners(faces, S) {
+                const R = this.roundR, N = 5, inside = (x, y, j) => S.some((o, k) => k !== j && x >= o.x0 - 0.5 && x <= o.x1 + 0.5 && y >= o.y0 - 0.5 && y <= o.y1 + 0.5);
+                this._roundSec = S.map((s, j) => {
+                    const corners = [[s.x0, s.y0, -1, -1], [s.x1, s.y0, 1, -1], [s.x1, s.y1, 1, 1], [s.x0, s.y1, -1, 1]];   // tl, tr, br, bl
+                    return corners.map(([x, y, sx, sy]) => {
+                        if (inside(x, y, j)) return 0;
+                        // trim the two straight faces that meet here
+                        for (const f of faces) {
+                            if (f.section !== j) continue;
+                            if (f.x1 === x && f.y1 === y) { if (f.y1 === f.y2) f.x1 += R * (f.x2 > f.x1 ? 1 : -1); else f.y1 += R * (f.y2 > f.y1 ? 1 : -1); }
+                            if (f.x2 === x && f.y2 === y) { if (f.y1 === f.y2) f.x2 -= R * (f.x2 > f.x1 ? 1 : -1); else f.y2 -= R * (f.y2 > f.y1 ? 1 : -1); }
+                        }
+                        // the arc: centre R in from the corner, from one face's end round to the other's
+                        const cx = x - sx * R, cy = y - sy * R, a0 = Math.atan2(sy, 0), a1 = Math.atan2(0, sx);
+                        let da = a1 - a0; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
+                        for (let i = 0; i < N; i++) {
+                            const t0 = a0 + da * i / N, t1 = a0 + da * (i + 1) / N, tm = (t0 + t1) / 2;
+                            faces.push({ side: 'C', section: j, x1: cx + Math.cos(t0) * R, y1: cy + Math.sin(t0) * R, x2: cx + Math.cos(t1) * R, y2: cy + Math.sin(t1) * R, nx: Math.cos(tm), ny: Math.sin(tm) });
+                        }
+                        return R;
+                    });
+                });
+            },
+
+            /** A section's footprint as points (its rounded corners traced), for shadows. */
+            _footprint(section, si) {
+                const x0 = this.x + section.x, y0 = this.y + section.y, x1 = x0 + section.w, y1 = y0 + section.h;
+                if (this.roundR) this._leanFaces();
+                const r = this._roundSec && this._roundSec[si];
+                if (!r) return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+                const pts = [], arc = (cx, cy, R, a0) => { for (let i = 0; i <= 5; i++) { const a = a0 + i / 5 * Math.PI / 2; pts.push([cx + Math.cos(a) * R, cy + Math.sin(a) * R]); } };
+                if (r[0]) arc(x0 + r[0], y0 + r[0], r[0], Math.PI); else pts.push([x0, y0]);
+                if (r[1]) arc(x1 - r[1], y0 + r[1], r[1], -Math.PI / 2); else pts.push([x1, y0]);
+                if (r[2]) arc(x1 - r[2], y1 - r[2], r[2], 0); else pts.push([x1, y1]);
+                if (r[3]) arc(x0 + r[3], y1 - r[3], r[3], Math.PI / 2); else pts.push([x0, y1]);
+                return pts;
+            },
+
+            /** A section's roof outline, with its rounded corners (world coordinates). */
+            _roofPath(section, si, inset = 0) {
+                const r = this._roundSec && this._roundSec[si], p = new Path2D(), x = this.x + section.x + inset, y = this.y + section.y + inset;
+                const w = section.w - inset * 2, h = section.h - inset * 2;
+                if (r) p.roundRect(x, y, w, h, r.map(v => Math.max(0, v - inset))); else p.rect(x, y, w, h);
+                return p;
             },
 
             _leanScale(extraFloors = 0) {
@@ -24310,7 +24405,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _visibleFaces(cam) {
                 return this._leanFaces().filter(f =>
                     (f.side === 'S' && cam.y > f.y1) || (f.side === 'N' && cam.y < f.y1) ||
-                    (f.side === 'E' && cam.x > f.x1) || (f.side === 'W' && cam.x < f.x1));
+                    (f.side === 'E' && cam.x > f.x1) || (f.side === 'W' && cam.x < f.x1) ||
+                    (f.side === 'C' && (cam.x - (f.x1 + f.x2) / 2) * f.nx + (cam.y - (f.y1 + f.y2) / 2) * f.ny > 0));
             },
 
             _drawLeanTop(ctx) {
@@ -24323,7 +24419,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const f of faces) {
                     const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
                     const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
-                    const shade = f.side === 'S' ? 18 : f.side === 'N' ? -8 : 6;
+                    const shade = f.side === 'S' ? 18 : f.side === 'N' ? -8 : f.side === 'C' ? Math.round(6 + (f.ny > 0 ? 12 : 14) * f.ny) : 6;
                     const g = ctx.createLinearGradient((ax + bx) / 2, (ay + by) / 2, (cx + dx) / 2, (cy + dy) / 2);
                     g.addColorStop(0, darkenHex(wall, 6));
                     g.addColorStop(1, shade >= 0 ? lightenHex(wall, shade) : darkenHex(wall, -shade));
@@ -24334,6 +24430,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this._drawFaceFeature(ctx, f, P, false);
                 }
                 if (this.style === 'silver_queen') this._sqDrawPortico(ctx);
+                this._paintSign(ctx);                                                          // the sign, before the roof (so the roof can hide it)
+                if (this.style === 'silver_queen') this._sqDrawColumns(ctx);                   // the lantern columns stand in front of the portico
                 // --- Roofs (drawn in world coords under the scale-about-camera transform) ---
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const sq = this.style === 'silver_queen';
@@ -24342,7 +24440,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (sq) {                                                                  // lavender slab with a soft sheen (world-space gradients, made once)
                         ctx.fillStyle = LandmarkKit.grad(this, 'roof' + si, () => { const g = ctx.createLinearGradient(sx, sy, sx + section.w, sy + section.h); g.addColorStop(0, SQ_THEME.roof); g.addColorStop(1, SQ_THEME.roofLo); return g; });
                     } else ctx.fillStyle = this.colors.roof;
-                    ctx.fillRect(sx, sy, section.w, section.h);
+                    const outline = this._roundSec ? this._roofPath(section, si) : null;
+                    if (outline) { ctx.save(); ctx.fill(outline); ctx.clip(outline); } else ctx.fillRect(sx, sy, section.w, section.h);
                     if (sq) {                                                                  // a pearl sheen pooled toward the north-west corner
                         ctx.fillStyle = LandmarkKit.grad(this, 'sheen' + si, () => {
                             const pg = ctx.createRadialGradient(sx + section.w * 0.25, sy + section.h * 0.2, 10, sx + section.w * 0.25, sy + section.h * 0.2, Math.max(section.w, section.h) * 0.8);
@@ -24351,9 +24450,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                     ctx.strokeStyle = sq ? 'rgba(217,191,134,0.08)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;          // tar seams
                     for (let gx = 36; gx < section.w; gx += 36) { ctx.beginPath(); ctx.moveTo(sx + gx, sy); ctx.lineTo(sx + gx, sy + section.h); ctx.stroke(); }
+                    if (outline) ctx.restore();
                     ctx.strokeStyle = sq ? SQ_THEME.trim : lightenHex(this.colors.roof, 22); ctx.lineWidth = sq ? 4 : 5;       // parapet
-                    ctx.strokeRect(sx + 2.5, sy + 2.5, section.w - 5, section.h - 5);
-                    if (sq) { ctx.strokeStyle = 'rgba(45,29,89,0.45)'; ctx.lineWidth = 1; ctx.strokeRect(sx + 6, sy + 6, section.w - 12, section.h - 12); }
+                    if (outline) ctx.stroke(this._roofPath(section, si, 2.5)); else ctx.strokeRect(sx + 2.5, sy + 2.5, section.w - 5, section.h - 5);
+                    if (sq) { ctx.strokeStyle = 'rgba(45,29,89,0.45)'; ctx.lineWidth = 1; if (outline) ctx.stroke(this._roofPath(section, si, 6)); else ctx.strokeRect(sx + 6, sy + 6, section.w - 12, section.h - 12); }
                 });
                 if (sq) this._sqRoofEdgeLights(ctx, false);
                 if (this.style) this._drawRoofFeatures(ctx, false);
@@ -24418,6 +24518,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * at night the lips catch the building's lamp colour (LandmarkKit.rim).
              */
             _drawFaceWindows(ctx, f, P, emissive) {
+                if (f.side === 'C') return;                          // rounded corners: no windows on the curve
                 const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS);
                 const ax = f.x1, ay = f.y1, bx = f.x2, by = f.y2;
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
@@ -24923,8 +25024,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             gold: '#e8c27a', goldHi: '#fff1c9'
         };
         const SQ_PORTICO = {
-            depth: 52, floors: 4, overhang: 6, colR: 5.5,
-            colLine: 60, colFloors: 7,          // columns stand just in front of the canopy and rise above it
+            depth: 52, floors: 4, overhang: 6, colR: 3.6,
+            colLine: 74, colFloors: 3.5,        // lantern columns: free-standing on the floor well in front of the portico, lanterns under its roof line
             // Column offsets from the door centre (px). The paired columns flank the
             // door; ±80 and ±143 line up with the pilasters that run up the wall.
             cols: [-168, -143, -80, -62, 62, 80, 143, 168],
@@ -25003,6 +25104,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** Verandas: glass-railed balconies in the bays between pilasters, every fourth floor. */
             _sqBalconies(f) {
+                if (f.side === 'C') return [];
                 if (f._sqBal) return f._sqBal;
                 const pil = this._sqPilasters(f), out = [];
                 if (!f._sqEntrance) {
@@ -25032,9 +25134,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const ex = bx - ax, ey = by - ay, tx = cx - dx, ty = cy - dy, ux = dx - ax, uy = dy - ay;
                 const at = (u, v) => [ax + ex * u + (ux + tx * u - ex * u) * v, ay + ey * u + (uy + ty * u - ey * u) * v];
                 const sub = (p, u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); p.moveTo(a[0], a[1]); p.lineTo(b[0], b[1]); p.lineTo(c[0], c[1]); p.lineTo(d[0], d[1]); p.closePath(); };
-                const pil = this._sqPilasters(f), H = this._sqH(), lod = _zoomLOD, K = LandmarkKit, T = SQ_THEME;
+                const corner = f.side === 'C', pil = corner ? { us: [], w: 0, len: Math.hypot(f.x2 - f.x1, f.y2 - f.y1) } : this._sqPilasters(f), H = this._sqH(), lod = _zoomLOD, K = LandmarkKit, T = SQ_THEME;
                 const vBelt = SQ_PORTICO.floors * CONFIG.BUILDINGS.FLOOR_HEIGHT / H;
-                const nx = f.side === 'E' ? 1 : f.side === 'W' ? -1 : 0, ny = f.side === 'S' ? 1 : f.side === 'N' ? -1 : 0;
+                const nx = f.nx, ny = f.ny;
                 const edge = [{ a: [ax, ay], b: [bx, by], nx, ny }];
                 ctx.save();
                 ctx.globalAlpha *= Math.min(1, (depth - 4) / 14);
@@ -25058,13 +25160,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Belt course at the portico's roof line, the crown cornice at the top
                         lips.push(K.ledge(ctx, edge, (vBelt + 0.012) * H, 3, 0.022 * H, '#6b5cae', T.roof, 'rgba(236, 226, 255, 0.55)'));
                         lips.push(K.ledge(ctx, edge, H, 4, 0.045 * H, '#ddd8ee', '#9d95bd', 'rgba(255, 250, 255, 0.7)'));
-                        if (lod === 0) {                                                                         // dentils under the cornice
+                        if (lod === 0 && !corner) {                                                              // dentils under the cornice
                             const n = Math.floor(pil.len / 6), den = new Path2D();
                             for (let i = 0; i < n; i++) { const u = (i + 0.3) / n; sub(den, u, u + 0.4 / n, 0.935, 0.952); }
                             ctx.fillStyle = 'rgba(38,28,58,0.55)'; ctx.fill(den);
                         }
                         f._sqLips = lips;
                         if (f._sqEntrance) this._sqArch(ctx, f, at, false);
+                    } else if (corner) {                                                                         // round the corner, only the ledges' rim
+                        const rim = K.rim(this, this._sqDark || 0);
+                        if (rim.a > 0.01 && f._sqLips) { ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(${rim.rgb}, ${0.6 * rim.a})`; ctx.lineWidth = 1.2; for (const lp of f._sqLips) if (lp) ctx.stroke(lp); }
                     } else if ((this._sqDark || 0) > 0.05) {
                         ctx.globalCompositeOperation = 'lighter';
                         const pulse = 0.82 + 0.18 * Math.sin(_gameTimeSec * 0.7 + (this._seed || 0));
@@ -25238,14 +25343,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             },
 
-            /** Portico columns: hexagonal plinth, silver shaft, collar at the canopy line, hexagon lantern on top.
-                Drawn after the sign, since the columns stand in front of the canopy and rise above it. */
+            /** Lantern columns: hexagonal plinth, silver shaft, a gilt collar under the lantern, hexagon lantern on top.
+                Drawn after the sign (they stand in front of the portico), before the building's roof. */
             _sqDrawColumns(ctx) {
                 const g = this._sqPortico();
                 if (!g) return;
                 const T = SQ_THEME, r = SQ_PORTICO.colR, P3 = (x, y, z) => this._sqP(x, y, z);
                 const hex = (x, y, rr) => { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.closePath(); };
-                const kT = this._sqK(g.zCol), kC = this._sqK(g.z);
+                const zC = g.zCol * 0.8, kT = this._sqK(g.zCol), kC = this._sqK(zC);
                 ctx.save();
                 // All eight columns batched: plinths, shafts (silver, a bright line down the lit side, a dark one down the other), collars, lanterns
                 const plin = new Path2D(), shafts = new Path2D(), hiL = new Path2D(), loL = new Path2D(), collars = new Path2D(), lanO = new Path2D(), lanI = new Path2D();
@@ -25259,9 +25364,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     shafts.moveTo(c.x + r, c.y); shafts.arc(c.x, c.y, r, 0, Math.PI * 2);
                     hiL.moveTo(c.x - px * r * 0.2, c.y - py * r * 0.2); hiL.lineTo(t0[0] - px * r * 0.2 * kT, t0[1] - py * r * 0.2 * kT);
                     loL.moveTo(c.x + px * r * 0.75, c.y + py * r * 0.75); loL.lineTo(t0[0] + px * r * 0.75 * kT, t0[1] + py * r * 0.75 * kT);
-                    const cc = P3(c.x, c.y, g.z);                                                          // collar where the canopy ties in
+                    const cc = P3(c.x, c.y, zC);                                                           // gilt collar under the lantern
                     collars.moveTo(cc[0] - px * r * kC * 1.15, cc[1] - py * r * kC * 1.15); collars.lineTo(cc[0] + px * r * kC * 1.15, cc[1] + py * r * kC * 1.15);
-                    hexP(lanO, t0[0], t0[1], (r + 3.2) * kT); hexP(lanI, t0[0], t0[1], (r + 0.6) * kT);  // lantern: silver frame, violet glass
+                    hexP(lanO, t0[0], t0[1], (r + 1.8) * kT); hexP(lanI, t0[0], t0[1], (r + 0.2) * kT);  // lantern: silver frame, violet glass
                 }
                 ctx.fillStyle = '#4c4468'; ctx.fill(plin); ctx.strokeStyle = '#a49cc6'; ctx.lineWidth = 1; ctx.stroke(plin);
                 ctx.fillStyle = T.silver; ctx.fill(shafts);
@@ -25288,11 +25393,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!g) return;
                 const w = g.x1 - g.x0, d = SQ_PORTICO.colLine + 8;
                 ctx.save();
-                ctx.fillStyle = SQ_THEME.marble; ctx.fillRect(g.x0, g.yf, w, d);
-                ctx.beginPath(); ctx.rect(g.x0, g.yf, w, d); ctx.clip();
-                ctx.strokeStyle = 'rgba(205,190,245,0.10)'; ctx.lineWidth = 1; ctx.beginPath();
-                for (let x = g.x0 - d; x < g.x1 + d; x += 16) { ctx.moveTo(x, g.yf); ctx.lineTo(x + d, g.yf + d); ctx.moveTo(x + d, g.yf); ctx.lineTo(x, g.yf + d); }
+                // The floor: square marble flags (not the roof's diagonal inlay, so the two never read as one)
+                ctx.fillStyle = '#231a44'; ctx.fillRect(g.x0, g.yf, w, d);
+                ctx.strokeStyle = 'rgba(205,190,245,0.12)'; ctx.lineWidth = 1; ctx.beginPath();
+                for (let x = g.x0 + 17; x < g.x1; x += 17) { ctx.moveTo(x, g.yf); ctx.lineTo(x, g.yf + d); }
+                for (let y = g.yf + 17; y < g.yf + d; y += 17) { ctx.moveTo(g.x0, y); ctx.lineTo(g.x1, y); }
                 ctx.stroke();
+                // The portico's shade on the floor under it: deep by the doors, lifting at its front edge
+                const sh = ctx.createLinearGradient(0, g.yf, 0, g.yb + 6);
+                sh.addColorStop(0, 'rgba(6, 2, 16, 0.55)'); sh.addColorStop(0.85, 'rgba(6, 2, 16, 0.35)'); sh.addColorStop(1, 'rgba(6, 2, 16, 0)');
+                ctx.fillStyle = sh; ctx.fillRect(g.x0, g.yf, w, g.yb + 6 - g.yf);
+                // Each lantern column's contact shadow, where it meets the floor
+                ctx.fillStyle = 'rgba(6, 2, 16, 0.45)'; ctx.beginPath();
+                for (const c of g.cols) { ctx.moveTo(c.x + 9, c.y + 2); ctx.ellipse(c.x + 1.5, c.y + 2, 7.5, 4, 0, 0, Math.PI * 2); }
+                ctx.fill();
                 ctx.restore();
                 ctx.save();
                 const ys = g.yf + d;                                                                          // steps
@@ -25527,7 +25641,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const cam = game.camera, k = 1 + this._leanScale();                                            // moonlit specular across the roofs
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const b = this.getBounds(), sweep = ((t * 0.012) % 1.6) - 0.3, sx = b.x + b.w * sweep;
-                ctx.beginPath(); for (const s of this.sections) ctx.rect(this.x + s.x, this.y + s.y, s.w, s.h); ctx.clip();
+                const clipP = new Path2D(); this.sections.forEach((s, si) => clipP.addPath(this._roofPath(s, si))); ctx.clip(clipP);
                 const g = ctx.createLinearGradient(sx - 140, b.y, sx + 140, b.y + 90);
                 g.addColorStop(0, 'rgba(220,210,255,0)'); g.addColorStop(0.5, `rgba(220,210,255,${0.07 * a})`); g.addColorStop(1, 'rgba(220,210,255,0)');
                 ctx.fillStyle = g; ctx.fillRect(b.x, b.y, b.w, b.h);
@@ -25806,6 +25920,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!this._sqBulbs) {
                     const inset = 10, step = 22, bulbs = [];
                     for (const f of this._leanFaces()) {
+                        if (f.side === 'C') { bulbs.push([(f.x1 + f.x2) / 2 - f.nx * inset, (f.y1 + f.y2) / 2 - f.ny * inset]); continue; }
                         const horiz = f.y1 === f.y2, lo = horiz ? f.x1 : f.y1, hi = horiz ? f.x2 : f.y2;
                         const inward = f.side === 'S' || f.side === 'E' ? -inset : inset;
                         const n = Math.max(1, Math.round((hi - lo - 2 * inset) / step));
@@ -26186,6 +26301,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 K.rings(ctx, (() => { const p = new Path2D(); for (const e of lv) { p.moveTo(e.a[0], e.a[1]); p.lineTo(e.b[0], e.b[1]); } return p; })(), [K.k(DN.ATRIUM_Z)], 0.8, 'rgba(232,194,122,0.35)');
                 this._dnAtriumRoof(ctx, false);
                 this._dnCanopy(ctx, G, false);
+                this._dnDrawSign(ctx);                                   // the script on the canopy, before the towers can hide it
                 this._dnTop = {};
                 for (const [sh, key] of [[G.west, 'w'], [G.east, 'e']]) {
                     this._dnTop[key] = this._dnTowerWalls(ctx, sh, key, H);
@@ -37440,6 +37556,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              { skinColor, gender: 'female'|'male'|'androgynous', hair: { type, color },
                top:    { type, color, trim?, inner? },   // inner = colour under an open jacket/coat
                bottom: { type, color, trim? },
+               (any piece can carry finish: 'gloss' | 'matte' — shading is matte unless the item
+                or its WARDROBE piece says gloss, e.g. leggings)
                shoes:  { type, color },
                hat:    { type, color, trim? } | null,
                jewelry: [ { type, color? }, ... ],
@@ -37725,7 +37843,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.moveTo(g.hip.x + 1, -2); ctx.lineTo(g.hip.x - 2, -3.5); ctx.moveTo(g.hip.x + 1, 2); ctx.lineTo(g.hip.x - 2, 3.5);   // bow at the back
                     ctx.stroke();
                 } },
-                leggings: { legs: 'full', shade: 0.5, detail(ctx, g, c) { ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.6; for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.moveTo(g.hipPt[i][0], g.hipPt[i][1]); ctx.lineTo(g.feet[i][0], g.feet[i][1]); ctx.stroke(); } } },
+                leggings: { legs: 'full', shade: 0.5, finish: 'gloss', detail(ctx, g, c) { ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.6; for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.moveTo(g.hipPt[i][0], g.hipPt[i][1]); ctx.lineTo(g.feet[i][0], g.feet[i][1]); ctx.stroke(); } } },
                 joggers:  { legs: 'full', detail(ctx, g, c) {
                     ctx.fillStyle = g.darken(c.color, 0.6);                 // cuffs at the ankles
                     for (let i = 0; i < 2; i++) { const [kx, ky] = g.knees[i], [fx, fy] = g.feet[i]; ctx.beginPath(); ctx.arc(kx + (fx - kx) * 0.82, ky + (fy - ky) * 0.82, 2.8, 0, Math.PI * 2); ctx.fill(); }
@@ -37944,6 +38062,287 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return { tops, bottoms, shoes, hats, jewelry };
         })();
 
+        /* =====================================================================
+           WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
+           the barrel, the grip hand near 0,0, +y to the holder's right), each in a
+           material. A model is painted once into a sprite (bakeWeapon) and stamped
+           by drawWeapon (ui/humanoid-render.js); only its lights are drawn live.
+           Ethereal, elegant sci-fi seen from straight above, in the shapes of
+           ETERNAL's catalog sketches, shaded as angular metallic glass: hard bevel
+           facets, slanted glass glints, faceted gem knobs, glass sleeves over the
+           lines of light. The shading runs along the gun, so it holds whichever
+           way the holder turns and never needs relighting.
+             muzzle   barrel tip (shots and the laser leave from here: weaponMuzzleLocal)
+             rail     where the laser module sits (its front end)
+             brass    the glitter colour of the spent casings each shot throws (null: an energy gun)
+             glow     live lights [x, y, r, colour], breathing slowly in a wave down the gun
+             run      a spark that glides down a light line [x0, x1, y, colour]
+           ===================================================================== */
+        const GUN_MATERIALS = {             // base, edge (the dark facet), hi (the bright bevel) — jewel tones, pearl, tinted obsidian glass
+            abyss:      ['#1a1436', '#06030f', '#5c4fa0'],      // obsidian glass, violet in its depths
+            midnight:   ['#172a86', '#050a30', '#6f8cff'],
+            lavender:   ['#a891ec', '#4a3790', '#f0e8ff'],
+            periwinkle: ['#8392f7', '#2e3796', '#e2e6ff'],
+            pearl:      ['#ece8fb', '#8f86b8', '#ffffff'],
+            crimson:    ['#c0143e', '#48031a', '#ff7a98'],
+            teal:       ['#12b8a4', '#034a42', '#9cfff2'],
+            bronze:     ['#a0602e', '#3a1606', '#f6b477'],       // rose bronze
+            molten:     ['#ff6418', '#7a1c00', '#ffd09a'],
+            gold:       ['#d2a038', '#5a3a06', '#fff0b0'],
+            champagne:  ['#eddcb2', '#8e7446', '#fffaea'],
+            pink:       ['#e81c84', '#5e0430', '#ffa0d0'],
+            violet:     ['#4a24a0', '#14063a', '#b596ff']
+        };
+
+        // Shapes (from the sketches): a rounded knob at the rear where the hand sits, a band that bulges out
+        // both sides (the side view's big ring), a long rounded slide or barrel, square collars with slots of
+        // light, a side knob and emblem, a nub at the muzzle.
+        // _r slab x0→x1 centred on cy, w wide · _cap the same, fully rounded · _c a knob (a faceted gem) ·
+        // _e/_ce lights (baked with a halo) · _g a glass sleeve over a light · _hole a bore · _slots three slots.
+        const _r = (x0, x1, cy, w, m, r = 0.3) => ({ rr: [x0, cy - w / 2, x1 - x0, w, r], m });
+        const _cap = (x0, x1, cy, w, m) => _r(x0, x1, cy, w, m, w / 2);
+        const _c = (x, y, r, m) => ({ dot: [x, y, r], m });
+        const _e = (x0, x1, cy, w, c) => ({ rr: [x0, cy - w / 2, x1 - x0, w, 0.2], c, emit: true });
+        const _ce = (x, y, r, c) => ({ dot: [x, y, r], c, emit: true });
+        const _g = (x0, x1, cy, w) => ({ rr: [x0, cy - w / 2, x1 - x0, w, w / 2], glass: true });
+        const _hole = (x, y, r) => ({ dot: [x, y, r], c: '#020104' });
+        const _slots = (x0, x1, cy, c) => [-1.3, 0, 1.3].map(o => _e(x0, x1, cy + o, 0.42, c));
+
+        const WEAPON_MODELS = {
+            pistol_fpx: {                                                                       // obsidian glass with deep-blue light (catalog sketch)
+                stance: 'pistol', muzzle: [13.4, 1], rail: [10.5, 4.3], brass: '#6f8cff',
+                parts: [
+                    _c(-2, 1, 2.4, 'abyss'), _c(-2.2, 1, 1.05, 'midnight'),                     // the rear knob
+                    _r(1, 12.2, 1, 4.4, 'abyss', 1.2),                                         // the slide
+                    _e(3.4, 9.6, 1, 0.45, '#4a78ff'), _g(3, 10, 1, 1.5),                        // a light down its spine, under glass
+                    _r(10.3, 11.9, 1, 1, 'midnight', 0.2), _e(10.6, 11.6, 1, 0.45, '#8fb0ff'),  // the sight notch
+                    _cap(11.6, 13.4, 1, 2.6, 'midnight'),                                       // the muzzle nub
+                    _cap(-1.4, 2.2, 1, 6.8, 'midnight'),                                        // the ring band, bulging both sides
+                    _cap(-0.6, 1.4, 1, 5.2, 'abyss'),
+                    _ce(0.4, -1.8, 0.75, '#4a78ff'), _ce(0.4, 3.8, 0.75, '#4a78ff')             // the ring's light at each side
+                ],
+                glow: [[0.4, -1.8, 2.6, '#4a78ff'], [0.4, 3.8, 2.6, '#4a78ff'], [6.5, 1, 2.6, '#4a78ff'], [11.1, 1, 2.2, '#8fb0ff']],
+                run: [3.4, 9.6, 1, '#9fbaff']
+            },
+            pistol_anavia: {                                                                    // periwinkle and lavender, a light for a core
+                stance: 'pistol', muzzle: [13.4, 1], rail: [10, 4.5], brass: null,
+                parts: [
+                    _c(-1.8, 1, 2.3, 'lavender'), _c(-2, 1, 1, 'periwinkle'),
+                    _r(0.6, 11.4, 1, 4.8, 'lavender', 2),
+                    _e(4, 10.2, 1, 0.9, '#9aa6ff'), _g(3.6, 10.6, 1, 2),                        // the core, under glass
+                    _c(12.2, 1, 2, 'periwinkle'), _ce(12.5, 1, 0.9, '#c4cbff'),                 // the front orb
+                    _cap(0.6, 3.4, 1, 7, 'periwinkle'),
+                    _ce(2, -2, 0.7, '#9fb0ff'), _ce(2, 4, 0.7, '#9fb0ff')
+                ],
+                glow: [[2, -2, 2.2, '#9fb0ff'], [2, 4, 2.2, '#9fb0ff'], [7, 1, 2.8, '#a58ee6'], [12.5, 1, 3.2, '#8c9cff']],
+                run: [4, 10.2, 1, '#e4e0ff']
+            },
+            pistol_ganger: {                                                                    // the hot pink pistol: the FP-X's shape
+                stance: 'pistol', muzzle: [12.9, 1], rail: [10, 4.2], brass: '#ff6ab8',
+                parts: [
+                    _c(-2, 1, 2.3, 'pink'),
+                    _r(1, 11.6, 1, 4.2, 'pink', 1.2),
+                    _cap(11.2, 12.9, 1, 2.4, 'abyss'),
+                    _cap(-1.4, 2, 1, 6.4, 'abyss'),
+                    _e(0.3, 1, 1, 5.4, '#ff9ad2')
+                ],
+                glow: [[0.65, 1, 2.6, '#ff6ab8']]
+            },
+            rifle_rb98: {                                                                       // pearl and teal
+                stance: 'rifle', muzzle: [29.3, 1.5], rail: [21, 4.3], brass: '#6ff5e2',
+                parts: [
+                    _cap(-10, -4.6, 1.5, 4.6, 'pearl'),                                         // the rear pad
+                    _r(-5.6, 13.2, 1.5, 5.8, 'pearl', 2.2),                                    // the body
+                    _e(-3.4, 11.4, 1.5, 0.5, '#3dffe0'), _g(-3.8, 11.8, 1.5, 1.7),
+                    _r(13, 19, 1.5, 5, 'teal', 0.6), ..._slots(13.8, 18.2, 1.5, '#3dffe0'),      // the vent collar
+                    _cap(19, 27.4, 1.5, 2.2, 'abyss'),
+                    _cap(26.4, 29.3, 1.5, 3.2, 'pearl'),                                        // the muzzle cap
+                    _cap(3.2, 6.4, 1.5, 7.4, 'teal'),                                           // the ring band
+                    _ce(4.8, -1.9, 0.7, '#3dffe0'), _ce(4.8, 4.9, 0.7, '#3dffe0')
+                ],
+                glow: [[-1, 1.5, 2.2, '#3dffe0'], [4.8, -1.9, 2.4, '#3dffe0'], [4.8, 4.9, 2.4, '#3dffe0'], [16, 1.5, 3.2, '#3dffe0']],
+                run: [-3.4, 11.4, 1.5, '#c8fff6']
+            },
+            sniper_sara: {                                                                      // YourGirlSara: molten orange, rose bronze and obsidian
+                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 2.9], brass: '#ff9a3c',
+                parts: [
+                    _cap(-12, -2, 0.5, 5.4, 'abyss'),                                          // the rounded rear hump
+                    _e(-10, -4, 0.5, 0.7, '#ff6a1a'),
+                    _r(-2.6, 14.2, 0.5, 5.6, 'bronze', 1.2),                                   // the receiver
+                    _c(6, 3.8, 1.3, 'bronze'),                                                  // the side knob
+                    _r(14.6, 18.6, 0.5, 4.8, 'bronze', 0.4), ..._slots(15.2, 18, 0.5, '#ff7a24'),
+                    _r(19.2, 23.2, 0.5, 4.8, 'bronze', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff7a24'),
+                    _cap(23.2, 51.4, 0.5, 2.8, 'abyss'),
+                    _e(24.5, 50, 0.5, 0.5, '#ff5a12'), _g(24, 50.6, 0.5, 1.6),                  // the barrel's heat line, under glass
+                    _r(51, 55.2, 0.5, 4, 'bronze', 0.8),                                        // the brake
+                    _r(52.1, 52.7, 0.5, 4, 'abyss'), _r(53.5, 54.1, 0.5, 4, 'abyss'),
+                    _cap(0.4, 13.6, 0.5, 3, 'abyss'),                                           // the scope, on top
+                    _r(3.4, 4.6, 0.5, 3.6, 'bronze'), _r(9.4, 10.6, 0.5, 3.6, 'bronze'),
+                    _ce(13, 0.5, 0.95, '#ffb060')
+                ],
+                glow: [[-7, 0.5, 2.4, '#ff6a1a'], [13, 0.5, 3.2, '#ff7a24'], [16.6, 0.5, 3, '#ff6a1a'], [21.2, 0.5, 3, '#ff6a1a'], [38, 0.5, 3, '#ff5a12']],
+                run: [24.5, 50, 0.5, '#ffd09a']
+            },
+            sniper_sr86: {                                                                      // SR-86: obsidian, crimson and pearl (catalog sketch)
+                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 2.8], brass: '#ff4d68',
+                parts: [
+                    _cap(-12, -2, 0.5, 5.4, 'abyss'),                                          // the thumb-hump rear
+                    _r(-9.6, -4, 0.5, 1, 'crimson'),
+                    _r(-2.6, 14.2, 0.5, 5.6, 'pearl', 1.2),                                    // the receiver
+                    _c(6, 3.8, 1.3, 'pearl'),                                                   // the side knob
+                    _e(4.4, 7.6, 0.5, 0.6, '#ff2448'), _e(5.7, 6.3, 0.5, 2.6, '#ff2448'),        // the cross emblem
+                    _r(14.6, 18.6, 0.5, 4.8, 'abyss', 0.4), ..._slots(15.2, 18, 0.5, '#ff2448'), // the two slotted collars
+                    _r(19.2, 23.2, 0.5, 4.8, 'abyss', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff2448'),
+                    _cap(23.2, 54.2, 0.5, 3, 'abyss'),                                          // the long smooth barrel
+                    _e(25, 50, 0.5, 0.35, '#ff2448'), _g(24.6, 50.4, 0.5, 1.4),                 // a hairline of red down it, under glass
+                    _hole(51.4, 0.5, 0.6),                                                      // its bore hole
+                    _cap(53.2, 55.2, 0.5, 2, 'crimson')                                         // the muzzle nub
+                ],
+                glow: [[6, 0.5, 3.2, '#ff2448'], [16.6, 0.5, 3, '#ff2448'], [21.2, 0.5, 3, '#ff2448'], [54.2, 0.5, 2, '#ff2448']],
+                run: [25, 50, 0.5, '#ff9aae']
+            },
+            golden_child: {                                                                     // gold and champagne, a light in its heart
+                stance: 'pistol', muzzle: [20, 1], rail: [13, 5.8], brass: null,
+                parts: [
+                    _cap(-3.6, 14, 1, 8.4, 'gold'),
+                    _e(-1.6, 12, 1, 0.5, '#ffe7a0'), _g(-2, 12.4, 1, 2),
+                    _cap(3.8, 7.4, 1, 9.6, 'champagne'),                                        // the ring band
+                    _ce(5.6, 1, 1.7, '#fff1c4'),                                                // the core
+                    _c(16.6, 1, 3.3, 'champagne'), _ce(17.6, 1, 1.35, '#ffd76a')                // the front orb and its bore
+                ],
+                glow: [[5.6, 1, 4.2, '#ffd76a'], [17.6, 1, 3.6, '#ffe7a0']],
+                run: [-1.6, 12, 1, '#fffaea']
+            },
+            empg: {                                                                             // the EMP blaster (catalog): a bulbous body, twin orbs at the front
+                stance: 'pistol', muzzle: [14.6, 1], rail: [9, 5.4], brass: null,
+                parts: [
+                    _c(-2, 1, 2.4, 'abyss'),
+                    _cap(-1.2, 12.4, 1, 7.4, 'violet'),
+                    _ce(1, 1, 0.75, '#c9a6ff'),                                                 // the port
+                    _e(3.6, 10, 1, 0.5, '#b48cff'), _g(3.2, 10.4, 1, 2.2),
+                    _c(12.6, -1.5, 1.6, 'pearl'), _ce(13, -1.5, 0.7, '#dcc6ff'),                 // the twin orbs
+                    _c(12.6, 3.5, 1.6, 'pearl'), _ce(13, 3.5, 0.7, '#dcc6ff')
+                ],
+                glow: [[1, 1, 2, '#c9a6ff'], [13, -1.5, 2.8, '#b48cff'], [13, 3.5, 2.8, '#b48cff']],
+                run: [3.6, 10, 1, '#efe4ff']
+            }
+        };
+        const LASER_MODULE = [                                                                  // under-barrel laser: body, then emitter at its front
+            { rr: [-5.5, -0.9, 5.5, 1.9, 0.3], m: 'abyss' }, { rr: [-0.9, -0.5, 0.9, 1.1, 0.2], c: '#ff2a3a', emit: true }
+        ];
+
+        /** The model for a weapon id: its own, else the closest by name, else the FP-X — never nothing. */
+        function weaponModel(id) {
+            id = id || '';
+            return WEAPON_MODELS[id] || (id.includes('sniper') ? WEAPON_MODELS.sniper_sara : id.includes('rifle') ? WEAPON_MODELS.rifle_rb98
+                : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
+        }
+
+        const _weaponSprites = new Map();
+        const WEAPON_BAKE = 4;                                                                  // sprite px per model px
+
+        function _gunPartPath(p, ox = 0, oy = 0) {
+            const path = new Path2D();
+            if (p.rr) path.roundRect(p.rr[0] + ox, p.rr[1] + oy, p.rr[2], p.rr[3], p.rr[4]);
+            else if (p.ring) path.roundRect(p.ring[0] + ox, p.ring[1] + oy, p.ring[2], p.ring[3], p.ring[4]);
+            else if (p.poly) p.poly.forEach(([x, y], i) => i ? path.lineTo(x + ox, y + oy) : path.moveTo(x + ox, y + oy));
+            else if (p.dot) path.arc(p.dot[0] + ox, p.dot[1] + oy, p.dot[2], 0, Math.PI * 2);
+            if (p.poly) path.closePath();
+            return path;
+        }
+        function _gunPartBox(p) {
+            if (p.rr || p.ring) { const r = p.rr || p.ring; return [r[0], r[1], r[0] + r[2], r[1] + r[3]]; }
+            if (p.poly) { const xs = p.poly.map(q => q[0]), ys = p.poly.map(q => q[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
+            if (p.dot) return [p.dot[0] - p.dot[2], p.dot[1] - p.dot[2], p.dot[0] + p.dot[2], p.dot[1] + p.dot[2]];
+            if (p.lines) { const xs = p.lines.flatMap(l => [l[0], l[2]]), ys = p.lines.flatMap(l => [l[1], l[3]]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
+            return [0, 0, 0, 0];
+        }
+
+        /** 'r, g, b' of a mix of two '#rrggbb' colours. */
+        function _gunMix(a, b, t) {
+            const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16), m = (s) => Math.round(((A >> s) & 255) * (1 - t) + ((B >> s) & 255) * t);
+            return `rgb(${m(16)}, ${m(8)}, ${m(0)})`;
+        }
+
+        /**
+         * Paint one part as angular metallic glass: a slab or capsule gets hard facets across its width
+         * (a bright bevel, the body, a darker lower facet, the dark edge) and slanted glass glints; a
+         * knob is a faceted gem split on the diagonal; a glass sleeve is a clear tinted pane with a
+         * bright edge; bores and lights are plain colour (lights with a baked halo).
+         */
+        function _paintGunPart(c, p) {
+            const [x0, y0, x1, y1] = _gunPartBox(p), path = _gunPartPath(p);
+            if (p.glass) {
+                c.fillStyle = 'rgba(226, 218, 255, 0.16)'; c.fill(path);
+                c.save(); c.clip(path);
+                c.strokeStyle = 'rgba(255, 255, 255, 0.55)'; c.lineWidth = 0.22;
+                c.beginPath(); c.moveTo(x0, y0 + 0.2); c.lineTo(x1, y0 + 0.2); c.stroke();
+                _gunGlints(c, x0, y0, x1, y1, 0.3);
+                c.restore(); return;
+            }
+            if (!p.m) {
+                c.fillStyle = p.c;
+                if (p.emit) { c.save(); c.shadowColor = p.c; c.shadowBlur = 2.2 * WEAPON_BAKE; c.fill(path); c.fill(path); c.restore(); }
+                c.fill(path); return;
+            }
+            const M = GUN_MATERIALS[p.m];
+            if (p.dot) {                                                                        // a faceted gem: lit half, shaded half, a glint
+                const [x, y, r] = p.dot, g = c.createLinearGradient(x - r, y - r, x + r, y + r);
+                g.addColorStop(0, M[2]); g.addColorStop(0.46, _gunMix(M[2], M[0], 0.55)); g.addColorStop(0.46, M[0]);
+                g.addColorStop(0.8, _gunMix(M[0], M[1], 0.5)); g.addColorStop(1, M[1]);
+                c.fillStyle = g; c.fill(path);
+                c.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                c.beginPath(); c.moveTo(x - r * 0.55, y - r * 0.2); c.lineTo(x - r * 0.2, y - r * 0.55); c.lineTo(x - r * 0.05, y - r * 0.4); c.lineTo(x - r * 0.4, y - r * 0.05); c.closePath(); c.fill();
+                return;
+            }
+            const g = c.createLinearGradient(0, y0, 0, y1);                                     // hard facets across the width
+            g.addColorStop(0, M[1]); g.addColorStop(0.08, M[1]);
+            g.addColorStop(0.08, M[2]); g.addColorStop(0.26, _gunMix(M[2], M[0], 0.5));
+            g.addColorStop(0.26, M[0]); g.addColorStop(0.6, M[0]);
+            g.addColorStop(0.6, _gunMix(M[0], M[1], 0.45)); g.addColorStop(0.9, _gunMix(M[0], M[1], 0.6));
+            g.addColorStop(0.9, M[1]); g.addColorStop(1, M[1]);
+            c.fillStyle = g; c.fill(path);
+            if (x1 - x0 > 3 && y1 - y0 > 1.6) { c.save(); c.clip(path); _gunGlints(c, x0, y0, x1, y1, 0.2); c.restore(); }
+        }
+        /** Slanted glass glints across a part (clipped by the caller): a broad one and a thin one. */
+        function _gunGlints(c, x0, y0, x1, y1, a) {
+            const h = y1 - y0, L = x1 - x0, sk = h * 0.7;
+            for (const [f, w, k] of [[0.3, Math.min(1.6, L * 0.08), 1], [0.3, 0.35, 0.8], [0.72, 0.5, 0.6]]) {
+                const sx = x0 + L * f + (k === 0.8 ? Math.min(1.6, L * 0.08) + 0.5 : 0);
+                c.fillStyle = `rgba(255, 255, 255, ${a * k})`;
+                c.beginPath(); c.moveTo(sx + sk, y0); c.lineTo(sx + sk + w, y0); c.lineTo(sx + w, y1); c.lineTo(sx, y1); c.closePath(); c.fill();
+            }
+        }
+
+        /**
+         * The baked sprite of a model (with an under-barrel laser when `laser`): drawn at 1/WEAPON_BAKE
+         * scale with its top-left at (x, y) in the gun's frame. An ink outline under every solid part
+         * keeps the silhouette readable at any zoom.
+         */
+        function bakeWeapon(model, laser) {
+            const key = model, cache = _weaponSprites.get(key) || {};
+            if (cache[laser ? 1 : 0]) return cache[laser ? 1 : 0];
+            let parts = model.parts;
+            if (laser && model.rail) parts = parts.concat(LASER_MODULE.map(p => {
+                const q = { ...p };
+                if (p.rr) q.rr = [p.rr[0] + model.rail[0], p.rr[1] + model.rail[1], p.rr[2], p.rr[3], p.rr[4]];
+                if (p.dot) q.dot = [p.dot[0] + model.rail[0], p.dot[1] + model.rail[1], p.dot[2]];
+                return q;
+            }));
+            let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+            for (const p of parts) { const b = _gunPartBox(p); bx0 = Math.min(bx0, b[0]); by0 = Math.min(by0, b[1]); bx1 = Math.max(bx1, b[2]); by1 = Math.max(by1, b[3]); }
+            bx0 -= 2.5; by0 -= 2.5; bx1 += 2.5; by1 += 2.5;                                   // room for the emitters' halos
+            const cv = document.createElement('canvas'), K = WEAPON_BAKE;
+            cv.width = Math.ceil((bx1 - bx0) * K); cv.height = Math.ceil((by1 - by0) * K);
+            const c = cv.getContext('2d');
+            c.scale(K, K); c.translate(-bx0, -by0); c.lineJoin = 'round';
+            c.strokeStyle = 'rgba(8, 4, 18, 0.9)'; c.lineWidth = 0.7;                           // the ink outline, all solids at once
+            for (const p of parts) if (p.m) c.stroke(_gunPartPath(p));
+            for (const p of parts) _paintGunPart(c, p);
+            const out = { cv, x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 };
+            cache[laser ? 1 : 0] = out; _weaponSprites.set(key, cache);
+            return out;
+        }
         const HAIR_SIM = {
             STEP: 1 / 120,          // game seconds per physics slice
             MAX_STEPS: 12,          // catch-up cap after a stall
@@ -38884,6 +39283,118 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);
         }
 
+        /* ── Shading ── Matte: no highlights at all. Seen from above, limbs are cylinders and the head a
+           dome, so each gets a smooth, wide shade on the side away from the sun (a soft sprite, no hard
+           edge). Hair gradients within its own colour: dark hair lifts a little toward the light, light
+           hair deepens a little away from it. Only glossy fabric (finish: 'gloss', e.g. leggings) keeps
+           a crisp sheen; jewelry shines on its own. humanShade() works out the light once per body
+           (null = flat); the passes read it. */
+        /** A soft light or shade (a radial sprite stretched to w×h, centred at x, y) at alpha a. */
+        function _softSpot(ctx, x, y, w, h, rgb, a) {
+            if (a <= 0.004) return;
+            const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * a;
+            ctx.drawImage(glowSprite(rgb, 0), x - w / 2, y - h / 2, w, h);
+            ctx.globalAlpha = a0;
+        }
+        /** Hair's own gradient tone: dark hair → a slightly lighter shade of itself (toward the light),
+         *  light hair → a slightly darker one (away from it). { rgb, up } (up: toward the light). */
+        const _hairTones = new Map();
+        function _hairTone(hex) {
+            let t = _hairTones.get(hex);
+            if (t) return t;
+            const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+            if (!m) return null;
+            const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255, luma = (0.3 * r + 0.59 * g + 0.11 * b) / 255;
+            const up = luma < 0.45, k = up ? 38 + 30 * (0.45 - luma) : -48;
+            const c = v => Math.max(0, Math.min(255, Math.round(v + k)));
+            t = { rgb: `${c(r)}, ${c(g)}, ${c(b)}`, up };
+            _hairTones.set(hex, t);
+            return t;
+        }
+        /** Is this piece of clothing glossy? The item's own finish wins, else the wardrobe piece's. */
+        function _glossy(piece, item) { return !!item && (item.finish ? item.finish === 'gloss' : !!(piece && piece.finish === 'gloss')); }
+        let _shadeFrame = -1, _shadeRims = 0, _lampGrid = null, _shadeCols = null, _bodyRot = 0;
+        const _SHADOW_RGB = '12, 6, 28';
+
+        /** Street lamps bucketed in 200px cells, rebuilt when the map's lamp list changes. */
+        function _lampNear(x, y, R) {
+            const L = typeof game !== 'undefined' ? game.lamps : null;
+            if (!L || !L.length) return null;
+            if (!_lampGrid || _lampGrid.src !== L || _lampGrid.n !== L.length) {
+                const cells = new Map();
+                for (const l of L) { if (l.candle) continue; const k = Math.floor(l.x / 200) + ',' + Math.floor(l.y / 200); (cells.get(k) || cells.set(k, []).get(k)).push(l); }
+                _lampGrid = { src: L, n: L.length, cells };
+            }
+            const cx = Math.floor(x / 200), cy = Math.floor(y / 200);
+            let best = null, bd = R;
+            for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+                const c = _lampGrid.cells.get((cx + i) + ',' + (cy + j));
+                if (c) for (const l of c) { const d = Math.hypot(l.x - x, l.y - y); if (d < bd) { bd = d; best = l; } }
+            }
+            return best ? { l: best, d: bd } : null;
+        }
+
+        /**
+         * The light on this body right now, in its own frame: level (0 flat · 1 limbs only · 2 all),
+         * lx/ly (unit-ish toward the light, 0 when it's overhead), hl/sh (shine and shade fills),
+         * body (knuckles and torso too: named characters, not the crowd), rim (a lamp's colour,
+         * its direction and strength) or null.
+         */
+        function humanShade(ctx, entity, config) {
+            const lod = typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0;
+            const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
+            const level = lod === 0 ? 2 : (lod === 1 && !ped ? 1 : 0);
+            if (!level || typeof sunNow !== 'function') return null;
+            if (_shadeFrame !== _frameTime) { _shadeFrame = _frameTime; _shadeRims = 0; _shadeCols = null; }
+            const C = CONFIG.HUMAN_SHADE, sun = sunNow();
+            const rot = _bodyRot, c = Math.cos(rot), s = Math.sin(rot);
+            const d = sun.day > 0.05 ? Math.min(1, sun.day * 1.4) : 0;
+            const W = Math.round((config._wet || 0) * 4) / 4;
+            const lx = (c * sun.dx + s * sun.dy) * d, ly = (-s * sun.dx + c * sun.dy) * d;
+            // The fills are the same for everyone this frame (per wetness step): built once
+            if (!_shadeCols) _shadeCols = new Map();
+            let K = _shadeCols.get(W);
+            if (!K) {
+                const a = (d > 0 ? C.HL_DAY * (0.5 + 0.5 * d) : C.HL_NIGHT) + W * C.HL_RAIN, rgb = d > 0 ? sun.rgb : '214, 204, 255';
+                const shA = C.SHADE * (0.4 + 0.6 * d);
+                K = { a, rgb, shA, hl: `rgba(${rgb}, ${a.toFixed(3)})`, hl2: `rgba(${rgb}, ${(a * 1.25).toFixed(3)})`,
+                      sh: `rgba(${_SHADOW_RGB}, ${shA.toFixed(3)})` };
+                _shadeCols.set(W, K);
+            }
+            const S = { level, body: level > 1 && !ped, lx, ly, a: K.a, m: Math.min(1, K.a * 1.7), shA: K.shA, rgb: K.rgb, hl: K.hl, hl2: K.hl2, sh: K.sh, rim: null };
+            // Night: the nearest burning street lamp rims them in its colour (the block's lamp colour)
+            if (level === 2 && sun.night > 0.3 && entity.x !== undefined && (!ped || _shadeRims < C.RIM_PEDS)) {
+                const n = _lampNear(entity.x, entity.y, C.RIM_R);
+                if (n) {
+                    const on = lampWake(n.l) * lampFlicker(n.l) * (n.l.intensity ?? 1);
+                    const k = on * (1 - n.d / C.RIM_R) * Math.min(1, (sun.night - 0.3) / 0.4) * C.RIM_A;
+                    if (k > 0.03) {
+                        if (ped) _shadeRims++;
+                        const wx = n.l.x - entity.x, wy = n.l.y - entity.y, m = Math.hypot(wx, wy) || 1;
+                        const col = /^#[0-9a-f]{6}$/i.test(n.l.color || '') ? hexToRgb(n.l.color) : '255, 238, 187';
+                        S.rim = { ang: Math.atan2(-s * wx / m + c * wy / m, c * wx / m + s * wy / m), style: `rgba(${col}, ${k.toFixed(3)})` };
+                    }
+                }
+            }
+            return S;
+        }
+
+        /** A soft shadow under the feet: cast along the sun by day, a round pool at night and indoors. */
+        function drawHumanContactShadow(ctx) {
+            if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
+            const C = CONFIG.HUMAN_SHADE, sp = glowSprite(_SHADOW_RGB, 0.45), a0 = ctx.globalAlpha;
+            ctx.save();
+            ctx.translate(-4, 0);
+            if (typeof _sunShadow !== 'undefined' && _sunShadow.on) {
+                const L = Math.min(1.6, _sunShadow.len) * _sunShadow.k;
+                ctx.rotate(Math.atan2(_sunShadow.dy, _sunShadow.dx) - _bodyRot);
+                ctx.translate(2 + 5 * L, 0); ctx.scale((11 + 9 * L) / 32, 9 / 32);
+                ctx.globalAlpha = a0 * (C.SHADOW_NIGHT + (C.SHADOW_DAY - C.SHADOW_NIGHT) * _sunShadow.k);
+            } else { ctx.scale(12 / 32, 10 / 32); ctx.globalAlpha = a0 * C.SHADOW_NIGHT; }
+            ctx.drawImage(sp, -32, -32);
+            ctx.restore();
+        }
+
         /**
          * Draw a procedural character. Builds and height (ui/bodies.js) scale the body
          * frame here; a hovering android bobs over a soft glow.
@@ -38891,6 +39402,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function drawProceduralHumanoid(ctx, entity, config = {}) {
             const S = bodyScale(config), A = androidLook(config.body);
             const hover = A && A.hover && !config.isDriving;
+            if (!config.isDriving && _zoomLOD < 2) {
+                const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a);         // the body's facing on screen, for its light
+                if (!config.noShadow) drawHumanContactShadow(ctx);
+            }
             if (!S && !hover) return _drawHumanoidBody(ctx, entity, config, null, A);
             const bob = hover ? 1 + Math.sin(_gameTimeSec * 2.2 + (entity.x || 0) * 0.01) * 0.035 : 1;
             if (hover) {                                                    // light under a floating android
@@ -38937,6 +39452,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         
             // Rain darkens clothes a touch (not skin)
             const wet = W ? W.rain * 0.08 : 0;
+            const SH = isDriving ? null : humanShade(ctx, entity, { _wet: W ? W.rain : 0 });
             const darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * (hex === skinColor ? frac : frac + wet))) : '#000';
         
             // --- 2. PROPORTIONS ---
@@ -39287,12 +39803,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
-            const drawLimb = (x1, y1, x2, y2, width, color) => {
+            const drawLimb = (x1, y1, x2, y2, width, color, gloss) => {
                 const len = Math.hypot(x2-x1, y2-y1)/2 + 2;
                 const ang = Math.atan2(y2-y1, x2-x1);
                 ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
                 ctx.fillStyle = color;
                 ctx.beginPath(); ctx.ellipse(0, 0, len, width, 0, 0, Math.PI*2); ctx.fill();
+                if (SH) {                                                   // light across the limb, toward the sun
+                    const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;
+                    if (gloss) {                                            // glossy fabric: a crisp sheen
+                        ctx.fillStyle = SH.hl2;
+                        ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.36, 0, 0, Math.PI*2); ctx.fill();
+                    } else {                                                // matte: a smooth gradient, lit side to shaded side
+                        if (SH.lx || SH.ly) _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.3);
+                    }
+                }
                 ctx.restore();
             };
             
@@ -39332,7 +39857,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // the retract). Sniper models sit 2px lower in the hand, matching NPCs.
                     if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
                         const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
-                        drawWeapon(ctx, weaponId, wx, wy, 0, scale);
+                        const laser = game.inventory && game.inventory.getEquippedAttachment()?.effect === 'laser_sight';
+                        drawWeapon(ctx, weaponId, wx, wy, 0, scale, laser);
                         // Muzzle in the player's frame — laser sight and shots start here
                         const mz = weaponMuzzleLocal(weaponId);
                         entity._muzzleLocal = { x: wx + mz.x * scale, y: wy + mz.y * scale };
@@ -39372,6 +39898,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Sleeves can come from the shirt under a vest; legs from trousers under an apron
             const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : clothes.top.color) : null;
             const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
+            const topGloss = _glossy(topP, clothes.top), botGloss = _glossy(botP, clothes.bottom);
             const jewelryAt = (where) => (clothes.jewelry || []).filter(j => WD && WD.jewelry[j.type] && WD.jewelry[j.type].at === where);
             const headX0 = bounce - bodyRecoil;
             const clothDyn = { wind: W ? W.wind : null };                 // the weather blows on hems and trains
@@ -39490,8 +40017,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const thighColor = legs !== 'bare' ? darken(legCol, 0.35) : darken(skinColor, 0.05);
         
             // 2. Calves
-            drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor); 
-            drawLimb(rKneeX, rKneeY, rFootX, rFootY, 3, legColor);
+            drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor, legs === 'full' && botGloss);
+            drawLimb(rKneeX, rKneeY, rFootX, rFootY, 3, legColor, legs === 'full' && botGloss);
             if (shoeP && shoeP.calf) {                                   // boots come up the calf
                 const bootColor = darken(clothes.shoes.color, 0.45), c = shoeP.calf;
                 drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, 3.4, bootColor);
@@ -39499,8 +40026,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         
             // 3. Thighs
-            drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor);
-            drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor);
+            drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor, legs !== 'bare' && botGloss);
+            drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor, legs !== 'bare' && botGloss);
             if (A && legs !== 'full') {                                     // android knees
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
@@ -39558,14 +40085,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         
             // 7. Forearms (fabric only under long sleeves)
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
-            drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor);
-            drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor);
+            drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor, sleeve === 'long' && topGloss);
+            drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor, sleeve === 'long' && topGloss);
             for (const j of jewelryAt('wrists')) WD.jewelry[j.type].draw(ctx, g, j);
         
             // 8. Upper Arms (fabric under short or long sleeves)
             const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
-            drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor);
-            drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor);
+            drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor, sleeve !== 'none' && topGloss);
+            drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor, sleeve !== 'none' && topGloss);
             if (A) {                                                        // android joints: seam rings at elbows and wrists
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY], [lFistX, lFistY], [rFistX, rFistY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
@@ -39595,6 +40122,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
             }
             for (const j of jewelryAt('neck')) WD.jewelry[j.type].draw(ctx, g, j);
+            if (SH && SH.body) {                                            // the torso's form: soft shade on the side away from the sun
+                const cx = torsoXOff + torsoWidth * 0.5;
+                if (SH.lx || SH.ly) _softSpot(ctx, cx - SH.lx * 2.5, -SH.ly * 7, torsoWidth * 1.5, 16, _SHADOW_RGB, SH.shA * 1.3);
+                if (topGloss) {                                             // glossy fabric: a crisp ridge across the shoulders too
+                    ctx.fillStyle = SH.hl2;
+                    ctx.beginPath(); ctx.roundRect(cx - 1.4 + SH.lx * 1.5, -8 + SH.ly * 1.5, 2.8, 16, 1.4); ctx.fill();
+                }
+            }
             if (A && !clothes.top) {                                        // bare plating: chest panel seams and the Double Nights mark
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6; ctx.beginPath();
                 ctx.moveTo(torsoXOff + 1, 0); ctx.lineTo(torsoXOff + torsoWidth - 1, 0);
@@ -39621,8 +40156,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             withHead(headX, hx => {
                 if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }
                 drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
+                if (SH && SH.level > 1 && (SH.lx || SH.ly)) {               // the head as a matte dome: hair gradients in its own colour, then shade away from the sun
+                    const ht = clothes.hair && !clothes.hat ? _hairTone(clothes.hair.color) : null;
+                    if (ht) { const s = ht.up ? 1 : -1; _softSpot(ctx, hx + s * SH.lx * 3, s * SH.ly * 3, 13, 13, ht.rgb, 0.55 * Math.hypot(SH.lx, SH.ly)); }
+                    _softSpot(ctx, hx - SH.lx * 3.5, -SH.ly * 3.5, 13, 13, _SHADOW_RGB, SH.shA * (SH.body ? 1.3 : 0.9));
+                }
                 if (turning) ctx.restore();
             });
+            if (SH && SH.rim) {                                             // a street lamp's colour catching shoulder and head
+                const r = SH.rim.ang;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.arc(-1, 0, 10, r - 0.7, r + 0.7);
+                ctx.moveTo(headX + Math.cos(r - 0.9) * 8, Math.sin(r - 0.9) * 8); ctx.arc(headX, 0, 8, r - 0.9, r + 0.9);
+                ctx.stroke(); ctx.restore();
+            }
             if (hitK > 0.05) {                                              // the flash of the hit
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 const fl = ctx.createRadialGradient(headX * 0.5, 0, 0, headX * 0.5, 0, 15);
@@ -39807,106 +40354,36 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         /**
-         * Renders a weapon using canvas primitives.
-         * Used by both Player (equipped) and Loot (dropped).
+         * A weapon from its model (ui/weapon-models.js): one baked sprite, then its emitters
+         * glowing live. Used for guns in hand (player, NPCs, the drive-by) and dropped loot.
+         * `laser`: an under-barrel laser module is fitted.
          */
-        function drawWeapon(ctx, type, x, y, angle, scale = 1.0) {
+        function drawWeapon(ctx, type, x, y, angle, scale = 1.0, laser = false) {
+            const M = weaponModel(type), sp = bakeWeapon(M, laser);
             ctx.save();
             ctx.translate(x, y);
-            ctx.rotate(angle);
-            ctx.scale(scale, scale);
-        
-            // Common styling
-            ctx.shadowBlur = 0;
-            
-            if (type.includes('pistol')) {
-                // --- PISTOL (Short, compact) ---
-                // Grip (held in hand)
-                ctx.fillStyle = '#333';
-                ctx.fillRect(-2, 2, 4, 6); 
-                
-                // Body/Slide
-                ctx.fillStyle = type.includes('anavia') ? '#CCCCFF' : '#555'; // Anavia is periwinkle
-                ctx.fillRect(-2, -2, 12, 6);
-                
-                // Barrel Tip
-                ctx.fillStyle = '#111';
-                ctx.fillRect(10, -1, 2, 4);
-                
-                // Laser/Glow
-                ctx.fillStyle = type.includes('anavia') ? '#00f3ff' : '#ff0000';
-                ctx.fillRect(8, 0, 2, 2);
-                
-            } else if (type.includes('sniper')) {
-                // --- SNIPER (Long, scope) ---
-                // Stock
-                ctx.fillStyle = '#1a1a1a';
-                ctx.fillRect(-10, 0, 10, 6);
-                
-                // Body
-                ctx.fillStyle = '#C5A000'; // Gold body for "YourGirlSara"
-                ctx.fillRect(0, -2, 25, 5);
-                
-                // Long Barrel
-                ctx.fillStyle = '#111';
-                ctx.fillRect(25, -1, 30, 3);
-                
-                // Scope
-                ctx.fillStyle = '#333';
-                ctx.fillRect(5, -6, 12, 3); // Scope body
-                ctx.fillStyle = '#00f3ff';
-                ctx.fillRect(5, -6, 2, 3);  // Lens
-                
-            } else if (type.includes('rifle')) {
-                // --- RIFLE / SMG ---
-                // Stock
-                ctx.fillStyle = '#222';
-                ctx.fillRect(-8, 0, 8, 8);
-                
-                // Body
-                ctx.fillStyle = '#00ffcc'; // Teal for RB-98
-                ctx.fillRect(0, -2, 18, 7);
-                
-                // Mag
-                ctx.fillStyle = '#111';
-                ctx.fillRect(4, 5, 4, 6);
-                
-                // Barrel
-                ctx.fillStyle = '#333';
-                ctx.fillRect(18, 0, 10, 3);
-                
-            } else if (type.includes('golden')) {
-                // --- GOLDEN CHILD (Orb launcher) ---
-                // Grip
-                ctx.fillStyle = '#1a1a1a';
-                ctx.fillRect(-2, 2, 5, 7);
-                
-                // Body — rounded gold housing
-                ctx.fillStyle = '#B8860B';
-                ctx.beginPath();
-                ctx.roundRect(-2, -3, 16, 8, 3);
-                ctx.fill();
-                
-                // Gold trim
-                ctx.fillStyle = '#FFD700';
-                ctx.fillRect(0, -2, 12, 2);
-                
-                // Barrel — wide bore for orbs
-                ctx.fillStyle = '#222';
-                ctx.beginPath();
-                ctx.roundRect(14, -2, 6, 6, [0, 2, 2, 0]);
-                ctx.fill();
-                
-                // Orb glow in barrel
-                ctx.fillStyle = '#FFD700';
-                ctx.shadowColor = '#FFD700';
-                ctx.shadowBlur = 6;
-                ctx.beginPath();
-                ctx.arc(17, 1, 2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
+            if (angle) ctx.rotate(angle);
+            if (scale !== 1) ctx.scale(scale, scale);
+            ctx.drawImage(sp.cv, sp.x, sp.y, sp.w, sp.h);
+            if (M.glow.length && _zoomLOD < 2) {
+                // The lights breathe slowly (~3.6 s), each a beat behind the one before, so a soft wave
+                // travels down the gun; a spark glides along its light line every few seconds.
+                const a0 = ctx.globalAlpha, t = _frameTime / 1000;
+                ctx.globalCompositeOperation = 'lighter';
+                M.glow.forEach((g, i) => {
+                    const br = 0.5 + 0.5 * Math.sin(t * 1.75 - i * 0.7);
+                    ctx.globalAlpha = a0 * (0.22 + 0.5 * br);
+                    drawGlow(ctx, g[0], g[1], g[2] * (0.85 + 0.25 * br), g[3], 0.2);
+                });
+                if (M.run && _zoomLOD === 0) {
+                    const u = (t / 3.2) % 1, k = Math.sin(Math.min(1, u / 0.7) * Math.PI);   // glides for 70% of the cycle, then rests
+                    if (u < 0.7) {
+                        ctx.globalAlpha = a0 * 0.9 * k;
+                        drawGlow(ctx, M.run[0] + (M.run[1] - M.run[0]) * (u / 0.7), M.run[2], 1.8, M.run[3], 0.35);
+                    }
+                }
+                ctx.globalAlpha = a0;
             }
-        
             ctx.restore();
         }
         
@@ -41434,15 +41911,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                     ctx.translate(this.x, this.y);
                                     const bob = Math.sin(_frameTime / 500) * 3;
                                     
-                                    // Ground Glow
-                                    ctx.shadowColor = '#a469ff'; 
-                                    ctx.shadowBlur = 15;
-                                    ctx.fillStyle = 'rgba(164, 105, 255, 0.4)';
-                                    ctx.beginPath();
-                                    ctx.ellipse(0, 10, 15, 5, 0, 0, Math.PI*2);
-                                    ctx.fill();
-                                    ctx.shadowBlur = 0;
-                    
+                                    // Ground glow: a violet pool squashed flat under it
+                                    ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75;
+                                    drawGlow(ctx, 0, 0, 22, '#a469ff', 0.3);
+                                    ctx.restore();
+
                                     drawWeapon(ctx, this.item.id, 0, bob, this.angle, 0.8);
                                     ctx.restore();
                                 }
@@ -44418,7 +44891,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.decals = new DecalSystem();
                 this.puddles = null; // PuddleSystem disabled for performance (will revisit)
                 this.leafParticles = new LeafParticleSystem(this); // Floating leaves
-                this.projectiles = []; this.props = []; this.npcs = []; this.enemies = []; this.loot = []; this.lamps = []; this.lastKnownMarkers = []; this.muzzleFlashes = [];
+                this.projectiles = []; this.props = []; this.npcs = []; this.enemies = []; this.loot = []; this.lamps = []; this.lastKnownMarkers = []; this.muzzleFlashes = []; this.casings = [];
                 this.stickyOrbs = []; // Golden Child DOT orbs attached to enemies
                 this.traffic = new TrafficManager(); // <--- ADD THIS LINE
                 this.pedestrians = new PedestrianManager(); // Roaming civilians
@@ -45114,7 +45587,95 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         // GameEngine — Screen shake, time slow, death, resize, firing, boosters, player damage.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        const _muzzleStars = new Map();
+        /** A muzzle flash's star (96×48, its centre at 24,24, the long spike forward along +x) in `color`. */
+        function muzzleStarSprite(color) {
+            let cv = _muzzleStars.get(color);
+            if (cv) return cv;
+            cv = document.createElement('canvas'); cv.width = 96; cv.height = 48;
+            const c = cv.getContext('2d'), rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '255, 204, 136';
+            const spike = (x0, y0, x1, y1, w) => {                          // a tapered spike from (x0,y0) to (x1,y1)
+                const a = Math.atan2(y1 - y0, x1 - x0), nx = -Math.sin(a) * w, ny = Math.cos(a) * w;
+                c.beginPath(); c.moveTo(x0 + nx, y0 + ny); c.lineTo(x1, y1); c.lineTo(x0 - nx, y0 - ny); c.closePath(); c.fill();
+            };
+            const g = c.createRadialGradient(24, 24, 0, 24, 24, 22);
+            g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(0.3, `rgba(${rgb}, 0.9)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
+            c.fillStyle = g; c.fillRect(0, 0, 48, 48);
+            c.fillStyle = `rgba(${rgb}, 0.95)`;
+            spike(24, 24, 96, 24, 7); spike(24, 24, 60, 8, 4); spike(24, 24, 60, 40, 4); spike(24, 24, 24, 4, 3.5); spike(24, 24, 24, 44, 3.5);
+            c.fillStyle = 'rgba(255, 255, 255, 0.95)'; spike(24, 24, 70, 24, 3); c.beginPath(); c.arc(24, 24, 5, 0, Math.PI * 2); c.fill();
+            _muzzleStars.set(color, cv);
+            return cv;
+        }
+
         engineMixin({
+            /**
+             * A spent casing flies from the gun's ejection port (to the right of the barrel, a little
+             * back), spins and settles, and lies there glinting like a fleck of glitter in the gun's
+             * colour (its model's `brass`, ui/weapon-models.js; none for energy guns). At most 24.
+             */
+            spawnCasing(x, y, angle, weaponId) {
+                const col = weaponId ? weaponModel(weaponId).brass : null;
+                if (!col || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
+                const L = this.casings || (this.casings = []), c = Math.cos(angle), s = Math.sin(angle);
+                const sniper = weaponId.includes('sniper'), back = sniper ? 30 : 8, v = 1.7 + Math.random() * 1.1;
+                L.push({ x: x - c * back, y: y - s * back, vx: -s * v - c * (0.35 + Math.random() * 0.4), vy: c * v - s * (0.35 + Math.random() * 0.4),
+                         a: angle, spin: (Math.random() - 0.5) * 0.9, t: 0, big: sniper, col, ph: Math.random() * 6.28, rate: 0.004 + Math.random() * 0.005 });
+                if (L.length > 24) L.shift();
+            },
+            updateCasings() {
+                const L = this.casings;
+                if (!L || !L.length) return;
+                for (let i = L.length - 1; i >= 0; i--) {
+                    const k = L[i]; k.t++;
+                    if (k.t < 26) { k.x += k.vx; k.y += k.vy; k.vx *= 0.86; k.vy *= 0.86; k.a += k.spin; k.spin *= 0.9; }
+                    if (k.t > 420) L.splice(i, 1);
+                }
+            },
+            /**
+             * Casings on the ground (after decals, under everyone) as glitter: a fleck in the gun's colour
+             * that twinkles on its own rhythm, and at the top of each twinkle a four-point glint.
+             */
+            drawCasings(ctx, cb) {
+                const L = this.casings;
+                if (!L || !L.length || _zoomLOD >= 1) return;
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.lineCap = 'round';
+                for (const k of L) {
+                    if (k.x < cb.left || k.x > cb.right || k.y < cb.top || k.y > cb.bottom) continue;
+                    const fade = k.t > 360 ? (420 - k.t) / 60 : 1, spin = k.t < 26 ? 1 : 0;
+                    const tw = Math.pow(Math.abs(Math.sin(_frameTime * k.rate + k.ph)), 6), s = k.big ? 1.3 : 1;
+                    ctx.globalAlpha = fade * (0.45 + 0.55 * Math.max(tw, spin * 0.7));
+                    ctx.fillStyle = k.col;
+                    ctx.fillRect(k.x - 0.6 * s, k.y - 0.6 * s, 1.2 * s, 1.2 * s);        // the fleck
+                    if (tw > 0.35) {                                                     // the glint
+                        const r = (1.2 + 2.6 * tw) * s;
+                        ctx.globalAlpha = fade * tw;
+                        ctx.fillStyle = '#ffffff'; ctx.fillRect(k.x - 0.35, k.y - 0.35, 0.7, 0.7);
+                        ctx.strokeStyle = k.col; ctx.lineWidth = 0.45;
+                        ctx.beginPath(); ctx.moveTo(k.x - r, k.y); ctx.lineTo(k.x + r, k.y); ctx.moveTo(k.x, k.y - r); ctx.lineTo(k.x, k.y + r); ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            },
+            /** The star of each fresh muzzle flash, at the muzzle along the shot (its light is the lighting pass's). */
+            drawMuzzleStars(ctx) {
+                const F = this.muzzleFlashes;
+                if (!F || !F.length) return;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                const base = ctx.getTransform();
+                for (const f of F) {
+                    if (f.angle === undefined) continue;
+                    const k = Math.min(1, (f.life || 0) / 3), s = (f.radius || 50) / 170 * (0.7 + 0.3 * k);
+                    ctx.setTransform(base);
+                    ctx.translate(f.x, f.y); ctx.rotate(f.angle); ctx.scale(s, s * (0.8 + 0.4 * ((f.x * 7 + f.life) % 1)));
+                    ctx.globalAlpha = 0.35 + 0.65 * k;
+                    ctx.drawImage(muzzleStarSprite(f.color), -24, -24);
+                }
+                ctx.restore();
+            },
+
             triggerShake(amount) {
                 if (amount > this.camera.shake) {
                     this.camera.shake = amount;
@@ -45368,8 +45929,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     y: py, 
                     radius: stats.flashRadius || 50, 
                     color: shotColor, // Flash matches bullet color
-                    life: 3 
+                    life: 3,
+                    angle
                 });
+                if (onFoot) this.spawnCasing(px, py, angle, this.currentWeapon.id);
             },
 
             // Inside GameEngine class
@@ -51913,6 +52476,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.muzzleFlashes[i].life--;
                     if(this.muzzleFlashes[i].life <= 0) this.muzzleFlashes.splice(i, 1);
                 }
+                this.updateCasings();
             
                 this.updateTime();
                 this.updateUI();
@@ -52297,7 +52861,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const flashColor = (weaponDef?.stats?.projectileColor) || (abilityDef?.stats?.flashColor) || shot.color || '#ffaa00';
                         const flashRadius = (weaponDef?.stats?.flashRadius) || (abilityDef?.stats?.flashRadius) || 40;
                         this.projectiles.push(shot);
-                        this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: flashRadius, color: flashColor, life: 3 });
+                        const shotAng = Math.atan2(shot.vy, shot.vx);
+                        this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: flashRadius, color: flashColor, life: 3, angle: shotAng });
+                        this.spawnCasing(shot.x, shot.y, shotAng, tm.equippedWeaponId);
                         if (tm.hireType === 'permanent') captionSystem.teammateCombatQuip(tm.name);
                         else captionSystem.dancerFollowQuip(tm.name);
                     };
@@ -52435,7 +53001,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         for (const shot of shots) {
                             if (shot instanceof ProjectileEntity) {
                                 this.projectiles.push(shot);
-                                this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: 50, color: shot.color, life: 3 });
+                                const shotAng = Math.atan2(shot.vy, shot.vx);
+                                this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: 50, color: shot.color, life: 3, angle: shotAng });
+                                if (enemy.equippedWeaponId !== undefined) this.spawnCasing(shot.x, shot.y, shotAng, enemy.equippedWeaponId || 'pistol_ganger');
                             }
                         }
                     }
@@ -53703,6 +54271,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 this.decals.draw(this.ctx, cullBounds.world);
+                this.drawCasings(this.ctx, cullBounds.world);                 // spent brass (engine/combat-effects.js)
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day
                 this.drawCastShadows(this.ctx, cullBounds.world);
                 
@@ -54169,6 +54738,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.ctx.restore();
                 }
                 
+                this.drawMuzzleStars(this.ctx);                              // the flash's star at each muzzle
+
                 // Passenger lean-out rendering — draw in-car companions at their seat positions
                 // Uses drawProceduralHumanoid with isDriving flag for unified lean-out animation
                 // Drawn BEFORE the car overlay so the car body partially covers them
@@ -57326,11 +57897,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const b of map.buildings || []) {
                     if (!b.isV2 || b.x > cull.right + 300 || b.x + b.w < cull.left - 300 || b.y > cull.bottom + 300 || b.y + b.h < cull.top - 300) continue;
                     const hgt = Math.min(b.floors, B.MAX_FLOORS) * B.FLOOR_HEIGHT, ox = dx * hgt, oy = dy * hgt;
-                    for (const s of b.sections) {
-                        const x0 = b.x + s.x, y0 = b.y + s.y, x1 = x0 + s.w, y1 = y0 + s.h;
-                        const h = hull([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0 + ox, y0 + oy], [x1 + ox, y0 + oy], [x1 + ox, y1 + oy], [x0 + ox, y1 + oy]]);
+                    b.sections.forEach((s, si) => {
+                        const fp = b._footprint(s, si);                                              // (rounded corners traced)
+                        const h = hull(fp.concat(fp.map(([x, y]) => [x + ox, y + oy])));
                         h.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath();
-                    }
+                    });
                 }
                 const cars = new Set(this.traffic ? this.traffic.vehicles : []);                // cars, low and long
                 for (const v of [this.car, this.ownedCar, this.deliveryVehicle]) if (v) cars.add(v);
@@ -58001,7 +58572,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // --- TRANSIENT ENTITIES ---
                 this.projectiles = [];
                 this.stickyOrbs = [];
-                this.muzzleFlashes = [];
+                this.muzzleFlashes = []; this.casings = [];
                 this.loot = [];
                 this.activeInteraction = null;
                 

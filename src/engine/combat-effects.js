@@ -1,6 +1,94 @@
         // GameEngine — Screen shake, time slow, death, resize, firing, boosters, player damage.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        const _muzzleStars = new Map();
+        /** A muzzle flash's star (96×48, its centre at 24,24, the long spike forward along +x) in `color`. */
+        function muzzleStarSprite(color) {
+            let cv = _muzzleStars.get(color);
+            if (cv) return cv;
+            cv = document.createElement('canvas'); cv.width = 96; cv.height = 48;
+            const c = cv.getContext('2d'), rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '255, 204, 136';
+            const spike = (x0, y0, x1, y1, w) => {                          // a tapered spike from (x0,y0) to (x1,y1)
+                const a = Math.atan2(y1 - y0, x1 - x0), nx = -Math.sin(a) * w, ny = Math.cos(a) * w;
+                c.beginPath(); c.moveTo(x0 + nx, y0 + ny); c.lineTo(x1, y1); c.lineTo(x0 - nx, y0 - ny); c.closePath(); c.fill();
+            };
+            const g = c.createRadialGradient(24, 24, 0, 24, 24, 22);
+            g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(0.3, `rgba(${rgb}, 0.9)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
+            c.fillStyle = g; c.fillRect(0, 0, 48, 48);
+            c.fillStyle = `rgba(${rgb}, 0.95)`;
+            spike(24, 24, 96, 24, 7); spike(24, 24, 60, 8, 4); spike(24, 24, 60, 40, 4); spike(24, 24, 24, 4, 3.5); spike(24, 24, 24, 44, 3.5);
+            c.fillStyle = 'rgba(255, 255, 255, 0.95)'; spike(24, 24, 70, 24, 3); c.beginPath(); c.arc(24, 24, 5, 0, Math.PI * 2); c.fill();
+            _muzzleStars.set(color, cv);
+            return cv;
+        }
+
         engineMixin({
+            /**
+             * A spent casing flies from the gun's ejection port (to the right of the barrel, a little
+             * back), spins and settles, and lies there glinting like a fleck of glitter in the gun's
+             * colour (its model's `brass`, ui/weapon-models.js; none for energy guns). At most 24.
+             */
+            spawnCasing(x, y, angle, weaponId) {
+                const col = weaponId ? weaponModel(weaponId).brass : null;
+                if (!col || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
+                const L = this.casings || (this.casings = []), c = Math.cos(angle), s = Math.sin(angle);
+                const sniper = weaponId.includes('sniper'), back = sniper ? 30 : 8, v = 1.7 + Math.random() * 1.1;
+                L.push({ x: x - c * back, y: y - s * back, vx: -s * v - c * (0.35 + Math.random() * 0.4), vy: c * v - s * (0.35 + Math.random() * 0.4),
+                         a: angle, spin: (Math.random() - 0.5) * 0.9, t: 0, big: sniper, col, ph: Math.random() * 6.28, rate: 0.004 + Math.random() * 0.005 });
+                if (L.length > 24) L.shift();
+            },
+            updateCasings() {
+                const L = this.casings;
+                if (!L || !L.length) return;
+                for (let i = L.length - 1; i >= 0; i--) {
+                    const k = L[i]; k.t++;
+                    if (k.t < 26) { k.x += k.vx; k.y += k.vy; k.vx *= 0.86; k.vy *= 0.86; k.a += k.spin; k.spin *= 0.9; }
+                    if (k.t > 420) L.splice(i, 1);
+                }
+            },
+            /**
+             * Casings on the ground (after decals, under everyone) as glitter: a fleck in the gun's colour
+             * that twinkles on its own rhythm, and at the top of each twinkle a four-point glint.
+             */
+            drawCasings(ctx, cb) {
+                const L = this.casings;
+                if (!L || !L.length || _zoomLOD >= 1) return;
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.lineCap = 'round';
+                for (const k of L) {
+                    if (k.x < cb.left || k.x > cb.right || k.y < cb.top || k.y > cb.bottom) continue;
+                    const fade = k.t > 360 ? (420 - k.t) / 60 : 1, spin = k.t < 26 ? 1 : 0;
+                    const tw = Math.pow(Math.abs(Math.sin(_frameTime * k.rate + k.ph)), 6), s = k.big ? 1.3 : 1;
+                    ctx.globalAlpha = fade * (0.45 + 0.55 * Math.max(tw, spin * 0.7));
+                    ctx.fillStyle = k.col;
+                    ctx.fillRect(k.x - 0.6 * s, k.y - 0.6 * s, 1.2 * s, 1.2 * s);        // the fleck
+                    if (tw > 0.35) {                                                     // the glint
+                        const r = (1.2 + 2.6 * tw) * s;
+                        ctx.globalAlpha = fade * tw;
+                        ctx.fillStyle = '#ffffff'; ctx.fillRect(k.x - 0.35, k.y - 0.35, 0.7, 0.7);
+                        ctx.strokeStyle = k.col; ctx.lineWidth = 0.45;
+                        ctx.beginPath(); ctx.moveTo(k.x - r, k.y); ctx.lineTo(k.x + r, k.y); ctx.moveTo(k.x, k.y - r); ctx.lineTo(k.x, k.y + r); ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            },
+            /** The star of each fresh muzzle flash, at the muzzle along the shot (its light is the lighting pass's). */
+            drawMuzzleStars(ctx) {
+                const F = this.muzzleFlashes;
+                if (!F || !F.length) return;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                const base = ctx.getTransform();
+                for (const f of F) {
+                    if (f.angle === undefined) continue;
+                    const k = Math.min(1, (f.life || 0) / 3), s = (f.radius || 50) / 170 * (0.7 + 0.3 * k);
+                    ctx.setTransform(base);
+                    ctx.translate(f.x, f.y); ctx.rotate(f.angle); ctx.scale(s, s * (0.8 + 0.4 * ((f.x * 7 + f.life) % 1)));
+                    ctx.globalAlpha = 0.35 + 0.65 * k;
+                    ctx.drawImage(muzzleStarSprite(f.color), -24, -24);
+                }
+                ctx.restore();
+            },
+
             triggerShake(amount) {
                 if (amount > this.camera.shake) {
                     this.camera.shake = amount;
@@ -254,8 +342,10 @@
                     y: py, 
                     radius: stats.flashRadius || 50, 
                     color: shotColor, // Flash matches bullet color
-                    life: 3 
+                    life: 3,
+                    angle
                 });
+                if (onFoot) this.spawnCasing(px, py, angle, this.currentWeapon.id);
             },
 
             // Inside GameEngine class

@@ -476,15 +476,11 @@
                                     ctx.translate(this.x, this.y);
                                     const bob = Math.sin(_frameTime / 500) * 3;
                                     
-                                    // Ground Glow
-                                    ctx.shadowColor = '#a469ff'; 
-                                    ctx.shadowBlur = 15;
-                                    ctx.fillStyle = 'rgba(164, 105, 255, 0.4)';
-                                    ctx.beginPath();
-                                    ctx.ellipse(0, 10, 15, 5, 0, 0, Math.PI*2);
-                                    ctx.fill();
-                                    ctx.shadowBlur = 0;
-                    
+                                    // Ground glow: a violet pool squashed flat under it
+                                    ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75;
+                                    drawGlow(ctx, 0, 0, 22, '#a469ff', 0.3);
+                                    ctx.restore();
+
                                     drawWeapon(ctx, this.item.id, 0, bob, this.angle, 0.8);
                                     ctx.restore();
                                 }

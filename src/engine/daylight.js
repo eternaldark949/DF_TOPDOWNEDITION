@@ -89,11 +89,11 @@
                 for (const b of map.buildings || []) {
                     if (!b.isV2 || b.x > cull.right + 300 || b.x + b.w < cull.left - 300 || b.y > cull.bottom + 300 || b.y + b.h < cull.top - 300) continue;
                     const hgt = Math.min(b.floors, B.MAX_FLOORS) * B.FLOOR_HEIGHT, ox = dx * hgt, oy = dy * hgt;
-                    for (const s of b.sections) {
-                        const x0 = b.x + s.x, y0 = b.y + s.y, x1 = x0 + s.w, y1 = y0 + s.h;
-                        const h = hull([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0 + ox, y0 + oy], [x1 + ox, y0 + oy], [x1 + ox, y1 + oy], [x0 + ox, y1 + oy]]);
+                    b.sections.forEach((s, si) => {
+                        const fp = b._footprint(s, si);                                              // (rounded corners traced)
+                        const h = hull(fp.concat(fp.map(([x, y]) => [x + ox, y + oy])));
                         h.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath();
-                    }
+                    });
                 }
                 const cars = new Set(this.traffic ? this.traffic.vehicles : []);                // cars, low and long
                 for (const v of [this.car, this.ownedCar, this.deliveryVehicle]) if (v) cars.add(v);

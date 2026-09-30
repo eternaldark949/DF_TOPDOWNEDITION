@@ -938,6 +938,118 @@
             if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);
         }
 
+        /* ── Shading ── Matte: no highlights at all. Seen from above, limbs are cylinders and the head a
+           dome, so each gets a smooth, wide shade on the side away from the sun (a soft sprite, no hard
+           edge). Hair gradients within its own colour: dark hair lifts a little toward the light, light
+           hair deepens a little away from it. Only glossy fabric (finish: 'gloss', e.g. leggings) keeps
+           a crisp sheen; jewelry shines on its own. humanShade() works out the light once per body
+           (null = flat); the passes read it. */
+        /** A soft light or shade (a radial sprite stretched to w×h, centred at x, y) at alpha a. */
+        function _softSpot(ctx, x, y, w, h, rgb, a) {
+            if (a <= 0.004) return;
+            const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * a;
+            ctx.drawImage(glowSprite(rgb, 0), x - w / 2, y - h / 2, w, h);
+            ctx.globalAlpha = a0;
+        }
+        /** Hair's own gradient tone: dark hair → a slightly lighter shade of itself (toward the light),
+         *  light hair → a slightly darker one (away from it). { rgb, up } (up: toward the light). */
+        const _hairTones = new Map();
+        function _hairTone(hex) {
+            let t = _hairTones.get(hex);
+            if (t) return t;
+            const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+            if (!m) return null;
+            const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255, luma = (0.3 * r + 0.59 * g + 0.11 * b) / 255;
+            const up = luma < 0.45, k = up ? 38 + 30 * (0.45 - luma) : -48;
+            const c = v => Math.max(0, Math.min(255, Math.round(v + k)));
+            t = { rgb: `${c(r)}, ${c(g)}, ${c(b)}`, up };
+            _hairTones.set(hex, t);
+            return t;
+        }
+        /** Is this piece of clothing glossy? The item's own finish wins, else the wardrobe piece's. */
+        function _glossy(piece, item) { return !!item && (item.finish ? item.finish === 'gloss' : !!(piece && piece.finish === 'gloss')); }
+        let _shadeFrame = -1, _shadeRims = 0, _lampGrid = null, _shadeCols = null, _bodyRot = 0;
+        const _SHADOW_RGB = '12, 6, 28';
+
+        /** Street lamps bucketed in 200px cells, rebuilt when the map's lamp list changes. */
+        function _lampNear(x, y, R) {
+            const L = typeof game !== 'undefined' ? game.lamps : null;
+            if (!L || !L.length) return null;
+            if (!_lampGrid || _lampGrid.src !== L || _lampGrid.n !== L.length) {
+                const cells = new Map();
+                for (const l of L) { if (l.candle) continue; const k = Math.floor(l.x / 200) + ',' + Math.floor(l.y / 200); (cells.get(k) || cells.set(k, []).get(k)).push(l); }
+                _lampGrid = { src: L, n: L.length, cells };
+            }
+            const cx = Math.floor(x / 200), cy = Math.floor(y / 200);
+            let best = null, bd = R;
+            for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+                const c = _lampGrid.cells.get((cx + i) + ',' + (cy + j));
+                if (c) for (const l of c) { const d = Math.hypot(l.x - x, l.y - y); if (d < bd) { bd = d; best = l; } }
+            }
+            return best ? { l: best, d: bd } : null;
+        }
+
+        /**
+         * The light on this body right now, in its own frame: level (0 flat · 1 limbs only · 2 all),
+         * lx/ly (unit-ish toward the light, 0 when it's overhead), hl/sh (shine and shade fills),
+         * body (knuckles and torso too: named characters, not the crowd), rim (a lamp's colour,
+         * its direction and strength) or null.
+         */
+        function humanShade(ctx, entity, config) {
+            const lod = typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0;
+            const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
+            const level = lod === 0 ? 2 : (lod === 1 && !ped ? 1 : 0);
+            if (!level || typeof sunNow !== 'function') return null;
+            if (_shadeFrame !== _frameTime) { _shadeFrame = _frameTime; _shadeRims = 0; _shadeCols = null; }
+            const C = CONFIG.HUMAN_SHADE, sun = sunNow();
+            const rot = _bodyRot, c = Math.cos(rot), s = Math.sin(rot);
+            const d = sun.day > 0.05 ? Math.min(1, sun.day * 1.4) : 0;
+            const W = Math.round((config._wet || 0) * 4) / 4;
+            const lx = (c * sun.dx + s * sun.dy) * d, ly = (-s * sun.dx + c * sun.dy) * d;
+            // The fills are the same for everyone this frame (per wetness step): built once
+            if (!_shadeCols) _shadeCols = new Map();
+            let K = _shadeCols.get(W);
+            if (!K) {
+                const a = (d > 0 ? C.HL_DAY * (0.5 + 0.5 * d) : C.HL_NIGHT) + W * C.HL_RAIN, rgb = d > 0 ? sun.rgb : '214, 204, 255';
+                const shA = C.SHADE * (0.4 + 0.6 * d);
+                K = { a, rgb, shA, hl: `rgba(${rgb}, ${a.toFixed(3)})`, hl2: `rgba(${rgb}, ${(a * 1.25).toFixed(3)})`,
+                      sh: `rgba(${_SHADOW_RGB}, ${shA.toFixed(3)})` };
+                _shadeCols.set(W, K);
+            }
+            const S = { level, body: level > 1 && !ped, lx, ly, a: K.a, m: Math.min(1, K.a * 1.7), shA: K.shA, rgb: K.rgb, hl: K.hl, hl2: K.hl2, sh: K.sh, rim: null };
+            // Night: the nearest burning street lamp rims them in its colour (the block's lamp colour)
+            if (level === 2 && sun.night > 0.3 && entity.x !== undefined && (!ped || _shadeRims < C.RIM_PEDS)) {
+                const n = _lampNear(entity.x, entity.y, C.RIM_R);
+                if (n) {
+                    const on = lampWake(n.l) * lampFlicker(n.l) * (n.l.intensity ?? 1);
+                    const k = on * (1 - n.d / C.RIM_R) * Math.min(1, (sun.night - 0.3) / 0.4) * C.RIM_A;
+                    if (k > 0.03) {
+                        if (ped) _shadeRims++;
+                        const wx = n.l.x - entity.x, wy = n.l.y - entity.y, m = Math.hypot(wx, wy) || 1;
+                        const col = /^#[0-9a-f]{6}$/i.test(n.l.color || '') ? hexToRgb(n.l.color) : '255, 238, 187';
+                        S.rim = { ang: Math.atan2(-s * wx / m + c * wy / m, c * wx / m + s * wy / m), style: `rgba(${col}, ${k.toFixed(3)})` };
+                    }
+                }
+            }
+            return S;
+        }
+
+        /** A soft shadow under the feet: cast along the sun by day, a round pool at night and indoors. */
+        function drawHumanContactShadow(ctx) {
+            if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
+            const C = CONFIG.HUMAN_SHADE, sp = glowSprite(_SHADOW_RGB, 0.45), a0 = ctx.globalAlpha;
+            ctx.save();
+            ctx.translate(-4, 0);
+            if (typeof _sunShadow !== 'undefined' && _sunShadow.on) {
+                const L = Math.min(1.6, _sunShadow.len) * _sunShadow.k;
+                ctx.rotate(Math.atan2(_sunShadow.dy, _sunShadow.dx) - _bodyRot);
+                ctx.translate(2 + 5 * L, 0); ctx.scale((11 + 9 * L) / 32, 9 / 32);
+                ctx.globalAlpha = a0 * (C.SHADOW_NIGHT + (C.SHADOW_DAY - C.SHADOW_NIGHT) * _sunShadow.k);
+            } else { ctx.scale(12 / 32, 10 / 32); ctx.globalAlpha = a0 * C.SHADOW_NIGHT; }
+            ctx.drawImage(sp, -32, -32);
+            ctx.restore();
+        }
+
         /**
          * Draw a procedural character. Builds and height (ui/bodies.js) scale the body
          * frame here; a hovering android bobs over a soft glow.
@@ -945,6 +1057,10 @@
         function drawProceduralHumanoid(ctx, entity, config = {}) {
             const S = bodyScale(config), A = androidLook(config.body);
             const hover = A && A.hover && !config.isDriving;
+            if (!config.isDriving && _zoomLOD < 2) {
+                const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a);         // the body's facing on screen, for its light
+                if (!config.noShadow) drawHumanContactShadow(ctx);
+            }
             if (!S && !hover) return _drawHumanoidBody(ctx, entity, config, null, A);
             const bob = hover ? 1 + Math.sin(_gameTimeSec * 2.2 + (entity.x || 0) * 0.01) * 0.035 : 1;
             if (hover) {                                                    // light under a floating android
@@ -991,6 +1107,7 @@
         
             // Rain darkens clothes a touch (not skin)
             const wet = W ? W.rain * 0.08 : 0;
+            const SH = isDriving ? null : humanShade(ctx, entity, { _wet: W ? W.rain : 0 });
             const darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * (hex === skinColor ? frac : frac + wet))) : '#000';
         
             // --- 2. PROPORTIONS ---
@@ -1341,12 +1458,21 @@
                 }
             }
             
-            const drawLimb = (x1, y1, x2, y2, width, color) => {
+            const drawLimb = (x1, y1, x2, y2, width, color, gloss) => {
                 const len = Math.hypot(x2-x1, y2-y1)/2 + 2;
                 const ang = Math.atan2(y2-y1, x2-x1);
                 ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
                 ctx.fillStyle = color;
                 ctx.beginPath(); ctx.ellipse(0, 0, len, width, 0, 0, Math.PI*2); ctx.fill();
+                if (SH) {                                                   // light across the limb, toward the sun
+                    const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;
+                    if (gloss) {                                            // glossy fabric: a crisp sheen
+                        ctx.fillStyle = SH.hl2;
+                        ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.36, 0, 0, Math.PI*2); ctx.fill();
+                    } else {                                                // matte: a smooth gradient, lit side to shaded side
+                        if (SH.lx || SH.ly) _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.3);
+                    }
+                }
                 ctx.restore();
             };
             
@@ -1386,7 +1512,8 @@
                     // the retract). Sniper models sit 2px lower in the hand, matching NPCs.
                     if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
                         const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
-                        drawWeapon(ctx, weaponId, wx, wy, 0, scale);
+                        const laser = game.inventory && game.inventory.getEquippedAttachment()?.effect === 'laser_sight';
+                        drawWeapon(ctx, weaponId, wx, wy, 0, scale, laser);
                         // Muzzle in the player's frame — laser sight and shots start here
                         const mz = weaponMuzzleLocal(weaponId);
                         entity._muzzleLocal = { x: wx + mz.x * scale, y: wy + mz.y * scale };
@@ -1426,6 +1553,7 @@
             // Sleeves can come from the shirt under a vest; legs from trousers under an apron
             const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : clothes.top.color) : null;
             const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
+            const topGloss = _glossy(topP, clothes.top), botGloss = _glossy(botP, clothes.bottom);
             const jewelryAt = (where) => (clothes.jewelry || []).filter(j => WD && WD.jewelry[j.type] && WD.jewelry[j.type].at === where);
             const headX0 = bounce - bodyRecoil;
             const clothDyn = { wind: W ? W.wind : null };                 // the weather blows on hems and trains
@@ -1544,8 +1672,8 @@
             const thighColor = legs !== 'bare' ? darken(legCol, 0.35) : darken(skinColor, 0.05);
         
             // 2. Calves
-            drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor); 
-            drawLimb(rKneeX, rKneeY, rFootX, rFootY, 3, legColor);
+            drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor, legs === 'full' && botGloss);
+            drawLimb(rKneeX, rKneeY, rFootX, rFootY, 3, legColor, legs === 'full' && botGloss);
             if (shoeP && shoeP.calf) {                                   // boots come up the calf
                 const bootColor = darken(clothes.shoes.color, 0.45), c = shoeP.calf;
                 drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, 3.4, bootColor);
@@ -1553,8 +1681,8 @@
             }
         
             // 3. Thighs
-            drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor);
-            drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor);
+            drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor, legs !== 'bare' && botGloss);
+            drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor, legs !== 'bare' && botGloss);
             if (A && legs !== 'full') {                                     // android knees
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
@@ -1612,14 +1740,14 @@
         
             // 7. Forearms (fabric only under long sleeves)
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
-            drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor);
-            drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor);
+            drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor, sleeve === 'long' && topGloss);
+            drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor, sleeve === 'long' && topGloss);
             for (const j of jewelryAt('wrists')) WD.jewelry[j.type].draw(ctx, g, j);
         
             // 8. Upper Arms (fabric under short or long sleeves)
             const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
-            drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor);
-            drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor);
+            drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor, sleeve !== 'none' && topGloss);
+            drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor, sleeve !== 'none' && topGloss);
             if (A) {                                                        // android joints: seam rings at elbows and wrists
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY], [lFistX, lFistY], [rFistX, rFistY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
@@ -1649,6 +1777,14 @@
                 if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
             }
             for (const j of jewelryAt('neck')) WD.jewelry[j.type].draw(ctx, g, j);
+            if (SH && SH.body) {                                            // the torso's form: soft shade on the side away from the sun
+                const cx = torsoXOff + torsoWidth * 0.5;
+                if (SH.lx || SH.ly) _softSpot(ctx, cx - SH.lx * 2.5, -SH.ly * 7, torsoWidth * 1.5, 16, _SHADOW_RGB, SH.shA * 1.3);
+                if (topGloss) {                                             // glossy fabric: a crisp ridge across the shoulders too
+                    ctx.fillStyle = SH.hl2;
+                    ctx.beginPath(); ctx.roundRect(cx - 1.4 + SH.lx * 1.5, -8 + SH.ly * 1.5, 2.8, 16, 1.4); ctx.fill();
+                }
+            }
             if (A && !clothes.top) {                                        // bare plating: chest panel seams and the Double Nights mark
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6; ctx.beginPath();
                 ctx.moveTo(torsoXOff + 1, 0); ctx.lineTo(torsoXOff + torsoWidth - 1, 0);
@@ -1675,8 +1811,20 @@
             withHead(headX, hx => {
                 if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }
                 drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, walkDyn, clothes.hat, clothes.jewelry);
+                if (SH && SH.level > 1 && (SH.lx || SH.ly)) {               // the head as a matte dome: hair gradients in its own colour, then shade away from the sun
+                    const ht = clothes.hair && !clothes.hat ? _hairTone(clothes.hair.color) : null;
+                    if (ht) { const s = ht.up ? 1 : -1; _softSpot(ctx, hx + s * SH.lx * 3, s * SH.ly * 3, 13, 13, ht.rgb, 0.55 * Math.hypot(SH.lx, SH.ly)); }
+                    _softSpot(ctx, hx - SH.lx * 3.5, -SH.ly * 3.5, 13, 13, _SHADOW_RGB, SH.shA * (SH.body ? 1.3 : 0.9));
+                }
                 if (turning) ctx.restore();
             });
+            if (SH && SH.rim) {                                             // a street lamp's colour catching shoulder and head
+                const r = SH.rim.ang;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.arc(-1, 0, 10, r - 0.7, r + 0.7);
+                ctx.moveTo(headX + Math.cos(r - 0.9) * 8, Math.sin(r - 0.9) * 8); ctx.arc(headX, 0, 8, r - 0.9, r + 0.9);
+                ctx.stroke(); ctx.restore();
+            }
             if (hitK > 0.05) {                                              // the flash of the hit
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 const fl = ctx.createRadialGradient(headX * 0.5, 0, 0, headX * 0.5, 0, 15);
@@ -1861,106 +2009,36 @@
         }
 
         /**
-         * Renders a weapon using canvas primitives.
-         * Used by both Player (equipped) and Loot (dropped).
+         * A weapon from its model (ui/weapon-models.js): one baked sprite, then its emitters
+         * glowing live. Used for guns in hand (player, NPCs, the drive-by) and dropped loot.
+         * `laser`: an under-barrel laser module is fitted.
          */
-        function drawWeapon(ctx, type, x, y, angle, scale = 1.0) {
+        function drawWeapon(ctx, type, x, y, angle, scale = 1.0, laser = false) {
+            const M = weaponModel(type), sp = bakeWeapon(M, laser);
             ctx.save();
             ctx.translate(x, y);
-            ctx.rotate(angle);
-            ctx.scale(scale, scale);
-        
-            // Common styling
-            ctx.shadowBlur = 0;
-            
-            if (type.includes('pistol')) {
-                // --- PISTOL (Short, compact) ---
-                // Grip (held in hand)
-                ctx.fillStyle = '#333';
-                ctx.fillRect(-2, 2, 4, 6); 
-                
-                // Body/Slide
-                ctx.fillStyle = type.includes('anavia') ? '#CCCCFF' : '#555'; // Anavia is periwinkle
-                ctx.fillRect(-2, -2, 12, 6);
-                
-                // Barrel Tip
-                ctx.fillStyle = '#111';
-                ctx.fillRect(10, -1, 2, 4);
-                
-                // Laser/Glow
-                ctx.fillStyle = type.includes('anavia') ? '#00f3ff' : '#ff0000';
-                ctx.fillRect(8, 0, 2, 2);
-                
-            } else if (type.includes('sniper')) {
-                // --- SNIPER (Long, scope) ---
-                // Stock
-                ctx.fillStyle = '#1a1a1a';
-                ctx.fillRect(-10, 0, 10, 6);
-                
-                // Body
-                ctx.fillStyle = '#C5A000'; // Gold body for "YourGirlSara"
-                ctx.fillRect(0, -2, 25, 5);
-                
-                // Long Barrel
-                ctx.fillStyle = '#111';
-                ctx.fillRect(25, -1, 30, 3);
-                
-                // Scope
-                ctx.fillStyle = '#333';
-                ctx.fillRect(5, -6, 12, 3); // Scope body
-                ctx.fillStyle = '#00f3ff';
-                ctx.fillRect(5, -6, 2, 3);  // Lens
-                
-            } else if (type.includes('rifle')) {
-                // --- RIFLE / SMG ---
-                // Stock
-                ctx.fillStyle = '#222';
-                ctx.fillRect(-8, 0, 8, 8);
-                
-                // Body
-                ctx.fillStyle = '#00ffcc'; // Teal for RB-98
-                ctx.fillRect(0, -2, 18, 7);
-                
-                // Mag
-                ctx.fillStyle = '#111';
-                ctx.fillRect(4, 5, 4, 6);
-                
-                // Barrel
-                ctx.fillStyle = '#333';
-                ctx.fillRect(18, 0, 10, 3);
-                
-            } else if (type.includes('golden')) {
-                // --- GOLDEN CHILD (Orb launcher) ---
-                // Grip
-                ctx.fillStyle = '#1a1a1a';
-                ctx.fillRect(-2, 2, 5, 7);
-                
-                // Body — rounded gold housing
-                ctx.fillStyle = '#B8860B';
-                ctx.beginPath();
-                ctx.roundRect(-2, -3, 16, 8, 3);
-                ctx.fill();
-                
-                // Gold trim
-                ctx.fillStyle = '#FFD700';
-                ctx.fillRect(0, -2, 12, 2);
-                
-                // Barrel — wide bore for orbs
-                ctx.fillStyle = '#222';
-                ctx.beginPath();
-                ctx.roundRect(14, -2, 6, 6, [0, 2, 2, 0]);
-                ctx.fill();
-                
-                // Orb glow in barrel
-                ctx.fillStyle = '#FFD700';
-                ctx.shadowColor = '#FFD700';
-                ctx.shadowBlur = 6;
-                ctx.beginPath();
-                ctx.arc(17, 1, 2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
+            if (angle) ctx.rotate(angle);
+            if (scale !== 1) ctx.scale(scale, scale);
+            ctx.drawImage(sp.cv, sp.x, sp.y, sp.w, sp.h);
+            if (M.glow.length && _zoomLOD < 2) {
+                // The lights breathe slowly (~3.6 s), each a beat behind the one before, so a soft wave
+                // travels down the gun; a spark glides along its light line every few seconds.
+                const a0 = ctx.globalAlpha, t = _frameTime / 1000;
+                ctx.globalCompositeOperation = 'lighter';
+                M.glow.forEach((g, i) => {
+                    const br = 0.5 + 0.5 * Math.sin(t * 1.75 - i * 0.7);
+                    ctx.globalAlpha = a0 * (0.22 + 0.5 * br);
+                    drawGlow(ctx, g[0], g[1], g[2] * (0.85 + 0.25 * br), g[3], 0.2);
+                });
+                if (M.run && _zoomLOD === 0) {
+                    const u = (t / 3.2) % 1, k = Math.sin(Math.min(1, u / 0.7) * Math.PI);   // glides for 70% of the cycle, then rests
+                    if (u < 0.7) {
+                        ctx.globalAlpha = a0 * 0.9 * k;
+                        drawGlow(ctx, M.run[0] + (M.run[1] - M.run[0]) * (u / 0.7), M.run[2], 1.8, M.run[3], 0.35);
+                    }
+                }
+                ctx.globalAlpha = a0;
             }
-        
             ctx.restore();
         }
         

@@ -161,7 +161,7 @@
                 // --- TRANSIENT ENTITIES ---
                 this.projectiles = [];
                 this.stickyOrbs = [];
-                this.muzzleFlashes = [];
+                this.muzzleFlashes = []; this.casings = [];
                 this.loot = [];
                 this.activeInteraction = null;
                 

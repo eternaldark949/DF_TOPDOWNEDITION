@@ -341,6 +341,7 @@
                 K.rings(ctx, (() => { const p = new Path2D(); for (const e of lv) { p.moveTo(e.a[0], e.a[1]); p.lineTo(e.b[0], e.b[1]); } return p; })(), [K.k(DN.ATRIUM_Z)], 0.8, 'rgba(232,194,122,0.35)');
                 this._dnAtriumRoof(ctx, false);
                 this._dnCanopy(ctx, G, false);
+                this._dnDrawSign(ctx);                                   // the script on the canopy, before the towers can hide it
                 this._dnTop = {};
                 for (const [sh, key] of [[G.west, 'w'], [G.east, 'e']]) {
                     this._dnTop[key] = this._dnTowerWalls(ctx, sh, key, H);
