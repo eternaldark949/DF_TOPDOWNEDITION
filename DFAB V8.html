@@ -18810,6 +18810,81 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * Wind animation uses sine waves with per-instance phase offset
          * for natural, non-synchronized movement.
          */
+        /* FLORA — each kind of plant painted once into a sprite (a lit canopy, inner shade,
+           leaf grain, blossom), then drawn with a sway offset. The old glow_* kinds are the
+           city's dream trees now: blossom in pink and violet, jade, moon-silver, amber, crimson. */
+        const FLORA_KINDS = {
+            tree:        { base: '#153524', mid: '#245a38', hi: '#5d9a68', dark: '#0c2016' },
+            glow_pink:   { base: '#4a1f3e', mid: '#9a4a78', hi: '#f4b0d4', dark: '#2a0f22', petals: ['#ffd3ea', '#ff9fcf', '#fff4fa'] },
+            glow_purple: { base: '#2f2052', mid: '#6448a8', hi: '#c9aeff', dark: '#1a1030', petals: ['#e6d8ff', '#b894ff', '#fff'] },
+            glow_gold:   { base: '#3e2a14', mid: '#8e6228', hi: '#f0c878', dark: '#22160a', petals: ['#ffe6b0', '#fff2d0'] },
+            glow_green:  { base: '#11302a', mid: '#2a6a56', hi: '#8ee0c2', dark: '#081c18', petals: ['#d8fff0'] },
+            glow_cyan:   { base: '#1c2840', mid: '#465f92', hi: '#bcd2ff', dark: '#0e1426', petals: ['#eaf2ff', '#cfe0ff'] },
+            glow_red:    { base: '#3e1018', mid: '#98243a', hi: '#ff8a9e', dark: '#22060c', petals: ['#ffd0d8'] },
+            bush:        { base: '#16341f', mid: '#285c34', hi: '#5c9660', dark: '#0c2014' },
+            palm:        { base: '#1b3d22', mid: '#2f6636', hi: '#7cb46a', dark: '#10261a' }
+        };
+        const _floraCache = new Map();
+        /** The sprite for a kind/size (sizes bucketed to 0.2), in 4 variants. */
+        function floraSprite(type, size, variant) {
+            const sz = Math.round(size * 5) / 5, key = type + '|' + sz + '|' + variant;
+            let spr = _floraCache.get(key);
+            if (spr) return spr;
+            const K = FLORA_KINDS[type] || FLORA_KINDS.tree, rnd = seededRandom(variant * 977 + Math.round(sz * 100) + type.length * 31);
+            const palm = type === 'palm', bush = type === 'bush';
+            const R = (palm ? 24 : bush ? 13 : 21) * sz, W = Math.ceil(R * 2.6 + 6), cv = document.createElement('canvas'); cv.width = cv.height = W;
+            const c = cv.getContext('2d'), o = W / 2;
+            if (palm) {
+                const n = 8 + (variant % 2);
+                for (let i = 0; i < n; i++) {
+                    const a = i / n * Math.PI * 2 + rnd() * 0.3, len = R * (0.85 + rnd() * 0.3);
+                    c.save(); c.translate(o, o); c.rotate(a);
+                    c.fillStyle = i % 2 ? K.mid : K.base;
+                    c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(len * 0.45, -len * 0.22, len, 0); c.quadraticCurveTo(len * 0.45, len * 0.22, 0, 0); c.fill();
+                    c.strokeStyle = K.hi; c.globalAlpha = 0.5; c.lineWidth = 0.8; c.beginPath(); c.moveTo(2, 0); c.lineTo(len * 0.95, 0); c.stroke(); c.globalAlpha = 1;
+                    c.strokeStyle = K.dark; c.lineWidth = 0.6; c.beginPath();
+                    for (let t = 0.2; t < 0.9; t += 0.12) { c.moveTo(len * t, 0); c.lineTo(len * (t + 0.06), len * 0.12 * (1 - t)); c.moveTo(len * t, 0); c.lineTo(len * (t + 0.06), -len * 0.12 * (1 - t)); }
+                    c.stroke(); c.restore();
+                }
+                c.fillStyle = '#4a3420'; c.beginPath(); c.arc(o, o, R * 0.16, 0, Math.PI * 2); c.fill();
+            } else {
+                // Canopy: overlapping clusters, dark underneath; light from the upper left, shade to the lower right
+                const lumps = bush ? 5 : 8;
+                c.fillStyle = K.dark; c.beginPath(); c.arc(o + 1, o + 1, R * 1.02, 0, Math.PI * 2); c.fill();
+                for (let i = 0; i < lumps; i++) {
+                    const a = i / lumps * Math.PI * 2 + rnd() * 0.5, d = R * (0.45 + rnd() * 0.15), r = R * (0.48 + rnd() * 0.12);
+                    c.fillStyle = K.base; c.beginPath(); c.arc(o + Math.cos(a) * d, o + Math.sin(a) * d, r, 0, Math.PI * 2); c.fill();
+                }
+                c.fillStyle = K.base; c.beginPath(); c.arc(o, o, R * 0.62, 0, Math.PI * 2); c.fill();
+                for (let i = 0; i < lumps; i++) {
+                    const a = i / lumps * Math.PI * 2 + 0.4, d = R * 0.38, r = R * 0.36;
+                    const g = c.createRadialGradient(o + Math.cos(a) * d - r * 0.35, o + Math.sin(a) * d - r * 0.35, 1, o + Math.cos(a) * d, o + Math.sin(a) * d, r);
+                    g.addColorStop(0, K.mid); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(o + Math.cos(a) * d, o + Math.sin(a) * d, r, 0, Math.PI * 2); c.fill();
+                }
+                const lit = c.createRadialGradient(o - R * 0.4, o - R * 0.45, 1, o - R * 0.2, o - R * 0.2, R * 0.9);
+                lit.addColorStop(0, K.hi); lit.addColorStop(1, 'rgba(0,0,0,0)');
+                c.globalAlpha = 0.55; c.fillStyle = lit; c.beginPath(); c.arc(o, o, R, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+                const shade = c.createRadialGradient(o + R * 0.5, o + R * 0.55, 1, o + R * 0.4, o + R * 0.45, R * 0.9);
+                shade.addColorStop(0, 'rgba(0,0,0,0.35)'); shade.addColorStop(1, 'rgba(0,0,0,0)');
+                c.fillStyle = shade; c.beginPath(); c.arc(o, o, R, 0, Math.PI * 2); c.fill();
+                for (let i = 0; i < R * 4; i++) {                                                     // leaf grain
+                    const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * R * 0.95;
+                    c.fillStyle = rnd() < 0.5 ? K.hi : K.dark; c.globalAlpha = 0.35; c.fillRect(o + Math.cos(a) * d, o + Math.sin(a) * d, 1.4, 1.4);
+                }
+                c.globalAlpha = 1;
+                if (K.petals) for (let i = 0; i < R * 2; i++) {                                         // blossom, heavier toward the light
+                    const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * R * 0.92, x = o + Math.cos(a) * d, y = o + Math.sin(a) * d;
+                    if (x + y > o * 2 + R * 0.5 && rnd() < 0.6) continue;
+                    c.globalAlpha = 0.55 + rnd() * 0.4; c.fillStyle = K.petals[Math.floor(rnd() * K.petals.length)];
+                    c.beginPath(); c.arc(x, y, 0.7 + rnd() * 0.9, 0, Math.PI * 2); c.fill();
+                }
+                c.globalAlpha = 1;
+            }
+            spr = { cv, w: W };
+            _floraCache.set(key, spr);
+            return spr;
+        }
+
         class Foliage {
             constructor(x, y, type = 'tree', size = 1.0) {
                 this.x = x;
@@ -18892,28 +18967,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const time = frameTimeSec || _frameTimeSec;
                 // Calculate sway based on wind strength and time
                 const sway = Math.sin(time * 2 + this.phaseOffset) * wind * 8 * this.swayMultiplier * windDirection;
-                const sway2 = Math.sin(time * 2.5 + this.phaseOffset + 1) * wind * 5 * this.swayMultiplier * windDirection;
-                
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                
-                // Determine base type for glowing variants
-                let baseType = this.type;
-                if (this.isGlowing) {
-                    baseType = 'tree'; // Glowing variants use tree shape by default
-                }
-                
-                if (baseType === 'tree' || this.isGlowing) {
-                    this._drawTree(ctx, sway, sway2, time);
-                } else if (baseType === 'bush') {
-                    this._drawBush(ctx, sway, sway2, time);
-                } else if (baseType === 'palm') {
-                    this._drawPalm(ctx, sway, sway2, time);
-                }
-                
-                ctx.restore();
+                const s = this.size, palm = this.type === 'palm', bush = this.type === 'bush';
+                // Shadow on the ground (drawn live: in daylight it will follow the sun)
+                ctx.fillStyle = 'rgba(0,0,0,0.22)';
+                ctx.beginPath(); ctx.ellipse(this.x + sway * 0.4 + 4 * s, this.y + (bush ? 3 : 6) * s, (bush ? 13 : palm ? 16 : 19) * s, (bush ? 6 : 8) * s, 0, 0, Math.PI * 2); ctx.fill();
+                // The canopy: its painted sprite, carried by the wind
+                if (this._variant === undefined) this._variant = Math.floor(this.phaseOffset * 0.637) % 4;
+                const spr = floraSprite(this.type, s, this._variant);
+                const cx = this.x + sway * (bush ? 0.6 : palm ? 0.3 : 1), cy = this.y - (bush ? 2 : palm ? 30 : 25) * s;
+                if (palm) {
+                    ctx.save(); ctx.translate(cx, cy); ctx.rotate(sway * 0.012); ctx.drawImage(spr.cv, -spr.w / 2, -spr.w / 2); ctx.restore();
+                } else ctx.drawImage(spr.cv, cx - spr.w / 2, cy - spr.w / 2);
             }
-            
+
             _drawTree(ctx, sway, sway2, time) {
                 const s = this.size;
                 
@@ -23910,13 +23976,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // =====================================================================
         const _bldHash = (seed, i) => { const s = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; return s - Math.floor(s); };
 
+        // The city's curated palette: plum, charcoal and brass, ivory stone, rose, midnight
         const APARTMENT_PALETTES = [
-            { name: 'rose',     roof: '#2b1f27', wall: '#27171f', accent: '#ff5fa2', lit: '#ffd6a8' },
-            { name: 'teal',     roof: '#1d272a', wall: '#152125', accent: '#3fe0d0', lit: '#c4f6ff' },
-            { name: 'amber',    roof: '#2b251c', wall: '#231d14', accent: '#ffb347', lit: '#ffe4ad' },
-            { name: 'lavender', roof: '#25202f', wall: '#1d1927', accent: '#b58cff', lit: '#ffdcf2' },
-            { name: 'crimson',  roof: '#2b1b1d', wall: '#241517', accent: '#ff4d57', lit: '#ffd09c' },
-            { name: 'mint',     roof: '#1f2b25', wall: '#17231d', accent: '#6dffb0', lit: '#f4ffd9' }
+            { name: 'plum',     roof: '#2a1c30', wall: '#22152a', accent: '#c89bff', lit: '#ffd8b0' },
+            { name: 'charcoal', roof: '#25242b', wall: '#1c1b22', accent: '#e8c27a', lit: '#ffe2b0' },
+            { name: 'ivory',    roof: '#3a3440', wall: '#2c2733', accent: '#f3e6d0', lit: '#fff1d6' },
+            { name: 'rose',     roof: '#2e1d27', wall: '#26171f', accent: '#ff8fb8', lit: '#ffd6c8' },
+            { name: 'midnight', roof: '#1d2032', wall: '#161827', accent: '#a9bfff', lit: '#e8eeff' },
+            { name: 'brass',    roof: '#2c2419', wall: '#221b12', accent: '#e8b860', lit: '#ffe0a8' }
         ];
         const APARTMENT_NAMES = ['Luna Court', 'Velvet Arms', 'The Marlowe', 'Crescent House', 'Starlight Flats', 'Neon Terrace',
                                  'Orchid Row', 'Halcyon', 'The Violet', 'Moonrise', 'Echo Lofts', 'Solace Place', 'Nocturne', 'Aurelia'];
@@ -32790,6 +32857,325 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
         
+        /* =====================================================================
+           PARKS — the city's gardens (CityLayout PARK zones)
+           ---------------------------------------------------------------------
+           One layout per park block, seeded by its name, so the same park paints
+           the same way in every ground tile (world/ground-baker.js) and puts its
+           trees and lanterns in the same places (engine/map-loading.js):
+           a hedge border with four gateways, a lavender-gravel walk looping round
+           a moon pool, paths in from the gates, beds of pink, violet and white
+           flowers, benches facing the water.
+           ===================================================================== */
+        const HUB_PARKS = { block_6_4: 'Lotus Park', block_8_2: 'Violet Commons', block_12_0: 'Moonwell Gardens' };
+
+        function parkLayout(b) {
+            if (b._park) return b._park;
+            const rnd = seededRandom([...b.name].reduce((h, ch) => h * 31 + ch.charCodeAt(0), 7) >>> 0);
+            const cx = b.x + b.w / 2, cy = b.y + b.h / 2, rx = b.w * 0.34, ry = b.h * 0.32;
+            const pondR = Math.min(b.w, b.h) * 0.13;
+            const gates = [[cx, b.y + 14], [cx, b.y + b.h - 14], [b.x + 14, cy], [b.x + b.w - 14, cy]];
+            const onLoop = (a, k = 1) => [cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k];
+            const beds = [];
+            for (let i = 0; i < 8; i++) {
+                const a = (i + 0.5) * Math.PI / 4, k = i % 2 ? 1.28 : 0.66, [x, y] = onLoop(a, k);
+                beds.push({ x, y, r: 26 + rnd() * 18, rot: rnd() * Math.PI, cols: [['#ff9fcf', '#ffd3ea', '#fff4fa'], ['#c6a8ff', '#e6d8ff', '#9d7de6'], ['#ffb3dc', '#d7a8ff', '#fff0f8']][i % 3] });
+            }
+            const benches = [];
+            for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8, [x, y] = onLoop(a, 0.86); benches.push({ x, y, a: a + Math.PI }); }
+            const lamps = [];
+            for (let i = 0; i < 6; i++) { const [x, y] = onLoop(i * Math.PI / 3 + 0.2, 1.08); lamps.push({ x, y }); }
+            // Trees on the lawn, clear of the walk, the pool, the beds and the paths
+            const trees = [], clear = (x, y) => {
+                const e = Math.hypot((x - cx) / rx, (y - cy) / ry);
+                if (Math.abs(e - 1) < 0.2 || Math.hypot(x - cx, y - cy) < pondR + 60) return false;
+                if (Math.abs(x - cx) < 34 || Math.abs(y - cy) < 34) return false;                  // the cross paths
+                return !beds.some(bd => Math.hypot(x - bd.x, y - bd.y) < bd.r + 26) && !trees.some(t => Math.hypot(x - t.x, y - t.y) < 70);
+            };
+            for (let k = 0; k < 220 && trees.length < 18; k++) {
+                const x = b.x + 60 + rnd() * (b.w - 120), y = b.y + 60 + rnd() * (b.h - 120);
+                if (clear(x, y)) trees.push({ x, y, type: ['glow_pink', 'glow_purple', 'tree', 'tree', 'glow_cyan'][Math.floor(rnd() * 5)], size: 1.3 + rnd() * 0.6 });
+            }
+            return (b._park = { cx, cy, rx, ry, pondR, gates, beds, benches, lamps, trees, name: HUB_PARKS[b.name] || '' });
+        }
+
+        /** Paint a park's ground into a tile (the ground baker clips to the tile). */
+        function paintParkGround(c, b, R) {
+            const P = parkLayout(b), rnd = seededRandom(b.x * 3 + b.y * 7);
+            c.save();
+            c.beginPath(); c.rect(b.x, b.y, b.w, b.h); c.clip();
+            // Lawn with grain and soft hollows
+            c.fillStyle = '#15291c'; c.fillRect(b.x, b.y, b.w, b.h);
+            for (let k = 0; k < (b.w * b.h) / 140; k++) { c.fillStyle = rnd() < 0.55 ? '#1f3f29' : 'rgba(5, 16, 9, 0.7)'; c.fillRect(b.x + rnd() * b.w, b.y + rnd() * b.h, 2, 1 + rnd() * 2); }
+            // The hedge border, with a gap at each gate
+            c.strokeStyle = '#0f2416'; c.lineWidth = 18; c.strokeRect(b.x + 9, b.y + 9, b.w - 18, b.h - 18);
+            c.strokeStyle = 'rgba(70, 120, 80, 0.35)'; c.lineWidth = 2; c.strokeRect(b.x + 3, b.y + 3, b.w - 6, b.h - 6);
+            // Paths: gates → walk (lavender gravel, a pale edge)
+            const gravel = '#4a4054', edge = 'rgba(214, 200, 240, 0.22)';
+            c.lineCap = 'round';
+            for (const [gx, gy] of P.gates) {
+                c.fillStyle = '#15291c'; c.fillRect(gx - 26, gy - 26, 52, 52);                     // the gap in the hedge
+                c.strokeStyle = gravel; c.lineWidth = 30; c.beginPath(); c.moveTo(gx, gy); c.lineTo(P.cx + (gx - P.cx) * 0.2, P.cy + (gy - P.cy) * 0.2); c.stroke();
+            }
+            c.strokeStyle = gravel; c.lineWidth = 30; c.beginPath(); c.ellipse(P.cx, P.cy, P.rx, P.ry, 0, 0, Math.PI * 2); c.stroke();
+            c.strokeStyle = edge; c.lineWidth = 1.2;
+            for (const k of [-15, 15]) { c.beginPath(); c.ellipse(P.cx, P.cy, P.rx + k, P.ry + k, 0, 0, Math.PI * 2); c.stroke(); }
+            for (let k = 0; k < 900; k++) {                                                        // gravel grain along the walk
+                const a = rnd() * Math.PI * 2, d = (rnd() - 0.5) * 28;
+                c.fillStyle = rnd() < 0.5 ? 'rgba(255, 240, 255, 0.08)' : 'rgba(0, 0, 0, 0.18)';
+                c.fillRect(P.cx + Math.cos(a) * (P.rx + d), P.cy + Math.sin(a) * (P.ry + d), 1.5, 1.5);
+            }
+            // The moon pool: stone rim, dark water holding a crescent, lily pads
+            c.fillStyle = '#3a3240'; c.beginPath(); c.arc(P.cx, P.cy, P.pondR + 10, 0, Math.PI * 2); c.fill();
+            const wg = c.createRadialGradient(P.cx - P.pondR * 0.3, P.cy - P.pondR * 0.3, 4, P.cx, P.cy, P.pondR);
+            wg.addColorStop(0, '#2c2560'); wg.addColorStop(1, '#100c26'); c.fillStyle = wg; c.beginPath(); c.arc(P.cx, P.cy, P.pondR, 0, Math.PI * 2); c.fill();
+            c.strokeStyle = 'rgba(232, 194, 122, 0.45)'; c.lineWidth = 1.5; c.beginPath(); c.arc(P.cx, P.cy, P.pondR + 5, 0, Math.PI * 2); c.stroke();
+            c.save(); c.beginPath(); c.arc(P.cx + P.pondR * 0.25, P.cy - P.pondR * 0.2, P.pondR * 0.28, 0, Math.PI * 2); c.arc(P.cx + P.pondR * 0.33, P.cy - P.pondR * 0.26, P.pondR * 0.24, 0, Math.PI * 2, true);
+            c.fillStyle = 'rgba(240, 232, 255, 0.55)'; c.fill('evenodd'); c.restore();
+            for (let k = 0; k < 9; k++) {
+                const a = rnd() * Math.PI * 2, d = P.pondR * (0.4 + rnd() * 0.45), x = P.cx + Math.cos(a) * d, y = P.cy + Math.sin(a) * d, r = 5 + rnd() * 4;
+                c.fillStyle = '#2e6b5c'; c.beginPath(); c.moveTo(x, y); c.arc(x, y, r, a + 0.4, a + Math.PI * 2 - 0.4); c.closePath(); c.fill();
+                if (k % 3 === 0) { c.fillStyle = '#ffc6e0'; c.beginPath(); c.arc(x, y, 2.2, 0, Math.PI * 2); c.fill(); }
+            }
+            // Flower beds: dark soil, drifts of blooms
+            for (const bd of P.beds) {
+                c.fillStyle = '#1e1418'; c.beginPath(); c.ellipse(bd.x, bd.y, bd.r, bd.r * 0.62, bd.rot, 0, Math.PI * 2); c.fill();
+                for (let k = 0; k < bd.r * 2.4; k++) {
+                    const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * 0.9, lx = Math.cos(a) * bd.r * d, ly = Math.sin(a) * bd.r * 0.62 * d;
+                    const x = bd.x + lx * Math.cos(bd.rot) - ly * Math.sin(bd.rot), y = bd.y + lx * Math.sin(bd.rot) + ly * Math.cos(bd.rot);
+                    c.fillStyle = rnd() < 0.3 ? '#2a5234' : bd.cols[Math.floor(rnd() * bd.cols.length)];
+                    c.beginPath(); c.arc(x, y, 1.3 + rnd() * 1.3, 0, Math.PI * 2); c.fill();
+                }
+            }
+            // Benches facing the water
+            for (const bn of P.benches) {
+                c.save(); c.translate(bn.x, bn.y); c.rotate(bn.a);
+                c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(-15, -4, 32, 11);
+                c.fillStyle = '#3a2a24'; c.fillRect(-16, -5, 32, 9);
+                c.fillStyle = '#4e3a30'; for (let k = 0; k < 3; k++) c.fillRect(-15, -4 + k * 3, 30, 1.6);
+                c.fillStyle = 'rgba(232, 194, 122, 0.6)'; c.fillRect(-16, -5, 2, 9); c.fillRect(14, -5, 2, 9);
+                c.restore();
+            }
+            // The name, cut into the stone at the north gate
+            if (P.name) {
+                c.font = '600 12px Montserrat, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+                c.fillStyle = 'rgba(232, 214, 190, 0.35)'; c.fillText(P.name.toUpperCase(), P.gates[0][0], P.gates[0][1] + 34);
+            }
+            c.restore();
+        }
+        /* =====================================================================
+           GROUND BAKER — the city's streets and ground, painted once per tile
+           ---------------------------------------------------------------------
+           The hub's ground (lots, lawns, the scrapyard), roads, intersections,
+           pavements and crossings are painted into 512 px tiles the first time
+           they come into view, and after that the frame just blits them (it used
+           to redraw every road in full every frame). Tiles are kept in a small
+           LRU; at most a couple are painted per frame (a tile still being
+           painted shows the plain ground colour for that frame).
+
+           Roads are painted from their own geometry — corners and lane offsets
+           along the road (Road.getCorners / paramToWorld) — so a diagonal or
+           curved road only needs to describe itself the same way (paintRoad).
+
+           The look: wet asphalt with grain and repairs, champagne lane dashes and
+           a lavender centre line, worn ivory crossings, paver pavements with a
+           lit kerb, drains and manholes; lawns where the ground is green.
+           ===================================================================== */
+        const GROUND_LOOK = {
+            lot: '#221e28', asphalt: '#16141b', asphaltHi: '#1e1b25', joint: '#121017',
+            dash: 'rgba(232, 200, 140, 0.62)', centre: 'rgba(196, 168, 255, 0.55)', edge: 'rgba(226, 214, 240, 0.16)',
+            paveA: '#2b2731', paveB: '#27232d', seam: 'rgba(8, 6, 12, 0.55)', kerb: '#3b3542', kerbLit: 'rgba(232, 200, 140, 0.22)',
+            stripe: 'rgba(234, 226, 212, 0.6)', lawn: '#15281b', lawnHi: '#20402a', lawnLo: 'rgba(6, 18, 10, 0.7)'
+        };
+
+        class GroundBaker {
+            constructor(game) {
+                this.game = game;
+                this.S = 512;                 // tile size (world px, painted 1:1)
+                this.max = 40;                // tiles kept (≈ 40 MB at most)
+                this.cache = new Map();
+                this.mapId = null;
+                this.budget = 0;
+            }
+
+            /** Only the city is baked (other maps keep their own ground). */
+            activeFor(map) { return !!(map && map.id === 'hub_949' && this.game.traffic && this.game.traffic.network && this.game.traffic.network.roads.length); }
+
+            invalidate() { this.cache.clear(); }
+
+            /** Blit the tiles under the view (painting at most two new ones this frame). */
+            draw(ctx, view) {
+                const map = this.game.activeMap;
+                if (map.id !== this.mapId) { this.invalidate(); this.mapId = map.id; }
+                this.lod = (this.game.camera.zoom || 1) < 0.6 ? 1 : 0;         // zoomed out: half-resolution tiles (much cheaper to blit)
+                const S = this.S, i0 = Math.max(0, Math.floor(view.left / S)), j0 = Math.max(0, Math.floor(view.top / S));
+                const i1 = Math.min(Math.ceil(map.width / S) - 1, Math.floor(view.right / S)), j1 = Math.min(Math.ceil(map.height / S) - 1, Math.floor(view.bottom / S));
+                this.budget = 2;
+                for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+                    const t = this._tile(i, j);
+                    if (t) ctx.drawImage(t, i * S, j * S, S, S);
+                    else { ctx.fillStyle = GROUND_LOOK.lot; ctx.fillRect(i * S, j * S, S, S); }
+                }
+            }
+
+            _tile(i, j) {
+                const key = i + ',' + j + ',' + this.lod;
+                const hit = this.cache.get(key);
+                if (hit) { this.cache.delete(key); this.cache.set(key, hit); return hit; }   // most recent last
+                if (this.budget <= 0) return null;
+                this.budget--;
+                const cv = this._bake(i, j, this.lod);
+                this.cache.set(key, cv);
+                while (this.cache.size > this.max) this.cache.delete(this.cache.keys().next().value);
+                return cv;
+            }
+
+            _bake(i, j, lod = 0) {
+                const S = this.S, g = this.game, map = g.activeMap, k = 1 / (1 << lod);
+                const cv = document.createElement('canvas'); cv.width = S * k; cv.height = S * k;
+                const c = cv.getContext('2d');
+                c.scale(k, k);
+                const x0 = i * S, y0 = j * S, R = { left: x0, top: y0, right: x0 + S, bottom: y0 + S };
+                const hits = (x, y, w, h) => x < R.right && x + w > R.left && y < R.bottom && y + h > R.top;
+                const rnd = seededRandom(i * 7919 + j * 104729 + 949);
+                c.translate(-x0, -y0);
+                // 1. The lots: a dark violet ground with a fine grain
+                c.fillStyle = GROUND_LOOK.lot; c.fillRect(x0, y0, S, S);
+                for (let k = 0; k < 420; k++) {
+                    c.fillStyle = rnd() < 0.5 ? 'rgba(255, 240, 255, 0.022)' : 'rgba(0, 0, 0, 0.14)';
+                    c.fillRect(x0 + rnd() * S, y0 + rnd() * S, 1 + rnd() * 3, 1 + rnd() * 2);
+                }
+                // 2. Floor zones: green ones are lawns, the rest tint the ground
+                for (const z of map.floorZones || []) {
+                    if (!hits(z.x, z.y, z.w, z.h)) continue;
+                    if (this._isGreen(z.color)) this._paintLawn(c, z, R, rnd);
+                    else { c.globalAlpha = 0.45; c.fillStyle = z.color; c.fillRect(z.x, z.y, z.w, z.h); c.globalAlpha = 1; }
+                }
+                // 3. Parks and plazas (city-layout zones)
+                const city = map.cityLayout;
+                if (city) for (const b of city.blocks) {
+                    if ((b.type === 'PARK' || b.type === 'PLAZA') && hits(b.x, b.y, b.w, b.h) && typeof paintParkGround === 'function') paintParkGround(c, b, R);
+                }
+                // 4. Roads, then intersections over them
+                const net = g.traffic.network;
+                for (const road of net.roads) if (hits(road.x, road.y, road.w, road.h)) this.paintRoad(c, road, R, rnd);
+                for (const ix of net.intersections) if (hits(ix.x, ix.y, ix.width, ix.height)) this._paintIntersection(c, ix);
+                // 5. Pavements and crossings
+                for (const p of map.pavements || []) if (hits(p.x, p.y, p.w, p.h)) this._paintPavement(c, p, R, rnd);
+                for (const cw of map.crosswalks || []) if (hits(cw.x, cw.y, cw.w, cw.h)) this._paintCrossing(c, cw, rnd);
+                return cv;
+            }
+
+            _isGreen(col) {
+                const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(col || '');
+                return !!m && parseInt(m[2], 16) > parseInt(m[1], 16) + 6 && parseInt(m[2], 16) > parseInt(m[3], 16) + 4;
+            }
+
+            _paintLawn(c, z, R, rnd) {
+                const x = Math.max(z.x, R.left), y = Math.max(z.y, R.top), w = Math.min(z.x + z.w, R.right) - x, h = Math.min(z.y + z.h, R.bottom) - y;
+                c.fillStyle = GROUND_LOOK.lawn; c.fillRect(x, y, w, h);
+                for (let k = 0; k < (w * h) / 180; k++) { c.fillStyle = rnd() < 0.55 ? GROUND_LOOK.lawnHi : GROUND_LOOK.lawnLo; c.fillRect(x + rnd() * w, y + rnd() * h, 2, 1 + rnd() * 2); }
+                for (let k = 0; k < (w * h) / 9000; k++) {                                      // soft darker hollows
+                    const cx = x + rnd() * w, cy = y + rnd() * h, r = 20 + rnd() * 50, gr = c.createRadialGradient(cx, cy, 0, cx, cy, r);
+                    gr.addColorStop(0, 'rgba(4, 14, 8, 0.35)'); gr.addColorStop(1, 'rgba(4, 14, 8, 0)'); c.fillStyle = gr; c.fillRect(cx - r, cy - r, r * 2, r * 2);
+                }
+            }
+
+            /**
+             * A road, painted from its geometry: asphalt with grain and repairs, wheel paths,
+             * lane dashes, the centre line, faint edges and its name. Works for any angle; a
+             * curved road would provide the same getCorners/paramToWorld along its path.
+             */
+            paintRoad(c, road, R, rnd) {
+                const L = GROUND_LOOK, corners = road.getCorners(), halfT = road.thickness / 2;
+                c.save();
+                c.beginPath(); corners.forEach((p, k) => k ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath();
+                c.fillStyle = L.asphalt; c.fill();
+                c.clip();
+                // Grain, repairs (patches of fresher tar), wheel paths darker down each lane
+                const x = Math.max(road.x, R.left), y = Math.max(road.y, R.top), w = Math.min(road.x + road.w, R.right) - x, h = Math.min(road.y + road.h, R.bottom) - y;
+                for (let k = 0; k < (w * h) / 60; k++) { c.fillStyle = rnd() < 0.5 ? 'rgba(255,240,255,0.03)' : 'rgba(0,0,0,0.18)'; c.fillRect(x + rnd() * w, y + rnd() * h, 1 + rnd() * 2, 1); }
+                for (let k = 0; k < (w * h) / 40000; k++) { c.fillStyle = L.asphaltHi; c.fillRect(x + rnd() * w, y + rnd() * h, 30 + rnd() * 70, 16 + rnd() * 30); }
+                const lanes = road.symmetrical ? road.numLanes * 2 : road.numLanes;
+                c.lineWidth = 9; c.strokeStyle = 'rgba(0, 0, 0, 0.16)';
+                for (let l = 0; l < lanes; l++) for (const off of [-13, 13]) {
+                    const lat = -halfT + road.laneWidth * (l + 0.5) + off, a = road.paramToWorld(0, lat), b = road.paramToWorld(road.length, lat);
+                    c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+                }
+                // Lane markings
+                const line = (lat, style) => { const a = road.paramToWorld(0, lat), b = road.paramToWorld(road.length, lat); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke(); };
+                for (let l = 1; l < lanes; l++) {
+                    const lat = l * road.laneWidth - halfT;
+                    if (road.symmetrical && l === road.numLanes) {                               // the centre: a double lavender line
+                        c.setLineDash([]); c.strokeStyle = L.centre; c.lineWidth = 1.6; line(lat - 3, 'solid'); line(lat + 3, 'solid');
+                    } else { c.setLineDash([22, 18]); c.strokeStyle = L.dash; c.lineWidth = 2; line(lat, 'dash'); }
+                }
+                c.setLineDash([]); c.strokeStyle = L.edge; c.lineWidth = 1.5; line(-halfT + 5); line(halfT - 5);
+                // Its name, painted on the tarmac every 600 px, one per carriageway
+                if (road.name) {
+                    c.font = '600 11px Montserrat, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(232, 214, 190, 0.22)';
+                    const n = Math.max(1, Math.round(road.length / 600)), lat = Math.min(13, road.laneWidth * 0.35) + 8;
+                    for (let k = 0; k < n; k++) {
+                        const along = road.length * (k + 0.5) / n;
+                        for (const s of road.symmetrical ? [-1, 1] : [1]) {
+                            const p = road.paramToWorld(along, s * lat);
+                            c.save(); c.translate(p.x, p.y); c.rotate(road.angle + (s > 0 ? Math.PI : 0)); c.fillText(road.name.toUpperCase(), 0, 0); c.restore();
+                        }
+                    }
+                }
+                c.restore();
+            }
+
+            _paintIntersection(c, ix) {
+                c.fillStyle = GROUND_LOOK.asphalt; c.fillRect(ix.x, ix.y, ix.width, ix.height);
+                c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 1; c.strokeRect(ix.x + 0.5, ix.y + 0.5, ix.width - 1, ix.height - 1);
+                const cx = ix.x + ix.width / 2, cy = ix.y + ix.height / 2;                      // a manhole, off-centre
+                c.fillStyle = '#1d1a22'; c.beginPath(); c.arc(cx + 22, cy - 18, 11, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = 'rgba(232, 200, 140, 0.18)'; c.lineWidth = 1; c.stroke();
+                c.strokeStyle = 'rgba(0,0,0,0.4)'; c.beginPath(); for (let k = -6; k <= 6; k += 4) { c.moveTo(cx + 22 - 7, cy - 18 + k); c.lineTo(cx + 22 + 7, cy - 18 + k); } c.stroke();
+            }
+
+            _paintPavement(c, p, R, rnd) {
+                const L = GROUND_LOOK, T = 25;
+                c.save(); c.beginPath(); c.rect(Math.max(p.x, R.left), Math.max(p.y, R.top), Math.min(p.x + p.w, R.right) - Math.max(p.x, R.left), Math.min(p.y + p.h, R.bottom) - Math.max(p.y, R.top)); c.clip();
+                c.fillStyle = L.paveA; c.fillRect(p.x, p.y, p.w, p.h);
+                const gx0 = Math.floor(Math.max(p.x, R.left - T) / T) * T, gy0 = Math.floor(Math.max(p.y, R.top - T) / T) * T;
+                for (let gx = gx0; gx < Math.min(p.x + p.w, R.right); gx += T) for (let gy = gy0; gy < Math.min(p.y + p.h, R.bottom); gy += T) {
+                    const hsh = _bldHash(gx * 0.13 + gy * 0.71, 3);
+                    if (hsh < 0.35) { c.fillStyle = L.paveB; c.fillRect(gx, gy, T, T); }
+                    else if (hsh > 0.93) { c.fillStyle = 'rgba(255, 236, 250, 0.035)'; c.fillRect(gx, gy, T, T); }
+                }
+                c.strokeStyle = L.seam; c.lineWidth = 1; c.beginPath();
+                for (let gx = gx0; gx <= p.x + p.w; gx += T) { c.moveTo(gx + 0.5, p.y); c.lineTo(gx + 0.5, p.y + p.h); }
+                for (let gy = gy0; gy <= p.y + p.h; gy += T) { c.moveTo(p.x, gy + 0.5); c.lineTo(p.x + p.w, gy + 0.5); }
+                c.stroke();
+                // Kerbs all round, their top edge catching the light; a drain every so often
+                c.strokeStyle = L.kerb; c.lineWidth = 4; c.strokeRect(p.x + 2, p.y + 2, p.w - 4, p.h - 4);
+                c.strokeStyle = L.kerbLit; c.lineWidth = 1; c.strokeRect(p.x + 0.5, p.y + 0.5, p.w - 1, p.h - 1);
+                const long = p.w > p.h;
+                for (let s = 180; s < (long ? p.w : p.h) - 40; s += 260) {
+                    const dx = long ? p.x + s : p.x + 6, dy = long ? p.y + 6 : p.y + s;
+                    c.fillStyle = '#141218'; c.fillRect(dx, dy, long ? 22 : 8, long ? 8 : 22);
+                    c.strokeStyle = 'rgba(120, 110, 130, 0.35)'; c.beginPath();
+                    for (let k = 2; k < 22; k += 4) { if (long) { c.moveTo(dx + k, dy + 1); c.lineTo(dx + k, dy + 7); } else { c.moveTo(dx + 1, dy + k); c.lineTo(dx + 7, dy + k); } }
+                    c.stroke();
+                }
+                c.restore();
+            }
+
+            _paintCrossing(c, cw, rnd) {
+                c.fillStyle = GROUND_LOOK.asphalt; c.fillRect(cw.x, cw.y, cw.w, cw.h);
+                c.fillStyle = GROUND_LOOK.stripe;
+                const stripe = (x, y, w, h) => {                                                 // worn: a few gaps, softer ends
+                    c.fillRect(x, y, w, h);
+                    c.fillStyle = 'rgba(22, 20, 27, 0.55)';
+                    for (let k = 0; k < 5; k++) c.fillRect(x + rnd() * w, y + rnd() * h, 2 + rnd() * 4, 1 + rnd() * 3);
+                    c.fillStyle = GROUND_LOOK.stripe;
+                };
+                if (cw.orientation === 'H') for (let sy = cw.y + 8; sy < cw.y + cw.h - 8; sy += 18) stripe(cw.x + 8, sy, cw.w - 16, 11);
+                else for (let sx = cw.x + 8; sx < cw.x + cw.w - 8; sx += 18) stripe(sx, cw.y + 8, 11, cw.h - 16);
+            }
+        }
         class UISystem {
             constructor(gameEngine) {
                 this.game = gameEngine;
@@ -42910,7 +43296,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.transcript = new DialogueTranscript();
                 this.scenes = new ScenePlayer(this);            // story/scene-runner.js: the story's scenes
                 this.coach = new Coach(this);                   // ui/coach.js: points at the UI and says what it's for
-                this.hud = new HudReveal(this);                 // ui/hud-reveal.js: the HUD appears as the story introduces it
+                this.hud = new HudReveal(this);
+                this.groundBaker = new GroundBaker(this);       // world/ground-baker.js: the city's streets, painted once per tile                 // ui/hud-reveal.js: the HUD appears as the story introduces it
                 // Universal capture: any write to the NPC text element gets transcribed,
                 // regardless of which code path produced it (DialogueSequence, single-line
                 // shop greetings, recruit prompts, story handler). Pulls the speaker from
@@ -48254,6 +48641,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     // Track original prop count so we can extract graveyard stones for cache later
                     this._hubCache_hubPropCount = mapData.props.length;
+
+                    // The same city every visit: generation draws from a seeded stream (restored below)
+                    const _unseededRandom = Math.random;
+                    Math.random = seededRandom(949);
                     
                     // 1. CREATE CITY LAYOUT
                     const city = new CityLayout({
@@ -48276,7 +48667,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     city.addVerticalRoad(1200, 'West Ave', 2);
                     city.addVerticalRoad(2800, 'East Ave', 2);
                     
-                    // 3. GENERATE BLOCKS (must be done before placing buildings)
+                    // 3. GENERATE BLOCKS (must be done before placing buildings); the parks are kept free (world/parks.js)
+                    for (const [block, name] of Object.entries(HUB_PARKS)) city.setZoneType(block, CityLayout.ZONE.PARK, { name });
                     city.generateBlocks();
                     
                     // Debug: Log blocks to console
@@ -48699,6 +49091,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         mapData.foliage = mapData.foliage.filter(f => !inCourt(f));
                         mapData.lamps = mapData.lamps.filter(l => !inCourt(l));
                     }
+                    // The parks' trees and lanterns (their ground is painted by the ground baker)
+                    for (const b of city.blocks) {
+                        if (b.type !== CityLayout.ZONE.PARK) continue;
+                        const P = parkLayout(b);
+                        for (const t of P.trees) mapData.foliage.push(new Foliage(t.x, t.y, t.type, t.size));
+                        for (const l of P.lamps) mapData.lamps.push(new LampEntity({ x: l.x, y: l.y, lampType: 1, color: '#ffd9a8', lightRadius: 170 }));
+                    }
                     console.log(`Generated ${mapData.foliage.length} foliage elements (including glowing trees)`);
                     
                     // 11d. SOUTHERN GRAVEYARD
@@ -48814,6 +49213,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // =========================================================
                     //  CACHE RESULTS for instant restore on future visits
                     // =========================================================
+                    Math.random = _unseededRandom;
                     this._hubCache = {
                         buildings: mapData.buildings,
                         buildingColliders: mapData.buildingColliders,
@@ -51922,16 +52322,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Uses actual camera zoom (not cullZoom) so floor always fills the screen
                 const viewHalfW = (this.canvas.width / 2) / this.camera.zoom;
                 const viewHalfH = (this.canvas.height / 2) / this.camera.zoom;
-                this.ctx.fillStyle = this.activeMap.floorColor;
                 const floorLeft = Math.max(0, camX - viewHalfW - 50);
                 const floorTop = Math.max(0, camY - viewHalfH - 50);
                 const floorRight = Math.min(this.activeMap.width, camX + viewHalfW + 50);
                 const floorBottom = Math.min(this.activeMap.height, camY + viewHalfH + 50);
-                this.ctx.fillRect(floorLeft, floorTop, floorRight - floorLeft, floorBottom - floorTop);
+                // The city: ground, zones, roads, pavements and crossings come baked in tiles (world/ground-baker.js)
+                const bakedGround = !!(this.groundBaker && this.groundBaker.activeFor(this.activeMap));
+                if (bakedGround) {
+                    this.groundBaker.draw(this.ctx, { left: floorLeft, top: floorTop, right: floorRight, bottom: floorBottom });
+                } else {
+                    this.ctx.fillStyle = this.activeMap.floorColor;
+                    this.ctx.fillRect(floorLeft, floorTop, floorRight - floorLeft, floorBottom - floorTop);
+                }
                 
                 // Floor Zones (Grass, Industrial ground - drawn UNDER roads)
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
-                if (this._renderGridFloorZones) {
+                if (this._renderGridFloorZones && !bakedGround) {
                     const visibleZones = this._renderGridFloorZones.query(cullBounds.world);
                     for (const z of visibleZones) {
                         this.ctx.fillStyle = z.color;
@@ -51973,8 +52379,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 
-                // Roads (Asphalt)
-                this.traffic.drawNetwork(this.ctx, this.debugMode);
+                // Roads (Asphalt) — baked with the ground in the city; the debug overlay still draws live
+                if (!bakedGround || this.debugMode) this.traffic.drawNetwork(this.ctx, this.debugMode);
                 
                 // Puddle Reflections (draw on roads, before buildings/entities)
                 if (this.puddles && this.weather?.isRaining && this.activeMap?.type === 'outdoor') {
@@ -52059,7 +52465,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Pavements
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
-                if (this._renderGridPavements) {
+                if (this._renderGridPavements && !bakedGround) {
                     const visiblePavements = this._renderGridPavements.query(cullBounds.world);
                     for (const p of visiblePavements) {
                         p.draw(this.ctx);
@@ -52068,7 +52474,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Crosswalks
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
-                if (this._renderGridCrosswalks) {
+                if (this._renderGridCrosswalks && !bakedGround) {
                     const visibleCrosswalks = this._renderGridCrosswalks.query(cullBounds.world);
                     for (const cw of visibleCrosswalks) {
                         this.ctx.fillStyle = '#1a1a20';
@@ -52305,7 +52711,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.ctx.restore();
                 }
             
-                // Grid (Faint) - WITH VIEWPORT CULLING
+                // Grid (Faint) - WITH VIEWPORT CULLING (not in the city: its ground is painted)
+                if (!bakedGround) {
                 this.ctx.strokeStyle = 'rgba(164, 105, 255, 0.1)'; 
                 this.ctx.lineWidth = 1;
                 const gridSize = 100; 
@@ -52328,6 +52735,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.ctx.lineTo(gridMaxX, y); 
                 } 
                 this.ctx.stroke();
+                }
                 
                 // Map Walls
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)

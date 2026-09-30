@@ -112,16 +112,22 @@
                 // Uses actual camera zoom (not cullZoom) so floor always fills the screen
                 const viewHalfW = (this.canvas.width / 2) / this.camera.zoom;
                 const viewHalfH = (this.canvas.height / 2) / this.camera.zoom;
-                this.ctx.fillStyle = this.activeMap.floorColor;
                 const floorLeft = Math.max(0, camX - viewHalfW - 50);
                 const floorTop = Math.max(0, camY - viewHalfH - 50);
                 const floorRight = Math.min(this.activeMap.width, camX + viewHalfW + 50);
                 const floorBottom = Math.min(this.activeMap.height, camY + viewHalfH + 50);
-                this.ctx.fillRect(floorLeft, floorTop, floorRight - floorLeft, floorBottom - floorTop);
+                // The city: ground, zones, roads, pavements and crossings come baked in tiles (world/ground-baker.js)
+                const bakedGround = !!(this.groundBaker && this.groundBaker.activeFor(this.activeMap));
+                if (bakedGround) {
+                    this.groundBaker.draw(this.ctx, { left: floorLeft, top: floorTop, right: floorRight, bottom: floorBottom });
+                } else {
+                    this.ctx.fillStyle = this.activeMap.floorColor;
+                    this.ctx.fillRect(floorLeft, floorTop, floorRight - floorLeft, floorBottom - floorTop);
+                }
                 
                 // Floor Zones (Grass, Industrial ground - drawn UNDER roads)
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
-                if (this._renderGridFloorZones) {
+                if (this._renderGridFloorZones && !bakedGround) {
                     const visibleZones = this._renderGridFloorZones.query(cullBounds.world);
                     for (const z of visibleZones) {
                         this.ctx.fillStyle = z.color;
@@ -163,8 +169,8 @@
                     }
                 }
                 
-                // Roads (Asphalt)
-                this.traffic.drawNetwork(this.ctx, this.debugMode);
+                // Roads (Asphalt) — baked with the ground in the city; the debug overlay still draws live
+                if (!bakedGround || this.debugMode) this.traffic.drawNetwork(this.ctx, this.debugMode);
                 
                 // Puddle Reflections (draw on roads, before buildings/entities)
                 if (this.puddles && this.weather?.isRaining && this.activeMap?.type === 'outdoor') {
@@ -249,7 +255,7 @@
                 
                 // Pavements
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
-                if (this._renderGridPavements) {
+                if (this._renderGridPavements && !bakedGround) {
                     const visiblePavements = this._renderGridPavements.query(cullBounds.world);
                     for (const p of visiblePavements) {
                         p.draw(this.ctx);
@@ -258,7 +264,7 @@
                 
                 // Crosswalks
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
-                if (this._renderGridCrosswalks) {
+                if (this._renderGridCrosswalks && !bakedGround) {
                     const visibleCrosswalks = this._renderGridCrosswalks.query(cullBounds.world);
                     for (const cw of visibleCrosswalks) {
                         this.ctx.fillStyle = '#1a1a20';
@@ -495,7 +501,8 @@
                     this.ctx.restore();
                 }
             
-                // Grid (Faint) - WITH VIEWPORT CULLING
+                // Grid (Faint) - WITH VIEWPORT CULLING (not in the city: its ground is painted)
+                if (!bakedGround) {
                 this.ctx.strokeStyle = 'rgba(164, 105, 255, 0.1)'; 
                 this.ctx.lineWidth = 1;
                 const gridSize = 100; 
@@ -518,6 +525,7 @@
                     this.ctx.lineTo(gridMaxX, y); 
                 } 
                 this.ctx.stroke();
+                }
                 
                 // Map Walls
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)

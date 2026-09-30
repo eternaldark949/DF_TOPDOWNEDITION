@@ -37,6 +37,8 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `world/lobby-life.js` | The Double Nights lobby's crowd: guests (portals, the doors, the desk queue, lounges, elevators, rolling luggage) and AI staff (gold bellhops with carts, Blood Moon concierges, a silver valet) — ambient walkers, not NPCs |
 | `world/rooms.js` | Room System, the standard for indoor maps: per-room visibility (soft violet veil, gentle reveal, light spilling through open doors, dim-through-glass from outside), fading room lights, `outdoorness`, sky light on outdoor rooms; windows, doors (hinged doors with swing physics, sliding glass, open arches; bullets strike and push them — `hitDoors`; shut doors block sight — `doorBlocks`), rooms of several rects, silk linens, `RoomSystem`, `ROOM_DEFS` — every indoor map has rooms (arenas and the ethereal plane aside); the checklist for giving a map rooms is in its header |
 | `world/maps.js` | `MAP_DATA`: every map's size, floor zones, walls, transitions, landmarks (optional `wallStyle`, and `navProps` to route paths round big furniture) |
+| `world/ground-baker.js` | **The city's ground, baked**: lots, lawns, parks, roads (painted from their geometry via `paintRoad`, so any angle, curves later), intersections, paver pavements, worn crossings, into 512 px tiles on first sight (LRU, half-res tiles when zoomed out). `draw.js` blits them in the hub instead of redrawing roads every frame |
+| `world/parks.js` | **Parks** (`HUB_PARKS`: Lotus Park, Violet Commons, Moonwell Gardens): `parkLayout(block)` (seeded: hedge, gates, gravel walk, moon pool, flower beds, benches, lanterns, trees) and `paintParkGround` |
 | `world/map-entities.js` | `createMapEntities`: props, NPCs and lamps per map (the apartment suite's furniture is here). Shorthands shared by every map: `decorPropsIn(color)`, `softLight`, `areaLight`, `hiddenLamp` (each case aliases them F/S/A/L) |
 | `world/billboards.js` | `BILLBOARDS`: your artwork on tilted panels around the city. Add one by copying a line |
 | `world/city-layout.js` | `CityLayout`: blocks, roads and building placement for the city |
@@ -62,7 +64,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `entities/lamps.js` | `LampEntity` (all lamp types) |
 | `entities/actors.js` | `ActorEntity`, `PlayerEntity`, projectiles, triggers |
 | `entities/static-builders-profiler.js` | Turning walls/buildings into colliders, perf bench, profiler |
-| `entities/street-objects.js` | Neon signs, loot, pavement, foliage |
+| `entities/street-objects.js` | Neon signs, loot, pavement, foliage; `FLORA_KINDS` / `floraSprite` (each tree, blossom, bush and palm painted once into a sprite) |
 | `entities/npc.js` | `NPC` companions and characters, quips and emotes (their looks: `core/appearances.js`) |
 | `entities/pedestrians.js` | Pedestrians and their manager |
 | `entities/enemies.js` | Velvet cat, drones, gunners (and the Sanctum's three wardens, `WARDENS`: personas with their own art, twice her size, sight-gated fire), gangers, restricted zone, horde gauntlet (`GAUNTLET_MAPS`: its maps — the House of Death, and sealed placeholders — picked from Grum's menu, `openGauntletMenu` in engine/shops-menus.js) |

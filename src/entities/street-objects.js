@@ -127,6 +127,81 @@
          * Wind animation uses sine waves with per-instance phase offset
          * for natural, non-synchronized movement.
          */
+        /* FLORA — each kind of plant painted once into a sprite (a lit canopy, inner shade,
+           leaf grain, blossom), then drawn with a sway offset. The old glow_* kinds are the
+           city's dream trees now: blossom in pink and violet, jade, moon-silver, amber, crimson. */
+        const FLORA_KINDS = {
+            tree:        { base: '#153524', mid: '#245a38', hi: '#5d9a68', dark: '#0c2016' },
+            glow_pink:   { base: '#4a1f3e', mid: '#9a4a78', hi: '#f4b0d4', dark: '#2a0f22', petals: ['#ffd3ea', '#ff9fcf', '#fff4fa'] },
+            glow_purple: { base: '#2f2052', mid: '#6448a8', hi: '#c9aeff', dark: '#1a1030', petals: ['#e6d8ff', '#b894ff', '#fff'] },
+            glow_gold:   { base: '#3e2a14', mid: '#8e6228', hi: '#f0c878', dark: '#22160a', petals: ['#ffe6b0', '#fff2d0'] },
+            glow_green:  { base: '#11302a', mid: '#2a6a56', hi: '#8ee0c2', dark: '#081c18', petals: ['#d8fff0'] },
+            glow_cyan:   { base: '#1c2840', mid: '#465f92', hi: '#bcd2ff', dark: '#0e1426', petals: ['#eaf2ff', '#cfe0ff'] },
+            glow_red:    { base: '#3e1018', mid: '#98243a', hi: '#ff8a9e', dark: '#22060c', petals: ['#ffd0d8'] },
+            bush:        { base: '#16341f', mid: '#285c34', hi: '#5c9660', dark: '#0c2014' },
+            palm:        { base: '#1b3d22', mid: '#2f6636', hi: '#7cb46a', dark: '#10261a' }
+        };
+        const _floraCache = new Map();
+        /** The sprite for a kind/size (sizes bucketed to 0.2), in 4 variants. */
+        function floraSprite(type, size, variant) {
+            const sz = Math.round(size * 5) / 5, key = type + '|' + sz + '|' + variant;
+            let spr = _floraCache.get(key);
+            if (spr) return spr;
+            const K = FLORA_KINDS[type] || FLORA_KINDS.tree, rnd = seededRandom(variant * 977 + Math.round(sz * 100) + type.length * 31);
+            const palm = type === 'palm', bush = type === 'bush';
+            const R = (palm ? 24 : bush ? 13 : 21) * sz, W = Math.ceil(R * 2.6 + 6), cv = document.createElement('canvas'); cv.width = cv.height = W;
+            const c = cv.getContext('2d'), o = W / 2;
+            if (palm) {
+                const n = 8 + (variant % 2);
+                for (let i = 0; i < n; i++) {
+                    const a = i / n * Math.PI * 2 + rnd() * 0.3, len = R * (0.85 + rnd() * 0.3);
+                    c.save(); c.translate(o, o); c.rotate(a);
+                    c.fillStyle = i % 2 ? K.mid : K.base;
+                    c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(len * 0.45, -len * 0.22, len, 0); c.quadraticCurveTo(len * 0.45, len * 0.22, 0, 0); c.fill();
+                    c.strokeStyle = K.hi; c.globalAlpha = 0.5; c.lineWidth = 0.8; c.beginPath(); c.moveTo(2, 0); c.lineTo(len * 0.95, 0); c.stroke(); c.globalAlpha = 1;
+                    c.strokeStyle = K.dark; c.lineWidth = 0.6; c.beginPath();
+                    for (let t = 0.2; t < 0.9; t += 0.12) { c.moveTo(len * t, 0); c.lineTo(len * (t + 0.06), len * 0.12 * (1 - t)); c.moveTo(len * t, 0); c.lineTo(len * (t + 0.06), -len * 0.12 * (1 - t)); }
+                    c.stroke(); c.restore();
+                }
+                c.fillStyle = '#4a3420'; c.beginPath(); c.arc(o, o, R * 0.16, 0, Math.PI * 2); c.fill();
+            } else {
+                // Canopy: overlapping clusters, dark underneath; light from the upper left, shade to the lower right
+                const lumps = bush ? 5 : 8;
+                c.fillStyle = K.dark; c.beginPath(); c.arc(o + 1, o + 1, R * 1.02, 0, Math.PI * 2); c.fill();
+                for (let i = 0; i < lumps; i++) {
+                    const a = i / lumps * Math.PI * 2 + rnd() * 0.5, d = R * (0.45 + rnd() * 0.15), r = R * (0.48 + rnd() * 0.12);
+                    c.fillStyle = K.base; c.beginPath(); c.arc(o + Math.cos(a) * d, o + Math.sin(a) * d, r, 0, Math.PI * 2); c.fill();
+                }
+                c.fillStyle = K.base; c.beginPath(); c.arc(o, o, R * 0.62, 0, Math.PI * 2); c.fill();
+                for (let i = 0; i < lumps; i++) {
+                    const a = i / lumps * Math.PI * 2 + 0.4, d = R * 0.38, r = R * 0.36;
+                    const g = c.createRadialGradient(o + Math.cos(a) * d - r * 0.35, o + Math.sin(a) * d - r * 0.35, 1, o + Math.cos(a) * d, o + Math.sin(a) * d, r);
+                    g.addColorStop(0, K.mid); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(o + Math.cos(a) * d, o + Math.sin(a) * d, r, 0, Math.PI * 2); c.fill();
+                }
+                const lit = c.createRadialGradient(o - R * 0.4, o - R * 0.45, 1, o - R * 0.2, o - R * 0.2, R * 0.9);
+                lit.addColorStop(0, K.hi); lit.addColorStop(1, 'rgba(0,0,0,0)');
+                c.globalAlpha = 0.55; c.fillStyle = lit; c.beginPath(); c.arc(o, o, R, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+                const shade = c.createRadialGradient(o + R * 0.5, o + R * 0.55, 1, o + R * 0.4, o + R * 0.45, R * 0.9);
+                shade.addColorStop(0, 'rgba(0,0,0,0.35)'); shade.addColorStop(1, 'rgba(0,0,0,0)');
+                c.fillStyle = shade; c.beginPath(); c.arc(o, o, R, 0, Math.PI * 2); c.fill();
+                for (let i = 0; i < R * 4; i++) {                                                     // leaf grain
+                    const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * R * 0.95;
+                    c.fillStyle = rnd() < 0.5 ? K.hi : K.dark; c.globalAlpha = 0.35; c.fillRect(o + Math.cos(a) * d, o + Math.sin(a) * d, 1.4, 1.4);
+                }
+                c.globalAlpha = 1;
+                if (K.petals) for (let i = 0; i < R * 2; i++) {                                         // blossom, heavier toward the light
+                    const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * R * 0.92, x = o + Math.cos(a) * d, y = o + Math.sin(a) * d;
+                    if (x + y > o * 2 + R * 0.5 && rnd() < 0.6) continue;
+                    c.globalAlpha = 0.55 + rnd() * 0.4; c.fillStyle = K.petals[Math.floor(rnd() * K.petals.length)];
+                    c.beginPath(); c.arc(x, y, 0.7 + rnd() * 0.9, 0, Math.PI * 2); c.fill();
+                }
+                c.globalAlpha = 1;
+            }
+            spr = { cv, w: W };
+            _floraCache.set(key, spr);
+            return spr;
+        }
+
         class Foliage {
             constructor(x, y, type = 'tree', size = 1.0) {
                 this.x = x;
@@ -209,28 +284,19 @@
                 const time = frameTimeSec || _frameTimeSec;
                 // Calculate sway based on wind strength and time
                 const sway = Math.sin(time * 2 + this.phaseOffset) * wind * 8 * this.swayMultiplier * windDirection;
-                const sway2 = Math.sin(time * 2.5 + this.phaseOffset + 1) * wind * 5 * this.swayMultiplier * windDirection;
-                
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                
-                // Determine base type for glowing variants
-                let baseType = this.type;
-                if (this.isGlowing) {
-                    baseType = 'tree'; // Glowing variants use tree shape by default
-                }
-                
-                if (baseType === 'tree' || this.isGlowing) {
-                    this._drawTree(ctx, sway, sway2, time);
-                } else if (baseType === 'bush') {
-                    this._drawBush(ctx, sway, sway2, time);
-                } else if (baseType === 'palm') {
-                    this._drawPalm(ctx, sway, sway2, time);
-                }
-                
-                ctx.restore();
+                const s = this.size, palm = this.type === 'palm', bush = this.type === 'bush';
+                // Shadow on the ground (drawn live: in daylight it will follow the sun)
+                ctx.fillStyle = 'rgba(0,0,0,0.22)';
+                ctx.beginPath(); ctx.ellipse(this.x + sway * 0.4 + 4 * s, this.y + (bush ? 3 : 6) * s, (bush ? 13 : palm ? 16 : 19) * s, (bush ? 6 : 8) * s, 0, 0, Math.PI * 2); ctx.fill();
+                // The canopy: its painted sprite, carried by the wind
+                if (this._variant === undefined) this._variant = Math.floor(this.phaseOffset * 0.637) % 4;
+                const spr = floraSprite(this.type, s, this._variant);
+                const cx = this.x + sway * (bush ? 0.6 : palm ? 0.3 : 1), cy = this.y - (bush ? 2 : palm ? 30 : 25) * s;
+                if (palm) {
+                    ctx.save(); ctx.translate(cx, cy); ctx.rotate(sway * 0.012); ctx.drawImage(spr.cv, -spr.w / 2, -spr.w / 2); ctx.restore();
+                } else ctx.drawImage(spr.cv, cx - spr.w / 2, cy - spr.w / 2);
             }
-            
+
             _drawTree(ctx, sway, sway2, time) {
                 const s = this.size;
                 

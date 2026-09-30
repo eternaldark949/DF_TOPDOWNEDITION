@@ -73,6 +73,8 @@ const SCRIPTS = [
     'traffic/garage-zib.js',
     'traffic/traffic-vehicle.js',
     'traffic/traffic-manager.js',
+    'world/parks.js',
+    'world/ground-baker.js',
     'ui/ui-system.js',
     'ui/music-widget.js',
     'story/narrative-cutscenes.js',
