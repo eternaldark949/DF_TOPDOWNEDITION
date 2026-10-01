@@ -944,6 +944,22 @@
             text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); opacity: 0;
         }
         #cinematic-hint.show { animation: cineHint 3.2s ease forwards; }
+        #cine-bar {
+            position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 3002;
+            display: flex; gap: 8px; padding: 6px 8px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity 0.6s ease;
+            background: rgba(12, 4, 16, 0.55); border: 1px solid rgba(200, 170, 255, 0.28); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        }
+        body.cinematic-view #cine-bar { opacity: 0.85; pointer-events: auto; }
+        #cine-bar button {
+            min-width: 40px; height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(200, 170, 255, 0.3);
+            background: rgba(30, 12, 40, 0.6); color: var(--df-lavender-pale); font-family: var(--font-ui); font-size: 0.8rem; letter-spacing: 2px; cursor: pointer; white-space: nowrap;
+        }
+        #cine-bar button:active { background: rgba(180, 140, 255, 0.35); }
+        #cinematic-hint { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+        #cine-flash { position: fixed; inset: 0; z-index: 3003; pointer-events: none; opacity: 0; background: #fff; display: flex; align-items: center; justify-content: center; }
+        #cine-flash span { font-family: var(--font-ui); letter-spacing: 6px; font-size: 0.9rem; color: #1a0a20; }
+        #cine-flash.go { animation: cineFlash 1.1s ease-out forwards; }
+        @keyframes cineFlash { 0% { opacity: 0.85; } 25% { opacity: 0.35; background: rgba(255,255,255,0.35); } 70% { opacity: 0.6; background: transparent; } 100% { opacity: 0; background: transparent; } }
         @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
 
         /* --- SAVE SLOT OVERLAY --- */

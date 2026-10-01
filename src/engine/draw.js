@@ -27,7 +27,7 @@
                Instrumented with Profiler.
                ===================================================================== */
             draw() {
-                if (!this.running || this.paused) return;
+                if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 // --- PROFILER START ---
                 this.profiler.beginFrame();
@@ -69,6 +69,7 @@
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
+                if (this.cineCam) { camX += this.cineCam.dx; camY += this.cineCam.dy; }   // Cinematic View's pan
                 this.view = { x: camX, y: camY, zoom: this.camera.zoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
                 
                 this.ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
@@ -602,7 +603,10 @@
                         // Threshold scales with zoom — distant cars at max zoom-out skip effects earlier
                         const dx = v.x - camX, dy = v.y - camY;
                         v._lod = (dx * dx + dy * dy > _vehicleLODThreshSq) ? 1 : (_zoomLOD >= 2 ? 1 : 0);
-                        v.draw(this.ctx);
+                        const fa = v.fade ?? 1;
+                        if (fa <= 0) return;
+                        if (fa < 1) { this.ctx.save(); this.ctx.globalAlpha *= fa; v.draw(this.ctx); this.ctx.restore(); }   // fading in or out
+                        else v.draw(this.ctx);
                     });
                 }
                 

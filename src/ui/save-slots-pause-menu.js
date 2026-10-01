@@ -471,11 +471,56 @@
                     setTimeout(() => this._syncNowPlaying(), 120);   // togglePlay settles after the AudioContext resumes
                 });
 
-                // Cinematic view: any tap brings the menu back
+                // Cinematic view: drag pans, pinch or wheel zooms, a quick tap brings the menu back
+                this._cinePtrs = new Map();
+                const cineOn = () => document.body.classList.contains('cinematic-view');
                 window.addEventListener('pointerdown', (e) => {
-                    if (!document.body.classList.contains('cinematic-view')) return;
-                    e.preventDefault(); e.stopPropagation(); this.exitCinematic();
+                    if (!cineOn() || e.target.closest?.('#cine-bar')) return;
+                    e.preventDefault(); e.stopPropagation();
+                    this._cinePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now() });
+                    if (this._cinePtrs.size > 1) this._cineGesture = true;            // a pinch is never a tap
                 }, true);
+                window.addEventListener('pointermove', (e) => {
+                    const p = this._cinePtrs.get(e.pointerId);
+                    if (!cineOn() || !p) return;
+                    e.preventDefault();
+                    if (this._cinePtrs.size === 1) {
+                        if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) > 8) this._cineGesture = true;
+                        this._cinePan(e.clientX - p.x, e.clientY - p.y);
+                    } else {
+                        const [a, b] = [...this._cinePtrs.values()];
+                        const before = Math.hypot(a.x - b.x, a.y - b.y);
+                        p.x = e.clientX; p.y = e.clientY;
+                        const after = Math.hypot(a.x - b.x, a.y - b.y);
+                        if (before > 10) this._cineZoom(after / before);
+                    }
+                    p.x = e.clientX; p.y = e.clientY;
+                }, true);
+                const up = (e) => {
+                    const p = this._cinePtrs.get(e.pointerId);
+                    if (!p) return;
+                    this._cinePtrs.delete(e.pointerId);
+                    if (!cineOn()) return;
+                    e.preventDefault(); e.stopPropagation();
+                    const tap = !this._cineGesture && e.type === 'pointerup' && performance.now() - p.t0 < 400;
+                    if (!this._cinePtrs.size) this._cineGesture = false;
+                    if (tap) this.exitCinematic();
+                };
+                window.addEventListener('pointerup', up, true);
+                window.addEventListener('pointercancel', up, true);
+                window.addEventListener('wheel', (e) => {
+                    if (!cineOn()) return;
+                    e.preventDefault(); this._cineZoom(Math.exp(-e.deltaY * 0.0015));
+                }, { capture: true, passive: false });
+                const bar = document.getElementById('cine-bar');
+                bar?.addEventListener('click', (e) => {
+                    const act = e.target.closest('[data-cine]')?.dataset.cine;
+                    if (act === 'save') this.saveCinePicture();
+                    else if (act === 'in') this._cineZoom(1.2);
+                    else if (act === 'out') this._cineZoom(1 / 1.2);
+                    else if (act === 'reset') { const c = game.cineCam; if (c) { c.dx = c.dy = 0; game.camera.zoom = c.zoom; } }
+                    else if (act === 'back') this.exitCinematic();
+                });
 
                 // Click backdrop to close
                 this.menu.querySelector('.pause-backdrop').addEventListener('click', () => {
@@ -632,6 +677,8 @@
             enterCinematic() {
                 this.close();
                 game.pauseSystem.acquire('cinematic_view');
+                game.cineCam = { dx: 0, dy: 0, zoom: game.camera.zoom };          // draw() keeps going while it's set
+                this._cinePtrs?.clear(); this._cineGesture = false;
                 document.body.classList.add('cinematic-view');
                 const hint = document.getElementById('cinematic-hint');
                 if (hint) { hint.classList.remove('show'); void hint.offsetWidth; hint.classList.add('show'); }
@@ -641,8 +688,51 @@
                 if (!document.body.classList.contains('cinematic-view')) return;
                 document.body.classList.remove('cinematic-view');
                 document.getElementById('cinematic-hint')?.classList.remove('show');
+                if (game.cineCam) { game.camera.zoom = game.cineCam.zoom; game.cineCam = null; }
                 game.pauseSystem.release('cinematic_view');
                 this.open();
+            }
+
+            /** Pan by a screen-space drag (CSS px), kept within CINE_PAN world px of where the view began. */
+            _cinePan(sx, sy) {
+                const c = game.cineCam; if (!c) return;
+                const k = (game.canvas.width / (game.canvas.clientWidth || game.canvas.width)) / game.camera.zoom;
+                c.dx -= sx * k; c.dy -= sy * k;
+                const R = CONFIG.CAMERA.CINE_PAN, d = Math.hypot(c.dx, c.dy);
+                if (d > R) { c.dx *= R / d; c.dy *= R / d; }
+            }
+
+            _cineZoom(f) {
+                if (!game.cineCam) return;
+                const [lo, hi] = CONFIG.CAMERA.CINE_ZOOM;
+                game.camera.zoom = Math.max(lo, Math.min(hi, game.camera.zoom * f));
+            }
+
+            /** The held frame as a PNG, colour grade and all: downloaded, or the share sheet where files can be shared (phones). */
+            saveCinePicture() {
+                const src = game.canvas, out = document.createElement('canvas');
+                out.width = src.width; out.height = src.height;
+                const ctx = out.getContext('2d');
+                const f = src.style.filter;
+                if (f && f !== 'none' && 'filter' in ctx) ctx.filter = f;
+                ctx.drawImage(src, 0, 0);
+                const flash = document.getElementById('cine-flash');
+                if (flash) { flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go'); }
+                const d = new Date(), z = (n) => String(n).padStart(2, '0');
+                const name = `Dimensions-Freelancer-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.png`;
+                out.toBlob(async (blob) => {
+                    if (!blob) return;
+                    this._lastPicture = blob;
+                    const file = typeof File === 'function' ? new File([blob], name, { type: 'image/png' }) : null;
+                    const touch = window.matchMedia?.('(pointer: coarse)').matches;
+                    if (touch && file && navigator.canShare?.({ files: [file] })) {
+                        try { await navigator.share({ files: [file], title: 'Dimensions: Freelancer' }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+                    }
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob); a.download = name;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+                }, 'image/png');
             }
 
             // The capsule mirrors the music widget: station on the disc, track (or station) and play state

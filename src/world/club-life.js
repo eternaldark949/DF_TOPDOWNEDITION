@@ -195,8 +195,10 @@
                     const [gx, gy] = step.go, d = Math.hypot(gx - w.x, gy - w.y);
                     if (d > 6 && !step._arrived) {
                         let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
-                        const px = w.x - pl.x, py = w.y - pl.y, pd = Math.hypot(px, py);
-                        if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
+                            const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
+                            if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        }
                         for (const o of this.walkers) {
                             if (o === w || o.life < 0.5 || o.seated) continue;
                             const ox = w.x - o.x, oy = w.y - o.y;

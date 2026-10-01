@@ -1162,6 +1162,22 @@
             text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); opacity: 0;
         }
         #cinematic-hint.show { animation: cineHint 3.2s ease forwards; }
+        #cine-bar {
+            position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 3002;
+            display: flex; gap: 8px; padding: 6px 8px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity 0.6s ease;
+            background: rgba(12, 4, 16, 0.55); border: 1px solid rgba(200, 170, 255, 0.28); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        }
+        body.cinematic-view #cine-bar { opacity: 0.85; pointer-events: auto; }
+        #cine-bar button {
+            min-width: 40px; height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(200, 170, 255, 0.3);
+            background: rgba(30, 12, 40, 0.6); color: var(--df-lavender-pale); font-family: var(--font-ui); font-size: 0.8rem; letter-spacing: 2px; cursor: pointer; white-space: nowrap;
+        }
+        #cine-bar button:active { background: rgba(180, 140, 255, 0.35); }
+        #cinematic-hint { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+        #cine-flash { position: fixed; inset: 0; z-index: 3003; pointer-events: none; opacity: 0; background: #fff; display: flex; align-items: center; justify-content: center; }
+        #cine-flash span { font-family: var(--font-ui); letter-spacing: 6px; font-size: 0.9rem; color: #1a0a20; }
+        #cine-flash.go { animation: cineFlash 1.1s ease-out forwards; }
+        @keyframes cineFlash { 0% { opacity: 0.85; } 25% { opacity: 0.35; background: rgba(255,255,255,0.35); } 70% { opacity: 0.6; background: transparent; } 100% { opacity: 0; background: transparent; } }
         @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
 
         /* --- SAVE SLOT OVERLAY --- */
@@ -3887,7 +3903,15 @@
         </div>
     </div>
     <!-- Cinematic view (pause menu → Quick Access): the HUD hidden, the world held still -->
-    <div id="cinematic-hint">Tap or press Esc to return</div>
+    <div id="cinematic-hint">Drag to pan · pinch to zoom · tap to return</div>
+    <div id="cine-bar" aria-label="Cinematic view">
+        <button data-cine="save" title="Save picture">📷 SAVE</button>
+        <button data-cine="out" title="Zoom out">−</button>
+        <button data-cine="in" title="Zoom in">+</button>
+        <button data-cine="reset" title="Recentre">⟲</button>
+        <button data-cine="back" title="Back to the menu">✕</button>
+    </div>
+    <div id="cine-flash"><span>SAVED</span></div>
     
     <!-- SAVE SLOT OVERLAY -->
     <div id="save-slot-overlay"></div>
@@ -4041,6 +4065,10 @@
             // --- CAMERA ---
             CAMERA: {
                 DEFAULT_ZOOM: 1.0,
+                HOLSTER_ZOOM: 1.18,             // on foot, gun away: 18% closer (engine/update.js camera)
+                INDOOR_ZOOM: 1.20,              // indoors: 20% closer (stacks with holstered)
+                INTERACT_ZOOM: 1.05,            // by something to use, or talking: 5% closer than that
+                CINE_PAN: 450, CINE_ZOOM: [0.5, 2.5],       // Cinematic View: pan radius (world px) and zoom limits
                 SHAKE_DECAY: 0.9,
                 SHAKE_MIN_THRESHOLD: 0.5
             },
@@ -4371,7 +4399,7 @@
                 HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
                 REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
-                CAM_ZOOM: { SPAN: 0.5, FLOOR: 0.5 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
+                CAM_ZOOM: { SPAN: 0.25, FLOOR: 0.75 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
                 STICK_YAW_DAMP: 5,
                 IMPACT_YAW: 0.9,                // Twist from an off-centre knock (onImpact)              // Touch stick unwinds by this × yawRate (no overshoot)
                 COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)
@@ -21369,13 +21397,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     let moveX = (dx / dist) * pace;
                     let moveY = (dy / dist) * pace;
                     
-                    // Avoid player
-                    const playerDist = Math.hypot(player.x - this.x, player.y - this.y);
-                    if (playerDist < 60) {
-                        const avoidX = (this.x - player.x) / playerDist;
-                        const avoidY = (this.y - player.y) / playerDist;
-                        moveX += avoidX * 1.5;
-                        moveY += avoidY * 1.5;
+                    // Make way for 949 and her crew (engine/update.js _makeWay)
+                    for (const p of (typeof game !== 'undefined' && game._makeWay) || [player]) {
+                        const pd = Math.hypot(p.x - this.x, p.y - this.y);
+                        if (pd < 60 && pd > 0.1) { moveX += (this.x - p.x) / pd * 1.5; moveY += (this.y - p.y) / pd * 1.5; }
                     }
                     
                     // Avoid other pedestrians
@@ -21909,8 +21934,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (d > 6) {
                         let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
                         // Make way for 949, and keep a little room from one another
-                        const px = w.x - pl.x, py = w.y - pl.y, pd = Math.hypot(px, py);
-                        if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
+                            const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
+                            if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        }
                         for (const o of this.walkers) {
                             if (o === w || o.life < 0.5) continue;
                             const ox = w.x - o.x, oy = w.y - o.y, od = Math.hypot(ox, oy);
@@ -22203,8 +22230,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const [gx, gy] = step.go, d = Math.hypot(gx - w.x, gy - w.y);
                     if (d > 6 && !step._arrived) {
                         let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
-                        const px = w.x - pl.x, py = w.y - pl.y, pd = Math.hypot(px, py);
-                        if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
+                            const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
+                            if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        }
                         for (const o of this.walkers) {
                             if (o === w || o.life < 0.5 || o.seated) continue;
                             const ox = w.x - o.x, oy = w.y - o.y;
@@ -33212,27 +33241,38 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return false;
             }
 
+            /** The last resort: is the strip we'd drive through to pass a person (toward the kerb) empty of people? */
+            _kerbClear(obs) {
+                if (typeof game === 'undefined') return false;
+                const a = this.angle, fx = Math.cos(a), fy = Math.sin(a), side = obs.lateral > 0 ? -1 : 1;   // pass on the side away from them
+                const passLat = obs.lateral + side * ((obs.width || 20) / 2 + this.width / 2 + 8), half = this.width / 2 + 14;
+                const people = (game._makeWay || []).concat(game.pedestrians && game.pedestrians.pedestrians || []);
+                for (const p of people) {
+                    if (!p || p.dead) continue;
+                    const dx = p.x - this.x, dy = p.y - this.y, along = dx * fx + dy * fy, lat = -dx * fy + dy * fx;
+                    if (along > -this.length / 2 && along < obs.dist + this.length * 1.5 && Math.abs(lat - passLat) < half) return false;
+                }
+                return true;
+            }
+
+            /** The lanes beside ours on this stretch (same segment), nearest first */
+            _sideLanes(opposing) {
+                const cur = this.currentLane, seg = cur.segment;
+                return cur.road.lanes.filter(l => l !== cur && (!seg || l.segment === seg) && (l.isOpposing !== cur.isOpposing) === opposing)
+                    .sort((p, q) => Math.abs(this._latTo(p)) - Math.abs(this._latTo(q)));
+            }
+            _latTo(lane) { return (this.x - lane.start.x) * -lane.uy + (this.y - lane.start.y) * lane.ux; }
+
             findAdjacentLane() {
                 if (!this.currentLane || !this.currentLane.road) return null;
-                const road = this.currentLane.road;
-                const myIndex = this.currentLane.laneIndex;
-                for (let lane of road.lanes) {
-                    if (lane.isOpposing === this.currentLane.isOpposing && lane.laneIndex !== myIndex) {
-                        if (this.isLaneClear(lane, 150)) return lane;
-                    }
-                }
+                for (const lane of this._sideLanes(false)) if (this.isLaneClear(lane, 150)) return lane;   // (this stretch only, nearest first)
                 return null;
             }
             
             findOpposingLane() {
                 if (!this.currentLane || !this.currentLane.road || !this.currentLane.road.symmetrical) return null;
-                const road = this.currentLane.road;
-                for (let lane of road.lanes) {
-                    if (lane.isOpposing !== this.currentLane.isOpposing) {
-                        if (this.isLaneClear(lane, 200)) return lane;
-                    }
-                }
-                return null;
+                const near = this._sideLanes(true)[0];                                 // the oncoming lane right beside us, if it's clear
+                return near && this.isLaneClear(near, 200) ? near : null;
             }
             
             /**
@@ -34038,13 +34078,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // emit a SINGLE swerve obstacle whose lateral span covers the whole
                 // group — a virtual bounding box in the car's reference frame.
                 const cluster = [];
-                if (player.visible && !(playerCar && playerCar.hasDriver)) {
+                // Mid lane change / overtake: only people in the lane we're moving into are in the way
+                const tl = this.laneChangeState !== 'NONE' && this.targetLane, tlHalf = this.width / 2 + 18;
+                const inTarget = (x, y) => !tl || Math.abs((x - tl.start.x) * -tl.uy + (y - tl.start.y) * tl.ux) < tlHalf || Math.hypot(x - this.x, y - this.y) < this.length * 1.4;   // (or right under our nose)
+                if (player.visible && !(playerCar && playerCar.hasDriver) && inTarget(player.x, player.y)) {
                     const r = checkTunnelEx(player.x, player.y, lookAheadDist, dynamicTunnelWidth + 10);
                     if (r) cluster.push({ entity: player, x: player.x, y: player.y, dist: r.dist, lateral: r.lateral, vx: player.vx || 0, vy: player.vy || 0 });
                 }
                 if (teammates && teammates.length > 0) {
                     for (let tm of teammates) {
-                        if (!tm || tm.inCar || tm.dead || tm.downed || !tm.recruited) continue;
+                        if (!tm || tm.inCar || tm.dead || tm.downed || !tm.recruited || !inTarget(tm.x, tm.y)) continue;
                         const r = checkTunnelEx(tm.x, tm.y, lookAheadDist, dynamicTunnelWidth + 10);
                         if (r) cluster.push({ entity: tm, x: tm.x, y: tm.y, dist: r.dist, lateral: r.lateral, vx: tm.vx || 0, vy: tm.vy || 0 });
                     }
@@ -34174,17 +34217,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // --- 2. SWERVE CALCULATION ---
                 // Calculate optimal swerve direction for avoidable obstacles
-                let swerveSteer = 0;
+                let swerveSteer = 0, edgeNudgeNow = false;
                 let needsSwerve = false;
                 
+                // People in the road (949, her crew): no swerving round them. Slow, stop, and go round only by a
+                // proper lane change or overtake into a lane that's clear (section 3). The pavement is a last resort:
+                // after a long wait (_actorWait > 480 ticks), slowly, and only if nobody is standing on that side.
+                const actorAhead = swerveObstacles.find(o => o.type === 'actor' || o.type === 'actor_cluster');
+                if (actorAhead) {
+                    if (Math.abs(this.speed) < 0.5) this._actorWait = (this._actorWait || 0) + 1;
+                    if (this._actorWait === 120 && typeof ambience !== 'undefined' && ambience.ready && ambience._horn) ambience._horn(0.025);   // a polite toot
+                } else this._actorWait = 0;
                 if (swerveObstacles.length > 0 && this.laneChangeState === 'NONE' && !this.currentTurnPath) {
                     // Find the closest swerve obstacle
                     const closestSwerve = swerveObstacles.reduce((a, b) => a.dist < b.dist ? a : b);
+                    const isPerson = closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster';
+                    const kerbOK = isPerson && this._actorWait > 480 && this._kerbClear(closestSwerve);
+                    // Someone at the edge of our path (already mostly clear of the body) only needs a nudge, never the kerb
+                    const edgeNudge = isPerson && Math.abs(closestSwerve.lateral) - (closestSwerve.width || 20) / 2 > this.width / 2 - 8;
                     
-                    // Only swerve if obstacle is close enough to matter
+                    // Only swerve if obstacle is close enough to matter (people: only a nudge, or that last resort)
                     const swerveThreshold = this.length * 4 + currentSpeed * 5;
-                    if (closestSwerve.dist < swerveThreshold) {
-                        needsSwerve = true;
+                    if (closestSwerve.dist < swerveThreshold && (!isPerson || kerbOK || edgeNudge)) {
+                        needsSwerve = true; edgeNudgeNow = edgeNudge && !kerbOK;
                         
                         // Calculate open space on each side, accounting for obstacle width.
                         // For point obstacles (single actor, single car) this matches old
@@ -34234,6 +34289,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const actorMoving = isActor && closestSwerve.inMotion;
                         let magnitude = isActor ? 0.45 : 0.9;
                         if (actorMoving) magnitude *= 0.55;
+                        if (isActor && edgeNudge && !kerbOK) magnitude = Math.min(magnitude, 0.2);
                         
                         // Pick a side. Threshold scales with obstacle width — a wide
                         // cluster needs to be more "off-center" before we commit to
@@ -34312,7 +34368,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (closestSwerve.type === 'vehicle') {
                         shouldOvertake = true;
                         isPlayerObstacle = closestSwerve.entity === playerCar;
-                    } else if (closestSwerve.type === 'actor') {
+                    } else if (closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster') {
                         shouldOvertake = true;
                         isPlayerObstacle = true;
                     }
@@ -34444,6 +34500,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // we *also* tighten the speed envelope so the car has time for the actor
                 // to clear. Without this layer, gentle swerve + full speed = clipping the
                 // actor's heels.
+                if (needsSwerve && actorAhead && !edgeNudgeNow) targetSpeed = Math.min(targetSpeed, this.maxSpeed * 0.3);   // the last-resort kerb pass: crawling
                 if (needsSwerve) {
                     const movingActor = swerveObstacles.find(o =>
                         (o.type === 'actor' || o.type === 'actor_cluster') && o.inMotion
@@ -35351,12 +35408,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (v.controlMode === 'AI' && Math.abs(v.speed || 0) < 0.2) v._frozen = (v._frozen || 0) + 1; else v._frozen = 0;
                     const frozenOut = v._frozen > 900 && v.driverType !== 'player' && v.driverType !== 'zib' && !v.isOwnedCar &&
                         !v.isDeliveryVehicle && distToPlayer > 900;
-                    if (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd || frozenOut) { 
+                    // Leaving: fade out over ~0.5 s (still rolling on into the lane's end), then go
+                    if (!v.fading && (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd || frozenOut)) v.fading = true;
+                    if (v.fading) v.fade = Math.min(v.fade ?? 1, 1) - 1 / 30;
+                    else if ((v.fade ?? 1) < 1) v.fade = Math.min(1, v.fade + 1 / 36);       // arriving: fade in over ~0.6 s
+                    if (v.fading && (v.fade <= 0 || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN + 600)) {
                         if (v.currentIntersection) v.currentIntersection.releaseEntry(v);
                         // Properly destroy entity to unregister from collision system
                         if (!v.markedForDestroy) v.destroy();
                         this.vehicles.splice(i, 1);
-                    } else {
+                    } else if (!v.dead) {
                         // Pass decalSystem to update
                         v.update(player, playerCar, this.vehicles, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, teammates);
                     }
@@ -35376,7 +35437,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
                     this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
                     if (this.network.allLanes.length > 0) {
-                        for(let k=0; k<8; k++) { 
+                        // Spawn out of sight where possible: the camera's view plus a margin
+                        const gv = typeof game !== 'undefined' ? game.view : null, cv = typeof game !== 'undefined' ? game.canvas : null;
+                        const hw = gv && cv ? cv.width / 2 / gv.zoom + 120 : 0, hh = gv && cv ? cv.height / 2 / gv.zoom + 120 : 0;
+                        for(let k=0; k<14; k++) { 
                             const spawnLane = this.network.allLanes[Math.floor(Math.random() * this.network.allLanes.length)];
                             // Choose the car first, so the check is made where it will actually appear
                             const brand = TrafficVehicle._selectRandomBrand(), model = TrafficVehicle._selectRandomModel(brand);
@@ -35387,6 +35451,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             const spawnY = spawnLane.start.y + spawnLane.uy * spawnOffset;
                             const distToP = Math.hypot(player.x - spawnX, player.y - spawnY);
                             if (distToP < CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN || distToP > CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX) clear = false; 
+                            if (clear && gv && k < 12 && Math.abs(spawnX - gv.x) < hw && Math.abs(spawnY - gv.y) < hh) clear = false;   // (the last tries take what they can; the fade hides it)
                             if (clear) {
                                 // Nobody within the separation, and nobody coming up the lane who couldn't stop for it
                                 const cars = this.vehicles.concat(playerCar && playerCar.visible ? [playerCar] : []);
@@ -35402,6 +35467,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             if (clear) {
                                 // Spawn new vehicle - it auto-registers via GameEntity queue
                                 const newVehicle = new TrafficVehicle(spawnLane, brand, model);
+                                newVehicle.fade = 0;
                                 this.vehicles.push(newVehicle);
                                 break; 
                             }
@@ -35414,7 +35480,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             resolveCollisions(playerCar, player, weather, audioSys, ownedCar, decalSystem) {
                 if (this._crunchCd > 0) this._crunchCd--;
                 // 1. GATHER ALL PHYSICAL VEHICLES (and re-grid them where they are now, after moving)
-                const allVehicles = this.vehicles.filter(v => !v.dead);
+                const allVehicles = this.vehicles.filter(v => !v.dead && !(v.fading && v.fade < 0.5));   // (a car fading out is a ghost)
                 this.grid.clear();
                 for (const v of allVehicles) this.grid.add(v);
                 if (playerCar && playerCar.visible && !allVehicles.includes(playerCar)) this.grid.add(playerCar);
@@ -53700,6 +53766,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const reactionVehicles = (this.isDriving && this.car)
                     ? this.traffic.vehicles.concat(this.car)
                     : this.traffic.vehicles;
+                // Who the crowds make way for: 949 and her crew on foot (pedestrians, the lobby's and the club's walkers)
+                this._makeWay = [this.player];
+                for (const t of this.teammates) if (t && (t.recruited || t.hired) && !t.inCar && !t.downed && !t.dead) this._makeWay.push(t);
                 this.pedestrians.update(this.player, this.activeMap, reactionVehicles, this.weaponMode !== 'none' && !this.weaponHolstered, this.enemies);
                 this.profiler.stop('AI:Pedestrians');
                 
@@ -53989,8 +54058,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         sepX += Math.cos(pushAngle) * CONFIG.COMPANION.PLAYER_SEPARATION_FORCE;
                         sepY += Math.sin(pushAngle) * CONFIG.COMPANION.PLAYER_SEPARATION_FORCE;
                     }
-                    tm.x += sepX;
-                    tm.y += sepY;
+                    // …and from the crowd (pedestrians, map NPCs, the lobby's and club's walkers): a gentle give, both ways
+                    const navT = NavGrid.for(this.activeMap);
+                    const nudge = (o, r, give) => {
+                        if (!o || o === tm || o.dead || (o.life !== undefined && o.life < 0.5) || o.seated || o.glide) return;
+                        const ox = tm.x - o.x, oy = tm.y - o.y;
+                        if (ox > r || ox < -r || oy > r || oy < -r) return;
+                        const od = Math.hypot(ox, oy);
+                        if (od >= r || od < 0.1) return;
+                        const k = (r - od) / r;                                               // deeper in, firmer
+                        sepX += (ox / od) * k * 2.2; sepY += (oy / od) * k * 2.2;
+                        if (give) { const gx = o.x - (ox / od) * k * give, gy = o.y - (oy / od) * k * give;   // a standing walker sways aside too
+                            if (!navT || navT.walkable(gx, gy)) { o.x = gx; o.y = gy; } }
+                    };
+                    for (const o of this.pedestrians.pedestrians || []) nudge(o, 24, 0);
+                    for (const o of this.npcs || []) if (!this.teammates.includes(o)) nudge(o, 26, 0);
+                    if (this.lobbyLife) for (const o of this.lobbyLife.walkers) nudge(o, 22, 0.8);
+                    if (this.clubLife) for (const o of this.clubLife.walkers) nudge(o, 22, 0.8);
+                    if (!navT || navT.walkable(tm.x + sepX, tm.y + sepY)) { tm.x += sepX; tm.y += sepY; }
 
                     // ── EYELINE TACTICS: a firing spot overrides the formation slot ──
                     const eyelineSpot = updateCompanionTactics(tm, this);
@@ -54911,7 +54996,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Pulls back with speed, down to a floor: the look-ahead already shows the road in front
                     const speedRatio = Math.abs(this.car.speed) / this.car.maxSpeed, CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
                     targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
-                } else if (nearInteractable) { targetZoom = 1.4; }
+                } else {
+                    // On foot: in a little closer with the gun away, and again indoors; by something to use (or talking), 5% closer still
+                    const C = CONFIG.CAMERA, holstered = this.weaponHolstered || this.weaponMode === 'none';
+                    let base = 1.0;
+                    if (holstered) base *= C.HOLSTER_ZOOM;
+                    if (this.activeMap && this.activeMap.type === 'indoor') base *= C.INDOOR_ZOOM;
+                    targetZoom = nearInteractable ? base * C.INTERACT_ZOOM : base;
+                }
                 if (this.isLandscape) targetZoom *= 0.9;          // a short screen: a little more ground above and below her
                 
                 const diff = targetZoom - this.camera.zoom;
@@ -55004,6 +55096,32 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 } 
                 
+                // 1b. THE CREW ON FOOT vs TRAFFIC: pushed clear of a car's body; a fast one hits them
+                for (const tm of this.teammates) {
+                    if (!tm || tm.inCar || tm.dead || !(tm.recruited || tm.hired)) continue;
+                    if (tm._carHitCd > 0) tm._carHitCd--;
+                    for (const v of this.traffic.grid.getNearby({ x: tm.x, y: tm.y, length: 30, width: 30 })) {
+                        if (v === this.car && this.isDriving && tm.inCar) continue;
+                        if (v.fade !== undefined && v.fade < 0.5) continue;                 // a car fading in or out isn't solid yet
+                        const c = Math.cos(-v.angle), s = Math.sin(-v.angle), dx = tm.x - v.x, dy = tm.y - v.y;
+                        const lx = dx * c - dy * s, ly = dx * s + dy * c, hl = v.length / 2 + 2, hw = v.width / 2 + 2;
+                        const ex = lx - Math.max(-hl, Math.min(hl, lx)), ey = ly - Math.max(-hw, Math.min(hw, ly)), d2 = ex * ex + ey * ey, R = (tm.radius || 14) + 1;
+                        if (d2 >= R * R) continue;
+                        let d = Math.sqrt(d2), o = R - d, nx = ex / (d || 1), ny = ey / (d || 1);
+                        if (d2 <= 0) {                                                      // centre inside the body: out the nearest side
+                            const sx = hl - Math.abs(lx), sy = hw - Math.abs(ly);
+                            if (sx < sy) { nx = Math.sign(lx) || 1; ny = 0; o = sx + R; } else { nx = 0; ny = Math.sign(ly) || 1; o = sy + R; }
+                        }
+                        const wx = nx * Math.cos(v.angle) - ny * Math.sin(v.angle), wy = nx * Math.sin(v.angle) + ny * Math.cos(v.angle);
+                        tm.x += wx * o; tm.y += wy * o;                                    // the car doesn't give; they're shoved aside
+                        if (Math.abs(v.speed) > 4 && !(tm._carHitCd > 0) && !tm.downed) {
+                            tm._carHitCd = 40;
+                            if (tm.takeDamage) tm.takeDamage(10, wx * 6, wy * 6);
+                            this.triggerShake(4);
+                        }
+                    }
+                }
+
                 // 2. VEHICLE vs VEHICLE Collisions
                 this.traffic.resolveCollisions(this.car, this.player, this.weather, audioSys, this.ownedCar, this.decals);
             },
@@ -55064,7 +55182,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                Instrumented with Profiler.
                ===================================================================== */
             draw() {
-                if (!this.running || this.paused) return;
+                if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 // --- PROFILER START ---
                 this.profiler.beginFrame();
@@ -55106,6 +55224,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
+                if (this.cineCam) { camX += this.cineCam.dx; camY += this.cineCam.dy; }   // Cinematic View's pan
                 this.view = { x: camX, y: camY, zoom: this.camera.zoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
                 
                 this.ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
@@ -55639,7 +55758,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Threshold scales with zoom — distant cars at max zoom-out skip effects earlier
                         const dx = v.x - camX, dy = v.y - camY;
                         v._lod = (dx * dx + dy * dy > _vehicleLODThreshSq) ? 1 : (_zoomLOD >= 2 ? 1 : 0);
-                        v.draw(this.ctx);
+                        const fa = v.fade ?? 1;
+                        if (fa <= 0) return;
+                        if (fa < 1) { this.ctx.save(); this.ctx.globalAlpha *= fa; v.draw(this.ctx); this.ctx.restore(); }   // fading in or out
+                        else v.draw(this.ctx);
                     });
                 }
                 
@@ -62258,11 +62380,56 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     setTimeout(() => this._syncNowPlaying(), 120);   // togglePlay settles after the AudioContext resumes
                 });
 
-                // Cinematic view: any tap brings the menu back
+                // Cinematic view: drag pans, pinch or wheel zooms, a quick tap brings the menu back
+                this._cinePtrs = new Map();
+                const cineOn = () => document.body.classList.contains('cinematic-view');
                 window.addEventListener('pointerdown', (e) => {
-                    if (!document.body.classList.contains('cinematic-view')) return;
-                    e.preventDefault(); e.stopPropagation(); this.exitCinematic();
+                    if (!cineOn() || e.target.closest?.('#cine-bar')) return;
+                    e.preventDefault(); e.stopPropagation();
+                    this._cinePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now() });
+                    if (this._cinePtrs.size > 1) this._cineGesture = true;            // a pinch is never a tap
                 }, true);
+                window.addEventListener('pointermove', (e) => {
+                    const p = this._cinePtrs.get(e.pointerId);
+                    if (!cineOn() || !p) return;
+                    e.preventDefault();
+                    if (this._cinePtrs.size === 1) {
+                        if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) > 8) this._cineGesture = true;
+                        this._cinePan(e.clientX - p.x, e.clientY - p.y);
+                    } else {
+                        const [a, b] = [...this._cinePtrs.values()];
+                        const before = Math.hypot(a.x - b.x, a.y - b.y);
+                        p.x = e.clientX; p.y = e.clientY;
+                        const after = Math.hypot(a.x - b.x, a.y - b.y);
+                        if (before > 10) this._cineZoom(after / before);
+                    }
+                    p.x = e.clientX; p.y = e.clientY;
+                }, true);
+                const up = (e) => {
+                    const p = this._cinePtrs.get(e.pointerId);
+                    if (!p) return;
+                    this._cinePtrs.delete(e.pointerId);
+                    if (!cineOn()) return;
+                    e.preventDefault(); e.stopPropagation();
+                    const tap = !this._cineGesture && e.type === 'pointerup' && performance.now() - p.t0 < 400;
+                    if (!this._cinePtrs.size) this._cineGesture = false;
+                    if (tap) this.exitCinematic();
+                };
+                window.addEventListener('pointerup', up, true);
+                window.addEventListener('pointercancel', up, true);
+                window.addEventListener('wheel', (e) => {
+                    if (!cineOn()) return;
+                    e.preventDefault(); this._cineZoom(Math.exp(-e.deltaY * 0.0015));
+                }, { capture: true, passive: false });
+                const bar = document.getElementById('cine-bar');
+                bar?.addEventListener('click', (e) => {
+                    const act = e.target.closest('[data-cine]')?.dataset.cine;
+                    if (act === 'save') this.saveCinePicture();
+                    else if (act === 'in') this._cineZoom(1.2);
+                    else if (act === 'out') this._cineZoom(1 / 1.2);
+                    else if (act === 'reset') { const c = game.cineCam; if (c) { c.dx = c.dy = 0; game.camera.zoom = c.zoom; } }
+                    else if (act === 'back') this.exitCinematic();
+                });
 
                 // Click backdrop to close
                 this.menu.querySelector('.pause-backdrop').addEventListener('click', () => {
@@ -62419,6 +62586,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             enterCinematic() {
                 this.close();
                 game.pauseSystem.acquire('cinematic_view');
+                game.cineCam = { dx: 0, dy: 0, zoom: game.camera.zoom };          // draw() keeps going while it's set
+                this._cinePtrs?.clear(); this._cineGesture = false;
                 document.body.classList.add('cinematic-view');
                 const hint = document.getElementById('cinematic-hint');
                 if (hint) { hint.classList.remove('show'); void hint.offsetWidth; hint.classList.add('show'); }
@@ -62428,8 +62597,51 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!document.body.classList.contains('cinematic-view')) return;
                 document.body.classList.remove('cinematic-view');
                 document.getElementById('cinematic-hint')?.classList.remove('show');
+                if (game.cineCam) { game.camera.zoom = game.cineCam.zoom; game.cineCam = null; }
                 game.pauseSystem.release('cinematic_view');
                 this.open();
+            }
+
+            /** Pan by a screen-space drag (CSS px), kept within CINE_PAN world px of where the view began. */
+            _cinePan(sx, sy) {
+                const c = game.cineCam; if (!c) return;
+                const k = (game.canvas.width / (game.canvas.clientWidth || game.canvas.width)) / game.camera.zoom;
+                c.dx -= sx * k; c.dy -= sy * k;
+                const R = CONFIG.CAMERA.CINE_PAN, d = Math.hypot(c.dx, c.dy);
+                if (d > R) { c.dx *= R / d; c.dy *= R / d; }
+            }
+
+            _cineZoom(f) {
+                if (!game.cineCam) return;
+                const [lo, hi] = CONFIG.CAMERA.CINE_ZOOM;
+                game.camera.zoom = Math.max(lo, Math.min(hi, game.camera.zoom * f));
+            }
+
+            /** The held frame as a PNG, colour grade and all: downloaded, or the share sheet where files can be shared (phones). */
+            saveCinePicture() {
+                const src = game.canvas, out = document.createElement('canvas');
+                out.width = src.width; out.height = src.height;
+                const ctx = out.getContext('2d');
+                const f = src.style.filter;
+                if (f && f !== 'none' && 'filter' in ctx) ctx.filter = f;
+                ctx.drawImage(src, 0, 0);
+                const flash = document.getElementById('cine-flash');
+                if (flash) { flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go'); }
+                const d = new Date(), z = (n) => String(n).padStart(2, '0');
+                const name = `Dimensions-Freelancer-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.png`;
+                out.toBlob(async (blob) => {
+                    if (!blob) return;
+                    this._lastPicture = blob;
+                    const file = typeof File === 'function' ? new File([blob], name, { type: 'image/png' }) : null;
+                    const touch = window.matchMedia?.('(pointer: coarse)').matches;
+                    if (touch && file && navigator.canShare?.({ files: [file] })) {
+                        try { await navigator.share({ files: [file], title: 'Dimensions: Freelancer' }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+                    }
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob); a.download = name;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+                }, 'image/png');
             }
 
             // The capsule mirrors the music widget: station on the disc, track (or station) and play state

@@ -518,13 +518,10 @@
                     let moveX = (dx / dist) * pace;
                     let moveY = (dy / dist) * pace;
                     
-                    // Avoid player
-                    const playerDist = Math.hypot(player.x - this.x, player.y - this.y);
-                    if (playerDist < 60) {
-                        const avoidX = (this.x - player.x) / playerDist;
-                        const avoidY = (this.y - player.y) / playerDist;
-                        moveX += avoidX * 1.5;
-                        moveY += avoidY * 1.5;
+                    // Make way for 949 and her crew (engine/update.js _makeWay)
+                    for (const p of (typeof game !== 'undefined' && game._makeWay) || [player]) {
+                        const pd = Math.hypot(p.x - this.x, p.y - this.y);
+                        if (pd < 60 && pd > 0.1) { moveX += (this.x - p.x) / pd * 1.5; moveY += (this.y - p.y) / pd * 1.5; }
                     }
                     
                     // Avoid other pedestrians
