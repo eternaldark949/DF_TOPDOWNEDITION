@@ -334,31 +334,10 @@
                 }
             }
         
+            // Open the menu on the inventory, or close it (Screens keeps every sub-screen in step)
             toggleMenu() {
-                if (!this.menu) return;
-                const isHidden = this.menu.style.display === 'none';
-                if (isHidden) {
-                    this.menu.style.display = 'flex'; // Use flex to keep alignment
-                    this.render();
-                    this.game.pauseSystem.acquire('inventory_menu');
-                    this.game.renderSidebarPortrait();
-                    
-                    // Reset to inventory view (hide augments/contacts screen if was showing)
-                    document.getElementById('inventory-list-container').style.display = '';
-                    document.getElementById('augments-screen').style.display = 'none';
-                    document.getElementById('contacts-screen').style.display = 'none';
-                    document.getElementById('story-screen').style.display = 'none';
-                    document.getElementById('collection-screen').style.display = 'none';
-                    document.getElementById('screen-title-text').textContent = 'Inventory';
-                    
-                    // Update nav highlight
-                    if (typeof invSidebar !== 'undefined') {
-                        invSidebar.setActiveNav('inventory');
-                    }
-                } else {
-                    this.menu.style.display = 'none';
-                    this.game.pauseSystem.release('inventory_menu');
-                }
+                if (Screens.menuOpen()) Screens.close();
+                else Screens.open('inventory');
             }
         
             render() {
@@ -366,7 +345,9 @@
                 this.uiList.innerHTML = '';
                 
                 // Get filter state from sidebar
-                let filteredItems = this.items;
+                // EQUIPPED is this list showing only what's equipped; the filter still narrows it
+                const equippedOnly = Screens.current === 'equipped';
+                let filteredItems = equippedOnly ? this.items.filter(i => this.isItemEquipped(i.id)) : this.items;
                 if (typeof invSidebar !== 'undefined' && invSidebar.filterEnabled && invSidebar.activeFilter) {
                     const filter = invSidebar.activeFilter;
                     if (filter !== 'all') {
@@ -381,12 +362,12 @@
                             'consumables': 'consumable'
                         };
                         const targetType = filterToType[filter] || filter;
-                        filteredItems = this.items.filter(item => item.type === targetType);
+                        filteredItems = filteredItems.filter(item => item.type === targetType);
                     }
                 }
                 
                 if (filteredItems.length === 0) {
-                    const message = this.items.length === 0 ? 'NO ITEMS CARRIED' : 'NO MATCHING ITEMS';
+                    const message = this.items.length === 0 ? 'NO ITEMS CARRIED' : equippedOnly ? 'NOTHING EQUIPPED' : 'NO MATCHING ITEMS';
                     this.uiList.innerHTML = `<div style="color:#666; text-align:center; margin-top:50px;">${message}</div>`;
                     return;
                 }
@@ -406,10 +387,10 @@
                             </div>
                             <div class="pill-desc">${item.description}</div>
                         </div>
-                        <div class="control-node" style="${isEquipped ? 'background:#00f3ff; box-shadow:0 0 8px #00f3ff;' : ''}"></div>
+                        <div class="control-node"></div>
                         <div class="node-menu">
                             <button class="node-btn use-btn">${isEquipped ? (config.unequipLabel || 'UNEQUIP') : (config.equipLabel || 'EQUIP')}</button>
-                            <button class="node-btn drop-btn" style="color:#ff5555">DROP</button>
+                            <button class="node-btn drop-btn">DROP</button>
                         </div>
                     `;
                     // ... remaining logic

@@ -27,7 +27,7 @@
             initMapControls() { 
                 const canvas = this.mapCanvas;
                 // In landscape the phone is drawn scaled down (--phone-scale): pan by what the finger covered on the phone
-                const k = () => document.body.classList.contains('landscape') ? 1 / (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--phone-scale')) || 1) : 1;
+                const k = () => 1 / this.scale;
                 canvas.addEventListener('wheel', (e) => { e.preventDefault(); const zoomSpeed = 0.1; const direction = e.deltaY > 0 ? -1 : 1; let newZoom = this.mapView.zoom + (direction * zoomSpeed * this.mapView.zoom); newZoom = Math.max(0.5, Math.min(newZoom, 8.0)); this.mapView.zoom = newZoom; this.drawMap(); });
                 canvas.addEventListener('mousedown', (e) => { this.mapView.isDragging = true; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; canvas.style.cursor = 'grabbing'; });
                 window.addEventListener('mousemove', (e) => { if (!this.mapView.isDragging || this.overlay.style.display === 'none') return; const dx = e.clientX - this.mapView.lastX; const dy = e.clientY - this.mapView.lastY; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; this.mapView.offsetX += dx * k(); this.mapView.offsetY += dy * k(); this.drawMap(); });
@@ -74,8 +74,22 @@
                 this.call = null;
             },
 
+            // The phone matches the screen: on its side (600×300, body.phone-wide) whenever the screen is wider
+            // than tall, upright (300×600) otherwise, and scaled down to fit with a margin so its close pill is
+            // always on screen. Called from resize(), on visualViewport changes (browser bars) and on open.
+            scale: 1,
+            fit() {
+                const vv = window.visualViewport, w = vv ? vv.width : window.innerWidth, h = vv ? vv.height : window.innerHeight;
+                const wide = w > h, W = wide ? 600 : 300, H = wide ? 300 : 600;
+                this.scale = Math.max(0.3, Math.min(1, (h - 48) / H, (w - 32) / W));
+                document.body.classList.toggle('phone-wide', wide);
+                document.documentElement.style.setProperty('--phone-scale', this.scale.toFixed(3));
+                if (this.isOpen && this.currentApp === 'maps') this.drawMap();
+            },
+
             open() {
                 if (this.call && !this.call.answered) { this.answerCall(); return; }   // the phone's ringing: the button answers it
+                this.fit();
                 this.isOpen = true;
                 this.overlay.style.display = 'flex';
                 this.showHome();
@@ -813,48 +827,37 @@
             },
             
             drawMap(recenter = false) {
-                const canvas = this.mapCanvas; const ctx = canvas.getContext('2d');
-                canvas.width = 280; canvas.height = 350; 
-                ctx.fillStyle = '#0a0a15'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                if (!game.activeMap) return;
-                const scaleX = canvas.width / game.activeMap.width; const scaleY = canvas.height / game.activeMap.height;
-                this.mapView.baseScale = Math.min(scaleX, scaleY);
-                const finalScale = this.mapView.baseScale * this.mapView.zoom;
-                let centerX, centerY;
-                if (recenter) { centerX = game.player.x * finalScale; centerY = game.player.y * finalScale; this.mapView.offsetX = (canvas.width / 2) - centerX; this.mapView.offsetY = (canvas.height / 2) - centerY; }
-                ctx.save(); ctx.translate(this.mapView.offsetX, this.mapView.offsetY); ctx.scale(finalScale, finalScale);
-                ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, game.activeMap.width, game.activeMap.height);
-                if (game.activeMap.floorZones) { game.activeMap.floorZones.forEach(z => { ctx.fillStyle = z.color; ctx.fillRect(z.x, z.y, z.w, z.h); }); }
-                if (game.traffic && game.traffic.network) { ctx.fillStyle = '#222'; game.traffic.network.roads.forEach(r => { if(r.isDiagonal){const c=r.getCorners();ctx.beginPath();ctx.moveTo(c[0].x,c[0].y);for(let i=1;i<c.length;i++)ctx.lineTo(c[i].x,c[i].y);ctx.closePath();ctx.fill();}else{ctx.fillRect(r.x, r.y, r.w, r.h);} }); }
-                if (game.activeMap.buildings) { ctx.fillStyle = '#333'; game.activeMap.buildings.forEach(b => { ctx.fillRect(b.x, b.y, b.w, b.h); }); }
-                
-                // Map POI Icons (restaurant, medical, etc.)
-                if (game.activeMap.buildings) {
-                    game.activeMap.buildings.forEach(b => {
-                        if (b.mapCategory === 'restaurant') {
-                            const ix = b.x + (b.w || 100) / 2;
-                            const iy = b.y + (b.h || 100) / 2;
-                            // Coffee cup icon
-                            ctx.save(); ctx.translate(ix, iy);
-                            ctx.fillStyle = '#ffaa00';
-                            ctx.beginPath(); ctx.moveTo(-20, -25); ctx.lineTo(-14, 16); ctx.quadraticCurveTo(0, 24, 14, 16); ctx.lineTo(20, -25); ctx.closePath(); ctx.fill();
-                            ctx.fillStyle = '#f5e6c8'; ctx.fillRect(-22, -30, 44, 8);
-                            ctx.strokeStyle = '#ffaa00'; ctx.lineWidth = 4;
-                            ctx.beginPath(); ctx.arc(24, -8, 12, -Math.PI/2, Math.PI/2); ctx.stroke();
-                            ctx.restore();
-                        } else if (b.mapCategory === 'medical') {
-                            const ix = b.x + (b.w || 100) / 2;
-                            const iy = b.y + (b.h || 100) / 2;
-                            ctx.fillStyle = '#00ff88'; ctx.fillRect(ix - 4, iy - 14, 8, 28); ctx.fillRect(ix - 14, iy - 4, 28, 8);
-                        }
-                    });
+                // The same city of light and icons as the golden map (ui/map-icons.js), sized to how the canvas is
+                // shown (it was a fixed 280×350 stretched to fit) at the screen's pixel ratio. Pan offsets are CSS px.
+                const canvas = this.mapCanvas, ctx = canvas.getContext('2d'), M = game.activeMap;
+                const D = Math.min(3, Math.max(1, window.devicePixelRatio || 1)), cw = canvas.clientWidth || 280, ch = canvas.clientHeight || 300;
+                if (canvas.width !== Math.round(cw * D) || canvas.height !== Math.round(ch * D)) { canvas.width = Math.round(cw * D); canvas.height = Math.round(ch * D); }
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.fillStyle = MAP_PAL.base; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                if (!M) return;
+                this.mapView.baseScale = Math.min(cw / M.width, ch / M.height);
+                const fs = this.mapView.baseScale * this.mapView.zoom;
+                if (recenter) { this.mapView.offsetX = cw / 2 - game.player.x * fs; this.mapView.offsetY = ch / 2 - game.player.y * fs; }
+                const ox = this.mapView.offsetX, oy = this.mapView.offsetY;
+                ctx.setTransform(D * fs, 0, 0, D * fs, D * ox, D * oy);
+                MapArt.paintCity(ctx, M, { px: D * fs, dpr: D, bounds: { x: -ox / fs, y: -oy / fs, w: cw / fs, h: ch / fs },
+                    network: M.type !== 'indoor' && game.traffic ? game.traffic.network : null, lamps: M.type !== 'indoor' ? game.lamps : null });
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                MapArt.bloom(canvas);
+                const S = (mx, my) => ({ x: D * (ox + mx * fs), y: D * (oy + my * fs) }), k = MapIcons.zoomK(this.mapView.zoom) * 0.85;
+                const on = (p) => p.x > -30 * D && p.x < canvas.width + 30 * D && p.y > -30 * D && p.y < canvas.height + 30 * D;
+                if (M.transitions) for (const t of M.transitions) { const p = S(t.x + t.w / 2, t.y + t.h / 2); if (on(p)) MapIcons.draw(ctx, 'transition', p.x, p.y, { dpr: D, css: MapIcons.SIZE.transition * k }); }
+                if (M.buildings) for (const b of M.buildings) {
+                    if (b.mapCategory !== 'restaurant' && b.mapCategory !== 'medical') continue;
+                    const p = S(b.x + (b.w || 100) / 2, b.y + (b.h || 100) / 2);
+                    if (on(p)) MapIcons.draw(ctx, b.mapCategory === 'restaurant' ? 'pin:cup' : 'pin:cross', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k });
                 }
-                ctx.fillStyle = '#444'; game.activeMap.walls.forEach(w => { ctx.fillRect(w.x, w.y, w.w, w.h); });
-                if (game.activeMap.transitions) { ctx.fillStyle = '#00ff88'; game.activeMap.transitions.forEach(t => { ctx.beginPath(); ctx.arc(t.x + t.w/2, t.y + t.h/2, 15, 0, Math.PI * 2); ctx.fill(); }); }
-                ctx.fillStyle = '#ff0000'; ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(game.player.x, game.player.y, 25, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(game.player.x, game.player.y); ctx.lineTo( game.player.x + Math.cos(game.player.angle) * 60, game.player.y + Math.sin(game.player.angle) * 60 ); ctx.stroke();
-                ctx.restore();
-                ctx.fillStyle = '#fff'; ctx.font = '12px Montserrat'; ctx.fillText(`ZOOM: ${this.mapView.zoom.toFixed(1)}x`, 10, canvas.height - 10);
+                if (game.ownedCar && game.ownedCar.visible) { const p = S(game.ownedCar.x, game.ownedCar.y); if (on(p)) MapIcons.draw(ctx, 'car', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: game.ownedCar.angle }); }
+                const pp = S(game.player.x, game.player.y);
+                MapIcons.draw(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: game.player.angle });
+                MapIcons.draw(ctx, 'search', 16 * D, canvas.height - 14 * D, { dpr: D, css: 12 });
+                ctx.fillStyle = '#ffd76a'; ctx.font = `600 ${10 * D}px Montserrat, sans-serif`; ctx.textBaseline = 'middle';
+                ctx.fillText(`${this.mapView.zoom.toFixed(1)}×`, 28 * D, canvas.height - 14 * D);
             },
             
             showHelp() { this.currentApp = 'help'; this.homeScreen.style.display = 'none'; document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none'); document.getElementById('screen-help').style.display = 'flex'; },
@@ -1504,11 +1507,19 @@
         }
 
         
+        // Always a way out: a tap on the dimmed backdrop (not the phone itself) or the corner ✕ closes it
+        phoneSystem.overlay.addEventListener('click', (e) => { if (e.target === phoneSystem.overlay) phoneSystem.close(); });
+        document.getElementById('phone-close-x')?.addEventListener('click', () => phoneSystem.close());
+        window.visualViewport?.addEventListener('resize', () => phoneSystem.fit());
+        phoneSystem.fit();
+
         // Close phone with Escape key
         // Close phone OR Map with Escape key
         document.addEventListener('keydown', (e) => {
             // 1. Handle ESCAPE - Pause Menu Priority
             if (e.key === 'Escape') {
+                // Cinematic view: Esc brings the pause menu back
+                if (document.body.classList.contains('cinematic-view')) { pauseMenu.exitCinematic(); return; }
                 // If pause menu is open, close it
                 if (pauseMenu && pauseMenu.isOpen) {
                     pauseMenu.close();
@@ -1521,17 +1532,9 @@
                     return;
                 }
                 
-                // Close Golden Map if open
-                const mapUI = document.getElementById('map-interface');
-                if (mapUI.style.display === 'block') {
-                    game.ui.toggleMap(false);
-                    return;
-                }
-                
-                // Close Inventory if open
-                const inventoryMenu = document.getElementById('freelancer-menu');
-                if (inventoryMenu.style.display !== 'none' && inventoryMenu.style.display !== '') {
-                    game.inventory.toggleMenu();
+                // Close the map or the freelancer menu if open
+                if (Screens.mapOpen() || Screens.menuOpen()) {
+                    Screens.close();
                     return;
                 }
                 
@@ -1564,6 +1567,12 @@
                 } else if (e.key === 'ArrowDown') {
                     e.preventDefault();
                     pauseMenu.navigateDown();
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    pauseMenu.navigateLeft();
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    pauseMenu.navigateRight();
                 } else if (e.key === 'Enter') {
                     e.preventDefault();
                     pauseMenu.selectCurrent();
@@ -1573,16 +1582,9 @@
         
             // 2. Handle 'M' Key (Smart Toggle)
             if (e.key === 'm' || e.key === 'M') {
-                if (game.running && !game.paused) {
-                    const mapUI = document.getElementById('map-interface');
-                    const isClosed = mapUI.style.display === 'none' || mapUI.style.display === '';
-                    
-                    if (isClosed) {
-                        game.ui.toggleMap(true);
-                    } else {
-                        game.ui.toggleMap(false);
-                    }
-                }
+                // the map holds a pause token, so check for it before the !paused gate
+                if (Screens.mapOpen()) Screens.close();
+                else if (game.running && !game.paused) Screens.open('map');
             }
         
             // 3. Handle 'P' Key (Phone)
@@ -1596,16 +1598,8 @@
             
             // 4. Handle 'B' Key (Back - closes map/inventory)
             if (e.key === 'b' || e.key === 'B') {
-                // Close Golden Map if open
-                const mapUI = document.getElementById('map-interface');
-                if (mapUI.style.display === 'block') {
-                    game.ui.toggleMap(false);
-                    return;
-                }
-                // Close Inventory if open
-                const inventoryMenu = document.getElementById('freelancer-menu');
-                if (inventoryMenu.style.display !== 'none' && inventoryMenu.style.display !== '') {
-                    game.inventory.toggleMenu();
+                if (Screens.mapOpen() || Screens.menuOpen()) {
+                    Screens.close();
                     return;
                 }
             }

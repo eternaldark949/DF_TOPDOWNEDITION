@@ -16,12 +16,8 @@
                     } else if(this.activeInteraction.interactionType === 'crafting_table') {
                         this.openCraftingTable();
                     } else if(this.activeInteraction.interactionType === 'armory') {
-                        // Open inventory directly to weapons/equipment screen
-                        this.inventory.toggleMenu();
-                        requestAnimationFrame(() => {
-                            const invNav = document.querySelector('#freelancer-menu .sidebar-nav-item[data-screen="inventory"]');
-                            if (invNav) invNav.click();
-                        });
+                        // Open the menu straight on the inventory
+                        Screens.open('inventory');
                         audioSys.sfx('ui');
                     } else if(this.activeInteraction.interactionType === 'auto_shop_counter') {
                         this.openAutoShop();
@@ -191,7 +187,7 @@
                     document.getElementById('dock-buttons').classList.remove('visible');
                     
                     // Open the Golden Map
-                    this.ui.toggleMap(true);
+                    Screens.open('map');
                 });
                 
                 document.getElementById('btn-inventory').addEventListener('click', (e) => {
@@ -201,7 +197,7 @@
                     document.getElementById('dock-buttons').classList.remove('visible');
                     
                     // Open Inventory
-                    this.inventory.toggleMenu();
+                    Screens.open('inventory');
                 });
                 
                 // 2. Main Menu Load Button — opens save slot selector

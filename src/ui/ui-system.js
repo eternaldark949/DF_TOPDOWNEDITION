@@ -26,6 +26,8 @@
                 this.cacheMapId = null;
                 this.cacheBoundsMap = null;        // {x, y, w, h} in map-space
                 this.cacheFinalScale = 0;          // baseScale × zoom at build time
+                this.cacheBand = 0;                // the zoom band the cache was painted for (0.5 / 1 / 2 / 4)
+                this.dpr = 1;                      // device pixels per CSS pixel (canvases are sized in device px)
                 
                 this.mapView = {
                     zoom: 1.0,
@@ -162,8 +164,8 @@
                     const dy = e.clientY - this.mapView.lastY;
                     this.mapView.lastX = e.clientX;
                     this.mapView.lastY = e.clientY;
-                    this.mapView.offsetX += dx;
-                    this.mapView.offsetY += dy;
+                    this.mapView.offsetX += dx * this.dpr;
+                    this.mapView.offsetY += dy * this.dpr;
                     this.renderGoldenMap();
                 });
         
@@ -198,8 +200,8 @@
                         const dy = e.touches[0].clientY - this.mapView.lastY;
                         this.mapView.lastX = e.touches[0].clientX;
                         this.mapView.lastY = e.touches[0].clientY;
-                        this.mapView.offsetX += dx;
-                        this.mapView.offsetY += dy;
+                        this.mapView.offsetX += dx * this.dpr;
+                        this.mapView.offsetY += dy * this.dpr;
                         this.renderGoldenMap();
                     } else if (e.touches.length === 2) {
                         const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -233,8 +235,8 @@
                 const offsetX = (w - mapVisualWidth) / 2 + this.mapView.offsetX;
                 const offsetY = (h - mapVisualHeight) / 2 + this.mapView.offsetY;
                 
-                const worldX = (screenX - offsetX) / finalScale;
-                const worldY = (screenY - offsetY) / finalScale;
+                const worldX = (screenX * this.dpr - offsetX) / finalScale;      // screenX/Y arrive in CSS px
+                const worldY = (screenY * this.dpr - offsetY) / finalScale;
                 
                 return { x: worldX, y: worldY };
             }
@@ -490,17 +492,16 @@
                 if (!this.roadLevelPath || this.roadLevelPath.length < 2) return;
                 
                 const time = _frameTimeSec;
-                const dashOffset = time * 40; // Animated dash
+                const dashOffset = time * 40 * (this._u || 1); // Animated dash
                 
                 ctx.save();
                 
-                // Outer glow
-                ctx.strokeStyle = 'rgba(138, 43, 226, 0.5)';
-                ctx.lineWidth = 18;
+                // Outer glow (widths in CSS px: this._u is map units per CSS px)
+                const U = this._u || 1;
+                ctx.strokeStyle = 'rgba(138, 43, 226, 0.28)';
+                ctx.lineWidth = 14 * U;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                ctx.shadowColor = '#8a2be2';
-                ctx.shadowBlur = 25;
                 
                 ctx.beginPath();
                 ctx.moveTo(this.roadLevelPath[0].x, this.roadLevelPath[0].y);
@@ -511,8 +512,7 @@
                 
                 // Middle layer
                 ctx.strokeStyle = 'rgba(180, 100, 255, 0.7)';
-                ctx.lineWidth = 10;
-                ctx.shadowBlur = 15;
+                ctx.lineWidth = 6 * U;
                 
                 ctx.beginPath();
                 ctx.moveTo(this.roadLevelPath[0].x, this.roadLevelPath[0].y);
@@ -522,10 +522,9 @@
                 ctx.stroke();
                 
                 // Core line with animated dash
-                ctx.strokeStyle = '#da70d6';
-                ctx.lineWidth = 4;
-                ctx.shadowBlur = 8;
-                ctx.setLineDash([20, 12]);
+                ctx.strokeStyle = '#efd9ff';
+                ctx.lineWidth = 2.2 * U;
+                ctx.setLineDash([10 * U, 7 * U]);
                 ctx.lineDashOffset = -dashOffset;
                 
                 ctx.beginPath();
@@ -584,244 +583,82 @@
             }
             
             // --- DRAW DIRECT DISTANCE LINE (White dashed line with distance) ---
-            drawDistanceLine(ctx, iconScale) {
-                if (!this.navMarker) return;
-                
-                const player = this.game.player;
-                const marker = this.navMarker;
-                
-                // Calculate distance
-                const distPixels = Math.hypot(marker.x - player.x, marker.y - player.y);
-                const distMeters = Math.round(distPixels / 10); // 10 pixels = 1 meter (adjust as needed)
-                
+            drawDistanceLine(ctx) {
+                // Screen space (device px): a fine dashed line from you to the destination, its distance in a violet pill
+                if (!this.navMarker || !this._toScreen) return;
+                const D = this.dpr, a = this._toScreen(this.game.player.x, this.game.player.y), b = this._toScreen(this.navMarker.x, this.navMarker.y);
+                const distM = Math.round(Math.hypot(this.navMarker.x - this.game.player.x, this.navMarker.y - this.game.player.y) / 10);
+                const text = distM >= 1000 ? (distM / 1000).toFixed(1) + ' km' : distM + ' m';
                 ctx.save();
-                
-                // Animated dash for visual flow
-                const time = _frameTimeSec;
-                const dashOffset = time * 30;
-                
-                // Draw white dashed line from player to marker
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.lineWidth = 3 * iconScale;
-                ctx.setLineDash([15, 10]);
-                ctx.lineDashOffset = -dashOffset;
-                ctx.lineCap = 'round';
-                
-                ctx.beginPath();
-                ctx.moveTo(player.x, player.y);
-                ctx.lineTo(marker.x, marker.y);
-                ctx.stroke();
-                
-                // Draw distance label at midpoint
-                const midX = (player.x + marker.x) / 2;
-                const midY = (player.y + marker.y) / 2;
-                
-                // Format distance nicely
-                let distText;
-                if (distMeters >= 1000) {
-                    distText = (distMeters / 1000).toFixed(1) + ' km';
-                } else {
-                    distText = distMeters + ' m';
-                }
-                
-                // Background pill for text
-                const fontSize = 52 * iconScale;
-                ctx.font = `bold ${fontSize}px Orbitron`;
-                const textWidth = ctx.measureText(distText).width;
-                const pillPadding = 8 * iconScale;
-                const pillHeight = fontSize + pillPadding * 2;
-                const pillWidth = textWidth + pillPadding * 3;
-                
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-                ctx.beginPath();
-                ctx.roundRect(midX - pillWidth/2, midY - pillHeight/2, pillWidth, pillHeight, 4 * iconScale);
-                ctx.fill();
-                
-                // Border
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.lineWidth = 1 * iconScale;
-                ctx.setLineDash([]);
-                ctx.stroke();
-                
-                // Distance text
-                ctx.fillStyle = '#fff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(distText, midX, midY);
-                
+                ctx.strokeStyle = 'rgba(255, 243, 207, 0.55)'; ctx.lineWidth = 1.5 * D; ctx.lineCap = 'round';
+                ctx.setLineDash([7 * D, 6 * D]); ctx.lineDashOffset = -(_frameTimeSec * 24 * D);
+                ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.setLineDash([]);
+                const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+                ctx.font = `600 ${11 * D}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                const tw = ctx.measureText(text).width, pw = tw + 18 * D, ph = 20 * D;
+                ctx.fillStyle = 'rgba(28, 12, 52, 0.88)'; ctx.strokeStyle = 'rgba(217, 204, 255, 0.6)'; ctx.lineWidth = 1 * D;
+                ctx.beginPath(); ctx.roundRect(mx - pw / 2, my - ph / 2, pw, ph, ph / 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#f3e6c2'; ctx.fillText(text, mx, my + 0.5 * D);
                 ctx.restore();
             }
             
             // --- DRAW NAVIGATION MARKER (Ruby Colored) ---
-            drawNavMarker(ctx, iconScale) {
-                if (!this.navMarker) return;
-                
-                const time = _frameTime;
-                const pulse = (Math.sin(time / 300) + 1) / 2;
-                
+            drawNavMarker(ctx) {
+                // Your destination: a crimson pin with a gold flag (fixed size), a soft gold ring breathing under it
+                if (!this.navMarker || !this._toScreen) return;
+                const D = this.dpr, p = this._toScreen(this.navMarker.x, this.navMarker.y), k = this._zk;
+                const pulse = (Math.sin(_frameTime / 300) + 1) / 2;
                 ctx.save();
-                ctx.translate(this.navMarker.x, this.navMarker.y);
-                
-                // Ruby glow
-                ctx.shadowColor = '#e0115f'; // Ruby red
-                ctx.shadowBlur = 25 + pulse * 15;
-                
-                // Outer ring (pulsing)
-                const ringSize = (40 + pulse * 10) * iconScale;
-                ctx.strokeStyle = `rgba(224, 17, 95, ${0.6 + pulse * 0.3})`; // Ruby
-                ctx.lineWidth = 4 * iconScale;
-                ctx.beginPath();
-                ctx.arc(0, 0, ringSize, 0, Math.PI * 2);
-                ctx.stroke();
-                
-                // Inner diamond marker
-                ctx.fillStyle = '#e0115f'; // Ruby
-                ctx.beginPath();
-                const diamondSize = 20 * iconScale;
-                ctx.moveTo(0, -diamondSize);
-                ctx.lineTo(diamondSize * 0.6, 0);
-                ctx.lineTo(0, diamondSize);
-                ctx.lineTo(-diamondSize * 0.6, 0);
-                ctx.closePath();
-                ctx.fill();
-                
-                // White center dot
-                ctx.fillStyle = '#fff';
-                ctx.shadowBlur = 5;
-                ctx.beginPath();
-                ctx.arc(0, 0, 5 * iconScale, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Label
-                if (this.mapView.zoom > 1.2) {
-                    ctx.shadowBlur = 0;
-                    ctx.fillStyle = '#fff';
-                    ctx.font = `bold ${55 * iconScale}px Orbitron`;
-                    ctx.textAlign = 'center';
-                    ctx.fillText("DESTINATION", 0, -ringSize - 20 * iconScale);
-                }
-                
+                ctx.strokeStyle = `rgba(255, 207, 106, ${0.25 + 0.35 * (1 - pulse)})`; ctx.lineWidth = 1.5 * D;
+                ctx.beginPath(); ctx.arc(p.x, p.y, (8 + 10 * pulse) * D * k, 0, Math.PI * 2); ctx.stroke();
                 ctx.restore();
+                MapIcons.draw(ctx, 'dest', p.x, p.y, { dpr: D, css: MapIcons.SIZE.dest * k });
             }
             
             // --- DRAW MAP LEGEND ---
             drawMapLegend(ctx, w, h) {
-                const padding = 15;
-                const legendWidth = 160;
-                const legendHeight = 160;
-                const x = w - legendWidth - padding;
-                const y = padding;
-                
+                // Built from the same icons and sizes as the map; kept inside the free area between the sidebars
+                // On a short screen (a phone on its side) the whole legend scales down
+                const D = this.dpr * Math.max(0.62, Math.min(1, h / this.dpr / 640)), items = [['player', 'You'], ['car', 'Your vehicle'], ['dest', 'Destination'], ['objective', 'Objective'], ['client', 'Client'], ['transition', 'Way through'], ['danger', 'Danger zone']];
+                const lw = 150 * D, row = 21 * D, lh = (34 + items.length * 21) * D, area = this._freeArea(w, h);
+                const x = area.right - lw - 14 * D, y = area.bottom - lh - 14 * D;
                 ctx.save();
-                
-                // Background
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.strokeStyle = 'rgba(205, 127, 50, 0.6)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.roundRect(x, y, legendWidth, legendHeight, 8);
-                ctx.fill();
-                ctx.stroke();
-                
-                // Title
-                ctx.fillStyle = '#cd7f32';
-                ctx.font = 'bold 12px Orbitron';
-                ctx.textAlign = 'left';
-                ctx.fillText('LEGEND', x + 10, y + 20);
-                
-                // Legend items
-                const items = [
-                    { color: '#E6E6FA', label: 'You', shape: 'triangle' },
-                    { color: '#ff3366', label: 'Your Vehicle', shape: 'rect' },
-                    { color: '#e0115f', label: 'Destination', shape: 'diamond' },
-                    { color: '#FFD700', label: 'NPC', shape: 'circle' },
-                    { color: '#8f99fb', label: 'Transition', shape: 'circle' },
-                    { color: '#ff2200', label: 'Danger Zone', shape: 'hazard' }
-                ];
-                
-                let itemY = y + 38;
-                for (let item of items) {
-                    // Icon
-                    ctx.fillStyle = item.color;
-                    ctx.shadowColor = item.color;
-                    ctx.shadowBlur = 5;
-                    
-                    if (item.shape === 'triangle') {
-                        ctx.beginPath();
-                        ctx.moveTo(x + 18, itemY - 4);
-                        ctx.lineTo(x + 12, itemY + 4);
-                        ctx.lineTo(x + 24, itemY + 4);
-                        ctx.closePath();
-                        ctx.fill();
-                    } else if (item.shape === 'rect') {
-                        ctx.fillRect(x + 10, itemY - 4, 16, 8);
-                    } else if (item.shape === 'diamond') {
-                        ctx.beginPath();
-                        ctx.moveTo(x + 18, itemY - 5);
-                        ctx.lineTo(x + 23, itemY);
-                        ctx.lineTo(x + 18, itemY + 5);
-                        ctx.lineTo(x + 13, itemY);
-                        ctx.closePath();
-                        ctx.fill();
-                    } else if (item.shape === 'hazard') {
-                        // Dashed square icon
-                        ctx.strokeStyle = item.color;
-                        ctx.lineWidth = 1.5;
-                        ctx.setLineDash([3, 2]);
-                        ctx.strokeRect(x + 10, itemY - 5, 16, 10);
-                        ctx.setLineDash([]);
-                        // Small warning symbol inside
-                        ctx.font = 'bold 8px sans-serif';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('⚠', x + 18, itemY + 3);
-                    } else {
-                        ctx.beginPath();
-                        ctx.arc(x + 18, itemY, 5, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                    
-                    // Label
-                    ctx.shadowBlur = 0;
-                    ctx.fillStyle = '#ddd';
-                    ctx.font = '10px Montserrat';
-                    ctx.fillText(item.label, x + 35, itemY + 3);
-                    
-                    itemY += 20;
-                }
-                
+                ctx.fillStyle = 'rgba(16, 7, 32, 0.78)'; ctx.strokeStyle = 'rgba(217, 204, 255, 0.35)'; ctx.lineWidth = 1 * D;
+                ctx.setLineDash([2 * D, 3 * D]);
+                ctx.beginPath(); ctx.roundRect(x, y, lw, lh, 14 * D); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+                ctx.fillStyle = '#ffd76a'; ctx.font = `600 ${10 * D}px Montserrat, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillText('L E G E N D', x + 14 * D, y + 17 * D);
+                ctx.font = `${10.5 * D}px Montserrat, sans-serif`;
+                items.forEach(([k, label], i) => {
+                    const cy = y + (36 + i * 21) * D;
+                    MapIcons.draw(ctx, k, x + 24 * D, cy + (k === 'dest' ? 7 * D : 0), { dpr: this.dpr, css: (k === 'dest' ? 16 : 14) * D / this.dpr });
+                    ctx.fillStyle = '#e6dcff'; ctx.fillText(label, x + 44 * D, cy);
+                });
                 ctx.restore();
             }
             
             // --- DRAW ZOOM READOUT ---
             drawZoomReadout(ctx, w, h) {
-                const padding = 15;
-                
+                const D = this.dpr, area = this._freeArea(w, h), x = area.left + 14 * D, y = area.bottom - 40 * D;
                 ctx.save();
-                
-                // Background pill
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                ctx.strokeStyle = 'rgba(205, 127, 50, 0.5)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.roundRect(padding, h - 40, 90, 28, 5);
-                ctx.fill();
-                ctx.stroke();
-                
-                // Zoom text
-                ctx.fillStyle = '#cd7f32';
-                ctx.font = 'bold 12px Orbitron';
-                ctx.textAlign = 'left';
-                ctx.fillText(`${this.mapView.zoom.toFixed(1)}x`, padding + 12, h - 21);
-                
-                // Zoom icon
-                ctx.fillStyle = '#888';
-                ctx.font = '14px sans-serif';
-                ctx.fillText('🔍', padding + 55, h - 20);
-                
+                ctx.fillStyle = 'rgba(16, 7, 32, 0.78)'; ctx.strokeStyle = 'rgba(217, 204, 255, 0.35)'; ctx.lineWidth = 1 * D;
+                ctx.beginPath(); ctx.roundRect(x, y, 78 * D, 26 * D, 13 * D); ctx.fill(); ctx.stroke();
+                MapIcons.draw(ctx, 'search', x + 18 * D, y + 13 * D, { dpr: D });
+                ctx.fillStyle = '#ffd76a'; ctx.font = `600 ${11 * D}px Montserrat, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillText(`${this.mapView.zoom.toFixed(1)}×`, x + 34 * D, y + 13.5 * D);
                 ctx.restore();
             }
-        
-            // Inside UISystem class
+
+            /** The canvas area not under the sidebars (device px), so overlays never hide behind them. */
+            _freeArea(w, h) {
+                const D = this.dpr, cr = this.mapCanvas.getBoundingClientRect();
+                let left = 0, right = w;
+                const L = document.getElementById('map-sidebar-left'), R = document.getElementById('map-sidebar-right');
+                const vis = (el) => el && el.offsetParent !== null && getComputedStyle(el).visibility !== 'hidden';
+                if (vis(L)) { const r = L.getBoundingClientRect(); if (r.width > 0 && r.right < cr.width * 0.5) left = Math.max(0, (r.right - cr.left) * D); }
+                if (vis(R)) { const r = R.getBoundingClientRect(); if (r.width > 0 && r.left > cr.width * 0.5) right = Math.min(w, (r.left - cr.left) * D); }
+                return { left, right, top: 0, bottom: h };
+            }
         
             // --- 2. THE VIEWPORT-EXTENDED CACHE RENDERER ---
             // Renders static geometry (walls, roads, buildings, labels) into a
@@ -829,129 +666,31 @@
             // geometry whose AABB intersects the cache region gets drawn — the
             // expensive shadowBlur / lighter-composite road passes are confined
             // to roughly one screenful instead of the entire map.
-            updateMapCache(visibleX, visibleY, visibleW, visibleH, finalScale) {
+            updateMapCache(visibleX, visibleY, visibleW, visibleH, finalScale, band, bandScale) {
+                // The static city, painted at a fixed zoom BAND (0.5 / 1 / 2 / 4 × the fit scale) over the view plus a
+                // margin, then stretched to the exact zoom: pinching and wheeling within a band reuse it; only a band
+                // change or panning past the margin repaints. Capped at 2560 px a side (Safari's canvas memory).
                 const mapData = this.game.activeMap;
-                
-                // 50% buffer on each side → cache is 2× viewport in each dim.
-                // Pan up to one viewport before triggering a rebuild.
-                const bufferX = visibleW * 0.5;
-                const bufferY = visibleH * 0.5;
-                const cacheBoundsX = visibleX - bufferX;
-                const cacheBoundsY = visibleY - bufferY;
-                const cacheBoundsW = visibleW + bufferX * 2;
-                const cacheBoundsH = visibleH + bufferY * 2;
-                
-                // Cache canvas in display pixels. Clamp to a sane max in case of
-                // extreme high-DPR or unusual viewport — typical is ~2k×3k.
-                const MAX_CACHE_DIM = 4096;
-                let canvasW = Math.ceil(cacheBoundsW * finalScale);
-                let canvasH = Math.ceil(cacheBoundsH * finalScale);
-                let effectiveScale = finalScale;
-                if (canvasW > MAX_CACHE_DIM || canvasH > MAX_CACHE_DIM) {
-                    const ratio = Math.min(MAX_CACHE_DIM / canvasW, MAX_CACHE_DIM / canvasH);
-                    canvasW = Math.ceil(canvasW * ratio);
-                    canvasH = Math.ceil(canvasH * ratio);
-                    effectiveScale = finalScale * ratio;
-                }
-                
-                this.cacheCanvas.width = canvasW;
-                this.cacheCanvas.height = canvasH;
-                
-                this.cacheBoundsMap = { x: cacheBoundsX, y: cacheBoundsY, w: cacheBoundsW, h: cacheBoundsH };
-                this.cacheFinalScale = effectiveScale;
+                const bufX = visibleW * 0.3, bufY = visibleH * 0.3;
+                const bx = visibleX - bufX, by = visibleY - bufY, bw = visibleW + bufX * 2, bh = visibleH + bufY * 2;
+                const MAX = 2560;
+                let cw = Math.ceil(bw * bandScale), ch = Math.ceil(bh * bandScale), eff = bandScale;
+                if (cw > MAX || ch > MAX) { const r = Math.min(MAX / cw, MAX / ch); cw = Math.ceil(cw * r); ch = Math.ceil(ch * r); eff = bandScale * r; }
+                this.cacheCanvas.width = cw; this.cacheCanvas.height = ch;
+                this.cacheBoundsMap = { x: bx, y: by, w: bw, h: bh };
+                this.cacheFinalScale = eff; this.cacheBand = band;
                 this.cacheMapId = mapData.id || null;
                 this.isCacheDirty = false;
-                
+                this.cacheBuilds = (this.cacheBuilds || 0) + 1;
                 const ctx = this.cacheCtx;
-                
-                // Map-space → cache pixels. After this transform, drawing at map
-                // coords (e.g. road.x1, road.y1) lands at the right cache pixel.
-                ctx.setTransform(
-                    effectiveScale, 0, 0, effectiveScale,
-                    -cacheBoundsX * effectiveScale,
-                    -cacheBoundsY * effectiveScale
-                );
-                
-                // AABB intersect helper — generous PAD covers line widths + glow
-                // bleed so we don't clip half-drawn roads at the cache edge.
-                const PAD = 100;
-                const intersects = (rx, ry, rw, rh) => (
-                    rx + rw + PAD >= cacheBoundsX &&
-                    rx - PAD <= cacheBoundsX + cacheBoundsW &&
-                    ry + rh + PAD >= cacheBoundsY &&
-                    ry - PAD <= cacheBoundsY + cacheBoundsH
-                );
-                
-                ctx.lineCap = 'round';
-                
-                // --- WALLS (Universal) ---
-                if (mapData.walls) {
-                    ctx.lineWidth = 6;
-                    mapData.walls.forEach(w => {
-                        if (!intersects(w.x, w.y, w.w, w.h)) return;
-                        ctx.fillStyle = '#4a2c18';
-                        ctx.fillRect(w.x, w.y, w.w, w.h);
-                        ctx.strokeStyle = '#cd7f32';
-                        ctx.strokeRect(w.x, w.y, w.w, w.h);
-                    });
-                }
-                
-                // --- OUTDOOR MAPS (Buildings + Roads + Labels) ---
-                if (mapData.type !== 'indoor') {
-                    // 1. Buildings (bottom layer)
-                    if (mapData.buildings) {
-                        ctx.lineWidth = 6;
-                        mapData.buildings.forEach(b => {
-                            if (!intersects(b.x, b.y, b.w, b.h)) return;
-                            ctx.fillStyle = '#4a2c18';
-                            ctx.fillRect(b.x, b.y, b.w, b.h);
-                            ctx.strokeStyle = '#cd7f32';
-                            ctx.strokeRect(b.x, b.y, b.w, b.h);
-                        });
-                    }
-                    
-                    // 2. Roads — pre-filter to only those touching the cache region.
-                    // Three-pass paint (red base, lighter orange core, gold hotspot
-                    // with shadowBlur) is the most expensive part of the whole render;
-                    // culling here is what makes large maps cheap.
-                    const roadIntersects = (r) => {
-                        const minX = Math.min(r.x1, r.x2);
-                        const minY = Math.min(r.y1, r.y2);
-                        const maxX = Math.max(r.x1, r.x2);
-                        const maxY = Math.max(r.y1, r.y2);
-                        return intersects(minX, minY, maxX - minX, maxY - minY);
-                    };
-                    const visibleRoads = this.game.traffic.network.roads.filter(roadIntersects);
-                    
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.lineWidth = 120;
-                    ctx.strokeStyle = '#550000';
-                    visibleRoads.forEach(r => this.drawRoadLine(ctx, r));
-                    
-                    ctx.globalCompositeOperation = 'lighter';
-                    ctx.lineWidth = 60;
-                    ctx.strokeStyle = '#ff4500';
-                    visibleRoads.forEach(r => this.drawRoadLine(ctx, r));
-                    
-                    ctx.lineWidth = 20;
-                    ctx.strokeStyle = '#FFD700';
-                    ctx.shadowColor = '#FFD700';
-                    ctx.shadowBlur = 20;
-                    visibleRoads.forEach(r => this.drawRoadLine(ctx, r));
-                    
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.shadowBlur = 0;
-                    
-                    // Building and road labels are NOT rendered into the cache.
-                    // They live on a separate text layer drawn in screen-space at
-                    // a screen-fixed font size — see drawMapTextLayer() in
-                    // renderGoldenMap. This keeps text always crisp regardless
-                    // of zoom and lets us tier visibility (hide labels when zoomed
-                    // out far enough that they'd be cluttered or unreadable).
-                }
-                
-                // Reset transform so subsequent direct cache writes (if any) start fresh.
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.fillStyle = MAP_PAL.base; ctx.fillRect(0, 0, cw, ch);
+                ctx.setTransform(eff, 0, 0, eff, -bx * eff, -by * eff);
+                MapArt.paintCity(ctx, mapData, { px: eff, dpr: this.dpr, bounds: this.cacheBoundsMap,
+                    network: mapData.type !== 'indoor' && this.game.traffic ? this.game.traffic.network : null,
+                    lamps: mapData.type !== 'indoor' ? this.game.lamps : null });
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                MapArt.bloom(this.cacheCanvas);
             }
         
             renderGoldenMap() {
@@ -983,30 +722,32 @@
                 // Cache valid if: same map, same scale (within tolerance), and
                 // the visible region is fully inside cacheBoundsMap. Pan stays
                 // free until the visible window touches a cache edge.
-                const SCALE_TOL = 0.0005;
+                // Zoom band: the nearest of 0.5 / 1 / 2 / 4 (the cache is stretched at most ~1.4× either way)
+                const band = Math.max(0.5, Math.min(4, Math.pow(2, Math.round(Math.log2(this.mapView.zoom)))));
                 const b = this.cacheBoundsMap;
                 const cacheValid = !this.isCacheDirty &&
                     this.cacheMapId === mapData.id &&
                     b !== null &&
-                    Math.abs(this.cacheFinalScale - finalScale) < SCALE_TOL &&
+                    this.cacheBand === band &&
                     visibleX >= b.x &&
                     visibleY >= b.y &&
                     visibleX + visibleW <= b.x + b.w &&
                     visibleY + visibleH <= b.y + b.h;
                 
                 if (!cacheValid) {
-                    this.updateMapCache(visibleX, visibleY, visibleW, visibleH, finalScale);
+                    this.updateMapCache(visibleX, visibleY, visibleW, visibleH, finalScale, band, baseScale * band);
                 }
                 
-                // 1. Clear screen
-                ctx.fillStyle = '#020103';
+                // 1. Clear screen (deep violet beyond the map's edge)
+                ctx.fillStyle = MAP_PAL.base;
                 ctx.fillRect(0, 0, w, h);
+                ctx.imageSmoothingEnabled = true;
                 
                 // 2. Blit cache at the screen position corresponding to
                 //    cacheBoundsMap's top-left in map-space.
                 //    Round to integer pixels to avoid sub-pixel filtering smear during pan.
-                const cacheScreenX = Math.round(screenOriginX + this.cacheBoundsMap.x * finalScale);
-                const cacheScreenY = Math.round(screenOriginY + this.cacheBoundsMap.y * finalScale);
+                const cacheScreenX = screenOriginX + this.cacheBoundsMap.x * finalScale;
+                const cacheScreenY = screenOriginY + this.cacheBoundsMap.y * finalScale;
                 // If MAX_CACHE_DIM clamping reduced effective scale, the cache pixels
                 // need to be drawn at a slightly different size to land correctly.
                 // Compute target screen size from cache canvas dims and effective scale.
@@ -1042,105 +783,49 @@
             // is always pixel-crisp regardless of zoom level. Cost is low because
             // text rendering is fast and we cull anything off-screen.
             drawMapTextLayer(ctx, w, h, screenOriginX, screenOriginY, finalScale) {
+                // Labels in screen space at fixed CSS sizes: building names in champagne small caps, road names in
+                // gold italics; a dark violet keyline instead of a blur; nothing drawn where a label already sits.
                 const mapData = this.game.activeMap;
                 if (!mapData || mapData.type === 'indoor') return;
-                
-                // Zoom tier thresholds (tune as needed)
-                const ZOOM_BUILDINGS = 1.6;  // Below this, no building labels
-                const ZOOM_ROADS = 2.4;      // Below this, no road labels
-                const zoom = this.mapView.zoom;
-                
-                const showBuildings = zoom >= ZOOM_BUILDINGS && mapData.buildings;
-                const showRoads = zoom >= ZOOM_ROADS;
+                const D = this.dpr, zoom = this.mapView.zoom;
+                const showBuildings = zoom >= 1.4 && mapData.buildings, showRoads = zoom >= 1.0;
                 if (!showBuildings && !showRoads) return;
-                
-                // Convert a map-space (mx, my) point to screen pixels
-                const toScreenX = (mx) => screenOriginX + mx * finalScale;
-                const toScreenY = (my) => screenOriginY + my * finalScale;
-                
-                // Screen-space AABB cull — skip labels outside the canvas
-                const onScreen = (sx, sy, halfW, halfH) => (
-                    sx + halfW >= 0 && sx - halfW <= w &&
-                    sy + halfH >= 0 && sy - halfH <= h
-                );
-                
+                const sx = (mx) => screenOriginX + mx * finalScale, sy = (my) => screenOriginY + my * finalScale;
+                const placed = [];
+                const free = (x, y, hw, hh) => {
+                    if (x + hw < 0 || x - hw > w || y + hh < 0 || y - hh > h) return false;
+                    for (const r of placed) if (Math.abs(r[0] - x) < r[2] + hw && Math.abs(r[1] - y) < r[3] + hh) return false;
+                    placed.push([x, y, hw, hh]); return true;
+                };
                 ctx.save();
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                
-                // ── BUILDING LABELS ──
-                if (showBuildings) {
-                    // Font size eases up with zoom — at threshold 1.6× a ~14px
-                    // label is comfortable; at max 5× a ~22px label feels right
-                    // without dominating the map.
-                    const fontPx = Math.round(7 + (zoom - ZOOM_BUILDINGS) * 2.5);
-                    ctx.font = `bold ${fontPx}px Orbitron, sans-serif`;
-                    
-                    mapData.buildings.forEach(b => {
-                        if (!b.label || !b.label.trim()) return;
-                        const sx = toScreenX(b.x + b.w / 2);
-                        const sy = toScreenY(b.y + b.h / 2);
-                        if (!onScreen(sx, sy, 80, 20)) return;
-                        const text = b.label.toUpperCase();
-                        // Glow pass
-                        ctx.shadowColor = '#ffaa00';
-                        ctx.shadowBlur = 8;
-                        ctx.fillStyle = '#ffcc44';
-                        ctx.fillText(text, sx, sy);
-                        // Sharp overlay
-                        ctx.shadowBlur = 0;
-                        ctx.fillStyle = '#fff8e0';
-                        ctx.fillText(text, sx, sy);
-                    });
-                }
-                
-                // ── ROAD LABELS ──
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+                ctx.strokeStyle = 'rgba(11, 5, 22, 0.88)';
                 if (showRoads) {
-                    const fontPx = Math.round(6 + (zoom - ZOOM_ROADS) * 2);
-                    ctx.font = `bold ${fontPx}px Orbitron, sans-serif`;
-                    const LABEL_SPACING = 600; // Map-space spacing between repeats on long roads
-                    
-                    this.game.traffic.network.roads.forEach(road => {
-                        if (!road.name || !road.name.trim()) return;
-                        const isH = road.orientation === 'H';
-                        const longDim = isH ? road.w : road.h;
-                        const labelCount = Math.max(1, Math.round(longDim / LABEL_SPACING));
-                        const angle = isH ? 0 : -Math.PI / 2;
-                        const text = road.name.toUpperCase();
-                        const textWidth = ctx.measureText(text).width;
-                        
-                        for (let i = 0; i < labelCount; i++) {
-                            const t = (i + 0.5) / labelCount;
-                            const mx = isH ? (road.x + road.w * t) : (road.x + road.w / 2);
-                            const my = isH ? (road.y + road.h / 2) : (road.y + road.h * t);
-                            const sx = toScreenX(mx);
-                            const sy = toScreenY(my);
-                            // Generous cull radius — accounts for rotated bounding box
-                            if (!onScreen(sx, sy, textWidth / 2 + 20, 20)) continue;
-                            
-                            ctx.save();
-                            ctx.translate(sx, sy);
-                            ctx.rotate(angle);
-                            // Dark pill background for readability over road glow
-                            const padY = Math.ceil(fontPx * 0.65);
-                            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                            ctx.beginPath();
-                            ctx.roundRect(-textWidth/2 - 8, -padY, textWidth + 16, padY * 2, 6);
-                            ctx.fill();
-                            // Glow pass
-                            ctx.shadowColor = '#ff8800';
-                            ctx.shadowBlur = 6;
-                            ctx.fillStyle = '#ffaa44';
-                            ctx.fillText(text, 0, 0);
-                            // Sharp overlay
-                            ctx.shadowBlur = 0;
-                            ctx.fillStyle = '#ffeedd';
-                            ctx.fillText(text, 0, 0);
+                    const fs = Math.round((9 + Math.min(3, (zoom - 1) * 1.2)) * D);
+                    ctx.font = `italic 600 ${fs}px Montserrat, sans-serif`; ctx.lineWidth = 3 * D;
+                    for (const road of this.game.traffic.network.roads) {
+                        if (!road.name || !road.name.trim()) continue;
+                        const isH = road.orientation === 'H', text = road.name.toUpperCase().split('').join(' '), tw = ctx.measureText(text).width;
+                        const len = (isH ? road.w : road.h) * finalScale, n = Math.max(1, Math.floor(len / (tw + 260 * D)));
+                        for (let i = 0; i < n; i++) {
+                            const t = (i + 0.5) / n, x = sx(isH ? road.x + road.w * t : road.x + road.w / 2), y = sy(isH ? road.y + road.h / 2 : road.y + road.h * t);
+                            if (!free(x, y, isH ? tw / 2 + 6 * D : fs, isH ? fs : tw / 2 + 6 * D)) continue;
+                            ctx.save(); ctx.translate(x, y); if (!isH) ctx.rotate(-Math.PI / 2);
+                            ctx.strokeText(text, 0, 0); ctx.fillStyle = '#ffd76a'; ctx.fillText(text, 0, 0);
                             ctx.restore();
                         }
-                    });
+                    }
                 }
-                
+                if (showBuildings) {
+                    const fs = Math.round((9.5 + Math.min(3, (zoom - 1.4) * 1.1)) * D);
+                    ctx.font = `600 ${fs}px Montserrat, sans-serif`; ctx.lineWidth = 3 * D;
+                    for (const b of mapData.buildings) {
+                        if (!b.label || !b.label.trim()) continue;
+                        const text = b.label.toUpperCase(), tw = ctx.measureText(text).width, x = sx(b.x + b.w / 2), y = sy(b.y + b.h / 2);
+                        if (!free(x, y, tw / 2 + 4 * D, fs * 0.75)) continue;
+                        ctx.strokeText(text, x, y); ctx.fillStyle = '#f3e6c2'; ctx.fillText(text, x, y);
+                    }
+                }
                 ctx.restore();
             }
             
@@ -1152,11 +837,22 @@
             }
         
             drawScanlines(ctx, w, h) {
-                ctx.fillStyle = "rgba(0,0,0,0.5)";
-                for(let i=0; i<h; i+=4) { ctx.fillRect(0, i, w, 1); }
+                // A whisper of scanlines (cached tile), so the gold reads as a display, not as noise
+                if (!this._scanPat || this._scanDpr !== this.dpr) {
+                    const t = document.createElement('canvas'), D = this.dpr; t.width = 4; t.height = Math.max(2, Math.round(3 * D));
+                    const c = t.getContext('2d'); c.fillStyle = 'rgba(6, 2, 14, 0.16)'; c.fillRect(0, 0, 4, Math.max(1, Math.round(D)));
+                    this._scanPat = ctx.createPattern(t, 'repeat'); this._scanDpr = D;
+                }
+                ctx.save(); ctx.fillStyle = this._scanPat; ctx.fillRect(0, 0, w, h); ctx.restore();
             }
         
+            // Every screen opens through Screens (ui/screens.js), so the map and the menu never stack
             toggleMap(show) {
+                if (show) Screens.open('map');
+                else if (Screens.mapOpen()) Screens.close();
+            }
+
+            _showMap(show) {
                 const mapUI = document.getElementById('map-interface');
                 mapUI.style.display = show ? 'block' : 'none';
                 if (show) this.game.pauseSystem.acquire('map_ui');
@@ -1178,10 +874,6 @@
                     this.startIconAnimation(); // Start animating icons
                     this.game.renderSidebarPortrait();
                     
-                    // Update nav highlight
-                    if (typeof mapSidebar !== 'undefined') {
-                        mapSidebar.setActiveNav('map');
-                    }
                 } else {
                     this.stopIconAnimation(); // Stop animation when map closes
                 }
@@ -1204,355 +896,99 @@
             
             animateIcons() {
                 if (!this.isAnimating) return;
-                
-                const ctx = this.iconCtx;
-                const w = this.iconCanvas.width;
-                const h = this.iconCanvas.height;
-                const mapData = this.game.activeMap;
-                
-                // Get filter state from map sidebar
-                let filterEnabled = false;
-                let activeFilter = null;
-                if (typeof mapSidebar !== 'undefined') {
-                    filterEnabled = mapSidebar.filterEnabled;
-                    activeFilter = mapSidebar.activeFilter;
-                }
-                
-                // Helper to check if a marker category should be shown
-                const shouldShow = (category) => {
-                    if (!filterEnabled) return true; // Filter OFF = show all
-                    return activeFilter === category;
-                };
-                
-                // Clear icon layer
+                this.animationFrameId = requestAnimationFrame(() => this.animateIcons());
+                const ctx = this.iconCtx, w = this.iconCanvas.width, h = this.iconCanvas.height, mapData = this.game.activeMap, D = this.dpr;
+                if (!mapData) return;
+                let filterEnabled = false, activeFilter = null;
+                if (typeof mapSidebar !== 'undefined') { filterEnabled = mapSidebar.filterEnabled; activeFilter = mapSidebar.activeFilter; }
+                const shouldShow = (category) => !filterEnabled || activeFilter === category;
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.clearRect(0, 0, w, h);
-                
-                // Calculate transform (same as main map)
-                const scaleX = w / mapData.width;
-                const scaleY = h / mapData.height;
-                const baseScale = Math.min(scaleX, scaleY) * 0.9;
-                const finalScale = baseScale * this.mapView.zoom;
-                const mapVisualWidth = mapData.width * finalScale;
-                const mapVisualHeight = mapData.height * finalScale;
-                const iconScale = 1 / finalScale * (w / 1920);
-                
-                ctx.save();
-                ctx.translate((w - mapVisualWidth) / 2 + this.mapView.offsetX, (h - mapVisualHeight) / 2 + this.mapView.offsetY);
-                ctx.scale(finalScale, finalScale);
-                
-                // --- DRAW ANIMATED ICONS ---
-                
-                // 1. Transition Points (Always visible - essential navigation)
-                if (mapData.transitions) {
-                    const t = _frameTime / 300;
-                    const pulse = 1 + Math.sin(t) * 0.3;
-                    ctx.fillStyle = '#8f99fb'; ctx.shadowColor = '#8f99fb'; ctx.shadowBlur = 15;
-                    mapData.transitions.forEach(trans => {
-                        ctx.beginPath();
-                        ctx.arc(trans.x + trans.w/2, trans.y + trans.h/2, 25*iconScale*pulse, 0, Math.PI*2);
-                        ctx.fill();
-                    });
-                    ctx.shadowBlur = 0;
-                }
-                
-                // 2. Navigation Path (Simple road-level path - player set)
-                this.drawRoadLevelPath(ctx);
-                
-                // 2b. DEBUG: Draw car's actual waypoints (cyan over purple)
-                this.drawCarActualPath(ctx);
-                
-                // 3. Distance Line (Always visible)
-                this.drawDistanceLine(ctx, iconScale);
-                
-                // 4. Navigation Marker (Always visible - player set)
-                this.drawNavMarker(ctx, iconScale);
-                
-                // 5. NPCs (Filtered: clients)
-                if (this.game.npcs && shouldShow('clients')) {
-                    const npcPulse = 0.8 + Math.sin(_frameTime / 400) * 0.2;
-                    ctx.fillStyle = '#FFD700'; ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 10 + npcPulse * 8;
-                    this.game.npcs.forEach(npc => {
-                        ctx.beginPath();
-                        ctx.arc(npc.x, npc.y, 15 * iconScale * npcPulse, 0, Math.PI*2);
-                        ctx.fill();
-                    });
-                    ctx.shadowBlur = 0;
-                }
-                
-                // 6. Pedestrians (Always visible - ambient)
-                if (this.game.pedestrians && this.game.pedestrians.pedestrians && !filterEnabled) {
-                    const pedPulse = 0.9 + Math.sin(_frameTime / 600) * 0.1;
-                    ctx.fillStyle = '#88aacc'; ctx.shadowColor = '#88aacc'; ctx.shadowBlur = 5;
-                    this.game.pedestrians.pedestrians.forEach(ped => {
-                        if (!ped.dead) {
-                            ctx.beginPath();
-                            ctx.arc(ped.x, ped.y, 8 * iconScale * pedPulse, 0, Math.PI*2);
-                            ctx.fill();
-                        }
-                    });
-                    ctx.shadowBlur = 0;
-                }
-                
-                // 7. Owned Car (Always visible - player's vehicle)
-                if (this.game.ownedCar && this.game.ownedCar.visible) {
-                    const car = this.game.ownedCar;
-                    const carPulse = 0.9 + Math.sin(_frameTime / 500) * 0.1;
-                    ctx.save();
-                    ctx.translate(car.x, car.y);
-                    ctx.rotate(car.angle);
-                    ctx.fillStyle = '#ff3366'; ctx.shadowColor = '#ff3366'; ctx.shadowBlur = 15 + carPulse * 10;
-                    const carW = 26 * iconScale; const carL = 52 * iconScale;
-                    ctx.beginPath(); ctx.roundRect(-carL/2, -carW/2, carL, carW, 4); ctx.fill();
-                    ctx.fillStyle = '#fff'; ctx.shadowBlur = 5;
-                    ctx.fillRect(carL/2 - 2, -carW/2 + 2, 4, 6);
-                    ctx.fillRect(carL/2 - 2, carW/2 - 8, 4, 6);
-                    ctx.restore();
-                }
-                
-                // 8. Home Base / Spawn Point (Filtered: homebases)
-                if (shouldShow('homebases')) {
-                    // Try to get the parking_spot landmark (building location)
-                    // Fallback to spawn point if not available
-                    let homeX, homeY;
-                    if (this.game.landmarkRegistry && this.game.landmarkRegistry['parking_spot']) {
-                        const landmark = this.game.landmarkRegistry['parking_spot'];
-                        homeX = landmark.x;
-                        homeY = landmark.y;
-                    } else if (mapData.spawn) {
-                        homeX = mapData.spawn.x;
-                        homeY = mapData.spawn.y;
-                    } else {
-                        return; // No location to draw
-                    }
-                    
-                    const hbPulse = 0.9 + Math.sin(_frameTime / 600) * 0.15;
-                    
-                    // House icon - green with white glow
-                    ctx.fillStyle = '#00ff88'; 
-                    ctx.shadowColor = '#00ff88'; 
-                    ctx.shadowBlur = 20 + hbPulse * 10;
-                    
-                    // Draw a simple house shape
-                    const size = 40 * iconScale * hbPulse;
-                    ctx.beginPath();
-                    // Roof (triangle)
-                    ctx.moveTo(homeX, homeY - size * 0.8);
-                    ctx.lineTo(homeX - size * 0.7, homeY - size * 0.1);
-                    ctx.lineTo(homeX + size * 0.7, homeY - size * 0.1);
-                    ctx.closePath();
-                    ctx.fill();
-                    // Base (rectangle)
-                    ctx.fillRect(homeX - size * 0.5, homeY - size * 0.1, size, size * 0.8);
-                    
-                    // Door
-                    ctx.fillStyle = '#006633';
-                    ctx.fillRect(homeX - size * 0.15, homeY + size * 0.2, size * 0.3, size * 0.5);
-                    
-                    ctx.shadowBlur = 0;
-                }
-                
-                // 9. Objective Marker (Filtered: missions) - Golden objective marker
-                if (shouldShow('missions')) {
-                    this.drawObjectiveMarker(ctx);
-                }
-                
-                // 9. Player Marker (Animated pulse)
-                const p = this.game.player;
-                const playerPulse = 0.9 + Math.sin(_frameTime / 350) * 0.15;
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate(p.angle);
-                ctx.fillStyle = '#E6E6FA'; ctx.shadowColor = '#E6E6FA'; ctx.shadowBlur = 15 + playerPulse * 15;
-                const size = 50 * iconScale * playerPulse;
-                ctx.beginPath();
-                ctx.moveTo(size, 0);
-                ctx.lineTo(-size/2, -size/2);
-                ctx.lineTo(-size/4, 0);
-                ctx.lineTo(-size/2, size/2);
-                ctx.closePath();
-                ctx.fill();
-                ctx.restore();
-                
-                // 10. RESTRICTED ZONE — Crimson danger area with pulsing hazard border
-                // Always visible — critical gameplay landmark, not filtered
-                if (this.game.restrictedZone) {
-                    const rz = this.game.restrictedZone;
+                // The same transform as the map
+                const baseScale = Math.min(w / mapData.width, h / mapData.height) * 0.9, finalScale = baseScale * this.mapView.zoom;
+                const ox = (w - mapData.width * finalScale) / 2 + this.mapView.offsetX, oy = (h - mapData.height * finalScale) / 2 + this.mapView.offsetY;
+                this._toScreen = (mx, my) => ({ x: ox + mx * finalScale, y: oy + my * finalScale });
+                this._u = D / finalScale;                                   // map units per CSS px
+                this._zk = MapIcons.zoomK(this.mapView.zoom);               // icons grow a little with zoom, never with the screen
+                const S = this._toScreen, k = this._zk, on = (p, m = 40 * D) => p.x > -m && p.x < w + m && p.y > -m && p.y < h + m;
+
+                // ── Areas and routes, in map space ──
+                ctx.save(); ctx.translate(ox, oy); ctx.scale(finalScale, finalScale);
+                const rz = this.game.restrictedZone;
+                if (rz) {                                                   // the danger zone: a crimson wash and a slow dashed edge
                     const t = _frameTime / 400;
-                    const pulse = 0.9 + Math.sin(t) * 0.15;
-                    const cx = rz.x + rz.w / 2;
-                    const cy = rz.y + rz.h / 2;
-                    
-                    ctx.save();
-                    
-                    // Layer 1: Deep crimson fill over the zone
-                    ctx.fillStyle = rz.cleared ? 'rgba(40, 10, 0, 0.25)' : 'rgba(120, 0, 0, 0.3)';
+                    ctx.fillStyle = rz.cleared ? 'rgba(60, 14, 30, 0.28)' : 'rgba(150, 10, 40, 0.24)';
                     ctx.fillRect(rz.x, rz.y, rz.w, rz.h);
-                    
-                    // Layer 2: Inner glow (brighter when hostiles active)
-                    ctx.globalCompositeOperation = 'lighter';
-                    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rz.w, rz.h) * 0.5);
-                    if (rz.active && !rz.cleared) {
-                        grad.addColorStop(0, 'rgba(255, 30, 0, 0.12)');
-                        grad.addColorStop(0.6, 'rgba(180, 0, 0, 0.06)');
-                        grad.addColorStop(1, 'rgba(80, 0, 0, 0)');
-                    } else {
-                        grad.addColorStop(0, 'rgba(200, 60, 0, 0.06)');
-                        grad.addColorStop(1, 'rgba(60, 0, 0, 0)');
-                    }
-                    ctx.fillStyle = grad;
-                    ctx.fillRect(rz.x, rz.y, rz.w, rz.h);
-                    ctx.globalCompositeOperation = 'source-over';
-                    
-                    // Layer 3: Pulsing hazard border
-                    ctx.strokeStyle = rz.cleared ? 'rgba(200, 80, 0, 0.35)' : `rgba(255, 30, 0, ${0.4 + Math.sin(t * 1.5) * 0.2})`;
-                    ctx.lineWidth = 6 * pulse;
-                    ctx.setLineDash([20, 12]);
-                    ctx.lineDashOffset = _frameTime / 50;
-                    ctx.strokeRect(rz.x, rz.y, rz.w, rz.h);
-                    ctx.setLineDash([]);
-                    
-                    // Layer 4: Skull / danger icon at center
-                    const iconSize = 35 * iconScale * pulse;
-                    ctx.fillStyle = rz.cleared ? '#cc6600' : '#ff2200';
-                    ctx.shadowColor = rz.cleared ? '#cc6600' : '#ff2200';
-                    ctx.shadowBlur = 12 + pulse * 8;
-                    ctx.font = `bold ${Math.round(iconSize * 1.2)}px Orbitron`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('⚠', cx, cy);
-                    
-                    // Label below icon
-                    ctx.shadowBlur = 4;
-                    ctx.font = `bold ${Math.round(iconSize * 0.5)}px Orbitron`;
-                    ctx.fillStyle = '#ffaa44';
-                    ctx.fillText(rz.name, cx, cy + iconSize * 0.9);
-                    
-                    // Clear count badge (if cleared at least once)
-                    if (rz.clearCount > 0) {
-                        ctx.font = `bold ${Math.round(iconSize * 0.4)}px Orbitron`;
-                        ctx.fillStyle = '#ff8800';
-                        ctx.fillText(`×${rz.clearCount} CLEARED`, cx, cy + iconSize * 1.5);
-                    }
-                    
-                    ctx.shadowBlur = 0;
-                    ctx.restore();
+                    ctx.strokeStyle = rz.cleared ? 'rgba(255, 170, 90, 0.45)' : `rgba(255, 60, 70, ${0.5 + Math.sin(t * 1.5) * 0.2})`;
+                    ctx.lineWidth = 2 * this._u; ctx.setLineDash([10 * this._u, 7 * this._u]); ctx.lineDashOffset = _frameTime / 50 * this._u;
+                    ctx.strokeRect(rz.x, rz.y, rz.w, rz.h); ctx.setLineDash([]);
                 }
-                
-                // 11. Side Quest Mission Area (Textured red circle — no outline)
-                // Uses molten road-style layered fill similar to golden map roads
-                if (shouldShow('missions')) {
+                let quest = null;
+                if (shouldShow('missions')) {                               // the side quest's area: a soft molten-gold pool, no outline
                     const m = this.game.missions?.activeMission;
                     if (m && m.status === 'active') {
-                        let sqx, sqy;
-                        const mRadius = m.targetRadius || 100;
-                        
-                        // Determine target position
-                        if (m.type === MISSION_TYPES.DELIVERY && !m.pickedUp && this.game.deliveryVehicle) {
-                            sqx = this.game.deliveryVehicle.x;
-                            sqy = this.game.deliveryVehicle.y;
-                        } else {
-                            sqx = m.targetX;
-                            sqy = m.targetY;
-                        }
-                        
-                        if (sqx !== undefined && sqy !== undefined) {
-                            const t = _frameTime / 600;
-                            const pulse = 1 + Math.sin(t) * 0.08;
-                            const radius = (mRadius * iconScale) * pulse;
-                            
-                            ctx.save();
-                            
-                            // Layer 1: Deep red base fill
-                            ctx.globalCompositeOperation = 'source-over';
-                            ctx.fillStyle = 'rgba(85, 0, 0, 0.35)';
-                            ctx.beginPath();
-                            ctx.arc(sqx, sqy, radius, 0, Math.PI * 2);
-                            ctx.fill();
-                            
-                            // Layer 2: Orange mid-tone with lighter blend
-                            ctx.globalCompositeOperation = 'lighter';
-                            ctx.fillStyle = 'rgba(255, 69, 0, 0.12)';
-                            ctx.beginPath();
-                            ctx.arc(sqx, sqy, radius * 0.75, 0, Math.PI * 2);
-                            ctx.fill();
-                            
-                            // Layer 3: Inner gold hotspot
-                            ctx.fillStyle = 'rgba(255, 215, 0, 0.06)';
-                            ctx.beginPath();
-                            ctx.arc(sqx, sqy, radius * 0.4, 0, Math.PI * 2);
-                            ctx.fill();
-                            
-                            // Layer 4: Noise texture — scattered micro-dots for that molten look
-                            ctx.globalCompositeOperation = 'source-over';
-                            const dotCount = Math.floor(radius * 0.6);
-                            for (let d = 0; d < dotCount; d++) {
-                                const angle = (d / dotCount) * Math.PI * 2 + t * 0.3;
-                                const dist = Math.random() * radius * 0.9;
-                                const dx = sqx + Math.cos(angle) * dist;
-                                const dy = sqy + Math.sin(angle) * dist;
-                                const dotAlpha = 0.08 + Math.random() * 0.12;
-                                ctx.fillStyle = `rgba(255, ${Math.floor(80 + Math.random() * 80)}, 0, ${dotAlpha})`;
-                                ctx.fillRect(dx - 1, dy - 1, 2 + Math.random() * 2, 2 + Math.random() * 2);
-                            }
-                            
-                            // Layer 5: Soft radial edge glow (no hard outline)
-                            const gradient = ctx.createRadialGradient(sqx, sqy, radius * 0.7, sqx, sqy, radius);
-                            gradient.addColorStop(0, 'rgba(255, 69, 0, 0)');
-                            gradient.addColorStop(0.8, 'rgba(180, 30, 0, 0.08)');
-                            gradient.addColorStop(1, 'rgba(100, 0, 0, 0.2)');
-                            ctx.globalCompositeOperation = 'source-over';
-                            ctx.fillStyle = gradient;
-                            ctx.beginPath();
-                            ctx.arc(sqx, sqy, radius, 0, Math.PI * 2);
-                            ctx.fill();
-                            
-                            ctx.restore();
+                        let qx = m.targetX, qy = m.targetY;
+                        if (m.type === MISSION_TYPES.DELIVERY && !m.pickedUp && this.game.deliveryVehicle) { qx = this.game.deliveryVehicle.x; qy = this.game.deliveryVehicle.y; }
+                        if (qx !== undefined && qy !== undefined) {
+                            const r = (m.targetRadius || 100) * (1 + Math.sin(_frameTime / 600) * 0.06);
+                            const g = ctx.createRadialGradient(qx, qy, 0, qx, qy, r);
+                            g.addColorStop(0, 'rgba(255, 215, 120, 0.22)'); g.addColorStop(0.7, 'rgba(255, 150, 60, 0.12)'); g.addColorStop(1, 'rgba(160, 30, 60, 0)');
+                            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(qx, qy, r, 0, Math.PI * 2); ctx.fill();
+                            quest = { x: qx, y: qy };
                         }
                     }
                 }
-                
-                // 11. Story Objective Marker (Beautiful Red with White Stroke) - Filtered: missions
-                if (shouldShow('missions')) {
-                    const stepData = this.game.story?.currentStepData;
-                    if (stepData && stepData.targetMap === mapData.id) {
-                        let tx, ty;
-                        
-                        // Resolve coordinates from landmark or direct target
-                        if (typeof stepData.target === 'string') {
-                            const loc = this.game.getLandmark(stepData.target);
-                            if (loc) { tx = loc.x; ty = loc.y; }
-                        } else if (stepData.target) {
-                            tx = stepData.target.x; 
-                            ty = stepData.target.y;
-                        } else if (typeof stepData.targetX === 'number') {
-                            tx = stepData.targetX;
-                            ty = stepData.targetY;
-                        }
-                        
-                        if (tx !== undefined && ty !== undefined) {
-                            const t = _frameTime / 200;
-                            const pulse = 1 + Math.sin(t) * 0.2;
-                            
-                            // Semi-transparent red fill with white stroke
-                            ctx.strokeStyle = '#fff';
-                            ctx.lineWidth = 8 * iconScale;
-                            ctx.fillStyle = 'rgba(170, 0, 0, 0.4)';
-                            ctx.shadowColor = '#ff0000';
-                            ctx.shadowBlur = 30;
-                            
-                            ctx.beginPath();
-                            ctx.arc(tx, ty, (80 * iconScale) * pulse, 0, Math.PI * 2);
-                            ctx.fill();
-                            ctx.stroke();
-                            ctx.shadowBlur = 0;
-                        }
-                    }
-                }
-                
+                this.drawRoadLevelPath(ctx);
+                this.drawCarActualPath(ctx);
                 ctx.restore();
-                
-                // Continue animation
-                this.animationFrameId = requestAnimationFrame(() => this.animateIcons());
+
+                // ── Markers, in screen space at fixed sizes ──
+                if (mapData.transitions) for (const t of mapData.transitions) { const p = S(t.x + t.w / 2, t.y + t.h / 2); if (on(p)) MapIcons.draw(ctx, 'transition', p.x, p.y, { dpr: D, css: MapIcons.SIZE.transition * k }); }
+                // Points of interest from the buildings' categories
+                if (mapData.buildings) for (const b of mapData.buildings) {
+                    const cat = b.mapCategory; if (!cat) continue;
+                    const kind = cat === 'restaurant' ? 'pin:cup' : cat === 'medical' ? 'pin:cross' : 'pin:dot', key = cat === 'restaurant' ? 'restaurants' : null;
+                    if (filterEnabled && (!key || activeFilter !== key)) continue;
+                    const p = S(b.x + b.w / 2, b.y + b.h / 2); if (on(p)) MapIcons.draw(ctx, kind, p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k });
+                }
+                if (this.game.pedestrians && this.game.pedestrians.pedestrians && !filterEnabled) {   // the crowd: fine lavender motes
+                    ctx.fillStyle = 'rgba(217, 204, 255, 0.55)'; const r = 1.6 * D;
+                    ctx.beginPath(); for (const ped of this.game.pedestrians.pedestrians) { if (ped.dead) continue; const p = S(ped.x, ped.y); if (on(p, 4)) ctx.rect(p.x - r, p.y - r, r * 2, r * 2); } ctx.fill();
+                }
+                if (this.game.npcs && shouldShow('clients')) for (const n of this.game.npcs) { const p = S(n.x, n.y); if (on(p)) MapIcons.draw(ctx, 'client', p.x, p.y, { dpr: D, css: MapIcons.SIZE.client * k }); }
+                if (shouldShow('homebases')) {
+                    const L = this.game.landmarkRegistry && this.game.landmarkRegistry['parking_spot'], hx = L ? L.x : mapData.spawn && mapData.spawn.x, hy = L ? L.y : mapData.spawn && mapData.spawn.y;
+                    if (hx !== undefined) { const p = S(hx, hy); if (on(p)) MapIcons.draw(ctx, 'pin:home', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k }); }
+                }
+                if (rz) {
+                    const p = S(rz.x + rz.w / 2, rz.y + rz.h / 2), pulse = 1 + Math.sin(_frameTime / 400) * 0.05;
+                    if (on(p, 120 * D)) {
+                        MapIcons.draw(ctx, 'danger', p.x, p.y, { dpr: D, css: MapIcons.SIZE.danger * k, scale: pulse, alpha: rz.cleared ? 0.7 : 1 });
+                        ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.lineJoin = 'round'; ctx.lineWidth = 3 * D; ctx.strokeStyle = 'rgba(11, 5, 22, 0.9)';
+                        ctx.font = `600 ${10 * D}px Montserrat, sans-serif`;
+                        const ty = p.y + 18 * D * k, name = (rz.name || '').toUpperCase().split('').join(' ');
+                        ctx.strokeText(name, p.x, ty); ctx.fillStyle = rz.cleared ? '#ffcf8a' : '#ff8a96'; ctx.fillText(name, p.x, ty);
+                        if (rz.clearCount > 0) { const c2 = `×${rz.clearCount} CLEARED`; ctx.font = `${9 * D}px Montserrat, sans-serif`; ctx.strokeText(c2, p.x, ty + 13 * D); ctx.fillStyle = '#ffd76a'; ctx.fillText(c2, p.x, ty + 13 * D); }
+                        ctx.restore();
+                    }
+                }
+                if (quest) { const p = S(quest.x, quest.y); if (on(p)) MapIcons.draw(ctx, 'pin:sparkle', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k }); }
+                if (shouldShow('missions')) {
+                    this.drawObjectiveMarker(ctx);
+                    const sd = this.game.story?.currentStepData;                // the story's own target
+                    if (sd && sd.targetMap === mapData.id) {
+                        let tx, ty;
+                        if (typeof sd.target === 'string') { const l = this.game.getLandmark(sd.target); if (l) { tx = l.x; ty = l.y; } }
+                        else if (sd.target) { tx = sd.target.x; ty = sd.target.y; }
+                        else if (typeof sd.targetX === 'number') { tx = sd.targetX; ty = sd.targetY; }
+                        if (tx !== undefined) { const p = S(tx, ty); if (on(p)) MapIcons.draw(ctx, 'pin:star', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k }); }
+                    }
+                }
+                this.drawDistanceLine(ctx);
+                this.drawNavMarker(ctx);
+                if (this.game.ownedCar && this.game.ownedCar.visible) { const c = this.game.ownedCar, p = S(c.x, c.y); if (on(p)) MapIcons.draw(ctx, 'car', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: c.angle }); }
+                const pl = this.game.player, pp = S(pl.x, pl.y);                // you, on top
+                MapIcons.draw(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: pl.angle, scale: 0.94 + Math.sin(_frameTime / 350) * 0.06 });
             }
             
             // Center the map view on the player's current position
@@ -1594,14 +1030,16 @@
             }
         
             resizeMap() {
-                this.mapCanvas.width = window.innerWidth;
-                this.mapCanvas.height = window.innerHeight;
-                // Also resize icon animation layer
-                this.iconCanvas.width = window.innerWidth;
-                this.iconCanvas.height = window.innerHeight;
+                // Canvases in device pixels (crisp on every screen); their CSS size stays the window's
+                const D = this.dpr = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+                const cw = window.innerWidth, ch = window.innerHeight;
+                for (const cv of [this.mapCanvas, this.iconCanvas]) {
+                    if (cv.width !== Math.round(cw * D) || cv.height !== Math.round(ch * D)) { cv.width = Math.round(cw * D); cv.height = Math.round(ch * D); }
+                    cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+                }
+                this.isCacheDirty = true;
             }
             
-        
             bindDragLogic(node, pill) {
                 node.addEventListener('mousedown', (e) => {
                     e.stopPropagation(); // Prevent clicking the pill itself
@@ -1651,91 +1089,21 @@
             /* --- ADD TO UISystem class --- */
             
             drawObjectiveMarker(ctx) {
-                // 1. Get Current Mission Data
-                // We access the story state directly from the manager
+                // The story objective: a gold ring and star at a fixed size, breathing, with a slow gold halo
                 const story = this.game.story;
-                if (!story || !story.nsm) return;
-            
-                const state = story.state;
-                const stepData = story.nsm.getStepData(state.part, state.chapter, state.mission, state.step);
-                
-                if (!stepData) return;
-            
-                // 2. Check Validity
-                // Only show if the objective is on the CURRENT viewing map
-                // (Assuming activeMap.id matches the IDs in your STORY_DB like 'hub_949')
-                if (stepData.targetMap !== this.game.activeMap.id) return;
-            
-                // 3. Resolve Coordinates
-                let targetX = null;
-                let targetY = null;
-            
-                // A. Use Modular Landmark System (Preferred)
-                if (stepData.target && this.game.getLandmark) {
-                    const loc = this.game.getLandmark(stepData.target);
-                    if (loc) {
-                        targetX = loc.x;
-                        targetY = loc.y;
-                    }
-                } 
-                // B. Fallback to hardcoded X/Y if legacy data exists
-                else if (stepData.x !== undefined) {
-                    targetX = stepData.x;
-                    targetY = stepData.y;
-                }
-            
-                if (targetX === null || targetY === null) return;
-            
-                // 4. Draw the "Golden Marker"
-                const time = _frameTime;
-                const pulse = (Math.sin(time / 200) + 1) / 2; // Fast pulse (0 to 1)
-                
-                // Calculate size (Counter-scale with zoom so it stays visible)
-                // We divide by zoom so the marker stays roughly same screen size even when zoomed out
-                const zoomFactor = Math.max(1, this.mapView.zoom); 
-                const size = (80 + (pulse * 30)) / zoomFactor; 
-            
+                if (!story || !story.nsm || !this._toScreen) return;
+                const st = story.state, step = story.nsm.getStepData(st.part, st.chapter, st.mission, st.step);
+                if (!step || step.targetMap !== this.game.activeMap.id) return;
+                let tx = null, ty = null;
+                if (step.target && this.game.getLandmark) { const l = this.game.getLandmark(step.target); if (l) { tx = l.x; ty = l.y; } }
+                else if (step.x !== undefined) { tx = step.x; ty = step.y; }
+                if (tx === null || ty === null) return;
+                const D = this.dpr, p = this._toScreen(tx, ty), pulse = (Math.sin(_frameTime / 260) + 1) / 2;
                 ctx.save();
-                ctx.translate(targetX, targetY);
-                
-                // Glow
-                ctx.shadowColor = '#FFD700'; // Gold
-                ctx.shadowBlur = 30 + (pulse * 20);
-                
-                // 1. Rotating Outer Diamond
-                ctx.save();
-                ctx.rotate(time / 1500); 
-                ctx.strokeStyle = `rgba(255, 215, 0, ${0.6 + pulse * 0.4})`;
-                ctx.lineWidth = 6 / zoomFactor;
-                ctx.strokeRect(-size/2, -size/2, size, size);
+                ctx.strokeStyle = `rgba(255, 215, 106, ${0.15 + 0.35 * (1 - pulse)})`; ctx.lineWidth = 1.5 * D;
+                ctx.beginPath(); ctx.arc(p.x, p.y, (16 + 12 * pulse) * D * this._zk, 0, Math.PI * 2); ctx.stroke();
                 ctx.restore();
-            
-                // 2. Counter-Rotating Inner Diamond
-                ctx.save();
-                ctx.rotate(-time / 1500); 
-                const innerSize = size * 0.6;
-                ctx.strokeStyle = `rgba(255, 255, 255, 0.8)`;
-                ctx.lineWidth = 3 / zoomFactor;
-                ctx.strokeRect(-innerSize/2, -innerSize/2, innerSize, innerSize);
-                ctx.restore();
-                
-                // 3. Center Dot
-                ctx.fillStyle = '#fff';
-                ctx.beginPath();
-                ctx.arc(0, 0, 8 / zoomFactor, 0, Math.PI*2);
-                ctx.fill();
-                
-                // 4. Label (Optional)
-                // Only show if zoomed in closer
-                if (this.mapView.zoom > 1.5) {
-                    ctx.fillStyle = '#FFD700';
-                    ctx.font = `bold ${24/zoomFactor}px Orbitron`;
-                    ctx.textAlign = 'center';
-                    ctx.shadowBlur = 0;
-                    ctx.fillText("OBJECTIVE", 0, -size/1.5);
-                }
-            
-                ctx.restore();
+                MapIcons.draw(ctx, 'objective', p.x, p.y, { dpr: D, css: MapIcons.SIZE.objective * this._zk, scale: 0.95 + 0.08 * pulse });
             }
 
         }

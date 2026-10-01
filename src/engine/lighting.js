@@ -434,16 +434,29 @@
                 ctx.setTransform(1, 0, 0, 1, 0, 0); 
                 ctx.globalAlpha = finalOpacity;
                 let layer = this.lightCanvas;
-                if (GameSettings.softShadows) {                              // soften by a half-size step (no ctx.filter)
-                    const sc = this._softCanvas || (this._softCanvas = document.createElement('canvas'));
-                    const sw = Math.max(1, lw >> 1), sh = Math.max(1, lh >> 1);
-                    if (sc.width !== sw || sc.height !== sh) { sc.width = sw; sc.height = sh; }
-                    const sx = sc.getContext('2d'); sx.imageSmoothingEnabled = true;
-                    sx.clearRect(0, 0, sw, sh); sx.drawImage(this.lightCanvas, 0, 0, sw, sh);
-                    layer = sc;
+                if (GameSettings.softShadows) {
+                    // Soft edges, the same in every browser and no ctx.filter (Safari before 18 has none): a separable
+                    // box blur on the half-resolution light layer — three whole-pixel shifts across, then three down,
+                    // each a third, added up. Six plain copies of a small canvas.
+                    const pair = this._softCanvas || (this._softCanvas = [document.createElement('canvas'), document.createElement('canvas')]);
+                    let src = this.lightCanvas;
+                    for (let pass = 0; pass < 2; pass++) {
+                        const cv = pair[pass];
+                        if (cv.width !== lw || cv.height !== lh) { cv.width = lw; cv.height = lh; }
+                        const sx = cv.getContext('2d');
+                        sx.globalCompositeOperation = 'copy'; sx.globalAlpha = 1 / 3;
+                        sx.drawImage(src, 0, 0);
+                        sx.globalCompositeOperation = 'lighter';
+                        if (pass === 0) { sx.drawImage(src, -1, 0); sx.drawImage(src, 1, 0); }
+                        else { sx.drawImage(src, 0, -1); sx.drawImage(src, 0, 1); }
+                        sx.globalCompositeOperation = 'source-over'; sx.globalAlpha = 1;
+                        src = cv;
+                    }
+                    layer = src;
                 }
                 ctx.imageSmoothingEnabled = true;
-                ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
+                if (layer === this.lightCanvas) ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
+                else ctx.drawImage(layer, 1, 1, lw - 2, lh - 2, 0, 0, this.canvas.width, this.canvas.height);   // the blur's outer pixel is half-covered: crop it
                 
                 // 8. NV SIGNAL BOOST
                 if (this.nvIntensity > 0.01) {

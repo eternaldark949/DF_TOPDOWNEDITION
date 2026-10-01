@@ -100,7 +100,11 @@
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            background: rgba(5, 5, 10, 0.98);
+            /* black with a wine/plum haze, after ETERNAL's mock-up */
+            background:
+                radial-gradient(ellipse 55% 45% at 50% 0%, var(--df-wine), transparent 70%),
+                radial-gradient(ellipse 50% 60% at 45% 100%, rgba(40, 4, 30, 0.6), transparent 70%),
+                rgba(5, 1, 3, 0.97);
             z-index: 2000;
             display: flex;
             box-sizing: border-box;
@@ -123,11 +127,11 @@
         .screen-title {
             font-family: 'Great Vibes'; 
             font-size: 2.5rem; 
-            color: #fff; 
+            color: var(--df-lavender-pale); 
             margin-top: 10px;
             margin-bottom: 20px;
             flex-shrink: 0;
-            text-shadow: 0 0 15px rgba(164, 105, 255, 0.5);
+            text-shadow: 0 0 14px rgba(202, 176, 250, 0.55), 0 0 2px rgba(255, 255, 255, 0.6);
             text-align: center;
         }
         
@@ -138,80 +142,77 @@
             padding-bottom: 20px;
         }
         
-        /* Updated Pill — Type-Based Color Variants */
+        /* Item pills, after ETERNAL's mock-up: dotted capsules; electric violet when open,
+           pale lavender when equipped, a crimson dotted ring for consumables, champagne for keepsakes */
         .ui-pill {
             width: 100%; 
-            min-height: 70px;
-            border: 2px dashed rgba(164, 105, 255, 0.25);
-            border-radius: 40px;
+            min-height: 76px;
+            border: 2px dotted rgba(202, 176, 250, 0.45);
+            border-radius: 44px;
             display: flex; 
             align-items: center; 
-            padding: 10px 20px;
+            padding: 10px 22px;
             padding-right: 60px;
-            margin-bottom: 12px; 
+            margin-bottom: 14px; 
             box-sizing: border-box;
             position: relative;
             cursor: pointer;
-            transition: all 0.35s ease;
-            background: linear-gradient(135deg, rgba(35, 12, 55, 0.7) 0%, rgba(15, 5, 30, 0.5) 100%);
+            transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+            background: linear-gradient(90deg, rgba(4, 1, 6, 0.92) 0%, rgba(24, 6, 50, 0.85) 55%, rgba(48, 14, 120, 0.7) 100%);
         }
+        .ui-pill:hover { border-color: rgba(202, 176, 250, 0.8); box-shadow: 0 0 18px rgba(142, 85, 245, 0.25); }
         
-        /* --- ICON CIRCLE --- */
+        /* --- ICON TILE --- */
         .pill-icon {
-            width: 50px; height: 50px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            width: 54px; height: 54px;
+            border-radius: 14px;
+            background: radial-gradient(circle at 50% 40%, rgba(60, 20, 30, 0.9), #050103 75%);
+            border: 1px solid rgba(202, 176, 250, 0.15);
             display: flex; justify-content: center; align-items: center;
             font-size: 1.4rem;
-            margin-right: 15px;
+            margin-right: 18px;
             flex-shrink: 0;
-            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 14px rgba(0, 0, 0, 0.7);
         }
         
-        /* --- WEAPON VARIANT (Purple) --- */
-        .ui-pill.type-weapon { border-color: rgba(164, 105, 255, 0.25); background: linear-gradient(135deg, rgba(35, 12, 55, 0.7) 0%, rgba(15, 5, 30, 0.5) 100%); }
-        .ui-pill.type-weapon.expanded { border-color: rgba(164, 105, 255, 0.6); background: linear-gradient(135deg, rgba(80, 30, 140, 0.85) 0%, rgba(45, 12, 90, 0.6) 100%); box-shadow: 0 0 30px rgba(164, 105, 255, 0.35), inset 0 0 40px rgba(164, 105, 255, 0.08); }
-        .ui-pill.type-weapon .pill-icon { border-color: rgba(164, 105, 255, 0.2); }
-        .ui-pill.type-weapon.expanded .pill-icon { border-color: rgba(164, 105, 255, 0.5); box-shadow: 0 0 12px rgba(164, 105, 255, 0.3); }
-        .ui-pill.type-weapon .pill-name { color: #d4b8ff; }
-        .ui-pill.type-weapon.expanded .pill-name { color: #fff; }
+        /* --- OPEN (expanded): the mock-up's electric-violet card --- */
+        .ui-pill.expanded {
+            border-color: rgba(202, 176, 250, 0.75);
+            background: linear-gradient(90deg, #050103 0%, var(--df-violet-deep) 30%, #3f0a9d 60%, var(--df-violet) 100%);
+            box-shadow: 0 0 26px rgba(93, 20, 226, 0.45), inset 0 0 30px rgba(142, 85, 245, 0.15);
+        }
         
-        /* --- ATTACHMENT VARIANT (same as weapon) --- */
-        .ui-pill.type-attachment { border-color: rgba(164, 105, 255, 0.25); background: linear-gradient(135deg, rgba(35, 12, 55, 0.7) 0%, rgba(15, 5, 30, 0.5) 100%); }
-        .ui-pill.type-attachment.expanded { border-color: rgba(164, 105, 255, 0.6); background: linear-gradient(135deg, rgba(80, 30, 140, 0.85) 0%, rgba(45, 12, 90, 0.6) 100%); box-shadow: 0 0 30px rgba(164, 105, 255, 0.35), inset 0 0 40px rgba(164, 105, 255, 0.08); }
-        .ui-pill.type-attachment .pill-icon { border-color: rgba(164, 105, 255, 0.2); }
-        .ui-pill.type-attachment.expanded .pill-icon { border-color: rgba(164, 105, 255, 0.5); box-shadow: 0 0 12px rgba(164, 105, 255, 0.3); }
-        .ui-pill.type-attachment .pill-name { color: #d4b8ff; }
-        .ui-pill.type-attachment.expanded .pill-name { color: #fff; }
-        
-        /* --- CONSUMABLE VARIANT (Red/Crimson) --- */
-        .ui-pill.type-consumable { border-color: rgba(180, 30, 30, 0.25); background: linear-gradient(135deg, rgba(55, 8, 8, 0.7) 0%, rgba(30, 4, 4, 0.5) 100%); }
-        .ui-pill.type-consumable.expanded { border-color: rgba(200, 40, 40, 0.6); background: linear-gradient(135deg, rgba(120, 18, 18, 0.85) 0%, rgba(70, 8, 8, 0.6) 100%); box-shadow: 0 0 30px rgba(200, 40, 40, 0.3), inset 0 0 40px rgba(200, 40, 40, 0.06); }
-        .ui-pill.type-consumable .pill-icon { border-color: rgba(180, 30, 30, 0.2); }
-        .ui-pill.type-consumable.expanded .pill-icon { border-color: rgba(200, 40, 40, 0.5); box-shadow: 0 0 12px rgba(200, 40, 40, 0.3); }
-        .ui-pill.type-consumable .pill-name { color: #ffb0b0; }
-        .ui-pill.type-consumable.expanded .pill-name { color: #fff; }
-        .ui-pill.type-consumable .pill-type-badge { color: #ff5555; border-color: #ff5555; }
-        
-        /* --- COLLECTIBLE / INTEL VARIANT (Gold/Amber) --- */
-        .ui-pill.type-collectible, .ui-pill.type-intel { border-color: rgba(200, 160, 0, 0.2); background: linear-gradient(135deg, rgba(50, 35, 5, 0.7) 0%, rgba(25, 18, 2, 0.5) 100%); }
-        .ui-pill.type-collectible.expanded, .ui-pill.type-intel.expanded { border-color: rgba(255, 215, 0, 0.5); background: linear-gradient(135deg, rgba(100, 70, 10, 0.85) 0%, rgba(60, 40, 5, 0.6) 100%); box-shadow: 0 0 25px rgba(255, 215, 0, 0.25); }
-        .ui-pill.type-collectible .pill-name, .ui-pill.type-intel .pill-name { color: #ffd780; }
-        .ui-pill.type-collectible.expanded .pill-name, .ui-pill.type-intel.expanded .pill-name { color: #fff; }
-        .ui-pill.type-collectible .pill-type-badge, .ui-pill.type-intel .pill-type-badge { color: #ffd700; border-color: #ffd700; }
-        
-        /* --- EQUIPPED STATE (Cyan ring on icon) --- */
-        .ui-pill.active-item .pill-icon { border: 2px solid #00f3ff; box-shadow: 0 0 12px rgba(0, 243, 255, 0.5); }
+        /* --- EQUIPPED: the mock-up's pale lavender card --- */
+        .ui-pill.active-item {
+            border-color: rgba(255, 255, 255, 0.55);
+            background: radial-gradient(ellipse 80% 140% at 35% 50%, var(--df-lavender-pale) 0%, #dac1fc 55%, #b896f6 100%);
+            box-shadow: 0 0 22px rgba(202, 176, 250, 0.45);
+        }
+        .ui-pill.active-item .pill-name { color: #5b2fc4; }
+        .ui-pill.active-item .pill-desc { color: var(--df-violet-ink); }
+        .ui-pill.active-item .pill-icon { border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 0 12px rgba(93, 20, 226, 0.35); }
+        .ui-pill.active-item.expanded { background: radial-gradient(ellipse 80% 140% at 35% 50%, #fff 0%, #e4d0fd 55%, #c4a5f8 100%); }
         .ui-pill.active-item .pill-equipped-tag { display: inline; }
         
+        /* --- TYPE ACCENTS (border only; the body follows the state above) --- */
+        .ui-pill.type-consumable { border-color: rgba(208, 16, 28, 0.7); }
+        .ui-pill.type-consumable.expanded { box-shadow: 0 0 26px rgba(208, 16, 28, 0.3), inset 0 0 30px rgba(142, 85, 245, 0.15); }
+        .ui-pill.type-collectible, .ui-pill.type-intel { border-color: rgba(216, 198, 162, 0.55); }
+        .ui-pill.type-collectible .pill-name, .ui-pill.type-intel .pill-name { color: var(--df-champagne); }
+        
         /* --- PILL TEXT ELEMENTS --- */
-        .pill-name { font-family: 'Montserrat', sans-serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; transition: color 0.3s; }
-        .pill-desc { color: rgba(200, 200, 200, 0.6); font-size: 0.7rem; font-style: italic; margin-top: 2px; transition: color 0.3s; }
-        .ui-pill.expanded .pill-desc { color: rgba(255, 255, 255, 0.8); }
-        .pill-type-badge { font-family: 'Orbitron', sans-serif; font-size: 0.5rem; font-weight: bold; color: #a469ff; border: 1px solid #a469ff; padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 1px; margin-right: 8px; }
-        .pill-equipped-tag { color: #00f3ff; font-size: 0.6rem; font-weight: 600; letter-spacing: 1px; display: none; }
-        .pill-qty { font-family: 'Orbitron', sans-serif; font-size: 0.6rem; color: rgba(200, 200, 200, 0.5); letter-spacing: 1px; }
+        .pill-name {
+            font-family: 'Montserrat', sans-serif; font-size: 0.78rem; font-weight: 600; letter-spacing: 1.5px;
+            text-transform: uppercase; color: var(--df-lavender); transition: color 0.3s;
+            display: inline-block; padding-bottom: 5px; margin-bottom: 4px;
+            border-bottom: 1px solid rgba(202, 176, 250, 0.3); min-width: 55%;
+        }
+        .ui-pill.expanded .pill-name { color: #e6d8ff; }
+        .pill-desc { color: rgba(225, 214, 245, 0.8); font-size: 0.74rem; line-height: 1.35; margin-top: 2px; transition: color 0.3s; }
+        .ui-pill.expanded .pill-desc { color: #fff; }
+        .pill-type-badge { font-family: 'Montserrat', sans-serif; font-size: 0.5rem; font-weight: 600; color: var(--df-lavender); border: 1px solid var(--df-lavender); padding: 1px 6px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px; margin-right: 8px; }
+        .pill-equipped-tag { color: #5b2fc4; background: rgba(255, 255, 255, 0.55); border-radius: 8px; padding: 1px 8px; font-size: 0.55rem; font-weight: 700; letter-spacing: 1.5px; display: none; }
+        .pill-qty { font-family: 'Montserrat', sans-serif; font-size: 0.6rem; color: var(--df-lavender); letter-spacing: 1px; }
         
         /* Touch-Friendly Close 'X' */
         #inventory-close-x {
@@ -238,36 +239,29 @@
             justify-content: center;
             gap: 10px;
             min-width: 180px;
-            height: 48px;
+            height: 38px;
             padding: 0 24px;
-            background: rgba(20, 10, 30, 0.7);
-            border: 2px solid #a469ff;
+            background: radial-gradient(ellipse 70% 120% at 50% 50%, #e2d8ee 0%, var(--df-lavender) 75%, #b39be0 100%);
+            border: 2px dotted rgba(255, 255, 255, 0.75);
             border-radius: 24px; /* Smooth pill shape */
-            color: #fff;
+            color: #1b0d2e;
             font-family: var(--font-ui);
-            font-size: 0.8rem;
-            font-weight: 500;
-            letter-spacing: 2px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 3px;
             text-transform: uppercase;
             cursor: pointer;
             pointer-events: auto;
             transition: all 0.25s ease;
-            box-shadow: 
-                0 0 15px rgba(164, 105, 255, 0.3),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 22px rgba(202, 176, 250, 0.45), 0 0 50px rgba(142, 85, 245, 0.2);
         }
         
         .screen-back-btn:hover {
-            background: rgba(164, 105, 255, 0.25);
-            border-color: #c799ff;
-            box-shadow: 
-                0 0 25px rgba(164, 105, 255, 0.5),
-                inset 0 1px 0 rgba(255, 255, 255, 0.15);
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            background: radial-gradient(ellipse 70% 120% at 50% 50%, #fff 0%, #dccbfb 75%, var(--df-lavender) 100%);
+            box-shadow: 0 0 28px rgba(202, 176, 250, 0.65), 0 0 60px rgba(142, 85, 245, 0.3);
         }
         
         .screen-back-btn:active {
-            background: rgba(164, 105, 255, 0.4);
             transform: scale(0.98);
         }
         
@@ -328,19 +322,25 @@
         .sidebar-portrait {
             width: 120px;
             height: 120px;
-            border-radius: 50%;
-            border: 2px solid rgba(255, 215, 0, 0.4);
+            border-radius: 38%;
+            border: 2px dotted var(--df-peach);
             margin-bottom: 30px;
             display: flex;
             justify-content: center;
             align-items: center;
             background: rgba(10, 5, 15, 0.6);
             flex-shrink: 0;
-            box-shadow: 0 0 15px rgba(255, 215, 0, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 30px rgba(120, 20, 40, 0.35), inset 0 0 20px rgba(0, 0, 0, 0.6);
         }
         
         .sidebar-portrait canvas {
             border-radius: 50%;
+        }
+        
+        /* the thin warm hairline under the portrait */
+        .screen-sidebar-left .sidebar-nav {
+            border-top: 1px solid rgba(216, 198, 162, 0.22);
+            padding-top: 14px;
         }
         
         /* Navigation Items */
@@ -356,30 +356,33 @@
         
         .sidebar-nav-item {
             font-family: var(--font-ui);
-            font-size: 0.75rem;
-            font-weight: 500;
-            letter-spacing: 3px;
+            font-size: 0.7rem;
+            font-weight: 400;
+            letter-spacing: 4px;
             text-transform: uppercase;
-            color: #888;
-            padding: 10px 20px;
+            color: var(--df-lilac-grey);
+            padding: 9px 20px;
             cursor: pointer;
-            transition: all 0.25s ease;
+            transition: color 0.25s ease, text-shadow 0.25s ease;
             text-align: center;
             width: 100%;
+            box-sizing: border-box;
             position: relative;
+            z-index: 0;
         }
         
         .sidebar-nav-item:hover {
             color: #fff;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            text-shadow: 0 0 10px rgba(202, 176, 250, 0.6);
         }
         
+        /* Active: a pill lit white in the middle, fading to lavender at the ends */
         .sidebar-nav-item.active {
-            color: #fff;
-            text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+            color: #120818;
+            font-weight: 700;
+            text-shadow: none;
         }
         
-        /* Active item highlight bar */
         .sidebar-nav-item.active::before {
             content: '';
             position: absolute;
@@ -387,14 +390,16 @@
             right: 0;
             top: 50%;
             transform: translateY(-50%);
-            height: 36px;
+            height: 30px;
             background: linear-gradient(90deg, 
                 transparent 0%, 
-                rgba(200, 180, 220, 0.15) 20%, 
-                rgba(200, 180, 220, 0.25) 50%, 
-                rgba(200, 180, 220, 0.15) 80%, 
+                rgba(176, 150, 210, 0.75) 14%, 
+                #f2ecf4 42%, 
+                #f2ecf4 58%, 
+                rgba(176, 150, 210, 0.75) 86%, 
                 transparent 100%);
-            border-radius: 4px;
+            border-radius: 15px;
+            box-shadow: 0 0 18px rgba(202, 176, 250, 0.35);
             z-index: -1;
         }
         
@@ -432,13 +437,15 @@
             align-items: center;
             gap: 15px;
             margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(216, 198, 162, 0.25);
         }
         
         .filter-title-text {
             font-family: var(--font-script);
             font-size: 2rem;
-            color: #fff;
-            text-shadow: 0 0 10px var(--gold-primary);
+            color: var(--df-cream);
+            text-shadow: 0 0 10px rgba(255, 194, 72, 0.45);
         }
         
         /* Filter Toggle Switch */
@@ -460,7 +467,7 @@
         }
         
         .filter-toggle-labels span.active {
-            color: var(--gold-primary);
+            color: var(--df-gold);
         }
         
         .filter-toggle-track {
@@ -475,8 +482,8 @@
         }
         
         .filter-toggle-track.on {
-            border-color: var(--gold-primary);
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+            border-color: var(--df-gold);
+            box-shadow: 0 0 10px rgba(255, 194, 72, 0.35);
         }
         
         .filter-toggle-knob {
@@ -492,8 +499,8 @@
         
         .filter-toggle-track.on .filter-toggle-knob {
             left: 20px;
-            background: var(--gold-primary);
-            box-shadow: 0 0 8px var(--gold-primary);
+            background: var(--df-gold);
+            box-shadow: 0 0 8px var(--df-gold);
         }
         
         /* Filter Items */
@@ -506,41 +513,45 @@
         
         .filter-item {
             font-family: var(--font-ui);
-            font-size: 0.7rem;
+            font-size: 0.66rem;
             font-weight: 500;
             letter-spacing: 2px;
             text-transform: uppercase;
-            color: #888;
+            color: var(--df-champagne);
             padding: 8px 16px;
             cursor: pointer;
-            transition: all 0.25s ease;
-            text-align: right;
+            transition: color 0.25s ease;
+            text-align: center;
             position: relative;
+            z-index: 0;
+            align-self: stretch;
         }
         
         .filter-item:hover {
-            color: #ccc;
+            color: #fff3dc;
         }
         
+        /* Active filter: a champagne bar fading out at both ends */
         .filter-item.active {
-            color: #fff;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            color: #1a1208;
+            font-weight: 700;
         }
         
-        /* Active filter highlight */
         .filter-item.active::before {
             content: '';
             position: absolute;
-            left: 0;
-            right: 0;
+            left: -25px;
+            right: -25px;
             top: 50%;
             transform: translateY(-50%);
-            height: 30px;
-            background: linear-gradient(270deg, 
-                rgba(200, 180, 220, 0.2) 0%, 
-                rgba(200, 180, 220, 0.1) 60%, 
+            height: 28px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(150, 132, 100, 0.8) 15%, 
+                #e6d6b4 45%, 
+                #e6d6b4 55%, 
+                rgba(150, 132, 100, 0.8) 85%, 
                 transparent 100%);
-            border-radius: 4px;
             z-index: -1;
         }
         
@@ -574,20 +585,20 @@
         .sidebar-handle-diamond {
             width: 12px;
             height: 12px;
-            background: rgba(164, 105, 255, 0.8);
+            background: #fffdfa;
             transform: rotate(45deg);
             box-shadow: 
-                0 0 15px rgba(164, 105, 255, 0.6),
-                0 0 30px rgba(164, 105, 255, 0.3);
+                0 0 10px rgba(255, 194, 72, 0.7),
+                0 0 24px rgba(202, 176, 250, 0.5);
             transition: all 0.25s ease;
             margin: auto;
         }
         
         .sidebar-handle:hover .sidebar-handle-diamond {
-            background: rgba(199, 153, 255, 1);
+            background: #fff;
             box-shadow: 
-                0 0 20px rgba(164, 105, 255, 0.8),
-                0 0 40px rgba(164, 105, 255, 0.5);
+                0 0 14px rgba(255, 194, 72, 0.9),
+                0 0 34px rgba(202, 176, 250, 0.7);
             transform: rotate(45deg) scale(1.2);
         }
         
@@ -612,6 +623,19 @@
         
         .screen-main-content.sidebar-right-collapsed {
             margin-right: 40px;
+        }
+        
+        /* Screens the item filter doesn't apply to (Screens.FILTERED): no right sidebar,
+           and the content takes its room */
+        #freelancer-menu.no-filter #inv-sidebar-right,
+        #freelancer-menu.no-filter #inv-handle-right {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(100%);
+        }
+        #inv-sidebar-right { transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease; }
+        @media screen and (min-width: 701px) {
+            body:not(.landscape) #freelancer-menu.no-filter .screen-main-content { margin-right: 40px; }
         }
         
         /* --- MOBILE RESPONSIVENESS --- */
@@ -641,6 +665,9 @@
                 transform: translateX(-100%);
             }
             
+            .screen-sidebar-left { background: linear-gradient(270deg, rgba(5, 1, 3, 0.9) 0%, rgba(5, 1, 3, 0.97) 30%); }
+            .screen-sidebar-right { background: linear-gradient(90deg, rgba(5, 1, 3, 0.9) 0%, rgba(5, 1, 3, 0.97) 30%); }
+            
             .screen-sidebar-right.auto-collapse {
                 transform: translateX(100%);
             }
@@ -666,7 +693,9 @@
             right: auto !important;
         }
         
-        /* --- PAUSE MENU (Phase 3) --- */
+        /* --- PAUSE MENU, after ETERNAL's mock-up ---
+           The game blurred behind a plum veil that deepens to the right. Left: Now Playing, Quick Access,
+           objectives. Right: a script "Paused" and letter-spaced caps, the active one a lit pill. */
         #pause-menu {
             position: fixed;
             top: 0;
@@ -688,9 +717,11 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            background:
+                linear-gradient(90deg, rgba(20, 4, 10, 0.25) 0%, rgba(14, 3, 12, 0.55) 45%, rgba(10, 2, 10, 0.93) 70%, rgba(8, 1, 8, 0.96) 100%),
+                radial-gradient(ellipse 60% 70% at 20% 40%, rgba(120, 30, 10, 0.18), transparent 70%);
+            backdrop-filter: blur(9px);
+            -webkit-backdrop-filter: blur(9px);
         }
         
         .pause-content {
@@ -698,14 +729,10 @@
             width: 100%;
             height: 100%;
             display: flex;
-            flex-direction: column;
-            /* `safe center` keeps the menu centred when it fits but falls back to
-               top-aligned when it doesn't — plain `center` would push the title
-               and the first menu items above the scroll origin, out of reach. */
-            justify-content: center;
-            justify-content: safe center;
-            align-items: flex-end;
-            padding: 24px 10% 24px 0;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 7% 24px 3%;
             box-sizing: border-box;
             overflow-y: auto;
             overscroll-behavior: contain;   /* don't hand the scroll to the page */
@@ -713,109 +740,134 @@
             touch-action: pan-y;            /* body sets touch-action:none */
             scrollbar-width: thin;
             scrollbar-color: rgba(200, 180, 220, 0.35) transparent;
+            gap: 4vw;
         }
         .pause-content::-webkit-scrollbar { width: 6px; }
         .pause-content::-webkit-scrollbar-track { background: transparent; }
         .pause-content::-webkit-scrollbar-thumb { background: rgba(200, 180, 220, 0.35); border-radius: 3px; }
+
+        .pause-left { display: flex; flex-direction: column; gap: 26px; width: min(380px, 40vw); flex-shrink: 0; margin-top: 8vh; }
+        .pause-right { display: flex; flex-direction: column; align-items: center; min-width: 0; width: min(520px, 46vw); }
         
         .pause-header {
-            text-align: right;
-            margin-bottom: 40px;
+            text-align: center;
+            margin-bottom: 26px;
+            width: 100%;
         }
         
         .pause-title {
             font-family: var(--font-script);
-            font-size: 3.5rem;
-            color: #fff;
-            text-shadow: 0 0 20px rgba(164, 105, 255, 0.5);
+            font-size: 3.4rem;
+            font-weight: 400;
+            color: var(--df-lavender-pale);
+            text-shadow: 0 0 18px rgba(202, 176, 250, 0.55), 0 0 2px rgba(255, 255, 255, 0.6);
             margin: 0;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 14px;
+            border-bottom: 1px solid;
+            border-image: linear-gradient(90deg, transparent, rgba(216, 198, 162, 0.55), rgba(255, 255, 255, 0.6), rgba(216, 198, 162, 0.55), transparent) 1;
         }
         
         .pause-menu-list {
             display: flex;
             flex-direction: column;
-            align-items: flex-end;
-            gap: 8px;
+            align-items: stretch;
+            gap: 2px;
+            width: 100%;
         }
         
         .pause-menu-item {
             font-family: var(--font-ui);
-            font-size: 0.85rem;
-            font-weight: 500;
-            letter-spacing: 3px;
+            font-size: 0.74rem;
+            font-weight: 400;
+            letter-spacing: 4px;
             text-transform: uppercase;
-            color: #888;
-            padding: 12px 30px;
+            color: var(--df-lilac-grey);
+            padding: 10px 24px;
             cursor: pointer;
-            transition: all 0.25s ease;
-            text-align: right;
+            transition: color 0.25s ease;
+            text-align: center;
             position: relative;
-            min-width: 280px;
+            z-index: 0;
+            outline: none;
         }
         
         .pause-menu-item:hover {
-            color: #ccc;
-        }
-        
-        .pause-menu-item.active,
-        .pause-menu-item:focus {
             color: #fff;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
         
-        /* Active/selected item highlight bar */
-        .pause-menu-item.active::before,
-        .pause-menu-item:focus::before {
+        /* Active: a pill lit white in the middle, fading to lavender and out */
+        .pause-menu-item.active {
+            color: #120818;
+            font-weight: 700;
+        }
+        
+        .pause-menu-item.active::before {
             content: '';
             position: absolute;
-            left: 0;
-            right: 0;
+            left: -2%;
+            right: -2%;
             top: 50%;
             transform: translateY(-50%);
-            height: 40px;
-            background: linear-gradient(270deg, 
-                rgba(200, 180, 220, 0.25) 0%, 
-                rgba(200, 180, 220, 0.15) 40%, 
-                rgba(200, 180, 220, 0.05) 70%,
+            height: 32px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(176, 150, 210, 0.7) 12%, 
+                #f2ecf4 40%, 
+                #f2ecf4 60%, 
+                rgba(176, 150, 210, 0.7) 88%, 
                 transparent 100%);
-            border-radius: 4px;
+            border-radius: 16px;
+            box-shadow: 0 0 22px rgba(202, 176, 250, 0.35);
             z-index: -1;
         }
-        
-        /* Mobile adjustments */
-        @media screen and (max-width: 600px) {
-            .pause-content {
-                padding: 20px 5% 24px;
-                align-items: center;
-            }
-            
-            .pause-header {
-                text-align: center;
-            }
-            
-            .pause-menu-list {
-                align-items: center;
-            }
-            
-            .pause-menu-item {
-                text-align: center;
-                min-width: 250px;
-            }
-            
-            .pause-menu-item.active::before {
-                background: linear-gradient(90deg, 
-                    transparent 0%,
-                    rgba(200, 180, 220, 0.2) 30%, 
-                    rgba(200, 180, 220, 0.2) 70%,
-                    transparent 100%);
-            }
+
+        /* Now Playing: a dark disc with the station, a gold chevron, the track */
+        .pause-np {
+            display: flex; align-items: center; position: relative;
+            height: 64px; border-radius: 32px; padding-right: 26px;
+            background: linear-gradient(90deg, #1a0306 0%, #22071c 40%, #1c0a30 100%);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+            max-width: 340px;
+        }
+        .pause-np-disc {
+            width: 96px; height: 64px; border-radius: 32px 0 0 32px; flex-shrink: 0; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(ellipse at 40% 50%, #3a0710 0%, #1a0306 75%);
+            font-family: var(--font-ui); font-size: 0.62rem; letter-spacing: 3px; color: #f6e7dc;
+            white-space: nowrap; overflow: hidden; padding: 0 6px; box-sizing: border-box;
+            text-shadow: 0 0 8px rgba(255, 180, 160, 0.6);
+        }
+        .pause-np-play {
+            width: 26px; height: 64px; flex-shrink: 0; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(180deg, #a3803c, #5e4519);
+            color: #fff3d8; font-size: 0.7rem;
+            clip-path: polygon(0 0, 55% 0, 100% 50%, 55% 100%, 0 100%);
+        }
+        .pause-np-info { flex: 1; min-width: 0; padding-left: 14px; text-align: center; }
+        .pause-np-label { font-family: var(--font-script); font-size: 1rem; color: var(--df-gold); text-shadow: 0 0 6px rgba(255, 194, 72, 0.4); text-align: left; }
+        .pause-np-track { font-family: var(--font-ui); font-size: 0.72rem; color: #ece6f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-bottom: 3px; border-bottom: 1px solid rgba(216, 198, 162, 0.25); }
+        .pause-np-sub { font-family: var(--font-ui); font-size: 0.55rem; color: rgba(236, 230, 242, 0.6); margin-top: 3px; }
+        .pause-np-node { position: absolute; right: 12px; top: 50%; width: 7px; height: 7px; transform: translateY(-50%) rotate(45deg); background: #fffdfa; box-shadow: 0 0 8px rgba(255, 194, 72, 0.9); }
+
+        /* Quick Access: cream caps, the active item a lavender bar fading to the right */
+        .pause-quick { display: flex; flex-direction: column; gap: 2px; }
+        .pause-quick-title { font-family: var(--font-ui); font-size: 0.78rem; font-weight: 600; letter-spacing: 4px; color: var(--df-cream); margin-bottom: 10px; padding-left: 10px; }
+        .pause-quick-item {
+            font-family: var(--font-ui); font-size: 0.68rem; font-weight: 500; letter-spacing: 3px; color: #ece6f2;
+            padding: 6px 10px; cursor: pointer; position: relative; z-index: 0; outline: none; transition: color 0.2s;
+        }
+        .pause-quick-item:hover { color: #fff; }
+        .pause-quick-item.active { color: #1b0d2e; font-weight: 700; }
+        .pause-quick-item.active::before {
+            content: ''; position: absolute; inset: 0 0 0 0; z-index: -1;
+            background: linear-gradient(90deg, #e2d2fb 0%, #d9c6fb 70%, rgba(217, 198, 251, 0) 100%);
+            box-shadow: 0 0 16px rgba(202, 176, 250, 0.35);
         }
         
-        /* --- PAUSE MISSION OBJECTIVE --- */
+        /* --- PAUSE MISSION OBJECTIVE (left column, under Quick Access) --- */
         .pause-mission {
-            margin: 5px 30px 10px;
+            margin: 0;
             padding: 0;
             border: none;
             border-radius: 0;
@@ -823,47 +875,44 @@
             display: flex; flex-direction: column; gap: 6px;
         }
         .pause-obj-block {
-            padding: 8px 14px;
-            border-radius: 5px;
-            border-left: 3px solid rgba(255,255,255,0.1);
-            background: rgba(255,255,255,0.02);
+            padding: 7px 12px;
+            border-left: 2px solid rgba(255,255,255,0.1);
+            background: linear-gradient(90deg, rgba(20, 6, 26, 0.55), transparent);
         }
-        .pause-obj-block.story { border-left-color: rgba(140, 80, 200, 0.6); }
-        .pause-obj-block.optional { border-left-color: rgba(0, 200, 180, 0.5); }
-        .pause-obj-block.side { border-left-color: rgba(255, 170, 0, 0.5); }
+        .pause-obj-block.story { border-left-color: var(--df-lavender); }
+        .pause-obj-block.optional { border-left-color: rgba(120, 220, 205, 0.6); }
+        .pause-obj-block.side { border-left-color: var(--df-gold); }
         .pause-obj-label {
-            font-family: 'Montserrat', sans-serif;
+            font-family: var(--font-ui);
             font-size: 0.5rem;
-            color: #888;
-            letter-spacing: 2px;
+            color: var(--df-champagne);
+            letter-spacing: 2.5px;
             text-transform: uppercase;
             margin-bottom: 3px;
             font-weight: 600;
         }
-        .pause-obj-block.story .pause-obj-label { color: rgba(180, 140, 220, 0.8); }
-        .pause-obj-block.optional .pause-obj-label { color: rgba(100, 220, 200, 0.7); }
-        .pause-obj-block.side .pause-obj-label { color: rgba(255, 190, 80, 0.8); }
         .pause-obj-text {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 0.75rem;
-            color: #ccc;
-            line-height: 1.3;
-            font-weight: 500;
+            font-family: var(--font-ui);
+            font-size: 0.72rem;
+            color: #e6dff0;
+            line-height: 1.35;
+            font-weight: 400;
         }
         .pause-obj-none {
-            color: #444;
+            color: rgba(185, 174, 196, 0.45);
             font-style: italic;
             font-weight: 400;
-            font-size: 0.7rem;
+            font-size: 0.68rem;
         }
         .pause-mission-label {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 0.55rem;
-            color: #666;
-            letter-spacing: 3px;
+            font-family: var(--font-ui);
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--df-cream);
+            letter-spacing: 4px;
             text-transform: uppercase;
             margin-bottom: 6px;
-            font-weight: 600;
+            padding-left: 10px;
         }
         .pause-mission-text {
             font-family: 'Montserrat', sans-serif;
@@ -875,6 +924,27 @@
             color: #444;
             font-style: italic;
         }
+
+        /* Narrow portrait: one column, the menu first */
+        @media screen and (max-width: 700px) {
+            .pause-content { flex-direction: column; justify-content: flex-start; align-items: center; padding: 22px 5% 30px; gap: 26px; }
+            .pause-right { order: 1; width: 100%; max-width: 420px; }
+            .pause-left { order: 2; width: 100%; max-width: 420px; margin-top: 0; }
+            .pause-backdrop { background: linear-gradient(180deg, rgba(10, 2, 10, 0.92) 0%, rgba(14, 3, 12, 0.85) 60%, rgba(20, 4, 10, 0.7) 100%); }
+            .pause-np { margin: 0 auto; }
+        }
+
+        /* Cinematic view: the HUD fades away; the hint fades in, then out */
+        body.cinematic-view #game-ui, body.cinematic-view #scanlines, body.cinematic-view #ui-layer,
+        body.cinematic-view #message-modal, body.cinematic-view #mission-banner, body.cinematic-view #comms-bar,
+        body.cinematic-view #dialogue-caption { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.6s ease; }
+        #cinematic-hint {
+            position: fixed; left: 50%; bottom: 7%; transform: translateX(-50%); z-index: 3001; pointer-events: none;
+            font-family: var(--font-ui); font-size: 0.66rem; letter-spacing: 4px; text-transform: uppercase; color: var(--df-lavender-pale);
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); opacity: 0;
+        }
+        #cinematic-hint.show { animation: cineHint 3.2s ease forwards; }
+        @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
 
         /* --- SAVE SLOT OVERLAY --- */
         #save-slot-overlay {

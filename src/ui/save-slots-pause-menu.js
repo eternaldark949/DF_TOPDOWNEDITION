@@ -436,7 +436,9 @@
                 this.navMain = document.getElementById('pause-nav-main');
                 this.settingsPanel = document.getElementById('pause-settings-panel');
                 this.menuItems = this.navMain.querySelectorAll('.pause-menu-item');
+                this.quickItems = this.menu.querySelectorAll('.pause-quick-item');
                 this.activeIndex = 0;
+                this.quickIndex = -1;       // the highlighted Quick Access item (-1: the main list has focus)
                 this.isOpen = false;
                 this.inSettings = false;
                 
@@ -456,6 +458,25 @@
                     });
                 });
                 
+                // Quick Access (left column)
+                this.quickItems.forEach((item, index) => {
+                    item.addEventListener('click', () => { this.setQuickIndex(index); this.executeQuick(item.dataset.action); });
+                    item.addEventListener('mouseenter', () => this.setQuickIndex(index));
+                });
+
+                // Now Playing: the disc changes station, the chevron plays / pauses (the music widget does the work)
+                document.getElementById('pause-np-disc')?.addEventListener('click', () => { game.musicWidget?.cycleStation(); this._syncNowPlaying(); });
+                document.getElementById('pause-np-play')?.addEventListener('click', () => {
+                    game.musicWidget?.handlePlayClick();
+                    setTimeout(() => this._syncNowPlaying(), 120);   // togglePlay settles after the AudioContext resumes
+                });
+
+                // Cinematic view: any tap brings the menu back
+                window.addEventListener('pointerdown', (e) => {
+                    if (!document.body.classList.contains('cinematic-view')) return;
+                    e.preventDefault(); e.stopPropagation(); this.exitCinematic();
+                }, true);
+
                 // Click backdrop to close
                 this.menu.querySelector('.pause-backdrop').addEventListener('click', () => {
                     if (this.inSettings) {
@@ -485,6 +506,7 @@
                 this.isOpen = true;
                 game.pauseSystem.acquire('pause_menu');
                 this.setActiveIndex(0);
+                this._syncNowPlaying();
                 
                 // Update mission objective display — all three types
                 const storyText = document.getElementById('pause-obj-story-text');
@@ -562,24 +584,76 @@
             }
             
             setActiveIndex(index) {
+                this.quickItems.forEach(item => item.classList.remove('active'));
+                this.quickIndex = -1;
                 this.menuItems.forEach(item => item.classList.remove('active'));
                 this.activeIndex = index;
                 this.menuItems[index].classList.add('active');
                 this.menuItems[index].focus();
             }
+
+            // One highlight at a time: lighting a Quick Access item dims the main list's
+            setQuickIndex(index) {
+                this.menuItems.forEach(item => item.classList.remove('active'));
+                this.quickItems.forEach(item => item.classList.remove('active'));
+                this.quickIndex = index;
+                this.quickItems[index].classList.add('active');
+                this.quickItems[index].focus();
+            }
             
             navigateUp() {
+                if (this.quickIndex >= 0) { this.setQuickIndex(this.quickIndex > 0 ? this.quickIndex - 1 : this.quickItems.length - 1); return; }
                 const newIndex = this.activeIndex > 0 ? this.activeIndex - 1 : this.menuItems.length - 1;
                 this.setActiveIndex(newIndex);
             }
             
             navigateDown() {
+                if (this.quickIndex >= 0) { this.setQuickIndex((this.quickIndex + 1) % this.quickItems.length); return; }
                 const newIndex = this.activeIndex < this.menuItems.length - 1 ? this.activeIndex + 1 : 0;
                 this.setActiveIndex(newIndex);
             }
+
+            // ← Quick Access (left column) · → the main list
+            navigateLeft() { if (this.quickIndex < 0 && !this.inSettings) this.setQuickIndex(0); }
+            navigateRight() { if (this.quickIndex >= 0) this.setActiveIndex(this.activeIndex); }
             
             selectCurrent() {
+                if (this.quickIndex >= 0) { this.executeQuick(this.quickItems[this.quickIndex].dataset.action); return; }
                 this.executeAction(this.menuItems[this.activeIndex].dataset.action);
+            }
+
+            executeQuick(action) {
+                if (action === 'equip') { this.close(); Screens.open('equipped'); }
+                else if (action === 'drop') { this.close(); Screens.open('inventory'); }
+                else if (action === 'cinematic') this.enterCinematic();
+            }
+
+            // The world held still with every bit of HUD faded away; a tap or Esc brings the menu back
+            enterCinematic() {
+                this.close();
+                game.pauseSystem.acquire('cinematic_view');
+                document.body.classList.add('cinematic-view');
+                const hint = document.getElementById('cinematic-hint');
+                if (hint) { hint.classList.remove('show'); void hint.offsetWidth; hint.classList.add('show'); }
+            }
+
+            exitCinematic() {
+                if (!document.body.classList.contains('cinematic-view')) return;
+                document.body.classList.remove('cinematic-view');
+                document.getElementById('cinematic-hint')?.classList.remove('show');
+                game.pauseSystem.release('cinematic_view');
+                this.open();
+            }
+
+            // The capsule mirrors the music widget: station on the disc, track (or station) and play state
+            _syncNowPlaying() {
+                const mw = game.musicWidget; if (!mw) return;
+                const station = mw.stations?.[mw.currentStationIdx]?.name || '';
+                const track = (mw.trackText?.textContent || '').trim();
+                const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+                set('pause-np-station', station.split(' ')[0].toUpperCase());   // one word fits the disc
+                set('pause-np-track', track && !/^(no track|upload|tap|insert tape)/i.test(track) ? track : (/radio/i.test(station) ? station : station + ' Radio'));
+                set('pause-np-icon', mw.isPlaying ? '❚❚' : '▶');
             }
             
             executeAction(action) {
@@ -608,21 +682,10 @@
                         }
                         break;
                     case 'inventory':
-                        this.close();
-                        game.inventory.toggleMenu();
-                        break;
                     case 'map':
-                        this.close();
-                        game.ui.toggleMap(true);
-                        break;
                     case 'team':
                         this.close();
-                        game.inventory.toggleMenu();
-                        // Navigate to team screen (scoped to freelancer-menu, deferred one frame for DOM)
-                        requestAnimationFrame(() => {
-                            const teamNav = document.querySelector('#freelancer-menu .sidebar-nav-item[data-screen="team"]');
-                            if (teamNav) teamNav.click();
-                        });
+                        Screens.open(action);
                         break;
                     case 'settings':
                         this.openSettings();

@@ -1284,15 +1284,23 @@
                     this.ctx.stroke();
                     
                     // Sweep trail (fading arc behind sweep line)
-                    const sweepGrad = this.ctx.createConicGradient(sweepAngle - 0.8, cx, cy);
-                    sweepGrad.addColorStop(0, 'rgba(0, 243, 255, 0)');
-                    sweepGrad.addColorStop(0.12, 'rgba(0, 243, 255, 0.08)');
-                    sweepGrad.addColorStop(0.13, 'rgba(0, 243, 255, 0)');
                     this.ctx.globalAlpha = 1.0;
-                    this.ctx.fillStyle = sweepGrad;
-                    this.ctx.beginPath();
-                    this.ctx.arc(cx, cy, RADAR_RADIUS, 0, Math.PI * 2);
-                    this.ctx.fill();
+                    if (this.ctx.createConicGradient) {
+                        const sweepGrad = this.ctx.createConicGradient(sweepAngle - 0.8, cx, cy);
+                        sweepGrad.addColorStop(0, 'rgba(0, 243, 255, 0)');
+                        sweepGrad.addColorStop(0.12, 'rgba(0, 243, 255, 0.08)');
+                        sweepGrad.addColorStop(0.13, 'rgba(0, 243, 255, 0)');
+                        this.ctx.fillStyle = sweepGrad;
+                        this.ctx.beginPath();
+                        this.ctx.arc(cx, cy, RADAR_RADIUS, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    } else {                                                      // no conic gradients (Safari < 16.4): a fan of thin wedges
+                        for (let k = 0; k < 6; k++) {
+                            this.ctx.fillStyle = `rgba(0, 243, 255, ${(0.08 * (k + 1) / 6).toFixed(3)})`;
+                            const a0 = sweepAngle - 0.8 + k * 0.13;
+                            this.ctx.beginPath(); this.ctx.moveTo(cx, cy); this.ctx.arc(cx, cy, RADAR_RADIUS, a0, a0 + 0.13); this.ctx.closePath(); this.ctx.fill();
+                        }
+                    }
                     
                     // Enemy blips (crimson)
                     this.ctx.globalAlpha = 0.9;

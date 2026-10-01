@@ -220,7 +220,7 @@
                 const land = cssW > cssH && cssH <= 540;
                 this.isLandscape = land;
                 document.body.classList.toggle('landscape', land);
-                document.documentElement.style.setProperty('--phone-scale', land ? Math.min(1, (cssH - 24) / 600).toFixed(3) : '1');
+                if (typeof phoneSystem !== 'undefined') phoneSystem.fit();   // the phone turns and scales to fit (ui/phone.js)
             },
 
             fireWeapon() {
