@@ -329,12 +329,15 @@
         }
 
         /* The Freelancers wear their masks in the field; 949's comes off at home (and in the
-           Keeper's house). game.fieldMask = true / false forces it (scenes, the flashback). */
+           Keeper's house). game.fieldMask = true / false forces it (scenes, the flashback); otherwise
+           her own choice in Neu.Me (cosmetics.maskMode: 'on' / 'off') wins over that 'auto' rule. */
         const FIELD_MASK_949 = { type: 'field_mask', color: '#0b0710', tint: '#6a2a7a', eyes: PALETTE.stellaEyes };
         const HOME_MAPS = new Set(['apt_949', 'keepers_hill', 'keepers_parlor']);
         function stellaMasked(game) {
             if (!game) return false;
             if (game.fieldMask === true || game.fieldMask === false) return game.fieldMask;
+            const mode = game.cosmetics && game.cosmetics.maskMode;
+            if (mode === 'on' || mode === 'off') return mode === 'on';
             return !!(game.activeMap && !HOME_MAPS.has(game.activeMap.id));
         }
         /** Her jewelry, with the mask added when she's in the field (a mask of her own wins). */
