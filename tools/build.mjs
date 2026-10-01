@@ -26,6 +26,7 @@ const STYLES = [
     'styles/panels-phone.css',
     'styles/cinematic.css',
     'styles/coach.css',
+    'styles/dossier.css',
     'styles/landscape.css',
 ];
 

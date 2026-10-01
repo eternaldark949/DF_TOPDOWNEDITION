@@ -103,18 +103,25 @@
                 const el = document.getElementById('skills-screen-content');
                 if (!el || !this.resonance) return;
                 const R = this.resonance, next = R.toNext();
-                let html = `<div style="font-family:Orbitron,sans-serif;color:#c9a6ff;letter-spacing:2px;">◈ RESONANCE — LEVEL ${R.level}</div>
-                    <div style="font-size:0.7rem;color:#aaa;margin:6px 0 2px;">${next === Infinity ? 'Tuned to the limit.' : `${R.xp} / ${next} to the next level`} · ${R.points} Tuning point${R.points === 1 ? '' : 's'} · <span style="color:#c9a6ff">${R.unsettled} unsettled</span></div>
-                    <div style="font-size:0.7rem;color:#aaa;">Dark Element: <span style="color:#b98cff">◆ ${this.darkElement || 0}</span></div>
-                    <div style="font-size:0.7rem;color:#e8c27a;margin:8px 0 12px;">Visit Dr. Yin at the medbay to tune. Unsettled Resonance is lost by half if you fall before you get there.</div>`;
+                const pct = next === Infinity ? 100 : Math.max(0, Math.min(100, Math.round(R.xp / next * 100)));
+                let html = `<div class="df-section"><span><span class="glint">◆</span>Resonance</span><span class="count">Level ${R.level}</span></div>`;
+                html += `<div class="df-card"><div class="df-head"><div class="grow"><div class="title script">Level ${R.level}</div>`;
+                html += `<div class="eyebrow" style="margin-top:2px;">${next === Infinity ? 'Tuned to the limit' : `${R.xp} / ${next} to the next level`}</div></div>`;
+                html += `<div class="df-chips" style="justify-content:flex-end;"><span class="df-chip active">${R.points} Tuning point${R.points === 1 ? '' : 's'}</span>`;
+                html += `<span class="df-chip gold">${R.unsettled} unsettled</span><span class="df-chip info">Dark Element ◆ ${this.darkElement || 0}</span></div></div>`;
+                html += `<div class="df-bar${pct ? '' : ' zero'}" style="margin-top:12px;"><i style="--v:${pct}%"></i></div>`;
+                html += `<div class="df-hint" style="margin-top:12px;">Visit Dr. Yin at the medbay to tune. Unsettled Resonance is lost by half if you fall before you get there.</div></div>`;
+                html += `<div class="df-grid" style="margin-top:14px;">`;
                 for (const tree of RESONANCE_TREES) {
-                    html += `<div style="margin-bottom:10px;border-left:3px solid ${tree.color};padding-left:8px;"><div style="font-family:Orbitron,sans-serif;font-size:0.75rem;color:${tree.color};letter-spacing:2px;">${tree.name.toUpperCase()}</div>`;
+                    const spent = tree.nodes.reduce((a, n) => a + R.rank(n.id), 0);
+                    html += `<div class="df-card accent" style="--acc:${tree.color}"><div class="df-head"><div class="title" style="color:${tree.color}">${tree.name}</div><span class="count df-chip info">${spent} / ${tree.nodes.length * 3}</span></div>`;
                     for (const n of tree.nodes) {
                         const r = R.rank(n.id);
-                        html += `<div style="font-size:0.68rem;color:${r ? '#ddd' : '#777'};margin:3px 0;">${'●'.repeat(r)}${'○'.repeat(3 - r)} <b>${n.name}</b> — ${n.desc(Math.max(1, r))}</div>`;
+                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r))}</span></div>`;
                     }
                     html += `</div>`;
                 }
+                html += `</div>`;
                 el.innerHTML = html;
             },
         });

@@ -615,58 +615,51 @@
                 };
             },
 
-            // Render augments management in the sidebar screen
+            // Render augments management in the sidebar screen (dossier classes: styles/dossier.css)
             renderAugmentManagement() {
                 const container = document.getElementById('augments-screen-content');
                 if (!container) return;
-                
-                let html = '';
-                html += `<div style="font-size: 0.75rem; color: #888; margin-bottom: 10px;">EQUIPPED: ${this.augments.equipped.length} / ${this.augments.maxSlots}</div>`;
-                
-                if (this.augments.owned.length === 0) {
-                    html += '<div style="padding: 30px 15px; text-align: center;">';
-                    html += '<div style="font-size: 0.9rem; color: #555; font-style: italic; margin-bottom: 10px;">No augments installed.</div>';
-                    html += '<div style="font-size: 0.75rem; color: #00f3ff; opacity: 0.6;">Visit Dr. Yin\'s Clinic to purchase cybernetic augments.</div>';
-                    html += '</div>';
+                const A = this.augments;
+                let html = `<div class="df-section"><span><span class="glint">◆</span>Augment Slots</span><span class="count">${A.equipped.length} / ${A.maxSlots} equipped</span></div>`;
+                html += '<div class="df-tiles">';
+                for (let i = 0; i < A.maxSlots; i++) {
+                    const id = A.equipped[i], aug = id ? AUGMENT_CATALOG.find(a => a.id === id) : null;
+                    html += aug ? `<div class="df-tile"><div class="ico">${aug.icon}</div><div class="lbl">${aug.name}</div></div>`
+                                : `<div class="df-tile empty"><div class="lbl">Empty</div></div>`;
+                }
+                html += '</div>';
+
+                html += `<div class="df-section"><span>Installed</span><span class="count">${A.owned.length}</span></div>`;
+                if (A.owned.length === 0) {
+                    html += `<div class="df-empty">No augments installed.<div class="df-hint">Visit Dr. Yin's clinic to purchase cybernetic augments.</div></div>`;
                 } else {
-                    for (const id of this.augments.owned) {
+                    for (const id of A.owned) {
                         const aug = AUGMENT_CATALOG.find(a => a.id === id);
                         if (!aug) continue;
-                        const isEq = this.augments.isEquipped(id);
-                        const borderCol = isEq ? 'rgba(0,243,255,0.3)' : 'rgba(255,255,255,0.1)';
-                        const bgCol = isEq ? 'rgba(0,243,255,0.06)' : 'rgba(255,255,255,0.03)';
-                        html += `<div style="background: ${bgCol}; border: 1px solid ${borderCol}; border-radius: 6px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">`;
-                        html += `<div style="flex: 1;">`;
-                        html += `<div style="font-family: Orbitron, sans-serif; font-size: 0.75rem; color: ${isEq ? '#00f3ff' : '#ccc'}; margin-bottom: 3px;">${aug.icon} ${aug.name} ${isEq ? '<span style="color:#00ff66;font-size:0.6rem;margin-left:6px;">● ACTIVE</span>' : ''}</div>`;
-                        html += `<div style="font-size: 0.65rem; color: #777; line-height: 1.3;">${aug.desc}</div>`;
-                        html += `<div style="font-size: 0.6rem; color: #555; margin-top: 3px;">SLOT: ${aug.slot.toUpperCase()}</div>`;
-                        html += `</div>`;
-                        html += `<button onclick="game.augments.${isEq ? 'unequip' : 'equip'}('${id}'); game.renderAugmentManagement();" style="background: transparent; border: 1px solid ${isEq ? '#ff5555' : '#00f3ff'}; color: ${isEq ? '#ff5555' : '#00f3ff'}; padding: 6px 14px; cursor: pointer; font-size: 0.7rem; font-family: Montserrat, sans-serif; letter-spacing: 1px; flex-shrink: 0; margin-left: 10px;">${isEq ? 'UNEQUIP' : 'EQUIP'}</button>`;
-                        html += '</div>';
+                        const isEq = A.isEquipped(id);
+                        html += `<div class="df-card${isEq ? ' lit' : ''}"><div class="df-head">`;
+                        html += `<div class="note-ico">${aug.icon}</div><div class="grow">`;
+                        html += `<div class="eyebrow">Slot · ${aug.slot}</div><div class="title">${aug.name}</div><div class="desc">${aug.desc}</div></div>`;
+                        html += `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">${isEq ? '<span class="df-chip active">● Active</span>' : ''}`;
+                        html += `<button class="df-btn${isEq ? ' ghost' : ''}" data-aug="${id}" data-act="${isEq ? 'unequip' : 'equip'}">${isEq ? 'Unequip' : 'Equip'}</button></div>`;
+                        html += `</div></div>`;
                     }
                 }
-                
-                // Augment slots visualization at bottom
-                html += '<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);">';
-                html += '<div style="font-family: Orbitron, sans-serif; font-size: 0.65rem; color: #555; letter-spacing: 2px; margin-bottom: 8px;">AUGMENT SLOTS</div>';
-                html += '<div style="display: flex; gap: 8px;">';
-                for (let i = 0; i < this.augments.maxSlots; i++) {
-                    const equipped = this.augments.equipped[i];
-                    const aug = equipped ? AUGMENT_CATALOG.find(a => a.id === equipped) : null;
-                    if (aug) {
-                        html += `<div style="width: 80px; height: 80px; border: 1px solid rgba(0,243,255,0.4); border-radius: 6px; background: rgba(0,243,255,0.08); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">`;
-                        html += `<div style="font-size: 1.2rem;">${aug.icon}</div>`;
-                        html += `<div style="font-size: 0.5rem; color: #00f3ff; margin-top: 2px; line-height: 1.1;">${aug.name}</div>`;
-                        html += `</div>`;
-                    } else {
-                        html += `<div style="width: 80px; height: 80px; border: 1px dashed rgba(255,255,255,0.1); border-radius: 6px; display: flex; align-items: center; justify-content: center;">`;
-                        html += `<div style="font-size: 0.6rem; color: #333;">EMPTY</div>`;
-                        html += `</div>`;
-                    }
-                }
-                html += '</div></div>';
-                
                 container.innerHTML = html;
+                container.querySelectorAll('button[data-aug]').forEach(b => b.addEventListener('click', () => {
+                    A[b.dataset.act](b.dataset.aug); this.renderAugmentManagement();
+                }));
+            },
+
+            /** A contact or crew avatar: their painted bust (getPortraitDataURL), else a script monogram. */
+            _dfAvatar(name, acc, big) {
+                let inner;
+                try {
+                    const cfg = this.resolvePortraitConfig(name);
+                    inner = cfg && !cfg.isFallback ? `<img alt="" src="${this.getPortraitDataURL(name, big ? 128 : 72)}">` : null;
+                } catch (e) { inner = null; }
+                if (!inner) inner = `<div class="mono">${(name || '?').replace(/^(Dr\.|Barista|Chef)\s+/, '').charAt(0)}</div>`;
+                return `<div class="df-avatar${big ? ' big' : ''}" style="--acc:${acc}">${inner}${big ? '' : '<span class="dot"></span>'}</div>`;
             },
 
             // Render contacts screen in the sidebar
@@ -693,15 +686,17 @@
                 for (const tm of (this.teammates || [])) { knownRoles[tm.name] = 'teammate'; }
 
                 const categories = { clients: [], teammates: [], companions: [], associates: [], medics: [] };
-                const catLabels = { clients: 'CLIENTS', teammates: 'TEAMMATES', companions: 'COMPANIONS', associates: 'ASSOCIATES', medics: 'MEDICS' };
-                const catColors = { clients: '#ffaa00', teammates: '#00f3ff', companions: '#ff55aa', associates: '#aaa', medics: '#00ff88' };
+                const catLabels = { clients: 'Clients', teammates: 'Teammates', companions: 'Companions', associates: 'Associates', medics: 'Medics' };
+                const roleLabels = { clients: 'Client', teammates: 'Crew', companions: 'Companion', associates: 'Associate', medics: 'Medic' };
+                // Category accents, inside the scheme: gold, lavender, rose, lilac-grey, mint
+                const catColors = { clients: '#ffc248', teammates: '#cab0fa', companions: '#f0a6c8', associates: '#b9aec4', medics: '#9be8dc' };
 
                 // Populate from phone message history
                 if (typeof phoneSystem !== 'undefined' && phoneSystem.messageHistory) {
                     for (const [name, messages] of Object.entries(phoneSystem.messageHistory)) {
                         const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
                         const lastText = lastMsg ? (lastMsg.text || lastMsg) : '';
-                        const displayText = typeof lastText === 'string' ? lastText.substring(0, 50) : '';
+                        const displayText = typeof lastText === 'string' ? lastText : '';
                         const role = knownRoles[name] || 'civilian';
                         const cat = getCategory(name, role);
                         if (categories[cat]) categories[cat].push({ name, lastMsg: displayText, role });
@@ -715,19 +710,18 @@
                     if (contacts.length === 0) continue;
                     totalContacts += contacts.length;
                     const color = catColors[cat];
-                    html += `<div style="font-family: Orbitron, sans-serif; font-size: 0.65rem; color: ${color}; letter-spacing: 2px; margin: 15px 0 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">${catLabels[cat]}</div>`;
+                    html += `<div class="df-section"><span>${catLabels[cat]}</span><span class="count">${contacts.length}</span></div><div class="df-grid">`;
                     for (const c of contacts) {
-                        html += `<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; padding: 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">`;
-                        html += `<div><div style="font-size: 0.8rem; color: #ddd; margin-bottom: 2px;">${c.name}</div>`;
-                        if (c.lastMsg) html += `<div style="font-size: 0.65rem; color: #666; font-style: italic;">"${c.lastMsg}"</div>`;
-                        html += `</div>`;
-                        html += `<div style="font-size: 0.6rem; color: ${color}; opacity: 0.6;">●</div>`;
-                        html += `</div>`;
+                        html += `<div class="df-card accent" style="--acc:${color}"><div class="df-person">${this._dfAvatar(c.name, color)}<div class="who">`;
+                        html += `<div class="name">${c.name}</div><div class="role">${roleLabels[cat]}</div>`;
+                        if (c.lastMsg) html += `<div class="desc quote">“${c.lastMsg}”</div>`;
+                        html += `</div></div></div>`;
                     }
+                    html += `</div>`;
                 }
 
                 if (totalContacts === 0) {
-                    html = '<div style="padding: 30px 15px; text-align: center;"><div style="font-size: 0.9rem; color: #555; font-style: italic;">No contacts yet.</div><div style="font-size: 0.75rem; color: #666; margin-top: 8px;">Talk to people to add them to your contacts.</div></div>';
+                    html = '<div class="df-empty">No contacts yet.<div class="df-hint">Talk to people to add them to your contacts.</div></div>';
                 }
 
                 container.innerHTML = html;
@@ -749,80 +743,43 @@
                 const self = this;
                 let html = '';
 
-                // ── SECTION HEADER STYLE ──
-                const sectionStyle = `font-family: Orbitron, sans-serif; font-size: 0.65rem; letter-spacing: 3px; margin: 12px 0 10px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);`;
-
                 // ══════════════════════════════════════════════════
                 //  FREELANCER CREW (Permanent Teammates)
                 // ══════════════════════════════════════════════════
-                html += `<div style="${sectionStyle} color: #00f3ff;">FREELANCER CREW</div>`;
+                const crew = this.teammates || [];
+                html += `<div class="df-section"><span><span class="glint">◆</span>Freelancer Crew</span><span class="count">${crew.filter(t => t.recruited).length} active</span></div>`;
 
-                if (!this.teammates || this.teammates.length === 0) {
-                    html += `<div style="padding: 15px; color: #555; font-style: italic; font-size: 0.8rem;">No crew members found.</div>`;
+                if (crew.length === 0) {
+                    html += `<div class="df-empty">No crew members found.</div>`;
                 } else {
-                    for (let i = 0; i < this.teammates.length; i++) {
-                        const tm = this.teammates[i];
+                    html += `<div class="df-grid">`;
+                    for (let i = 0; i < crew.length; i++) {
+                        const tm = crew[i];
                         const isRecruited = tm.recruited;
                         const hpPercent = Math.max(0, Math.round((tm.hp / tm.maxHp) * 100));
                         const relPercent = Math.max(0, Math.min(100, tm.relationship || 0));
-                        const weaponName = tm.equippedWeaponId && ITEM_REGISTRY[tm.equippedWeaponId] 
+                        const weaponName = tm.equippedWeaponId && ITEM_REGISTRY[tm.equippedWeaponId]
                             ? ITEM_REGISTRY[tm.equippedWeaponId].name : 'Unarmed';
 
                         // Relationship rank label
-                        let relRank = 'STRANGER';
-                        if (relPercent >= 80) relRank = 'BONDED';
-                        else if (relPercent >= 60) relRank = 'TRUSTED';
-                        else if (relPercent >= 40) relRank = 'FAMILIAR';
-                        else if (relPercent >= 20) relRank = 'ACQUAINTANCE';
+                        let relRank = 'Stranger';
+                        if (relPercent >= 80) relRank = 'Bonded';
+                        else if (relPercent >= 60) relRank = 'Trusted';
+                        else if (relPercent >= 40) relRank = 'Familiar';
+                        else if (relPercent >= 20) relRank = 'Acquaintance';
 
-                        // Appearance color for portrait dot
-                        const portraitColor = tm.appearance?.accent || tm.appearance?.hair?.color || '#00f3ff';
-
-                        html += `<div style="background: rgba(0,243,255,0.03); border: 1px solid rgba(0,243,255,${isRecruited ? '0.15' : '0.06'}); border-radius: 4px; padding: 12px; margin-bottom: 8px;">`;
-
-                        // Row 1: Name + Status
-                        html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">`;
-                        html += `<div style="display: flex; align-items: center; gap: 8px;">`;
-                        html += `<div style="width: 10px; height: 10px; border-radius: 50%; background: ${portraitColor}; box-shadow: 0 0 6px ${portraitColor};"></div>`;
-                        html += `<div style="font-family: Orbitron, sans-serif; font-size: 0.85rem; color: #e0e0e0; letter-spacing: 1px;">${tm.name.toUpperCase()}</div>`;
-                        html += `</div>`;
-                        html += `<div style="font-family: Orbitron, sans-serif; font-size: 0.55rem; letter-spacing: 2px; color: ${tm.downed ? '#ff4444' : isRecruited ? '#00ff88' : '#ff6644'}; opacity: 0.9;">${tm.downed ? '✕ DOWNED' : isRecruited ? '● ACTIVE' : '○ STANDBY'}</div>`;
-                        html += `</div>`;
-
-                        // Row 2: Bio
-                        if (tm.bio) {
-                            html += `<div style="font-size: 0.7rem; color: #777; font-style: italic; margin-bottom: 8px; line-height: 1.4;">${tm.bio}</div>`;
-                        }
-
-                        // Row 3: HP Bar
-                        html += `<div style="margin-bottom: 6px;">`;
-                        html += `<div style="display: flex; justify-content: space-between; font-size: 0.55rem; color: #888; margin-bottom: 2px;">`;
-                        html += `<span>VITALS</span><span>${hpPercent}%</span></div>`;
-                        html += `<div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">`;
-                        html += `<div style="width: ${hpPercent}%; height: 100%; background: linear-gradient(90deg, #ff4444, #ff6666); border-radius: 2px; transition: width 0.3s;"></div>`;
+                        const status = tm.downed ? '<span class="df-chip crimson">✕ Downed</span>' : isRecruited ? '<span class="df-chip active">● Active</span>' : '<span class="df-chip info">○ Standby</span>';
+                        html += `<div class="df-card${isRecruited ? '' : ' dim'}"><div class="df-person">${this._dfAvatar(tm.name, isRecruited ? '#cab0fa' : '#b9aec4')}<div class="who">`;
+                        html += `<div class="name">${tm.name}</div><div class="role">${weaponName}</div></div>${status}</div>`;
+                        if (tm.bio) html += `<div class="desc">${tm.bio}</div>`;
+                        html += `<div class="df-bar-label"><span>Vitals</span><span>${hpPercent}%</span></div><div class="df-bar crimson${hpPercent ? '' : ' zero'}"><i style="--v:${hpPercent}%"></i></div>`;
+                        html += `<div class="df-bar-label"><span>Bond · ${relRank}</span><span>${relPercent} / 100</span></div><div class="df-bar gold${relPercent ? '' : ' zero'}"><i style="--v:${relPercent}%"></i></div>`;
+                        html += `<div style="display:flex;justify-content:flex-end;margin-top:12px;">`;
+                        html += isRecruited ? `<button class="df-btn ghost team-btn-dismiss-tm" data-index="${i}">Stand Down</button>`
+                                            : `<button class="df-btn team-btn-recruit-tm" data-index="${i}">Recruit</button>`;
                         html += `</div></div>`;
-
-                        // Row 4: Relationship Bar
-                        const relColor = relPercent >= 60 ? '#d4af37' : relPercent >= 30 ? '#b87333' : '#666';
-                        html += `<div style="margin-bottom: 8px;">`;
-                        html += `<div style="display: flex; justify-content: space-between; font-size: 0.55rem; color: #888; margin-bottom: 2px;">`;
-                        html += `<span>BOND — ${relRank}</span><span>${relPercent}/100</span></div>`;
-                        html += `<div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">`;
-                        html += `<div style="width: ${relPercent}%; height: 100%; background: linear-gradient(90deg, ${relColor}, ${relColor}aa); border-radius: 2px; transition: width 0.3s;"></div>`;
-                        html += `</div></div>`;
-
-                        // Row 5: Weapon + Recruit/Dismiss Button
-                        html += `<div style="display: flex; justify-content: space-between; align-items: center;">`;
-                        html += `<div style="font-size: 0.65rem; color: #999;">WEAPON: <span style="color: #ccc;">${weaponName}</span></div>`;
-                        if (isRecruited) {
-                            html += `<button class="team-btn-dismiss-tm" data-index="${i}" style="font-family: Orbitron, sans-serif; font-size: 0.55rem; letter-spacing: 1px; background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.3); color: #ff6644; padding: 4px 12px; border-radius: 3px; cursor: pointer;">STAND DOWN</button>`;
-                        } else {
-                            html += `<button class="team-btn-recruit-tm" data-index="${i}" style="font-family: Orbitron, sans-serif; font-size: 0.55rem; letter-spacing: 1px; background: rgba(0,243,255,0.1); border: 1px solid rgba(0,243,255,0.3); color: #00f3ff; padding: 4px 12px; border-radius: 3px; cursor: pointer;">RECRUIT</button>`;
-                        }
-                        html += `</div>`;
-
-                        html += `</div>`; // card end
                     }
+                    html += `</div>`;
                 }
 
                 // ══════════════════════════════════════════════════
@@ -831,89 +788,56 @@
                 const maxHires = 5;
                 const activeHires = this.hiredDancers || [];
 
-                html += `<div style="${sectionStyle} color: #ff55aa; margin-top: 18px;">HIRED GUNS <span style="font-size: 0.5rem; color: #888; letter-spacing: 1px;">(${activeHires.length}/${maxHires})</span></div>`;
+                html += `<div class="df-section"><span>Hired Guns</span><span class="count">${activeHires.length} / ${maxHires}</span></div>`;
 
                 if (activeHires.length === 0) {
-                    html += `<div style="padding: 15px; text-align: center;">`;
-                    html += `<div style="font-size: 0.8rem; color: #555; font-style: italic;">No hired guns on payroll.</div>`;
-                    html += `<div style="font-size: 0.65rem; color: #666; margin-top: 6px;">Visit the nightclub or VIP lounges to hire dancers as temporary muscle. 400 PP / 8 hours.</div>`;
-                    html += `</div>`;
+                    html += `<div class="df-empty">No hired guns on payroll.<div class="df-hint">Visit the nightclub or VIP lounges to hire dancers as temporary muscle. 400 PP / 8 hours.</div></div>`;
                 } else {
+                    html += `<div class="df-grid">`;
                     for (let i = 0; i < activeHires.length; i++) {
                         const d = activeHires[i];
                         const minsLeft = Math.max(0, (d.hireTime || 0) - this.worldMinutes);
-                        const hoursLeft = Math.floor(minsLeft / 60);
-                        const minsRemainder = minsLeft % 60;
-                        const timeStr = `${hoursLeft}h ${minsRemainder}m`;
+                        const timeStr = `${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m`;
                         const hpPercent = Math.max(0, Math.round((d.hp / d.maxHp) * 100));
                         const isLowTime = minsLeft < 60;
                         const isDemon = d.role === 'red_demon_dancer';
+                        const acc = isDemon ? '#ff4a5e' : '#f0a6c8';
 
-                        html += `<div style="background: rgba(255,85,170,0.03); border: 1px solid rgba(255,85,170,0.12); border-radius: 4px; padding: 10px; margin-bottom: 6px;">`;
-
-                        // Row 1: Name + Time Remaining
-                        html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">`;
-                        html += `<div style="display: flex; align-items: center; gap: 8px;">`;
-                        html += `<div style="width: 8px; height: 8px; border-radius: 50%; background: ${isDemon ? '#ff2244' : '#ff55aa'}; box-shadow: 0 0 5px ${isDemon ? '#ff2244' : '#ff55aa'};"></div>`;
-                        html += `<div style="font-family: Orbitron, sans-serif; font-size: 0.75rem; color: #ddd; letter-spacing: 1px;">${d.name.toUpperCase()}</div>`;
-                        html += `</div>`;
-                        html += `<div style="font-family: Orbitron, sans-serif; font-size: 0.55rem; color: ${isLowTime ? '#ff4444' : '#ff55aa'}; letter-spacing: 1px; ${isLowTime ? 'animation: pulse 1s infinite;' : ''}">${timeStr} LEFT</div>`;
-                        html += `</div>`;
-
-                        // Row 2: HP Bar + Dismiss
-                        html += `<div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">`;
-                        html += `<div style="flex: 1;">`;
-                        html += `<div style="display: flex; justify-content: space-between; font-size: 0.5rem; color: #888; margin-bottom: 2px;">`;
-                        html += `<span>VITALS</span><span>${hpPercent}%</span></div>`;
-                        html += `<div style="height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">`;
-                        html += `<div style="width: ${hpPercent}%; height: 100%; background: linear-gradient(90deg, #ff55aa, #ff88cc); border-radius: 2px;"></div>`;
-                        html += `</div></div>`;
-                        html += `<button class="team-btn-dismiss-hire" data-index="${i}" style="font-family: Orbitron, sans-serif; font-size: 0.5rem; letter-spacing: 1px; background: rgba(255,68,68,0.08); border: 1px solid rgba(255,68,68,0.2); color: #ff6644; padding: 3px 10px; border-radius: 3px; cursor: pointer; white-space: nowrap;">DISMISS</button>`;
-                        html += `</div>`;
-
+                        html += `<div class="df-card accent" style="--acc:${acc}"><div class="df-person">${this._dfAvatar(d.name, acc)}<div class="who">`;
+                        html += `<div class="name">${d.name}</div><div class="role">${isDemon ? 'Red Demon' : 'Dancer'}</div></div>`;
+                        html += `<span class="df-chip ${isLowTime ? 'crimson' : 'info'}">${timeStr} left</span></div>`;
+                        html += `<div class="df-bar-label"><span>Vitals</span><span>${hpPercent}%</span></div><div class="df-bar crimson${hpPercent ? '' : ' zero'}"><i style="--v:${hpPercent}%"></i></div>`;
+                        html += `<div style="display:flex;justify-content:flex-end;margin-top:12px;"><button class="df-btn danger team-btn-dismiss-hire" data-index="${i}">Dismiss</button></div>`;
                         html += `</div>`;
                     }
-
-                    // Empty slot indicators
+                    html += `</div>`;
                     const emptySlots = maxHires - activeHires.length;
-                    if (emptySlots > 0) {
-                        html += `<div style="font-size: 0.6rem; color: #444; text-align: center; margin-top: 6px; letter-spacing: 1px;">${emptySlots} OPEN SLOT${emptySlots > 1 ? 'S' : ''}</div>`;
-                    }
+                    if (emptySlots > 0) html += `<div class="df-pager" style="margin-top:12px;">${emptySlots} open slot${emptySlots > 1 ? 's' : ''}</div>`;
                 }
 
                 container.innerHTML = html;
 
                 // ── WIRE BUTTONS (double-tap confirmation) ──
-                // Helper: first click turns button into red "ARE YOU SURE?", second click executes
+                // First tap arms the button (crimson "ARE YOU SURE?"), the second executes; it disarms after 2.5 s
                 const confirmTap = (btn, onConfirm) => {
                     btn.addEventListener('click', () => {
-                        if (btn.dataset.confirm === 'true') {
-                            // Second tap — execute
-                            onConfirm();
-                        } else {
-                            // First tap — arm confirmation
-                            btn.dataset.confirm = 'true';
-                            btn._origText = btn.textContent;
-                            btn._origStyle = btn.style.cssText;
-                            btn.textContent = 'ARE YOU SURE?';
-                            btn.style.background = 'rgba(255,40,40,0.2)';
-                            btn.style.borderColor = 'rgba(255,40,40,0.6)';
-                            btn.style.color = '#ff4444';
-                            // Auto-reset after 2.5 seconds if no second tap
-                            btn._resetTimer = setTimeout(() => {
-                                btn.dataset.confirm = '';
-                                btn.textContent = btn._origText;
-                                btn.style.cssText = btn._origStyle;
-                            }, 2500);
-                        }
+                        if (btn.dataset.confirm === 'true') { onConfirm(); return; }
+                        btn.dataset.confirm = 'true';
+                        btn._origText = btn.textContent;
+                        btn.textContent = 'Are you sure?';
+                        btn.classList.add('confirm');
+                        btn._resetTimer = setTimeout(() => {
+                            btn.dataset.confirm = '';
+                            btn.textContent = btn._origText;
+                            btn.classList.remove('confirm');
+                        }, 2500);
                     });
                 };
 
                 // Recruit teammate (instant — no confirmation needed)
                 container.querySelectorAll('.team-btn-recruit-tm').forEach(btn => {
                     btn.addEventListener('click', () => {
-                        const idx = parseInt(btn.dataset.index);
-                        const tm = self.teammates[idx];
+                        const tm = self.teammates[parseInt(btn.dataset.index)];
                         if (tm) {
                             tm.recruited = true;
                             showMessage(`${tm.name.toUpperCase()} RECRUITED.`);
@@ -925,8 +849,7 @@
                 // Stand down teammate (double-tap)
                 container.querySelectorAll('.team-btn-dismiss-tm').forEach(btn => {
                     confirmTap(btn, () => {
-                        const idx = parseInt(btn.dataset.index);
-                        const tm = self.teammates[idx];
+                        const tm = self.teammates[parseInt(btn.dataset.index)];
                         if (tm) {
                             tm.recruited = false;
                             tm.inCar = false;
@@ -939,9 +862,7 @@
                 // Dismiss hired companion (double-tap)
                 container.querySelectorAll('.team-btn-dismiss-hire').forEach(btn => {
                     confirmTap(btn, () => {
-                        const idx = parseInt(btn.dataset.index);
-                        const contracts = self.hiredDancers;
-                        const dancer = contracts[idx];
+                        const dancer = self.hiredDancers[parseInt(btn.dataset.index)];
                         if (dancer) {
                             self.dismissCompanion(dancer);
                             showMessage(`${dancer.name.toUpperCase()} DISMISSED.`);
@@ -962,59 +883,36 @@
                 if (!container) return;
 
                 let html = '';
-                const sectionStyle = `font-family: Orbitron, sans-serif; font-size: 0.65rem; letter-spacing: 3px; margin: 14px 0 10px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);`;
-                const labelStyle = `font-size: 0.6rem; color: #666; letter-spacing: 1px;`;
-                const valueStyle = `font-size: 0.8rem; color: #ddd;`;
-                const modStyle = `font-size: 0.65rem; color: #00f3ff; margin-left: 6px;`;
+                const fmt = v => typeof v === 'number' ? (v % 1 === 0 ? v : v.toFixed(2)) : v;
+                const row = (k, v) => `<div class="df-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
 
                 // ══════════════════════════════════════════════════
                 //  IDENTITY
                 // ══════════════════════════════════════════════════
-                html += `<div style="${sectionStyle} color: #d4af37;">IDENTITY</div>`;
-                html += `<div style="background: rgba(212,175,55,0.03); border: 1px solid rgba(212,175,55,0.1); border-radius: 4px; padding: 14px; margin-bottom: 8px;">`;
-
-                // Name row with golden accent
-                html += `<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">`;
-                html += `<div style="width: 12px; height: 12px; border-radius: 50%; background: #d4af37; box-shadow: 0 0 8px rgba(212,175,55,0.5);"></div>`;
-                html += `<div style="font-family: Orbitron, sans-serif; font-size: 1rem; color: #e0d0a0; letter-spacing: 2px;">949</div>`;
-                html += `<div style="font-size: 0.6rem; color: #888; letter-spacing: 1px; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 10px;">STELLA</div>`;
-                html += `</div>`;
-
-                // Info grid
-                const infoRows = [
-                    ['AGE', '24'],
-                    ['OCCUPATION', 'FREELANCER'],
-                    ['RESIDENCE', 'Silver Queen Apartments, Southern Dimensions City'],
-                    ['OUTFIT', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedOutfit]?.name || '—').toUpperCase() : '—'],
-                    ['W.I.G', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedWig]?.name || '—').toUpperCase() : '—'],
-                    ['S.K.I.N', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedSkin]?.name || '—').toUpperCase() : '—'],
-                    ['V.O.C.A.L', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedVocal]?.name || '—').toUpperCase() : '—'],
-                    ['H.A.T', this.cosmetics ? (COSMETICS_REGISTRY[this.cosmetics.equippedHat]?.name || '—').toUpperCase() : '—'],
-                    ['J.E.W.E.L.R.Y', this.cosmetics && this.cosmetics.equippedJewelry.length ? this.cosmetics.equippedJewelry.map(id => COSMETICS_REGISTRY[id]?.name).filter(Boolean).join(', ').toUpperCase() : '—']
-                ];
-                for (const [label, val] of infoRows) {
-                    html += `<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">`;
-                    html += `<span style="${labelStyle} flex-shrink: 0;">${label}</span>`;
-                    html += `<span style="font-size: 0.7rem; color: #ccc; text-align: right;">${val}</span>`;
-                    html += `</div>`;
-                }
-                html += `</div>`;
+                const cos = this.cosmetics, nm = id => (COSMETICS_REGISTRY[id]?.name || '—');
+                html += `<div class="df-section"><span><span class="glint">◆</span>Identity</span></div>`;
+                html += `<div class="df-card"><div class="df-person">${this._dfAvatar('949', '#e3ad8f', true)}<div class="who">`;
+                html += `<div class="title script">Stella</div><div class="eyebrow" style="margin-top:2px;">949 · Freelancer · Age 24</div>`;
+                html += `<div class="df-chips" style="margin-top:8px;"><span class="df-chip gold">Silver Queen Apartments</span><span class="df-chip info">Southern Dimensions City</span></div>`;
+                html += `</div></div>`;
+                html += `<div class="df-rows" style="margin-top:12px;">`;
+                html += row('Outfit', cos ? nm(cos.equippedOutfit) : '—');
+                html += row('W.I.G', cos ? nm(cos.equippedWig) : '—');
+                html += row('S.K.I.N', cos ? nm(cos.equippedSkin) : '—');
+                html += row('V.O.C.A.L', cos ? nm(cos.equippedVocal) : '—');
+                html += row('H.A.T', cos && cos.equippedHat ? nm(cos.equippedHat) : '—');
+                html += row('J.E.W.E.L.R.Y', cos && cos.equippedJewelry.length ? cos.equippedJewelry.map(id => COSMETICS_REGISTRY[id]?.name).filter(Boolean).join(', ') : '—');
+                html += `</div></div>`;
 
                 // ══════════════════════════════════════════════════
                 //  STATS
                 // ══════════════════════════════════════════════════
-                html += `<div style="${sectionStyle} color: #00f3ff;">STATS</div>`;
-                html += `<div style="background: rgba(0,243,255,0.02); border: 1px solid rgba(0,243,255,0.08); border-radius: 4px; padding: 14px; margin-bottom: 8px;">`;
+                html += `<div class="df-section"><span>Stats</span></div><div class="df-card">`;
 
-                // HP Bar
                 const hp = this.playerHealth ?? 0;
                 const maxHp = this.maxPlayerHealth ?? 100;
                 const hpPct = Math.max(0, Math.round((hp / maxHp) * 100));
-                html += `<div style="margin-bottom: 10px;">`;
-                html += `<div style="display: flex; justify-content: space-between; ${labelStyle} margin-bottom: 3px;"><span>VITALS</span><span style="color:#ccc;">${hp} / ${maxHp}</span></div>`;
-                html += `<div style="height: 5px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">`;
-                html += `<div style="width: ${hpPct}%; height: 100%; background: linear-gradient(90deg, #ff4444, #ff6666); border-radius: 2px;"></div>`;
-                html += `</div></div>`;
+                html += `<div class="df-bar-label" style="margin-top:0;"><span>Vitals</span><span>${hp} / ${maxHp}</span></div><div class="df-bar crimson${hpPct ? '' : ' zero'}"><i style="--v:${hpPct}%"></i></div>`;
 
                 // Stat rows with buff comparison
                 const baseSpeed = this.player?.speed ?? 5.2;
@@ -1031,117 +929,65 @@
                 const statRow = (label, base, final, unit, lowerIsBetter) => {
                     const modified = Math.abs(final - base) > 0.001;
                     const better = lowerIsBetter ? final < base : final > base;
-                    let valHtml = `<span style="${valueStyle}">${typeof final === 'number' ? (final % 1 === 0 ? final : final.toFixed(2)) : final}</span>`;
-                    if (modified) {
-                        valHtml = `<span style="font-size: 0.7rem; color: #666; text-decoration: line-through;">${typeof base === 'number' ? (base % 1 === 0 ? base : base.toFixed(2)) : base}</span>`;
-                        valHtml += `<span style="font-size: 0.15rem;"> </span>`;
-                        valHtml += `<span style="font-size: 0.8rem; color: ${better ? '#00ff88' : '#ff6644'}; text-shadow: 0 0 4px ${better ? 'rgba(0,255,136,0.3)' : 'rgba(255,102,68,0.3)'};">${typeof final === 'number' ? (final % 1 === 0 ? final : final.toFixed(2)) : final}</span>`;
-                        valHtml += `<span style="${modStyle}">◆</span>`;
-                    }
-                    if (unit) valHtml += `<span style="font-size: 0.55rem; color: #555; margin-left: 3px;">${unit}</span>`;
-                    return `<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.03);"><span style="${labelStyle}">${label}</span><div>${valHtml}</div></div>`;
+                    let v = modified ? `<span class="was">${fmt(base)}</span>${fmt(final)}<span class="diamond">◆</span>` : `${fmt(final)}`;
+                    if (unit) v += `<span class="unit">${unit}</span>`;
+                    return `<div class="df-row"><span class="k">${label}</span><span class="v${modified ? (better ? ' up' : ' down') : ''}">${v}</span></div>`;
                 };
 
-                html += statRow('SPEED', baseSpeed, finalSpeed, '', false);
-                html += statRow('FLIT DISTANCE', baseFlitDist, finalFlitDist, 'px', false);
-                html += statRow('FLIT COST', baseFlitCost, finalFlitCost, '/ 120', true);
-                html += statRow('DETECTION MULT', baseDetect, finalDetect, '×', true);
-
-                // Weapon
                 const weapId = this.inventory?.equippedWeaponId;
                 const weapName = weapId && typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[weapId] ? ITEM_REGISTRY[weapId].name : 'Unarmed';
-                html += `<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">`;
-                html += `<span style="${labelStyle}">WEAPON</span><span style="${valueStyle}">${weapName}</span></div>`;
-
-                // Attachment
                 const attId = this.inventory?.equippedAttachmentId;
                 const attName = attId && typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[attId] ? ITEM_REGISTRY[attId].name : 'None';
-                html += `<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">`;
-                html += `<span style="${labelStyle}">ATTACHMENT</span><span style="${valueStyle}">${attName}</span></div>`;
 
-                // Stims / Currency / Scrap
-                html += `<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">`;
-                html += `<span style="${labelStyle}">STIMS</span><span style="${valueStyle}">${this.boosterCount ?? 0} / ${this.getEffectiveMaxBoosters?.() ?? 4}</span></div>`;
-
-                html += `<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">`;
-                html += `<span style="${labelStyle}">CURRENCY</span><span style="${valueStyle}">${this.currency ?? 0} <span style="font-size:0.55rem;color:#888;">PP</span></span></div>`;
-
-                html += `<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0;">`;
-                html += `<span style="${labelStyle}">SCRAP</span><span style="${valueStyle}">${this.scrap ?? 0}</span></div>`;
-
-                html += `</div>`;
+                html += `<div class="df-rows" style="margin-top:8px;">`;
+                html += statRow('Speed', baseSpeed, finalSpeed, '', false);
+                html += statRow('Flit Distance', baseFlitDist, finalFlitDist, 'px', false);
+                html += statRow('Flit Cost', baseFlitCost, finalFlitCost, '/ 120', true);
+                html += statRow('Detection', baseDetect, finalDetect, '×', true);
+                html += row('Weapon', weapName);
+                html += row('Attachment', attName);
+                html += row('Stims', `${this.boosterCount ?? 0} / ${this.getEffectiveMaxBoosters?.() ?? 4}`);
+                html += row('Currency', `${this.currency ?? 0}<span class="unit">PP</span>`);
+                html += row('Scrap', `${this.scrap ?? 0}`);
+                html += `</div></div>`;
 
                 // ══════════════════════════════════════════════════
                 //  ACTIVE BUFFS
                 // ══════════════════════════════════════════════════
-                html += `<div style="${sectionStyle} color: #ff55aa;">ACTIVE BUFFS</div>`;
-
+                html += `<div class="df-section"><span>Active Buffs</span></div>`;
                 const bs = this.player?.buffSystem;
-                let buffCount = 0;
+                let buffHtml = '';
                 if (bs) {
                     for (const buffId in bs.active) {
                         const buff = bs.active[buffId];
                         if (!buff.active) continue;
-                        buffCount++;
                         const config = CONSUMABLES[buffId];
                         if (!config) continue;
-
                         const minsLeft = Math.max(0, buff.endTime - this.worldMinutes);
-                        const hoursLeft = Math.floor(minsLeft / 60);
-                        const minsRemainder = minsLeft % 60;
-                        const timeStr = `${hoursLeft}h ${minsRemainder}m`;
-                        const isLow = minsLeft < 30;
-
-                        html += `<div style="background: rgba(255,85,170,0.03); border: 1px solid rgba(255,85,170,0.12); border-radius: 4px; padding: 10px; margin-bottom: 6px;">`;
-                        html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">`;
-                        html += `<span style="font-family: Orbitron, sans-serif; font-size: 0.75rem; color: ${config.uiColor || '#ff55aa'}; letter-spacing: 1px;">${config.name.toUpperCase()}</span>`;
-                        html += `<span style="font-family: Orbitron, sans-serif; font-size: 0.55rem; color: ${isLow ? '#ff4444' : '#aaa'}; letter-spacing: 1px;">${timeStr} LEFT</span>`;
-                        html += `</div>`;
-
-                        // Modifier list
+                        const timeStr = `${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m`;
+                        buffHtml += `<div class="df-card accent" style="--acc:${config.uiColor || '#f0a6c8'}"><div class="df-head"><div class="title">${config.name}</div><span class="df-chip ${minsLeft < 30 ? 'crimson' : 'info'}">${timeStr} left</span></div>`;
+                        buffHtml += `<div class="df-chips" style="margin-top:8px;">`;
                         for (const mod of config.modifiers) {
-                            const arrow = mod.type === 'multiply' && mod.value > 1 ? '▲' : mod.type === 'multiply' && mod.value < 1 ? '▼' : '●';
-                            const color = (mod.type === 'multiply' && mod.value > 1) ? '#00ff88' : '#ff6644';
-                            const valStr = mod.type === 'multiply' ? `×${mod.value}` : `+${mod.value}`;
-                            html += `<div style="font-size: 0.6rem; color: #888; padding: 1px 0;"><span style="color:${color};">${arrow}</span> ${mod.stat.toUpperCase()} ${valStr}</div>`;
+                            const up = mod.type === 'multiply' && mod.value > 1, down = mod.type === 'multiply' && mod.value < 1;
+                            buffHtml += `<span class="df-chip ${up ? 'mint' : 'crimson'}">${up ? '▲' : down ? '▼' : '●'} ${mod.stat} ${mod.type === 'multiply' ? '×' + mod.value : '+' + mod.value}</span>`;
                         }
-
-                        // Shield display if applicable
+                        buffHtml += `</div>`;
                         if (buff.shield !== undefined && buff.maxShield) {
                             const shieldPct = Math.round((buff.shield / buff.maxShield) * 100);
-                            html += `<div style="margin-top: 4px;">`;
-                            html += `<div style="display: flex; justify-content: space-between; font-size: 0.5rem; color: #b89730; margin-bottom: 2px;"><span>SHIELD</span><span>${shieldPct}%</span></div>`;
-                            html += `<div style="height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">`;
-                            html += `<div style="width: ${shieldPct}%; height: 100%; background: linear-gradient(90deg, #B8860B, #FFD700); border-radius: 2px;"></div>`;
-                            html += `</div></div>`;
+                            buffHtml += `<div class="df-bar-label"><span>Shield</span><span>${shieldPct}%</span></div><div class="df-bar gold${shieldPct ? '' : ' zero'}"><i style="--v:${shieldPct}%"></i></div>`;
                         }
-
-                        html += `</div>`;
+                        buffHtml += `</div>`;
                     }
                 }
-
-                if (buffCount === 0) {
-                    html += `<div style="padding: 12px; text-align: center; font-size: 0.75rem; color: #444; font-style: italic;">NO ACTIVE BUFFS</div>`;
-                }
+                html += buffHtml ? `<div class="df-grid">${buffHtml}</div>` : `<div class="df-empty">No active buffs.</div>`;
 
                 // ══════════════════════════════════════════════════
                 //  EQUIPPED AUGMENTS
                 // ══════════════════════════════════════════════════
-                html += `<div style="${sectionStyle} color: #00f3ff;">AUGMENTS</div>`;
-
-                const eqAugs = this.augments?.equipped || [];
-                if (eqAugs.length === 0) {
-                    html += `<div style="padding: 12px; text-align: center; font-size: 0.75rem; color: #444; font-style: italic;">NO AUGMENTS EQUIPPED</div>`;
-                } else {
-                    for (const id of eqAugs) {
-                        const aug = typeof AUGMENT_CATALOG !== 'undefined' ? AUGMENT_CATALOG.find(a => a.id === id) : null;
-                        if (!aug) continue;
-                        html += `<div style="background: rgba(0,243,255,0.03); border: 1px solid rgba(0,243,255,0.1); border-radius: 4px; padding: 8px 10px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center;">`;
-                        html += `<div><span style="font-size: 0.75rem; color: #00f3ff;">${aug.icon}</span> <span style="font-size: 0.7rem; color: #ccc;">${aug.name}</span></div>`;
-                        html += `<span style="font-size: 0.5rem; color: #555; letter-spacing: 1px;">${aug.slot.toUpperCase()}</span>`;
-                        html += `</div>`;
-                    }
-                }
+                html += `<div class="df-section"><span>Augments</span></div>`;
+                const eqAugs = (this.augments?.equipped || []).map(id => typeof AUGMENT_CATALOG !== 'undefined' ? AUGMENT_CATALOG.find(a => a.id === id) : null).filter(Boolean);
+                html += eqAugs.length ? `<div class="df-chips">${eqAugs.map(a => `<span class="df-chip active">${a.icon} ${a.name} · ${a.slot}</span>`).join('')}</div>`
+                                      : `<div class="df-empty">No augments equipped.</div>`;
 
                 container.innerHTML = html;
             },
@@ -1156,26 +1002,18 @@
                 }
                 const sv = this._storyView;
                 const storyState = this.story ? this.story.state : { part: 1, chapter: 1, mission: 1, step: 0 };
-
-                const sectionStyle = `font-family: Orbitron, sans-serif; font-size: 0.6rem; letter-spacing: 3px; margin: 14px 0 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);`;
                 let html = '';
 
                 // ── TAB BAR (MAIN / SIDE) ──
-                html += `<div style="display:flex; gap:0; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.08);">`;
-                for (const tab of ['main', 'side']) {
-                    const active = sv.tab === tab;
-                    html += `<div class="story-tab" data-tab="${tab}" style="flex:1; padding:10px 0; text-align:center; font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:3px; color:${active ? '#c8b8d0' : '#444'}; cursor:pointer; border-bottom:${active ? '2px solid #8866aa' : '2px solid transparent'}; transition:color 0.2s;">${tab.toUpperCase()}</div>`;
-                }
+                html += `<div class="df-tabs">`;
+                for (const tab of ['main', 'side']) html += `<div class="df-tab story-tab${sv.tab === tab ? ' active' : ''}" data-tab="${tab}">${tab}</div>`;
                 html += `</div>`;
 
                 if (sv.tab === 'main') {
-                    // ── PART SELECTOR (horizontal pills) ──
-                    html += `<div style="display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;">`;
+                    // ── PART SELECTOR ──
+                    html += `<div class="df-tabs" style="margin-top:-6px;">`;
                     for (let p = 1; p <= 4; p++) {
-                        const partData = STORY_DB[p];
-                        const isActive = sv.selectedPart === p;
-                        const hasContent = !!partData;
-                        html += `<div class="story-part-btn" data-part="${p}" style="padding:6px 14px; font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:2px; color:${isActive ? '#c8b8d0' : hasContent ? '#666' : '#333'}; cursor:${hasContent ? 'pointer' : 'default'}; background:${isActive ? 'rgba(136,102,170,0.15)' : 'rgba(255,255,255,0.02)'}; border:1px solid ${isActive ? 'rgba(136,102,170,0.3)' : 'rgba(255,255,255,0.05)'}; border-radius:4px; transition:all 0.2s;">PART ${p}</div>`;
+                        html += `<div class="df-tab small story-part-btn${sv.selectedPart === p ? ' active' : ''}${STORY_DB[p] ? '' : ' disabled'}" data-part="${p}">Part ${p}</div>`;
                     }
                     html += `</div>`;
 
@@ -1199,92 +1037,57 @@
                             const totalSteps = m.totalSteps || Object.keys(m.steps).length;
                             const currentStep = isCurrentMission ? Math.min(storyState.step, totalSteps) : (sv.selectedPart < storyState.part ? totalSteps : 0);
                             const pct = Math.round((currentStep / totalSteps) * 100);
+                            const status = isCurrentMission ? '<span class="df-chip active">● Active</span>' : pct >= 100 ? '<span class="df-chip done">✓ Complete</span>' : '<span class="df-chip locked">○ Locked</span>';
 
-                            html += `<div style="background:rgba(136,102,170,0.04); border:1px solid rgba(136,102,170,0.15); border-radius:6px; padding:14px; margin-bottom:10px;">`;
-
-                            // Title + status
-                            html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">`;
-                            html += `<div style="font-family:Orbitron,sans-serif; font-size:0.75rem; letter-spacing:2px; color:#c8b8d0;">MISSION ${current.mId}</div>`;
-                            html += `<div style="font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:2px; color:${isCurrentMission ? '#00ff88' : pct >= 100 ? '#8866aa' : '#555'};">${isCurrentMission ? '● ACTIVE' : pct >= 100 ? '✓ COMPLETE' : '○ LOCKED'}</div>`;
+                            html += `<div class="df-card${isCurrentMission ? ' lit' : pct >= 100 ? '' : ' locked'}" style="padding:20px 24px;">`;
+                            html += `<div class="df-head"><div class="eyebrow">Part ${current.partId} · Chapter ${current.chId} · Mission ${current.mId}</div>${status}</div>`;
+                            html += `<div class="title script" style="margin-top:4px;">${m.name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</div>`;
+                            if (m.desc) html += `<div class="desc" style="font-style:italic;">${m.desc}</div>`;
+                            html += `<div class="df-bar-label"><span>Progress</span><span>${pct}%</span></div><div class="df-bar${pct ? '' : ' zero'}"><i style="--v:${pct}%"></i></div>`;
                             html += `</div>`;
-
-                            // Mission name
-                            html += `<div style="font-family:Orbitron,sans-serif; font-size:0.85rem; color:#e0d0f0; letter-spacing:1px; margin-bottom:6px;">${m.name}</div>`;
-
-                            // Description
-                            if (m.desc) {
-                                html += `<div style="font-size:0.7rem; color:#777; font-style:italic; line-height:1.5; margin-bottom:10px;">${m.desc}</div>`;
-                            }
-
-                            // Progress bar
-                            html += `<div style="margin-bottom:4px;">`;
-                            html += `<div style="display:flex; justify-content:space-between; font-size:0.5rem; color:#888; margin-bottom:2px;">`;
-                            html += `<span>PROGRESS</span><span>${pct}%</span></div>`;
-                            html += `<div style="height:4px; background:rgba(255,255,255,0.06); border-radius:2px; overflow:hidden;">`;
-                            html += `<div style="width:${pct}%; height:100%; background:linear-gradient(90deg, #8866aa, #cc88ff); border-radius:2px; transition:width 0.3s;"></div>`;
-                            html += `</div></div>`;
-
-                            html += `</div>`; // End mission card
 
                             // ── NAV ARROWS ──
                             if (allMissions.length > 1) {
-                                html += `<div style="display:flex; justify-content:center; align-items:center; gap:20px; margin-bottom:12px;">`;
-                                html += `<div class="story-mission-nav" data-dir="-1" style="font-size:1.2rem; color:${mIdx > 0 ? '#888' : '#333'}; cursor:${mIdx > 0 ? 'pointer' : 'default'};">◀</div>`;
-                                html += `<div style="font-family:Orbitron,sans-serif; font-size:0.5rem; color:#555; letter-spacing:2px;">${mIdx + 1} / ${allMissions.length}</div>`;
-                                html += `<div class="story-mission-nav" data-dir="1" style="font-size:1.2rem; color:${mIdx < allMissions.length - 1 ? '#888' : '#333'}; cursor:${mIdx < allMissions.length - 1 ? 'pointer' : 'default'};">▶</div>`;
-                                html += `</div>`;
+                                html += `<div class="df-pager"><span class="df-arrow story-mission-nav${mIdx > 0 ? '' : ' disabled'}" data-dir="-1">◀</span>`;
+                                html += `<span>${mIdx + 1} / ${allMissions.length}</span>`;
+                                html += `<span class="df-arrow story-mission-nav${mIdx < allMissions.length - 1 ? '' : ' disabled'}" data-dir="1">▶</span></div>`;
                             }
 
-                            // ── INTEL SECTION ──
+                            // ── INTEL ──
                             if (m.location || m.target) {
-                                html += `<div style="${sectionStyle} color: #8866aa;">INTEL</div>`;
-                                html += `<div style="display:flex; gap:10px; flex-wrap:wrap;">`;
-
+                                html += `<div class="df-section"><span><span class="glint">◆</span>Intel</span></div><div class="df-pair">`;
                                 if (m.location) {
-                                    html += `<div style="flex:1; min-width:120px; background:rgba(136,102,170,0.04); border:1px solid rgba(136,102,170,0.1); border-radius:4px; padding:10px;">`;
-                                    html += `<div style="font-family:Orbitron,sans-serif; font-size:0.45rem; letter-spacing:2px; color:#666; margin-bottom:4px;">LOCATION</div>`;
-                                    html += `<div style="font-size:0.7rem; color:#c8b8d0;">${m.location}</div>`;
-                                    if (m.locationDesc) html += `<div style="font-size:0.6rem; color:#555; margin-top:3px;">${m.locationDesc}</div>`;
+                                    html += `<div class="df-card gold"><div class="eyebrow">Location</div><div class="title">${m.location}</div>`;
+                                    if (m.locationDesc) html += `<div class="desc">${m.locationDesc}</div>`;
                                     html += `</div>`;
                                 }
-
                                 if (m.target) {
-                                    html += `<div style="flex:1; min-width:120px; background:rgba(136,102,170,0.04); border:1px solid rgba(136,102,170,0.1); border-radius:4px; padding:10px;">`;
-                                    html += `<div style="font-family:Orbitron,sans-serif; font-size:0.45rem; letter-spacing:2px; color:#666; margin-bottom:4px;">TARGET</div>`;
-                                    html += `<div style="font-size:0.7rem; color:#c8b8d0;">${m.target}</div>`;
-                                    if (m.completionTime) html += `<div style="font-size:0.6rem; color:#555; margin-top:3px;">EST: ${m.completionTime}</div>`;
+                                    html += `<div class="df-card gold"><div class="eyebrow">Target</div><div class="title">${m.target}</div>`;
+                                    if (m.completionTime) html += `<div class="desc">Est. ${m.completionTime}</div>`;
                                     html += `</div>`;
                                 }
-
                                 html += `</div>`;
                             }
-
                         } else {
-                            html += `<div style="padding:30px 0; text-align:center; font-size:0.7rem; color:#444; font-style:italic;">Content locked.</div>`;
+                            html += `<div class="df-empty">Content locked.</div>`;
                         }
                     } else {
-                        html += `<div style="padding:30px 0; text-align:center; font-size:0.7rem; color:#444; font-style:italic;">This part has not been unlocked yet.</div>`;
+                        html += `<div class="df-empty">This part has not been unlocked yet.</div>`;
                     }
 
                 } else {
                     // ── SIDE TAB ──
-                    html += `<div style="${sectionStyle} color: #8866aa;">OPTIONAL CONTENT</div>`;
+                    html += `<div class="df-section"><span>Optional Content</span></div>`;
                     const mission = this.story?.nsm?.getActiveMission(storyState.part, storyState.chapter, storyState.mission);
                     const optionals = mission?.optional || [];
                     if (optionals.length === 0) {
-                        html += `<div style="padding:20px 0; text-align:center; font-size:0.7rem; color:#444; font-style:italic;">No side content discovered.</div>`;
+                        html += `<div class="df-empty">No side content discovered.</div>`;
                     } else {
                         for (const opt of optionals) {
                             const completed = this.story?.completedOptional?.includes(opt.id);
-                            html += `<div style="background:rgba(136,102,170,0.04); border:1px solid rgba(136,102,170,${completed ? '0.08' : '0.15'}); border-radius:4px; padding:12px; margin-bottom:8px;">`;
-                            html += `<div style="display:flex; justify-content:space-between; align-items:center;">`;
-                            html += `<div style="display:flex; align-items:center; gap:8px;">`;
-                            html += `<div style="width:8px; height:8px; border-radius:50%; background:${completed ? '#00ff66' : '#8866aa'}; box-shadow:0 0 6px ${completed ? '#00ff66' : '#8866aa'};"></div>`;
-                            html += `<div style="font-family:Orbitron,sans-serif; font-size:0.7rem; color:#c8b8d0; letter-spacing:1px;">${opt.name}</div>`;
-                            html += `</div>`;
-                            html += `<div style="font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:2px; color:${completed ? '#00ff66' : '#ffd700'};">${completed ? '✓ DONE' : 'AVAILABLE'}</div>`;
-                            html += `</div>`;
-                            html += `</div>`;
+                            html += `<div class="df-card accent" style="--acc:${completed ? '#8e55f5' : '#ffc248'}"><div class="df-head"><div class="grow"><div class="title">${opt.name}</div>`;
+                            if (opt.desc) html += `<div class="desc">${opt.desc}</div>`;
+                            html += `</div><span class="df-chip ${completed ? 'done' : 'available'}">${completed ? '✓ Done' : 'Available'}</span></div></div>`;
                         }
                     }
                 }
@@ -1312,6 +1115,7 @@
 
                 container.querySelectorAll('.story-mission-nav').forEach(nav => {
                     nav.addEventListener('click', () => {
+                        if (nav.classList.contains('disabled')) return;
                         const dir = parseInt(nav.dataset.dir);
                         sv.selectedMission = Math.max(1, sv.selectedMission + dir);
                         this.renderStoryScreen();
@@ -1324,57 +1128,38 @@
                 const container = document.getElementById('collection-screen-content');
                 if (!container) return;
 
-                let html = '';
-
-                // ── FOUND NOTES section ──
-                const sectionStyle = `font-family: Orbitron, sans-serif; font-size: 0.65rem; letter-spacing: 3px; margin: 12px 0 10px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);`;
-
-                html += `<div style="${sectionStyle} color: #c8b090;">FOUND NOTES</div>`;
+                const totalNotes = Object.keys(NOTE_REGISTRY).length;
+                const found = this.foundNotes ? this.foundNotes.length : 0;
+                let html = `<div class="df-section"><span><span class="glint">◆</span>Found Notes</span><span class="count">${found} / ${totalNotes} discovered</span></div>`;
 
                 if (!this.foundNotes || this.foundNotes.length === 0) {
-                    html += `<div style="padding: 30px 15px; text-align: center;">`;
-                    html += `<div style="font-size: 0.85rem; color: #555; font-style: italic; margin-bottom: 8px;">No notes discovered yet.</div>`;
-                    html += `<div style="font-size: 0.7rem; color: #666;">Explore the world to find letters, briefings, and lore.</div>`;
-                    html += `</div>`;
+                    html += `<div class="df-empty">No notes discovered yet.<div class="df-hint">Explore the world to find letters, briefings, and lore.</div></div>`;
                 } else {
-                    // Style colors per note type
+                    // Each kind of note keeps a touch of its own colour, inside the scheme
                     const styleColors = {
-                        letter: { border: 'rgba(180,140,80,0.2)', bg: 'rgba(42,31,20,0.4)', accent: '#c8a870', icon: '📜' },
-                        briefing: { border: 'rgba(100,120,180,0.15)', bg: 'rgba(10,10,20,0.4)', accent: '#6688cc', icon: '📋' },
-                        ancient: { border: 'rgba(160,80,200,0.15)', bg: 'rgba(26,10,26,0.4)', accent: '#cc88ff', icon: '🔮' },
-                        digital: { border: 'rgba(0,200,255,0.12)', bg: 'rgba(4,8,16,0.4)', accent: '#00bbff', icon: '💾' }
+                        letter: { accent: '#d8c6a2', icon: '📜', kind: 'Letter' },
+                        briefing: { accent: '#cab0fa', icon: '📋', kind: 'Briefing' },
+                        ancient: { accent: '#e3ad8f', icon: '🔮', kind: 'Ancient' },
+                        digital: { accent: '#9be8dc', icon: '💾', kind: 'Digital' }
                     };
-
+                    html += `<div class="df-grid">`;
                     for (const noteId of this.foundNotes) {
                         const note = NOTE_REGISTRY[noteId];
                         if (!note) continue;
                         const sc = styleColors[note.style] || styleColors.letter;
-
-                        html += `<div class="collection-note-card" data-note-id="${noteId}" style="background: ${sc.bg}; border: 1px solid ${sc.border}; border-radius: 6px; padding: 12px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s; display: flex; align-items: center; gap: 12px;">`;
-                        // Icon
-                        html += `<div style="font-size: 1.4rem; opacity: 0.7; flex-shrink: 0;">${note.icon || sc.icon}</div>`;
-                        // Info
-                        html += `<div style="flex: 1; min-width: 0;">`;
-                        html += `<div style="font-family: Orbitron, sans-serif; font-size: 0.75rem; color: ${sc.accent}; letter-spacing: 1px; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${note.title}</div>`;
-                        html += `<div style="font-size: 0.6rem; color: #777;">by ${note.author || 'Unknown'}</div>`;
-                        html += `</div>`;
-                        // Read indicator
-                        html += `<div class="collection-note-indicator" style="font-size: 0.5rem; color: ${sc.accent}; letter-spacing: 2px; opacity: 0.5; flex-shrink: 0;">READ</div>`;
-                        html += `</div>`;
+                        html += `<div class="df-card accent clickable collection-note-card" data-note-id="${noteId}" style="--acc:${sc.accent}"><div class="df-head">`;
+                        html += `<div class="note-ico">${note.icon || sc.icon}</div><div class="grow"><div class="eyebrow">${sc.kind}</div>`;
+                        html += `<div class="title">${note.title}</div>`;
+                        html += `<div class="desc" style="margin-top:2px;">by ${note.author || 'Unknown'}</div></div>`;
+                        html += `<span class="df-chip info collection-note-indicator">Read</span></div></div>`;
                     }
-                    
+                    html += `</div>`;
+
                     // Inline note viewer slot — populates when a card is tapped, no fullscreen
                     // overlay, no pause-state dance. Lives inside the menu's existing scroll
                     // context so the menu stays usable while reading.
-                    html += `<div id="collection-note-inline" style="display:none; margin-top: 8px; margin-bottom: 8px;"></div>`;
+                    html += `<div id="collection-note-inline" style="display:none; margin: 14px 0 8px;"></div>`;
                 }
-
-                // ── STATS ──
-                const totalNotes = Object.keys(NOTE_REGISTRY).length;
-                const found = this.foundNotes ? this.foundNotes.length : 0;
-                html += `<div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); text-align: center;">`;
-                html += `<div style="font-family: Orbitron, sans-serif; font-size: 0.55rem; color: #555; letter-spacing: 2px;">DISCOVERED: ${found} / ${totalNotes}</div>`;
-                html += `</div>`;
 
                 container.innerHTML = html;
 
@@ -1409,7 +1194,7 @@
                     slot.style.display = 'none';
                     slot.innerHTML = '';
                     delete slot.dataset.activeNote;
-                    allCards.forEach(c => { c.style.borderColor = ''; });
+                    allCards.forEach(c => c.classList.remove('selected'));
                     audioSys.sfx('ui');
                     return;
                 }
@@ -1424,7 +1209,7 @@
                 // Build inline content. Reuses note-{style} classes from the existing
                 // overlay so visual identity carries across both viewers.
                 const styleClass = `note-${note.style || 'letter'}`;
-                let inner = `<div class="${styleClass}" id="collection-note-inline-doc" style="border-radius: 6px; padding: 16px 18px 8px; position: relative;">`;
+                let inner = `<div class="df-reader"><div class="${styleClass}" id="collection-note-inline-doc" style="padding: 16px 18px 8px; position: relative;">`;
                 
                 // Close affordance (top-right). Inline X — small, doesn't compete with
                 // the note's typographic header.
@@ -1450,20 +1235,14 @@
                     inner += `<div id="note-signature" style="text-align:right; padding: 0 6px 8px; font-size:0.8rem;">${note.signature}</div>`;
                 }
                 
-                inner += `</div>`;
+                inner += `</div></div>`;
                 
                 slot.innerHTML = inner;
                 slot.style.display = 'block';
                 slot.dataset.activeNote = noteId;
                 
-                // Active-card highlight (uses same accent the card already shows).
-                const styleColors = {
-                    letter: '#c8a870', briefing: '#6688cc', ancient: '#cc88ff', digital: '#00bbff'
-                };
-                const accent = styleColors[note.style] || styleColors.letter;
-                allCards.forEach(c => {
-                    c.style.borderColor = (c.dataset.noteId === noteId) ? accent : '';
-                });
+                // Active-card highlight
+                allCards.forEach(c => c.classList.toggle('selected', c.dataset.noteId === noteId));
                 
                 // Wire close button
                 const closeBtn = slot.querySelector('.collection-note-inline-close');
