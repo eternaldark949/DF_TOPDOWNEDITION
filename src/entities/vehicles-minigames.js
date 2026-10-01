@@ -82,7 +82,7 @@
              */
             getBoundingBox() {
                 // Use the diagonal as the bounding radius to handle any rotation
-                const maxDim = Math.max(this.length, this.vehicleWidth);
+                const maxDim = Math.hypot(this.length, this.vehicleWidth);
                 return {
                     x: this.x - maxDim / 2,
                     y: this.y - maxDim / 2,

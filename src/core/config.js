@@ -333,6 +333,9 @@
                of phase = PI / w ticks). For the planted foot to stay put, that 2A
                sweep must equal the ground the body covers meanwhile (v * PI / w).
                With CADENCE 0.2: A ~ 7.85 * sqrt(v) -> 14.7px @3.5, 17.9px @5.2, 20.8px @7.0. */
+            PHYSICS: {
+                PUSH_MASS: 8            // an actor shoves props as if this many times its own mass (player 15 → 120 vs a 50 prop)
+            },
             // Humanoid shading (ui/humanoid-render.js humanShade): a shine down every limb, torso and
             // head (they're cylinders and domes seen from above), a soft contact shadow cast along
             // the sun, and at night a rim of the nearest street lamp's colour.

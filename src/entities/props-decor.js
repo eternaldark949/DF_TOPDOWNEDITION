@@ -1547,7 +1547,10 @@
                 if (config.lootLines) { this.lootMin = config.lootMin; this.lootMax = config.lootMax; this.lootLines = config.lootLines; }   // lost things (searchLostLuggage)
                 this.roomId = config.roomId || null;  // For light switches: which room this controls
                 this._switchState = true;  // Light switch: true = lights ON
-                this.angularFriction = 0.9;  // Rotation slows down over time
+                this.angularFriction = 0.85;  // Rotation slows down over time (as fast as sliding does)
+                // Fixtures never turn: wall-mounted things, thin wall pieces, and anything too heavy to shift
+                this.fixedRotation = config.fixedRotation ?? (this.noNav || this.mass >= 1e4
+                    || ['light_switch', 'armory', 'medbay_refill', 'tv_screen', 'vending_machine'].includes(this.interactionType));
                 
                 // Legacy compatibility: expose w and h
                 this.w = this.width;
@@ -1602,6 +1605,17 @@
              * Wall and prop-prop collisions are handled by CollisionSystem.
              */
             update() {
+                // A broken number never spreads: restore the last good state
+                if (!Number.isFinite(this.x + this.y + this.vx + this.vy + this.angle + this.angularVel)) {
+                    const g = this._good || { x: 0, y: 0, angle: 0 };
+                    this.x = g.x; this.y = g.y; this.angle = g.angle; this.vx = this.vy = this.angularVel = 0;
+                }
+                if (this.fixedRotation) this.angularVel = 0;
+                // Speed cap: no faster than about half its own thickness a tick (walls can't be skipped)
+                const sp = Math.hypot(this.vx, this.vy), cap = Math.max(4, Math.min(14, Math.min(this.width, this.height) * 0.9));
+                if (sp > cap) { this.vx *= cap / sp; this.vy *= cap / sp; }
+                if (Math.abs(this.angularVel) > 0.35) this.angularVel = Math.sign(this.angularVel) * 0.35;
+
                 // Apply velocity
                 this.x += this.vx;
                 this.y += this.vy;
@@ -1618,6 +1632,10 @@
                 if (Math.abs(this.vx) < 0.1) this.vx = 0;
                 if (Math.abs(this.vy) < 0.1) this.vy = 0;
                 if (Math.abs(this.angularVel) < 0.001) this.angularVel = 0;
+                // Asleep after a still half-second (CollisionSystem skips sleeper pairs); a contact wakes it
+                this._still = (this.vx || this.vy || this.angularVel) ? 0 : (this._still || 0) + 1;
+                if (!this._good) this._good = {};
+                this._good.x = this.x; this._good.y = this.y; this._good.angle = this.angle;
                 
                 // Keep w/h in sync for legacy compatibility
                 this.w = this.width;
@@ -1636,16 +1654,13 @@
                 ctx.fillStyle = this.color;
                 
                 if (this.decorType) {
-                    ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
                     drawClinicDecorProp(ctx, this);
                 } else if (this.interactionType === 'medbay_refill') {
-                    ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
                     drawHealthStation(ctx, this);
                 } else if (this.interactionType === 'armory') {
                     // === ARMORY LOCKER (wall-mounted weapons rack) ===
-                    ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
                     
                     const ax = this.x, ay = this.y, aw = this.width, ah = this.height;
@@ -1685,12 +1700,10 @@
                     ctx.textAlign = 'start';
                     
                 } else if (this.interactionType === 'vending_machine') {
-                    ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
                     drawMiniSpree(ctx, this);
                 } else if (this.interactionType === 'bed_sleep') {
                     // --- NEW: SMALLER BED RENDERER ---
-                    ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
                     
                     // Mattress
@@ -1711,7 +1724,6 @@
                     
                 } else if (this.interactionType === 'couch_two_seater') {
                     // --- TWO SEATER COUCH (Top-down view) ---
-                    ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
                     
                     // Couch base/frame (darker)
@@ -1741,7 +1753,6 @@
                     
                 } else if (this.interactionType === 'tv_screen') {
                     // --- TV SCREEN (Top-down, warm glow for fireplace effect) ---
-                    ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
                     
                     // TV frame (black border)
@@ -1767,7 +1778,6 @@
                     
                 } else if (this.interactionType === 'light_switch') {
                     // --- LIGHT SWITCH (Wall-mounted panel with LED indicator) ---
-                    ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
                     
                     const sx = this.x, sy = this.y, sw = this.width, sh = this.height;
@@ -1801,7 +1811,6 @@
                     
                 } else if (this.interactionType === 'bedside_table') {
                     // --- BEDSIDE TABLE (Top-down, small square table) ---
-                    ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
                     
                     // Table top
@@ -1825,7 +1834,6 @@
                     
                 } else if (this.color === '#555') {
                     // Gravestones (no rotation for gravestones)
-                    ctx.rotate(-this.angle);
                     ctx.translate(-center.x, -center.y);
                     ctx.fillStyle = '#444';
                     ctx.beginPath();

@@ -203,7 +203,7 @@
              */
             getBoundingBox() {
                 // Use the diagonal to account for any rotation
-                const maxDim = Math.max(this.length, this.width);
+                const maxDim = Math.hypot(this.length, this.width);
                 return {
                     x: this.x - maxDim / 2,
                     y: this.y - maxDim / 2,
@@ -962,6 +962,7 @@
                                 steerCurve = false, gripFloor = 0 }) {
                 const VD = CONFIG.VEHICLE_DRIVE;
                 const VA = CONFIG.VEHICLE_AI;
+                this._wallProbeTick = _simTick;   // walls are handled here: CollisionSystem skips this car's wall pass
                 if (typeof this.vx === 'undefined') { this.vx = 0; this.vy = 0; }
 
                 /* --- PER-VEHICLE PERFORMANCE ---

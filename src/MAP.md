@@ -54,12 +54,12 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `physics/spatial.js` | `PhysicsSystem` (`carContact`: car hits push apart by mass and take the closing speed out of `vx`/`vy`, a little bounce, no spin — both collision passes use it; the driven car gets `onImpact` with a twist by where it was hit), spatial hash, render/transition grids |
 | `physics/game-entity.js` | `GameEntity`, the base class for everything that moves or collides |
-| `physics/collision.js` | `CollisionSystem`: circles, boxes, rotated boxes, pushing, hinged-door hook |
+| `physics/collision.js` | `CollisionSystem`: circles, boxes, rotated boxes, pushing, hinged-door hook  **Contact solver** (`_solveContact`): position correction past 0.5px slop (80%) shared by inverse mass (0 for static, `immovable` or mass ≥ 1e4), then a normal impulse and Coulomb friction, each with its angular term at the real contact point (`_contactPoint`: the deepest corner(s), ties averaged); props spin from where they're hit (I = m(w²+h²)/12). 3 relaxation passes for props; sleepers (`_still` > 30) skip each other; moving props collide off screen too; cars shove props; car-vs-car is TrafficManager's alone; a car that probed walls this tick (`_wallProbeTick`) skips the wall pass; actors push with `CONFIG.PHYSICS.PUSH_MASS` × their mass and take no velocity back. |
 
 ## entities/
 | File | What's in it |
 |---|---|
-| `entities/props-decor.js` | `StaticEntity`, apartment (incl. the crafting workbench, `apt_craft`), clinic, House of Death (`hod_*`), Double Nights lobby (`dn_*`), penthouse suite (`ps_*`), Sanctum (`sc_*`) and Moon City Nightclub (`mc_*`) furniture art, the graveyard's carved stones (`gy_stone`, 8 variants, cached sprites), the MiniSpree vending machine and the health station (one design on every map), `PropEntity` |
+| `entities/props-decor.js` | `StaticEntity`, apartment (incl. the crafting workbench, `apt_craft`), clinic, House of Death (`hod_*`), Double Nights lobby (`dn_*`), penthouse suite (`ps_*`), Sanctum (`sc_*`) and Moon City Nightclub (`mc_*`) furniture art, the graveyard's carved stones (`gy_stone`, 8 variants, cached sprites), the MiniSpree vending machine and the health station (one design on every map), `PropEntity`  `PropEntity`: art drawn in the box's rotated frame; `fixedRotation` for fixtures; speed cap, spin cap, NaN restore, sleep counter. |
 | `entities/vehicles-minigames.js` | `VehicleEntity`, bumper cars, Ferris wheel, bumper-car minigame |
 | `entities/lamps.js` | `LampEntity` (all lamp types) |
 | `entities/actors.js` | `ActorEntity`, `PlayerEntity`, projectiles, triggers |
