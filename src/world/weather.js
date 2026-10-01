@@ -936,6 +936,37 @@
                 });
                 ctx.globalAlpha = 1.0;
             }
+            /**
+             * Cinematic View's pan: rain over ground the real camera never spawned for. Tops the panned view
+             * up to the density round the camera with held drops (heights spread, nothing advances), so the
+             * still rain reaches wherever the photo looks. `covered` is the rect drops already exist in.
+             */
+            fillView(view, covered) {
+                if (!this.isRaining || !view) return;
+                const RC = CONFIG.WEATHER, zoom = view.zoom || 1, hw = this._halfW, hh = this._halfH;
+                const vw = this.width / zoom + 80, vh = this.height / zoom + 80, L = view.x - vw / 2, T = view.y - vh / 2;
+                const inC = (x, y) => covered && x > covered.l && x < covered.r && y > covered.t && y < covered.b;
+                if (!this._cineDensity) {                                            // drops per world px² round the camera, measured once
+                    let n = 0; for (const d of this.drops) if (inC(d.groundX, d.groundY)) n++;
+                    this._cineDensity = covered ? n / Math.max(1, (covered.r - covered.l) * (covered.b - covered.t)) : 0;
+                }
+                const want = Math.min(4000, Math.floor(this._cineDensity * vw * vh));
+                let have = 0; for (const d of this.drops) if (d.groundX > L && d.groundX < L + vw && d.groundY > T && d.groundY < T + vh) have++;
+                for (let k = 0, tries = 0; have < want && tries < want * 4 && this.drops.length < 6000; tries++) {
+                    const gx = L + Math.random() * vw, gy = T + Math.random() * vh;
+                    if (inC(gx, gy)) continue;                                      // that ground already has its rain
+                    const h0 = 0.05 + Math.random() * 0.95;
+                    const sx = (gx - view.x) * zoom + hw, sy = (gy - view.y) * zoom + hh, dx = sx - hw, dy = sy - hh;
+                    const par = h0 * h0 * RC.RAIN_PARALLAX;
+                    const stx = sx + dx * par - this.windVec.x * RC.RAIN_WIND_DRIFT * h0, sty = sy + dy * par - this.windVec.y * RC.RAIN_WIND_DRIFT * h0;
+                    const tx = sx - stx - this.windVec.x * RC.RAIN_WIND_DIR_STR, ty = sy - sty - this.windVec.y * RC.RAIN_WIND_DIR_STR, dist = Math.hypot(tx, ty);
+                    this.drops.push({ groundX: gx, groundY: gy, height: h0,
+                        fallSpeed: RC.RAIN_FALL_SPEED_MIN + Math.random() * (RC.RAIN_FALL_SPEED_MAX - RC.RAIN_FALL_SPEED_MIN),
+                        brightness: 0.35 + Math.random() * 0.65, dirX: dist > 0.1 ? tx / dist : 0, dirY: dist > 0.1 ? ty / dist : 1 });
+                    have++; k++;
+                }
+            }
+
             drawRainOverlay(ctx, camera, lamps) {
                 if (!this.isRaining || !camera) return;
                 ctx.save();
