@@ -419,17 +419,20 @@
              */
             _music(game, paused) {
                 const ctx = this.audio.ctx, now = ctx.currentTime;
-                let spec = game.activeMap && MAP_MUSIC[game.activeMap.id];
-                // A track that belongs to one area of a map (`area`, e.g. the graveyard): full inside,
-                // rising over `fade` px as 949 (or her car) comes up to it, silent and stopped beyond
-                let areaK = 1;
-                if (spec && spec.area) {
-                    const A = spec.area, who = game.isDriving && game.car ? game.car : game.player;
+                // A track that belongs to one area of a map (`area`, or a `building`'s footprint): full inside,
+                // rising over `fade` px as 949 (or her car) comes up to it, silent and stopped beyond.
+                // A map can list several (the hub: the graveyard, the club's bass through its walls); the nearest wins.
+                const entry = game.activeMap && MAP_MUSIC[game.activeMap.id];
+                let spec = null, areaK = 0;
+                for (const sp of entry ? (Array.isArray(entry) ? entry : [entry]) : []) {
+                    const A = sp.building ? this._buildingArea(game, sp.building) : sp.area;
+                    if (!A) { if (!sp.area && !sp.building && areaK < 1) { spec = sp; areaK = 1; } continue; }
+                    const who = game.isDriving && game.car ? game.car : game.player;
                     const dx = who ? Math.max(A.x - who.x, 0, who.x - (A.x + A.w)) : 1e9, dy = who ? Math.max(A.y - who.y, 0, who.y - (A.y + A.h)) : 1e9;
-                    const t = Math.max(0, 1 - Math.hypot(dx, dy) / (spec.fade || 500));
-                    areaK = t * t * (3 - 2 * t);
-                    if (areaK <= 0) spec = null;
+                    const t = Math.max(0, 1 - Math.hypot(dx, dy) / (sp.fade || 500)), k = t * t * (3 - 2 * t);
+                    if (k > areaK) { spec = sp; areaK = k; }
                 }
+                this._activeSpec = spec;
                 const M = this._mus || (this._mus = (() => {
                     const f = ctx.createBiquadFilter(), g = ctx.createGain();
                     f.type = 'lowpass'; f.frequency.value = 18000; f.Q.value = 0.5; g.gain.value = 0;
@@ -442,8 +445,8 @@
                     loadSound(spec.track).then(buf => {
                         M.loading = null;
                         if (!buf) return;
-                        const cur = game.activeMap && MAP_MUSIC[game.activeMap.id];
-                        if (!cur || cur.track !== spec.track) return;       // left the map while it decoded
+                        const cur = this._activeSpec;
+                        if (!cur || cur.track !== spec.track) return;       // left the map (or the area) while it decoded
                         if (M.src) { try { M.src.stop(); } catch (e) { /* already stopped */ } }
                         const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(M.f); s.start();
                         M.src = s; M.name = spec.track; M.t0 = ctx.currentTime; M.dur = buf.duration;
@@ -460,6 +463,7 @@
                         if (room.type === 'outdoor') { level *= 0.35 + 0.45 * open; cut = 550 + 5000 * open; }
                         else { level *= 0.55 + 0.35 * open; cut = 900 + 6000 * open; }
                     }
+                    if (spec.lowpass) cut = Math.min(cut, spec.lowpass);  // heard through walls: only the thump
                     if (paused) level *= 0.3;
                     if (game.musicWidget && game.musicWidget.isPlaying) level = 0;   // the phone radio takes over
                 }
@@ -472,10 +476,22 @@
                 } else M.quietSince = now;
             }
 
-            /** Beats played so far of this map's track (MAP_MUSIC bpm/beat0), counted from where the
+            /** A building's footprint on this map (for `building:` area music), cached per map. */
+            _buildingArea(game, id) {
+                const m = game.activeMap; if (!m) return null;
+                if (this._areaMap !== m) { this._areaMap = m; this._areas = {}; }
+                if (id in this._areas) return this._areas[id];
+                const b = (m.buildings || []).find(o => o.id === id);
+                if (!b) return (this._areas[id] = null);
+                let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+                for (const s of b.sections) { x0 = Math.min(x0, b.x + s.x); y0 = Math.min(y0, b.y + s.y); x1 = Math.max(x1, b.x + s.x + s.w); y1 = Math.max(y1, b.y + s.y + s.h); }
+                return (this._areas[id] = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+            }
+
+            /** Beats played so far of the playing track (MAP_MUSIC bpm/beat0), counted from where the
              *  speakers actually are in the loop, or null when it isn't playing. Lights keep time with it. */
             musicBeat(game) {
-                const M = this._mus, spec = game.activeMap && MAP_MUSIC[game.activeMap.id];
+                const M = this._mus, spec = this._activeSpec;
                 if (!M || !M.src || !spec || !spec.bpm || M.name !== spec.track || M.level < 0.002) return null;
                 const ctx = this.audio.ctx;
                 if (ctx.state !== 'running') return null;                       // a locked or paused clock stands still
@@ -608,7 +624,11 @@
             // The van, on the way to the job (the intro): over the rain on the roof and the road
             van_interior: { track: 'van 2', volume: 0.45 },
             // Grave Stories: the southern graveyard in Southern Dimensions City (its walls, engine/map-loading.js 11d)
-            hub_949: { track: 'grave stories (1)', volume: 0.5, area: { x: 500, y: 8800, w: 3000, h: 2000 }, fade: 600 },
+            hub_949: [
+                { track: 'grave stories (1)', volume: 0.5, area: { x: 500, y: 8800, w: 3000, h: 2000 }, fade: 600 },
+                // Moon City's bass through its walls: heard as you come up to the club, low-passed to the thump; its lights keep time
+                { track: 'moon city nightclub - swig', building: 'moon_city', volume: 0.32, fade: 420, lowpass: 260, bpm: 140, beat0: 0 }
+            ],
         };
         const CLUB_BPM = 140;
         const CLUB_PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];   // the club's lights: violet, lavender, rose, gold
@@ -617,7 +637,7 @@
          *  it plays, else a free-running clock at that tempo (audio locked, paused). null without one. */
         function mapBeatN() {
             if (typeof game === 'undefined' || !game || !game.activeMap) return null;
-            const spec = MAP_MUSIC[game.activeMap.id];
+            const e = MAP_MUSIC[game.activeMap.id], spec = Array.isArray(e) ? (typeof ambience !== 'undefined' ? ambience._activeSpec : null) : e;
             if (!spec || !spec.bpm) return null;
             const b = typeof ambience !== 'undefined' ? ambience.musicBeat(game) : null;
             return b !== null ? b : (_frameTime / 1000) * spec.bpm / 60;

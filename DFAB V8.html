@@ -1162,6 +1162,22 @@
             text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); opacity: 0;
         }
         #cinematic-hint.show { animation: cineHint 3.2s ease forwards; }
+        #cine-bar {
+            position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 3002;
+            display: flex; gap: 8px; padding: 6px 8px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity 0.6s ease;
+            background: rgba(12, 4, 16, 0.55); border: 1px solid rgba(200, 170, 255, 0.28); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        }
+        body.cinematic-view #cine-bar { opacity: 0.85; pointer-events: auto; }
+        #cine-bar button {
+            min-width: 40px; height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(200, 170, 255, 0.3);
+            background: rgba(30, 12, 40, 0.6); color: var(--df-lavender-pale); font-family: var(--font-ui); font-size: 0.8rem; letter-spacing: 2px; cursor: pointer; white-space: nowrap;
+        }
+        #cine-bar button:active { background: rgba(180, 140, 255, 0.35); }
+        #cinematic-hint { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+        #cine-flash { position: fixed; inset: 0; z-index: 3003; pointer-events: none; opacity: 0; background: #fff; display: flex; align-items: center; justify-content: center; }
+        #cine-flash span { font-family: var(--font-ui); letter-spacing: 6px; font-size: 0.9rem; color: #1a0a20; }
+        #cine-flash.go { animation: cineFlash 1.1s ease-out forwards; }
+        @keyframes cineFlash { 0% { opacity: 0.85; } 25% { opacity: 0.35; background: rgba(255,255,255,0.35); } 70% { opacity: 0.6; background: transparent; } 100% { opacity: 0; background: transparent; } }
         @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
 
         /* --- SAVE SLOT OVERLAY --- */
@@ -2542,6 +2558,13 @@
             margin-top: 8px; font-family: Georgia, serif; font-style: italic; font-size: clamp(0.62rem, 2.8vw, 0.9rem);
             color: #e8c9b8; letter-spacing: 0.08em; text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
         }
+
+        /* The apartment's hand (engine/furniture.js): turn buttons beside the pill while holding */
+        #grab-rotate { display: none; gap: 8px; justify-content: flex-end; pointer-events: auto; }
+        .grab-rot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;
+            font-size: 1.2rem; color: var(--df-lavender-pale, #f1e8fe); background: rgba(20, 8, 30, 0.7); border: 1px dotted rgba(232, 194, 122, 0.7);
+            box-shadow: 0 0 10px rgba(232, 194, 122, 0.25); user-select: none; touch-action: none; }
+        .grab-rot:active { background: rgba(93, 20, 226, 0.5); }
         /* =========================================
            CINEMATIC DIALOGUE (ui/cinematic-dialogue.js)
            Subtitles over a soft scrim, portrait cameos, choices on the right,
@@ -3239,6 +3262,8 @@
             <div id="action-dock">
                 <button class="game-btn" id="btn-transition"></button>
                 <div class="game-btn" id="btn-interact"></div>
+                <div class="game-btn" id="btn-grab"></div>
+                <div id="grab-rotate"><div class="grab-rot" id="btn-rot-l" title="Turn left (Shift+R)">⟲</div><div class="grab-rot" id="btn-rot-r" title="Turn right (R)">⟳</div></div>
             </div>
             
             <div id="btn-fire">
@@ -3878,7 +3903,15 @@
         </div>
     </div>
     <!-- Cinematic view (pause menu → Quick Access): the HUD hidden, the world held still -->
-    <div id="cinematic-hint">Tap or press Esc to return</div>
+    <div id="cinematic-hint">Drag to pan · pinch to zoom · tap to return</div>
+    <div id="cine-bar" aria-label="Cinematic view">
+        <button data-cine="save" title="Save picture">📷 SAVE</button>
+        <button data-cine="out" title="Zoom out">−</button>
+        <button data-cine="in" title="Zoom in">+</button>
+        <button data-cine="reset" title="Recentre">⟲</button>
+        <button data-cine="back" title="Back to the menu">✕</button>
+    </div>
+    <div id="cine-flash"><span>SAVED</span></div>
     
     <!-- SAVE SLOT OVERLAY -->
     <div id="save-slot-overlay"></div>
@@ -4032,6 +4065,10 @@
             // --- CAMERA ---
             CAMERA: {
                 DEFAULT_ZOOM: 1.0,
+                HOLSTER_ZOOM: 1.18,             // on foot, gun away: 18% closer (engine/update.js camera)
+                INDOOR_ZOOM: 1.20,              // indoors: 20% closer (stacks with holstered)
+                INTERACT_ZOOM: 1.05,            // by something to use, or talking: 5% closer than that
+                CINE_PAN: 450, CINE_ZOOM: [0.5, 2.5],       // Cinematic View: pan radius (world px) and zoom limits
                 SHAKE_DECAY: 0.9,
                 SHAKE_MIN_THRESHOLD: 0.5
             },
@@ -4112,6 +4149,7 @@
                 WALL: 0.5, DOOR: 0.6,           // reach kept through a wall / a shut door
                 ERR_NEAR: 20, ERR_FAR: 150      // how far off their guess is, close up / at the edge of hearing
             },
+            WALK_TO_CAR: true,          // on foot, "Drive" walks 949 round to the driver's door first (engine/events.js _walkToCar)
             NAV: {
                 CELL: 20,                   // Grid cell size (px)
                 AGENT_RADIUS: 16,           // Obstacles are inflated by this (teammate radius 14 + margin)
@@ -4361,7 +4399,7 @@
                 HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
                 REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
-                CAM_ZOOM: { SPAN: 0.5, FLOOR: 0.5 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
+                CAM_ZOOM: { SPAN: 0.25, FLOOR: 0.75 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
                 STICK_YAW_DAMP: 5,
                 IMPACT_YAW: 0.9,                // Twist from an off-centre knock (onImpact)              // Touch stick unwinds by this × yawRate (no overshoot)
                 COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)
@@ -5396,6 +5434,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (L) out.push({ items: L.leaves, pos: true, scalars: ['rotation', 'tumble'] });
                 if (game.graveyardGhosts) out.push({ items: game.graveyardGhosts, pos: true, angles: ['angle'], scalars: ['life'] });
                 if (game.lobbyLife && game.lobbyLife.walkers.length) out.push({ items: game.lobbyLife.walkers, pos: true, angles: ['angle'], scalars: ['life'] });
+                if (game.clubLife && game.clubLife.walkers.length) out.push({ items: game.clubLife.walkers, pos: true, angles: ['angle'], scalars: ['life'] });
                 if (game.flitVFX) out.push({ items: game.flitVFX, scalars: ['ghostAlpha', 'trailLife', 'arrivalGlow'] });
                 if (game.lastKnownMarkers) out.push({ items: game.lastKnownMarkers, scalars: ['opacity'] });
                 if (m && m.ferrisWheel) out.push({ items: [m.ferrisWheel], angles: ['angle'] });
@@ -6061,6 +6100,102 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             tm.y += (dy / d) * step;
         }
         
+        // ============================================================================
+        //  WALKER — "go to" for any procedural humanoid (the player, NPCs, teammates…)
+        //  Walker.goTo(actor, x, y, { face, speed, arrive, timeout, via, onArrive, onFail })
+        //  (`via`: [[x, y], …] points to pass on the way, e.g. round a car the nav grid doesn't know)
+        //  walks the actor along the nav grid (actorSteer), eases into the spot, turns to
+        //  `face` (an angle or an [x, y] point), then calls onArrive. No progress for
+        //  `timeout` ticks: onFail. Returns { done(), ok(), cancel() } — the scene runner's
+        //  waitable, so `yield Walker.goTo(npc, x, y)` works in scenes.
+        //  The player isn't moved here: while a walk owns her, engine/update.js feeds
+        //  stepPlayer()'s direction in as her movement input (so walls, cars, the map edge
+        //  and facing all behave), and any real input takes the controls back.
+        //  Everyone else is stepped by Walker.update(game), once a sim tick.
+        // ============================================================================
+        const Walker = {
+            walks: [],
+
+            goTo(actor, x, y, o = {}) {
+                this.cancel(actor);
+                const isPlayer = typeof game !== 'undefined' && actor === game.player;
+                // A goal on furniture or in a wall: the nearest spot a body can stand
+                const nav = typeof game !== 'undefined' && game.activeMap ? NavGrid.for(game.activeMap) : null;
+                if (nav && !nav.walkable(x, y)) { const f = nav.nearestFree(x, y, 6); if (f !== null && f !== undefined) { x = nav.cx(f); y = nav.cy(f); } }
+                const pts = (o.via || []).concat([[x, y]]);
+                const w = { actor, x: pts[0][0], y: pts[0][1], pts: pts.slice(1), face: o.face, speed: o.speed || 1.5, arrive: o.arrive ?? 6, timeout: o.timeout ?? 300,
+                            onArrive: o.onArrive, onFail: o.onFail, state: 'walk', best: Infinity, stuck: 0, isPlayer };
+                if (isPlayer) actor._walk = w; else this.walks.push(w);
+                return { done: () => w.state !== 'walk' && w.state !== 'turn', ok: () => w.state === 'arrived', cancel: () => this._end(w, 'cancelled') };
+            },
+
+            /** Stop whatever walk this actor is on (no callbacks). */
+            cancel(actor) {
+                if (actor && actor._walk) this._end(actor._walk, 'cancelled');
+                const w = this.walks.find(o => o.actor === actor);
+                if (w) this._end(w, 'cancelled');
+            },
+
+            isWalking(actor) { return !!(actor && (actor._walk || this.walks.some(o => o.actor === actor))); },
+
+            _end(w, state) {
+                if (w.state !== 'walk' && w.state !== 'turn') return;
+                w.state = state;
+                if (w.isPlayer && w.actor._walk === w) w.actor._walk = null;
+                const i = this.walks.indexOf(w); if (i >= 0) this.walks.splice(i, 1);
+                if (state === 'arrived' && w.onArrive) w.onArrive();
+                if (state === 'failed' && w.onFail) w.onFail();
+            },
+
+            /** Arrived or still turning to face: true while the walk is done moving (and handles the turn). */
+            _settle(w) {
+                const a = w.actor;
+                if (w.face != null) {
+                    const target = typeof w.face === 'number' ? w.face : Math.atan2(w.face[1] - a.y, w.face[0] - a.x);
+                    const da = Math.atan2(Math.sin(target - (a.angle || 0)), Math.cos(target - (a.angle || 0)));
+                    w.state = 'turn';
+                    if (Math.abs(da) > 0.03) { a.angle = (a.angle || 0) + Math.sign(da) * Math.min(Math.abs(da), 0.22); return; }
+                    a.angle = target;
+                }
+                this._end(w, 'arrived');
+            },
+
+            _progress(w, d) {
+                if (d < w.best - 1) { w.best = d; w.stuck = 0; return true; }            // (a pixel of real progress resets the clock)
+                if (++w.stuck > w.timeout) { this._end(w, 'failed'); return false; }
+                return true;
+            },
+
+            /** The player's walk this tick: a movement input {x, y} (|v| ≤ 1), or null once she's there. */
+            stepPlayer(game) {
+                const w = game.player._walk;
+                if (!w) return null;
+                const a = game.player, d = Math.hypot(w.x - a.x, w.y - a.y);
+                if (w.state !== 'turn' && d <= Math.max(w.arrive, 8) && w.pts.length) { [w.x, w.y] = w.pts.shift(); w.best = Infinity; w.stuck = 0; return this.stepPlayer(game); }   // a via point: on to the next
+                if (w.state === 'turn' || d <= w.arrive) { this._settle(w); return { x: 0, y: 0 }; }
+                if (!this._progress(w, d)) return null;
+                const s = actorSteer(a, w.x, w.y, 1, game.activeMap), m = Math.hypot(s.x, s.y) || 1;
+                const ease = Math.min(1, Math.max(0.3, d / 26));                 // slow into the spot
+                return { x: s.x / m * ease, y: s.y / m * ease };
+            },
+
+            /** Steps every non-player walk (NPCs, teammates, scene extras): once a sim tick. */
+            update(game) {
+                const map = game.activeMap; if (!map) return;
+                for (let i = this.walks.length - 1; i >= 0; i--) {
+                    const w = this.walks[i], a = w.actor;
+                    if (!a || a.dead) { this._end(w, 'cancelled'); continue; }
+                    let d = Math.hypot(w.x - a.x, w.y - a.y);
+                    if (w.state !== 'turn' && d <= Math.max(w.arrive, 8) && w.pts.length) { [w.x, w.y] = w.pts.shift(); w.best = Infinity; w.stuck = 0; d = Math.hypot(w.x - a.x, w.y - a.y); }
+                    if (w.state === 'turn' || d <= w.arrive) { gaitCommand(a, 0, 0); this._settle(w); continue; }
+                    if (!this._progress(w, d)) continue;
+                    const sp = w.speed * Math.min(1, Math.max(0.35, d / 20));
+                    const s = actorSteer(a, w.x, w.y, sp, map);
+                    gaitCommand(a, s.x, s.y); a.x += s.x; a.y += s.y;
+                    if (Math.abs(s.x) + Math.abs(s.y) > 0.05) a.angle = Math.atan2(s.y, s.x);
+                }
+            }
+        };
         /* roundRect for browsers without it (Safari before 16.4): on the 2D context and on Path2D, taking a
            single radius or [all], [tl-br, tr-bl], [tl, tr-bl, br] or [tl, tr, br, bl] like the real one. */
         (() => {
@@ -6574,6 +6709,46 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return { gender: pickFrom(r, ['female', 'male', 'androgynous']), build: pickFrom(r, [undefined, 'slim', 'athletic']),
                          body: { kind: 'android', finish }, top: { type: 'dn_uniform', ...uni },
                          bottom: { type: 'pants', color: '#141216' }, shoes: { type: 'loafers', color: '#0e0e10' }, pose: 'concierge' };
+            },
+            // Moon City's clubgoers (world/club-life.js): evening wear in the house colours —
+            // black lacquer, plum and wine velvet, violet, lavender, rose, champagne gold, chrome
+            clubgoer(r) {
+                const pick = l => pickFrom(r, l), P = PALETTE;
+                const night = ['#0b0810', '#141016', '#1a1022', '#2a0a3a', '#5a0c34', '#8a1a52', '#e8c27a', '#c8a8ff', '#8a5cff', '#d8dcef', '#ff5a8a'];
+                const metal = () => pick([P.houseGold || '#e8c27a', '#d8dcef']);
+                const gender = pick(['female', 'female', 'male', 'male', 'androgynous']);
+                const look = { gender, skinColor: pick(P.skins), build: pick([undefined, 'slim', 'athletic', 'curvy', 'broad']), height: 0.94 + r() * 0.12,
+                               hair: { type: pick(gender === 'male' ? ['short', 'afro', 'dreadlocks', 'curls', 'braids'] : ['long', 'ponytail', 'braids', 'curls', 'afro', 'short', 'dreadlocks']),
+                                       color: r() < 0.15 ? pick(['#c8a8ff', '#ff5a8a', '#e8dcc8']) : pick(P.hairs) } };
+                if (gender === 'male') {
+                    look.top = { type: pick(['suit', 'jacket', 'turtleneck', 'tshirt', 'vest']), color: pick(night), inner: pick(['#0b0810', '#e8e8e8', '#5a0c34']) };
+                    look.bottom = { type: 'pants', color: pick(['#0b0810', '#141016', '#1a1022']) };
+                    look.shoes = { type: pick(['loafers', 'boots']), color: '#0e0c10' };
+                    if (r() < 0.35) look.jewelry = [{ type: pick(['necklace', 'sunglasses']), color: pick([metal(), '#141414']) }];
+                } else {
+                    look.top = { type: pick(['sports_bra', 'crop_top', 'sleeved_crop', 'tank', 'turtleneck', 'suit']), color: pick(night), inner: '#0b0810' };
+                    look.bottom = { type: pick(['pencil_skirt', 'skirt', 'leggings', 'long_skirt', 'pants', 'shorts']), color: pick(night) };
+                    if (look.bottom.type === 'leggings') look.bottom.finish = 'gloss';
+                    look.shoes = { type: r() < 0.8 ? 'heels' : 'boots', color: pick(['#0b0810', '#e8c27a', '#8a1a52', '#d8dcef']) };
+                    const j = [];
+                    if (r() < 0.5) j.push({ type: 'hoops', color: metal() });
+                    if (r() < 0.4) j.push({ type: 'necklace', color: metal() });
+                    if (r() < 0.3) j.push({ type: 'bangles', color: metal() });
+                    if (j.length) look.jewelry = j;
+                }
+                return look;
+            },
+            // Moon City's staff: a bouncer in black and gold, a barback in a vest, the powder-room attendant
+            mc_staff(kind, r) {
+                const gold = PALETTE.houseGold || '#e8c27a';
+                if (kind === 'bouncer') return { gender: 'male', build: 'broad', height: 1.07, skinColor: pickFrom(r, PALETTE.skins), hair: { type: 'short', color: '#0a0a0a' },
+                    top: { type: 'suit', color: '#0b0810', inner: '#0b0810', trim: gold }, bottom: { type: 'pants', color: '#0b0810' }, shoes: { type: 'loafers', color: '#0a0a0a' },
+                    jewelry: [{ type: 'sunglasses', color: '#141414' }], pose: 'arms_crossed' };
+                if (kind === 'barback') return { gender: pickFrom(r, ['male', 'female']), build: 'slim', skinColor: pickFrom(r, PALETTE.skins), hair: { type: pickFrom(r, ['short', 'ponytail']), color: pickFrom(r, PALETTE.hairs) },
+                    top: { type: 'vest', color: '#0b0810', inner: '#ece6f0', trim: gold }, bottom: { type: 'pants', color: '#141016' }, shoes: { type: 'loafers', color: '#0a0a0a' } };
+                return { gender: 'female', skinColor: pickFrom(r, PALETTE.skins), hair: { type: 'long', color: pickFrom(r, PALETTE.hairs) },
+                    top: { type: 'suit', color: '#1a1022', inner: '#5a0c34', trim: gold }, bottom: { type: 'pencil_skirt', color: '#0b0810' }, shoes: { type: 'heels', color: '#0b0810' },
+                    jewelry: [{ type: 'necklace', color: gold }], pose: 'concierge' };
             },
             // The Ethereal plane's wanderers
             spirit() {
@@ -8337,17 +8512,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             _music(game, paused) {
                 const ctx = this.audio.ctx, now = ctx.currentTime;
-                let spec = game.activeMap && MAP_MUSIC[game.activeMap.id];
-                // A track that belongs to one area of a map (`area`, e.g. the graveyard): full inside,
-                // rising over `fade` px as 949 (or her car) comes up to it, silent and stopped beyond
-                let areaK = 1;
-                if (spec && spec.area) {
-                    const A = spec.area, who = game.isDriving && game.car ? game.car : game.player;
+                // A track that belongs to one area of a map (`area`, or a `building`'s footprint): full inside,
+                // rising over `fade` px as 949 (or her car) comes up to it, silent and stopped beyond.
+                // A map can list several (the hub: the graveyard, the club's bass through its walls); the nearest wins.
+                const entry = game.activeMap && MAP_MUSIC[game.activeMap.id];
+                let spec = null, areaK = 0;
+                for (const sp of entry ? (Array.isArray(entry) ? entry : [entry]) : []) {
+                    const A = sp.building ? this._buildingArea(game, sp.building) : sp.area;
+                    if (!A) { if (!sp.area && !sp.building && areaK < 1) { spec = sp; areaK = 1; } continue; }
+                    const who = game.isDriving && game.car ? game.car : game.player;
                     const dx = who ? Math.max(A.x - who.x, 0, who.x - (A.x + A.w)) : 1e9, dy = who ? Math.max(A.y - who.y, 0, who.y - (A.y + A.h)) : 1e9;
-                    const t = Math.max(0, 1 - Math.hypot(dx, dy) / (spec.fade || 500));
-                    areaK = t * t * (3 - 2 * t);
-                    if (areaK <= 0) spec = null;
+                    const t = Math.max(0, 1 - Math.hypot(dx, dy) / (sp.fade || 500)), k = t * t * (3 - 2 * t);
+                    if (k > areaK) { spec = sp; areaK = k; }
                 }
+                this._activeSpec = spec;
                 const M = this._mus || (this._mus = (() => {
                     const f = ctx.createBiquadFilter(), g = ctx.createGain();
                     f.type = 'lowpass'; f.frequency.value = 18000; f.Q.value = 0.5; g.gain.value = 0;
@@ -8360,8 +8538,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     loadSound(spec.track).then(buf => {
                         M.loading = null;
                         if (!buf) return;
-                        const cur = game.activeMap && MAP_MUSIC[game.activeMap.id];
-                        if (!cur || cur.track !== spec.track) return;       // left the map while it decoded
+                        const cur = this._activeSpec;
+                        if (!cur || cur.track !== spec.track) return;       // left the map (or the area) while it decoded
                         if (M.src) { try { M.src.stop(); } catch (e) { /* already stopped */ } }
                         const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(M.f); s.start();
                         M.src = s; M.name = spec.track; M.t0 = ctx.currentTime; M.dur = buf.duration;
@@ -8378,6 +8556,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         if (room.type === 'outdoor') { level *= 0.35 + 0.45 * open; cut = 550 + 5000 * open; }
                         else { level *= 0.55 + 0.35 * open; cut = 900 + 6000 * open; }
                     }
+                    if (spec.lowpass) cut = Math.min(cut, spec.lowpass);  // heard through walls: only the thump
                     if (paused) level *= 0.3;
                     if (game.musicWidget && game.musicWidget.isPlaying) level = 0;   // the phone radio takes over
                 }
@@ -8390,10 +8569,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 } else M.quietSince = now;
             }
 
-            /** Beats played so far of this map's track (MAP_MUSIC bpm/beat0), counted from where the
+            /** A building's footprint on this map (for `building:` area music), cached per map. */
+            _buildingArea(game, id) {
+                const m = game.activeMap; if (!m) return null;
+                if (this._areaMap !== m) { this._areaMap = m; this._areas = {}; }
+                if (id in this._areas) return this._areas[id];
+                const b = (m.buildings || []).find(o => o.id === id);
+                if (!b) return (this._areas[id] = null);
+                let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+                for (const s of b.sections) { x0 = Math.min(x0, b.x + s.x); y0 = Math.min(y0, b.y + s.y); x1 = Math.max(x1, b.x + s.x + s.w); y1 = Math.max(y1, b.y + s.y + s.h); }
+                return (this._areas[id] = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+            }
+
+            /** Beats played so far of the playing track (MAP_MUSIC bpm/beat0), counted from where the
              *  speakers actually are in the loop, or null when it isn't playing. Lights keep time with it. */
             musicBeat(game) {
-                const M = this._mus, spec = game.activeMap && MAP_MUSIC[game.activeMap.id];
+                const M = this._mus, spec = this._activeSpec;
                 if (!M || !M.src || !spec || !spec.bpm || M.name !== spec.track || M.level < 0.002) return null;
                 const ctx = this.audio.ctx;
                 if (ctx.state !== 'running') return null;                       // a locked or paused clock stands still
@@ -8526,7 +8717,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // The van, on the way to the job (the intro): over the rain on the roof and the road
             van_interior: { track: 'van 2', volume: 0.45 },
             // Grave Stories: the southern graveyard in Southern Dimensions City (its walls, engine/map-loading.js 11d)
-            hub_949: { track: 'grave stories (1)', volume: 0.5, area: { x: 500, y: 8800, w: 3000, h: 2000 }, fade: 600 },
+            hub_949: [
+                { track: 'grave stories (1)', volume: 0.5, area: { x: 500, y: 8800, w: 3000, h: 2000 }, fade: 600 },
+                // Moon City's bass through its walls: heard as you come up to the club, low-passed to the thump; its lights keep time
+                { track: 'moon city nightclub - swig', building: 'moon_city', volume: 0.32, fade: 420, lowpass: 260, bpm: 140, beat0: 0 }
+            ],
         };
         const CLUB_BPM = 140;
         const CLUB_PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];   // the club's lights: violet, lavender, rose, gold
@@ -8535,7 +8730,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          *  it plays, else a free-running clock at that tempo (audio locked, paused). null without one. */
         function mapBeatN() {
             if (typeof game === 'undefined' || !game || !game.activeMap) return null;
-            const spec = MAP_MUSIC[game.activeMap.id];
+            const e = MAP_MUSIC[game.activeMap.id], spec = Array.isArray(e) ? (typeof ambience !== 'undefined' ? ambience._activeSpec : null) : e;
             if (!spec || !spec.bpm) return null;
             const b = typeof ambience !== 'undefined' ? ambience.musicBeat(game) : null;
             return b !== null ? b : (_frameTime / 1000) * spec.bpm / 60;
@@ -13754,6 +13949,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // (every live enemy too, on screen or not, so no one ghosts through a closed door)
                 if (game && game.roomSystem && game.roomSystem.active) {
                     let doorActors = actors;
+                    if (game.clubLife && game.clubLife.walkers.length) doorActors = doorActors.concat(game.clubLife.doorActors());   // the club's crowd pushes the restroom doors
                     if (game.enemies && game.enemies.length) {
                         const seen = new Set(actors);
                         doorActors = actors.concat(game.enemies.filter(e => e && !e.dead && e.active !== false && !seen.has(e)));
@@ -18176,7 +18372,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             applyMovement(dx, dy) {
                 if (!this.visible) return;
                 
-                const speed = this.getCurrentSpeed();
+                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1);   // (moveMul: slowed, e.g. moving furniture)
                 gaitCommand(this, dx * speed, dy * speed);
                 this.x += dx * speed;
                 this.y += dy * speed;
@@ -21201,13 +21397,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     let moveX = (dx / dist) * pace;
                     let moveY = (dy / dist) * pace;
                     
-                    // Avoid player
-                    const playerDist = Math.hypot(player.x - this.x, player.y - this.y);
-                    if (playerDist < 60) {
-                        const avoidX = (this.x - player.x) / playerDist;
-                        const avoidY = (this.y - player.y) / playerDist;
-                        moveX += avoidX * 1.5;
-                        moveY += avoidY * 1.5;
+                    // Make way for 949 and her crew (engine/update.js _makeWay)
+                    for (const p of (typeof game !== 'undefined' && game._makeWay) || [player]) {
+                        const pd = Math.hypot(p.x - this.x, p.y - this.y);
+                        if (pd < 60 && pd > 0.1) { moveX += (this.x - p.x) / pd * 1.5; moveY += (this.y - p.y) / pd * 1.5; }
                     }
                     
                     // Avoid other pedestrians
@@ -21741,8 +21934,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (d > 6) {
                         let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
                         // Make way for 949, and keep a little room from one another
-                        const px = w.x - pl.x, py = w.y - pl.y, pd = Math.hypot(px, py);
-                        if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
+                            const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
+                            if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        }
                         for (const o of this.walkers) {
                             if (o === w || o.life < 0.5) continue;
                             const ox = w.x - o.x, oy = w.y - o.y, od = Math.hypot(ox, oy);
@@ -21835,6 +22030,519 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         else { ctx.beginPath(); ctx.arc(2, 12, 5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 0.8; ctx.stroke(); }
                     }
                     ctx.restore();
+                }
+            }
+        }
+        // ============================================================================
+        //  CLUB LIFE — Moon City's crowd (moon_city_nightclub only)
+        //  Clubgoers come in past the bouncer, check a coat, then spend the night between
+        //  the dance floor, the bar (a stool or the rail, and a drink that stays in hand),
+        //  the booths and high-tops, and the restrooms (a stall, the urinals, the mirrors),
+        //  and leave the way they came. A barback works the floor, an attendant keeps the
+        //  powder room. Like the lobby's guests (world/lobby-life.js) they're ambient
+        //  walkers, not NPCs: no dialogue, no prompts — cheap, and they can't trip the story.
+        //  Busiest late (22:00–03:00), a handful by day. They push the restroom doors.
+        //  Updated from engine/update.js, drawn with the characters (engine/draw.js).
+        // ============================================================================
+        const CLUB_GATE = [800, 1150];
+        const CLUB_STOOLS = [280, 343, 406, 595, 658, 721];                       // bar stool centres (x 510)
+        const CLUB_STALLS = { powder: [192, 282, 372, 462], gents: [722, 814, 906, 998] };   // stall centres (x 60)
+        const CLUB_URINALS = [53, 103, 153, 203, 253];                           // y 612, facing the north wall
+        const CLUB_SPOTS = {
+            coat: [465, 1078], foyer: [[620, 1090], [980, 1090], [1050, 1078], [560, 1110]],
+            rail: CLUB_STOOLS.map(y => [538, y]),                                // standing at the bar, leaning on it
+            hightops: [[555, 125], [530, 162], [580, 170], [1125, 135], [1100, 175], [1150, 172], [1125, 805], [1100, 845], [1150, 842]],
+            hightopAt: [[555, 155], [1125, 165], [1125, 835]],
+            mirrors: [[70, 82], [125, 82], [180, 82], [235, 82]],                // the powder-room vanity
+            sinks: [[170, 1122], [230, 1122], [290, 1122]],                      // the gents' basins (south wall)
+            floorEdge: [[560, 300], [1040, 300], [560, 720], [1040, 720], [700, 760], [900, 760]],
+            bouncer: [935, 1095], barback: [[535, 500], [535, 870], [1125, 870], [600, 220], [1060, 220]], attendant: [255, 120]
+        };
+        // Seats: where you sit, where you step up to it from, which way you face
+        const CLUB_SEATS = {
+            stool: CLUB_STOOLS.map(y => ({ at: [510, y], from: [540, y], face: Math.PI })),
+            booth: [470, 1060].flatMap(bx => [
+                { at: [bx + 40, bx === 470 ? 938 : 938], from: [bx + 40, 872], face: -Math.PI / 2 },
+                { at: [bx + 65, 940], from: [bx + 65, 872], face: -Math.PI / 2 },
+                { at: [bx + 90, 938], from: [bx + 90, 872], face: -Math.PI / 2 },
+                { at: [bx + 21, 912], from: [bx - 14, 905], face: 0 },
+                { at: [bx + 109, 912], from: [bx + 144, 905], face: Math.PI }
+            ]),
+            settee: [{ at: [250, 330], from: [212, 330], face: Math.PI }, { at: [250, 370], from: [212, 370], face: Math.PI }, { at: [250, 405], from: [212, 405], face: Math.PI }]
+        };
+        const CLUB_POLES = [[800, 370], [660, 560], [940, 560]];
+        const CLUB_CROWD = { low: 14, medium: 24, high: 34 };
+        const CLUB_DRINKS = ['neon', 'neon', 'martini', 'champagne', 'rose', 'cream_soda', 'whiskey', 'red_wine', 'stellar_lemonade'];
+
+        class ClubLife {
+            constructor() { this.walkers = []; this.map = null; this.taken = new Map(); }
+
+            /** Fresh crowd for a (re)entered club. */
+            reset(game) {
+                this.walkers = []; this.map = game.activeMap; this._spawnTimer = 0; this.taken = new Map();
+                const nav = NavGrid.for(this.map), snap = ([x, y]) => { const f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; };
+                this._snap = snap;
+                // Dance-floor cells (40 px grid), clear of the poles and the club's own dancers
+                const dancers = (this.map.npcs || []).filter(n => n.role === 'dancer' || n.role === 'red_demon_dancer').map(n => [n.x, n.y]);
+                const block = CLUB_POLES.concat(dancers);
+                this.cells = [];
+                for (let i = 0; i <= 10; i++) for (let j = 0; j <= 9; j++) {
+                    const x = 600 + i * 40, y = 320 + j * 40;
+                    if (block.every(([bx, by]) => Math.hypot(bx - x, by - y) > 42)) this.cells.push([x, y]);
+                }
+                const r = Math.random;
+                // Staff: the bouncer at the ropes, a barback working the floor, the powder-room attendant
+                for (const kind of ['bouncer', 'barback', 'attendant']) {
+                    const p = kind === 'bouncer' ? CLUB_SPOTS.bouncer : kind === 'attendant' ? CLUB_SPOTS.attendant : CLUB_SPOTS.barback[0];
+                    const w = this._make(kind, p[0], p[1], ROLE_LOOKS.mc_staff(kind, seededRandom('mc' + kind)));
+                    w.life = 1; w.speed = kind === 'barback' ? 1.8 : 1.4;
+                    this.walkers.push(w);
+                }
+                // A night already under way
+                const n = this._target(game);
+                for (let i = 0; i < Math.round(n * 0.8); i++) this._spawnGuest(true);
+            }
+
+            /** How full the club is: the density setting, scaled by the hour (busiest 22:00–03:00). */
+            _target(game) {
+                const base = CLUB_CROWD[GameSettings.pedestrianDensity] || CLUB_CROWD.medium;
+                const h = (((game.worldMinutes || 0) / 60) % 24 + 24) % 24;
+                const k = h >= 22 || h < 3 ? 1 : h >= 20 ? 0.6 + (h - 20) * 0.2 : h < 5 ? 1 - (h - 3) * 0.3 : h >= 17 ? 0.35 : 0.2;
+                return Math.max(3, Math.round(base * k));
+            }
+
+            _make(kind, x, y, look) {
+                return { kind, x, y, angle: -Math.PI / 2, walkPhase: 0, look, life: 0, fade: 0, steps: [], timer: 0, speed: 1.5, stuck: 0, lastD: Infinity, radius: 9 };
+            }
+
+            /** A free item from a claimable pool (stalls, stools, cells…), or -1. */
+            _claim(pool, n, w) {
+                let set = this.taken.get(pool); if (!set) this.taken.set(pool, set = new Map());
+                const free = []; for (let i = 0; i < n; i++) if (!set.has(i)) free.push(i);
+                if (!free.length) return -1;
+                const i = free[Math.random() * free.length | 0]; set.set(i, w); return i;
+            }
+            _release(w) { for (const set of this.taken.values()) for (const [k, o] of set) if (o === w) set.delete(k); }
+
+            /** A clubgoer walks in, or (when the club is entered) is already somewhere in the night. */
+            _spawnGuest(midVisit) {
+                const r = Math.random;
+                const look = ROLE_LOOKS.clubgoer(seededRandom('club' + r()));
+                const p = midVisit ? pickFrom(r, this.cells.concat(CLUB_SPOTS.rail, CLUB_SPOTS.floorEdge)) : CLUB_GATE;
+                const g = this._make('guest', p[0] + (r() - 0.5) * 8, p[1] + (r() - 0.5) * 8, look);
+                g.speed = 1.2 + r() * 0.5; g.fade = midVisit ? 0 : 0.05; g.life = midVisit ? 1 : 0;
+                if (midVisit && r() < 0.5) look.held = { type: 'glass', drink: pickFrom(r, CLUB_DRINKS), hand: 'right' };
+                // The night: a coat checked on the way in, then a few things, then home
+                if (!midVisit) { if (r() < 0.35) g.steps.push({ go: CLUB_SPOTS.coat, face: [465, 1040], wait: 60 + r() * 60 | 0, pose: 'idle' }); }
+                const acts = 2 + (r() * 4 | 0);
+                for (let i = 0; i < acts; i++) {
+                    const a = r();
+                    if (a < 0.38) g.steps.push({ dance: true, wait: 600 + r() * 1400 | 0 });
+                    else if (a < 0.58) g.steps.push(r() < 0.5 ? { seat: 'stool', wait: 400 + r() * 700 | 0, pose: pickFrom(r, ['sit', 'sit_lean', 'sit_phone']), drink: true }
+                                                              : { rail: true, wait: 300 + r() * 500 | 0, drink: true });
+                    else if (a < 0.7) g.steps.push({ seat: 'booth', wait: 600 + r() * 900 | 0, pose: pickFrom(r, ['sit', 'sit_lean', 'sit_phone']) });
+                    else if (a < 0.78) g.steps.push({ hightop: true, wait: 300 + r() * 500 | 0 });
+                    else g.steps.push({ restroom: true });
+                }
+                g.steps.push({ exit: true, go: CLUB_GATE });
+                this.walkers.push(g);
+            }
+
+            /** Turn a planned activity into concrete stops (claiming what it needs). */
+            _expand(w, step) {
+                const r = Math.random, S = CLUB_SPOTS, out = [];
+                if (step.dance) {
+                    const i = this._claim('cell', this.cells.length, w);
+                    if (i < 0) return [{ go: pickFrom(r, S.floorEdge), wait: 200, pose: 'idle' }];
+                    return [{ go: this.cells[i], wait: step.wait, pose: 'dance', face: [800 + (r() - 0.5) * 300, 120], pool: 'cell' }];
+                }
+                if (step.seat) {
+                    const list = CLUB_SEATS[step.seat], i = this._claim(step.seat, list.length, w);
+                    if (i < 0) return step.seat === 'stool' ? [{ rail: true, wait: step.wait, drink: true }] : [];
+                    const s = list[i];
+                    return [{ go: this._snap(s.from), seatAt: s.at, seatFace: s.face, wait: step.wait, pose: step.pose, drink: step.drink, pool: step.seat }];
+                }
+                if (step.rail) {
+                    const i = this._claim('rail', S.rail.length, w);
+                    if (i < 0) return [];
+                    return [{ go: this._snap(S.rail[i]), face: [420, S.rail[i][1]], wait: step.wait, pose: 'lean_rail', drink: true, pool: 'rail' }];
+                }
+                if (step.hightop) {
+                    const i = this._claim('hightop', S.hightops.length, w);
+                    if (i < 0) return [];
+                    const p = S.hightops[i], t = S.hightopAt.reduce((b, q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < Math.hypot(b[0] - p[0], b[1] - p[1]) ? q : b);
+                    return [{ go: this._snap(p), face: t, wait: step.wait, pose: pickFrom(r, ['idle', 'phone', 'breathe']), pool: 'hightop' }];
+                }
+                if (step.restroom) {
+                    const g = w.look.gender, room = g === 'female' ? 'powder' : g === 'male' ? 'gents' : (r() < 0.5 ? 'powder' : 'gents');
+                    if (room === 'gents' && r() < 0.6) {                               // the urinals
+                        const i = this._claim('urinal', CLUB_URINALS.length, w);
+                        if (i >= 0) out.push({ go: this._snap([CLUB_URINALS[i], 614]), face: [CLUB_URINALS[i], 560], wait: 140 + r() * 120 | 0, pose: 'idle', pool: 'urinal' });
+                    }
+                    if (!out.length) {                                                 // a stall: in, door shut, out
+                        const list = CLUB_STALLS[room], i = this._claim('stall_' + room, list.length, w);
+                        if (i < 0) return [{ go: this._snap(room === 'powder' ? [200, 220] : [220, 800]), wait: 160, pose: 'phone' }];   // a queue for the loo
+                        out.push({ go: this._snap([118, list[i]]), seatAt: [62, list[i]], seatFace: 0, hide: true, wait: 240 + r() * 300 | 0, pose: 'idle', pool: 'stall_' + room });
+                    }
+                    // Wash up / a look in the mirror on the way out
+                    if (room === 'powder') {
+                        const i = this._claim('mirror', S.mirrors.length, w);
+                        if (i >= 0) out.push({ go: this._snap(S.mirrors[i]), face: [S.mirrors[i][0], 30], wait: 120 + r() * 200 | 0, pose: 'idle', pool: 'mirror' });
+                        if (r() < 0.25) { const j = this._claim('settee', CLUB_SEATS.settee.length, w); if (j >= 0) { const s = CLUB_SEATS.settee[j]; out.push({ go: this._snap(s.from), seatAt: s.at, seatFace: s.face, wait: 300 + r() * 300 | 0, pose: 'sit_phone', pool: 'settee' }); } }
+                    } else {
+                        const i = this._claim('sink', S.sinks.length, w);
+                        if (i >= 0) out.push({ go: this._snap(S.sinks[i]), face: [S.sinks[i][0], 1170], wait: 90 + r() * 80 | 0, pose: 'idle', pool: 'sink' });
+                    }
+                    return out;
+                }
+                return [step];
+            }
+
+            update(game) {
+                if (!game.activeMap || game.activeMap.id !== 'moon_city_nightclub') { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
+                if (this.map !== game.activeMap) this.reset(game);
+                let guests = 0; for (const w of this.walkers) if (w.kind === 'guest') guests++;
+                const target = this._target(game);
+                if (--this._spawnTimer <= 0 && guests < target) { this._spawnGuest(false); this._spawnTimer = (guests < target * 0.7 ? 40 : 90) + Math.random() * 80 | 0; }
+                const pl = game.player, M = game.activeMap, nav = NavGrid.for(M);
+                for (let i = this.walkers.length - 1; i >= 0; i--) {
+                    const w = this.walkers[i];
+                    if (w.fade > 0) { w.life = Math.min(1, w.life + w.fade); if (w.life >= 1) w.fade = 0; }
+                    if (w.fade < 0) { w.life += w.fade; if (w.life <= 0) { this._release(w); this.walkers.splice(i, 1); continue; } }
+                    // Settling onto a seat (or into a stall), or getting up again: a short glide, no steering
+                    if (w.glide) {
+                        const G = w.glide, k = ++G.t / G.n;
+                        w.x = G.x0 + (G.x1 - G.x0) * Math.min(1, k); w.y = G.y0 + (G.y1 - G.y0) * Math.min(1, k);
+                        if (G.hide) w.life = G.up ? Math.min(1, k) : Math.max(0, 1 - k);
+                        gaitCommand(w, 0, 0);
+                        if (k >= 1) { w.glide = null; if (G.done) G.done(); }
+                        continue;
+                    }
+                    if (w.kind !== 'guest') this._staffThink(w, game);
+                    let step = w.steps[0];
+                    if (!step) { if (w.kind === 'guest' && w.fade >= 0) w.fade = -0.05; continue; }
+                    for (let k = 0; k < 3 && step && !step.go && !step.exit; k++) {     // an activity: work out where (a fallback may be another activity)
+                        w.steps.splice(0, 1, ...this._expand(w, step));
+                        step = w.steps[0];
+                    }
+                    if (!step) continue;
+                    if (!step.go && !step.exit) { w.steps.shift(); continue; }
+                    const [gx, gy] = step.go, d = Math.hypot(gx - w.x, gy - w.y);
+                    if (d > 6 && !step._arrived) {
+                        let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
+                        for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
+                            const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
+                            if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        }
+                        for (const o of this.walkers) {
+                            if (o === w || o.life < 0.5 || o.seated) continue;
+                            const ox = w.x - o.x, oy = w.y - o.y;
+                            if (ox > 20 || ox < -20 || oy > 20 || oy < -20) continue;
+                            const od = Math.hypot(ox, oy);
+                            if (od < 20 && od > 0.1) { vx += (ox / od) * 0.35; vy += (oy / od) * 0.35; }
+                        }
+                        if (nav && !nav.walkable(w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }
+                        gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
+                        if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
+                        if (d < w.lastD - 0.2) { w.lastD = d; w.stuck = 0; }
+                        else if (++w.stuck > 360) { w.steps.shift(); this._releaseStep(w, step); w.stuck = 0; w.lastD = Infinity; }
+                        w.look.pose = undefined;
+                        continue;
+                    }
+                    // Arrived
+                    w.lastD = Infinity; w.stuck = 0;
+                    if (step.exit) { if (w.fade >= 0) { w.fade = -0.05; w.angle = Math.PI / 2; } continue; }
+                    if (!step._arrived) {
+                        step._arrived = true;
+                        if (step.seatAt) {                                             // sit down / step into the stall
+                            const back = [w.x, w.y];
+                            w.angle = step.seatFace; w.seated = true;
+                            w.glide = { x0: w.x, y0: w.y, x1: step.seatAt[0], y1: step.seatAt[1], t: 0, n: step.hide ? 26 : 16, hide: step.hide };
+                            step._back = back;
+                            continue;
+                        }
+                    }
+                    if (step.face) w.angle = Math.atan2(step.face[1] - w.y, step.face[0] - w.x);
+                    else if (step.seatFace !== undefined) w.angle = step.seatFace;
+                    w.look.pose = step.hide ? undefined : step.pose;
+                    // A drink, fetched at the bar (the bartender's had it poured)
+                    if (step.drink && !w.look.held && step.wait < 200) w.look.held = { type: 'glass', drink: pickFrom(Math.random, CLUB_DRINKS), hand: 'right' };
+                    if (--step.wait <= 0) {
+                        if (step._back) {                                              // get up / come out
+                            const b = step._back; step._back = null;
+                            w.glide = { x0: w.x, y0: w.y, x1: b[0], y1: b[1], t: 0, n: step.hide ? 26 : 14, hide: step.hide, up: true,
+                                        done: () => { w.seated = false; w.steps.shift(); this._releaseStep(w, step); } };
+                            w.look.pose = undefined;
+                            continue;
+                        }
+                        w.steps.shift(); this._releaseStep(w, step);
+                        // Glasses get finished; some go back for another
+                        if (w.look.held && Math.random() < 0.25) w.look.held = null;
+                    }
+                }
+            }
+
+            _releaseStep(w, step) {
+                if (!step || !step.pool) return;
+                const set = this.taken.get(step.pool); if (!set) return;
+                for (const [k, o] of set) if (o === w) set.delete(k);
+            }
+
+            /** Staff: the bouncer turns to each arrival, the barback clears glasses, the attendant tidies. */
+            _staffThink(w, game) {
+                if (w.kind === 'bouncer') {
+                    const p = CLUB_SPOTS.bouncer;
+                    if (Math.hypot(w.x - p[0], w.y - p[1]) > 8) { if (!w.steps.length) w.steps.push({ go: p, wait: 60, pose: 'arms_crossed' }); return; }
+                    const g = this.walkers.find(o => o.kind === 'guest' && o.life > 0.2 && o.y > 1020 && Math.abs(o.x - 800) < 120);
+                    w.angle = g ? Math.atan2(g.y - w.y, g.x - w.x) : Math.PI;
+                    w.look.pose = 'arms_crossed';
+                    return;
+                }
+                if (w.steps.length) return;
+                const r = Math.random, S = CLUB_SPOTS;
+                if (w.kind === 'barback') w.steps.push({ go: this._snap(pickFrom(r, S.barback.slice(1))), wait: 90 + r() * 80 | 0, pose: 'polish' }, { go: this._snap(S.barback[0]), face: [450, 500], wait: 120, pose: 'polish' });
+                else w.steps.push({ go: this._snap(S.attendant), face: [150, 30], wait: 300, pose: pickFrom(r, ['concierge', 'arms_crossed']) },
+                                  { go: this._snap(pickFrom(r, S.mirrors)), face: [150, 30], wait: 120, pose: 'polish' });
+            }
+
+            /** Walkers for door physics: anyone up and about (not seated or tucked in a stall). */
+            doorActors() { return this.walkers.filter(w => w.life > 0.5 && !w.seated); }
+
+            draw(ctx, cb) {
+                if (!this.walkers.length) return;
+                const list = this.walkers.filter(w => w.life > 0.01 && (!cb || (w.x > cb.left && w.x < cb.right && w.y > cb.top && w.y < cb.bottom))).sort((a, b) => a.y - b.y);
+                for (const w of list) {
+                    ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.globalAlpha = w.life;
+                    drawProceduralHumanoid(ctx, w, { stance: 'idle', ...w.look });
+                    ctx.restore();
+                }
+            }
+        }
+        // ============================================================================
+        //  FURNITURE — grab and move the apartment's furniture (apt_949 only)
+        //  The hand pill (#btn-grab, G) shows by a movable piece. Press it: four gold
+        //  handles appear on the piece's sides (the nearest picked); tap one, or press a
+        //  direction, then G / tap again. 949 walks to that side (Walker.goTo), faces it
+        //  and takes hold. Holding: she moves at 0.4× and the piece goes with her — push,
+        //  pull or slide — and never into a wall or another piece (if it would, neither
+        //  moves). R / ⟲ ⟳ turn it 15°. G, Esc or leaving lets go. The layout is kept
+        //  (questState.aptLayout) and comes back each visit; long-press the hand to reset.
+        //  Ticked from engine/update.js (update before input, afterCollision after the
+        //  collision pass), drawn after the characters (engine/draw.js).
+        // ============================================================================
+        const FURNITURE_GRAB = {
+            MAP: 'apt_949', RANGE: 90, MOVE_MUL: 0.4, GRIP_GAP: 16, TURN: Math.PI / 12,
+            // What can be moved, and what it's called on the pill
+            NAMES: { apt_sofa: 'Sofa', apt_coffee: 'Coffee Table', apt_chair: 'Armchair', apt_console: 'Console', apt_plant: 'Plant',
+                     apt_planter: 'Planter', apt_stool: 'Stool', apt_bed: 'Bed', apt_side: 'Side Table', apt_lounger: 'Lounger',
+                     apt_bistro: 'Bistro Set', apt_telescope: 'Telescope' }
+        };
+
+        class FurnitureSystem {
+            constructor(game) { this.game = game; this.state = 'idle'; this.target = null; this.side = 0; this.cand = null; }
+
+            /** Busy choosing a side, walking to it or holding something (blocks firing). */
+            busy() { return this.state !== 'idle'; }
+            get holding() { return this.state === 'hold'; }
+
+            _grabbable(p) { return p && p.decorType && FURNITURE_GRAB.NAMES[p.decorType] && !p.interactionType?.startsWith('lost'); }
+            _layout() { const q = this.game.questState || (this.game.questState = {}); return q.aptLayout || (q.aptLayout = {}); }
+
+            /** The apartment was just built: number its pieces, pin the movable ones heavy, put them where they were left. */
+            onMapLoaded(game) {
+                this.release(true);
+                if (!game.activeMap || game.activeMap.id !== FURNITURE_GRAB.MAP) return;
+                const L = (game.questState && game.questState.aptLayout) || {};
+                game.activeMap.props.forEach((p, i) => {
+                    p._aptIdx = i;
+                    if (!this._grabbable(p)) return;
+                    p.mass = 1e7;                                                 // furniture: it stays put unless she moves it
+                    p._home = [p.x, p.y, p.angle || 0];
+                    const s = L[i];
+                    if (s) { p.x = s[0] - p.width / 2; p.y = s[1] - p.height / 2; p.angle = s[2]; }
+                });
+            }
+
+            /** Put every piece back where the apartment had it. */
+            resetLayout() {
+                const g = this.game; this.release(true);
+                if (g.questState) g.questState.aptLayout = {};
+                for (const p of g.props || []) if (p._home) { [p.x, p.y, p.angle] = p._home; }
+                showMessage('FURNITURE BACK WHERE IT WAS');
+            }
+
+            // --- geometry -------------------------------------------------------------
+            _c(p) { return { x: p.x + p.width / 2, y: p.y + p.height / 2 }; }
+            _corners(cx, cy, w, h, a) {
+                const c = Math.cos(a), s = Math.sin(a), hw = w / 2, hh = h / 2;
+                return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, y]) => [cx + x * c - y * s, cy + x * s + y * c]);
+            }
+            _sat(A, B) {
+                for (const P of [A, B]) for (let i = 0; i < 4; i++) {
+                    const [x1, y1] = P[i], [x2, y2] = P[(i + 1) % 4], nx = y1 - y2, ny = x2 - x1;
+                    let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+                    for (const [x, y] of A) { const d = x * nx + y * ny; a0 = Math.min(a0, d); a1 = Math.max(a1, d); }
+                    for (const [x, y] of B) { const d = x * nx + y * ny; b0 = Math.min(b0, d); b1 = Math.max(b1, d); }
+                    if (a1 <= b0 || b1 <= a0) return false;
+                }
+                return true;
+            }
+            /** Would the piece, centred at (cx, cy) and turned to a, run into a wall, another piece or the map's edge? */
+            _blocked(p, cx, cy, a) {
+                const g = this.game, M = g.activeMap, A = this._corners(cx, cy, p.width - 2, p.height - 2, a);
+                for (const [x, y] of A) if (x < 0 || y < 0 || x > M.width || y > M.height) return true;
+                for (const w of M.walls || []) if (this._sat(A, [[w.x, w.y], [w.x + w.w, w.y], [w.x + w.w, w.y + w.h], [w.x, w.y + w.h]])) return true;
+                for (const o of g.props || []) {
+                    if (o === p || o.hasCollision === false || o.noNav) continue;
+                    const c = this._c(o);
+                    if (Math.abs(c.x - cx) > (o.width + o.height + p.width + p.height) / 1.4) continue;
+                    if (this._sat(A, this._corners(c.x, c.y, o.width, o.height, o.angle || 0))) return true;
+                }
+                return false;
+            }
+            /** Where she stands to hold side s (0 its +x face, 1 +y, 2 −x, 3 −y, in the piece's own frame). */
+            _grip(p, s) {
+                const c = this._c(p), a = p.angle || 0, gap = FURNITURE_GRAB.GRIP_GAP + (this.game.player.radius || 12);
+                const lx = s === 0 ? p.width / 2 + gap : s === 2 ? -p.width / 2 - gap : 0, ly = s === 1 ? p.height / 2 + gap : s === 3 ? -p.height / 2 - gap : 0;
+                return { x: c.x + lx * Math.cos(a) - ly * Math.sin(a), y: c.y + lx * Math.sin(a) + ly * Math.cos(a) };
+            }
+            _nearestSide(p, x, y) {
+                const c = this._c(p), a = p.angle || 0, dx = x - c.x, dy = y - c.y;
+                const lx = dx * Math.cos(a) + dy * Math.sin(a), ly = -dx * Math.sin(a) + dy * Math.cos(a);
+                return Math.abs(lx) / p.width > Math.abs(ly) / p.height ? (lx > 0 ? 0 : 2) : (ly > 0 ? 1 : 3);
+            }
+            _distTo(p, x, y) {                                                    // from (x, y) to the piece's edge
+                const c = this._c(p), a = p.angle || 0, dx = x - c.x, dy = y - c.y;
+                const lx = Math.abs(dx * Math.cos(a) + dy * Math.sin(a)) - p.width / 2, ly = Math.abs(-dx * Math.sin(a) + dy * Math.cos(a)) - p.height / 2;
+                return Math.hypot(Math.max(0, lx), Math.max(0, ly));
+            }
+
+            // --- the hand ------------------------------------------------------------
+            /** The hand pill / G: grab the nearest piece → confirm the side → let go. */
+            press() {
+                const g = this.game, pl = g.player;
+                if (this.state === 'idle') {
+                    if (!this.cand) return;
+                    this.target = this.cand; this.side = this._nearestSide(this.target, pl.x, pl.y); this.state = 'choose';
+                    if (typeof audioSys !== 'undefined') audioSys.sfx('ui');
+                } else if (this.state === 'choose') this._walkTo();
+                else this.release();
+            }
+
+            /** Choosing: pick the side facing a direction (arrows / WASD). */
+            chooseDir(dx, dy) {
+                if (this.state !== 'choose' || !this.target) return;
+                const a = this.target.angle || 0;
+                let best = 0, bd = -Infinity;
+                for (let s = 0; s < 4; s++) { const na = a + s * Math.PI / 2, d = Math.cos(na) * dx + Math.sin(na) * dy; if (d > bd) { bd = d; best = s; } }
+                this.side = best;
+            }
+
+            /** A tap / click while choosing: on a handle picks that side (tapping the picked one confirms). True if handled. */
+            tap(wx, wy) {
+                if (this.state !== 'choose' || !this.target) return false;
+                for (let s = 0; s < 4; s++) {
+                    const h = this._handle(this.target, s);
+                    if (Math.hypot(h.x - wx, h.y - wy) < 24) { if (s === this.side) this._walkTo(); else this.side = s; return true; }
+                }
+                return false;
+            }
+
+            _handle(p, s) { const gp = this._grip(p, s), c = this._c(p); return { x: gp.x + (c.x - gp.x) * 0.3, y: gp.y + (c.y - gp.y) * 0.3 }; }
+
+            _walkTo() {
+                const p = this.target, gp = this._grip(p, this.side), c = this._c(p);
+                this.state = 'walk';
+                Walker.goTo(this.game.player, gp.x, gp.y, { face: [c.x, c.y], arrive: 5, timeout: 240,
+                    onArrive: () => this._attach(), onFail: () => { showMessage("CAN'T REACH THAT SIDE"); this.release(true); } });
+            }
+
+            _attach() {
+                const g = this.game, p = this.target, c = this._c(p);
+                if (!p || this.state !== 'walk') return;
+                this.state = 'hold';
+                this.off = { x: c.x - g.player.x, y: c.y - g.player.y };
+                g.player.moveMul = FURNITURE_GRAB.MOVE_MUL;
+                if (typeof audioSys !== 'undefined') audioSys.sfx('ui');
+            }
+
+            /** Let go (and keep where it was left). */
+            release(silent) {
+                const g = this.game;
+                if (this.state === 'walk') Walker.cancel(g.player);
+                if (this.state === 'hold' && this.target && this.target._aptIdx !== undefined) {
+                    const c = this._c(this.target); this._layout()[this.target._aptIdx] = [Math.round(c.x), Math.round(c.y), +(this.target.angle || 0).toFixed(4)];
+                }
+                if (g.player) g.player.moveMul = 1;
+                this.state = 'idle'; this.target = null;
+            }
+
+            /** Turn the held piece 15° about its middle; she stays on her side. */
+            rotate(dir) {
+                if (this.state !== 'hold') return;
+                const g = this.game, p = this.target, c = this._c(p), na = (p.angle || 0) + dir * FURNITURE_GRAB.TURN;
+                if (this._blocked(p, c.x, c.y, na)) { showMessage('NO ROOM TO TURN IT'); return; }
+                const old = p.angle; p.angle = na;
+                const gp = this._grip(p, this.side), nav = NavGrid.for(g.activeMap);
+                if (nav && !nav.walkable(gp.x, gp.y)) { p.angle = old; showMessage('NO ROOM TO TURN IT'); return; }
+                g.player.x = gp.x; g.player.y = gp.y; resetHumanoidAnim(g.player);
+                this.off = { x: c.x - gp.x, y: c.y - gp.y };
+            }
+
+            // --- each tick ------------------------------------------------------------
+            /** Before input: the pill, the nearest candidate, and (holding) where she started this tick. */
+            update(game) {
+                const btn = this._btn || (this._btn = document.getElementById('btn-grab'));
+                const rot = this._rot || (this._rot = document.getElementById('grab-rotate'));
+                const here = game.activeMap && game.activeMap.id === FURNITURE_GRAB.MAP && !game.isDriving && !game.paused;
+                if (!here) { if (this.state !== 'idle') this.release(); if (btn) btn.style.display = 'none'; if (rot) rot.style.display = 'none'; this.cand = null; return; }
+                const pl = game.player;
+                if (this.state === 'walk' && !Walker.isWalking(pl)) { if (this.state === 'walk') this.release(true); }   // she walked off (real input took over)
+                if (this.state === 'idle') {
+                    let best = null, bd = FURNITURE_GRAB.RANGE;
+                    for (const p of game.props || []) { if (!this._grabbable(p)) continue; const d = this._distTo(p, pl.x, pl.y); if (d < bd) { bd = d; best = p; } }
+                    this.cand = best;
+                }
+                if (this.state === 'hold') this._prev = { x: pl.x, y: pl.y };
+                if (btn) {
+                    const name = this.target ? FURNITURE_GRAB.NAMES[this.target.decorType] : this.cand ? FURNITURE_GRAB.NAMES[this.cand.decorType] : '';
+                    btn.style.display = this.state !== 'idle' || this.cand ? 'flex' : 'none';
+                    if (btn.style.display === 'flex') setActionPill(btn, this.state === 'idle' ? 'Grab' : this.state === 'choose' ? 'Hold' : this.state === 'walk' ? 'Grab' : 'Let go', name, 'G');
+                }
+                if (rot) rot.style.display = this.state === 'hold' ? 'flex' : 'none';
+            }
+
+            /** After the collision pass: the held piece follows her, or (if it'd hit something) neither moves. */
+            afterCollision(game) {
+                if (this.state !== 'hold' || !this.target) return;
+                const p = this.target, pl = game.player, cx = pl.x + this.off.x, cy = pl.y + this.off.y;
+                if (this._blocked(p, cx, cy, p.angle || 0)) { if (this._prev) { pl.x = this._prev.x; pl.y = this._prev.y; } }
+                else { p.x = cx - p.width / 2; p.y = cy - p.height / 2; p.vx = p.vy = 0; p._still = 0; }
+                const c = this._c(p); pl.angle = Math.atan2(c.y - pl.y, c.x - pl.x);   // she keeps her hands on it
+            }
+
+            // --- drawing ---------------------------------------------------------------
+            draw(ctx) {
+                const g = this.game; if (!g.activeMap || g.activeMap.id !== FURNITURE_GRAB.MAP) return;
+                const p = this.target || this.cand; if (!p) return;
+                const c = this._c(p), a = p.angle || 0, t = _gameTimeSec;
+                ctx.save();
+                ctx.translate(c.x, c.y); ctx.rotate(a);
+                ctx.strokeStyle = `rgba(232, 194, 122, ${this.state === 'idle' ? 0.35 + 0.15 * Math.sin(t * 3) : 0.7})`;
+                ctx.lineWidth = this.state === 'idle' ? 1 : 1.6; ctx.setLineDash(this.state === 'idle' ? [4, 4] : []);
+                ctx.strokeRect(-p.width / 2 - 3, -p.height / 2 - 3, p.width + 6, p.height + 6);
+                ctx.setLineDash([]);
+                ctx.restore();
+                if (this.state === 'choose' || this.state === 'walk') {
+                    for (let s = 0; s < 4; s++) {                                     // a gold chevron on each side, pointing in
+                        const h = this._handle(p, s), ang = a + s * Math.PI / 2 + Math.PI, on = s === this.side, k = on ? 1.35 + 0.15 * Math.sin(t * 6) : 1;
+                        ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(ang); ctx.scale(k, k);
+                        if (on) { ctx.globalAlpha = 0.45; drawGlow(ctx, 0, 0, 16, '232, 194, 122', 0); ctx.globalAlpha = 1; }
+                        ctx.beginPath(); ctx.moveTo(-5, -7); ctx.lineTo(4, 0); ctx.lineTo(-5, 7); ctx.lineTo(-2, 0); ctx.closePath();
+                        ctx.fillStyle = on ? '#fff1c2' : 'rgba(232, 194, 122, 0.75)'; ctx.fill();
+                        ctx.strokeStyle = 'rgba(40, 20, 10, 0.6)'; ctx.lineWidth = 0.8; ctx.stroke();
+                        ctx.restore();
+                    }
                 }
             }
         }
@@ -24147,7 +24855,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             _setupSign(signConfig) {
-                if (this.style === 'double_nights') { this.attachedSign = null; return; }   // its script sign is on the canopy (_dnDrawSign)
+                if (this.style === 'double_nights' || this.style === 'moon_city') { this.attachedSign = null; return; }   // their own script signs (_dnDrawSign, _mcDrawSign)
                 const mainSection = this.sections[0];
                 const titleCase = (str) => str.replace(/\w\S*/g, (txt) => 
                     txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
@@ -24184,7 +24892,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     label: doorConfig.label
                 };
                 
-                if (doorConfig.lightColor) {
+                if (doorConfig.lightColor && this.style !== 'moon_city') {           // (Moon City lights its door itself: _mcLights)
                     this.attachedLights.push(new LampEntity({ x: this.x + entranceSection.x + entranceSection.w / 2, y: this.y + entranceSection.y + entranceSection.h - 5, lampType: 3, color: doorConfig.lightColor, lightRadius: 200 }));
                 }
             }
@@ -24244,7 +24952,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.attachedLights = [];
                 this._generateLights();
                 // Recreate door light if applicable (Silver Queen has its own entrance rig)
-                if (this._doorLightColor && this.style !== 'silver_queen' && this.style !== 'double_nights') {
+                if (this._doorLightColor && this.style !== 'silver_queen' && this.style !== 'double_nights' && this.style !== 'moon_city') {
                     let entranceSection = this.sections[0];
                     let maxY = entranceSection.y + entranceSection.h;
                     this.sections.forEach(s => { if (s.y + s.h > maxY) { entranceSection = s; maxY = s.y + s.h; } });
@@ -24354,6 +25062,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             _paintSign(ctx) {
                 if (this.style === 'double_nights') { if (typeof game !== 'undefined' && game.camera) this._dnDrawSign(ctx); return; }
+                if (this.style === 'moon_city') { if (typeof game !== 'undefined' && game.camera) { this._mcDrawCanopy(ctx, false); this._mcDrawSign(ctx, false); } return; }
                 if (!this.attachedSign || !this.attachedTransition) return;
                 
                 ctx.save();
@@ -24620,6 +25329,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.facadeFeature = r(4) < 0.55 ? 'balconies' : 'fire_escape';
                 } else if (this.style === 'double_nights') {
                     this.floors = DN.FLOORS; this.roofFeatures = []; this.emissiveReach = 950;   // crowns, beams (buildings/double-nights.js)
+                } else if (this.style === 'moon_city') {
+                    this.roofFeatures = []; this.facadeFeature = 'moon_city'; this.emissiveReach = 600;   // fins, skylight, searchlights (buildings/moon-city.js)
                 } else if (this.style === 'silver_queen') {
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
@@ -24634,6 +25345,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const accent = this.colors.accent;
                 if (this.style === 'silver_queen' && t) { this._sqLights(); return; }
                 if (this.style === 'double_nights') { this._dnLights(); return; }
+                if (this.style === 'moon_city') { this._mcLights(); return; }
                 if (t) {
                     const cx = t.x + t.w / 2, cy = t.y - 10;
                     // Entrance pair, warm pool at the door — purposeful light instead of a bulb grid
@@ -24782,6 +25494,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // --- Roofs (drawn in world coords under the scale-about-camera transform) ---
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const sq = this.style === 'silver_queen';
+                if (this.style === 'moon_city') { this._mcDrawRoof(ctx, false); ctx.restore(); return; }
                 this.sections.forEach((section, si) => {
                     const sx = this.x + section.x, sy = this.y + section.y;
                     if (sq) {                                                                  // lavender slab with a soft sheen (world-space gradients, made once)
@@ -24824,6 +25537,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this._drawFaceWindows(ctx, f, P, true); this._drawFaceFeature(ctx, f, P, true);
                 }
                 if (this.style === 'silver_queen') { this._sqEmissiveStructure(ctx, dark, glow); ctx.globalAlpha = glow; ctx.globalCompositeOperation = 'source-over'; }
+                if (this.style === 'moon_city') { this._mcDrawCanopy(ctx, true); this._mcDrawSign(ctx, true, dark); ctx.globalAlpha = glow; ctx.globalCompositeOperation = 'source-over'; }
                 // Roof: rim light along parapets reads the silhouette at night, plus neon/rooftop lights
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const rim = this.style ? this.colors.accent : '#8fa0c8';
@@ -24832,9 +25546,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.sections.forEach(section => ctx.strokeRect(this.x + section.x + 1, this.y + section.y + 1, section.w - 2, section.h - 2));
                 ctx.shadowBlur = 0; ctx.globalAlpha = glow;
                 if (this.style === 'silver_queen') this._sqRoofEdgeLights(ctx, true);
+                if (this.style === 'moon_city') this._mcDrawRoof(ctx, true);
                 if (this.style) this._drawRoofFeatures(ctx, true);
                 ctx.restore();
                 if (this.style === 'silver_queen') { this._sqVeil(ctx, dark); this._sqDrawCrown(ctx, true); this._sqDrawBeams(ctx, dark); }
+                if (this.style === 'moon_city') this._mcBeams(ctx, dark);
             },
 
             /** Floodlight wash up the front face from the entrance lamps (accent-tinted). */
@@ -24865,7 +25581,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * at night the lips catch the building's lamp colour (LandmarkKit.rim).
              */
             _drawFaceWindows(ctx, f, P, emissive) {
-                if (f.side === 'C') return;                          // rounded corners: no windows on the curve
+                if (f.side === 'C' || this.style === 'moon_city') return;             // (Moon City: no windows, its fins and smoked glass are _mcFace)                          // rounded corners: no windows on the curve
                 const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS);
                 const ax = f.x1, ay = f.y1, bx = f.x2, by = f.y2;
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
@@ -24955,6 +25671,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _drawFaceFeature(ctx, f, P, emissive) {
                 if (!this.facadeFeature) return;
                 if (this.facadeFeature === 'silver_queen') { this._sqFace(ctx, f, P, emissive); return; }
+                if (this.facadeFeature === 'moon_city') { this._mcFace(ctx, f, P, emissive); return; }
                 const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS);
                 const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
@@ -26822,6 +27539,355 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             }
         });
+        /* =====================================================================
+           MOON CITY — the nightclub on the hub (style 'moon_city')
+           ---------------------------------------------------------------------
+           In the house's own colours (the interior's brand): black lacquer walls
+           ribbed with violet neon fins and gold cornices, a smoked-glass skylight
+           over the dance floor that shows the floor's lights pulsing beneath it,
+           a gold crescent on the roof, two slow searchlights, "Moon City" in
+           script neon. At the door: a rose-velvet canopy on gold posts, a red
+           carpet, velvet ropes on gold stanchions, a crimson pool of light, a
+           little low mist, a bouncer in black and gold, and a queue that moves.
+           The lights keep time with the club (clubBeatN; the real kick when the
+           muffled track can be heard outside, audio/audio.js MAP_MUSIC).
+           Same footprint and door as the old block, so nothing else moves.
+           Hooks: building-v2.js (_applyStyle, lights, faces, roof, sign,
+           emissive), engine/draw.js (ground), engine/map-loading.js (forecourt).
+           ===================================================================== */
+        const MCX = {
+            CANOPY_Z: 12, SIGN_Z: 24, FIN: 46,
+            C: {
+                lacquer: '#0b0810', plum: '#1a1022', wall: '#140c1a', fin: '#2a1a36',
+                violet: '#8a5cff', lavender: '#c8a8ff', lilac: '#e8d8ff',
+                gold: '#e8c27a', goldDk: '#a8823e', goldLt: '#fff1c2',
+                rose: '#ff5a8a', velvet: '#5a0c34', velvetLt: '#8a1a52', crimson: '#ff3a6a', marble: '#0e0a12'
+            }
+        };
+
+        /** A crescent moon at (x, y), radius r, horns turned by `rot`. */
+        function _mcCrescent(ctx, x, y, r, rot = -0.5) {
+            ctx.beginPath();
+            ctx.arc(x, y, r, rot + 0.35, rot + Math.PI * 2 - 0.35);
+            ctx.arc(x + Math.cos(rot) * r * 0.42, y + Math.sin(rot) * r * 0.42, r * 0.78, rot + Math.PI * 2 - 0.62, rot + 0.62, true);
+            ctx.closePath();
+        }
+
+        Object.assign(BuildingV2.prototype, {
+            /** Footprint pieces in world space (made once). */
+            _mcGeo() {
+                if (this._mcG) return this._mcG;
+                const X = this.x, Y = this.y, hall = this.sections[0], wing = this.sections[1] || hall;
+                const wb = Y + wing.y + wing.h, dx = X + wing.x + wing.w / 2;
+                return (this._mcG = {
+                    hall: { x: X + hall.x, y: Y + hall.y, w: hall.w, h: hall.h },
+                    wing: { x: X + wing.x, y: Y + wing.y, w: wing.w, h: wing.h },
+                    door: { x: dx, y: wb },
+                    sky: { cx: X + hall.x + hall.w * 0.55, cy: Y + hall.y + hall.h * 0.5, rx: hall.w * 0.3, ry: hall.h * 0.3 },
+                    moon: { x: X + hall.x + hall.w * 0.88, y: Y + hall.y + hall.h * 0.24 },
+                    medal: { x: X + wing.x + wing.w * 0.42, y: Y + wing.y + wing.h * 0.5, r: Math.min(wing.w, wing.h) * 0.3 },
+                    sign: { x: X + hall.x + (wing.w + hall.w) / 2, y: Y + hall.y + hall.h + 10 },
+                    court: { x: dx - 110, y: wb, w: 220, h: 104 },
+                    queue: [0, 1, 2, 3, 4, 5].map(i => [dx + 64, wb + 22 + i * 17])
+                });
+            },
+
+            /** Kept clear of street trees and lamps (engine/map-loading.js). */
+            _mcForecourt() { const c = this._mcGeo().court; return { x: c.x - 30, y: c.y - 10, w: c.w + 60, h: c.h + 90 }; },   // (the carpet's end too)
+
+            /** Hidden lights: the crimson pool at the door, the canopy, violet uplights, the sign's spill. */
+            _mcLights() {
+                const G = this._mcGeo(), C = MCX.C;
+                const L = (x, y, color, r) => { const l = new LampEntity({ x, y, lampType: 4, color, lightRadius: r }); l.visible = false; l.keepColor = true; this.attachedLights.push(l); };
+                L(G.door.x, G.door.y + 26, C.crimson, 230);
+                L(G.door.x, G.door.y + 4, '#ffc890', 150);
+                L(G.sign.x, G.sign.y + 10, C.lilac, 210);
+                for (const u of [0.15, 0.5, 0.85]) L(G.wing.x + G.wing.w + (G.hall.w - G.wing.w) * u, G.hall.y + G.hall.h + 6, '#b48cff', 170);
+                for (const u of [0.25, 0.75]) L(G.hall.x + G.hall.w * u, G.hall.y - 6, '#b48cff', 160);
+                L(G.wing.x + G.wing.w + 6, G.wing.y + G.wing.h * 0.5, C.rose, 150);
+            },
+
+            /** The club's beat: count, position in the beat, the kick, and this bar's colour. */
+            _mcBeat() {
+                const n = typeof clubBeatN === 'function' ? clubBeatN() : _gameTimeSec * 140 / 60;
+                const beat = ((n % 1) + 1) % 1, bar = Math.floor(n / 8);
+                return { n, beat, bar, kick: Math.pow(1 - beat, 3) };
+            },
+
+            /** A wall: lacquer between violet neon fins, smoked-glass bands, gold cornices. */
+            _mcFace(ctx, f, P, emissive) {
+                if (f.side === 'C') return;
+                const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
+                const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
+                if (Math.hypot(dx - ax, dy - ay) < 4) return;
+                const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
+                const len = Math.hypot(bx - ax, by - ay), n = Math.max(2, Math.round(len / MCX.FIN)), C = MCX.C;
+                const quad = (u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); };
+                const line = (u0, v0, u1, v1) => { const a = at(u0, v0), b = at(u1, v1); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); };
+                if (!emissive) {
+                    // smoked glass between the fins
+                    const sun = sunNow(), day = sun ? sun.day : 0;
+                    for (let i = 0; i < n; i++) {
+                        quad((i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
+                        ctx.fillStyle = 'rgba(12, 6, 20, 0.92)'; ctx.fill();
+                        if (day > 0.05) { ctx.fillStyle = `rgba(168, 160, 220, ${0.22 * day})`; ctx.fill(); }
+                    }
+                    ctx.lineWidth = 2.2; ctx.strokeStyle = C.fin;                                  // the fins
+                    for (let i = 0; i <= n; i++) line(i / n, 0.06, i / n, 0.96);
+                    ctx.lineWidth = 1.4; ctx.strokeStyle = C.goldDk;                               // gold cornice and plinth
+                    line(0, 0.97, 1, 0.97); ctx.lineWidth = 0.8; line(0, 0.06, 1, 0.06);
+                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.25)'; line(0, 0.8, 1, 0.8);
+                    return;
+                }
+                // At night: the fins breathe violet and lavender, pumping on the kick
+                const B = this._mcBeat(), t = _gameTimeSec, op = ctx.globalCompositeOperation;
+                ctx.globalCompositeOperation = 'lighter';
+                for (let i = 0; i < n; i++) {                                                     // a lavender glow behind the glass
+                    quad((i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
+                    ctx.fillStyle = `rgba(200, 168, 255, ${0.07 + 0.05 * B.kick})`; ctx.fill();
+                }
+                for (let i = 0; i <= n; i++) {
+                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick;
+                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.7})`; line(i / n, 0.08, i / n, 0.94);
+                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; line(i / n, 0.08, i / n, 0.94);
+                }
+                ctx.lineWidth = 1; ctx.strokeStyle = `rgba(255, 241, 194, 0.55)`; line(0, 0.97, 1, 0.97);   // the cornice catches gold
+                ctx.globalCompositeOperation = op;
+            },
+
+            /** The roof (drawn in the roof plane): lacquer decks, gold parapets, the skylight, the crescent. */
+            _mcDrawRoof(ctx, emissive) {
+                const G = this._mcGeo(), C = MCX.C, S = G.sky;
+                if (!emissive) {
+                    for (const s of [G.hall, G.wing]) {
+                        ctx.fillStyle = LandmarkKit.grad(this, 'mcroof' + s.y, () => { const g = ctx.createLinearGradient(s.x, s.y, s.x + s.w, s.y + s.h); g.addColorStop(0, '#171020'); g.addColorStop(1, C.lacquer); return g; });
+                        ctx.fillRect(s.x, s.y, s.w, s.h);
+                        ctx.strokeStyle = 'rgba(232, 194, 122, 0.06)'; ctx.lineWidth = 1;                // lacquer panels
+                        for (let gx = 50; gx < s.w; gx += 50) { ctx.beginPath(); ctx.moveTo(s.x + gx, s.y); ctx.lineTo(s.x + gx, s.y + s.h); ctx.stroke(); }
+                        ctx.strokeStyle = C.goldDk; ctx.lineWidth = 3; ctx.strokeRect(s.x + 2, s.y + 2, s.w - 4, s.h - 4);
+                        ctx.strokeStyle = 'rgba(255, 241, 194, 0.35)'; ctx.lineWidth = 0.8; ctx.strokeRect(s.x + 6, s.y + 6, s.w - 12, s.h - 12);
+                    }
+                    // The skylight over the dance floor: smoked glass in a gold ring, its leading in rays
+                    ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx, S.ry, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = '#0d0814'; ctx.fill();
+                    const sun = sunNow(), day = sun ? sun.day : 0;
+                    if (day > 0.05) {                                                               // by day it holds the sky
+                        ctx.fillStyle = LandmarkKit.grad(this, 'mcsky', () => { const g = ctx.createLinearGradient(S.cx - S.rx, S.cy - S.ry, S.cx + S.rx, S.cy + S.ry); g.addColorStop(0, 'rgba(190, 186, 236, 1)'); g.addColorStop(0.5, 'rgba(120, 110, 180, 1)'); g.addColorStop(1, 'rgba(60, 40, 100, 1)'); return g; });
+                        ctx.globalAlpha = 0.35 * day; ctx.fill(); ctx.globalAlpha = 1;
+                    }
+                    ctx.save(); ctx.clip();
+                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.35)'; ctx.lineWidth = 1;
+                    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(S.cx, S.cy); ctx.lineTo(S.cx + Math.cos(a) * S.rx * 1.2, S.cy + Math.sin(a) * S.ry * 1.2); ctx.stroke(); }
+                    ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx * 0.55, S.ry * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
+                    ctx.restore();
+                    ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx, S.ry, 0, 0, Math.PI * 2);
+                    ctx.strokeStyle = C.gold; ctx.lineWidth = 3; ctx.stroke();
+                    ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx + 5, S.ry + 5, 0, 0, Math.PI * 2); ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1; ctx.stroke();
+                    // The VIP wing: a gold medallion, the house crescent at its heart, rays of gold leaf
+                    const M = G.medal;
+                    ctx.beginPath(); ctx.arc(M.x, M.y, M.r, 0, Math.PI * 2); ctx.fillStyle = '#100a16'; ctx.fill();
+                    ctx.strokeStyle = C.goldDk; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(M.x, M.y, M.r - 6, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(232, 194, 122, 0.45)'; ctx.lineWidth = 0.8; ctx.stroke();
+                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.3)';
+                    for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, r0 = M.r * 0.42, r1 = M.r - 9; ctx.beginPath(); ctx.moveTo(M.x + Math.cos(a) * r0, M.y + Math.sin(a) * r0); ctx.lineTo(M.x + Math.cos(a) * r1, M.y + Math.sin(a) * r1); ctx.stroke(); }
+                    ctx.fillStyle = C.gold; _mcCrescent(ctx, M.x, M.y, M.r * 0.32); ctx.fill();
+                    // The gold crescent on its plinth
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'; _mcCrescent(ctx, G.moon.x + 3, G.moon.y + 4, 26); ctx.fill();
+                    ctx.fillStyle = LandmarkKit.grad(this, 'mcmoon', () => { const g = ctx.createLinearGradient(G.moon.x - 26, G.moon.y - 26, G.moon.x + 26, G.moon.y + 26); g.addColorStop(0, C.goldLt); g.addColorStop(0.5, C.gold); g.addColorStop(1, C.goldDk); return g; });
+                    _mcCrescent(ctx, G.moon.x, G.moon.y, 26); ctx.fill();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'; ctx.lineWidth = 0.8; ctx.stroke();
+                    // Discreet plant: black lacquer units edged in gold
+                    for (const [x, y, w, h] of [[G.hall.x + 40, G.hall.y + 30, 46, 30], [G.hall.x + 100, G.hall.y + 30, 24, 24], [G.wing.x + 190, G.wing.y + 40, 40, 28]]) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 3, y + 3, w, h);
+                        ctx.fillStyle = '#100a16'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = 'rgba(168, 130, 62, 0.6)'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+                    }
+                    return;
+                }
+                // Night: the dance floor glows up through the skylight, in the club's colours, on the beat
+                const B = this._mcBeat(), op = ctx.globalCompositeOperation;
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.save(); ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx - 2, S.ry - 2, 0, 0, Math.PI * 2); ctx.clip();
+                const cell = 26, base = ctx.globalAlpha;
+                for (let gx = S.cx - S.rx; gx < S.cx + S.rx; gx += cell) for (let gy = S.cy - S.ry; gy < S.cy + S.ry; gy += cell) {
+                    const i = Math.round((gx - S.cx) / cell), j = Math.round((gy - S.cy) / cell);
+                    const pat = B.bar % 4, ph = pat === 0 ? Math.hypot(i, j) * 0.5 - B.n * 0.5 : pat === 1 ? (i + j) * 0.35 - B.n : pat === 2 ? ((i + j + Math.floor(B.n)) % 2) * 2 : Math.atan2(j, i) * 2 + B.n;
+                    const a = 0.25 + 0.25 * Math.sin(ph * Math.PI) + 0.35 * B.kick;
+                    ctx.globalAlpha = base * Math.max(0, a) * 0.55;
+                    ctx.fillStyle = `rgb(${CLUB_PAL[(Math.abs(i * 3 + j) + B.bar) % 4]})`;
+                    ctx.fillRect(gx + 2, gy + 2, cell - 4, cell - 4);
+                }
+                ctx.restore(); ctx.globalAlpha = base;
+                ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx, S.ry, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 241, 194, ${0.5 + 0.3 * B.kick})`; ctx.lineWidth = 2; ctx.stroke();
+                // The medallion glows rose at its heart
+                glowA(ctx, G.medal.x, G.medal.y, G.medal.r * 1.3, '255, 90, 140', base * (0.35 + 0.25 * B.kick));
+                ctx.globalAlpha = base;
+                // The crescent's lavender halo
+                glowA(ctx, G.moon.x, G.moon.y, 70, '200, 168, 255', base * (0.55 + 0.2 * Math.sin(_gameTimeSec * 0.6)));
+                ctx.globalAlpha = base; ctx.fillStyle = 'rgba(255, 241, 194, 0.55)'; _mcCrescent(ctx, G.moon.x, G.moon.y, 26); ctx.fill();
+                ctx.globalCompositeOperation = op;
+            },
+
+            /** Two slow searchlights from the roof, violet and rose, sweeping the night sky. */
+            _mcBeams(ctx, dark) {
+                if (dark < 0.25 || _zoomLOD >= 2) return;
+                const G = this._mcGeo(), t = _gameTimeSec, k = 1 + this._leanScale();
+                ctx.save(); LandmarkKit.plane(ctx, k); ctx.globalCompositeOperation = 'lighter';
+                for (const [x, y, rgb, ph] of [[G.hall.x + 70, G.hall.y + 60, '170, 130, 255', 0], [G.hall.x + G.hall.w - 50, G.hall.y + G.hall.h - 40, '255, 90, 140', 2.4]]) {
+                    const a = Math.sin(t * 0.22 + ph) * 1.1 + ph, L = 560, w = 0.08;
+                    const g = ctx.createRadialGradient(x, y, 4, x, y, L);
+                    g.addColorStop(0, `rgba(${rgb}, ${0.22 * dark})`); g.addColorStop(1, `rgba(${rgb}, 0)`);
+                    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, L, a - w, a + w); ctx.closePath(); ctx.fill();
+                    glowA(ctx, x, y, 16, rgb, 0.8 * dark); ctx.globalAlpha = 1;
+                }
+                ctx.restore();
+            },
+
+            /** The rose-velvet canopy over the door on gold posts, its front edge scalloped; bulbs at night. */
+            _mcDrawCanopy(ctx, emissive) {
+                const G = this._mcGeo(), C = MCX.C, cam = game.camera, k = LandmarkKit.k(MCX.CANOPY_Z);
+                const x0 = G.door.x - 62, x1 = G.door.x + 62, y0 = G.door.y - 4, y1 = G.door.y + 44;
+                const Pk = (x, y) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
+                if (!emissive) {
+                    ctx.save(); ctx.strokeStyle = C.gold; ctx.lineWidth = 2;                            // posts, ground to canopy
+                    for (const x of [x0 + 6, x1 - 6]) { const [px, py] = Pk(x, y1 - 4); ctx.beginPath(); ctx.moveTo(x, y1 - 4); ctx.lineTo(px, py); ctx.stroke(); }
+                    ctx.restore();
+                }
+                LandmarkKit.flat(ctx, k, (c) => {
+                    if (!emissive) {
+                        c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x0 + 4, y0 + 6, x1 - x0, y1 - y0);
+                        const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, C.velvet); g.addColorStop(0.6, C.velvetLt); g.addColorStop(1, C.velvet);
+                        c.fillStyle = g; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y0); c.lineTo(x1, y1 - 6);
+                        for (let x = x1; x > x0; x -= 12) c.quadraticCurveTo(x - 6, y1 + 4, x - 12, y1 - 6);     // scalloped valance
+                        c.closePath(); c.fill();
+                        c.strokeStyle = C.gold; c.lineWidth = 1.4; c.stroke();
+                        c.strokeStyle = 'rgba(255, 241, 194, 0.25)'; c.lineWidth = 0.8;                       // velvet pleats
+                        for (let x = x0 + 10; x < x1; x += 10) { c.beginPath(); c.moveTo(x, y0 + 2); c.lineTo(x, y1 - 8); c.stroke(); }
+                        c.fillStyle = C.gold; _mcCrescent(c, G.door.x, (y0 + y1) / 2 - 2, 9); c.fill();          // the crescent on the canopy
+                    } else {
+                        const t = _frameTime / 1000;                                                    // marquee bulbs along the valance
+                        c.globalCompositeOperation = 'lighter';
+                        for (let x = x0 + 6, i = 0; x < x1; x += 12, i++) {
+                            const tw = 0.55 + 0.45 * Math.sin(t * 3 + i * 1.3);
+                            c.globalAlpha = tw; c.fillStyle = '#ffe8f0'; c.beginPath(); c.arc(x, y1 - 3, 1.6, 0, Math.PI * 2); c.fill();
+                            if (_zoomLOD < 1) { c.globalAlpha = tw * 0.35; drawGlow(c, x, y1 - 3, 7, '255, 180, 210', 0); }
+                        }
+                        c.globalAlpha = 0.9; c.fillStyle = 'rgba(255, 241, 194, 0.8)'; _mcCrescent(c, G.door.x, (y0 + y1) / 2 - 2, 9); c.fill();
+                    }
+                });
+            },
+
+            /** "Moon City" in script neon on the hall's front, the crescent beside it, NIGHTCLUB in gold beneath. */
+            _mcDrawSign(ctx, emissive, dark = 0) {
+                const G = this._mcGeo(), C = MCX.C, k = LandmarkKit.k(MCX.SIGN_Z), x = G.sign.x, y = G.sign.y;
+                const t = _frameTime / 1000, flick = (t % 7.3) < 0.12 ? 0.35 : (t % 11.1) < 0.06 ? 0.6 : 1;
+                LandmarkKit.flat(ctx, k, (c) => {
+                    c.textAlign = 'center'; c.textBaseline = 'middle';
+                    c.font = "46px 'Great Vibes', cursive";
+                    if (!emissive) {
+                        c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillText('Moon City', x + 2, y + 3);
+                        c.fillStyle = '#d8c8f0'; c.fillText('Moon City', x, y);
+                        c.fillStyle = C.gold; _mcCrescent(c, x - 118, y - 4, 13); c.fill();
+                        c.font = '600 9px Montserrat, sans-serif'; c.fillStyle = C.goldDk;
+                        c.fillText('N I G H T C L U B', x, y + 26);
+                        return;
+                    }
+                    const a = Math.max(0.15, Math.min(1, dark * 1.3)) * flick;
+                    c.globalCompositeOperation = 'lighter';
+                    if (_zoomLOD < 1) { c.globalAlpha = a * 0.5; drawGlow(c, x, y, 150, '255, 120, 180', 0); }
+                    c.globalAlpha = a; c.shadowColor = C.rose; c.shadowBlur = _zoomLOD < 1 ? 16 : 0;
+                    c.fillStyle = '#ffb8d4'; c.fillText('Moon City', x, y);
+                    c.shadowBlur = 0; c.fillStyle = 'rgba(255, 244, 250, 0.9)'; c.fillText('Moon City', x, y);
+                    c.fillStyle = C.goldLt; _mcCrescent(c, x - 118, y - 4, 13); c.fill();
+                    if (_zoomLOD < 1) { c.globalAlpha = a * 0.6; drawGlow(c, x - 118, y - 4, 26, '232, 194, 122', 0); }
+                    c.globalAlpha = a * 0.85; c.font = '600 9px Montserrat, sans-serif'; c.fillStyle = C.gold;
+                    c.fillText('N I G H T C L U B', x, y + 26);
+                });
+            },
+
+            /** The forecourt: marble, gold crescents, the red carpet, the ropes (baked); the pool, mist, bouncer and queue (live). */
+            _mcDrawGround(ctx) {
+                const G = this._mcGeo(), Q = G.court, C = MCX.C;
+                const spr = LandmarkKit.sprite(this, 'mcground', Q.x, Q.y, Q.w, Q.h, 2, (c) => {
+                    c.fillStyle = C.marble; c.fillRect(Q.x, Q.y, Q.w, Q.h);
+                    const r = seededRandom('mccourt');
+                    c.strokeStyle = 'rgba(200, 168, 255, 0.07)'; c.lineWidth = 0.8;                       // veining
+                    for (let i = 0; i < 14; i++) { const x = Q.x + r() * Q.w, y = Q.y + r() * Q.h; c.beginPath(); c.moveTo(x, y); c.bezierCurveTo(x + 20, y + r() * 30, x + 40, y - r() * 20, x + 70, y + r() * 25); c.stroke(); }
+                    c.strokeStyle = 'rgba(168, 130, 62, 0.55)'; c.lineWidth = 1; c.strokeRect(Q.x + 6, Q.y + 3, Q.w - 12, Q.h - 8);   // a fine gold inlay border
+                    for (const sx of [-1, 1]) { c.fillStyle = 'rgba(232, 194, 122, 0.55)'; _mcCrescent(c, G.door.x + sx * 82, Q.y + 58, 13, sx < 0 ? 0.6 : Math.PI - 0.6); c.fill(); }
+                    // The red carpet, door to kerb, gold-edged
+                    const cw = 40; c.fillStyle = '#6a0a22'; c.fillRect(G.door.x - cw / 2, Q.y, cw, Q.h);
+                    c.fillStyle = 'rgba(0,0,0,0.18)'; for (let y = Q.y + 6; y < Q.y + Q.h; y += 8) c.fillRect(G.door.x - cw / 2, y, cw, 1);
+                    c.fillStyle = C.gold; c.fillRect(G.door.x - cw / 2, Q.y, 2, Q.h); c.fillRect(G.door.x + cw / 2 - 2, Q.y, 2, Q.h);
+                    // Velvet ropes on gold stanchions either side of the carpet
+                    for (const sx of [-1, 1]) {
+                        const xr = G.door.x + sx * 36, ys = [Q.y + 14, Q.y + 42, Q.y + 70, Q.y + 96];
+                        c.strokeStyle = C.velvetLt; c.lineWidth = 2.6;
+                        for (let i = 0; i < ys.length - 1; i++) { c.beginPath(); c.moveTo(xr, ys[i]); c.quadraticCurveTo(xr + sx * 5, (ys[i] + ys[i + 1]) / 2, xr, ys[i + 1]); c.stroke(); }
+                        for (const y of ys) { c.fillStyle = 'rgba(0,0,0,0.4)'; c.beginPath(); c.arc(xr + 1.5, y + 2, 3.6, 0, Math.PI * 2); c.fill(); c.fillStyle = C.gold; c.beginPath(); c.arc(xr, y, 3.4, 0, Math.PI * 2); c.fill(); c.fillStyle = C.goldLt; c.beginPath(); c.arc(xr - 1, y - 1, 1.2, 0, Math.PI * 2); c.fill(); }
+                    }
+                });
+                ctx.drawImage(spr.cv, spr.x, spr.y, spr.w, spr.h);
+                const dark = typeof game !== 'undefined' && game.getAmbientDarkness ? game.getAmbientDarkness() : 0.6;
+                const night = typeof game !== 'undefined' && game.dayCycle ? game.dayCycle().lampsOn : dark > 0.4;
+                const B = this._mcBeat(), t = _gameTimeSec;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                if (night) {                                                                        // the crimson pool at the door, breathing on the kick
+                    glowA(ctx, G.door.x, G.door.y + 30, 90, '255, 40, 90', 0.32 + 0.12 * B.kick);
+                    if (_zoomLOD < 1) for (let i = 0; i < 5; i++) {                                // low mist curling about the door
+                        const mx = G.door.x + Math.sin(t * 0.21 + i * 1.7) * 70, my = Q.y + 30 + Math.cos(t * 0.17 + i * 2.3) * 24 + i * 9;
+                        glowA(ctx, mx, my, 46, i % 2 ? '200, 168, 255' : '255, 120, 170', 0.07);
+                    }
+                }
+                ctx.restore();
+                this._mcPeople(ctx, night);
+            },
+
+            /** The bouncer at the rope and the queue along it: the front one goes in now and then, others come out. */
+            _mcPeople(ctx, night) {
+                const G = this._mcGeo(), now = _gameTimeSec;
+                const Q = this._mcQ || (this._mcQ = { people: [], t: now, next: now + 4, out: now + 20 });
+                const dt = Math.min(0.1, Math.max(0, now - Q.t)); Q.t = now;
+                if (!Q.bouncer) Q.bouncer = { x: G.door.x + 46, y: G.door.y + 16, angle: Math.PI / 2, walkPhase: 0, look: ROLE_LOOKS.mc_staff('bouncer', seededRandom('mcbouncer')), life: 1 };
+                const want = night ? 5 : 1;
+                const queued = Q.people.filter(p => p.state === 'queue');
+                if (queued.length < want && Q.people.length < 9 && (!Q.spawnAt || now > Q.spawnAt)) {   // someone joins the end of the line
+                    const p = { x: G.door.x + 120, y: G.court.y + G.court.h + 10, angle: Math.PI, walkPhase: 0, look: ROLE_LOOKS.clubgoer(seededRandom('mcq' + Math.random())), life: 0, state: 'queue' };
+                    if (Math.random() < 0.4) p.look.held = null;
+                    Q.people.push(p); Q.spawnAt = now + 1.5 + Math.random() * 2;
+                }
+                if (now > Q.next && queued.length) { queued[0].state = 'enter'; Q.next = now + (night ? 5 + Math.random() * 6 : 14); }   // the bouncer waves the front one in
+                if (night && now > Q.out) {                                                         // someone leaves, down the carpet
+                    Q.people.push({ x: G.door.x, y: G.door.y + 4, angle: Math.PI / 2, walkPhase: 0, look: ROLE_LOOKS.clubgoer(seededRandom('mco' + Math.random())), life: 0, state: 'leave' });
+                    Q.out = now + 8 + Math.random() * 10;
+                }
+                let slot = 0;
+                for (let i = Q.people.length - 1; i >= 0; i--) {
+                    const p = Q.people[i];
+                    let tx, ty;
+                    if (p.state === 'queue') { const s = G.queue[Math.min(G.queue.length - 1, Q.people.filter(o => o.state === 'queue').indexOf(p))]; tx = s[0]; ty = s[1]; slot++; p.life = Math.min(1, p.life + dt * 1.5); }
+                    else if (p.state === 'enter') { tx = G.door.x; ty = G.door.y + 2; if (Math.hypot(tx - p.x, ty - p.y) < 8) p.life -= dt * 2; else p.life = Math.min(1, p.life + dt); }
+                    else { tx = G.door.x; ty = G.court.y + G.court.h + 30; p.life = ty - p.y < 30 ? p.life - dt * 1.5 : Math.min(1, p.life + dt * 2); }
+                    if (p.life <= 0 && p.state !== 'queue') { Q.people.splice(i, 1); continue; }
+                    const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), sp = 1.1 * dt * 60;
+                    let vx = 0, vy = 0;
+                    if (d > 2) { vx = dx / d * Math.min(sp, d); vy = dy / d * Math.min(sp, d); p.x += vx; p.y += vy; p.angle = Math.atan2(vy, vx); p.look.pose = undefined; }
+                    else { p.angle = p.state === 'queue' ? -Math.PI / 2 : p.angle; p.look.pose = pickFrom(seededRandom(p.look.skinColor + slot), ['idle', 'phone', 'fidget', 'breathe']); }
+                    gaitCommand(p, vx, vy);
+                }
+                // the bouncer turns to whoever's at the front
+                const front = Q.people.find(o => o.state !== 'leave');
+                Q.bouncer.angle = front ? Math.atan2(front.y - Q.bouncer.y, front.x - Q.bouncer.x) : Math.PI / 2;
+                Q.bouncer.look.pose = 'arms_crossed';
+                const cam = typeof game !== 'undefined' ? game.camera : null;
+                if (cam && Math.hypot(G.door.x - cam.x, G.door.y - cam.y) > 1400) return;          // off screen: don't draw
+                for (const p of [...Q.people, Q.bouncer].sort((a, b) => a.y - b.y)) {
+                    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle); ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+                    drawProceduralHumanoid(ctx, p, { stance: 'idle', ...p.look });
+                    ctx.restore();
+                }
+            }
+        });
         // =====================================================================
         //  SKY LAYER — ad airships and floating shards above the city
         // =====================================================================
@@ -27220,6 +28286,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function createMoonCityNightclub(x, y, config = {}) {
             return new BuildingV2({
                 id: 'moon_city',
+                style: 'moon_city',                    // buildings/moon-city.js: lacquer, neon fins, the skylight, the canopy
                 x: x,
                 y: y,
                 label: 'Moon City Nightclub',
@@ -27240,14 +28307,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 windowMarginX: 30,
                 windowMarginY: 20,
                 
-                // Colors - deep magenta/neon pink club theme
-                roofColor: '#28122a',           // Rich purple roof
-                roofLightColor: '#341838',      // Lighter purple
-                wallColor: '#221428',           // Very dark magenta walls
-                wallLightColor: '#2c1a30',      // Dark plum
-                accentColor: '#ff00aa',         // Hot pink neon accent
-                windowColor: '#0f0515',         // Dark tinted glass (UV purple)
-                windowLitColor: '#ff00aa',      // Hot pink glow (matches neon)
+                // Colours: the house brand (the interior's) — black lacquer, violet neon, champagne gold
+                roofColor: '#120a18',
+                roofLightColor: '#1a1022',
+                wallColor: '#140c1a',           // black lacquer, a breath of plum
+                wallLightColor: '#1a1022',
+                accentColor: '#b48cff',         // violet neon (the street lamps round the block glow it too)
+                windowColor: '#0c0612',         // smoked glass
+                windowLitColor: '#c8a8ff',
                 windowFrameColor: '#0a050a',    // Near-black frames
                 balconyColor: '#1a0a1a',        // Dark purple railings
                 
@@ -27264,11 +28331,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ],
                 
                 // Attachments
-                sign: { text: 'CLUB', color: '#ff00aa', size: 40 },
+                sign: { text: 'Moon City', color: '#c8a8ff', size: 40 },
                 door: {
                     target: config.doorTarget || 'moon_city_nightclub',
                     label: 'Enter Club',
-                    lightColor: '#ff00aa'
+                    lightColor: '#ff3a6a'
                 },
                 
                 ...config
@@ -28112,13 +29179,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 { x: 0, y: 0, w: 600, h: 300 },
                 { x: 0, y: 300, w: 280, h: 200 }
             ],
-            accentColor: '#ff00aa',
+            accentColor: '#b48cff',
             label: 'Moon City Nightclub',
             type: 'club',
             category: 'entertainment',
             floors: 4,
-            sign: { text: 'CLUB', color: '#ff00aa', size: 40 },
-            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff00aa' }
+            sign: { text: 'CLUB', color: '#c8a8ff', size: 40 },
+            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' }
         });
         
         // Generic V2 buildings for auto-fill (not unique — can be placed multiple times)
@@ -32174,27 +33241,38 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return false;
             }
 
+            /** The last resort: is the strip we'd drive through to pass a person (toward the kerb) empty of people? */
+            _kerbClear(obs) {
+                if (typeof game === 'undefined') return false;
+                const a = this.angle, fx = Math.cos(a), fy = Math.sin(a), side = obs.lateral > 0 ? -1 : 1;   // pass on the side away from them
+                const passLat = obs.lateral + side * ((obs.width || 20) / 2 + this.width / 2 + 8), half = this.width / 2 + 14;
+                const people = (game._makeWay || []).concat(game.pedestrians && game.pedestrians.pedestrians || []);
+                for (const p of people) {
+                    if (!p || p.dead) continue;
+                    const dx = p.x - this.x, dy = p.y - this.y, along = dx * fx + dy * fy, lat = -dx * fy + dy * fx;
+                    if (along > -this.length / 2 && along < obs.dist + this.length * 1.5 && Math.abs(lat - passLat) < half) return false;
+                }
+                return true;
+            }
+
+            /** The lanes beside ours on this stretch (same segment), nearest first */
+            _sideLanes(opposing) {
+                const cur = this.currentLane, seg = cur.segment;
+                return cur.road.lanes.filter(l => l !== cur && (!seg || l.segment === seg) && (l.isOpposing !== cur.isOpposing) === opposing)
+                    .sort((p, q) => Math.abs(this._latTo(p)) - Math.abs(this._latTo(q)));
+            }
+            _latTo(lane) { return (this.x - lane.start.x) * -lane.uy + (this.y - lane.start.y) * lane.ux; }
+
             findAdjacentLane() {
                 if (!this.currentLane || !this.currentLane.road) return null;
-                const road = this.currentLane.road;
-                const myIndex = this.currentLane.laneIndex;
-                for (let lane of road.lanes) {
-                    if (lane.isOpposing === this.currentLane.isOpposing && lane.laneIndex !== myIndex) {
-                        if (this.isLaneClear(lane, 150)) return lane;
-                    }
-                }
+                for (const lane of this._sideLanes(false)) if (this.isLaneClear(lane, 150)) return lane;   // (this stretch only, nearest first)
                 return null;
             }
             
             findOpposingLane() {
                 if (!this.currentLane || !this.currentLane.road || !this.currentLane.road.symmetrical) return null;
-                const road = this.currentLane.road;
-                for (let lane of road.lanes) {
-                    if (lane.isOpposing !== this.currentLane.isOpposing) {
-                        if (this.isLaneClear(lane, 200)) return lane;
-                    }
-                }
-                return null;
+                const near = this._sideLanes(true)[0];                                 // the oncoming lane right beside us, if it's clear
+                return near && this.isLaneClear(near, 200) ? near : null;
             }
             
             /**
@@ -33000,13 +34078,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // emit a SINGLE swerve obstacle whose lateral span covers the whole
                 // group — a virtual bounding box in the car's reference frame.
                 const cluster = [];
-                if (player.visible && !(playerCar && playerCar.hasDriver)) {
+                // Mid lane change / overtake: only people in the lane we're moving into are in the way
+                const tl = this.laneChangeState !== 'NONE' && this.targetLane, tlHalf = this.width / 2 + 18;
+                const inTarget = (x, y) => !tl || Math.abs((x - tl.start.x) * -tl.uy + (y - tl.start.y) * tl.ux) < tlHalf || Math.hypot(x - this.x, y - this.y) < this.length * 1.4;   // (or right under our nose)
+                if (player.visible && !(playerCar && playerCar.hasDriver) && inTarget(player.x, player.y)) {
                     const r = checkTunnelEx(player.x, player.y, lookAheadDist, dynamicTunnelWidth + 10);
                     if (r) cluster.push({ entity: player, x: player.x, y: player.y, dist: r.dist, lateral: r.lateral, vx: player.vx || 0, vy: player.vy || 0 });
                 }
                 if (teammates && teammates.length > 0) {
                     for (let tm of teammates) {
-                        if (!tm || tm.inCar || tm.dead || tm.downed || !tm.recruited) continue;
+                        if (!tm || tm.inCar || tm.dead || tm.downed || !tm.recruited || !inTarget(tm.x, tm.y)) continue;
                         const r = checkTunnelEx(tm.x, tm.y, lookAheadDist, dynamicTunnelWidth + 10);
                         if (r) cluster.push({ entity: tm, x: tm.x, y: tm.y, dist: r.dist, lateral: r.lateral, vx: tm.vx || 0, vy: tm.vy || 0 });
                     }
@@ -33136,17 +34217,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // --- 2. SWERVE CALCULATION ---
                 // Calculate optimal swerve direction for avoidable obstacles
-                let swerveSteer = 0;
+                let swerveSteer = 0, edgeNudgeNow = false;
                 let needsSwerve = false;
                 
+                // People in the road (949, her crew): no swerving round them. Slow, stop, and go round only by a
+                // proper lane change or overtake into a lane that's clear (section 3). The pavement is a last resort:
+                // after a long wait (_actorWait > 480 ticks), slowly, and only if nobody is standing on that side.
+                const actorAhead = swerveObstacles.find(o => o.type === 'actor' || o.type === 'actor_cluster');
+                if (actorAhead) {
+                    if (Math.abs(this.speed) < 0.5) this._actorWait = (this._actorWait || 0) + 1;
+                    if (this._actorWait === 120 && typeof ambience !== 'undefined' && ambience.ready && ambience._horn) ambience._horn(0.025);   // a polite toot
+                } else this._actorWait = 0;
                 if (swerveObstacles.length > 0 && this.laneChangeState === 'NONE' && !this.currentTurnPath) {
                     // Find the closest swerve obstacle
                     const closestSwerve = swerveObstacles.reduce((a, b) => a.dist < b.dist ? a : b);
+                    const isPerson = closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster';
+                    const kerbOK = isPerson && this._actorWait > 480 && this._kerbClear(closestSwerve);
+                    // Someone at the edge of our path (already mostly clear of the body) only needs a nudge, never the kerb
+                    const edgeNudge = isPerson && Math.abs(closestSwerve.lateral) - (closestSwerve.width || 20) / 2 > this.width / 2 - 8;
                     
-                    // Only swerve if obstacle is close enough to matter
+                    // Only swerve if obstacle is close enough to matter (people: only a nudge, or that last resort)
                     const swerveThreshold = this.length * 4 + currentSpeed * 5;
-                    if (closestSwerve.dist < swerveThreshold) {
-                        needsSwerve = true;
+                    if (closestSwerve.dist < swerveThreshold && (!isPerson || kerbOK || edgeNudge)) {
+                        needsSwerve = true; edgeNudgeNow = edgeNudge && !kerbOK;
                         
                         // Calculate open space on each side, accounting for obstacle width.
                         // For point obstacles (single actor, single car) this matches old
@@ -33196,6 +34289,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const actorMoving = isActor && closestSwerve.inMotion;
                         let magnitude = isActor ? 0.45 : 0.9;
                         if (actorMoving) magnitude *= 0.55;
+                        if (isActor && edgeNudge && !kerbOK) magnitude = Math.min(magnitude, 0.2);
                         
                         // Pick a side. Threshold scales with obstacle width — a wide
                         // cluster needs to be more "off-center" before we commit to
@@ -33274,7 +34368,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (closestSwerve.type === 'vehicle') {
                         shouldOvertake = true;
                         isPlayerObstacle = closestSwerve.entity === playerCar;
-                    } else if (closestSwerve.type === 'actor') {
+                    } else if (closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster') {
                         shouldOvertake = true;
                         isPlayerObstacle = true;
                     }
@@ -33406,6 +34500,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // we *also* tighten the speed envelope so the car has time for the actor
                 // to clear. Without this layer, gentle swerve + full speed = clipping the
                 // actor's heels.
+                if (needsSwerve && actorAhead && !edgeNudgeNow) targetSpeed = Math.min(targetSpeed, this.maxSpeed * 0.3);   // the last-resort kerb pass: crawling
                 if (needsSwerve) {
                     const movingActor = swerveObstacles.find(o =>
                         (o.type === 'actor' || o.type === 'actor_cluster') && o.inMotion
@@ -34313,12 +35408,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (v.controlMode === 'AI' && Math.abs(v.speed || 0) < 0.2) v._frozen = (v._frozen || 0) + 1; else v._frozen = 0;
                     const frozenOut = v._frozen > 900 && v.driverType !== 'player' && v.driverType !== 'zib' && !v.isOwnedCar &&
                         !v.isDeliveryVehicle && distToPlayer > 900;
-                    if (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd || frozenOut) { 
+                    // Leaving: fade out over ~0.5 s (still rolling on into the lane's end), then go
+                    if (!v.fading && (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd || frozenOut)) v.fading = true;
+                    if (v.fading) v.fade = Math.min(v.fade ?? 1, 1) - 1 / 30;
+                    else if ((v.fade ?? 1) < 1) v.fade = Math.min(1, v.fade + 1 / 36);       // arriving: fade in over ~0.6 s
+                    if (v.fading && (v.fade <= 0 || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN + 600)) {
                         if (v.currentIntersection) v.currentIntersection.releaseEntry(v);
                         // Properly destroy entity to unregister from collision system
                         if (!v.markedForDestroy) v.destroy();
                         this.vehicles.splice(i, 1);
-                    } else {
+                    } else if (!v.dead) {
                         // Pass decalSystem to update
                         v.update(player, playerCar, this.vehicles, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, teammates);
                     }
@@ -34338,7 +35437,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
                     this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
                     if (this.network.allLanes.length > 0) {
-                        for(let k=0; k<8; k++) { 
+                        // Spawn out of sight where possible: the camera's view plus a margin
+                        const gv = typeof game !== 'undefined' ? game.view : null, cv = typeof game !== 'undefined' ? game.canvas : null;
+                        const hw = gv && cv ? cv.width / 2 / gv.zoom + 120 : 0, hh = gv && cv ? cv.height / 2 / gv.zoom + 120 : 0;
+                        for(let k=0; k<14; k++) { 
                             const spawnLane = this.network.allLanes[Math.floor(Math.random() * this.network.allLanes.length)];
                             // Choose the car first, so the check is made where it will actually appear
                             const brand = TrafficVehicle._selectRandomBrand(), model = TrafficVehicle._selectRandomModel(brand);
@@ -34349,6 +35451,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             const spawnY = spawnLane.start.y + spawnLane.uy * spawnOffset;
                             const distToP = Math.hypot(player.x - spawnX, player.y - spawnY);
                             if (distToP < CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN || distToP > CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX) clear = false; 
+                            if (clear && gv && k < 12 && Math.abs(spawnX - gv.x) < hw && Math.abs(spawnY - gv.y) < hh) clear = false;   // (the last tries take what they can; the fade hides it)
                             if (clear) {
                                 // Nobody within the separation, and nobody coming up the lane who couldn't stop for it
                                 const cars = this.vehicles.concat(playerCar && playerCar.visible ? [playerCar] : []);
@@ -34364,6 +35467,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             if (clear) {
                                 // Spawn new vehicle - it auto-registers via GameEntity queue
                                 const newVehicle = new TrafficVehicle(spawnLane, brand, model);
+                                newVehicle.fade = 0;
                                 this.vehicles.push(newVehicle);
                                 break; 
                             }
@@ -34376,7 +35480,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             resolveCollisions(playerCar, player, weather, audioSys, ownedCar, decalSystem) {
                 if (this._crunchCd > 0) this._crunchCd--;
                 // 1. GATHER ALL PHYSICAL VEHICLES (and re-grid them where they are now, after moving)
-                const allVehicles = this.vehicles.filter(v => !v.dead);
+                const allVehicles = this.vehicles.filter(v => !v.dead && !(v.fading && v.fade < 0.5));   // (a car fading out is a ghost)
                 this.grid.clear();
                 for (const v of allVehicles) this.grid.add(v);
                 if (playerCar && playerCar.visible && !allVehicles.includes(playerCar)) this.grid.add(playerCar);
@@ -37122,6 +38226,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // everyone keeps time: a sway to a side each beat, a dip on every kick, a turn over four
                 // beats; the third dance sways at half time, slow and sultry, but still dips on the kick.
                 // Without music, a relaxed 120 BPM on each dancer's own phase.
+                // Both hands out on something heavy, leaning into it (moving furniture: engine/furniture.js)
+                push(t) {
+                    const b = breath(t);
+                    return { l: [13, -6.5], r: [13, 6.5], le: [6, -11], re: [6, 11], torso: 0, bounce: b * 0.15, head: [1.2, 0] };
+                },
                 dance(t, o) {
                     const B = o.beat != null ? o.beat : t * 2 + o.seed, v = Math.floor(o.seed) % 3;
                     const ph = Math.PI * B, s = Math.sin(v === 2 ? ph / 2 : ph), up = Math.abs(Math.sin(ph));
@@ -39495,7 +40604,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const name = POSES[config.pose] ? config.pose : 'idle';
                 if (name !== ps.name) { ps.name = name; ps.t = 0; }
                 ps.t += dt;
-                const target = !moving && ps.still > 0.4 ? 1 : 0;
+                const target = config.poseWhileMoving || (!moving && ps.still > 0.4) ? 1 : 0;   // (some poses hold while walking: pushing furniture)
                 ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
                 if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender, beat: name === 'dance' ? mapBeatN() : null }); poseW = ps.w; }
             }
@@ -40495,6 +41604,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Apply colors to lamps within colored blocks
                 lamps.forEach(lamp => {
+                    if (lamp.keepColor) return;                          // a landmark's own lights (e.g. Moon City's crimson door pool)
                     const lx = lamp.x || lamp.baseX || 0;
                     const ly = lamp.y || lamp.baseY || 0;
                     
@@ -41992,7 +43102,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const ACTION_VERBS = {
             talk: 'talk', bond: 'heart', adopt: 'heart', search: 'hand', 'pick up': 'hand', buy: 'coin', shop: 'coin',
             rest: 'moon', craft: 'gear', loadout: 'gear', read: 'page', lights: 'bulb', refill: 'cross',
-            hail: 'car', hijack: 'car', drive: 'car', enter: 'door', exit: 'exit', leave: 'exit', go: 'portal'
+            hail: 'car', hijack: 'car', drive: 'car', grab: 'hand', hold: 'hand', 'let go': 'hand', enter: 'door', exit: 'exit', leave: 'exit', go: 'portal'
         };
 
         /** Set a pill's verb, what it's for, and its keycap; the DOM is only touched when they change. */
@@ -44785,6 +45895,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.flitVFX = []; // Active flit visual effects (ghost afterimages, lightning trails)
                 this.graveyardGhosts = []; // Procedural humanoid ghosts in the cemetery
                 this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (world/lobby-life.js)
+                this.clubLife = new ClubLife();   // Moon City's crowd (world/club-life.js)
+                this.furniture = new FurnitureSystem(this);   // grab and move the apartment's furniture (engine/furniture.js)
                 
                 // Time slow system for dramatic moments (boss kills, etc.)
                 this.timeSlowState = {
@@ -45069,8 +46181,33 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.startDialogue(this.activeInteraction);
                     }
                 } else {
+                    if (this._walkToCar()) return;                     // she walks round to the driver's door first
                     this.toggleVehicle();
                 }
+            },
+
+            /** Getting in on foot: walk to the driver's door (Walker.goTo), face the car, then get in.
+             *  True when a walk started (or is already on); close enough, or turned off, gets in at once. */
+            _walkToCar() {
+                const car = this.car;
+                if (!CONFIG.WALK_TO_CAR || this.isDriving || !car || this.activeMap.type === 'indoor') return false;
+                if (this.player._walk && this.player._walk.toCar) return true;
+                // In the car's frame: +x forward, -y the driver's side (traffic-vehicle.js seat layout)
+                const a = car.angle, ca = Math.cos(a), sa = Math.sin(a), nav = NavGrid.for(this.activeMap);
+                const hl = (car.length || 80) / 2, hw = (car.width || 40) / 2;
+                const W = (lx, ly) => [car.x + lx * ca - ly * sa, car.y + lx * sa + ly * ca];
+                const L = (x, y) => [(x - car.x) * ca + (y - car.y) * sa, -(x - car.x) * sa + (y - car.y) * ca];
+                let side = -1, [dx, dy] = W(hl * 0.2, -(hw + 20));                                   // the driver's door
+                if (nav && !nav.walkable(dx, dy)) { side = 1; [dx, dy] = W(hl * 0.2, hw + 20); }      // blocked: in from the other side
+                const door = { x: dx, y: dy };
+                if (Math.hypot(door.x - this.player.x, door.y - this.player.y) < 30) return false;
+                // On the far side? Round the nose or the tail (the nav grid doesn't know about cars)
+                const [plx, ply] = L(this.player.x, this.player.y), via = [], ex = plx >= 0 ? hl + 30 : -(hl + 30), ew = hw + 32;
+                if (Math.sign(ply) !== side && Math.abs(plx) < hl + 20) via.push(W(ex, Math.sign(ply || 1) * ew), W(ex, side * ew));
+                const h = Walker.goTo(this.player, door.x, door.y, { face: [car.x, car.y], arrive: 7, timeout: 240, via,
+                    onArrive: () => { if (!this.isDriving && this.car === car && Math.hypot(car.x - this.player.x, car.y - this.player.y) < 90) this.toggleVehicle(); } });
+                if (this.player._walk) this.player._walk.toCar = true;
+                return !!h;
             },
 
             initEvents() {
@@ -45078,6 +46215,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 window.addEventListener('keydown', (e) => { 
                     this.keys[e.key] = true; 
                     if (e.key === 'h' || e.key === 'H') this.useBooster();
+                    // Furniture (engine/furniture.js): G grabs / confirms / lets go, R turns, directions pick a side
+                    if (this.furniture && this.running && !this.paused) {
+                        if (e.key === 'g' || e.key === 'G') this.furniture.press();
+                        if ((e.key === 'r' || e.key === 'R') && this.furniture.holding) this.furniture.rotate(e.shiftKey ? -1 : 1);
+                        if (this.furniture.state === 'choose') {
+                            const D = { ArrowUp: [0, -1], w: [0, -1], W: [0, -1], ArrowDown: [0, 1], s: [0, 1], S: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0], ArrowRight: [1, 0], d: [1, 0], D: [1, 0] }[e.key];
+                            if (D) { this.furniture.chooseDir(D[0], D[1]); e.preventDefault(); }
+                        }
+                    }
                     if (e.key === 'j' || e.key === 'J') this.useBoosterOnAlly();
                     
                     // AUTO-DRIVE TOGGLE (only while driving)
@@ -45125,6 +46271,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const toggleAction = (e) => { e.preventDefault(); this.interact(); };
 
                 this.interactBtn.addEventListener('click', toggleAction); this.interactBtn.addEventListener('touchstart', toggleAction);
+                // The hand (engine/furniture.js): tap to grab / confirm / let go; hold it a moment to reset the layout
+                const grabBtn = document.getElementById('btn-grab');
+                if (grabBtn) {
+                    let held = null, long = false;
+                    grabBtn.addEventListener('pointerdown', (e) => {
+                        e.preventDefault(); e.stopPropagation(); long = false;
+                        held = setTimeout(() => { long = true; if (this.furniture.state === 'idle') this.furniture.resetLayout(); }, 900);
+                    });
+                    const up = (e) => { if (held === null) return; clearTimeout(held); held = null; e.preventDefault(); if (!long) this.furniture.press(); };
+                    grabBtn.addEventListener('pointerup', up);
+                    grabBtn.addEventListener('pointercancel', () => { clearTimeout(held); held = null; });
+                    for (const [id, dir] of [['btn-rot-l', -1], ['btn-rot-r', 1]]) {
+                        const b = document.getElementById(id);
+                        if (b) b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); this.furniture.rotate(dir); });
+                    }
+                }
+                // Choosing a side: a tap on a handle (world space) picks it, before anything else hears the tap
+                this.canvas.addEventListener('pointerdown', (e) => {
+                    if (!this.furniture || this.furniture.state !== 'choose') return;
+                    const rect = this.canvas.getBoundingClientRect(), sx = rect.width ? this.canvas.width / rect.width : 1, sy = rect.height ? this.canvas.height / rect.height : 1;
+                    const w = this.viewToWorld((e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy);
+                    if (this.furniture.tap(w.x, w.y)) { e.preventDefault(); e.stopImmediatePropagation(); }
+                }, true);
                 // Weather debug: cycles Clear → Drizzle → Rain → Storm → Auto.
                 // The first four pin the sky (schedule paused) so you can inspect
                 // a condition without it rolling out from under you; Auto hands
@@ -45766,6 +46935,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // 1. VISIBILITY CHECKS
                 if (!this.player.visible && !this.isDriving) return;
                 if (this.paused) return;
+                if (this.furniture && this.furniture.busy()) return;   // her hands are on the furniture
                 if (!this.currentWeapon && this.weaponMode !== 'none') return;
             
                 // --- MELEE / PUNCH LOGIC (Unchanged) ---
@@ -50374,7 +51544,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // V2 buildings (auto-detected from BuildingV2Registry)
                         moon_city: {
                             landmarkId: 'club_entrance',
-                            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff00aa' }
+                            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' }
                         },
                         neural_sys: {
                             landmarkId: 'neural_systems',
@@ -50418,7 +51588,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // 5b. SET CUSTOM LAMP COLORS FOR V1 BUILDINGS
                     // V2 buildings auto-set their block lamp colors from accent color
                     city.setBlockLampColors({
-                        'block_2_2': '#ff00aa',    // Moon City Nightclub - hot pink
+                        'block_2_2': '#b48cff',    // Moon City Nightclub - violet neon (its own lights keep their colours)
                         'block_4_4': '#00f3ff',    // Dr. Yin's Clinic - medical cyan
                         'block_6_2': '#0088ff',    // Neural Systems - tech blue
                         'block_4_2': '#ff8800'     // Biggs Amusement Park - carnival amber
@@ -50770,7 +51940,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     // Keep the landmark forecourts (Silver Queen's portico and carpet, Double Nights' drive and fountain) clear of street trees
                     for (const b of mapData.buildings || []) {
-                        const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : null;
+                        const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : b.style === 'moon_city' ? b._mcForecourt() : null;
                         if (!court) continue;
                         const inCourt = (o) => o.x > court.x && o.x < court.x + court.w && o.y > court.y && o.y < court.y + court.h;
                         mapData.foliage = mapData.foliage.filter(f => !inCourt(f));
@@ -51149,6 +52319,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // -------------------------------------------------------
 
                 this.props = this.activeMap.props || [];
+                if (this.furniture) this.furniture.onMapLoaded(this);   // the apartment's layout as she left it (engine/furniture.js)
                 this.npcs = this.activeMap.npcs || [];
                 this.lamps = this.activeMap.lamps || [];
                 this.enemies = []; this.loot = []; 
@@ -52595,6 +53766,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const reactionVehicles = (this.isDriving && this.car)
                     ? this.traffic.vehicles.concat(this.car)
                     : this.traffic.vehicles;
+                // Who the crowds make way for: 949 and her crew on foot (pedestrians, the lobby's and the club's walkers)
+                this._makeWay = [this.player];
+                for (const t of this.teammates) if (t && (t.recruited || t.hired) && !t.inCar && !t.downed && !t.dead) this._makeWay.push(t);
                 this.pedestrians.update(this.player, this.activeMap, reactionVehicles, this.weaponMode !== 'none' && !this.weaponHolstered, this.enemies);
                 this.profiler.stop('AI:Pedestrians');
                 
@@ -52678,6 +53852,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
                 // The Double Nights lobby: guests and staff come and go; searched cases refill daily
                 this.lobbyLife.update(this);
+                this.clubLife.update(this);
+                Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
                     if (this._lostMap !== this.activeMap) { this._lostMap = this.activeMap; this._hasLost = this.props.some(p => p.interactionType === 'lost_luggage'); }
                     if (this._hasLost) this.refreshLostLuggage();
@@ -52791,6 +53967,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.keys['a'] || this.keys['ArrowLeft']) inputX = -1; 
                 if (this.keys['d'] || this.keys['ArrowRight']) inputX = 1;
                 if (this.joystick.active) { inputX = this.joystick.dx; inputY = this.joystick.dy; }
+                // The apartment's hand (engine/furniture.js): the pill; choosing a side holds her still
+                if (this.furniture) { this.furniture.update(this); if (this.furniture.state === 'choose') { inputX = 0; inputY = 0; } }
+                // A walk owns 949 (world/walker.js): it supplies the movement, until any real input takes over
+                if (this.player._walk) {
+                    if (inputX || inputY || this.fireJoystick.active || this.isDriving) Walker.cancel(this.player);
+                    else { const s = Walker.stepPlayer(this); if (s) { inputX = s.x; inputY = s.y; } }
+                }
                 this.profiler.stop('Input:Process');
             
                 // --- 5. ENTITY UPDATES ---
@@ -52875,8 +54058,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         sepX += Math.cos(pushAngle) * CONFIG.COMPANION.PLAYER_SEPARATION_FORCE;
                         sepY += Math.sin(pushAngle) * CONFIG.COMPANION.PLAYER_SEPARATION_FORCE;
                     }
-                    tm.x += sepX;
-                    tm.y += sepY;
+                    // …and from the crowd (pedestrians, map NPCs, the lobby's and club's walkers): a gentle give, both ways
+                    const navT = NavGrid.for(this.activeMap);
+                    const nudge = (o, r, give) => {
+                        if (!o || o === tm || o.dead || (o.life !== undefined && o.life < 0.5) || o.seated || o.glide) return;
+                        const ox = tm.x - o.x, oy = tm.y - o.y;
+                        if (ox > r || ox < -r || oy > r || oy < -r) return;
+                        const od = Math.hypot(ox, oy);
+                        if (od >= r || od < 0.1) return;
+                        const k = (r - od) / r;                                               // deeper in, firmer
+                        sepX += (ox / od) * k * 2.2; sepY += (oy / od) * k * 2.2;
+                        if (give) { const gx = o.x - (ox / od) * k * give, gy = o.y - (oy / od) * k * give;   // a standing walker sways aside too
+                            if (!navT || navT.walkable(gx, gy)) { o.x = gx; o.y = gy; } }
+                    };
+                    for (const o of this.pedestrians.pedestrians || []) nudge(o, 24, 0);
+                    for (const o of this.npcs || []) if (!this.teammates.includes(o)) nudge(o, 26, 0);
+                    if (this.lobbyLife) for (const o of this.lobbyLife.walkers) nudge(o, 22, 0.8);
+                    if (this.clubLife) for (const o of this.clubLife.walkers) nudge(o, 22, 0.8);
+                    if (!navT || navT.walkable(tm.x + sepX, tm.y + sepY)) { tm.x += sepX; tm.y += sepY; }
 
                     // ── EYELINE TACTICS: a firing spot overrides the formation slot ──
                     const eyelineSpot = updateCompanionTactics(tm, this);
@@ -53691,6 +54890,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.useNewCollisionSystem) {
                     CollisionSystem.update(this.camera, this.canvas, this);
                 }
+                if (this.furniture) this.furniture.afterCollision(this);   // a held piece follows her (or holds her back)
                 this.profiler.stop('Physics:Collisions');
             
                 this.profiler.start('Logic:UI_Interact');
@@ -53796,7 +54996,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Pulls back with speed, down to a floor: the look-ahead already shows the road in front
                     const speedRatio = Math.abs(this.car.speed) / this.car.maxSpeed, CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
                     targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
-                } else if (nearInteractable) { targetZoom = 1.4; }
+                } else {
+                    // On foot: in a little closer with the gun away, and again indoors; by something to use (or talking), 5% closer still
+                    const C = CONFIG.CAMERA, holstered = this.weaponHolstered || this.weaponMode === 'none';
+                    let base = 1.0;
+                    if (holstered) base *= C.HOLSTER_ZOOM;
+                    if (this.activeMap && this.activeMap.type === 'indoor') base *= C.INDOOR_ZOOM;
+                    targetZoom = nearInteractable ? base * C.INTERACT_ZOOM : base;
+                }
                 if (this.isLandscape) targetZoom *= 0.9;          // a short screen: a little more ground above and below her
                 
                 const diff = targetZoom - this.camera.zoom;
@@ -53889,6 +55096,32 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 } 
                 
+                // 1b. THE CREW ON FOOT vs TRAFFIC: pushed clear of a car's body; a fast one hits them
+                for (const tm of this.teammates) {
+                    if (!tm || tm.inCar || tm.dead || !(tm.recruited || tm.hired)) continue;
+                    if (tm._carHitCd > 0) tm._carHitCd--;
+                    for (const v of this.traffic.grid.getNearby({ x: tm.x, y: tm.y, length: 30, width: 30 })) {
+                        if (v === this.car && this.isDriving && tm.inCar) continue;
+                        if (v.fade !== undefined && v.fade < 0.5) continue;                 // a car fading in or out isn't solid yet
+                        const c = Math.cos(-v.angle), s = Math.sin(-v.angle), dx = tm.x - v.x, dy = tm.y - v.y;
+                        const lx = dx * c - dy * s, ly = dx * s + dy * c, hl = v.length / 2 + 2, hw = v.width / 2 + 2;
+                        const ex = lx - Math.max(-hl, Math.min(hl, lx)), ey = ly - Math.max(-hw, Math.min(hw, ly)), d2 = ex * ex + ey * ey, R = (tm.radius || 14) + 1;
+                        if (d2 >= R * R) continue;
+                        let d = Math.sqrt(d2), o = R - d, nx = ex / (d || 1), ny = ey / (d || 1);
+                        if (d2 <= 0) {                                                      // centre inside the body: out the nearest side
+                            const sx = hl - Math.abs(lx), sy = hw - Math.abs(ly);
+                            if (sx < sy) { nx = Math.sign(lx) || 1; ny = 0; o = sx + R; } else { nx = 0; ny = Math.sign(ly) || 1; o = sy + R; }
+                        }
+                        const wx = nx * Math.cos(v.angle) - ny * Math.sin(v.angle), wy = nx * Math.sin(v.angle) + ny * Math.cos(v.angle);
+                        tm.x += wx * o; tm.y += wy * o;                                    // the car doesn't give; they're shoved aside
+                        if (Math.abs(v.speed) > 4 && !(tm._carHitCd > 0) && !tm.downed) {
+                            tm._carHitCd = 40;
+                            if (tm.takeDamage) tm.takeDamage(10, wx * 6, wy * 6);
+                            this.triggerShake(4);
+                        }
+                    }
+                }
+
                 // 2. VEHICLE vs VEHICLE Collisions
                 this.traffic.resolveCollisions(this.car, this.player, this.weather, audioSys, this.ownedCar, this.decals);
             },
@@ -53949,7 +55182,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                Instrumented with Profiler.
                ===================================================================== */
             draw() {
-                if (!this.running || this.paused) return;
+                if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 // --- PROFILER START ---
                 this.profiler.beginFrame();
@@ -53991,6 +55224,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
+                if (this.cineCam) { camX += this.cineCam.dx; camY += this.cineCam.dy; }   // Cinematic View's pan
                 this.view = { x: camX, y: camY, zoom: this.camera.zoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
                 
                 this.ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
@@ -54244,7 +55478,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.activeMap.buildings && this.activeMap.type === 'outdoor') {
                     const cbW = cullBounds.world;
                     for (const b of this.activeMap.buildings) {
-                        const ground = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : null;
+                        const ground = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : b.style === 'moon_city' ? b._mcDrawGround : null;
                         if (!ground) continue;
                         if (b.x + b.w + 60 < cbW.left || b.x - 60 > cbW.right || b.y > cbW.bottom || b.y + b.h + 480 < cbW.top) continue;
                         ground.call(b, this.ctx);
@@ -54524,7 +55758,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Threshold scales with zoom — distant cars at max zoom-out skip effects earlier
                         const dx = v.x - camX, dy = v.y - camY;
                         v._lod = (dx * dx + dy * dy > _vehicleLODThreshSq) ? 1 : (_zoomLOD >= 2 ? 1 : 0);
-                        v.draw(this.ctx);
+                        const fa = v.fade ?? 1;
+                        if (fa <= 0) return;
+                        if (fa < 1) { this.ctx.save(); this.ctx.globalAlpha *= fa; v.draw(this.ctx); this.ctx.restore(); }   // fading in or out
+                        else v.draw(this.ctx);
                     });
                 }
                 
@@ -54594,6 +55831,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (this.scenes && this.scenes.actors.length) this.scenes.drawActors(this.ctx);   // a scene's cast
                     this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
                     this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
+                    this.clubLife.draw(this.ctx, cbE);     // Moon City's crowd
+                    if (this.furniture) this.furniture.draw(this.ctx);   // the hand's outline and side handles (engine/furniture.js)
                     if (!(this.scenes && this.scenes.crewOffstage)) this.teammates.forEach(tm => {
                         if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) return;
                         tm.draw(this.ctx, this.player);
@@ -58030,6 +59269,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const armed = (this.weaponMode === 'normal' || this.weaponMode === 'sniper') && !this.weaponHolstered;
                 if (armed) currentStance = this.currentWeapon ? stanceForWeapon(this.currentWeapon.id) : (this.weaponMode === 'sniper' ? 'sniper' : 'pistol');
                 else if (this.weaponMode === 'none' && this.shootCooldown > 0) currentStance = 'punch';
+                const pushing = this.furniture && this.furniture.holding;
+                if (pushing) currentStance = 'idle';                                   // both hands on the furniture
 
                 // Gun kick: snaps back on the shot, recovers in game ticks (blended like
                 // everything else). Heavier weapons (stats.recoil) kick harder and longer.
@@ -58069,7 +59310,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // In the rain outdoors a hoodie's hood goes up (unless she's wearing a hat)
                     hat: cosmeticConfig.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie' ? { type: 'hood_up', color: outfit.top.color } : null),
                     jewelry: withFieldMask(this, cosmeticConfig.jewelry),   // masked in the field (core/appearances.js)
-                    pose: typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
+                    pose: pushing ? 'push' : typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
+                    poseWhileMoving: pushing,
                     // A drawn gun takes the hand; the umbrella waits
                     held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
                 });
@@ -60308,6 +61550,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         document.addEventListener('keydown', (e) => {
             // 1. Handle ESCAPE - Pause Menu Priority
             if (e.key === 'Escape') {
+                // Holding furniture / choosing a side: Esc lets go
+                if (game.furniture && game.furniture.busy()) { game.furniture.release(); return; }
                 // Cinematic view: Esc brings the pause menu back
                 if (document.body.classList.contains('cinematic-view')) { pauseMenu.exitCinematic(); return; }
                 // If pause menu is open, close it
@@ -61136,11 +62380,56 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     setTimeout(() => this._syncNowPlaying(), 120);   // togglePlay settles after the AudioContext resumes
                 });
 
-                // Cinematic view: any tap brings the menu back
+                // Cinematic view: drag pans, pinch or wheel zooms, a quick tap brings the menu back
+                this._cinePtrs = new Map();
+                const cineOn = () => document.body.classList.contains('cinematic-view');
                 window.addEventListener('pointerdown', (e) => {
-                    if (!document.body.classList.contains('cinematic-view')) return;
-                    e.preventDefault(); e.stopPropagation(); this.exitCinematic();
+                    if (!cineOn() || e.target.closest?.('#cine-bar')) return;
+                    e.preventDefault(); e.stopPropagation();
+                    this._cinePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now() });
+                    if (this._cinePtrs.size > 1) this._cineGesture = true;            // a pinch is never a tap
                 }, true);
+                window.addEventListener('pointermove', (e) => {
+                    const p = this._cinePtrs.get(e.pointerId);
+                    if (!cineOn() || !p) return;
+                    e.preventDefault();
+                    if (this._cinePtrs.size === 1) {
+                        if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) > 8) this._cineGesture = true;
+                        this._cinePan(e.clientX - p.x, e.clientY - p.y);
+                    } else {
+                        const [a, b] = [...this._cinePtrs.values()];
+                        const before = Math.hypot(a.x - b.x, a.y - b.y);
+                        p.x = e.clientX; p.y = e.clientY;
+                        const after = Math.hypot(a.x - b.x, a.y - b.y);
+                        if (before > 10) this._cineZoom(after / before);
+                    }
+                    p.x = e.clientX; p.y = e.clientY;
+                }, true);
+                const up = (e) => {
+                    const p = this._cinePtrs.get(e.pointerId);
+                    if (!p) return;
+                    this._cinePtrs.delete(e.pointerId);
+                    if (!cineOn()) return;
+                    e.preventDefault(); e.stopPropagation();
+                    const tap = !this._cineGesture && e.type === 'pointerup' && performance.now() - p.t0 < 400;
+                    if (!this._cinePtrs.size) this._cineGesture = false;
+                    if (tap) this.exitCinematic();
+                };
+                window.addEventListener('pointerup', up, true);
+                window.addEventListener('pointercancel', up, true);
+                window.addEventListener('wheel', (e) => {
+                    if (!cineOn()) return;
+                    e.preventDefault(); this._cineZoom(Math.exp(-e.deltaY * 0.0015));
+                }, { capture: true, passive: false });
+                const bar = document.getElementById('cine-bar');
+                bar?.addEventListener('click', (e) => {
+                    const act = e.target.closest('[data-cine]')?.dataset.cine;
+                    if (act === 'save') this.saveCinePicture();
+                    else if (act === 'in') this._cineZoom(1.2);
+                    else if (act === 'out') this._cineZoom(1 / 1.2);
+                    else if (act === 'reset') { const c = game.cineCam; if (c) { c.dx = c.dy = 0; game.camera.zoom = c.zoom; } }
+                    else if (act === 'back') this.exitCinematic();
+                });
 
                 // Click backdrop to close
                 this.menu.querySelector('.pause-backdrop').addEventListener('click', () => {
@@ -61297,6 +62586,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             enterCinematic() {
                 this.close();
                 game.pauseSystem.acquire('cinematic_view');
+                game.cineCam = { dx: 0, dy: 0, zoom: game.camera.zoom };          // draw() keeps going while it's set
+                this._cinePtrs?.clear(); this._cineGesture = false;
                 document.body.classList.add('cinematic-view');
                 const hint = document.getElementById('cinematic-hint');
                 if (hint) { hint.classList.remove('show'); void hint.offsetWidth; hint.classList.add('show'); }
@@ -61306,8 +62597,51 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!document.body.classList.contains('cinematic-view')) return;
                 document.body.classList.remove('cinematic-view');
                 document.getElementById('cinematic-hint')?.classList.remove('show');
+                if (game.cineCam) { game.camera.zoom = game.cineCam.zoom; game.cineCam = null; }
                 game.pauseSystem.release('cinematic_view');
                 this.open();
+            }
+
+            /** Pan by a screen-space drag (CSS px), kept within CINE_PAN world px of where the view began. */
+            _cinePan(sx, sy) {
+                const c = game.cineCam; if (!c) return;
+                const k = (game.canvas.width / (game.canvas.clientWidth || game.canvas.width)) / game.camera.zoom;
+                c.dx -= sx * k; c.dy -= sy * k;
+                const R = CONFIG.CAMERA.CINE_PAN, d = Math.hypot(c.dx, c.dy);
+                if (d > R) { c.dx *= R / d; c.dy *= R / d; }
+            }
+
+            _cineZoom(f) {
+                if (!game.cineCam) return;
+                const [lo, hi] = CONFIG.CAMERA.CINE_ZOOM;
+                game.camera.zoom = Math.max(lo, Math.min(hi, game.camera.zoom * f));
+            }
+
+            /** The held frame as a PNG, colour grade and all: downloaded, or the share sheet where files can be shared (phones). */
+            saveCinePicture() {
+                const src = game.canvas, out = document.createElement('canvas');
+                out.width = src.width; out.height = src.height;
+                const ctx = out.getContext('2d');
+                const f = src.style.filter;
+                if (f && f !== 'none' && 'filter' in ctx) ctx.filter = f;
+                ctx.drawImage(src, 0, 0);
+                const flash = document.getElementById('cine-flash');
+                if (flash) { flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go'); }
+                const d = new Date(), z = (n) => String(n).padStart(2, '0');
+                const name = `Dimensions-Freelancer-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.png`;
+                out.toBlob(async (blob) => {
+                    if (!blob) return;
+                    this._lastPicture = blob;
+                    const file = typeof File === 'function' ? new File([blob], name, { type: 'image/png' }) : null;
+                    const touch = window.matchMedia?.('(pointer: coarse)').matches;
+                    if (touch && file && navigator.canShare?.({ files: [file] })) {
+                        try { await navigator.share({ files: [file], title: 'Dimensions: Freelancer' }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+                    }
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob); a.download = name;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+                }, 'image/png');
             }
 
             // The capsule mirrors the music widget: station on the disc, track (or station) and play state

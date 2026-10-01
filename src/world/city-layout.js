@@ -138,6 +138,7 @@
                 
                 // Apply colors to lamps within colored blocks
                 lamps.forEach(lamp => {
+                    if (lamp.keepColor) return;                          // a landmark's own lights (e.g. Moon City's crimson door pool)
                     const lx = lamp.x || lamp.baseX || 0;
                     const ly = lamp.y || lamp.baseY || 0;
                     

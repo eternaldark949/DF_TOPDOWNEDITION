@@ -61,8 +61,33 @@
                         this.startDialogue(this.activeInteraction);
                     }
                 } else {
+                    if (this._walkToCar()) return;                     // she walks round to the driver's door first
                     this.toggleVehicle();
                 }
+            },
+
+            /** Getting in on foot: walk to the driver's door (Walker.goTo), face the car, then get in.
+             *  True when a walk started (or is already on); close enough, or turned off, gets in at once. */
+            _walkToCar() {
+                const car = this.car;
+                if (!CONFIG.WALK_TO_CAR || this.isDriving || !car || this.activeMap.type === 'indoor') return false;
+                if (this.player._walk && this.player._walk.toCar) return true;
+                // In the car's frame: +x forward, -y the driver's side (traffic-vehicle.js seat layout)
+                const a = car.angle, ca = Math.cos(a), sa = Math.sin(a), nav = NavGrid.for(this.activeMap);
+                const hl = (car.length || 80) / 2, hw = (car.width || 40) / 2;
+                const W = (lx, ly) => [car.x + lx * ca - ly * sa, car.y + lx * sa + ly * ca];
+                const L = (x, y) => [(x - car.x) * ca + (y - car.y) * sa, -(x - car.x) * sa + (y - car.y) * ca];
+                let side = -1, [dx, dy] = W(hl * 0.2, -(hw + 20));                                   // the driver's door
+                if (nav && !nav.walkable(dx, dy)) { side = 1; [dx, dy] = W(hl * 0.2, hw + 20); }      // blocked: in from the other side
+                const door = { x: dx, y: dy };
+                if (Math.hypot(door.x - this.player.x, door.y - this.player.y) < 30) return false;
+                // On the far side? Round the nose or the tail (the nav grid doesn't know about cars)
+                const [plx, ply] = L(this.player.x, this.player.y), via = [], ex = plx >= 0 ? hl + 30 : -(hl + 30), ew = hw + 32;
+                if (Math.sign(ply) !== side && Math.abs(plx) < hl + 20) via.push(W(ex, Math.sign(ply || 1) * ew), W(ex, side * ew));
+                const h = Walker.goTo(this.player, door.x, door.y, { face: [car.x, car.y], arrive: 7, timeout: 240, via,
+                    onArrive: () => { if (!this.isDriving && this.car === car && Math.hypot(car.x - this.player.x, car.y - this.player.y) < 90) this.toggleVehicle(); } });
+                if (this.player._walk) this.player._walk.toCar = true;
+                return !!h;
             },
 
             initEvents() {
@@ -70,6 +95,15 @@
                 window.addEventListener('keydown', (e) => { 
                     this.keys[e.key] = true; 
                     if (e.key === 'h' || e.key === 'H') this.useBooster();
+                    // Furniture (engine/furniture.js): G grabs / confirms / lets go, R turns, directions pick a side
+                    if (this.furniture && this.running && !this.paused) {
+                        if (e.key === 'g' || e.key === 'G') this.furniture.press();
+                        if ((e.key === 'r' || e.key === 'R') && this.furniture.holding) this.furniture.rotate(e.shiftKey ? -1 : 1);
+                        if (this.furniture.state === 'choose') {
+                            const D = { ArrowUp: [0, -1], w: [0, -1], W: [0, -1], ArrowDown: [0, 1], s: [0, 1], S: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0], ArrowRight: [1, 0], d: [1, 0], D: [1, 0] }[e.key];
+                            if (D) { this.furniture.chooseDir(D[0], D[1]); e.preventDefault(); }
+                        }
+                    }
                     if (e.key === 'j' || e.key === 'J') this.useBoosterOnAlly();
                     
                     // AUTO-DRIVE TOGGLE (only while driving)
@@ -117,6 +151,29 @@
                 const toggleAction = (e) => { e.preventDefault(); this.interact(); };
 
                 this.interactBtn.addEventListener('click', toggleAction); this.interactBtn.addEventListener('touchstart', toggleAction);
+                // The hand (engine/furniture.js): tap to grab / confirm / let go; hold it a moment to reset the layout
+                const grabBtn = document.getElementById('btn-grab');
+                if (grabBtn) {
+                    let held = null, long = false;
+                    grabBtn.addEventListener('pointerdown', (e) => {
+                        e.preventDefault(); e.stopPropagation(); long = false;
+                        held = setTimeout(() => { long = true; if (this.furniture.state === 'idle') this.furniture.resetLayout(); }, 900);
+                    });
+                    const up = (e) => { if (held === null) return; clearTimeout(held); held = null; e.preventDefault(); if (!long) this.furniture.press(); };
+                    grabBtn.addEventListener('pointerup', up);
+                    grabBtn.addEventListener('pointercancel', () => { clearTimeout(held); held = null; });
+                    for (const [id, dir] of [['btn-rot-l', -1], ['btn-rot-r', 1]]) {
+                        const b = document.getElementById(id);
+                        if (b) b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); this.furniture.rotate(dir); });
+                    }
+                }
+                // Choosing a side: a tap on a handle (world space) picks it, before anything else hears the tap
+                this.canvas.addEventListener('pointerdown', (e) => {
+                    if (!this.furniture || this.furniture.state !== 'choose') return;
+                    const rect = this.canvas.getBoundingClientRect(), sx = rect.width ? this.canvas.width / rect.width : 1, sy = rect.height ? this.canvas.height / rect.height : 1;
+                    const w = this.viewToWorld((e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy);
+                    if (this.furniture.tap(w.x, w.y)) { e.preventDefault(); e.stopImmediatePropagation(); }
+                }, true);
                 // Weather debug: cycles Clear → Drizzle → Rain → Storm → Auto.
                 // The first four pin the sky (schedule paused) so you can inspect
                 // a condition without it rolling out from under you; Auto hands

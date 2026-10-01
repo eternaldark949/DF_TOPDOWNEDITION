@@ -25,7 +25,7 @@
         const ACTION_VERBS = {
             talk: 'talk', bond: 'heart', adopt: 'heart', search: 'hand', 'pick up': 'hand', buy: 'coin', shop: 'coin',
             rest: 'moon', craft: 'gear', loadout: 'gear', read: 'page', lights: 'bulb', refill: 'cross',
-            hail: 'car', hijack: 'car', drive: 'car', enter: 'door', exit: 'exit', leave: 'exit', go: 'portal'
+            hail: 'car', hijack: 'car', drive: 'car', grab: 'hand', hold: 'hand', 'let go': 'hand', enter: 'door', exit: 'exit', leave: 'exit', go: 'portal'
         };
 
         /** Set a pill's verb, what it's for, and its keycap; the DOM is only touched when they change. */

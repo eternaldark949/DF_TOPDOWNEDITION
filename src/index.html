@@ -409,6 +409,8 @@
             <div id="action-dock">
                 <button class="game-btn" id="btn-transition"></button>
                 <div class="game-btn" id="btn-interact"></div>
+                <div class="game-btn" id="btn-grab"></div>
+                <div id="grab-rotate"><div class="grab-rot" id="btn-rot-l" title="Turn left (Shift+R)">⟲</div><div class="grab-rot" id="btn-rot-r" title="Turn right (R)">⟳</div></div>
             </div>
             
             <div id="btn-fire">
@@ -1048,7 +1050,15 @@
         </div>
     </div>
     <!-- Cinematic view (pause menu → Quick Access): the HUD hidden, the world held still -->
-    <div id="cinematic-hint">Tap or press Esc to return</div>
+    <div id="cinematic-hint">Drag to pan · pinch to zoom · tap to return</div>
+    <div id="cine-bar" aria-label="Cinematic view">
+        <button data-cine="save" title="Save picture">📷 SAVE</button>
+        <button data-cine="out" title="Zoom out">−</button>
+        <button data-cine="in" title="Zoom in">+</button>
+        <button data-cine="reset" title="Recentre">⟲</button>
+        <button data-cine="back" title="Back to the menu">✕</button>
+    </div>
+    <div id="cine-flash"><span>SAVED</span></div>
     
     <!-- SAVE SLOT OVERLAY -->
     <div id="save-slot-overlay"></div>

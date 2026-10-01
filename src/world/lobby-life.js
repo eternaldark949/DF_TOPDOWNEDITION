@@ -109,8 +109,10 @@
                     if (d > 6) {
                         let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
                         // Make way for 949, and keep a little room from one another
-                        const px = w.x - pl.x, py = w.y - pl.y, pd = Math.hypot(px, py);
-                        if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
+                            const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
+                            if (pd < 34 && pd > 0.1) { vx += (px / pd) * 0.9 - (py / pd) * 0.5; vy += (py / pd) * 0.9 + (px / pd) * 0.5; }
+                        }
                         for (const o of this.walkers) {
                             if (o === w || o.life < 0.5) continue;
                             const ox = w.x - o.x, oy = w.y - o.y, od = Math.hypot(ox, oy);

@@ -1130,3 +1130,10 @@
             margin-top: 8px; font-family: Georgia, serif; font-style: italic; font-size: clamp(0.62rem, 2.8vw, 0.9rem);
             color: #e8c9b8; letter-spacing: 0.08em; text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
         }
+
+        /* The apartment's hand (engine/furniture.js): turn buttons beside the pill while holding */
+        #grab-rotate { display: none; gap: 8px; justify-content: flex-end; pointer-events: auto; }
+        .grab-rot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;
+            font-size: 1.2rem; color: var(--df-lavender-pale, #f1e8fe); background: rgba(20, 8, 30, 0.7); border: 1px dotted rgba(232, 194, 122, 0.7);
+            box-shadow: 0 0 10px rgba(232, 194, 122, 0.25); user-select: none; touch-action: none; }
+        .grab-rot:active { background: rgba(93, 20, 226, 0.5); }

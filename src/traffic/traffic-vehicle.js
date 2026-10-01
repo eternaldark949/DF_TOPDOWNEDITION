@@ -751,27 +751,38 @@
                 return false;
             }
 
+            /** The last resort: is the strip we'd drive through to pass a person (toward the kerb) empty of people? */
+            _kerbClear(obs) {
+                if (typeof game === 'undefined') return false;
+                const a = this.angle, fx = Math.cos(a), fy = Math.sin(a), side = obs.lateral > 0 ? -1 : 1;   // pass on the side away from them
+                const passLat = obs.lateral + side * ((obs.width || 20) / 2 + this.width / 2 + 8), half = this.width / 2 + 14;
+                const people = (game._makeWay || []).concat(game.pedestrians && game.pedestrians.pedestrians || []);
+                for (const p of people) {
+                    if (!p || p.dead) continue;
+                    const dx = p.x - this.x, dy = p.y - this.y, along = dx * fx + dy * fy, lat = -dx * fy + dy * fx;
+                    if (along > -this.length / 2 && along < obs.dist + this.length * 1.5 && Math.abs(lat - passLat) < half) return false;
+                }
+                return true;
+            }
+
+            /** The lanes beside ours on this stretch (same segment), nearest first */
+            _sideLanes(opposing) {
+                const cur = this.currentLane, seg = cur.segment;
+                return cur.road.lanes.filter(l => l !== cur && (!seg || l.segment === seg) && (l.isOpposing !== cur.isOpposing) === opposing)
+                    .sort((p, q) => Math.abs(this._latTo(p)) - Math.abs(this._latTo(q)));
+            }
+            _latTo(lane) { return (this.x - lane.start.x) * -lane.uy + (this.y - lane.start.y) * lane.ux; }
+
             findAdjacentLane() {
                 if (!this.currentLane || !this.currentLane.road) return null;
-                const road = this.currentLane.road;
-                const myIndex = this.currentLane.laneIndex;
-                for (let lane of road.lanes) {
-                    if (lane.isOpposing === this.currentLane.isOpposing && lane.laneIndex !== myIndex) {
-                        if (this.isLaneClear(lane, 150)) return lane;
-                    }
-                }
+                for (const lane of this._sideLanes(false)) if (this.isLaneClear(lane, 150)) return lane;   // (this stretch only, nearest first)
                 return null;
             }
             
             findOpposingLane() {
                 if (!this.currentLane || !this.currentLane.road || !this.currentLane.road.symmetrical) return null;
-                const road = this.currentLane.road;
-                for (let lane of road.lanes) {
-                    if (lane.isOpposing !== this.currentLane.isOpposing) {
-                        if (this.isLaneClear(lane, 200)) return lane;
-                    }
-                }
-                return null;
+                const near = this._sideLanes(true)[0];                                 // the oncoming lane right beside us, if it's clear
+                return near && this.isLaneClear(near, 200) ? near : null;
             }
             
             /**
@@ -1577,13 +1588,16 @@
                 // emit a SINGLE swerve obstacle whose lateral span covers the whole
                 // group — a virtual bounding box in the car's reference frame.
                 const cluster = [];
-                if (player.visible && !(playerCar && playerCar.hasDriver)) {
+                // Mid lane change / overtake: only people in the lane we're moving into are in the way
+                const tl = this.laneChangeState !== 'NONE' && this.targetLane, tlHalf = this.width / 2 + 18;
+                const inTarget = (x, y) => !tl || Math.abs((x - tl.start.x) * -tl.uy + (y - tl.start.y) * tl.ux) < tlHalf || Math.hypot(x - this.x, y - this.y) < this.length * 1.4;   // (or right under our nose)
+                if (player.visible && !(playerCar && playerCar.hasDriver) && inTarget(player.x, player.y)) {
                     const r = checkTunnelEx(player.x, player.y, lookAheadDist, dynamicTunnelWidth + 10);
                     if (r) cluster.push({ entity: player, x: player.x, y: player.y, dist: r.dist, lateral: r.lateral, vx: player.vx || 0, vy: player.vy || 0 });
                 }
                 if (teammates && teammates.length > 0) {
                     for (let tm of teammates) {
-                        if (!tm || tm.inCar || tm.dead || tm.downed || !tm.recruited) continue;
+                        if (!tm || tm.inCar || tm.dead || tm.downed || !tm.recruited || !inTarget(tm.x, tm.y)) continue;
                         const r = checkTunnelEx(tm.x, tm.y, lookAheadDist, dynamicTunnelWidth + 10);
                         if (r) cluster.push({ entity: tm, x: tm.x, y: tm.y, dist: r.dist, lateral: r.lateral, vx: tm.vx || 0, vy: tm.vy || 0 });
                     }
@@ -1713,17 +1727,29 @@
 
                 // --- 2. SWERVE CALCULATION ---
                 // Calculate optimal swerve direction for avoidable obstacles
-                let swerveSteer = 0;
+                let swerveSteer = 0, edgeNudgeNow = false;
                 let needsSwerve = false;
                 
+                // People in the road (949, her crew): no swerving round them. Slow, stop, and go round only by a
+                // proper lane change or overtake into a lane that's clear (section 3). The pavement is a last resort:
+                // after a long wait (_actorWait > 480 ticks), slowly, and only if nobody is standing on that side.
+                const actorAhead = swerveObstacles.find(o => o.type === 'actor' || o.type === 'actor_cluster');
+                if (actorAhead) {
+                    if (Math.abs(this.speed) < 0.5) this._actorWait = (this._actorWait || 0) + 1;
+                    if (this._actorWait === 120 && typeof ambience !== 'undefined' && ambience.ready && ambience._horn) ambience._horn(0.025);   // a polite toot
+                } else this._actorWait = 0;
                 if (swerveObstacles.length > 0 && this.laneChangeState === 'NONE' && !this.currentTurnPath) {
                     // Find the closest swerve obstacle
                     const closestSwerve = swerveObstacles.reduce((a, b) => a.dist < b.dist ? a : b);
+                    const isPerson = closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster';
+                    const kerbOK = isPerson && this._actorWait > 480 && this._kerbClear(closestSwerve);
+                    // Someone at the edge of our path (already mostly clear of the body) only needs a nudge, never the kerb
+                    const edgeNudge = isPerson && Math.abs(closestSwerve.lateral) - (closestSwerve.width || 20) / 2 > this.width / 2 - 8;
                     
-                    // Only swerve if obstacle is close enough to matter
+                    // Only swerve if obstacle is close enough to matter (people: only a nudge, or that last resort)
                     const swerveThreshold = this.length * 4 + currentSpeed * 5;
-                    if (closestSwerve.dist < swerveThreshold) {
-                        needsSwerve = true;
+                    if (closestSwerve.dist < swerveThreshold && (!isPerson || kerbOK || edgeNudge)) {
+                        needsSwerve = true; edgeNudgeNow = edgeNudge && !kerbOK;
                         
                         // Calculate open space on each side, accounting for obstacle width.
                         // For point obstacles (single actor, single car) this matches old
@@ -1773,6 +1799,7 @@
                         const actorMoving = isActor && closestSwerve.inMotion;
                         let magnitude = isActor ? 0.45 : 0.9;
                         if (actorMoving) magnitude *= 0.55;
+                        if (isActor && edgeNudge && !kerbOK) magnitude = Math.min(magnitude, 0.2);
                         
                         // Pick a side. Threshold scales with obstacle width — a wide
                         // cluster needs to be more "off-center" before we commit to
@@ -1851,7 +1878,7 @@
                     if (closestSwerve.type === 'vehicle') {
                         shouldOvertake = true;
                         isPlayerObstacle = closestSwerve.entity === playerCar;
-                    } else if (closestSwerve.type === 'actor') {
+                    } else if (closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster') {
                         shouldOvertake = true;
                         isPlayerObstacle = true;
                     }
@@ -1983,6 +2010,7 @@
                 // we *also* tighten the speed envelope so the car has time for the actor
                 // to clear. Without this layer, gentle swerve + full speed = clipping the
                 // actor's heels.
+                if (needsSwerve && actorAhead && !edgeNudgeNow) targetSpeed = Math.min(targetSpeed, this.maxSpeed * 0.3);   // the last-resort kerb pass: crawling
                 if (needsSwerve) {
                     const movingActor = swerveObstacles.find(o =>
                         (o.type === 'actor' || o.type === 'actor_cluster') && o.inMotion

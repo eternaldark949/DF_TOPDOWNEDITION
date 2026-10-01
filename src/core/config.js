@@ -135,6 +135,10 @@
             // --- CAMERA ---
             CAMERA: {
                 DEFAULT_ZOOM: 1.0,
+                HOLSTER_ZOOM: 1.18,             // on foot, gun away: 18% closer (engine/update.js camera)
+                INDOOR_ZOOM: 1.20,              // indoors: 20% closer (stacks with holstered)
+                INTERACT_ZOOM: 1.05,            // by something to use, or talking: 5% closer than that
+                CINE_PAN: 450, CINE_ZOOM: [0.5, 2.5],       // Cinematic View: pan radius (world px) and zoom limits
                 SHAKE_DECAY: 0.9,
                 SHAKE_MIN_THRESHOLD: 0.5
             },
@@ -215,6 +219,7 @@
                 WALL: 0.5, DOOR: 0.6,           // reach kept through a wall / a shut door
                 ERR_NEAR: 20, ERR_FAR: 150      // how far off their guess is, close up / at the edge of hearing
             },
+            WALK_TO_CAR: true,          // on foot, "Drive" walks 949 round to the driver's door first (engine/events.js _walkToCar)
             NAV: {
                 CELL: 20,                   // Grid cell size (px)
                 AGENT_RADIUS: 16,           // Obstacles are inflated by this (teammate radius 14 + margin)
@@ -464,7 +469,7 @@
                 HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
                 REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
-                CAM_ZOOM: { SPAN: 0.5, FLOOR: 0.5 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
+                CAM_ZOOM: { SPAN: 0.25, FLOOR: 0.75 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
                 STICK_YAW_DAMP: 5,
                 IMPACT_YAW: 0.9,                // Twist from an off-centre knock (onImpact)              // Touch stick unwinds by this × yawRate (no overshoot)
                 COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)

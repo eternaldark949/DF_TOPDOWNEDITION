@@ -1516,6 +1516,8 @@
         document.addEventListener('keydown', (e) => {
             // 1. Handle ESCAPE - Pause Menu Priority
             if (e.key === 'Escape') {
+                // Holding furniture / choosing a side: Esc lets go
+                if (game.furniture && game.furniture.busy()) { game.furniture.release(); return; }
                 // Cinematic view: Esc brings the pause menu back
                 if (document.body.classList.contains('cinematic-view')) { pauseMenu.exitCinematic(); return; }
                 // If pause menu is open, close it

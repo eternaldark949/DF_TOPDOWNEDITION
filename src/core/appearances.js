@@ -183,6 +183,46 @@
                          body: { kind: 'android', finish }, top: { type: 'dn_uniform', ...uni },
                          bottom: { type: 'pants', color: '#141216' }, shoes: { type: 'loafers', color: '#0e0e10' }, pose: 'concierge' };
             },
+            // Moon City's clubgoers (world/club-life.js): evening wear in the house colours —
+            // black lacquer, plum and wine velvet, violet, lavender, rose, champagne gold, chrome
+            clubgoer(r) {
+                const pick = l => pickFrom(r, l), P = PALETTE;
+                const night = ['#0b0810', '#141016', '#1a1022', '#2a0a3a', '#5a0c34', '#8a1a52', '#e8c27a', '#c8a8ff', '#8a5cff', '#d8dcef', '#ff5a8a'];
+                const metal = () => pick([P.houseGold || '#e8c27a', '#d8dcef']);
+                const gender = pick(['female', 'female', 'male', 'male', 'androgynous']);
+                const look = { gender, skinColor: pick(P.skins), build: pick([undefined, 'slim', 'athletic', 'curvy', 'broad']), height: 0.94 + r() * 0.12,
+                               hair: { type: pick(gender === 'male' ? ['short', 'afro', 'dreadlocks', 'curls', 'braids'] : ['long', 'ponytail', 'braids', 'curls', 'afro', 'short', 'dreadlocks']),
+                                       color: r() < 0.15 ? pick(['#c8a8ff', '#ff5a8a', '#e8dcc8']) : pick(P.hairs) } };
+                if (gender === 'male') {
+                    look.top = { type: pick(['suit', 'jacket', 'turtleneck', 'tshirt', 'vest']), color: pick(night), inner: pick(['#0b0810', '#e8e8e8', '#5a0c34']) };
+                    look.bottom = { type: 'pants', color: pick(['#0b0810', '#141016', '#1a1022']) };
+                    look.shoes = { type: pick(['loafers', 'boots']), color: '#0e0c10' };
+                    if (r() < 0.35) look.jewelry = [{ type: pick(['necklace', 'sunglasses']), color: pick([metal(), '#141414']) }];
+                } else {
+                    look.top = { type: pick(['sports_bra', 'crop_top', 'sleeved_crop', 'tank', 'turtleneck', 'suit']), color: pick(night), inner: '#0b0810' };
+                    look.bottom = { type: pick(['pencil_skirt', 'skirt', 'leggings', 'long_skirt', 'pants', 'shorts']), color: pick(night) };
+                    if (look.bottom.type === 'leggings') look.bottom.finish = 'gloss';
+                    look.shoes = { type: r() < 0.8 ? 'heels' : 'boots', color: pick(['#0b0810', '#e8c27a', '#8a1a52', '#d8dcef']) };
+                    const j = [];
+                    if (r() < 0.5) j.push({ type: 'hoops', color: metal() });
+                    if (r() < 0.4) j.push({ type: 'necklace', color: metal() });
+                    if (r() < 0.3) j.push({ type: 'bangles', color: metal() });
+                    if (j.length) look.jewelry = j;
+                }
+                return look;
+            },
+            // Moon City's staff: a bouncer in black and gold, a barback in a vest, the powder-room attendant
+            mc_staff(kind, r) {
+                const gold = PALETTE.houseGold || '#e8c27a';
+                if (kind === 'bouncer') return { gender: 'male', build: 'broad', height: 1.07, skinColor: pickFrom(r, PALETTE.skins), hair: { type: 'short', color: '#0a0a0a' },
+                    top: { type: 'suit', color: '#0b0810', inner: '#0b0810', trim: gold }, bottom: { type: 'pants', color: '#0b0810' }, shoes: { type: 'loafers', color: '#0a0a0a' },
+                    jewelry: [{ type: 'sunglasses', color: '#141414' }], pose: 'arms_crossed' };
+                if (kind === 'barback') return { gender: pickFrom(r, ['male', 'female']), build: 'slim', skinColor: pickFrom(r, PALETTE.skins), hair: { type: pickFrom(r, ['short', 'ponytail']), color: pickFrom(r, PALETTE.hairs) },
+                    top: { type: 'vest', color: '#0b0810', inner: '#ece6f0', trim: gold }, bottom: { type: 'pants', color: '#141016' }, shoes: { type: 'loafers', color: '#0a0a0a' } };
+                return { gender: 'female', skinColor: pickFrom(r, PALETTE.skins), hair: { type: 'long', color: pickFrom(r, PALETTE.hairs) },
+                    top: { type: 'suit', color: '#1a1022', inner: '#5a0c34', trim: gold }, bottom: { type: 'pencil_skirt', color: '#0b0810' }, shoes: { type: 'heels', color: '#0b0810' },
+                    jewelry: [{ type: 'necklace', color: gold }], pose: 'concierge' };
+            },
             // The Ethereal plane's wanderers
             spirit() {
                 return { skinColor: '#9fb8d0', gender: 'female', eyeColor: '#dff2ff', hair: { type: 'long', color: '#4a5a70' },

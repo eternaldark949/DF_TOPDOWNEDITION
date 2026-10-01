@@ -151,12 +151,16 @@
                     if (v.controlMode === 'AI' && Math.abs(v.speed || 0) < 0.2) v._frozen = (v._frozen || 0) + 1; else v._frozen = 0;
                     const frozenOut = v._frozen > 900 && v.driverType !== 'player' && v.driverType !== 'zib' && !v.isOwnedCar &&
                         !v.isDeliveryVehicle && distToPlayer > 900;
-                    if (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd || frozenOut) { 
+                    // Leaving: fade out over ~0.5 s (still rolling on into the lane's end), then go
+                    if (!v.fading && (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd || frozenOut)) v.fading = true;
+                    if (v.fading) v.fade = Math.min(v.fade ?? 1, 1) - 1 / 30;
+                    else if ((v.fade ?? 1) < 1) v.fade = Math.min(1, v.fade + 1 / 36);       // arriving: fade in over ~0.6 s
+                    if (v.fading && (v.fade <= 0 || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN + 600)) {
                         if (v.currentIntersection) v.currentIntersection.releaseEntry(v);
                         // Properly destroy entity to unregister from collision system
                         if (!v.markedForDestroy) v.destroy();
                         this.vehicles.splice(i, 1);
-                    } else {
+                    } else if (!v.dead) {
                         // Pass decalSystem to update
                         v.update(player, playerCar, this.vehicles, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, teammates);
                     }
@@ -176,7 +180,10 @@
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
                     this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
                     if (this.network.allLanes.length > 0) {
-                        for(let k=0; k<8; k++) { 
+                        // Spawn out of sight where possible: the camera's view plus a margin
+                        const gv = typeof game !== 'undefined' ? game.view : null, cv = typeof game !== 'undefined' ? game.canvas : null;
+                        const hw = gv && cv ? cv.width / 2 / gv.zoom + 120 : 0, hh = gv && cv ? cv.height / 2 / gv.zoom + 120 : 0;
+                        for(let k=0; k<14; k++) { 
                             const spawnLane = this.network.allLanes[Math.floor(Math.random() * this.network.allLanes.length)];
                             // Choose the car first, so the check is made where it will actually appear
                             const brand = TrafficVehicle._selectRandomBrand(), model = TrafficVehicle._selectRandomModel(brand);
@@ -187,6 +194,7 @@
                             const spawnY = spawnLane.start.y + spawnLane.uy * spawnOffset;
                             const distToP = Math.hypot(player.x - spawnX, player.y - spawnY);
                             if (distToP < CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN || distToP > CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX) clear = false; 
+                            if (clear && gv && k < 12 && Math.abs(spawnX - gv.x) < hw && Math.abs(spawnY - gv.y) < hh) clear = false;   // (the last tries take what they can; the fade hides it)
                             if (clear) {
                                 // Nobody within the separation, and nobody coming up the lane who couldn't stop for it
                                 const cars = this.vehicles.concat(playerCar && playerCar.visible ? [playerCar] : []);
@@ -202,6 +210,7 @@
                             if (clear) {
                                 // Spawn new vehicle - it auto-registers via GameEntity queue
                                 const newVehicle = new TrafficVehicle(spawnLane, brand, model);
+                                newVehicle.fade = 0;
                                 this.vehicles.push(newVehicle);
                                 break; 
                             }
@@ -214,7 +223,7 @@
             resolveCollisions(playerCar, player, weather, audioSys, ownedCar, decalSystem) {
                 if (this._crunchCd > 0) this._crunchCd--;
                 // 1. GATHER ALL PHYSICAL VEHICLES (and re-grid them where they are now, after moving)
-                const allVehicles = this.vehicles.filter(v => !v.dead);
+                const allVehicles = this.vehicles.filter(v => !v.dead && !(v.fading && v.fade < 0.5));   // (a car fading out is a ghost)
                 this.grid.clear();
                 for (const v of allVehicles) this.grid.add(v);
                 if (playerCar && playerCar.visible && !allVehicles.includes(playerCar)) this.grid.add(playerCar);

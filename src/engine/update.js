@@ -193,6 +193,9 @@
                 const reactionVehicles = (this.isDriving && this.car)
                     ? this.traffic.vehicles.concat(this.car)
                     : this.traffic.vehicles;
+                // Who the crowds make way for: 949 and her crew on foot (pedestrians, the lobby's and the club's walkers)
+                this._makeWay = [this.player];
+                for (const t of this.teammates) if (t && (t.recruited || t.hired) && !t.inCar && !t.downed && !t.dead) this._makeWay.push(t);
                 this.pedestrians.update(this.player, this.activeMap, reactionVehicles, this.weaponMode !== 'none' && !this.weaponHolstered, this.enemies);
                 this.profiler.stop('AI:Pedestrians');
                 
@@ -276,6 +279,8 @@
             
                 // The Double Nights lobby: guests and staff come and go; searched cases refill daily
                 this.lobbyLife.update(this);
+                this.clubLife.update(this);
+                Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
                     if (this._lostMap !== this.activeMap) { this._lostMap = this.activeMap; this._hasLost = this.props.some(p => p.interactionType === 'lost_luggage'); }
                     if (this._hasLost) this.refreshLostLuggage();
@@ -389,6 +394,13 @@
                 if (this.keys['a'] || this.keys['ArrowLeft']) inputX = -1; 
                 if (this.keys['d'] || this.keys['ArrowRight']) inputX = 1;
                 if (this.joystick.active) { inputX = this.joystick.dx; inputY = this.joystick.dy; }
+                // The apartment's hand (engine/furniture.js): the pill; choosing a side holds her still
+                if (this.furniture) { this.furniture.update(this); if (this.furniture.state === 'choose') { inputX = 0; inputY = 0; } }
+                // A walk owns 949 (world/walker.js): it supplies the movement, until any real input takes over
+                if (this.player._walk) {
+                    if (inputX || inputY || this.fireJoystick.active || this.isDriving) Walker.cancel(this.player);
+                    else { const s = Walker.stepPlayer(this); if (s) { inputX = s.x; inputY = s.y; } }
+                }
                 this.profiler.stop('Input:Process');
             
                 // --- 5. ENTITY UPDATES ---
@@ -473,8 +485,24 @@
                         sepX += Math.cos(pushAngle) * CONFIG.COMPANION.PLAYER_SEPARATION_FORCE;
                         sepY += Math.sin(pushAngle) * CONFIG.COMPANION.PLAYER_SEPARATION_FORCE;
                     }
-                    tm.x += sepX;
-                    tm.y += sepY;
+                    // …and from the crowd (pedestrians, map NPCs, the lobby's and club's walkers): a gentle give, both ways
+                    const navT = NavGrid.for(this.activeMap);
+                    const nudge = (o, r, give) => {
+                        if (!o || o === tm || o.dead || (o.life !== undefined && o.life < 0.5) || o.seated || o.glide) return;
+                        const ox = tm.x - o.x, oy = tm.y - o.y;
+                        if (ox > r || ox < -r || oy > r || oy < -r) return;
+                        const od = Math.hypot(ox, oy);
+                        if (od >= r || od < 0.1) return;
+                        const k = (r - od) / r;                                               // deeper in, firmer
+                        sepX += (ox / od) * k * 2.2; sepY += (oy / od) * k * 2.2;
+                        if (give) { const gx = o.x - (ox / od) * k * give, gy = o.y - (oy / od) * k * give;   // a standing walker sways aside too
+                            if (!navT || navT.walkable(gx, gy)) { o.x = gx; o.y = gy; } }
+                    };
+                    for (const o of this.pedestrians.pedestrians || []) nudge(o, 24, 0);
+                    for (const o of this.npcs || []) if (!this.teammates.includes(o)) nudge(o, 26, 0);
+                    if (this.lobbyLife) for (const o of this.lobbyLife.walkers) nudge(o, 22, 0.8);
+                    if (this.clubLife) for (const o of this.clubLife.walkers) nudge(o, 22, 0.8);
+                    if (!navT || navT.walkable(tm.x + sepX, tm.y + sepY)) { tm.x += sepX; tm.y += sepY; }
 
                     // ── EYELINE TACTICS: a firing spot overrides the formation slot ──
                     const eyelineSpot = updateCompanionTactics(tm, this);
@@ -1289,6 +1317,7 @@
                 if (this.useNewCollisionSystem) {
                     CollisionSystem.update(this.camera, this.canvas, this);
                 }
+                if (this.furniture) this.furniture.afterCollision(this);   // a held piece follows her (or holds her back)
                 this.profiler.stop('Physics:Collisions');
             
                 this.profiler.start('Logic:UI_Interact');
@@ -1394,7 +1423,14 @@
                     // Pulls back with speed, down to a floor: the look-ahead already shows the road in front
                     const speedRatio = Math.abs(this.car.speed) / this.car.maxSpeed, CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
                     targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
-                } else if (nearInteractable) { targetZoom = 1.4; }
+                } else {
+                    // On foot: in a little closer with the gun away, and again indoors; by something to use (or talking), 5% closer still
+                    const C = CONFIG.CAMERA, holstered = this.weaponHolstered || this.weaponMode === 'none';
+                    let base = 1.0;
+                    if (holstered) base *= C.HOLSTER_ZOOM;
+                    if (this.activeMap && this.activeMap.type === 'indoor') base *= C.INDOOR_ZOOM;
+                    targetZoom = nearInteractable ? base * C.INTERACT_ZOOM : base;
+                }
                 if (this.isLandscape) targetZoom *= 0.9;          // a short screen: a little more ground above and below her
                 
                 const diff = targetZoom - this.camera.zoom;
@@ -1487,6 +1523,32 @@
                     }
                 } 
                 
+                // 1b. THE CREW ON FOOT vs TRAFFIC: pushed clear of a car's body; a fast one hits them
+                for (const tm of this.teammates) {
+                    if (!tm || tm.inCar || tm.dead || !(tm.recruited || tm.hired)) continue;
+                    if (tm._carHitCd > 0) tm._carHitCd--;
+                    for (const v of this.traffic.grid.getNearby({ x: tm.x, y: tm.y, length: 30, width: 30 })) {
+                        if (v === this.car && this.isDriving && tm.inCar) continue;
+                        if (v.fade !== undefined && v.fade < 0.5) continue;                 // a car fading in or out isn't solid yet
+                        const c = Math.cos(-v.angle), s = Math.sin(-v.angle), dx = tm.x - v.x, dy = tm.y - v.y;
+                        const lx = dx * c - dy * s, ly = dx * s + dy * c, hl = v.length / 2 + 2, hw = v.width / 2 + 2;
+                        const ex = lx - Math.max(-hl, Math.min(hl, lx)), ey = ly - Math.max(-hw, Math.min(hw, ly)), d2 = ex * ex + ey * ey, R = (tm.radius || 14) + 1;
+                        if (d2 >= R * R) continue;
+                        let d = Math.sqrt(d2), o = R - d, nx = ex / (d || 1), ny = ey / (d || 1);
+                        if (d2 <= 0) {                                                      // centre inside the body: out the nearest side
+                            const sx = hl - Math.abs(lx), sy = hw - Math.abs(ly);
+                            if (sx < sy) { nx = Math.sign(lx) || 1; ny = 0; o = sx + R; } else { nx = 0; ny = Math.sign(ly) || 1; o = sy + R; }
+                        }
+                        const wx = nx * Math.cos(v.angle) - ny * Math.sin(v.angle), wy = nx * Math.sin(v.angle) + ny * Math.cos(v.angle);
+                        tm.x += wx * o; tm.y += wy * o;                                    // the car doesn't give; they're shoved aside
+                        if (Math.abs(v.speed) > 4 && !(tm._carHitCd > 0) && !tm.downed) {
+                            tm._carHitCd = 40;
+                            if (tm.takeDamage) tm.takeDamage(10, wx * 6, wy * 6);
+                            this.triggerShake(4);
+                        }
+                    }
+                }
+
                 // 2. VEHICLE vs VEHICLE Collisions
                 this.traffic.resolveCollisions(this.car, this.player, this.weather, audioSys, this.ownedCar, this.decals);
             },

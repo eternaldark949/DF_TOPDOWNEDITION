@@ -160,7 +160,7 @@
             }
             
             _setupSign(signConfig) {
-                if (this.style === 'double_nights') { this.attachedSign = null; return; }   // its script sign is on the canopy (_dnDrawSign)
+                if (this.style === 'double_nights' || this.style === 'moon_city') { this.attachedSign = null; return; }   // their own script signs (_dnDrawSign, _mcDrawSign)
                 const mainSection = this.sections[0];
                 const titleCase = (str) => str.replace(/\w\S*/g, (txt) => 
                     txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
@@ -197,7 +197,7 @@
                     label: doorConfig.label
                 };
                 
-                if (doorConfig.lightColor) {
+                if (doorConfig.lightColor && this.style !== 'moon_city') {           // (Moon City lights its door itself: _mcLights)
                     this.attachedLights.push(new LampEntity({ x: this.x + entranceSection.x + entranceSection.w / 2, y: this.y + entranceSection.y + entranceSection.h - 5, lampType: 3, color: doorConfig.lightColor, lightRadius: 200 }));
                 }
             }
@@ -257,7 +257,7 @@
                 this.attachedLights = [];
                 this._generateLights();
                 // Recreate door light if applicable (Silver Queen has its own entrance rig)
-                if (this._doorLightColor && this.style !== 'silver_queen' && this.style !== 'double_nights') {
+                if (this._doorLightColor && this.style !== 'silver_queen' && this.style !== 'double_nights' && this.style !== 'moon_city') {
                     let entranceSection = this.sections[0];
                     let maxY = entranceSection.y + entranceSection.h;
                     this.sections.forEach(s => { if (s.y + s.h > maxY) { entranceSection = s; maxY = s.y + s.h; } });
@@ -367,6 +367,7 @@
              */
             _paintSign(ctx) {
                 if (this.style === 'double_nights') { if (typeof game !== 'undefined' && game.camera) this._dnDrawSign(ctx); return; }
+                if (this.style === 'moon_city') { if (typeof game !== 'undefined' && game.camera) { this._mcDrawCanopy(ctx, false); this._mcDrawSign(ctx, false); } return; }
                 if (!this.attachedSign || !this.attachedTransition) return;
                 
                 ctx.save();
@@ -633,6 +634,8 @@
                     this.facadeFeature = r(4) < 0.55 ? 'balconies' : 'fire_escape';
                 } else if (this.style === 'double_nights') {
                     this.floors = DN.FLOORS; this.roofFeatures = []; this.emissiveReach = 950;   // crowns, beams (buildings/double-nights.js)
+                } else if (this.style === 'moon_city') {
+                    this.roofFeatures = []; this.facadeFeature = 'moon_city'; this.emissiveReach = 600;   // fins, skylight, searchlights (buildings/moon-city.js)
                 } else if (this.style === 'silver_queen') {
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
@@ -647,6 +650,7 @@
                 const accent = this.colors.accent;
                 if (this.style === 'silver_queen' && t) { this._sqLights(); return; }
                 if (this.style === 'double_nights') { this._dnLights(); return; }
+                if (this.style === 'moon_city') { this._mcLights(); return; }
                 if (t) {
                     const cx = t.x + t.w / 2, cy = t.y - 10;
                     // Entrance pair, warm pool at the door — purposeful light instead of a bulb grid
@@ -795,6 +799,7 @@
                 // --- Roofs (drawn in world coords under the scale-about-camera transform) ---
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const sq = this.style === 'silver_queen';
+                if (this.style === 'moon_city') { this._mcDrawRoof(ctx, false); ctx.restore(); return; }
                 this.sections.forEach((section, si) => {
                     const sx = this.x + section.x, sy = this.y + section.y;
                     if (sq) {                                                                  // lavender slab with a soft sheen (world-space gradients, made once)
@@ -837,6 +842,7 @@
                     this._drawFaceWindows(ctx, f, P, true); this._drawFaceFeature(ctx, f, P, true);
                 }
                 if (this.style === 'silver_queen') { this._sqEmissiveStructure(ctx, dark, glow); ctx.globalAlpha = glow; ctx.globalCompositeOperation = 'source-over'; }
+                if (this.style === 'moon_city') { this._mcDrawCanopy(ctx, true); this._mcDrawSign(ctx, true, dark); ctx.globalAlpha = glow; ctx.globalCompositeOperation = 'source-over'; }
                 // Roof: rim light along parapets reads the silhouette at night, plus neon/rooftop lights
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const rim = this.style ? this.colors.accent : '#8fa0c8';
@@ -845,9 +851,11 @@
                 this.sections.forEach(section => ctx.strokeRect(this.x + section.x + 1, this.y + section.y + 1, section.w - 2, section.h - 2));
                 ctx.shadowBlur = 0; ctx.globalAlpha = glow;
                 if (this.style === 'silver_queen') this._sqRoofEdgeLights(ctx, true);
+                if (this.style === 'moon_city') this._mcDrawRoof(ctx, true);
                 if (this.style) this._drawRoofFeatures(ctx, true);
                 ctx.restore();
                 if (this.style === 'silver_queen') { this._sqVeil(ctx, dark); this._sqDrawCrown(ctx, true); this._sqDrawBeams(ctx, dark); }
+                if (this.style === 'moon_city') this._mcBeams(ctx, dark);
             },
 
             /** Floodlight wash up the front face from the entrance lamps (accent-tinted). */
@@ -878,7 +886,7 @@
              * at night the lips catch the building's lamp colour (LandmarkKit.rim).
              */
             _drawFaceWindows(ctx, f, P, emissive) {
-                if (f.side === 'C') return;                          // rounded corners: no windows on the curve
+                if (f.side === 'C' || this.style === 'moon_city') return;             // (Moon City: no windows, its fins and smoked glass are _mcFace)                          // rounded corners: no windows on the curve
                 const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS);
                 const ax = f.x1, ay = f.y1, bx = f.x2, by = f.y2;
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
@@ -968,6 +976,7 @@
             _drawFaceFeature(ctx, f, P, emissive) {
                 if (!this.facadeFeature) return;
                 if (this.facadeFeature === 'silver_queen') { this._sqFace(ctx, f, P, emissive); return; }
+                if (this.facadeFeature === 'moon_city') { this._mcFace(ctx, f, P, emissive); return; }
                 const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS);
                 const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
