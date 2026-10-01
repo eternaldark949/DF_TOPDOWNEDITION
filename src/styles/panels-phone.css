@@ -22,10 +22,11 @@
         .pause-settings-panel::-webkit-scrollbar-track { background: transparent; }
         .pause-settings-panel::-webkit-scrollbar-thumb { background: rgba(212,168,75,0.3); border-radius: 2px; }
         .settings-section-label {
-            font-family: var(--font-tech);
+            font-family: var(--font-ui);
             font-size: 0.6rem;
-            letter-spacing: 3px;
-            color: rgba(164, 105, 255, 0.6);
+            font-weight: 600;
+            letter-spacing: 4px;
+            color: var(--df-champagne);
             text-transform: uppercase;
             text-align: right;
             margin-top: 10px;
@@ -51,50 +52,39 @@
             font-weight: 500;
             letter-spacing: 2px;
             text-transform: uppercase;
-            color: #999;
+            color: var(--df-lilac-grey);
         }
         .settings-value {
-            font-family: var(--font-tech);
-            font-size: 0.7rem;
-            letter-spacing: 1px;
-            color: #fff;
+            font-family: var(--font-ui);
+            font-size: 0.64rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            color: var(--df-lavender-pale);
             cursor: pointer;
             padding: 4px 14px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 3px;
+            border: 1px dotted rgba(202, 176, 250, 0.5);
+            border-radius: 12px;
             transition: all 0.2s ease;
             user-select: none;
             min-width: 60px;
             text-align: center;
         }
         .settings-value:hover {
-            border-color: var(--glow-color);
-            color: var(--glow-color);
-            text-shadow: 0 0 8px rgba(164, 105, 255, 0.4);
+            border-color: var(--df-lavender);
+            color: #fff;
+            box-shadow: 0 0 10px rgba(202, 176, 250, 0.35);
         }
         .settings-value:active {
             transform: scale(0.96);
         }
-        .settings-value.val-low {
-            color: #4CAF50;
-            border-color: rgba(76, 175, 80, 0.3);
+        /* Values in the menu scheme: the higher or "on", the brighter the pill */
+        .settings-value.val-low { color: var(--df-lavender); border-color: rgba(202, 176, 250, 0.35); }
+        .settings-value.val-medium { color: var(--df-champagne); border-color: rgba(216, 198, 162, 0.5); }
+        .settings-value.val-high, .settings-value.val-on {
+            color: #1b0d2e; border: 1px solid rgba(255, 255, 255, 0.7);
+            background: radial-gradient(ellipse 70% 120% at 50% 50%, #f2ecf4 0%, var(--df-lavender) 90%);
         }
-        .settings-value.val-medium {
-            color: #FFD700;
-            border-color: rgba(255, 215, 0, 0.3);
-        }
-        .settings-value.val-high {
-            color: #ff6b6b;
-            border-color: rgba(255, 107, 107, 0.3);
-        }
-        .settings-value.val-on {
-            color: #4CAF50;
-            border-color: rgba(76, 175, 80, 0.3);
-        }
-        .settings-value.val-off {
-            color: #666;
-            border-color: rgba(255, 255, 255, 0.08);
-        }
+        .settings-value.val-off { color: rgba(185, 174, 196, 0.5); border-color: rgba(185, 174, 196, 0.18); }
         .settings-back-btn {
             font-family: var(--font-ui);
             font-size: 0.8rem;
@@ -592,7 +582,7 @@
             pointer-events: auto; 
             touch-action: none; 
         }
-        #phone-container { width: 300px; height: 600px; border-radius: 16px; border: 2px solid rgba(140, 20, 30, 0.6); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(140, 20, 30, 0.15); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        #phone-container { transform: scale(var(--phone-scale, 1)); flex-shrink: 0; width: 300px; height: 600px; border-radius: 16px; border: 2px solid rgba(140, 20, 30, 0.6); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(140, 20, 30, 0.15); display: flex; flex-direction: column; overflow: hidden; position: relative; }
         #phone-screen { 
             flex: 1; padding: 0; display: flex; flex-direction: column; position: relative; overflow: hidden;
             background: 
@@ -631,14 +621,34 @@
         #phone-now-playing .np-label { font-family: 'Montserrat', sans-serif; font-size: 0.5rem; color: rgba(255,255,255,0.3); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
         #phone-now-playing .np-title { font-family: 'Montserrat', sans-serif; font-size: 0.7rem; color: rgba(255,255,255,0.6); font-weight: 500; }
 
-        #phone-close { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 36px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.15); border: none; color: transparent; font-size: 0; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: all 0.2s; z-index: 10; }
-        #phone-close::before { content: 'CLOSE'; position: absolute; top: -14px; font-family: 'Montserrat', sans-serif; font-size: 0.4rem; color: rgba(255,255,255,0.25); letter-spacing: 2px; white-space: nowrap; }
-        #phone-close:hover { background: rgba(255, 255, 255, 0.3); }
-        #phone-close:hover::before { color: rgba(255,255,255,0.5); }
+        /* Close: a lavender pill at the foot of the phone, on a generous transparent hit area */
+        #phone-close { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 40px; background: transparent; border: none; color: transparent; font-size: 0; cursor: pointer; z-index: 10; }
+        #phone-close::before { content: 'CLOSE  ✕'; position: absolute; left: 50%; bottom: 9px; transform: translateX(-50%); padding: 4px 16px; border-radius: 12px; white-space: nowrap;
+            font-family: 'Montserrat', sans-serif; font-size: 0.55rem; font-weight: 700; letter-spacing: 2.5px; color: #1b0d2e;
+            background: radial-gradient(ellipse 70% 120% at 50% 50%, #ece4f6 0%, var(--df-lavender) 80%); border: 1px dotted rgba(255,255,255,0.8); box-shadow: 0 0 14px rgba(202,176,250,0.45); transition: all 0.2s; }
+        #phone-close:hover::before { box-shadow: 0 0 20px rgba(202,176,250,0.75); background: #fff; }
+        /* ...and a ✕ in the screen corner, outside the phone, never scaled away */
+        #phone-close-x { position: absolute; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: var(--df-lavender-pale); cursor: pointer; z-index: 2;
+            background: rgba(20, 8, 30, 0.6); border: 1px dotted rgba(202,176,250,0.6); box-shadow: 0 0 12px rgba(142,85,245,0.3); }
+        #phone-close-x:hover { background: rgba(93, 20, 226, 0.5); }
         /* border-box so height:100% + padding doesn't overflow the frame — this is
            what forced the old hardcoded max-height on the content area. Extra bottom
            padding keeps content clear of the absolutely-positioned close bar. */
-        .phone-app-screen { display: none; flex-direction: column; height: 100%; padding: 20px 20px 30px; box-sizing: border-box; }
+        .phone-app-screen { display: none; flex-direction: column; height: 100%; padding: 20px 20px 42px; box-sizing: border-box; }
+
+        /* --- The phone on its side (body.phone-wide: the screen is wider than tall) --- */
+        body.phone-wide #phone-container { width: 600px; height: 300px; }
+        body.phone-wide #phone-home[style*="block"] { display: grid !important; grid-template-columns: 200px 1fr; grid-template-rows: 1fr auto; height: 100%; box-sizing: border-box; padding-bottom: 34px; }
+        body.phone-wide #phone-time { grid-column: 1; grid-row: 1; margin: 46px 0 4px; font-size: 3rem; }
+        body.phone-wide #phone-weather-widget { grid-column: 1; grid-row: 1; align-self: end; margin-bottom: 6px; }
+        body.phone-wide #phone-apps { grid-column: 2; grid-row: 1 / span 2; grid-template-columns: repeat(5, 1fr); align-content: center; margin: 0; padding: 14px 18px 0; }
+        body.phone-wide #phone-now-playing { grid-column: 1; grid-row: 2; margin: 0 0 0 12px; border-radius: 10px; }
+        body.phone-wide .phone-app-screen { padding: 8px 18px 40px; }
+        body.phone-wide .phone-app-header { padding: 4px 0; margin-bottom: 8px; }
+        body.phone-wide #screen-maps .phone-app-content { display: flex; flex-direction: column; }
+        body.phone-wide #phone-map-canvas { flex: 1; height: auto; min-height: 110px; }
+        body.phone-wide #screen-maps p { margin: 4px 0 0 !important; }
         .phone-app-header { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(140, 20, 30, 0.2); margin-bottom: 15px; }
         .phone-back-btn { width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.06); border: none; color: #999; font-size: 1rem; cursor: pointer; margin-right: 10px; }
         .phone-app-title { font-family: 'Montserrat', sans-serif; font-size: 0.9rem; color: rgba(140, 20, 30, 0.8); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }

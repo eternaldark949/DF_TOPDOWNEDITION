@@ -911,7 +911,9 @@
             right: auto !important;
         }
         
-        /* --- PAUSE MENU (Phase 3) --- */
+        /* --- PAUSE MENU, after ETERNAL's mock-up ---
+           The game blurred behind a plum veil that deepens to the right. Left: Now Playing, Quick Access,
+           objectives. Right: a script "Paused" and letter-spaced caps, the active one a lit pill. */
         #pause-menu {
             position: fixed;
             top: 0;
@@ -933,9 +935,11 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            background:
+                linear-gradient(90deg, rgba(20, 4, 10, 0.25) 0%, rgba(14, 3, 12, 0.55) 45%, rgba(10, 2, 10, 0.93) 70%, rgba(8, 1, 8, 0.96) 100%),
+                radial-gradient(ellipse 60% 70% at 20% 40%, rgba(120, 30, 10, 0.18), transparent 70%);
+            backdrop-filter: blur(9px);
+            -webkit-backdrop-filter: blur(9px);
         }
         
         .pause-content {
@@ -943,14 +947,10 @@
             width: 100%;
             height: 100%;
             display: flex;
-            flex-direction: column;
-            /* `safe center` keeps the menu centred when it fits but falls back to
-               top-aligned when it doesn't — plain `center` would push the title
-               and the first menu items above the scroll origin, out of reach. */
-            justify-content: center;
-            justify-content: safe center;
-            align-items: flex-end;
-            padding: 24px 10% 24px 0;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 7% 24px 3%;
             box-sizing: border-box;
             overflow-y: auto;
             overscroll-behavior: contain;   /* don't hand the scroll to the page */
@@ -958,109 +958,134 @@
             touch-action: pan-y;            /* body sets touch-action:none */
             scrollbar-width: thin;
             scrollbar-color: rgba(200, 180, 220, 0.35) transparent;
+            gap: 4vw;
         }
         .pause-content::-webkit-scrollbar { width: 6px; }
         .pause-content::-webkit-scrollbar-track { background: transparent; }
         .pause-content::-webkit-scrollbar-thumb { background: rgba(200, 180, 220, 0.35); border-radius: 3px; }
+
+        .pause-left { display: flex; flex-direction: column; gap: 26px; width: min(380px, 40vw); flex-shrink: 0; margin-top: 8vh; }
+        .pause-right { display: flex; flex-direction: column; align-items: center; min-width: 0; width: min(520px, 46vw); }
         
         .pause-header {
-            text-align: right;
-            margin-bottom: 40px;
+            text-align: center;
+            margin-bottom: 26px;
+            width: 100%;
         }
         
         .pause-title {
             font-family: var(--font-script);
-            font-size: 3.5rem;
-            color: #fff;
-            text-shadow: 0 0 20px rgba(164, 105, 255, 0.5);
+            font-size: 3.4rem;
+            font-weight: 400;
+            color: var(--df-lavender-pale);
+            text-shadow: 0 0 18px rgba(202, 176, 250, 0.55), 0 0 2px rgba(255, 255, 255, 0.6);
             margin: 0;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 14px;
+            border-bottom: 1px solid;
+            border-image: linear-gradient(90deg, transparent, rgba(216, 198, 162, 0.55), rgba(255, 255, 255, 0.6), rgba(216, 198, 162, 0.55), transparent) 1;
         }
         
         .pause-menu-list {
             display: flex;
             flex-direction: column;
-            align-items: flex-end;
-            gap: 8px;
+            align-items: stretch;
+            gap: 2px;
+            width: 100%;
         }
         
         .pause-menu-item {
             font-family: var(--font-ui);
-            font-size: 0.85rem;
-            font-weight: 500;
-            letter-spacing: 3px;
+            font-size: 0.74rem;
+            font-weight: 400;
+            letter-spacing: 4px;
             text-transform: uppercase;
-            color: #888;
-            padding: 12px 30px;
+            color: var(--df-lilac-grey);
+            padding: 10px 24px;
             cursor: pointer;
-            transition: all 0.25s ease;
-            text-align: right;
+            transition: color 0.25s ease;
+            text-align: center;
             position: relative;
-            min-width: 280px;
+            z-index: 0;
+            outline: none;
         }
         
         .pause-menu-item:hover {
-            color: #ccc;
-        }
-        
-        .pause-menu-item.active,
-        .pause-menu-item:focus {
             color: #fff;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
         
-        /* Active/selected item highlight bar */
-        .pause-menu-item.active::before,
-        .pause-menu-item:focus::before {
+        /* Active: a pill lit white in the middle, fading to lavender and out */
+        .pause-menu-item.active {
+            color: #120818;
+            font-weight: 700;
+        }
+        
+        .pause-menu-item.active::before {
             content: '';
             position: absolute;
-            left: 0;
-            right: 0;
+            left: -2%;
+            right: -2%;
             top: 50%;
             transform: translateY(-50%);
-            height: 40px;
-            background: linear-gradient(270deg, 
-                rgba(200, 180, 220, 0.25) 0%, 
-                rgba(200, 180, 220, 0.15) 40%, 
-                rgba(200, 180, 220, 0.05) 70%,
+            height: 32px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(176, 150, 210, 0.7) 12%, 
+                #f2ecf4 40%, 
+                #f2ecf4 60%, 
+                rgba(176, 150, 210, 0.7) 88%, 
                 transparent 100%);
-            border-radius: 4px;
+            border-radius: 16px;
+            box-shadow: 0 0 22px rgba(202, 176, 250, 0.35);
             z-index: -1;
         }
-        
-        /* Mobile adjustments */
-        @media screen and (max-width: 600px) {
-            .pause-content {
-                padding: 20px 5% 24px;
-                align-items: center;
-            }
-            
-            .pause-header {
-                text-align: center;
-            }
-            
-            .pause-menu-list {
-                align-items: center;
-            }
-            
-            .pause-menu-item {
-                text-align: center;
-                min-width: 250px;
-            }
-            
-            .pause-menu-item.active::before {
-                background: linear-gradient(90deg, 
-                    transparent 0%,
-                    rgba(200, 180, 220, 0.2) 30%, 
-                    rgba(200, 180, 220, 0.2) 70%,
-                    transparent 100%);
-            }
+
+        /* Now Playing: a dark disc with the station, a gold chevron, the track */
+        .pause-np {
+            display: flex; align-items: center; position: relative;
+            height: 64px; border-radius: 32px; padding-right: 26px;
+            background: linear-gradient(90deg, #1a0306 0%, #22071c 40%, #1c0a30 100%);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+            max-width: 340px;
+        }
+        .pause-np-disc {
+            width: 96px; height: 64px; border-radius: 32px 0 0 32px; flex-shrink: 0; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(ellipse at 40% 50%, #3a0710 0%, #1a0306 75%);
+            font-family: var(--font-ui); font-size: 0.62rem; letter-spacing: 3px; color: #f6e7dc;
+            white-space: nowrap; overflow: hidden; padding: 0 6px; box-sizing: border-box;
+            text-shadow: 0 0 8px rgba(255, 180, 160, 0.6);
+        }
+        .pause-np-play {
+            width: 26px; height: 64px; flex-shrink: 0; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(180deg, #a3803c, #5e4519);
+            color: #fff3d8; font-size: 0.7rem;
+            clip-path: polygon(0 0, 55% 0, 100% 50%, 55% 100%, 0 100%);
+        }
+        .pause-np-info { flex: 1; min-width: 0; padding-left: 14px; text-align: center; }
+        .pause-np-label { font-family: var(--font-script); font-size: 1rem; color: var(--df-gold); text-shadow: 0 0 6px rgba(255, 194, 72, 0.4); text-align: left; }
+        .pause-np-track { font-family: var(--font-ui); font-size: 0.72rem; color: #ece6f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-bottom: 3px; border-bottom: 1px solid rgba(216, 198, 162, 0.25); }
+        .pause-np-sub { font-family: var(--font-ui); font-size: 0.55rem; color: rgba(236, 230, 242, 0.6); margin-top: 3px; }
+        .pause-np-node { position: absolute; right: 12px; top: 50%; width: 7px; height: 7px; transform: translateY(-50%) rotate(45deg); background: #fffdfa; box-shadow: 0 0 8px rgba(255, 194, 72, 0.9); }
+
+        /* Quick Access: cream caps, the active item a lavender bar fading to the right */
+        .pause-quick { display: flex; flex-direction: column; gap: 2px; }
+        .pause-quick-title { font-family: var(--font-ui); font-size: 0.78rem; font-weight: 600; letter-spacing: 4px; color: var(--df-cream); margin-bottom: 10px; padding-left: 10px; }
+        .pause-quick-item {
+            font-family: var(--font-ui); font-size: 0.68rem; font-weight: 500; letter-spacing: 3px; color: #ece6f2;
+            padding: 6px 10px; cursor: pointer; position: relative; z-index: 0; outline: none; transition: color 0.2s;
+        }
+        .pause-quick-item:hover { color: #fff; }
+        .pause-quick-item.active { color: #1b0d2e; font-weight: 700; }
+        .pause-quick-item.active::before {
+            content: ''; position: absolute; inset: 0 0 0 0; z-index: -1;
+            background: linear-gradient(90deg, #e2d2fb 0%, #d9c6fb 70%, rgba(217, 198, 251, 0) 100%);
+            box-shadow: 0 0 16px rgba(202, 176, 250, 0.35);
         }
         
-        /* --- PAUSE MISSION OBJECTIVE --- */
+        /* --- PAUSE MISSION OBJECTIVE (left column, under Quick Access) --- */
         .pause-mission {
-            margin: 5px 30px 10px;
+            margin: 0;
             padding: 0;
             border: none;
             border-radius: 0;
@@ -1068,47 +1093,44 @@
             display: flex; flex-direction: column; gap: 6px;
         }
         .pause-obj-block {
-            padding: 8px 14px;
-            border-radius: 5px;
-            border-left: 3px solid rgba(255,255,255,0.1);
-            background: rgba(255,255,255,0.02);
+            padding: 7px 12px;
+            border-left: 2px solid rgba(255,255,255,0.1);
+            background: linear-gradient(90deg, rgba(20, 6, 26, 0.55), transparent);
         }
-        .pause-obj-block.story { border-left-color: rgba(140, 80, 200, 0.6); }
-        .pause-obj-block.optional { border-left-color: rgba(0, 200, 180, 0.5); }
-        .pause-obj-block.side { border-left-color: rgba(255, 170, 0, 0.5); }
+        .pause-obj-block.story { border-left-color: var(--df-lavender); }
+        .pause-obj-block.optional { border-left-color: rgba(120, 220, 205, 0.6); }
+        .pause-obj-block.side { border-left-color: var(--df-gold); }
         .pause-obj-label {
-            font-family: 'Montserrat', sans-serif;
+            font-family: var(--font-ui);
             font-size: 0.5rem;
-            color: #888;
-            letter-spacing: 2px;
+            color: var(--df-champagne);
+            letter-spacing: 2.5px;
             text-transform: uppercase;
             margin-bottom: 3px;
             font-weight: 600;
         }
-        .pause-obj-block.story .pause-obj-label { color: rgba(180, 140, 220, 0.8); }
-        .pause-obj-block.optional .pause-obj-label { color: rgba(100, 220, 200, 0.7); }
-        .pause-obj-block.side .pause-obj-label { color: rgba(255, 190, 80, 0.8); }
         .pause-obj-text {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 0.75rem;
-            color: #ccc;
-            line-height: 1.3;
-            font-weight: 500;
+            font-family: var(--font-ui);
+            font-size: 0.72rem;
+            color: #e6dff0;
+            line-height: 1.35;
+            font-weight: 400;
         }
         .pause-obj-none {
-            color: #444;
+            color: rgba(185, 174, 196, 0.45);
             font-style: italic;
             font-weight: 400;
-            font-size: 0.7rem;
+            font-size: 0.68rem;
         }
         .pause-mission-label {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 0.55rem;
-            color: #666;
-            letter-spacing: 3px;
+            font-family: var(--font-ui);
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--df-cream);
+            letter-spacing: 4px;
             text-transform: uppercase;
             margin-bottom: 6px;
-            font-weight: 600;
+            padding-left: 10px;
         }
         .pause-mission-text {
             font-family: 'Montserrat', sans-serif;
@@ -1120,6 +1142,27 @@
             color: #444;
             font-style: italic;
         }
+
+        /* Narrow portrait: one column, the menu first */
+        @media screen and (max-width: 700px) {
+            .pause-content { flex-direction: column; justify-content: flex-start; align-items: center; padding: 22px 5% 30px; gap: 26px; }
+            .pause-right { order: 1; width: 100%; max-width: 420px; }
+            .pause-left { order: 2; width: 100%; max-width: 420px; margin-top: 0; }
+            .pause-backdrop { background: linear-gradient(180deg, rgba(10, 2, 10, 0.92) 0%, rgba(14, 3, 12, 0.85) 60%, rgba(20, 4, 10, 0.7) 100%); }
+            .pause-np { margin: 0 auto; }
+        }
+
+        /* Cinematic view: the HUD fades away; the hint fades in, then out */
+        body.cinematic-view #game-ui, body.cinematic-view #scanlines, body.cinematic-view #ui-layer,
+        body.cinematic-view #message-modal, body.cinematic-view #mission-banner, body.cinematic-view #comms-bar,
+        body.cinematic-view #dialogue-caption { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.6s ease; }
+        #cinematic-hint {
+            position: fixed; left: 50%; bottom: 7%; transform: translateX(-50%); z-index: 3001; pointer-events: none;
+            font-family: var(--font-ui); font-size: 0.66rem; letter-spacing: 4px; text-transform: uppercase; color: var(--df-lavender-pale);
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); opacity: 0;
+        }
+        #cinematic-hint.show { animation: cineHint 3.2s ease forwards; }
+        @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
 
         /* --- SAVE SLOT OVERLAY --- */
         #save-slot-overlay {
@@ -1391,10 +1434,11 @@
         .pause-settings-panel::-webkit-scrollbar-track { background: transparent; }
         .pause-settings-panel::-webkit-scrollbar-thumb { background: rgba(212,168,75,0.3); border-radius: 2px; }
         .settings-section-label {
-            font-family: var(--font-tech);
+            font-family: var(--font-ui);
             font-size: 0.6rem;
-            letter-spacing: 3px;
-            color: rgba(164, 105, 255, 0.6);
+            font-weight: 600;
+            letter-spacing: 4px;
+            color: var(--df-champagne);
             text-transform: uppercase;
             text-align: right;
             margin-top: 10px;
@@ -1420,50 +1464,39 @@
             font-weight: 500;
             letter-spacing: 2px;
             text-transform: uppercase;
-            color: #999;
+            color: var(--df-lilac-grey);
         }
         .settings-value {
-            font-family: var(--font-tech);
-            font-size: 0.7rem;
-            letter-spacing: 1px;
-            color: #fff;
+            font-family: var(--font-ui);
+            font-size: 0.64rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            color: var(--df-lavender-pale);
             cursor: pointer;
             padding: 4px 14px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 3px;
+            border: 1px dotted rgba(202, 176, 250, 0.5);
+            border-radius: 12px;
             transition: all 0.2s ease;
             user-select: none;
             min-width: 60px;
             text-align: center;
         }
         .settings-value:hover {
-            border-color: var(--glow-color);
-            color: var(--glow-color);
-            text-shadow: 0 0 8px rgba(164, 105, 255, 0.4);
+            border-color: var(--df-lavender);
+            color: #fff;
+            box-shadow: 0 0 10px rgba(202, 176, 250, 0.35);
         }
         .settings-value:active {
             transform: scale(0.96);
         }
-        .settings-value.val-low {
-            color: #4CAF50;
-            border-color: rgba(76, 175, 80, 0.3);
+        /* Values in the menu scheme: the higher or "on", the brighter the pill */
+        .settings-value.val-low { color: var(--df-lavender); border-color: rgba(202, 176, 250, 0.35); }
+        .settings-value.val-medium { color: var(--df-champagne); border-color: rgba(216, 198, 162, 0.5); }
+        .settings-value.val-high, .settings-value.val-on {
+            color: #1b0d2e; border: 1px solid rgba(255, 255, 255, 0.7);
+            background: radial-gradient(ellipse 70% 120% at 50% 50%, #f2ecf4 0%, var(--df-lavender) 90%);
         }
-        .settings-value.val-medium {
-            color: #FFD700;
-            border-color: rgba(255, 215, 0, 0.3);
-        }
-        .settings-value.val-high {
-            color: #ff6b6b;
-            border-color: rgba(255, 107, 107, 0.3);
-        }
-        .settings-value.val-on {
-            color: #4CAF50;
-            border-color: rgba(76, 175, 80, 0.3);
-        }
-        .settings-value.val-off {
-            color: #666;
-            border-color: rgba(255, 255, 255, 0.08);
-        }
+        .settings-value.val-off { color: rgba(185, 174, 196, 0.5); border-color: rgba(185, 174, 196, 0.18); }
         .settings-back-btn {
             font-family: var(--font-ui);
             font-size: 0.8rem;
@@ -1961,7 +1994,7 @@
             pointer-events: auto; 
             touch-action: none; 
         }
-        #phone-container { width: 300px; height: 600px; border-radius: 16px; border: 2px solid rgba(140, 20, 30, 0.6); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(140, 20, 30, 0.15); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        #phone-container { transform: scale(var(--phone-scale, 1)); flex-shrink: 0; width: 300px; height: 600px; border-radius: 16px; border: 2px solid rgba(140, 20, 30, 0.6); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(140, 20, 30, 0.15); display: flex; flex-direction: column; overflow: hidden; position: relative; }
         #phone-screen { 
             flex: 1; padding: 0; display: flex; flex-direction: column; position: relative; overflow: hidden;
             background: 
@@ -2000,14 +2033,34 @@
         #phone-now-playing .np-label { font-family: 'Montserrat', sans-serif; font-size: 0.5rem; color: rgba(255,255,255,0.3); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
         #phone-now-playing .np-title { font-family: 'Montserrat', sans-serif; font-size: 0.7rem; color: rgba(255,255,255,0.6); font-weight: 500; }
 
-        #phone-close { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 36px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.15); border: none; color: transparent; font-size: 0; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: all 0.2s; z-index: 10; }
-        #phone-close::before { content: 'CLOSE'; position: absolute; top: -14px; font-family: 'Montserrat', sans-serif; font-size: 0.4rem; color: rgba(255,255,255,0.25); letter-spacing: 2px; white-space: nowrap; }
-        #phone-close:hover { background: rgba(255, 255, 255, 0.3); }
-        #phone-close:hover::before { color: rgba(255,255,255,0.5); }
+        /* Close: a lavender pill at the foot of the phone, on a generous transparent hit area */
+        #phone-close { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 40px; background: transparent; border: none; color: transparent; font-size: 0; cursor: pointer; z-index: 10; }
+        #phone-close::before { content: 'CLOSE  ✕'; position: absolute; left: 50%; bottom: 9px; transform: translateX(-50%); padding: 4px 16px; border-radius: 12px; white-space: nowrap;
+            font-family: 'Montserrat', sans-serif; font-size: 0.55rem; font-weight: 700; letter-spacing: 2.5px; color: #1b0d2e;
+            background: radial-gradient(ellipse 70% 120% at 50% 50%, #ece4f6 0%, var(--df-lavender) 80%); border: 1px dotted rgba(255,255,255,0.8); box-shadow: 0 0 14px rgba(202,176,250,0.45); transition: all 0.2s; }
+        #phone-close:hover::before { box-shadow: 0 0 20px rgba(202,176,250,0.75); background: #fff; }
+        /* ...and a ✕ in the screen corner, outside the phone, never scaled away */
+        #phone-close-x { position: absolute; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: var(--df-lavender-pale); cursor: pointer; z-index: 2;
+            background: rgba(20, 8, 30, 0.6); border: 1px dotted rgba(202,176,250,0.6); box-shadow: 0 0 12px rgba(142,85,245,0.3); }
+        #phone-close-x:hover { background: rgba(93, 20, 226, 0.5); }
         /* border-box so height:100% + padding doesn't overflow the frame — this is
            what forced the old hardcoded max-height on the content area. Extra bottom
            padding keeps content clear of the absolutely-positioned close bar. */
-        .phone-app-screen { display: none; flex-direction: column; height: 100%; padding: 20px 20px 30px; box-sizing: border-box; }
+        .phone-app-screen { display: none; flex-direction: column; height: 100%; padding: 20px 20px 42px; box-sizing: border-box; }
+
+        /* --- The phone on its side (body.phone-wide: the screen is wider than tall) --- */
+        body.phone-wide #phone-container { width: 600px; height: 300px; }
+        body.phone-wide #phone-home[style*="block"] { display: grid !important; grid-template-columns: 200px 1fr; grid-template-rows: 1fr auto; height: 100%; box-sizing: border-box; padding-bottom: 34px; }
+        body.phone-wide #phone-time { grid-column: 1; grid-row: 1; margin: 46px 0 4px; font-size: 3rem; }
+        body.phone-wide #phone-weather-widget { grid-column: 1; grid-row: 1; align-self: end; margin-bottom: 6px; }
+        body.phone-wide #phone-apps { grid-column: 2; grid-row: 1 / span 2; grid-template-columns: repeat(5, 1fr); align-content: center; margin: 0; padding: 14px 18px 0; }
+        body.phone-wide #phone-now-playing { grid-column: 1; grid-row: 2; margin: 0 0 0 12px; border-radius: 10px; }
+        body.phone-wide .phone-app-screen { padding: 8px 18px 40px; }
+        body.phone-wide .phone-app-header { padding: 4px 0; margin-bottom: 8px; }
+        body.phone-wide #screen-maps .phone-app-content { display: flex; flex-direction: column; }
+        body.phone-wide #phone-map-canvas { flex: 1; height: auto; min-height: 110px; }
+        body.phone-wide #screen-maps p { margin: 4px 0 0 !important; }
         .phone-app-header { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(140, 20, 30, 0.2); margin-bottom: 15px; }
         .phone-back-btn { width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.06); border: none; color: #999; font-size: 1rem; cursor: pointer; margin-right: 10px; }
         .phone-app-title { font-family: 'Montserrat', sans-serif; font-size: 0.9rem; color: rgba(140, 20, 30, 0.8); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
@@ -2751,7 +2804,6 @@
         body.landscape #boss-title .bt-main { font-size: clamp(1.4rem, 4.4vw, 2.3rem); }
 
         /* --- Panels on a short screen --- */
-        body.landscape #phone-container { transform: scale(var(--phone-scale, 1)); flex-shrink: 0; }
         /* Inventory and map sidebars: collapsed behind their diamond handles, as on a narrow phone */
         body.landscape .screen-sidebar-left { overflow-y: auto; padding: 16px 20px; }
         body.landscape .screen-sidebar-left.auto-collapse { transform: translateX(-100%); }
@@ -2773,16 +2825,21 @@
         body.landscape .menu-item-row { min-height: 34px; padding: 2px 0; }
         body.landscape .death-text { font-size: 3.6rem; letter-spacing: 12px; }
 
-        /* --- Pause: two columns — the title and objectives on the left, the menu (or settings) on the right --- */
-        body.landscape .pause-content {
-            display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr;
-            column-gap: 5vw; align-items: start; align-content: center; padding: 16px 6vw;
-        }
-        body.landscape .pause-header { grid-column: 1; grid-row: 1; justify-self: end; }
-        body.landscape .pause-mission { grid-column: 1; grid-row: 2; justify-self: end; }
-        body.landscape .pause-menu-list, body.landscape .pause-settings-panel { grid-column: 2; grid-row: 1 / span 2; align-self: center; max-height: calc(100vh - 32px); overflow-y: auto; }
-        body.landscape .pause-header { margin-bottom: 14px; }
-        body.landscape .pause-title { font-size: 2.6rem; }
+        /* --- Pause: the same two columns, tightened for a short screen --- */
+        body.landscape .pause-content { padding: 12px 5% 12px 3%; align-items: center; }
+        body.landscape .pause-left { margin-top: 0; gap: 14px; max-height: calc(100vh - 24px); overflow-y: auto; }
+        body.landscape .pause-right { max-height: calc(100vh - 24px); }
+        body.landscape .pause-menu-list, body.landscape .pause-settings-panel { max-height: calc(100vh - 110px); overflow-y: auto; }
+        body.landscape .pause-header { margin-bottom: 8px; }
+        body.landscape .pause-title { font-size: 2.4rem; padding-bottom: 8px; }
+        body.landscape .pause-menu-item { padding: 6px 20px; font-size: 0.66rem; }
+        body.landscape .pause-menu-item.active::before { height: 26px; }
+        body.landscape .pause-np { height: 52px; }
+        body.landscape .pause-np-disc { height: 52px; width: 80px; }
+        body.landscape .pause-np-play { height: 52px; }
+        body.landscape .pause-quick-title, body.landscape .pause-mission-label { margin-bottom: 4px; font-size: 0.68rem; }
+        body.landscape .pause-quick-item { padding: 4px 10px; }
+        body.landscape .pause-obj-block { padding: 4px 10px; }
     </style>
 </head>
 <body>
@@ -3209,6 +3266,7 @@
             </div>
             
             <div id="phone-overlay">
+                <div id="phone-close-x" title="Close the phone">✕</div>
                 <div id="phone-container">
                     <div id="phone-notch"></div>
                     <div id="phone-screen">
@@ -3648,29 +3706,50 @@
     <div id="pause-menu">
         <div class="pause-backdrop"></div>
         <div class="pause-content">
-            <div class="pause-header">
-                <h1 class="pause-title">Paused</h1>
-            </div>
-            <div class="pause-mission" id="pause-mission">
-                <div class="pause-mission-label">OBJECTIVES</div>
+            <!-- Left: what's playing, quick access, objectives (after ETERNAL's pause mock-up) -->
+            <div class="pause-left">
+                <div class="pause-np" id="pause-np">
+                    <div class="pause-np-disc" id="pause-np-disc" title="Change station"><span id="pause-np-station">LADY</span></div>
+                    <div class="pause-np-play" id="pause-np-play" title="Play / pause"><span id="pause-np-icon">▶</span></div>
+                    <div class="pause-np-info">
+                        <div class="pause-np-label">Now Playing</div>
+                        <div class="pause-np-track" id="pause-np-track">ETERNAL — Night Bridge</div>
+                        <div class="pause-np-sub">Music Player</div>
+                    </div>
+                    <div class="pause-np-node"></div>
+                </div>
+                <div class="pause-quick">
+                    <div class="pause-quick-title">QUICK ACCESS</div>
+                    <div class="pause-quick-item" data-action="equip" tabindex="0">EQUIP ITEMS</div>
+                    <div class="pause-quick-item" data-action="cinematic" tabindex="0">CINEMATIC VIEW</div>
+                    <div class="pause-quick-item" data-action="drop" tabindex="0">DROP ITEMS</div>
+                </div>
+                <div class="pause-mission" id="pause-mission">
+                    <div class="pause-mission-label">OBJECTIVES</div>
                 
-                <div class="pause-obj-block story" id="pause-obj-story">
-                    <div class="pause-obj-label">STORY</div>
-                    <div class="pause-obj-text" id="pause-obj-story-text"><span class="pause-obj-none">—</span></div>
-                </div>
+                    <div class="pause-obj-block story" id="pause-obj-story">
+                        <div class="pause-obj-label">STORY</div>
+                        <div class="pause-obj-text" id="pause-obj-story-text"><span class="pause-obj-none">—</span></div>
+                    </div>
 
-                <div class="pause-obj-block optional" id="pause-obj-optional">
-                    <div class="pause-obj-label">OPTIONAL</div>
-                    <div class="pause-obj-text" id="pause-obj-optional-text"><span class="pause-obj-none">—</span></div>
-                </div>
+                    <div class="pause-obj-block optional" id="pause-obj-optional">
+                        <div class="pause-obj-label">OPTIONAL</div>
+                        <div class="pause-obj-text" id="pause-obj-optional-text"><span class="pause-obj-none">—</span></div>
+                    </div>
 
-                <div class="pause-obj-block side" id="pause-obj-side">
-                    <div class="pause-obj-label">SIDE MISSION</div>
-                    <div class="pause-obj-text" id="pause-obj-side-text"><span class="pause-obj-none">—</span></div>
-                    <div id="pause-mission-cancel" style="display:none; margin-top: 6px;">
-                        <button id="btn-abandon-mission" style="background: transparent; border: 1px solid rgba(255,50,50,0.3); color: #ff5555; padding: 3px 10px; cursor: pointer; font-family: 'Montserrat', sans-serif; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; border-radius: 3px;">ABANDON</button>
+                    <div class="pause-obj-block side" id="pause-obj-side">
+                        <div class="pause-obj-label">SIDE MISSION</div>
+                        <div class="pause-obj-text" id="pause-obj-side-text"><span class="pause-obj-none">—</span></div>
+                        <div id="pause-mission-cancel" style="display:none; margin-top: 6px;">
+                            <button id="btn-abandon-mission" style="background: transparent; border: 1px solid rgba(255,50,50,0.3); color: #ff5555; padding: 3px 10px; cursor: pointer; font-family: 'Montserrat', sans-serif; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; border-radius: 3px;">ABANDON</button>
+                        </div>
                     </div>
                 </div>
+            </div>
+            <!-- Right: the menu (or the settings panel) -->
+            <div class="pause-right">
+            <div class="pause-header">
+                <h1 class="pause-title">Paused</h1>
             </div>
             <nav class="pause-menu-list" id="pause-nav-main">
                 <div class="pause-menu-item active" data-action="resume" tabindex="0">RESUME GAME</div>
@@ -3795,8 +3874,11 @@
                 
                 <div class="settings-back-btn" id="pause-settings-back">◁ BACK</div>
             </div>
+            </div>
         </div>
     </div>
+    <!-- Cinematic view (pause menu → Quick Access): the HUD hidden, the world held still -->
+    <div id="cinematic-hint">Tap or press Esc to return</div>
     
     <!-- SAVE SLOT OVERLAY -->
     <div id="save-slot-overlay"></div>
@@ -45576,7 +45658,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const land = cssW > cssH && cssH <= 540;
                 this.isLandscape = land;
                 document.body.classList.toggle('landscape', land);
-                document.documentElement.style.setProperty('--phone-scale', land ? Math.min(1, (cssH - 24) / 600).toFixed(3) : '1');
+                if (typeof phoneSystem !== 'undefined') phoneSystem.fit();   // the phone turns and scales to fit (ui/phone.js)
             },
 
             fireWeapon() {
@@ -58636,7 +58718,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             initMapControls() { 
                 const canvas = this.mapCanvas;
                 // In landscape the phone is drawn scaled down (--phone-scale): pan by what the finger covered on the phone
-                const k = () => document.body.classList.contains('landscape') ? 1 / (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--phone-scale')) || 1) : 1;
+                const k = () => 1 / this.scale;
                 canvas.addEventListener('wheel', (e) => { e.preventDefault(); const zoomSpeed = 0.1; const direction = e.deltaY > 0 ? -1 : 1; let newZoom = this.mapView.zoom + (direction * zoomSpeed * this.mapView.zoom); newZoom = Math.max(0.5, Math.min(newZoom, 8.0)); this.mapView.zoom = newZoom; this.drawMap(); });
                 canvas.addEventListener('mousedown', (e) => { this.mapView.isDragging = true; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; canvas.style.cursor = 'grabbing'; });
                 window.addEventListener('mousemove', (e) => { if (!this.mapView.isDragging || this.overlay.style.display === 'none') return; const dx = e.clientX - this.mapView.lastX; const dy = e.clientY - this.mapView.lastY; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; this.mapView.offsetX += dx * k(); this.mapView.offsetY += dy * k(); this.drawMap(); });
@@ -58683,8 +58765,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.call = null;
             },
 
+            // The phone matches the screen: on its side (600×300, body.phone-wide) whenever the screen is wider
+            // than tall, upright (300×600) otherwise, and scaled down to fit with a margin so its close pill is
+            // always on screen. Called from resize(), on visualViewport changes (browser bars) and on open.
+            scale: 1,
+            fit() {
+                const vv = window.visualViewport, w = vv ? vv.width : window.innerWidth, h = vv ? vv.height : window.innerHeight;
+                const wide = w > h, W = wide ? 600 : 300, H = wide ? 300 : 600;
+                this.scale = Math.max(0.3, Math.min(1, (h - 48) / H, (w - 32) / W));
+                document.body.classList.toggle('phone-wide', wide);
+                document.documentElement.style.setProperty('--phone-scale', this.scale.toFixed(3));
+                if (this.isOpen && this.currentApp === 'maps') this.drawMap();
+            },
+
             open() {
                 if (this.call && !this.call.answered) { this.answerCall(); return; }   // the phone's ringing: the button answers it
+                this.fit();
                 this.isOpen = true;
                 this.overlay.style.display = 'flex';
                 this.showHome();
@@ -60102,11 +60198,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         
+        // Always a way out: a tap on the dimmed backdrop (not the phone itself) or the corner ✕ closes it
+        phoneSystem.overlay.addEventListener('click', (e) => { if (e.target === phoneSystem.overlay) phoneSystem.close(); });
+        document.getElementById('phone-close-x')?.addEventListener('click', () => phoneSystem.close());
+        window.visualViewport?.addEventListener('resize', () => phoneSystem.fit());
+        phoneSystem.fit();
+
         // Close phone with Escape key
         // Close phone OR Map with Escape key
         document.addEventListener('keydown', (e) => {
             // 1. Handle ESCAPE - Pause Menu Priority
             if (e.key === 'Escape') {
+                // Cinematic view: Esc brings the pause menu back
+                if (document.body.classList.contains('cinematic-view')) { pauseMenu.exitCinematic(); return; }
                 // If pause menu is open, close it
                 if (pauseMenu && pauseMenu.isOpen) {
                     pauseMenu.close();
@@ -60154,6 +60258,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 } else if (e.key === 'ArrowDown') {
                     e.preventDefault();
                     pauseMenu.navigateDown();
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    pauseMenu.navigateLeft();
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    pauseMenu.navigateRight();
                 } else if (e.key === 'Enter') {
                     e.preventDefault();
                     pauseMenu.selectCurrent();
@@ -60892,7 +61002,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.navMain = document.getElementById('pause-nav-main');
                 this.settingsPanel = document.getElementById('pause-settings-panel');
                 this.menuItems = this.navMain.querySelectorAll('.pause-menu-item');
+                this.quickItems = this.menu.querySelectorAll('.pause-quick-item');
                 this.activeIndex = 0;
+                this.quickIndex = -1;       // the highlighted Quick Access item (-1: the main list has focus)
                 this.isOpen = false;
                 this.inSettings = false;
                 
@@ -60912,6 +61024,25 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     });
                 });
                 
+                // Quick Access (left column)
+                this.quickItems.forEach((item, index) => {
+                    item.addEventListener('click', () => { this.setQuickIndex(index); this.executeQuick(item.dataset.action); });
+                    item.addEventListener('mouseenter', () => this.setQuickIndex(index));
+                });
+
+                // Now Playing: the disc changes station, the chevron plays / pauses (the music widget does the work)
+                document.getElementById('pause-np-disc')?.addEventListener('click', () => { game.musicWidget?.cycleStation(); this._syncNowPlaying(); });
+                document.getElementById('pause-np-play')?.addEventListener('click', () => {
+                    game.musicWidget?.handlePlayClick();
+                    setTimeout(() => this._syncNowPlaying(), 120);   // togglePlay settles after the AudioContext resumes
+                });
+
+                // Cinematic view: any tap brings the menu back
+                window.addEventListener('pointerdown', (e) => {
+                    if (!document.body.classList.contains('cinematic-view')) return;
+                    e.preventDefault(); e.stopPropagation(); this.exitCinematic();
+                }, true);
+
                 // Click backdrop to close
                 this.menu.querySelector('.pause-backdrop').addEventListener('click', () => {
                     if (this.inSettings) {
@@ -60941,6 +61072,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.isOpen = true;
                 game.pauseSystem.acquire('pause_menu');
                 this.setActiveIndex(0);
+                this._syncNowPlaying();
                 
                 // Update mission objective display — all three types
                 const storyText = document.getElementById('pause-obj-story-text');
@@ -61018,24 +61150,76 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             setActiveIndex(index) {
+                this.quickItems.forEach(item => item.classList.remove('active'));
+                this.quickIndex = -1;
                 this.menuItems.forEach(item => item.classList.remove('active'));
                 this.activeIndex = index;
                 this.menuItems[index].classList.add('active');
                 this.menuItems[index].focus();
             }
+
+            // One highlight at a time: lighting a Quick Access item dims the main list's
+            setQuickIndex(index) {
+                this.menuItems.forEach(item => item.classList.remove('active'));
+                this.quickItems.forEach(item => item.classList.remove('active'));
+                this.quickIndex = index;
+                this.quickItems[index].classList.add('active');
+                this.quickItems[index].focus();
+            }
             
             navigateUp() {
+                if (this.quickIndex >= 0) { this.setQuickIndex(this.quickIndex > 0 ? this.quickIndex - 1 : this.quickItems.length - 1); return; }
                 const newIndex = this.activeIndex > 0 ? this.activeIndex - 1 : this.menuItems.length - 1;
                 this.setActiveIndex(newIndex);
             }
             
             navigateDown() {
+                if (this.quickIndex >= 0) { this.setQuickIndex((this.quickIndex + 1) % this.quickItems.length); return; }
                 const newIndex = this.activeIndex < this.menuItems.length - 1 ? this.activeIndex + 1 : 0;
                 this.setActiveIndex(newIndex);
             }
+
+            // ← Quick Access (left column) · → the main list
+            navigateLeft() { if (this.quickIndex < 0 && !this.inSettings) this.setQuickIndex(0); }
+            navigateRight() { if (this.quickIndex >= 0) this.setActiveIndex(this.activeIndex); }
             
             selectCurrent() {
+                if (this.quickIndex >= 0) { this.executeQuick(this.quickItems[this.quickIndex].dataset.action); return; }
                 this.executeAction(this.menuItems[this.activeIndex].dataset.action);
+            }
+
+            executeQuick(action) {
+                if (action === 'equip') { this.close(); Screens.open('equipped'); }
+                else if (action === 'drop') { this.close(); Screens.open('inventory'); }
+                else if (action === 'cinematic') this.enterCinematic();
+            }
+
+            // The world held still with every bit of HUD faded away; a tap or Esc brings the menu back
+            enterCinematic() {
+                this.close();
+                game.pauseSystem.acquire('cinematic_view');
+                document.body.classList.add('cinematic-view');
+                const hint = document.getElementById('cinematic-hint');
+                if (hint) { hint.classList.remove('show'); void hint.offsetWidth; hint.classList.add('show'); }
+            }
+
+            exitCinematic() {
+                if (!document.body.classList.contains('cinematic-view')) return;
+                document.body.classList.remove('cinematic-view');
+                document.getElementById('cinematic-hint')?.classList.remove('show');
+                game.pauseSystem.release('cinematic_view');
+                this.open();
+            }
+
+            // The capsule mirrors the music widget: station on the disc, track (or station) and play state
+            _syncNowPlaying() {
+                const mw = game.musicWidget; if (!mw) return;
+                const station = mw.stations?.[mw.currentStationIdx]?.name || '';
+                const track = (mw.trackText?.textContent || '').trim();
+                const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+                set('pause-np-station', station.split(' ')[0].toUpperCase());   // one word fits the disc
+                set('pause-np-track', track && !/^(no track|upload|tap|insert tape)/i.test(track) ? track : (/radio/i.test(station) ? station : station + ' Radio'));
+                set('pause-np-icon', mw.isPlaying ? '❚❚' : '▶');
             }
             
             executeAction(action) {

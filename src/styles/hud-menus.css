@@ -693,7 +693,9 @@
             right: auto !important;
         }
         
-        /* --- PAUSE MENU (Phase 3) --- */
+        /* --- PAUSE MENU, after ETERNAL's mock-up ---
+           The game blurred behind a plum veil that deepens to the right. Left: Now Playing, Quick Access,
+           objectives. Right: a script "Paused" and letter-spaced caps, the active one a lit pill. */
         #pause-menu {
             position: fixed;
             top: 0;
@@ -715,9 +717,11 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            background:
+                linear-gradient(90deg, rgba(20, 4, 10, 0.25) 0%, rgba(14, 3, 12, 0.55) 45%, rgba(10, 2, 10, 0.93) 70%, rgba(8, 1, 8, 0.96) 100%),
+                radial-gradient(ellipse 60% 70% at 20% 40%, rgba(120, 30, 10, 0.18), transparent 70%);
+            backdrop-filter: blur(9px);
+            -webkit-backdrop-filter: blur(9px);
         }
         
         .pause-content {
@@ -725,14 +729,10 @@
             width: 100%;
             height: 100%;
             display: flex;
-            flex-direction: column;
-            /* `safe center` keeps the menu centred when it fits but falls back to
-               top-aligned when it doesn't — plain `center` would push the title
-               and the first menu items above the scroll origin, out of reach. */
-            justify-content: center;
-            justify-content: safe center;
-            align-items: flex-end;
-            padding: 24px 10% 24px 0;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 7% 24px 3%;
             box-sizing: border-box;
             overflow-y: auto;
             overscroll-behavior: contain;   /* don't hand the scroll to the page */
@@ -740,109 +740,134 @@
             touch-action: pan-y;            /* body sets touch-action:none */
             scrollbar-width: thin;
             scrollbar-color: rgba(200, 180, 220, 0.35) transparent;
+            gap: 4vw;
         }
         .pause-content::-webkit-scrollbar { width: 6px; }
         .pause-content::-webkit-scrollbar-track { background: transparent; }
         .pause-content::-webkit-scrollbar-thumb { background: rgba(200, 180, 220, 0.35); border-radius: 3px; }
+
+        .pause-left { display: flex; flex-direction: column; gap: 26px; width: min(380px, 40vw); flex-shrink: 0; margin-top: 8vh; }
+        .pause-right { display: flex; flex-direction: column; align-items: center; min-width: 0; width: min(520px, 46vw); }
         
         .pause-header {
-            text-align: right;
-            margin-bottom: 40px;
+            text-align: center;
+            margin-bottom: 26px;
+            width: 100%;
         }
         
         .pause-title {
             font-family: var(--font-script);
-            font-size: 3.5rem;
-            color: #fff;
-            text-shadow: 0 0 20px rgba(164, 105, 255, 0.5);
+            font-size: 3.4rem;
+            font-weight: 400;
+            color: var(--df-lavender-pale);
+            text-shadow: 0 0 18px rgba(202, 176, 250, 0.55), 0 0 2px rgba(255, 255, 255, 0.6);
             margin: 0;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 14px;
+            border-bottom: 1px solid;
+            border-image: linear-gradient(90deg, transparent, rgba(216, 198, 162, 0.55), rgba(255, 255, 255, 0.6), rgba(216, 198, 162, 0.55), transparent) 1;
         }
         
         .pause-menu-list {
             display: flex;
             flex-direction: column;
-            align-items: flex-end;
-            gap: 8px;
+            align-items: stretch;
+            gap: 2px;
+            width: 100%;
         }
         
         .pause-menu-item {
             font-family: var(--font-ui);
-            font-size: 0.85rem;
-            font-weight: 500;
-            letter-spacing: 3px;
+            font-size: 0.74rem;
+            font-weight: 400;
+            letter-spacing: 4px;
             text-transform: uppercase;
-            color: #888;
-            padding: 12px 30px;
+            color: var(--df-lilac-grey);
+            padding: 10px 24px;
             cursor: pointer;
-            transition: all 0.25s ease;
-            text-align: right;
+            transition: color 0.25s ease;
+            text-align: center;
             position: relative;
-            min-width: 280px;
+            z-index: 0;
+            outline: none;
         }
         
         .pause-menu-item:hover {
-            color: #ccc;
-        }
-        
-        .pause-menu-item.active,
-        .pause-menu-item:focus {
             color: #fff;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
         
-        /* Active/selected item highlight bar */
-        .pause-menu-item.active::before,
-        .pause-menu-item:focus::before {
+        /* Active: a pill lit white in the middle, fading to lavender and out */
+        .pause-menu-item.active {
+            color: #120818;
+            font-weight: 700;
+        }
+        
+        .pause-menu-item.active::before {
             content: '';
             position: absolute;
-            left: 0;
-            right: 0;
+            left: -2%;
+            right: -2%;
             top: 50%;
             transform: translateY(-50%);
-            height: 40px;
-            background: linear-gradient(270deg, 
-                rgba(200, 180, 220, 0.25) 0%, 
-                rgba(200, 180, 220, 0.15) 40%, 
-                rgba(200, 180, 220, 0.05) 70%,
+            height: 32px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(176, 150, 210, 0.7) 12%, 
+                #f2ecf4 40%, 
+                #f2ecf4 60%, 
+                rgba(176, 150, 210, 0.7) 88%, 
                 transparent 100%);
-            border-radius: 4px;
+            border-radius: 16px;
+            box-shadow: 0 0 22px rgba(202, 176, 250, 0.35);
             z-index: -1;
         }
-        
-        /* Mobile adjustments */
-        @media screen and (max-width: 600px) {
-            .pause-content {
-                padding: 20px 5% 24px;
-                align-items: center;
-            }
-            
-            .pause-header {
-                text-align: center;
-            }
-            
-            .pause-menu-list {
-                align-items: center;
-            }
-            
-            .pause-menu-item {
-                text-align: center;
-                min-width: 250px;
-            }
-            
-            .pause-menu-item.active::before {
-                background: linear-gradient(90deg, 
-                    transparent 0%,
-                    rgba(200, 180, 220, 0.2) 30%, 
-                    rgba(200, 180, 220, 0.2) 70%,
-                    transparent 100%);
-            }
+
+        /* Now Playing: a dark disc with the station, a gold chevron, the track */
+        .pause-np {
+            display: flex; align-items: center; position: relative;
+            height: 64px; border-radius: 32px; padding-right: 26px;
+            background: linear-gradient(90deg, #1a0306 0%, #22071c 40%, #1c0a30 100%);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+            max-width: 340px;
+        }
+        .pause-np-disc {
+            width: 96px; height: 64px; border-radius: 32px 0 0 32px; flex-shrink: 0; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(ellipse at 40% 50%, #3a0710 0%, #1a0306 75%);
+            font-family: var(--font-ui); font-size: 0.62rem; letter-spacing: 3px; color: #f6e7dc;
+            white-space: nowrap; overflow: hidden; padding: 0 6px; box-sizing: border-box;
+            text-shadow: 0 0 8px rgba(255, 180, 160, 0.6);
+        }
+        .pause-np-play {
+            width: 26px; height: 64px; flex-shrink: 0; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(180deg, #a3803c, #5e4519);
+            color: #fff3d8; font-size: 0.7rem;
+            clip-path: polygon(0 0, 55% 0, 100% 50%, 55% 100%, 0 100%);
+        }
+        .pause-np-info { flex: 1; min-width: 0; padding-left: 14px; text-align: center; }
+        .pause-np-label { font-family: var(--font-script); font-size: 1rem; color: var(--df-gold); text-shadow: 0 0 6px rgba(255, 194, 72, 0.4); text-align: left; }
+        .pause-np-track { font-family: var(--font-ui); font-size: 0.72rem; color: #ece6f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-bottom: 3px; border-bottom: 1px solid rgba(216, 198, 162, 0.25); }
+        .pause-np-sub { font-family: var(--font-ui); font-size: 0.55rem; color: rgba(236, 230, 242, 0.6); margin-top: 3px; }
+        .pause-np-node { position: absolute; right: 12px; top: 50%; width: 7px; height: 7px; transform: translateY(-50%) rotate(45deg); background: #fffdfa; box-shadow: 0 0 8px rgba(255, 194, 72, 0.9); }
+
+        /* Quick Access: cream caps, the active item a lavender bar fading to the right */
+        .pause-quick { display: flex; flex-direction: column; gap: 2px; }
+        .pause-quick-title { font-family: var(--font-ui); font-size: 0.78rem; font-weight: 600; letter-spacing: 4px; color: var(--df-cream); margin-bottom: 10px; padding-left: 10px; }
+        .pause-quick-item {
+            font-family: var(--font-ui); font-size: 0.68rem; font-weight: 500; letter-spacing: 3px; color: #ece6f2;
+            padding: 6px 10px; cursor: pointer; position: relative; z-index: 0; outline: none; transition: color 0.2s;
+        }
+        .pause-quick-item:hover { color: #fff; }
+        .pause-quick-item.active { color: #1b0d2e; font-weight: 700; }
+        .pause-quick-item.active::before {
+            content: ''; position: absolute; inset: 0 0 0 0; z-index: -1;
+            background: linear-gradient(90deg, #e2d2fb 0%, #d9c6fb 70%, rgba(217, 198, 251, 0) 100%);
+            box-shadow: 0 0 16px rgba(202, 176, 250, 0.35);
         }
         
-        /* --- PAUSE MISSION OBJECTIVE --- */
+        /* --- PAUSE MISSION OBJECTIVE (left column, under Quick Access) --- */
         .pause-mission {
-            margin: 5px 30px 10px;
+            margin: 0;
             padding: 0;
             border: none;
             border-radius: 0;
@@ -850,47 +875,44 @@
             display: flex; flex-direction: column; gap: 6px;
         }
         .pause-obj-block {
-            padding: 8px 14px;
-            border-radius: 5px;
-            border-left: 3px solid rgba(255,255,255,0.1);
-            background: rgba(255,255,255,0.02);
+            padding: 7px 12px;
+            border-left: 2px solid rgba(255,255,255,0.1);
+            background: linear-gradient(90deg, rgba(20, 6, 26, 0.55), transparent);
         }
-        .pause-obj-block.story { border-left-color: rgba(140, 80, 200, 0.6); }
-        .pause-obj-block.optional { border-left-color: rgba(0, 200, 180, 0.5); }
-        .pause-obj-block.side { border-left-color: rgba(255, 170, 0, 0.5); }
+        .pause-obj-block.story { border-left-color: var(--df-lavender); }
+        .pause-obj-block.optional { border-left-color: rgba(120, 220, 205, 0.6); }
+        .pause-obj-block.side { border-left-color: var(--df-gold); }
         .pause-obj-label {
-            font-family: 'Montserrat', sans-serif;
+            font-family: var(--font-ui);
             font-size: 0.5rem;
-            color: #888;
-            letter-spacing: 2px;
+            color: var(--df-champagne);
+            letter-spacing: 2.5px;
             text-transform: uppercase;
             margin-bottom: 3px;
             font-weight: 600;
         }
-        .pause-obj-block.story .pause-obj-label { color: rgba(180, 140, 220, 0.8); }
-        .pause-obj-block.optional .pause-obj-label { color: rgba(100, 220, 200, 0.7); }
-        .pause-obj-block.side .pause-obj-label { color: rgba(255, 190, 80, 0.8); }
         .pause-obj-text {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 0.75rem;
-            color: #ccc;
-            line-height: 1.3;
-            font-weight: 500;
+            font-family: var(--font-ui);
+            font-size: 0.72rem;
+            color: #e6dff0;
+            line-height: 1.35;
+            font-weight: 400;
         }
         .pause-obj-none {
-            color: #444;
+            color: rgba(185, 174, 196, 0.45);
             font-style: italic;
             font-weight: 400;
-            font-size: 0.7rem;
+            font-size: 0.68rem;
         }
         .pause-mission-label {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 0.55rem;
-            color: #666;
-            letter-spacing: 3px;
+            font-family: var(--font-ui);
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--df-cream);
+            letter-spacing: 4px;
             text-transform: uppercase;
             margin-bottom: 6px;
-            font-weight: 600;
+            padding-left: 10px;
         }
         .pause-mission-text {
             font-family: 'Montserrat', sans-serif;
@@ -902,6 +924,27 @@
             color: #444;
             font-style: italic;
         }
+
+        /* Narrow portrait: one column, the menu first */
+        @media screen and (max-width: 700px) {
+            .pause-content { flex-direction: column; justify-content: flex-start; align-items: center; padding: 22px 5% 30px; gap: 26px; }
+            .pause-right { order: 1; width: 100%; max-width: 420px; }
+            .pause-left { order: 2; width: 100%; max-width: 420px; margin-top: 0; }
+            .pause-backdrop { background: linear-gradient(180deg, rgba(10, 2, 10, 0.92) 0%, rgba(14, 3, 12, 0.85) 60%, rgba(20, 4, 10, 0.7) 100%); }
+            .pause-np { margin: 0 auto; }
+        }
+
+        /* Cinematic view: the HUD fades away; the hint fades in, then out */
+        body.cinematic-view #game-ui, body.cinematic-view #scanlines, body.cinematic-view #ui-layer,
+        body.cinematic-view #message-modal, body.cinematic-view #mission-banner, body.cinematic-view #comms-bar,
+        body.cinematic-view #dialogue-caption { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.6s ease; }
+        #cinematic-hint {
+            position: fixed; left: 50%; bottom: 7%; transform: translateX(-50%); z-index: 3001; pointer-events: none;
+            font-family: var(--font-ui); font-size: 0.66rem; letter-spacing: 4px; text-transform: uppercase; color: var(--df-lavender-pale);
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); opacity: 0;
+        }
+        #cinematic-hint.show { animation: cineHint 3.2s ease forwards; }
+        @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
 
         /* --- SAVE SLOT OVERLAY --- */
         #save-slot-overlay {

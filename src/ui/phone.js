@@ -27,7 +27,7 @@
             initMapControls() { 
                 const canvas = this.mapCanvas;
                 // In landscape the phone is drawn scaled down (--phone-scale): pan by what the finger covered on the phone
-                const k = () => document.body.classList.contains('landscape') ? 1 / (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--phone-scale')) || 1) : 1;
+                const k = () => 1 / this.scale;
                 canvas.addEventListener('wheel', (e) => { e.preventDefault(); const zoomSpeed = 0.1; const direction = e.deltaY > 0 ? -1 : 1; let newZoom = this.mapView.zoom + (direction * zoomSpeed * this.mapView.zoom); newZoom = Math.max(0.5, Math.min(newZoom, 8.0)); this.mapView.zoom = newZoom; this.drawMap(); });
                 canvas.addEventListener('mousedown', (e) => { this.mapView.isDragging = true; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; canvas.style.cursor = 'grabbing'; });
                 window.addEventListener('mousemove', (e) => { if (!this.mapView.isDragging || this.overlay.style.display === 'none') return; const dx = e.clientX - this.mapView.lastX; const dy = e.clientY - this.mapView.lastY; this.mapView.lastX = e.clientX; this.mapView.lastY = e.clientY; this.mapView.offsetX += dx * k(); this.mapView.offsetY += dy * k(); this.drawMap(); });
@@ -74,8 +74,22 @@
                 this.call = null;
             },
 
+            // The phone matches the screen: on its side (600×300, body.phone-wide) whenever the screen is wider
+            // than tall, upright (300×600) otherwise, and scaled down to fit with a margin so its close pill is
+            // always on screen. Called from resize(), on visualViewport changes (browser bars) and on open.
+            scale: 1,
+            fit() {
+                const vv = window.visualViewport, w = vv ? vv.width : window.innerWidth, h = vv ? vv.height : window.innerHeight;
+                const wide = w > h, W = wide ? 600 : 300, H = wide ? 300 : 600;
+                this.scale = Math.max(0.3, Math.min(1, (h - 48) / H, (w - 32) / W));
+                document.body.classList.toggle('phone-wide', wide);
+                document.documentElement.style.setProperty('--phone-scale', this.scale.toFixed(3));
+                if (this.isOpen && this.currentApp === 'maps') this.drawMap();
+            },
+
             open() {
                 if (this.call && !this.call.answered) { this.answerCall(); return; }   // the phone's ringing: the button answers it
+                this.fit();
                 this.isOpen = true;
                 this.overlay.style.display = 'flex';
                 this.showHome();
@@ -1493,11 +1507,19 @@
         }
 
         
+        // Always a way out: a tap on the dimmed backdrop (not the phone itself) or the corner ✕ closes it
+        phoneSystem.overlay.addEventListener('click', (e) => { if (e.target === phoneSystem.overlay) phoneSystem.close(); });
+        document.getElementById('phone-close-x')?.addEventListener('click', () => phoneSystem.close());
+        window.visualViewport?.addEventListener('resize', () => phoneSystem.fit());
+        phoneSystem.fit();
+
         // Close phone with Escape key
         // Close phone OR Map with Escape key
         document.addEventListener('keydown', (e) => {
             // 1. Handle ESCAPE - Pause Menu Priority
             if (e.key === 'Escape') {
+                // Cinematic view: Esc brings the pause menu back
+                if (document.body.classList.contains('cinematic-view')) { pauseMenu.exitCinematic(); return; }
                 // If pause menu is open, close it
                 if (pauseMenu && pauseMenu.isOpen) {
                     pauseMenu.close();
@@ -1545,6 +1567,12 @@
                 } else if (e.key === 'ArrowDown') {
                     e.preventDefault();
                     pauseMenu.navigateDown();
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    pauseMenu.navigateLeft();
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    pauseMenu.navigateRight();
                 } else if (e.key === 'Enter') {
                     e.preventDefault();
                     pauseMenu.selectCurrent();

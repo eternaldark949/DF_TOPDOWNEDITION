@@ -436,6 +436,7 @@
             </div>
             
             <div id="phone-overlay">
+                <div id="phone-close-x" title="Close the phone">✕</div>
                 <div id="phone-container">
                     <div id="phone-notch"></div>
                     <div id="phone-screen">
@@ -875,29 +876,50 @@
     <div id="pause-menu">
         <div class="pause-backdrop"></div>
         <div class="pause-content">
-            <div class="pause-header">
-                <h1 class="pause-title">Paused</h1>
-            </div>
-            <div class="pause-mission" id="pause-mission">
-                <div class="pause-mission-label">OBJECTIVES</div>
+            <!-- Left: what's playing, quick access, objectives (after ETERNAL's pause mock-up) -->
+            <div class="pause-left">
+                <div class="pause-np" id="pause-np">
+                    <div class="pause-np-disc" id="pause-np-disc" title="Change station"><span id="pause-np-station">LADY</span></div>
+                    <div class="pause-np-play" id="pause-np-play" title="Play / pause"><span id="pause-np-icon">▶</span></div>
+                    <div class="pause-np-info">
+                        <div class="pause-np-label">Now Playing</div>
+                        <div class="pause-np-track" id="pause-np-track">ETERNAL — Night Bridge</div>
+                        <div class="pause-np-sub">Music Player</div>
+                    </div>
+                    <div class="pause-np-node"></div>
+                </div>
+                <div class="pause-quick">
+                    <div class="pause-quick-title">QUICK ACCESS</div>
+                    <div class="pause-quick-item" data-action="equip" tabindex="0">EQUIP ITEMS</div>
+                    <div class="pause-quick-item" data-action="cinematic" tabindex="0">CINEMATIC VIEW</div>
+                    <div class="pause-quick-item" data-action="drop" tabindex="0">DROP ITEMS</div>
+                </div>
+                <div class="pause-mission" id="pause-mission">
+                    <div class="pause-mission-label">OBJECTIVES</div>
                 
-                <div class="pause-obj-block story" id="pause-obj-story">
-                    <div class="pause-obj-label">STORY</div>
-                    <div class="pause-obj-text" id="pause-obj-story-text"><span class="pause-obj-none">—</span></div>
-                </div>
+                    <div class="pause-obj-block story" id="pause-obj-story">
+                        <div class="pause-obj-label">STORY</div>
+                        <div class="pause-obj-text" id="pause-obj-story-text"><span class="pause-obj-none">—</span></div>
+                    </div>
 
-                <div class="pause-obj-block optional" id="pause-obj-optional">
-                    <div class="pause-obj-label">OPTIONAL</div>
-                    <div class="pause-obj-text" id="pause-obj-optional-text"><span class="pause-obj-none">—</span></div>
-                </div>
+                    <div class="pause-obj-block optional" id="pause-obj-optional">
+                        <div class="pause-obj-label">OPTIONAL</div>
+                        <div class="pause-obj-text" id="pause-obj-optional-text"><span class="pause-obj-none">—</span></div>
+                    </div>
 
-                <div class="pause-obj-block side" id="pause-obj-side">
-                    <div class="pause-obj-label">SIDE MISSION</div>
-                    <div class="pause-obj-text" id="pause-obj-side-text"><span class="pause-obj-none">—</span></div>
-                    <div id="pause-mission-cancel" style="display:none; margin-top: 6px;">
-                        <button id="btn-abandon-mission" style="background: transparent; border: 1px solid rgba(255,50,50,0.3); color: #ff5555; padding: 3px 10px; cursor: pointer; font-family: 'Montserrat', sans-serif; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; border-radius: 3px;">ABANDON</button>
+                    <div class="pause-obj-block side" id="pause-obj-side">
+                        <div class="pause-obj-label">SIDE MISSION</div>
+                        <div class="pause-obj-text" id="pause-obj-side-text"><span class="pause-obj-none">—</span></div>
+                        <div id="pause-mission-cancel" style="display:none; margin-top: 6px;">
+                            <button id="btn-abandon-mission" style="background: transparent; border: 1px solid rgba(255,50,50,0.3); color: #ff5555; padding: 3px 10px; cursor: pointer; font-family: 'Montserrat', sans-serif; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; border-radius: 3px;">ABANDON</button>
+                        </div>
                     </div>
                 </div>
+            </div>
+            <!-- Right: the menu (or the settings panel) -->
+            <div class="pause-right">
+            <div class="pause-header">
+                <h1 class="pause-title">Paused</h1>
             </div>
             <nav class="pause-menu-list" id="pause-nav-main">
                 <div class="pause-menu-item active" data-action="resume" tabindex="0">RESUME GAME</div>
@@ -1022,8 +1044,11 @@
                 
                 <div class="settings-back-btn" id="pause-settings-back">◁ BACK</div>
             </div>
+            </div>
         </div>
     </div>
+    <!-- Cinematic view (pause menu → Quick Access): the HUD hidden, the world held still -->
+    <div id="cinematic-hint">Tap or press Esc to return</div>
     
     <!-- SAVE SLOT OVERLAY -->
     <div id="save-slot-overlay"></div>
