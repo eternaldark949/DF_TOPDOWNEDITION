@@ -608,21 +608,10 @@
                         }
                         break;
                     case 'inventory':
-                        this.close();
-                        game.inventory.toggleMenu();
-                        break;
                     case 'map':
-                        this.close();
-                        game.ui.toggleMap(true);
-                        break;
                     case 'team':
                         this.close();
-                        game.inventory.toggleMenu();
-                        // Navigate to team screen (scoped to freelancer-menu, deferred one frame for DOM)
-                        requestAnimationFrame(() => {
-                            const teamNav = document.querySelector('#freelancer-menu .sidebar-nav-item[data-screen="team"]');
-                            if (teamNav) teamNav.click();
-                        });
+                        Screens.open(action);
                         break;
                     case 'settings':
                         this.openSettings();

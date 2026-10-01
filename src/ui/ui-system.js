@@ -846,7 +846,13 @@
                 ctx.save(); ctx.fillStyle = this._scanPat; ctx.fillRect(0, 0, w, h); ctx.restore();
             }
         
+            // Every screen opens through Screens (ui/screens.js), so the map and the menu never stack
             toggleMap(show) {
+                if (show) Screens.open('map');
+                else if (Screens.mapOpen()) Screens.close();
+            }
+
+            _showMap(show) {
                 const mapUI = document.getElementById('map-interface');
                 mapUI.style.display = show ? 'block' : 'none';
                 if (show) this.game.pauseSystem.acquire('map_ui');
@@ -868,10 +874,6 @@
                     this.startIconAnimation(); // Start animating icons
                     this.game.renderSidebarPortrait();
                     
-                    // Update nav highlight
-                    if (typeof mapSidebar !== 'undefined') {
-                        mapSidebar.setActiveNav('map');
-                    }
                 } else {
                     this.stopIconAnimation(); // Stop animation when map closes
                 }

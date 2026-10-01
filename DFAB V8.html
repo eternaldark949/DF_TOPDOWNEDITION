@@ -30,6 +30,21 @@
             --red-deep: #550000;          /* Deep red (danger) */
             --glass-dark: rgba(10, 5, 10, 0.85);  /* Dark glass effect */
             --message-modal-color: #ffeed8;
+            /* Menu scheme, sampled from ETERNAL's inventory mock-up */
+            --df-ink: #050103;                /* the backdrop's black */
+            --df-wine: rgba(70, 6, 26, 0.55); /* the plum/wine haze in it */
+            --df-violet: #5d14e2;             /* selected card, electric violet */
+            --df-violet-deep: #23055d;        /* its shadowed side, QTY chips */
+            --df-violet-mid: #8e55f5;         /* context-menu blocks, rings */
+            --df-lavender: #cab0fa;           /* dotted borders, highlights */
+            --df-lavender-pale: #f1e8fe;      /* lit card / pill centres */
+            --df-violet-ink: #3a1d78;         /* text on the pale pills */
+            --df-lilac-grey: #b9aec4;         /* idle nav text */
+            --df-champagne: #d8c6a2;          /* filter items, active filter bar */
+            --df-cream: #f3e4c6;              /* filter title */
+            --df-gold: #ffc248;               /* toggle, diamond glints */
+            --df-peach: #e3ad8f;              /* portrait frame dots */
+            --df-crimson: #d0101c;            /* locked / unavailable border */
             color-scheme: light only;     /* Prevent dark mode interference */
         }
         
@@ -303,7 +318,11 @@
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            background: rgba(5, 5, 10, 0.98);
+            /* black with a wine/plum haze, after ETERNAL's mock-up */
+            background:
+                radial-gradient(ellipse 55% 45% at 50% 0%, var(--df-wine), transparent 70%),
+                radial-gradient(ellipse 50% 60% at 45% 100%, rgba(40, 4, 30, 0.6), transparent 70%),
+                rgba(5, 1, 3, 0.97);
             z-index: 2000;
             display: flex;
             box-sizing: border-box;
@@ -326,11 +345,11 @@
         .screen-title {
             font-family: 'Great Vibes'; 
             font-size: 2.5rem; 
-            color: #fff; 
+            color: var(--df-lavender-pale); 
             margin-top: 10px;
             margin-bottom: 20px;
             flex-shrink: 0;
-            text-shadow: 0 0 15px rgba(164, 105, 255, 0.5);
+            text-shadow: 0 0 14px rgba(202, 176, 250, 0.55), 0 0 2px rgba(255, 255, 255, 0.6);
             text-align: center;
         }
         
@@ -341,80 +360,77 @@
             padding-bottom: 20px;
         }
         
-        /* Updated Pill — Type-Based Color Variants */
+        /* Item pills, after ETERNAL's mock-up: dotted capsules; electric violet when open,
+           pale lavender when equipped, a crimson dotted ring for consumables, champagne for keepsakes */
         .ui-pill {
             width: 100%; 
-            min-height: 70px;
-            border: 2px dashed rgba(164, 105, 255, 0.25);
-            border-radius: 40px;
+            min-height: 76px;
+            border: 2px dotted rgba(202, 176, 250, 0.45);
+            border-radius: 44px;
             display: flex; 
             align-items: center; 
-            padding: 10px 20px;
+            padding: 10px 22px;
             padding-right: 60px;
-            margin-bottom: 12px; 
+            margin-bottom: 14px; 
             box-sizing: border-box;
             position: relative;
             cursor: pointer;
-            transition: all 0.35s ease;
-            background: linear-gradient(135deg, rgba(35, 12, 55, 0.7) 0%, rgba(15, 5, 30, 0.5) 100%);
+            transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+            background: linear-gradient(90deg, rgba(4, 1, 6, 0.92) 0%, rgba(24, 6, 50, 0.85) 55%, rgba(48, 14, 120, 0.7) 100%);
         }
+        .ui-pill:hover { border-color: rgba(202, 176, 250, 0.8); box-shadow: 0 0 18px rgba(142, 85, 245, 0.25); }
         
-        /* --- ICON CIRCLE --- */
+        /* --- ICON TILE --- */
         .pill-icon {
-            width: 50px; height: 50px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            width: 54px; height: 54px;
+            border-radius: 14px;
+            background: radial-gradient(circle at 50% 40%, rgba(60, 20, 30, 0.9), #050103 75%);
+            border: 1px solid rgba(202, 176, 250, 0.15);
             display: flex; justify-content: center; align-items: center;
             font-size: 1.4rem;
-            margin-right: 15px;
+            margin-right: 18px;
             flex-shrink: 0;
-            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 14px rgba(0, 0, 0, 0.7);
         }
         
-        /* --- WEAPON VARIANT (Purple) --- */
-        .ui-pill.type-weapon { border-color: rgba(164, 105, 255, 0.25); background: linear-gradient(135deg, rgba(35, 12, 55, 0.7) 0%, rgba(15, 5, 30, 0.5) 100%); }
-        .ui-pill.type-weapon.expanded { border-color: rgba(164, 105, 255, 0.6); background: linear-gradient(135deg, rgba(80, 30, 140, 0.85) 0%, rgba(45, 12, 90, 0.6) 100%); box-shadow: 0 0 30px rgba(164, 105, 255, 0.35), inset 0 0 40px rgba(164, 105, 255, 0.08); }
-        .ui-pill.type-weapon .pill-icon { border-color: rgba(164, 105, 255, 0.2); }
-        .ui-pill.type-weapon.expanded .pill-icon { border-color: rgba(164, 105, 255, 0.5); box-shadow: 0 0 12px rgba(164, 105, 255, 0.3); }
-        .ui-pill.type-weapon .pill-name { color: #d4b8ff; }
-        .ui-pill.type-weapon.expanded .pill-name { color: #fff; }
+        /* --- OPEN (expanded): the mock-up's electric-violet card --- */
+        .ui-pill.expanded {
+            border-color: rgba(202, 176, 250, 0.75);
+            background: linear-gradient(90deg, #050103 0%, var(--df-violet-deep) 30%, #3f0a9d 60%, var(--df-violet) 100%);
+            box-shadow: 0 0 26px rgba(93, 20, 226, 0.45), inset 0 0 30px rgba(142, 85, 245, 0.15);
+        }
         
-        /* --- ATTACHMENT VARIANT (same as weapon) --- */
-        .ui-pill.type-attachment { border-color: rgba(164, 105, 255, 0.25); background: linear-gradient(135deg, rgba(35, 12, 55, 0.7) 0%, rgba(15, 5, 30, 0.5) 100%); }
-        .ui-pill.type-attachment.expanded { border-color: rgba(164, 105, 255, 0.6); background: linear-gradient(135deg, rgba(80, 30, 140, 0.85) 0%, rgba(45, 12, 90, 0.6) 100%); box-shadow: 0 0 30px rgba(164, 105, 255, 0.35), inset 0 0 40px rgba(164, 105, 255, 0.08); }
-        .ui-pill.type-attachment .pill-icon { border-color: rgba(164, 105, 255, 0.2); }
-        .ui-pill.type-attachment.expanded .pill-icon { border-color: rgba(164, 105, 255, 0.5); box-shadow: 0 0 12px rgba(164, 105, 255, 0.3); }
-        .ui-pill.type-attachment .pill-name { color: #d4b8ff; }
-        .ui-pill.type-attachment.expanded .pill-name { color: #fff; }
-        
-        /* --- CONSUMABLE VARIANT (Red/Crimson) --- */
-        .ui-pill.type-consumable { border-color: rgba(180, 30, 30, 0.25); background: linear-gradient(135deg, rgba(55, 8, 8, 0.7) 0%, rgba(30, 4, 4, 0.5) 100%); }
-        .ui-pill.type-consumable.expanded { border-color: rgba(200, 40, 40, 0.6); background: linear-gradient(135deg, rgba(120, 18, 18, 0.85) 0%, rgba(70, 8, 8, 0.6) 100%); box-shadow: 0 0 30px rgba(200, 40, 40, 0.3), inset 0 0 40px rgba(200, 40, 40, 0.06); }
-        .ui-pill.type-consumable .pill-icon { border-color: rgba(180, 30, 30, 0.2); }
-        .ui-pill.type-consumable.expanded .pill-icon { border-color: rgba(200, 40, 40, 0.5); box-shadow: 0 0 12px rgba(200, 40, 40, 0.3); }
-        .ui-pill.type-consumable .pill-name { color: #ffb0b0; }
-        .ui-pill.type-consumable.expanded .pill-name { color: #fff; }
-        .ui-pill.type-consumable .pill-type-badge { color: #ff5555; border-color: #ff5555; }
-        
-        /* --- COLLECTIBLE / INTEL VARIANT (Gold/Amber) --- */
-        .ui-pill.type-collectible, .ui-pill.type-intel { border-color: rgba(200, 160, 0, 0.2); background: linear-gradient(135deg, rgba(50, 35, 5, 0.7) 0%, rgba(25, 18, 2, 0.5) 100%); }
-        .ui-pill.type-collectible.expanded, .ui-pill.type-intel.expanded { border-color: rgba(255, 215, 0, 0.5); background: linear-gradient(135deg, rgba(100, 70, 10, 0.85) 0%, rgba(60, 40, 5, 0.6) 100%); box-shadow: 0 0 25px rgba(255, 215, 0, 0.25); }
-        .ui-pill.type-collectible .pill-name, .ui-pill.type-intel .pill-name { color: #ffd780; }
-        .ui-pill.type-collectible.expanded .pill-name, .ui-pill.type-intel.expanded .pill-name { color: #fff; }
-        .ui-pill.type-collectible .pill-type-badge, .ui-pill.type-intel .pill-type-badge { color: #ffd700; border-color: #ffd700; }
-        
-        /* --- EQUIPPED STATE (Cyan ring on icon) --- */
-        .ui-pill.active-item .pill-icon { border: 2px solid #00f3ff; box-shadow: 0 0 12px rgba(0, 243, 255, 0.5); }
+        /* --- EQUIPPED: the mock-up's pale lavender card --- */
+        .ui-pill.active-item {
+            border-color: rgba(255, 255, 255, 0.55);
+            background: radial-gradient(ellipse 80% 140% at 35% 50%, var(--df-lavender-pale) 0%, #dac1fc 55%, #b896f6 100%);
+            box-shadow: 0 0 22px rgba(202, 176, 250, 0.45);
+        }
+        .ui-pill.active-item .pill-name { color: #5b2fc4; }
+        .ui-pill.active-item .pill-desc { color: var(--df-violet-ink); }
+        .ui-pill.active-item .pill-icon { border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 0 12px rgba(93, 20, 226, 0.35); }
+        .ui-pill.active-item.expanded { background: radial-gradient(ellipse 80% 140% at 35% 50%, #fff 0%, #e4d0fd 55%, #c4a5f8 100%); }
         .ui-pill.active-item .pill-equipped-tag { display: inline; }
         
+        /* --- TYPE ACCENTS (border only; the body follows the state above) --- */
+        .ui-pill.type-consumable { border-color: rgba(208, 16, 28, 0.7); }
+        .ui-pill.type-consumable.expanded { box-shadow: 0 0 26px rgba(208, 16, 28, 0.3), inset 0 0 30px rgba(142, 85, 245, 0.15); }
+        .ui-pill.type-collectible, .ui-pill.type-intel { border-color: rgba(216, 198, 162, 0.55); }
+        .ui-pill.type-collectible .pill-name, .ui-pill.type-intel .pill-name { color: var(--df-champagne); }
+        
         /* --- PILL TEXT ELEMENTS --- */
-        .pill-name { font-family: 'Montserrat', sans-serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; transition: color 0.3s; }
-        .pill-desc { color: rgba(200, 200, 200, 0.6); font-size: 0.7rem; font-style: italic; margin-top: 2px; transition: color 0.3s; }
-        .ui-pill.expanded .pill-desc { color: rgba(255, 255, 255, 0.8); }
-        .pill-type-badge { font-family: 'Orbitron', sans-serif; font-size: 0.5rem; font-weight: bold; color: #a469ff; border: 1px solid #a469ff; padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 1px; margin-right: 8px; }
-        .pill-equipped-tag { color: #00f3ff; font-size: 0.6rem; font-weight: 600; letter-spacing: 1px; display: none; }
-        .pill-qty { font-family: 'Orbitron', sans-serif; font-size: 0.6rem; color: rgba(200, 200, 200, 0.5); letter-spacing: 1px; }
+        .pill-name {
+            font-family: 'Montserrat', sans-serif; font-size: 0.78rem; font-weight: 600; letter-spacing: 1.5px;
+            text-transform: uppercase; color: var(--df-lavender); transition: color 0.3s;
+            display: inline-block; padding-bottom: 5px; margin-bottom: 4px;
+            border-bottom: 1px solid rgba(202, 176, 250, 0.3); min-width: 55%;
+        }
+        .ui-pill.expanded .pill-name { color: #e6d8ff; }
+        .pill-desc { color: rgba(225, 214, 245, 0.8); font-size: 0.74rem; line-height: 1.35; margin-top: 2px; transition: color 0.3s; }
+        .ui-pill.expanded .pill-desc { color: #fff; }
+        .pill-type-badge { font-family: 'Montserrat', sans-serif; font-size: 0.5rem; font-weight: 600; color: var(--df-lavender); border: 1px solid var(--df-lavender); padding: 1px 6px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px; margin-right: 8px; }
+        .pill-equipped-tag { color: #5b2fc4; background: rgba(255, 255, 255, 0.55); border-radius: 8px; padding: 1px 8px; font-size: 0.55rem; font-weight: 700; letter-spacing: 1.5px; display: none; }
+        .pill-qty { font-family: 'Montserrat', sans-serif; font-size: 0.6rem; color: var(--df-lavender); letter-spacing: 1px; }
         
         /* Touch-Friendly Close 'X' */
         #inventory-close-x {
@@ -441,36 +457,29 @@
             justify-content: center;
             gap: 10px;
             min-width: 180px;
-            height: 48px;
+            height: 38px;
             padding: 0 24px;
-            background: rgba(20, 10, 30, 0.7);
-            border: 2px solid #a469ff;
+            background: radial-gradient(ellipse 70% 120% at 50% 50%, #e2d8ee 0%, var(--df-lavender) 75%, #b39be0 100%);
+            border: 2px dotted rgba(255, 255, 255, 0.75);
             border-radius: 24px; /* Smooth pill shape */
-            color: #fff;
+            color: #1b0d2e;
             font-family: var(--font-ui);
-            font-size: 0.8rem;
-            font-weight: 500;
-            letter-spacing: 2px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 3px;
             text-transform: uppercase;
             cursor: pointer;
             pointer-events: auto;
             transition: all 0.25s ease;
-            box-shadow: 
-                0 0 15px rgba(164, 105, 255, 0.3),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 22px rgba(202, 176, 250, 0.45), 0 0 50px rgba(142, 85, 245, 0.2);
         }
         
         .screen-back-btn:hover {
-            background: rgba(164, 105, 255, 0.25);
-            border-color: #c799ff;
-            box-shadow: 
-                0 0 25px rgba(164, 105, 255, 0.5),
-                inset 0 1px 0 rgba(255, 255, 255, 0.15);
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            background: radial-gradient(ellipse 70% 120% at 50% 50%, #fff 0%, #dccbfb 75%, var(--df-lavender) 100%);
+            box-shadow: 0 0 28px rgba(202, 176, 250, 0.65), 0 0 60px rgba(142, 85, 245, 0.3);
         }
         
         .screen-back-btn:active {
-            background: rgba(164, 105, 255, 0.4);
             transform: scale(0.98);
         }
         
@@ -531,19 +540,25 @@
         .sidebar-portrait {
             width: 120px;
             height: 120px;
-            border-radius: 50%;
-            border: 2px solid rgba(255, 215, 0, 0.4);
+            border-radius: 38%;
+            border: 2px dotted var(--df-peach);
             margin-bottom: 30px;
             display: flex;
             justify-content: center;
             align-items: center;
             background: rgba(10, 5, 15, 0.6);
             flex-shrink: 0;
-            box-shadow: 0 0 15px rgba(255, 215, 0, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 30px rgba(120, 20, 40, 0.35), inset 0 0 20px rgba(0, 0, 0, 0.6);
         }
         
         .sidebar-portrait canvas {
             border-radius: 50%;
+        }
+        
+        /* the thin warm hairline under the portrait */
+        .screen-sidebar-left .sidebar-nav {
+            border-top: 1px solid rgba(216, 198, 162, 0.22);
+            padding-top: 14px;
         }
         
         /* Navigation Items */
@@ -559,30 +574,33 @@
         
         .sidebar-nav-item {
             font-family: var(--font-ui);
-            font-size: 0.75rem;
-            font-weight: 500;
-            letter-spacing: 3px;
+            font-size: 0.7rem;
+            font-weight: 400;
+            letter-spacing: 4px;
             text-transform: uppercase;
-            color: #888;
-            padding: 10px 20px;
+            color: var(--df-lilac-grey);
+            padding: 9px 20px;
             cursor: pointer;
-            transition: all 0.25s ease;
+            transition: color 0.25s ease, text-shadow 0.25s ease;
             text-align: center;
             width: 100%;
+            box-sizing: border-box;
             position: relative;
+            z-index: 0;
         }
         
         .sidebar-nav-item:hover {
             color: #fff;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            text-shadow: 0 0 10px rgba(202, 176, 250, 0.6);
         }
         
+        /* Active: a pill lit white in the middle, fading to lavender at the ends */
         .sidebar-nav-item.active {
-            color: #fff;
-            text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+            color: #120818;
+            font-weight: 700;
+            text-shadow: none;
         }
         
-        /* Active item highlight bar */
         .sidebar-nav-item.active::before {
             content: '';
             position: absolute;
@@ -590,14 +608,16 @@
             right: 0;
             top: 50%;
             transform: translateY(-50%);
-            height: 36px;
+            height: 30px;
             background: linear-gradient(90deg, 
                 transparent 0%, 
-                rgba(200, 180, 220, 0.15) 20%, 
-                rgba(200, 180, 220, 0.25) 50%, 
-                rgba(200, 180, 220, 0.15) 80%, 
+                rgba(176, 150, 210, 0.75) 14%, 
+                #f2ecf4 42%, 
+                #f2ecf4 58%, 
+                rgba(176, 150, 210, 0.75) 86%, 
                 transparent 100%);
-            border-radius: 4px;
+            border-radius: 15px;
+            box-shadow: 0 0 18px rgba(202, 176, 250, 0.35);
             z-index: -1;
         }
         
@@ -635,13 +655,15 @@
             align-items: center;
             gap: 15px;
             margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(216, 198, 162, 0.25);
         }
         
         .filter-title-text {
             font-family: var(--font-script);
             font-size: 2rem;
-            color: #fff;
-            text-shadow: 0 0 10px var(--gold-primary);
+            color: var(--df-cream);
+            text-shadow: 0 0 10px rgba(255, 194, 72, 0.45);
         }
         
         /* Filter Toggle Switch */
@@ -663,7 +685,7 @@
         }
         
         .filter-toggle-labels span.active {
-            color: var(--gold-primary);
+            color: var(--df-gold);
         }
         
         .filter-toggle-track {
@@ -678,8 +700,8 @@
         }
         
         .filter-toggle-track.on {
-            border-color: var(--gold-primary);
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+            border-color: var(--df-gold);
+            box-shadow: 0 0 10px rgba(255, 194, 72, 0.35);
         }
         
         .filter-toggle-knob {
@@ -695,8 +717,8 @@
         
         .filter-toggle-track.on .filter-toggle-knob {
             left: 20px;
-            background: var(--gold-primary);
-            box-shadow: 0 0 8px var(--gold-primary);
+            background: var(--df-gold);
+            box-shadow: 0 0 8px var(--df-gold);
         }
         
         /* Filter Items */
@@ -709,41 +731,45 @@
         
         .filter-item {
             font-family: var(--font-ui);
-            font-size: 0.7rem;
+            font-size: 0.66rem;
             font-weight: 500;
             letter-spacing: 2px;
             text-transform: uppercase;
-            color: #888;
+            color: var(--df-champagne);
             padding: 8px 16px;
             cursor: pointer;
-            transition: all 0.25s ease;
-            text-align: right;
+            transition: color 0.25s ease;
+            text-align: center;
             position: relative;
+            z-index: 0;
+            align-self: stretch;
         }
         
         .filter-item:hover {
-            color: #ccc;
+            color: #fff3dc;
         }
         
+        /* Active filter: a champagne bar fading out at both ends */
         .filter-item.active {
-            color: #fff;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            color: #1a1208;
+            font-weight: 700;
         }
         
-        /* Active filter highlight */
         .filter-item.active::before {
             content: '';
             position: absolute;
-            left: 0;
-            right: 0;
+            left: -25px;
+            right: -25px;
             top: 50%;
             transform: translateY(-50%);
-            height: 30px;
-            background: linear-gradient(270deg, 
-                rgba(200, 180, 220, 0.2) 0%, 
-                rgba(200, 180, 220, 0.1) 60%, 
+            height: 28px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(150, 132, 100, 0.8) 15%, 
+                #e6d6b4 45%, 
+                #e6d6b4 55%, 
+                rgba(150, 132, 100, 0.8) 85%, 
                 transparent 100%);
-            border-radius: 4px;
             z-index: -1;
         }
         
@@ -777,20 +803,20 @@
         .sidebar-handle-diamond {
             width: 12px;
             height: 12px;
-            background: rgba(164, 105, 255, 0.8);
+            background: #fffdfa;
             transform: rotate(45deg);
             box-shadow: 
-                0 0 15px rgba(164, 105, 255, 0.6),
-                0 0 30px rgba(164, 105, 255, 0.3);
+                0 0 10px rgba(255, 194, 72, 0.7),
+                0 0 24px rgba(202, 176, 250, 0.5);
             transition: all 0.25s ease;
             margin: auto;
         }
         
         .sidebar-handle:hover .sidebar-handle-diamond {
-            background: rgba(199, 153, 255, 1);
+            background: #fff;
             box-shadow: 
-                0 0 20px rgba(164, 105, 255, 0.8),
-                0 0 40px rgba(164, 105, 255, 0.5);
+                0 0 14px rgba(255, 194, 72, 0.9),
+                0 0 34px rgba(202, 176, 250, 0.7);
             transform: rotate(45deg) scale(1.2);
         }
         
@@ -815,6 +841,19 @@
         
         .screen-main-content.sidebar-right-collapsed {
             margin-right: 40px;
+        }
+        
+        /* Screens the item filter doesn't apply to (Screens.FILTERED): no right sidebar,
+           and the content takes its room */
+        #freelancer-menu.no-filter #inv-sidebar-right,
+        #freelancer-menu.no-filter #inv-handle-right {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(100%);
+        }
+        #inv-sidebar-right { transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease; }
+        @media screen and (min-width: 701px) {
+            body:not(.landscape) #freelancer-menu.no-filter .screen-main-content { margin-right: 40px; }
         }
         
         /* --- MOBILE RESPONSIVENESS --- */
@@ -843,6 +882,9 @@
             .screen-sidebar-left.auto-collapse {
                 transform: translateX(-100%);
             }
+            
+            .screen-sidebar-left { background: linear-gradient(270deg, rgba(5, 1, 3, 0.9) 0%, rgba(5, 1, 3, 0.97) 30%); }
+            .screen-sidebar-right { background: linear-gradient(90deg, rgba(5, 1, 3, 0.9) 0%, rgba(5, 1, 3, 0.97) 30%); }
             
             .screen-sidebar-right.auto-collapse {
                 transform: translateX(100%);
@@ -2321,16 +2363,15 @@
         #death-screen.respawn { background: rgba(255, 255, 255, 0.5) !important; }
 
         /* --- INVENTORY PILLS (Desktop overrides + Node Menu) --- */
-        .ui-pill { position: relative; width: 100%; min-height: 60px; border-radius: 40px; display: flex; align-items: center; padding: 10px 20px; padding-right: 60px; margin-bottom: 12px; transition: all 0.35s ease; }
-        .control-node { position: absolute; right: 20px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 12px; height: 12px; background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 0 6px rgba(255, 255, 255, 0.2); cursor: pointer; z-index: 100; transition: all 0.3s; }
-        .ui-pill.type-weapon .control-node, .ui-pill.type-attachment .control-node { border-color: rgba(164, 105, 255, 0.4); box-shadow: 0 0 8px rgba(164, 105, 255, 0.3); }
-        .ui-pill.type-consumable .control-node { border-color: rgba(200, 40, 40, 0.4); box-shadow: 0 0 8px rgba(200, 40, 40, 0.3); }
+        .control-node { position: absolute; right: 22px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 10px; height: 10px; background: #fffdfa; box-shadow: 0 0 8px rgba(255, 194, 72, 0.8), 0 0 18px rgba(202, 176, 250, 0.5); cursor: pointer; z-index: 100; transition: all 0.3s; }
         .control-node:hover { transform: translateY(-50%) rotate(225deg) scale(1.3); background: #fff; }
-        .node-menu { position: absolute; right: 40px; top: 50%; transform: translateY(-50%) scaleX(0); transform-origin: right center; display: flex; gap: 5px; background: rgba(0, 0, 0, 0.95); padding: 6px 16px 6px 12px; border-radius: 20px 0 0 20px; border: 1px solid rgba(255, 255, 255, 0.15); transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s; opacity: 0; pointer-events: none; backdrop-filter: blur(4px); }
+        /* Drop / Equip: flat lavender-violet blocks, as in the mock-up */
+        .node-menu { position: absolute; right: 44px; top: 50%; transform: translateY(-50%) scaleX(0); transform-origin: right center; display: flex; flex-direction: column; gap: 0; transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s; opacity: 0; pointer-events: none; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); }
         .ui-pill.expanded .node-menu { transform: translateY(-50%) scaleX(1); opacity: 1; pointer-events: auto; }
         .ui-pill.expanded .control-node { transform: translateY(-50%) rotate(225deg) scale(1.1); }
-        .node-btn { font-family: var(--font-ui); font-size: 0.65rem; font-weight: 600; color: #ccc; background: transparent; border: none; cursor: pointer; text-transform: uppercase; padding: 5px 10px; border-radius: 4px; letter-spacing: 1px; transition: all 0.2s; }
-        .node-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+        .node-btn { font-family: var(--font-ui); font-size: 0.62rem; font-weight: 600; color: #2a1060; background: var(--df-lavender); border: none; cursor: pointer; text-transform: uppercase; padding: 6px 26px; min-width: 110px; letter-spacing: 1.5px; transition: all 0.2s; }
+        .node-btn.drop-btn { background: var(--df-violet-mid); color: #fff; }
+        .node-btn:hover { filter: brightness(1.15); }
 
         /* The flit ring round the move stick: fill = flit charge (initJoystick / updateFlitRing) */
         #joystick-ring {
@@ -2717,6 +2758,9 @@
         body.landscape .screen-sidebar-right.auto-collapse { transform: translateX(100%); }
         body.landscape .screen-main-content { margin-left: 44px; margin-right: 44px; padding: 14px 20px; }
         body.landscape .sidebar-handle.mobile-visible { opacity: 1; pointer-events: auto; }
+        /* opened over the content on a small screen: a solid backdrop so the list doesn't show through */
+        body.landscape .screen-sidebar-left { background: linear-gradient(270deg, rgba(5, 1, 3, 0.9) 0%, rgba(5, 1, 3, 0.97) 30%); }
+        body.landscape .screen-sidebar-right { background: linear-gradient(90deg, rgba(5, 1, 3, 0.9) 0%, rgba(5, 1, 3, 0.97) 30%); }
         body.landscape #sleep-menu, body.landscape #vending-menu { max-height: 94vh; overflow-y: auto; box-sizing: border-box; padding: 16px 24px !important; }
         body.landscape #augment-shop { overflow-y: auto; justify-content: flex-start; }
         body.landscape .save-slot-panel { max-height: 92vh; overflow-y: auto; }
@@ -35668,7 +35712,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.save(); ctx.fillStyle = this._scanPat; ctx.fillRect(0, 0, w, h); ctx.restore();
             }
         
+            // Every screen opens through Screens (ui/screens.js), so the map and the menu never stack
             toggleMap(show) {
+                if (show) Screens.open('map');
+                else if (Screens.mapOpen()) Screens.close();
+            }
+
+            _showMap(show) {
                 const mapUI = document.getElementById('map-interface');
                 mapUI.style.display = show ? 'block' : 'none';
                 if (show) this.game.pauseSystem.acquire('map_ui');
@@ -35690,10 +35740,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.startIconAnimation(); // Start animating icons
                     this.game.renderSidebarPortrait();
                     
-                    // Update nav highlight
-                    if (typeof mapSidebar !== 'undefined') {
-                        mapSidebar.setActiveNav('map');
-                    }
                 } else {
                     this.stopIconAnimation(); // Stop animation when map closes
                 }
@@ -41508,31 +41554,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
         
+            // Open the menu on the inventory, or close it (Screens keeps every sub-screen in step)
             toggleMenu() {
-                if (!this.menu) return;
-                const isHidden = this.menu.style.display === 'none';
-                if (isHidden) {
-                    this.menu.style.display = 'flex'; // Use flex to keep alignment
-                    this.render();
-                    this.game.pauseSystem.acquire('inventory_menu');
-                    this.game.renderSidebarPortrait();
-                    
-                    // Reset to inventory view (hide augments/contacts screen if was showing)
-                    document.getElementById('inventory-list-container').style.display = '';
-                    document.getElementById('augments-screen').style.display = 'none';
-                    document.getElementById('contacts-screen').style.display = 'none';
-                    document.getElementById('story-screen').style.display = 'none';
-                    document.getElementById('collection-screen').style.display = 'none';
-                    document.getElementById('screen-title-text').textContent = 'Inventory';
-                    
-                    // Update nav highlight
-                    if (typeof invSidebar !== 'undefined') {
-                        invSidebar.setActiveNav('inventory');
-                    }
-                } else {
-                    this.menu.style.display = 'none';
-                    this.game.pauseSystem.release('inventory_menu');
-                }
+                if (Screens.menuOpen()) Screens.close();
+                else Screens.open('inventory');
             }
         
             render() {
@@ -41540,7 +41565,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.uiList.innerHTML = '';
                 
                 // Get filter state from sidebar
-                let filteredItems = this.items;
+                // EQUIPPED is this list showing only what's equipped; the filter still narrows it
+                const equippedOnly = Screens.current === 'equipped';
+                let filteredItems = equippedOnly ? this.items.filter(i => this.isItemEquipped(i.id)) : this.items;
                 if (typeof invSidebar !== 'undefined' && invSidebar.filterEnabled && invSidebar.activeFilter) {
                     const filter = invSidebar.activeFilter;
                     if (filter !== 'all') {
@@ -41555,12 +41582,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             'consumables': 'consumable'
                         };
                         const targetType = filterToType[filter] || filter;
-                        filteredItems = this.items.filter(item => item.type === targetType);
+                        filteredItems = filteredItems.filter(item => item.type === targetType);
                     }
                 }
                 
                 if (filteredItems.length === 0) {
-                    const message = this.items.length === 0 ? 'NO ITEMS CARRIED' : 'NO MATCHING ITEMS';
+                    const message = this.items.length === 0 ? 'NO ITEMS CARRIED' : equippedOnly ? 'NOTHING EQUIPPED' : 'NO MATCHING ITEMS';
                     this.uiList.innerHTML = `<div style="color:#666; text-align:center; margin-top:50px;">${message}</div>`;
                     return;
                 }
@@ -41580,10 +41607,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             </div>
                             <div class="pill-desc">${item.description}</div>
                         </div>
-                        <div class="control-node" style="${isEquipped ? 'background:#00f3ff; box-shadow:0 0 8px #00f3ff;' : ''}"></div>
+                        <div class="control-node"></div>
                         <div class="node-menu">
                             <button class="node-btn use-btn">${isEquipped ? (config.unequipLabel || 'UNEQUIP') : (config.equipLabel || 'EQUIP')}</button>
-                            <button class="node-btn drop-btn" style="color:#ff5555">DROP</button>
+                            <button class="node-btn drop-btn">DROP</button>
                         </div>
                     `;
                     // ... remaining logic
@@ -44814,12 +44841,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     } else if(this.activeInteraction.interactionType === 'crafting_table') {
                         this.openCraftingTable();
                     } else if(this.activeInteraction.interactionType === 'armory') {
-                        // Open inventory directly to weapons/equipment screen
-                        this.inventory.toggleMenu();
-                        requestAnimationFrame(() => {
-                            const invNav = document.querySelector('#freelancer-menu .sidebar-nav-item[data-screen="inventory"]');
-                            if (invNav) invNav.click();
-                        });
+                        // Open the menu straight on the inventory
+                        Screens.open('inventory');
                         audioSys.sfx('ui');
                     } else if(this.activeInteraction.interactionType === 'auto_shop_counter') {
                         this.openAutoShop();
@@ -44989,7 +45012,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     document.getElementById('dock-buttons').classList.remove('visible');
                     
                     // Open the Golden Map
-                    this.ui.toggleMap(true);
+                    Screens.open('map');
                 });
                 
                 document.getElementById('btn-inventory').addEventListener('click', (e) => {
@@ -44999,7 +45022,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     document.getElementById('dock-buttons').classList.remove('visible');
                     
                     // Open Inventory
-                    this.inventory.toggleMenu();
+                    Screens.open('inventory');
                 });
                 
                 // 2. Main Menu Load Button — opens save slot selector
@@ -60096,17 +60119,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     return;
                 }
                 
-                // Close Golden Map if open
-                const mapUI = document.getElementById('map-interface');
-                if (mapUI.style.display === 'block') {
-                    game.ui.toggleMap(false);
-                    return;
-                }
-                
-                // Close Inventory if open
-                const inventoryMenu = document.getElementById('freelancer-menu');
-                if (inventoryMenu.style.display !== 'none' && inventoryMenu.style.display !== '') {
-                    game.inventory.toggleMenu();
+                // Close the map or the freelancer menu if open
+                if (Screens.mapOpen() || Screens.menuOpen()) {
+                    Screens.close();
                     return;
                 }
                 
@@ -60148,16 +60163,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         
             // 2. Handle 'M' Key (Smart Toggle)
             if (e.key === 'm' || e.key === 'M') {
-                if (game.running && !game.paused) {
-                    const mapUI = document.getElementById('map-interface');
-                    const isClosed = mapUI.style.display === 'none' || mapUI.style.display === '';
-                    
-                    if (isClosed) {
-                        game.ui.toggleMap(true);
-                    } else {
-                        game.ui.toggleMap(false);
-                    }
-                }
+                // the map holds a pause token, so check for it before the !paused gate
+                if (Screens.mapOpen()) Screens.close();
+                else if (game.running && !game.paused) Screens.open('map');
             }
         
             // 3. Handle 'P' Key (Phone)
@@ -60171,16 +60179,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // 4. Handle 'B' Key (Back - closes map/inventory)
             if (e.key === 'b' || e.key === 'B') {
-                // Close Golden Map if open
-                const mapUI = document.getElementById('map-interface');
-                if (mapUI.style.display === 'block') {
-                    game.ui.toggleMap(false);
-                    return;
-                }
-                // Close Inventory if open
-                const inventoryMenu = document.getElementById('freelancer-menu');
-                if (inventoryMenu.style.display !== 'none' && inventoryMenu.style.display !== '') {
-                    game.inventory.toggleMenu();
+                if (Screens.mapOpen() || Screens.menuOpen()) {
+                    Screens.close();
                     return;
                 }
             }
@@ -60208,6 +60208,80 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         });
         
+        // --- SCREENS: the one way the sidebar-nav screens open and close ---
+        // Two panels: #map-interface (the golden map) and #freelancer-menu (every other
+        // screen, as a sub-screen of #inv-main-content). Screens.open(name) closes the other
+        // panel, hides every sub-screen, shows the one asked for, sets the title, the right
+        // sidebar (the item filter only where it filters) and both nav highlights.
+        // toggleMap / toggleMenu, the dock, pause menu, armory and the Esc / B / M keys all
+        // come through here, so two screens can never stack.
+
+        const Screens = {
+            current: null,      // the open screen's name, or null when both panels are shut
+
+            // name → [sub-screen id, title, render]
+            SUBS: {
+                inventory:  ['inventory-list-container', 'Inventory',  () => game.inventory.render()],
+                equipped:   ['inventory-list-container', 'Equipped',   () => game.inventory.render()],
+                story:      ['story-screen',      'Story',      () => game.renderStoryScreen()],
+                augments:   ['augments-screen',   'Augments',   () => game.renderAugmentManagement()],
+                character:  ['character-screen',  'Character',  () => game.renderCharacterScreen()],
+                team:       ['team-screen',       'Team',       () => game.renderTeamScreen()],
+                contacts:   ['contacts-screen',   'Contacts',   () => game.renderContactsScreen()],
+                skills:     ['skills-screen',     'Skills',     () => game.renderSkillsScreen()],
+                collection: ['collection-screen', 'Collection', () => game.renderCollectionScreen()]
+            },
+            FILTERED: { inventory: true, equipped: true },   // screens the item filter applies to
+
+            _menu() { return document.getElementById('freelancer-menu'); },
+            menuOpen() { const m = this._menu(); return !!m && m.style.display !== 'none' && m.style.display !== ''; },
+            mapOpen() { return document.getElementById('map-interface')?.style.display === 'block'; },
+
+            open(name) {
+                if (name === 'map') {
+                    this._showMenu(false);
+                    if (!this.mapOpen()) game.ui._showMap(true);
+                } else {
+                    const sub = this.SUBS[name];
+                    if (!sub) return;
+                    if (this.mapOpen()) game.ui._showMap(false);
+                    this._showMenu(true);
+                    const ids = new Set(Object.values(this.SUBS).map(s => s[0]));
+                    ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+                    document.getElementById(sub[0]).style.display = sub[0] === 'inventory-list-container' ? '' : 'block';
+                    document.getElementById('screen-title-text').textContent = sub[1];
+                    this.current = name;    // set before render: the inventory list reads it for EQUIPPED
+                    this._menu().classList.toggle('no-filter', !this.FILTERED[name]);
+                    sub[2]();
+                }
+                this.current = name;
+                if (typeof invSidebar !== 'undefined') invSidebar.setActiveNav(name);
+                if (typeof mapSidebar !== 'undefined') mapSidebar.setActiveNav(name);
+            },
+
+            close() {
+                if (this.mapOpen()) game.ui._showMap(false);
+                this._showMenu(false);
+                this.current = null;
+            },
+
+            // open `name`, or close it when it's the screen already showing
+            toggle(name) { if (this.current === name && (this.menuOpen() || this.mapOpen())) this.close(); else this.open(name); },
+
+            _showMenu(show) {
+                const m = this._menu();
+                if (!m || show === this.menuOpen()) return;
+                if (show) {
+                    m.style.display = 'flex';
+                    game.pauseSystem.acquire('inventory_menu');
+                    game.renderSidebarPortrait();
+                } else {
+                    m.style.display = 'none';
+                    game.pauseSystem.release('inventory_menu');
+                    document.querySelectorAll('#inventory-list .ui-pill.expanded').forEach(p => p.classList.remove('expanded'));
+                }
+            }
+        };
         // --- SIDEBAR SYSTEM (Phase 2) ---
         // Manages collapsible sidebars for map and inventory screens
         
@@ -60281,124 +60355,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     });
                 }
                 
-                // Nav item clicks (for future screen switching)
-                const navItems = this.leftSidebar?.querySelectorAll('.sidebar-nav-item');
-                navItems?.forEach(item => {
-                    item.addEventListener('click', () => {
-                        const screen = item.dataset.screen;
-                        // For now, just highlight - future: switch screens
-                        navItems.forEach(i => i.classList.remove('active'));
-                        item.classList.add('active');
-                        
-                        // Handle special navigation
-                        // Helper: hide all sub-screens
-                        const hideSubScreens = () => {
-                            document.getElementById('augments-screen').style.display = 'none';
-                            document.getElementById('skills-screen').style.display = 'none';
-                            document.getElementById('contacts-screen').style.display = 'none';
-                            document.getElementById('team-screen').style.display = 'none';
-                            document.getElementById('character-screen').style.display = 'none';
-                            document.getElementById('story-screen').style.display = 'none';
-                            document.getElementById('collection-screen').style.display = 'none';
-                        };
-                        
-                        if (screen === 'map' && this.canvas) {
-                            // Already on map
-                        } else if (screen === 'inventory' && !this.canvas) {
-                            // Already on inventory - make sure inventory content is visible
-                            document.getElementById('inventory-list-container').style.display = '';
-                            hideSubScreens();
-                            document.getElementById('screen-title-text').textContent = 'Inventory';
-                        } else if (screen === 'map') {
-                            // Switch to map from inventory
-                            game.inventory.toggleMenu();
-                            game.ui.toggleMap(true);
-                        } else if (screen === 'inventory') {
-                            // Switch to inventory from map
-                            game.ui.toggleMap(false);
-                            game.inventory.toggleMenu();
-                        } else if (screen === 'augments') {
-                            // Show augments management inline (not shop popup)
-                            if (this.canvas) {
-                                // From map: switch to inventory screen first
-                                game.ui.toggleMap(false);
-                                game.inventory.toggleMenu();
-                            }
-                            document.getElementById('inventory-list-container').style.display = 'none';
-                            hideSubScreens();
-                            document.getElementById('augments-screen').style.display = 'block';
-                            document.getElementById('screen-title-text').textContent = 'Augments';
-                            game.renderAugmentManagement();
-                        } else if (screen === 'skills') {
-                            // Resonance: level, unsettled, the trees (Dr. Yin is where you spend)
-                            if (this.canvas) { game.ui.toggleMap(false); game.inventory.toggleMenu(); }
-                            document.getElementById('inventory-list-container').style.display = 'none';
-                            hideSubScreens();
-                            document.getElementById('skills-screen').style.display = 'block';
-                            document.getElementById('screen-title-text').textContent = 'Skills';
-                            game.renderSkillsScreen();
-                        } else if (screen === 'contacts') {
-                            // Show contacts screen
-                            if (this.canvas) {
-                                game.ui.toggleMap(false);
-                                game.inventory.toggleMenu();
-                            }
-                            document.getElementById('inventory-list-container').style.display = 'none';
-                            hideSubScreens();
-                            document.getElementById('contacts-screen').style.display = 'block';
-                            document.getElementById('screen-title-text').textContent = 'Contacts';
-                            game.renderContactsScreen();
-                        } else if (screen === 'team') {
-                            // Show team management screen
-                            if (this.canvas) {
-                                game.ui.toggleMap(false);
-                                game.inventory.toggleMenu();
-                            }
-                            document.getElementById('inventory-list-container').style.display = 'none';
-                            hideSubScreens();
-                            document.getElementById('team-screen').style.display = 'block';
-                            document.getElementById('screen-title-text').textContent = 'Team';
-                            game.renderTeamScreen();
-                        } else if (screen === 'character') {
-                            // Show character screen
-                            if (this.canvas) {
-                                game.ui.toggleMap(false);
-                                game.inventory.toggleMenu();
-                            }
-                            document.getElementById('inventory-list-container').style.display = 'none';
-                            hideSubScreens();
-                            document.getElementById('character-screen').style.display = 'block';
-                            document.getElementById('screen-title-text').textContent = 'Character';
-                            game.renderCharacterScreen();
-                        } else if (screen === 'story') {
-                            // Show story/missions screen
-                            if (this.canvas) {
-                                game.ui.toggleMap(false);
-                                game.inventory.toggleMenu();
-                            }
-                            document.getElementById('inventory-list-container').style.display = 'none';
-                            hideSubScreens();
-                            document.getElementById('story-screen').style.display = 'block';
-                            document.getElementById('screen-title-text').textContent = 'Story';
-                            game.renderStoryScreen();
-                        } else if (screen === 'collection') {
-                            // Show collection screen
-                            if (this.canvas) {
-                                game.ui.toggleMap(false);
-                                game.inventory.toggleMenu();
-                            }
-                            document.getElementById('inventory-list-container').style.display = 'none';
-                            hideSubScreens();
-                            document.getElementById('collection-screen').style.display = 'block';
-                            document.getElementById('screen-title-text').textContent = 'Collection';
-                            game.renderCollectionScreen();
-                        }
-                        
-                        // Sync inventory sidebar highlight when switching from map
-                        if (typeof invSidebar !== 'undefined') invSidebar.setActiveNav(screen);
-                        // Sync map sidebar when switching from inventory
-                        if (typeof mapSidebar !== 'undefined') mapSidebar.setActiveNav(screen);
-                    });
+                // Nav item clicks: every screen opens through Screens (ui/screens.js)
+                this.leftSidebar?.querySelectorAll('.sidebar-nav-item').forEach(item => {
+                    item.addEventListener('click', () => Screens.open(item.dataset.screen));
                 });
             }
             
@@ -61105,21 +61064,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                         break;
                     case 'inventory':
-                        this.close();
-                        game.inventory.toggleMenu();
-                        break;
                     case 'map':
-                        this.close();
-                        game.ui.toggleMap(true);
-                        break;
                     case 'team':
                         this.close();
-                        game.inventory.toggleMenu();
-                        // Navigate to team screen (scoped to freelancer-menu, deferred one frame for DOM)
-                        requestAnimationFrame(() => {
-                            const teamNav = document.querySelector('#freelancer-menu .sidebar-nav-item[data-screen="team"]');
-                            if (teamNav) teamNav.click();
-                        });
+                        Screens.open(action);
                         break;
                     case 'settings':
                         this.openSettings();

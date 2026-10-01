@@ -19,6 +19,21 @@
             --red-deep: #550000;          /* Deep red (danger) */
             --glass-dark: rgba(10, 5, 10, 0.85);  /* Dark glass effect */
             --message-modal-color: #ffeed8;
+            /* Menu scheme, sampled from ETERNAL's inventory mock-up */
+            --df-ink: #050103;                /* the backdrop's black */
+            --df-wine: rgba(70, 6, 26, 0.55); /* the plum/wine haze in it */
+            --df-violet: #5d14e2;             /* selected card, electric violet */
+            --df-violet-deep: #23055d;        /* its shadowed side, QTY chips */
+            --df-violet-mid: #8e55f5;         /* context-menu blocks, rings */
+            --df-lavender: #cab0fa;           /* dotted borders, highlights */
+            --df-lavender-pale: #f1e8fe;      /* lit card / pill centres */
+            --df-violet-ink: #3a1d78;         /* text on the pale pills */
+            --df-lilac-grey: #b9aec4;         /* idle nav text */
+            --df-champagne: #d8c6a2;          /* filter items, active filter bar */
+            --df-cream: #f3e4c6;              /* filter title */
+            --df-gold: #ffc248;               /* toggle, diamond glints */
+            --df-peach: #e3ad8f;              /* portrait frame dots */
+            --df-crimson: #d0101c;            /* locked / unavailable border */
             color-scheme: light only;     /* Prevent dark mode interference */
         }
         

@@ -60,6 +60,9 @@
         body.landscape .screen-sidebar-right.auto-collapse { transform: translateX(100%); }
         body.landscape .screen-main-content { margin-left: 44px; margin-right: 44px; padding: 14px 20px; }
         body.landscape .sidebar-handle.mobile-visible { opacity: 1; pointer-events: auto; }
+        /* opened over the content on a small screen: a solid backdrop so the list doesn't show through */
+        body.landscape .screen-sidebar-left { background: linear-gradient(270deg, rgba(5, 1, 3, 0.9) 0%, rgba(5, 1, 3, 0.97) 30%); }
+        body.landscape .screen-sidebar-right { background: linear-gradient(90deg, rgba(5, 1, 3, 0.9) 0%, rgba(5, 1, 3, 0.97) 30%); }
         body.landscape #sleep-menu, body.landscape #vending-menu { max-height: 94vh; overflow-y: auto; box-sizing: border-box; padding: 16px 24px !important; }
         body.landscape #augment-shop { overflow-y: auto; justify-content: flex-start; }
         body.landscape .save-slot-panel { max-height: 92vh; overflow-y: auto; }

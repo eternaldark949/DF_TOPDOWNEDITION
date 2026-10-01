@@ -1510,17 +1510,9 @@
                     return;
                 }
                 
-                // Close Golden Map if open
-                const mapUI = document.getElementById('map-interface');
-                if (mapUI.style.display === 'block') {
-                    game.ui.toggleMap(false);
-                    return;
-                }
-                
-                // Close Inventory if open
-                const inventoryMenu = document.getElementById('freelancer-menu');
-                if (inventoryMenu.style.display !== 'none' && inventoryMenu.style.display !== '') {
-                    game.inventory.toggleMenu();
+                // Close the map or the freelancer menu if open
+                if (Screens.mapOpen() || Screens.menuOpen()) {
+                    Screens.close();
                     return;
                 }
                 
@@ -1562,16 +1554,9 @@
         
             // 2. Handle 'M' Key (Smart Toggle)
             if (e.key === 'm' || e.key === 'M') {
-                if (game.running && !game.paused) {
-                    const mapUI = document.getElementById('map-interface');
-                    const isClosed = mapUI.style.display === 'none' || mapUI.style.display === '';
-                    
-                    if (isClosed) {
-                        game.ui.toggleMap(true);
-                    } else {
-                        game.ui.toggleMap(false);
-                    }
-                }
+                // the map holds a pause token, so check for it before the !paused gate
+                if (Screens.mapOpen()) Screens.close();
+                else if (game.running && !game.paused) Screens.open('map');
             }
         
             // 3. Handle 'P' Key (Phone)
@@ -1585,16 +1570,8 @@
             
             // 4. Handle 'B' Key (Back - closes map/inventory)
             if (e.key === 'b' || e.key === 'B') {
-                // Close Golden Map if open
-                const mapUI = document.getElementById('map-interface');
-                if (mapUI.style.display === 'block') {
-                    game.ui.toggleMap(false);
-                    return;
-                }
-                // Close Inventory if open
-                const inventoryMenu = document.getElementById('freelancer-menu');
-                if (inventoryMenu.style.display !== 'none' && inventoryMenu.style.display !== '') {
-                    game.inventory.toggleMenu();
+                if (Screens.mapOpen() || Screens.menuOpen()) {
+                    Screens.close();
                     return;
                 }
             }
