@@ -7,6 +7,101 @@
         /**
          * Lamp Entity - Now supports rotation and proper alignment.
          */
+        /* Street lamps, seen from straight above, in an antiquated cast-iron style. Each style is
+           painted once into a sprite (per colour and lit/unlit) and stamped; the glow and the motes
+           stay live. `bulbs` are where the light sits (the lighting keys off the lamp itself). To add
+           a variation, add a style here and give the lamps that should wear it its `lampType`. */
+        const LAMP_IRON = '#14101a', LAMP_IRON_HI = 'rgba(176, 160, 214, 0.35)', LAMP_BRASS = '#b08a4a';
+        const LAMP_STYLES = {
+            // Twin lanterns on a scrolled crossarm over a fluted post (city streets and corners)
+            antique_twin: {
+                bulbs: [{ x: 0, y: -20 }, { x: 0, y: 20 }],
+                box: [-10, -29, 20, 58],                                         // the sprite's extent round the post
+                paint(c, lit, color) {
+                    _lampBase(c, 0, 0, 8);
+                    // the crossarm, with a scroll curling off each end, and a brass boss at the post
+                    c.strokeStyle = LAMP_IRON; c.lineCap = 'round'; c.lineWidth = 3.4;
+                    c.beginPath(); c.moveTo(0, -17); c.lineTo(0, 17); c.stroke();
+                    c.lineWidth = 1.6;
+                    for (const s of [-1, 1]) for (const side of [-1, 1]) {
+                        c.beginPath(); c.moveTo(0, s * 9); c.bezierCurveTo(side * 6, s * 9, side * 7, s * 14, side * 3.5, s * 14.5);
+                        c.arc(side * 3.5 + side * -1.4, s * 13.6, 1.4, side > 0 ? 0 : Math.PI, side > 0 ? Math.PI * 1.6 : Math.PI * 0.4, side < 0); c.stroke();
+                    }
+                    c.strokeStyle = LAMP_IRON_HI; c.lineWidth = 0.8;
+                    c.beginPath(); c.moveTo(-0.9, -16); c.lineTo(-0.9, 16); c.stroke();
+                    c.fillStyle = LAMP_BRASS; c.beginPath(); c.arc(0, 0, 2.2, 0, Math.PI * 2); c.fill();
+                    for (const b of this.bulbs) _lampLantern(c, b.x, b.y, 7, lit, color);
+                }
+            },
+            // A shepherd's crook curling out to one lantern (parks, the graveyard)
+            antique_crook: {
+                bulbs: [{ x: 22, y: 0 }],
+                box: [-8, -14, 38, 23],
+                paint(c, lit, color) {
+                    _lampBase(c, 0, 0, 6.5);
+                    c.strokeStyle = LAMP_IRON; c.lineCap = 'round'; c.lineWidth = 3;
+                    c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(8, -10, 20, -11, 24, -6); c.quadraticCurveTo(26, -3, 22, -1); c.stroke();
+                    c.lineWidth = 1.4;                                           // the little scroll under the arm
+                    c.beginPath(); c.moveTo(5, -4); c.quadraticCurveTo(10, -3, 11, -7); c.arc(9.8, -7, 1.2, 0, Math.PI * 1.5, true); c.stroke();
+                    c.strokeStyle = LAMP_IRON_HI; c.lineWidth = 0.7;
+                    c.beginPath(); c.moveTo(1, -1.5); c.bezierCurveTo(8, -11, 19, -12, 23, -7.5); c.stroke();
+                    for (const b of this.bulbs) _lampLantern(c, b.x, b.y, 6.5, lit, color);
+                }
+            }
+        };
+        const LAMP_TYPE_STYLE = { 1: 'antique_crook', 2: 'antique_twin' };
+
+        // The fluted cast-iron foot of the post, ringed in brass
+        function _lampBase(c, x, y, r) {
+            const g = c.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+            g.addColorStop(0, '#3a3046'); g.addColorStop(0.55, '#1c1624'); g.addColorStop(1, '#0b080f');
+            c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+            c.strokeStyle = 'rgba(0, 0, 0, 0.55)'; c.lineWidth = 0.8;
+            for (let i = 0; i < 12; i++) {                                       // the flutes
+                const a = i / 12 * Math.PI * 2;
+                c.beginPath(); c.moveTo(x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55); c.lineTo(x + Math.cos(a) * r * 0.92, y + Math.sin(a) * r * 0.92); c.stroke();
+            }
+            c.strokeStyle = LAMP_BRASS; c.lineWidth = 1;
+            c.beginPath(); c.arc(x, y, r * 0.5, 0, Math.PI * 2); c.stroke();
+            c.strokeStyle = LAMP_IRON_HI; c.lineWidth = 0.7;
+            c.beginPath(); c.arc(x, y, r - 0.6, Math.PI * 1.05, Math.PI * 1.6); c.stroke();
+        }
+
+        // A hexagonal lantern from above: lit glass round the edge of its iron cap, a brass finial on top
+        function _lampLantern(c, x, y, r, lit, color) {
+            const hex = (rr, rot = Math.PI / 6) => { c.beginPath(); for (let i = 0; i < 6; i++) { const a = rot + i * Math.PI / 3; c[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath(); };
+            if (lit) {
+                const g = c.createRadialGradient(x, y, 0, x, y, r);
+                g.addColorStop(0, '#fffaf0'); g.addColorStop(0.55, color); g.addColorStop(1, color);
+                c.fillStyle = g;
+            } else c.fillStyle = '#2a2433';
+            hex(r); c.fill();
+            c.strokeStyle = LAMP_IRON; c.lineWidth = 1.2; c.stroke();
+            c.lineWidth = 0.8;                                                   // the frame's corner ribs
+            for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; c.beginPath(); c.moveTo(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.62); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); c.stroke(); }
+            c.fillStyle = LAMP_IRON; hex(r * 0.5); c.fill();                     // the cap
+            c.strokeStyle = 'rgba(176, 138, 74, 0.8)'; c.lineWidth = 0.7; c.stroke();
+            c.strokeStyle = LAMP_IRON_HI; c.lineWidth = 0.6;
+            c.beginPath(); c.moveTo(x - r * 0.45, y - r * 0.2); c.lineTo(x - r * 0.1, y - r * 0.45); c.stroke();
+            c.fillStyle = LAMP_BRASS; c.beginPath(); c.arc(x, y, r * 0.17, 0, Math.PI * 2); c.fill();
+        }
+
+        const _lampSprites = new Map();
+        /** A lamp style painted once (cropped to its `box`) per colour, lit state and size:
+         *  1× when the city is seen from afar, 3× up close, so a zoomed-out street isn't shrinking big sprites. */
+        function lampSprite(style, color, lit, S = 3) {
+            const key = style + '|' + color + '|' + (lit ? 1 : 0) + '|' + S;
+            let cv = _lampSprites.get(key);
+            if (!cv) {
+                const [bx, by, bw, bh] = LAMP_STYLES[style].box;
+                cv = document.createElement('canvas'); cv.width = Math.ceil(bw * S); cv.height = Math.ceil(bh * S);
+                const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, -bx * S, -by * S);
+                LAMP_STYLES[style].paint(c, lit, color);
+                _lampSprites.set(key, cv);
+            }
+            return cv;
+        }
+
         class LampEntity extends GameEntity {
             constructor(config) {
                 super({
@@ -49,14 +144,9 @@
                 // 1. DETERMINE BULB POSITIONS (Relative to 0,0)
                 let bulbs = [];
                 
-                if (this.lampType === 1) { // Antiquated (Curved Arm)
-                    bulbs.push({x: 22, y: 0});
-                    // Base
-                    ctx.fillStyle = '#111'; 
-                    ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
-                    // Arm
-                    ctx.strokeStyle = '#222'; ctx.lineWidth = 4; 
-                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(22, 0); ctx.stroke();
+                const style = LAMP_TYPE_STYLE[this.lampType];
+                if (style) { // A street lamp: its antique style, a baked sprite (LAMP_STYLES)
+                    bulbs = LAMP_STYLES[style].bulbs;
                     
                 } else if (this.lampType === 3) { // Wall Mounted (circular)
                      bulbs.push({x: 0, y: 0});
@@ -84,22 +174,25 @@
                 } else if (this.lampType === 4) { // Floor Lamp
                      bulbs.push({x: 0, y: 0});
                      
-                } else { // Modern Street (T-Shape)
-                    // Default "Modern" is T-shaped perpendicular to the pole
-                    bulbs.push({x: 0, y: -20});
-                    bulbs.push({x: 0, y: 20});
-                    
-                    // Post
-                    ctx.fillStyle = '#222'; 
-                    ctx.fillRect(-7, -7, 14, 14);
-                    // Crossbar
-                    ctx.fillStyle = '#333'; 
-                    ctx.fillRect(-4, -24, 8, 48);
                 }
         
                 // 2. DRAW BULBS — a glow sprite behind each (faded with the room's light)
                 const k = this._lightK ?? 1, big = this.lampType === 4;
-                for (let b of bulbs) {
+                if (style) {
+                    const col = /^#[0-9a-f]{6}$/i.test(this.color) ? this.color : '#ffeebb';
+                    const m = ctx.getTransform(), S = Math.hypot(m.a, m.b) > 1.6 ? 3 : Math.hypot(m.a, m.b) > 0.8 ? 2 : 1;
+                    const [bx, by, bw, bh] = LAMP_STYLES[style].box;
+                    if (isOn) {
+                        ctx.globalAlpha = 0.85 * k;
+                        for (const b of bulbs) ctx.drawImage(this._glow(), b.x - 24, b.y - 24, 48, 48);
+                        ctx.globalAlpha = 1;
+                        if (k < 1) ctx.drawImage(lampSprite(style, col, false, S), bx, by, bw, bh);
+                        ctx.globalAlpha = k;
+                    }
+                    ctx.drawImage(lampSprite(style, col, isOn, S), bx, by, bw, bh);
+                    ctx.globalAlpha = 1;
+                }
+                for (let b of style ? [] : bulbs) {
                     const r = big ? 12 : 8;
                     if (isOn) {
                         const gr = big ? 34 : 24;

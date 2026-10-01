@@ -90,27 +90,26 @@
                 if (this.leaves.length >= this.maxLeaves) return;
                 
                 const cam = this.game.camera;
-                const wind = this.game.weather?.wind || 0.3;
-                const windDir = this.game.weather?.windDirection || 1;
+                const w = this.game.weather?.windVec || { x: 0, y: 0 }, ws = Math.hypot(w.x, w.y);
                 
                 const leaf = this._getLeaf();
                 
-                // Spawn from upwind edge of screen
+                // Spawn off the upwind edge(s) of the view, carried in on the wind (any direction)
                 const screenW = this.game.canvas.width / cam.zoom;
                 const screenH = this.game.canvas.height / cam.zoom;
-                
-                if (windDir > 0) {
-                    // Wind blowing right - spawn from left
-                    leaf.x = cam.x - screenW / 2 - 50;
+                const ux = ws > 0.05 ? w.x / ws : (Math.random() - 0.5), uy = ws > 0.05 ? w.y / ws : (Math.random() - 0.5);
+                if (Math.random() * (Math.abs(ux) + Math.abs(uy)) < Math.abs(ux)) {
+                    leaf.x = cam.x - Math.sign(ux || 1) * (screenW / 2 + 50);           // the left or right edge the wind comes from
+                    leaf.y = cam.y - screenH / 2 + Math.random() * screenH;
                 } else {
-                    // Wind blowing left - spawn from right
-                    leaf.x = cam.x + screenW / 2 + 50;
+                    leaf.y = cam.y - Math.sign(uy || 1) * (screenH / 2 + 50);           // the top or bottom edge
+                    leaf.x = cam.x - screenW / 2 + Math.random() * screenW;
                 }
-                leaf.y = cam.y - screenH / 2 + Math.random() * screenH;
                 
-                // Initial velocity (mostly horizontal with wind)
-                leaf.vx = windDir * (1 + Math.random() * 2) * wind;
-                leaf.vy = -0.5 + Math.random() * 1; // Slight rise/fall
+                // Already moving with the wind, give or take
+                const k = (0.6 + Math.random() * 0.6) * 0.6 * this.windInfluence;
+                leaf.vx = w.x * k + (Math.random() - 0.5) * 0.4;
+                leaf.vy = w.y * k + (Math.random() - 0.5) * 0.4;
                 
                 // Rotation
                 leaf.rotation = Math.random() * Math.PI * 2;
@@ -152,14 +151,17 @@
                 if (!this.enabled) return;
                 if (this.game.activeMap?.type !== 'outdoor') return;
                 
-                const wind = this.game.weather?.wind || 0.3;
-                const windDir = this.game.weather?.windDirection || 1;
+                const wind = this.game.weather?.wind ?? 0;
+                const w = this.game.weather?.windVec || { x: 0, y: 0 }, ws = Math.hypot(w.x, w.y);
+                const tx = w.x * 0.6 * this.windInfluence, ty = w.y * 0.6 * this.windInfluence;   // the speed the wind carries a leaf at
+                const px = ws > 0.05 ? -w.y / ws : 1, py = ws > 0.05 ? w.x / ws : 0;                 // across the wind, for the flutter
+                const gust = Math.min(1, ws / 2.5);
                 const cam = this.game.camera;
                 const screenW = this.game.canvas.width / cam.zoom;
                 const screenH = this.game.canvas.height / cam.zoom;
                 
-                // Spawn new leaves (more when windy)
-                const spawnChance = this.spawnRate * (0.5 + wind);
+                // Spawn new leaves (more when windy; still air brings few)
+                const spawnChance = this.spawnRate * (0.15 + wind);
                 if (Math.random() < spawnChance) {
                     this.spawnLeaf();
                 }
@@ -168,32 +170,23 @@
                 for (let i = this.leaves.length - 1; i >= 0; i--) {
                     const leaf = this.leaves[i];
                     
-                    // Wind influence
-                    leaf.vx += windDir * wind * 0.02 * this.windInfluence;
+                    // Carried by the wind: ease toward its velocity (top-down, so no "falling" south)
+                    leaf.vx += (tx - leaf.vx) * 0.02;
+                    leaf.vy += (ty - leaf.vy) * 0.02;
                     
-                    // Gravity (gentle fall)
-                    leaf.vy += 0.01;
-                    
-                    // Flutter effect (sinusoidal side motion)
+                    // Flutter across the wind (in still air, a light wander that settles)
                     leaf.flutter += leaf.flutterSpeed;
-                    const flutterForce = Math.sin(leaf.flutter) * 0.08;
-                    leaf.vx += flutterForce;
-                    leaf.vy += Math.cos(leaf.flutter) * 0.02;
-                    
-                    // Air resistance
-                    leaf.vx *= 0.99;
-                    leaf.vy *= 0.98;
-                    
-                    // Clamp falling speed
-                    leaf.vy = Math.min(leaf.vy, 2);
+                    const flutterForce = Math.sin(leaf.flutter) * (0.02 + 0.06 * gust);
+                    leaf.vx += px * flutterForce;
+                    leaf.vy += py * flutterForce;
                     
                     // Move
                     leaf.x += leaf.vx;
                     leaf.y += leaf.vy;
                     
                     // Rotate
-                    leaf.rotation += leaf.rotationSpeed;
-                    leaf.tumble += leaf.tumbleSpeed;
+                    leaf.rotation += leaf.rotationSpeed * (0.4 + gust);    // spins faster in a stronger wind
+                    leaf.tumble += leaf.tumbleSpeed * (0.4 + gust);
                     
                     // Check if off-screen (with margin)
                     const margin = 100;

@@ -82,19 +82,19 @@
             // of visits answered "when does it stop?" with "it doesn't". 22 keeps
             // the city emphatically wet while letting the forecast mean something.
             city:    { weights: { clear: 22, drizzle: 26, rain: 50, storm: 14 }, nightBias: 1.45,
-                       prevailing: 135, windVar: 45 },   // SE — matches v7's hardcoded wind exactly
+                       prevailing: 315, windVar: 45 },   // NW — the air sweeps down-right across the screen, with the rain
             // Open road outside the city — noticeably milder, so driving out of
             // town actually feels like going somewhere else.
             outskirt:{ weights: { clear: 34, drizzle: 28, rain: 30, storm: 8  }, nightBias: 1.15,
-                       prevailing: 225, windVar: 60 },   // SW — open ground, wanders more
+                       prevailing: 45,  windVar: 60 },   // NE — open ground, wanders more
             // Plaza/commercial pocket. Driest profile in the game.
             plaza:   { weights: { clear: 44, drizzle: 30, rain: 24, storm: 2  }, nightBias: 1.1,
-                       prevailing: 270, windVar: 70 },   // W — sheltered, least consistent
+                       prevailing: 90,  windVar: 70 },   // E — sheltered, least consistent
             // Boss arena — permanently foul. Weighted so it effectively never clears.
             tempest: { weights: { clear: 0,  drizzle: 8,  rain: 46, storm: 46 }, nightBias: 1.0,
-                       prevailing: 0,   windVar: 20 },   // N — relentless, barely shifts
+                       prevailing: 180, windVar: 20 },   // S — relentless, barely shifts
             _default:{ weights: { clear: 25, drizzle: 25, rain: 40, storm: 10 }, nightBias: 1.25,
-                       prevailing: 135, windVar: 55 }
+                       prevailing: 315, windVar: 55 }
         };
 
         /* =====================================================================
@@ -136,7 +136,7 @@
                 
                 // Wind as a 2D vector: {x:0, y:0} = no wind (pure perspective)
                 // Positive x = blows right, positive y = blows "down" on screen
-                this.windVec = { x: -2.5, y: -2.5 };
+                this.windVec = { x: 2.5, y: 2.5 };
                 this.wind = 0.5;             // Legacy scalar (0-1) for vehicle grip etc.
                 this.windDirection = 1;      // Legacy direction for vehicle grip etc.
                 
@@ -193,10 +193,10 @@
                 this.scheduleLocked = false;    // Missions/cutscenes can pin the sky
                 this.indoorSuppressed = false;  // Set by the room system, not by us
                 this._lastWorldMinutes = -1;    // Monotonic-clock guard
-                this._windTarget = { x: -2.5, y: -2.5 };
+                this._windTarget = { x: 2.5, y: 2.5 };
                 this._gustPhase = Math.random() * Math.PI * 2;
-                // Seeded from the city's prevailing SE wind, which is the same
-                // heading v7 hardcoded as {-2.5,-2.5}.
+                // Seeded from the city's prevailing NW wind: air travelling down-right,
+                // the way the rain has always slanted.
                 this._windAngle = this._prevailingAngle();
             }
 
@@ -213,8 +213,9 @@
 
                windVec points where the air is TRAVELLING. Every direction shown
                to the player is inverted from it, because meteorology names a
-               wind for where it comes FROM: air moving toward the northwest is
-               reported as a southeasterly.
+               wind for where it comes FROM: air moving toward the southeast (down-right,
+               the way the rain slants) is reported as a northwesterly. Everything the
+               wind touches (rain, cloth, hair, clouds, curtains, leaves) moves along +windVec.
                --------------------------------------------------------------- */
 
             /** Normalise any angle to [-π, π] so drift maths can't wind up. */
@@ -223,7 +224,7 @@
             /** Travel-angle for the current region's prevailing wind. */
             _prevailingAngle() {
                 const p = CLIMATE_PROFILES[this.climate] || CLIMATE_PROFILES._default;
-                const fromDeg = (typeof p.prevailing === 'number') ? p.prevailing : 135;
+                const fromDeg = (typeof p.prevailing === 'number') ? p.prevailing : 315;
                 const toRad = (fromDeg + 180) * Math.PI / 180;   // FROM -> TOWARD
                 return Math.atan2(-Math.cos(toRad), Math.sin(toRad));
             }
@@ -808,10 +809,10 @@
                         const dx = sx - hw;
                         const dy = sy - hh;
                         const parallax = h0 * h0 * RC.RAIN_PARALLAX;
-                        const startX = sx + dx * parallax + wx * RC.RAIN_WIND_DRIFT * h0;
-                        const startY = sy + dy * parallax + wy * RC.RAIN_WIND_DRIFT * h0;
-                        let toX = sx - startX + wx * RC.RAIN_WIND_DIR_STR;
-                        let toY = sy - startY + wy * RC.RAIN_WIND_DIR_STR;
+                        const startX = sx + dx * parallax - wx * RC.RAIN_WIND_DRIFT * h0;   // a drop sits upwind of where it lands
+                        const startY = sy + dy * parallax - wy * RC.RAIN_WIND_DRIFT * h0;
+                        let toX = sx - startX - wx * RC.RAIN_WIND_DIR_STR;
+                        let toY = sy - startY - wy * RC.RAIN_WIND_DIR_STR;
                         const dist = Math.sqrt(toX * toX + toY * toY);
                         let dirX = 0, dirY = 1;
                         if (dist > 0.1) { dirX = toX / dist; dirY = toY / dist; }
@@ -1027,8 +1028,8 @@
                     const dxs = sx - hw;
                     const dys = sy - hh;
                     const parallax = h * h * pxStr;
-                    const ax = sx + dxs * parallax + wx * wDrift * h;
-                    const ay = sy + dys * parallax + wy * wDrift * h;
+                    const ax = sx + dxs * parallax - wx * wDrift * h;   // upwind of the landing point, sliding downwind as it falls
+                    const ay = sy + dys * parallax - wy * wDrift * h;
                     
                     // Length tapers toward screen center: parallax displacement is
                     // small at center (vertical-ish drops, short streaks) and large
