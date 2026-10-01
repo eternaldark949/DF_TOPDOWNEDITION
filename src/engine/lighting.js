@@ -434,11 +434,12 @@
                 ctx.setTransform(1, 0, 0, 1, 0, 0); 
                 ctx.globalAlpha = finalOpacity;
                 let layer = this.lightCanvas;
-                if (GameSettings.softShadows) {
+                if (GameSettings.softShadows) {                              // soften by a half-size step (no ctx.filter)
                     const sc = this._softCanvas || (this._softCanvas = document.createElement('canvas'));
-                    if (sc.width !== lw || sc.height !== lh) { sc.width = lw; sc.height = lh; }
-                    const sx = sc.getContext('2d');
-                    sx.clearRect(0, 0, lw, lh); sx.filter = 'blur(1.5px)'; sx.drawImage(this.lightCanvas, 0, 0); sx.filter = 'none';
+                    const sw = Math.max(1, lw >> 1), sh = Math.max(1, lh >> 1);
+                    if (sc.width !== sw || sc.height !== sh) { sc.width = sw; sc.height = sh; }
+                    const sx = sc.getContext('2d'); sx.imageSmoothingEnabled = true;
+                    sx.clearRect(0, 0, sw, sh); sx.drawImage(this.lightCanvas, 0, 0, sw, sh);
                     layer = sc;
                 }
                 ctx.imageSmoothingEnabled = true;
@@ -481,18 +482,28 @@
                 this.bloomCtx.drawImage(this.bloomCanvas, 0, 0);
                 this.bloomCtx.globalAlpha = 1.0;
                 this.bloomCtx.globalCompositeOperation = 'source-over';
+                // The blur is a downscale chain (no ctx.filter: slow on many phones, unsupported in Safari):
+                // halving twice averages the light out; stretched back up with smoothing it reads as a soft
+                // bleed of about 12 and 24 px on screen, at a sixth and a twelfth of the resolution
                 const blurred = this._bloomBlur || (this._bloomBlur = [document.createElement('canvas'), document.createElement('canvas')]);
+                const sizes = [[Math.max(1, bw >> 1), Math.max(1, bh >> 1)], [Math.max(1, bw >> 2), Math.max(1, bh >> 2)]];
+                let src = this.bloomCanvas;
+                blurred.forEach((cv, i) => {
+                    const [w, h] = sizes[i];
+                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    const c = cv.getContext('2d'); c.imageSmoothingEnabled = true;
+                    c.clearRect(0, 0, w, h); c.drawImage(src, 0, 0, w, h);
+                    src = cv;
+                });
                 ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.globalCompositeOperation = 'lighter';
                 ctx.imageSmoothingEnabled = true;
-                [[4, 0.15], [8, 0.08]].forEach(([px, alpha], i) => {          // 4 / 8 px here ≈ 12 / 24 px on screen
-                    const cv = blurred[i];
-                    if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
-                    const c = cv.getContext('2d');
-                    c.clearRect(0, 0, bw, bh); c.filter = `blur(${px}px)`; c.drawImage(this.bloomCanvas, 0, 0); c.filter = 'none';
-                    ctx.globalAlpha = alpha;
-                    ctx.drawImage(cv, 0, 0, W, H);
-                });
+                // Fold the wide layer into the narrow one at small size, so the screen takes a single stretch
+                const c0 = blurred[0].getContext('2d'), [w0, h0] = sizes[0];
+                c0.globalCompositeOperation = 'lighter'; c0.globalAlpha = 0.08 / 0.15;
+                c0.drawImage(blurred[1], 0, 0, w0, h0);
+                c0.globalCompositeOperation = 'source-over'; c0.globalAlpha = 1;
+                ctx.globalAlpha = 0.15; ctx.drawImage(blurred[0], 0, 0, W, H);
                 ctx.globalAlpha = 1.0;
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.restore();

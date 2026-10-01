@@ -76,7 +76,7 @@
                 const c = cv.getContext('2d'), m = ctx.getTransform();
                 c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, H);
                 c.setTransform(m.a * R, m.b * R, m.c * R, m.d * R, m.e * R, m.f * R);
-                c.fillStyle = '#000'; c.beginPath();
+                c.fillStyle = 'rgb(92, 76, 150)'; c.beginPath();                              // lavender-tinted shade, painted in its colour (no tint pass)
                 const B = CONFIG.BUILDINGS, dx = S.dx * S.len, dy = S.dy * S.len;
                 const hull = (pts) => {                                                        // convex hull (monotone chain)
                     pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -122,12 +122,7 @@
                 ctx.globalCompositeOperation = 'multiply';
                 ctx.globalAlpha = 0.62 * strength;
                 // Lavender-tinted shade: multiply by a violet-grey rather than black
-                const tint = this._shadowTint || (this._shadowTint = (() => { const t = document.createElement('canvas'); return t; })());
-                if (tint.width !== W || tint.height !== H) { tint.width = W; tint.height = H; }
-                const tc = tint.getContext('2d');
-                tc.globalCompositeOperation = 'copy'; tc.drawImage(cv, 0, 0);
-                tc.globalCompositeOperation = 'source-in'; tc.fillStyle = 'rgb(92, 76, 150)'; tc.fillRect(0, 0, W, H);
-                ctx.drawImage(tint, 0, 0, this.canvas.width, this.canvas.height);
+                ctx.drawImage(cv, 0, 0, this.canvas.width, this.canvas.height);
                 ctx.restore();
                 // Clouds drifting over the city (softer, lighter; many when it's grey)
                 this._drawCloudShadows(ctx, cull, strength, S);

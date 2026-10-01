@@ -68,6 +68,22 @@
                 // 2. Get on-screen collidables
                 const margin = 300;
                 const onScreen = GameEntity.getOnScreen(camera, canvas, margin);
+                // A prop still moving off screen keeps colliding (else it drifts through walls out of sight)
+                const dyn = GameEntity.getByLayer('DYNAMIC');
+                if (dyn.length) {
+                    let seen = null;
+                    for (const p of dyn) {
+                        if (!p.active || !(p.vx || p.vy || p.angularVel)) continue;
+                        if (!seen) seen = new Set(onScreen);
+                        if (!seen.has(p)) { onScreen.push(p); seen.add(p); }
+                    }
+                }
+                // Actors that move by position (the player) have no vx/vy: their contact velocity is this tick's step
+                for (const e of onScreen) {
+                    if (e.collisionLayer !== GameEntity.LAYER.ACTOR) continue;
+                    e._cvx = e._cpx === undefined ? 0 : e.x - e._cpx; e._cvy = e._cpy === undefined ? 0 : e.y - e._cpy;
+                    e._cpx = e.x; e._cpy = e.y;
+                }
                 
                 // 3. Insert into spatial grid
                 for (let entity of onScreen) {
@@ -212,27 +228,13 @@
                     e.collisionLayer === GameEntity.LAYER.VEHICLE && e.active
                 );
                 
-                // Vehicle vs Vehicle
-                for (let i = 0; i < vehicles.length; i++) {
-                    const v1 = vehicles[i];
-                    const nearby = this.spatialGrid.getNearby(v1);
-                    
-                    for (let v2 of nearby) {
-                        if (v2.collisionLayer !== GameEntity.LAYER.VEHICLE) continue;
-                        if (!v2.active || v1 === v2) continue;
-                        if (vehicles.indexOf(v2) <= i) continue;
-                        
-                        this.stats.totalChecks++;
-                        const packet = this._satCollision(v1.getOBB(), v2.getOBB());
-                        if (packet) {
-                            this._resolveVehicleCollision(v1, v2, packet);
-                            this.stats.collisionsResolved++;
-                        }
-                    }
-                }
-                
-                // Vehicle vs Static
+                // Vehicle vs vehicle belongs to TrafficManager.resolveCollisions (every traffic car, the
+                // driven car and the owned car): resolving it here too doubled the impulse, crunch and shake.
+
+                // Vehicle vs Static: only for cars that didn't already probe the walls this tick
+                // (applyDrivePhysics marks _wallProbeTick)
                 for (let vehicle of vehicles) {
+                    if (vehicle._wallProbeTick === _simTick) continue;
                     const nearby = this.spatialGrid.getNearby(vehicle);
                     
                     for (let wall of nearby) {
@@ -248,6 +250,23 @@
                             this._resolveVehicleCollision(vehicle, { getOBB: () => wallOBB, isStatic: true }, packet);
                             this.stats.collisionsResolved++;
                         }
+                    }
+                }
+
+                // Vehicle vs props: a car shoves a prop aside (and spins it off the corner it hits); the
+                // prop barely slows the car (mass ratio)
+                for (let vehicle of vehicles) {
+                    const nearby = this.spatialGrid.getNearby(vehicle);
+                    for (let prop of nearby) {
+                        if (prop.collisionLayer !== GameEntity.LAYER.DYNAMIC || !prop.active) continue;
+                        this.stats.totalChecks++;
+                        const vo = vehicle.getOBB(), po = prop.getOBB();
+                        const packet = this._satCollision(vo, po);
+                        if (!packet) continue;
+                        const cp = this._contactPoint(vo, po, packet.nx, packet.ny);
+                        this._solveContact(vehicle, prop, packet, cp, 0.25, 0.4);
+                        prop._still = 0;
+                        this.stats.collisionsResolved++;
                     }
                 }
             }
@@ -334,6 +353,7 @@
                         this.stats.totalChecks++;
                         const packet = this._circleVsOBB(actor, prop);
                         if (packet) {
+                            prop._still = 0;
                             this._resolveCircleVsDynamic(actor, prop, packet);
                             this.stats.collisionsResolved++;
                         }
@@ -345,54 +365,160 @@
                 const dynamics = onScreen.filter(e => 
                     e.collisionLayer === GameEntity.LAYER.DYNAMIC && e.active
                 );
-                
-                const checkedPairs = new Set();
-                
-                // Dynamic vs Dynamic (OBB vs OBB)
-                for (let propA of dynamics) {
-                    const nearby = this.spatialGrid.getNearby(propA);
-                    
-                    for (let propB of nearby) {
-                        if (propB.collisionLayer !== GameEntity.LAYER.DYNAMIC) continue;
-                        if (!propB.active || propB === propA) continue;
-                        
-                        const pairId = propA.id < propB.id 
-                            ? `${propA.id}-${propB.id}` 
-                            : `${propB.id}-${propA.id}`;
-                        
-                        if (checkedPairs.has(pairId)) continue;
-                        checkedPairs.add(pairId);
-                        
-                        this.stats.totalChecks++;
-                        const packet = this._satCollision(propA.getOBB(), propB.getOBB());
-                        if (packet) {
-                            this._resolveDynamicCollision(propA, propB, packet);
-                            this.stats.collisionsResolved++;
+                if (!dynamics.length) return;
+                const asleep = (p) => (p._still || 0) > 30;
+
+                // A few relaxation passes: a prop pushed out of one contact into another settles instead of jittering
+                for (let pass = 0; pass < 3; pass++) {
+                    const checked = new Set();
+                    // Dynamic vs Dynamic (OBB vs OBB)
+                    for (let propA of dynamics) {
+                        const nearby = this.spatialGrid.getNearby(propA);
+                        for (let propB of nearby) {
+                            if (propB.collisionLayer !== GameEntity.LAYER.DYNAMIC) continue;
+                            if (!propB.active || propB === propA) continue;
+                            const key = propA.id < propB.id ? propA.id * 1e6 + propB.id : propB.id * 1e6 + propA.id;
+                            if (checked.has(key)) continue;
+                            checked.add(key);
+                            if (asleep(propA) && asleep(propB)) continue;                    // two sleepers stay put
+                            if (this._invMass(propA) === 0 && this._invMass(propB) === 0) continue;
+                            this.stats.totalChecks++;
+                            const oa = propA.getOBB(), ob = propB.getOBB();
+                            const packet = this._satCollision(oa, ob);
+                            if (packet) {
+                                const cp = this._contactPoint(oa, ob, packet.nx, packet.ny);
+                                this._solveContact(propA, propB, packet, cp, Math.min(propA.restitution || 0.3, propB.restitution || 0.3), 0.35);
+                                if (packet.depth > 0.5) { propA._still = 0; propB._still = 0; }
+                                this.stats.collisionsResolved++;
+                            }
                         }
                     }
-                }
-                
-                // Dynamic vs Static
-                for (let prop of dynamics) {
-                    const nearby = this.spatialGrid.getNearby(prop);
-                    
-                    for (let wall of nearby) {
-                        if (wall.collisionLayer !== GameEntity.LAYER.STATIC) continue;
-                        if (!wall.active) continue;
-                        
-                        this.stats.totalChecks++;
-                        const wallOBB = this._aabbToOBB(wall);
-                        wallOBB.mass = Infinity;
-                        
-                        const packet = this._satCollision(prop.getOBB(), wallOBB);
-                        if (packet) {
-                            this._resolveDynamicVsStatic(prop, packet);
-                            this.stats.collisionsResolved++;
+                    // Dynamic vs Static
+                    for (let prop of dynamics) {
+                        if (asleep(prop) || this._invMass(prop) === 0) continue;
+                        const nearby = this.spatialGrid.getNearby(prop);
+                        for (let wall of nearby) {
+                            if (wall.collisionLayer !== GameEntity.LAYER.STATIC) continue;
+                            if (!wall.active) continue;
+                            this.stats.totalChecks++;
+                            const wallOBB = this._aabbToOBB(wall);
+                            const po = prop.getOBB();
+                            const packet = this._satCollision(po, wallOBB);
+                            if (packet) {
+                                const cp = this._contactPoint(po, wallOBB, packet.nx, packet.ny);
+                                this._solveContact(prop, null, packet, cp, prop.restitution || 0.3, 0.45);
+                                this.stats.collisionsResolved++;
+                            }
                         }
                     }
                 }
             }
-            
+
+            // =====================
+            //  CONTACT SOLVER (rigid bodies in the plane)
+            // =====================
+
+            /** Inverse mass: 0 for static or immovable things (fixtures, very heavy decor) and walls. */
+            static _invMass(e) {
+                if (!e || e.isStatic || e.immovable) return 0;
+                const m = e.mass || 1;
+                return m >= 1e4 ? 0 : 1 / m;
+            }
+            /** Inverse moment of inertia about the centre: a box spins (I = m(w²+h²)/12); circles, cars and fixed decor don't. */
+            static _invInertia(e) {
+                if (!e || e.angularVel === undefined || e.fixedRotation || this._invMass(e) === 0) return 0;
+                const w = e.width || 20, h = e.height || 20;
+                return 12 / ((e.mass || 1) * (w * w + h * h));
+            }
+            static _centre(e) { return e.getCenter ? e.getCenter() : { x: e.x, y: e.y }; }
+            /** Contact velocity: actors add knockback and the position step (the player moves by position). */
+            static _vel(e) {
+                if (e.collisionLayer === GameEntity.LAYER.ACTOR)
+                    return { x: (e.vx || 0) + (e.knockbackVx || 0) + (e.vx ? 0 : e._cvx || 0), y: (e.vy || 0) + (e.knockbackVy || 0) + (e.vy ? 0 : e._cvy || 0) };
+                return { x: e.vx || 0, y: e.vy || 0 };
+            }
+            static _addVel(e, dx, dy) {
+                if (e.collisionLayer === GameEntity.LAYER.ACTOR && e.knockbackVx !== undefined) { e.knockbackVx += dx; e.knockbackVy += dy; }
+                else { e.vx = (e.vx || 0) + dx; e.vy = (e.vy || 0) + dy; }
+            }
+
+            /**
+             * Resolve one contact between a and b (b null = a wall): n points from b to a, cp is the contact point.
+             * Position: push apart by the depth beyond a little slop, shared by inverse mass. Velocity: a normal
+             * impulse with restitution e and Coulomb friction mu, each with its angular term (r × n)² / I,
+             * so an off-centre hit turns the body the way it should — no random spin.
+             */
+            static _solveContact(a, b, packet, cp, e, mu, invA) {
+                const { nx, ny, depth } = packet;
+                const iA = invA ?? this._invMass(a), iB = b ? this._invMass(b) : 0;
+                const sum = iA + iB;
+                if (sum === 0) return;
+                // Position correction (80% of the depth past 0.5px of slop)
+                const corr = Math.max(0, depth - 0.5) * 0.8 / sum;
+                if (iA) { a.x += nx * corr * iA; a.y += ny * corr * iA; }
+                if (iB) { b.x -= nx * corr * iB; b.y -= ny * corr * iB; }
+                if (depth > 0.5 && depth - 0.5 < 0.5) {                               // shallow: finish the push without overshoot
+                    const rest = (depth - 0.5) * 0.2 / sum;
+                    if (iA) { a.x += nx * rest * iA; a.y += ny * rest * iA; }
+                    if (iB) { b.x -= nx * rest * iB; b.y -= ny * rest * iB; }
+                }
+                // Velocities at the contact point
+                const IA = this._invInertia(a), IB = b ? this._invInertia(b) : 0;
+                const cA = this._centre(a), cB = b ? this._centre(b) : cp;
+                const rAx = cp.x - cA.x, rAy = cp.y - cA.y, rBx = cp.x - cB.x, rBy = cp.y - cB.y;
+                const vA = this._vel(a), vB = b ? this._vel(b) : { x: 0, y: 0 };
+                const wA = a.angularVel || 0, wB = b ? (b.angularVel || 0) : 0;
+                const rvx = (vA.x - wA * rAy) - (vB.x - wB * rBy), rvy = (vA.y + wA * rAx) - (vB.y + wB * rBx);
+                const vn = rvx * nx + rvy * ny;
+                if (vn >= 0) return;                                                   // already separating
+                const rAn = rAx * ny - rAy * nx, rBn = rBx * ny - rBy * nx;
+                const kN = sum + rAn * rAn * IA + rBn * rBn * IB;
+                const j = -(1 + e) * vn / kN;
+                // Actors push but take no velocity back (they move by their own will; knockback is for hits)
+                const vA_ = a.collisionLayer === GameEntity.LAYER.ACTOR ? 0 : iA, vB_ = b && b.collisionLayer === GameEntity.LAYER.ACTOR ? 0 : iB;
+                this._applyImpulse(a, b, nx * j, ny * j, rAx, rAy, rBx, rBy, vA_, vB_, IA, IB);
+                // Friction along the tangent, capped by mu·j
+                let tx = rvx - vn * nx, ty = rvy - vn * ny;
+                const tl = Math.hypot(tx, ty);
+                if (tl > 1e-6) {
+                    tx /= tl; ty /= tl;
+                    const rAt = rAx * ty - rAy * tx, rBt = rBx * ty - rBy * tx;
+                    const kT = sum + rAt * rAt * IA + rBt * rBt * IB;
+                    const jt = Math.max(-mu * j, Math.min(mu * j, -tl / kT));
+                    this._applyImpulse(a, b, tx * jt, ty * jt, rAx, rAy, rBx, rBy, vA_, vB_, IA, IB);
+                }
+            }
+            static _applyImpulse(a, b, Jx, Jy, rAx, rAy, rBx, rBy, iA, iB, IA, IB) {
+                if (iA) this._addVel(a, Jx * iA, Jy * iA);
+                if (IA) a.angularVel = (a.angularVel || 0) + (rAx * Jy - rAy * Jx) * IA;
+                if (b && iB) this._addVel(b, -Jx * iB, -Jy * iB);
+                if (b && IB) b.angularVel = (b.angularVel || 0) - (rBx * Jy - rBy * Jx) * IB;
+            }
+
+            /** Is point p inside the OBB (a little tolerance)? */
+            static _inOBB(p, o, tol = 0.6) {
+                const c = Math.cos(-(o.angle || 0)), s = Math.sin(-(o.angle || 0)), dx = p.x - o.x, dy = p.y - o.y;
+                const lx = dx * c - dy * s, ly = dx * s + dy * c;
+                return Math.abs(lx) <= (o.length || o.width || 20) / 2 + tol && Math.abs(ly) <= (o.width || o.height || 20) / 2 + tol;
+            }
+            /**
+             * Where two OBBs touch (n from o2 to o1): the deepest corner(s) of each into the other, averaging
+             * corners that tie (face to face, so a flush push doesn't twist), preferring the one that's inside.
+             */
+            static _contactPoint(o1, o2, nx, ny) {
+                const pick = (corners, sign) => {
+                    let best = Infinity; for (const c of corners) best = Math.min(best, sign * (c.x * nx + c.y * ny));
+                    let x = 0, y = 0, k = 0;
+                    for (const c of corners) if (sign * (c.x * nx + c.y * ny) <= best + 0.5) { x += c.x; y += c.y; k++; }
+                    return { x: x / k, y: y / k };
+                };
+                const p1 = pick(this._getOBBCorners(o1), 1), p2 = pick(this._getOBBCorners(o2), -1);
+                const in1 = this._inOBB(p1, o2), in2 = this._inOBB(p2, o1);
+                if (in1 && !in2) return p1;
+                if (in2 && !in1) return p2;
+                return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+            }
+
             // =====================
             //  COLLISION DETECTION
             // =====================
@@ -596,11 +722,14 @@
                     nx = localNx * cosBack - localNy * sinBack;
                     ny = localNx * sinBack + localNy * cosBack;
                 } else {
-                    // Circle center inside OBB
+                    // Circle centre inside the box: out through the nearest face, the whole way
                     const cosBack = Math.cos(obb.angle);
                     const sinBack = Math.sin(obb.angle);
-                    nx = -sinBack;
-                    ny = cosBack;
+                    const ex = hw - Math.abs(localX), ey = hh - Math.abs(localY);
+                    const lnx = ex < ey ? Math.sign(localX) || 1 : 0, lny = ex < ey ? 0 : Math.sign(localY) || 1;
+                    nx = lnx * cosBack - lny * sinBack;
+                    ny = lnx * sinBack + lny * cosBack;
+                    return { nx, ny, depth: Math.min(ex, ey) + circle.radius };
                 }
                 
                 return { nx, ny, depth: circle.radius - dist };
@@ -609,48 +738,6 @@
             // =====================
             //  COLLISION RESOLUTION
             // =====================
-            
-            /**
-             * Resolve collision between two dynamic entities using mass-based impulse.
-             */
-            static _resolveDynamicCollision(a, b, packet) {
-                const { nx, ny, depth } = packet;
-                
-                const m1 = a.mass || 1;
-                const m2 = b.mass || 1;
-                const totalMass = m1 + m2;
-                const ratio1 = m2 / totalMass;
-                const ratio2 = m1 / totalMass;
-                
-                // Position separation
-                a.x += nx * depth * ratio1;
-                a.y += ny * depth * ratio1;
-                b.x -= nx * depth * ratio2;
-                b.y -= ny * depth * ratio2;
-                
-                // Velocity impulse
-                const v1n = (a.vx || 0) * nx + (a.vy || 0) * ny;
-                const v2n = (b.vx || 0) * nx + (b.vy || 0) * ny;
-                const relVel = v1n - v2n;
-                
-                if (relVel > 0) return; // Separating
-                
-                const restitution = Math.min(a.restitution || 0.3, b.restitution || 0.3);
-                const j = -(1 + restitution) * relVel / totalMass;
-                
-                a.vx = (a.vx || 0) + j * m2 * nx;
-                a.vy = (a.vy || 0) + j * m2 * ny;
-                b.vx = (b.vx || 0) - j * m1 * nx;
-                b.vy = (b.vy || 0) - j * m1 * ny;
-                
-                // Angular impulse (props can spin)
-                if (a.angularVel !== undefined) {
-                    a.angularVel += (Math.random() - 0.5) * Math.abs(relVel) * 0.02;
-                }
-                if (b.angularVel !== undefined) {
-                    b.angularVel += (Math.random() - 0.5) * Math.abs(relVel) * 0.02;
-                }
-            }
             
             /**
              * Resolve actor vs actor collision (circle vs circle).
@@ -722,29 +809,6 @@
             }
             
             /**
-             * Resolve dynamic vs static collision.
-             */
-            static _resolveDynamicVsStatic(dynamic, packet) {
-                const { nx, ny, depth } = packet;
-                
-                // Full separation on dynamic
-                dynamic.x += nx * depth;
-                dynamic.y += ny * depth;
-                
-                // Velocity bounce
-                const vn = (dynamic.vx || 0) * nx + (dynamic.vy || 0) * ny;
-                if (vn < 0) {
-                    const restitution = dynamic.restitution || 0.3;
-                    dynamic.vx = (dynamic.vx || 0) - (1 + restitution) * vn * nx;
-                    dynamic.vy = (dynamic.vy || 0) - (1 + restitution) * vn * ny;
-                    
-                    // Dampen
-                    dynamic.vx *= 0.8;
-                    dynamic.vy *= 0.8;
-                }
-            }
-            
-            /**
              * Resolve circle (actor) vs static collision.
              */
             static _resolveCircleVsStatic(circle, packet) {
@@ -757,45 +821,12 @@
              * Resolve circle (actor) vs dynamic (prop) collision with impulse.
              */
             static _resolveCircleVsDynamic(actor, prop, packet) {
-                const { nx, ny, depth } = packet;
-                
-                const m1 = actor.mass || 10;
-                const m2 = prop.mass || 5;
-                const totalMass = m1 + m2;
-                const ratio1 = m2 / totalMass;
-                const ratio2 = m1 / totalMass;
-                
-                // Position separation
-                actor.x += nx * depth * ratio1;
-                actor.y += ny * depth * ratio1;
-                
-                if (!prop.isStatic) {
-                    prop.x -= nx * depth * ratio2;
-                    prop.y -= ny * depth * ratio2;
-                    
-                    // Velocity calculation
-                    const actorVx = (actor.knockbackVx || 0) + (actor.vx || 0);
-                    const actorVy = (actor.knockbackVy || 0) + (actor.vy || 0);
-                    const propVx = prop.vx || 0;
-                    const propVy = prop.vy || 0;
-                    
-                    const relVel = (actorVx - propVx) * nx + (actorVy - propVy) * ny;
-                    
-                    if (relVel < -0.5) {
-                        const restitution = 0.3;
-                        const j = -(1 + restitution) * relVel / totalMass;
-                        
-                        // Actor knockback
-                        if (actor.knockbackVx !== undefined) {
-                            actor.knockbackVx += j * m2 * nx;
-                            actor.knockbackVy += j * m2 * ny;
-                        }
-                        
-                        // Prop velocity
-                        prop.vx -= j * m1 * nx;
-                        prop.vy -= j * m1 * ny;
-                    }
-                }
+                // n points from the prop to the actor; they touch on the actor's near side
+                const r = actor.radius || 10;
+                const cp = { x: actor.x - packet.nx * (r - packet.depth / 2), y: actor.y - packet.ny * (r - packet.depth / 2) };
+                if (prop.isStatic) { actor.x += packet.nx * packet.depth; actor.y += packet.ny * packet.depth; return; }
+                // Legs push harder than a body weighs: actors shove with PUSH_MASS × their mass
+                this._solveContact(actor, prop, packet, cp, 0, 0.5, 1 / ((actor.mass || 10) * CONFIG.PHYSICS.PUSH_MASS));
             }
             
             // =====================

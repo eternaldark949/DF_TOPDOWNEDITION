@@ -38,6 +38,7 @@ const SCRIPTS = [
     'core/utils.js',
     'world/navigation.js',
     'core/draw-helpers.js',
+    'core/cache-db.js',
     'core/appearances.js',
     'core/settings.js',
     'story/story-db.js',

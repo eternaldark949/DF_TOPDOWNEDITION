@@ -12,45 +12,50 @@
                for cleaner code and consistent state.
                ========================================================= */
             updateUI() {
+                // Runs every tick, so it only touches the DOM when a value actually changed
+                // (each write can cost a style recalculation on phones). U caches the elements and last values.
+                const U = this._ui || (this._ui = {
+                    flit: document.getElementById('flit-bar'), shield: document.getElementById('ui-shield-bar'),
+                    shieldFill: document.getElementById('shield-bar-fill'), bars: null, last: {}, vizT: 0
+                });
+                const L = U.last, set = (k, v, fn) => { if (L[k] !== v) { L[k] = v; fn(v); } };
+
                 // --- 1. HEALTH BAR (Red gradient) ---
                 // Displays player's current HP as percentage of max
                 const healthPercent = Math.max(0, (this.playerHealth / this.maxPlayerHealth) * 100);
-                this.healthBar.style.width = `${healthPercent}%`;
+                set('hp', healthPercent.toFixed(1), v => { this.healthBar.style.width = `${v}%`; });
                 
                 // --- 2. FLIT ATTUNEMENT BAR (Champagne/Gold) ---
                 // Shows current attunement pool. Full bar = max charges available.
                 const flitPercent = Math.max(0, Math.min(100, 
                     (this.flitState.attunement / this.flitState.maxAttunement) * 100));
-                document.getElementById('flit-bar').style.width = `${flitPercent}%`;
+                if (U.flit) set('flit', flitPercent.toFixed(1), v => { U.flit.style.width = `${v}%`; });
 
                 // --- 3. ECONOMY DISPLAY ---
                 // PP = Primary currency for purchases
                 // Scrap = Secondary resource for upgrades
-                this.uiCurrency.textContent = `PP: ${this.currency}`;
-                this.uiScrap.textContent = `Scrap: ${this.scrap}`;
+                set('pp', this.currency, v => { this.uiCurrency.textContent = `PP: ${v}`; });
+                set('scrap', this.scrap, v => { this.uiScrap.textContent = `Scrap: ${v}`; });
                 this.updateResonanceHUD();
                 
                 // --- 4. BOOSTER/STIM COUNT ---
                 // Shows remaining healing items on the heal button
-                this.healBtn.innerHTML = `✚<br><span>${this.boosterCount}</span>`;
+                set('boost', this.boosterCount, v => { this.healBtn.innerHTML = `✚<br><span>${v}</span>`; });
                 
                 // --- 5. GOLDEN SHIELD BAR (any buff with shield) ---
-                const shieldContainer = document.getElementById('ui-shield-bar');
-                const shieldFill = document.getElementById('shield-bar-fill');
-                if (shieldContainer && shieldFill) {
+                if (U.shield && U.shieldFill) {
                     const shieldBuff = this.player.buffSystem.getShieldBuff();
-                    if (shieldBuff) {
-                        shieldContainer.style.display = 'block';
-                        shieldFill.style.width = `${(shieldBuff.shield / shieldBuff.maxShield) * 100}%`;
-                    } else {
-                        shieldContainer.style.display = 'none';
-                    }
+                    set('shieldOn', !!shieldBuff, v => { U.shield.style.display = v ? 'block' : 'none'; });
+                    if (shieldBuff) set('shieldW', ((shieldBuff.shield / shieldBuff.maxShield) * 100).toFixed(1), v => { U.shieldFill.style.width = `${v}%`; });
                 }
                 
                 // --- 6. AUDIO VISUALIZER (Cosmetic) ---
-                // Random bar heights create a "playing music" effect
-                const bars = document.querySelectorAll('#audio-viz .viz-bar');
-                bars.forEach(bar => bar.style.height = `${20 + Math.random() * 80}%`);
+                // Random bar heights create a "playing music" effect (about 10 times a second is plenty)
+                if (++U.vizT >= 6) {
+                    U.vizT = 0;
+                    if (!U.bars || !U.bars.length) U.bars = document.querySelectorAll('#audio-viz .viz-bar');
+                    U.bars.forEach(bar => bar.style.height = `${20 + Math.random() * 80}%`);
+                }
             },
             
             /* =========================================================

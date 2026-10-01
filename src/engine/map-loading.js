@@ -1423,6 +1423,24 @@
                 }
             
                 // 2. COMPUTE SHADOW POLYGON PER LAMP (cached on lamp object)
+                // The same map gives the same polygons: reuse them from the cache (core/cache-db.js) when the
+                // signature of every lamp and obstacle matches, else compute them and store them for next time.
+                let sig = this.activeMap.width + ',' + this.activeMap.height + '|';
+                for (const l of this.lamps) sig += ((l.x * 10) | 0) + ',' + ((l.y * 10) | 0) + ',' + ((l.radius * 10) | 0) + ';';
+                let os = 0, on = 0;
+                for (const o of allObstacles) { const w = o.width ?? o.w ?? 0, h = o.height ?? o.h ?? 0; os = (os * 31 + ((o.x * 7 + o.y * 13 + w * 17 + h * 19) | 0)) | 0; on++; }
+                sig += '|' + on + ':' + os;
+                const ckey = 'lampPolys:' + this.activeMap.id, cached = CacheDB.get(ckey, sig);
+                if (cached && cached.length === this.lamps.length) {
+                    this.lamps.forEach((lamp, i) => {
+                        const f = cached[i], pts = [];
+                        for (let k = 0; k < f.length; k += 2) pts.push({ x: f[k], y: f[k + 1] });
+                        lamp._shadowPoly = pts;
+                        if (pts.length > 0) this.debugLightData.push({ source: { x: lamp.x, y: lamp.y }, points: pts });
+                    });
+                    this.lightingBaked = true;
+                    return;
+                }
                 for (let lamp of this.lamps) {
                     // Visibility polygon (core/draw-helpers.js), bounded by the map's corners
                     const intersections = computeVisibilityPoly(lamp.x, lamp.y, lamp.radius, allObstacles, {
@@ -1437,6 +1455,11 @@
                         this.debugLightData.push({ source: {x: lamp.x, y: lamp.y}, points: intersections });
                     }
                 }
+                if (this.lamps.length > 4) CacheDB.put(ckey, sig, this.lamps.map(l => {
+                    const p = l._shadowPoly || [], f = new Float32Array(p.length * 2);
+                    p.forEach((q, i) => { f[2 * i] = q.x; f[2 * i + 1] = q.y; });
+                    return f;
+                }));
                 this.lightingBaked = true;
             },
             

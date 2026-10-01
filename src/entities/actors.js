@@ -787,9 +787,12 @@
                                 target.vx += dirX * impulseStrength;
                                 target.vy += dirY * impulseStrength;
                                 
-                                // Add spin on powerful hits
-                                if (this.damage > 50 && target.angularVelocity !== undefined) {
-                                    target.angularVelocity += (Math.random() - 0.5) * impulseStrength * 0.1;
+                                // Spin from where it struck: torque = r × J about the prop's centre (I = m(w²+h²)/12)
+                                if (target.angularVel !== undefined && !target.fixedRotation) {
+                                    const c = target.getCenter ? target.getCenter() : { x: target.x, y: target.y };
+                                    const rx = this.x - c.x, ry = this.y - c.y, w = target.width || 20, h = target.height || 20;
+                                    target.angularVel += 12 * (rx * dirY - ry * dirX) * impulseStrength / (w * w + h * h);
+                                    target._still = 0;
                                 }
                             }
                         }
