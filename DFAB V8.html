@@ -2101,7 +2101,7 @@
                               display: flex; align-items: center; justify-content: center; font-size: 0.55rem; }
         .msg-typing { font-style: italic; color: #c07878; animation: pulseText 1s infinite alternate; }
         
-        #phone-map-canvas { width: 100%; height: 300px; background: #0a0a15; border-radius: 10px; border: 1px solid #333; }
+        #phone-map-canvas { width: 100%; height: 300px; background: #0b0614; border-radius: 12px; border: 1px solid rgba(217, 204, 255, 0.25); box-shadow: 0 0 18px rgba(139, 92, 246, 0.18) inset; }
         .help-section { background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 10px; margin-bottom: 10px; }
         .help-section h4 { color: rgba(200, 100, 80, 0.8); font-size: 0.85rem; margin-bottom: 8px; margin-top: 0; }
         .help-section p { color: #bbb; font-size: 0.75rem; line-height: 1.5; }
@@ -2244,7 +2244,7 @@
         #log-clear-btn:hover { background: rgba(255,80,80,0.15); color: #fff; }
 
         /* --- MAP INTERFACE --- */
-        #map-interface { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 50; display: none; }
+        #map-interface { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #0b0614; z-index: 50; display: none; }
         #golden-map-canvas { 
             position: absolute;
             left: 0;
@@ -2253,7 +2253,6 @@
             bottom: 0;
             width: 100%;
             height: 100%; 
-            filter: contrast(1.2) brightness(1.1);
             z-index: 1;
         }
         /* Map sidebars overlay the canvas */
@@ -5936,6 +5935,28 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             tm.y += (dy / d) * step;
         }
         
+        /* roundRect for browsers without it (Safari before 16.4): on the 2D context and on Path2D, taking a
+           single radius or [all], [tl-br, tr-bl], [tl, tr-bl, br] or [tl, tr, br, bl] like the real one. */
+        (() => {
+            const shim = function (x, y, w, h, r = 0) {
+                let rs = Array.isArray(r) ? r.map(v => typeof v === 'object' ? (v.x || 0) : v) : [r];
+                if (rs.length === 1) rs = [rs[0], rs[0], rs[0], rs[0]];
+                else if (rs.length === 2) rs = [rs[0], rs[1], rs[0], rs[1]];
+                else if (rs.length === 3) rs = [rs[0], rs[1], rs[2], rs[1]];
+                const lim = Math.min(Math.abs(w), Math.abs(h)) / 2, [tl, tr, br, bl] = rs.map(v => Math.max(0, Math.min(v || 0, lim)));
+                if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
+                this.moveTo(x + tl, y);
+                this.arcTo(x + w, y, x + w, y + h, tr);
+                this.arcTo(x + w, y + h, x, y + h, br);
+                this.arcTo(x, y + h, x, y, bl);
+                this.arcTo(x, y, x + w, y, tl);
+                this.closePath();
+            };
+            if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = shim;
+            if (typeof Path2D !== 'undefined' && !Path2D.prototype.roundRect) Path2D.prototype.roundRect = shim;
+            if (typeof OffscreenCanvasRenderingContext2D !== 'undefined' && !OffscreenCanvasRenderingContext2D.prototype.roundRect) OffscreenCanvasRenderingContext2D.prototype.roundRect = shim;
+        })();
+
         /** Normalize an angle difference to [-PI, PI]. */
         function normalizeAngle(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
         
@@ -34548,6 +34569,257 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 else for (let sx = cw.x + 8; sx < cw.x + cw.w - 8; sx += 18) stripe(sx, cw.y + 8, 11, cw.h - 16);
             }
         }
+        /* =====================================================================
+           MAP ICONS & MAP ART — one icon set and one city look for the golden map
+           (ui/ui-system.js) and the phone's map (ui/phone.js).
+             MapIcons.draw(ctx, kind, x, y, opts)   a crisp icon at a FIXED size in CSS px
+                 (never the window width, never the map zoom; a gentle zoomK if asked),
+                 painted once per kind/size/dpr into a sprite and stamped after. Paths
+                 only — no emoji or text glyphs (Safari's colour-emoji fallback at big
+                 sizes with shadows was the scrapyard crash suspect).
+             MapArt.paintCity(ctx, map, opts)       the city of light: gold on deep violet —
+                 roads glowing like molten gold, pavements and crosswalks in faint gold,
+                 lamps as warm specks, violet blocks and buildings rimmed in gold, parks as
+                 deeper violet with a cobbled grain. Draws in map units on a ctx already
+                 transformed; opts.px = device px per map unit (keeps hairlines hairline).
+           ===================================================================== */
+        const MAP_PAL = {
+            base: '#0b0614', ground: '#120a24', block: '#170d2e', building: '#1e1138', park: '#0f0820',
+            rim: 'rgba(255, 200, 110, 0.32)', pave: 'rgba(255, 176, 80, 0.10)', cross: 'rgba(255, 222, 160, 0.30)',
+            gold: '#ffcf6a', goldHot: '#fff3cf', violet: '#8b5cf6', lavender: '#d9ccff', crimson: '#b0103a'
+        };
+
+        const MapIcons = {
+            // Fixed sizes in CSS px (the whole set in one place)
+            SIZE: { player: 22, car: 20, pin: 30, objective: 30, danger: 30, dest: 30, transition: 15, client: 11, search: 14 },
+            /** A gentle response to zoom (icons grow a little as you zoom in), never to the screen. */
+            zoomK(zoom) { return Math.max(0.9, Math.min(1.2, 0.86 + 0.08 * zoom)); },
+            _cache: new Map(),
+
+            /** The sprite for kind at a CSS size and pixel ratio: { cv, ax, ay } (anchor in sprite px). */
+            sprite(kind, css, dpr) {
+                const key = kind + '|' + Math.round(css * 4) + '|' + dpr;
+                let s = this._cache.get(key);
+                if (s) return s;
+                const S = Math.max(4, Math.round(css * dpr)), pad = Math.ceil(S * 0.45), W = S + pad * 2;
+                const cv = document.createElement('canvas'); cv.width = cv.height = W;
+                const c = cv.getContext('2d');
+                c.translate(pad, pad);
+                const [base, glyph] = kind.split(':');
+                const ay = (this._paint[base] || this._paint.client).call(this, c, S, glyph) ?? 0.5;   // painters return the anchor's y (0..1 of S)
+                s = { cv, ax: pad + S / 2, ay: pad + S * ay, W };
+                this._cache.set(key, s);
+                return s;
+            },
+
+            /** Stamp kind centred (or anchored: pins at their tip) at device-px x, y. opts: { css, dpr, rot, alpha, scale } */
+            draw(ctx, kind, x, y, opts = {}) {
+                const dpr = opts.dpr || 1, base = kind.split(':')[0];
+                const css = (opts.css || this.SIZE[base] || 16);
+                const s = this.sprite(kind, css, dpr), k = opts.scale || 1;
+                const a0 = ctx.globalAlpha;
+                if (opts.alpha !== undefined) ctx.globalAlpha = a0 * opts.alpha;
+                if (opts.rot) {
+                    ctx.save(); ctx.translate(x, y); ctx.rotate(opts.rot); ctx.scale(k, k);
+                    ctx.drawImage(s.cv, -s.ax, -s.ay); ctx.restore();
+                } else ctx.drawImage(s.cv, x - s.ax * k, y - s.ay * k, s.W * k, s.W * k);
+                ctx.globalAlpha = a0;
+            },
+
+            // ── Painters: each draws inside an S×S box (0..S), soft glows baked in (once), returns the anchor y ──
+            _glow(c, x, y, r, rgb, a) {
+                const g = c.createRadialGradient(x, y, 0, x, y, r);
+                g.addColorStop(0, `rgba(${rgb}, ${a})`); g.addColorStop(1, `rgba(${rgb}, 0)`);
+                c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+            },
+            _paint: {
+                /** A crimson teardrop pin: dark centre, dotted white ring, violet underglow, a lavender glyph. Anchored at its tip. */
+                pin(c, S, glyph) {
+                    const cx = S / 2, r = S * 0.3, cy = S * 0.36, tip = S * 0.98;
+                    this._glow(c, cx, tip - S * 0.06, S * 0.42, '139, 92, 246', 0.55);
+                    c.beginPath(); c.arc(cx, cy, r, Math.PI * 0.82, Math.PI * 0.18); c.lineTo(cx, tip); c.closePath();
+                    const g = c.createLinearGradient(0, cy - r, 0, tip);
+                    g.addColorStop(0, '#d0204e'); g.addColorStop(1, '#5e0418');
+                    c.fillStyle = g; c.fill();
+                    c.strokeStyle = 'rgba(255, 210, 220, 0.55)'; c.lineWidth = Math.max(1, S * 0.03); c.stroke();
+                    c.fillStyle = '#12061c'; c.beginPath(); c.arc(cx, cy, r * 0.62, 0, Math.PI * 2); c.fill();
+                    c.save(); c.setLineDash([Math.max(1, S * 0.035), Math.max(1, S * 0.035)]);
+                    c.strokeStyle = 'rgba(255, 255, 255, 0.85)'; c.lineWidth = Math.max(1, S * 0.03);
+                    c.beginPath(); c.arc(cx, cy, r * 0.8, 0, Math.PI * 2); c.stroke(); c.restore();
+                    MapIcons._glyph(c, glyph || 'dot', cx, cy, r * 0.42);
+                    return 0.98;
+                },
+                /** You: a violet triangle with a lavender rim and a soft glow, pointing +x. */
+                player(c, S) {
+                    const cx = S / 2, cy = S / 2;
+                    this._glow(c, cx, cy, S * 0.62, '139, 92, 246', 0.6);
+                    c.beginPath(); c.moveTo(cx + S * 0.46, cy); c.lineTo(cx - S * 0.34, cy - S * 0.36); c.lineTo(cx - S * 0.18, cy); c.lineTo(cx - S * 0.34, cy + S * 0.36); c.closePath();
+                    const g = c.createLinearGradient(cx - S * 0.3, cy - S * 0.3, cx + S * 0.4, cy + S * 0.3);
+                    g.addColorStop(0, '#b79bff'); g.addColorStop(1, '#6d3fe0');
+                    c.fillStyle = g; c.fill();
+                    c.strokeStyle = '#efe6ff'; c.lineWidth = Math.max(1, S * 0.06); c.lineJoin = 'round'; c.stroke();
+                },
+                /** Your car: a crimson capsule with gold headlights, pointing +x. */
+                car(c, S) {
+                    const cx = S / 2, cy = S / 2, L = S * 0.86, Wd = S * 0.44;
+                    this._glow(c, cx, cy, S * 0.6, '224, 40, 90', 0.4);
+                    c.beginPath(); c.roundRect(cx - L / 2, cy - Wd / 2, L, Wd, Wd * 0.4);
+                    c.fillStyle = '#c0143e'; c.fill();
+                    c.strokeStyle = 'rgba(255, 220, 230, 0.7)'; c.lineWidth = Math.max(1, S * 0.05); c.stroke();
+                    c.fillStyle = 'rgba(20, 6, 30, 0.75)'; c.fillRect(cx - L * 0.05, cy - Wd * 0.32, L * 0.26, Wd * 0.64);
+                    c.fillStyle = '#ffd76a';
+                    c.fillRect(cx + L / 2 - S * 0.07, cy - Wd / 2 + S * 0.03, S * 0.06, S * 0.1);
+                    c.fillRect(cx + L / 2 - S * 0.07, cy + Wd / 2 - S * 0.13, S * 0.06, S * 0.1);
+                },
+                /** The objective: a gold ring, a four-point star inside. */
+                objective(c, S) {
+                    const cx = S / 2, cy = S / 2;
+                    this._glow(c, cx, cy, S * 0.6, '255, 205, 100', 0.55);
+                    c.strokeStyle = '#ffd76a'; c.lineWidth = Math.max(1.5, S * 0.07);
+                    c.beginPath(); c.arc(cx, cy, S * 0.36, 0, Math.PI * 2); c.stroke();
+                    c.strokeStyle = 'rgba(255, 243, 207, 0.6)'; c.lineWidth = Math.max(1, S * 0.025);
+                    c.beginPath(); c.arc(cx, cy, S * 0.44, 0, Math.PI * 2); c.stroke();
+                    MapIcons._star(c, cx, cy, S * 0.22, '#fff3cf');
+                },
+                /** Danger (the scrapyard): a crimson hazard chevron with a gold rim and a gold bar-and-dot. */
+                danger(c, S) {
+                    const cx = S / 2;
+                    this._glow(c, cx, S * 0.58, S * 0.6, '255, 40, 40', 0.45);
+                    c.beginPath(); c.moveTo(cx, S * 0.08); c.lineTo(S * 0.94, S * 0.88); c.lineTo(S * 0.06, S * 0.88); c.closePath();
+                    const g = c.createLinearGradient(0, S * 0.08, 0, S * 0.88);
+                    g.addColorStop(0, '#e0203a'); g.addColorStop(1, '#6a0414');
+                    c.fillStyle = g; c.fill();
+                    c.strokeStyle = '#ffcf6a'; c.lineWidth = Math.max(1.2, S * 0.06); c.lineJoin = 'round'; c.stroke();
+                    c.fillStyle = '#ffe9b0';
+                    c.beginPath(); c.roundRect(cx - S * 0.05, S * 0.34, S * 0.1, S * 0.3, S * 0.04); c.fill();
+                    c.beginPath(); c.arc(cx, S * 0.74, S * 0.055, 0, Math.PI * 2); c.fill();
+                    return 0.55;
+                },
+                /** A door or way through: a lavender portal ring with a bright centre. */
+                transition(c, S) {
+                    const cx = S / 2, cy = S / 2;
+                    this._glow(c, cx, cy, S * 0.6, '180, 150, 255', 0.5);
+                    c.strokeStyle = '#d9ccff'; c.lineWidth = Math.max(1.2, S * 0.12);
+                    c.beginPath(); c.arc(cx, cy, S * 0.34, 0, Math.PI * 2); c.stroke();
+                    c.fillStyle = '#ffffff'; c.beginPath(); c.arc(cx, cy, S * 0.12, 0, Math.PI * 2); c.fill();
+                },
+                /** A person of interest: a gold bead in a violet ring. */
+                client(c, S) {
+                    const cx = S / 2, cy = S / 2;
+                    this._glow(c, cx, cy, S * 0.62, '255, 205, 100', 0.5);
+                    c.fillStyle = '#5b2bc4'; c.beginPath(); c.arc(cx, cy, S * 0.42, 0, Math.PI * 2); c.fill();
+                    c.fillStyle = '#ffd76a'; c.beginPath(); c.arc(cx, cy, S * 0.27, 0, Math.PI * 2); c.fill();
+                },
+                /** A magnifier (the zoom readout). */
+                search(c, S) {
+                    c.strokeStyle = '#d9ccff'; c.lineWidth = Math.max(1.2, S * 0.12); c.lineCap = 'round';
+                    c.beginPath(); c.arc(S * 0.42, S * 0.42, S * 0.26, 0, Math.PI * 2); c.stroke();
+                    c.beginPath(); c.moveTo(S * 0.62, S * 0.62); c.lineTo(S * 0.9, S * 0.9); c.stroke();
+                },
+                dest(c, S) { return MapIcons._paint.pin.call(this, c, S, 'flag'); }
+            },
+            /** A four-point star. */
+            _star(c, x, y, r, fill) {
+                c.fillStyle = fill; c.beginPath();
+                for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 - Math.PI / 2, rr = i % 2 ? r * 0.36 : r; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+                c.closePath(); c.fill();
+            },
+            /** The small lavender glyphs inside pins (all paths). */
+            _glyph(c, g, x, y, r) {
+                const L = '#e6dcff';
+                c.save(); c.fillStyle = L; c.strokeStyle = L; c.lineWidth = Math.max(1, r * 0.28); c.lineCap = 'round'; c.lineJoin = 'round';
+                switch (g) {
+                    case 'home': c.beginPath(); c.moveTo(x - r, y); c.lineTo(x, y - r); c.lineTo(x + r, y); c.lineTo(x + r * 0.7, y); c.lineTo(x + r * 0.7, y + r * 0.85); c.lineTo(x - r * 0.7, y + r * 0.85); c.lineTo(x - r * 0.7, y); c.closePath(); c.fill(); break;
+                    case 'cross': c.fillRect(x - r * 0.28, y - r, r * 0.56, r * 2); c.fillRect(x - r, y - r * 0.28, r * 2, r * 0.56); break;
+                    case 'cup': c.beginPath(); c.moveTo(x - r * 0.8, y - r * 0.6); c.lineTo(x + r * 0.5, y - r * 0.6); c.lineTo(x + r * 0.3, y + r * 0.8); c.lineTo(x - r * 0.6, y + r * 0.8); c.closePath(); c.fill(); c.beginPath(); c.arc(x + r * 0.55, y, r * 0.38, -Math.PI / 2, Math.PI / 2); c.stroke(); break;
+                    case 'wrench': c.beginPath(); c.moveTo(x - r * 0.75, y + r * 0.75); c.lineTo(x + r * 0.35, y - r * 0.35); c.stroke(); c.beginPath(); c.arc(x + r * 0.5, y - r * 0.5, r * 0.42, 0, Math.PI * 2); c.stroke(); break;
+                    case 'coin': c.beginPath(); c.moveTo(x, y - r); c.lineTo(x + r * 0.75, y); c.lineTo(x, y + r); c.lineTo(x - r * 0.75, y); c.closePath(); c.fill(); break;
+                    case 'star': MapIcons._star(c, x, y, r * 1.1, L); break;
+                    case 'flag': c.fillRect(x - r * 0.55, y - r, r * 0.22, r * 2); c.beginPath(); c.moveTo(x - r * 0.33, y - r); c.lineTo(x + r * 0.9, y - r * 0.55); c.lineTo(x - r * 0.33, y - r * 0.1); c.closePath(); c.fillStyle = '#ffd76a'; c.fill(); break;
+                    case 'sparkle': MapIcons._star(c, x, y, r * 1.1, '#ffd76a'); break;
+                    case 'person': c.beginPath(); c.arc(x, y - r * 0.45, r * 0.42, 0, Math.PI * 2); c.fill(); c.beginPath(); c.ellipse(x, y + r * 0.55, r * 0.75, r * 0.45, 0, Math.PI, 0); c.fill(); break;
+                    default: c.beginPath(); c.arc(x, y, r * 0.55, 0, Math.PI * 2); c.fill();
+                }
+                c.restore();
+            }
+        };
+
+        const MapArt = {
+            _grain: null,
+            /** A tiny cobbled-grain tile (parks and open ground). */
+            grain() {
+                if (this._grain) return this._grain;
+                const cv = document.createElement('canvas'); cv.width = cv.height = 40;
+                const c = cv.getContext('2d'), rnd = seededRandom(949);
+                for (let i = 0; i < 46; i++) { c.fillStyle = `rgba(${rnd() < 0.5 ? '139, 92, 246' : '255, 190, 110'}, ${0.05 + rnd() * 0.08})`; c.beginPath(); c.arc(rnd() * 40, rnd() * 40, 1.2 + rnd() * 2.6, 0, Math.PI * 2); c.fill(); }
+                return (this._grain = cv);
+            },
+
+            /**
+             * The city of light in map units. opts: { px (device px per map unit), bounds {x,y,w,h} to cull to,
+             * network (roads), lamps, glow (true: the soft gold bloom pass, golden map only) }.
+             */
+            paintCity(ctx, map, opts) {
+                const px = opts.px, u = 1 / px, B = opts.bounds || { x: 0, y: 0, w: map.width, h: map.height }, P = 160;
+                const hit = (x, y, w, h) => x + w + P >= B.x && x - P <= B.x + B.w && y + h + P >= B.y && y - P <= B.y + B.h;
+                ctx.fillStyle = MAP_PAL.ground; ctx.fillRect(0, 0, map.width, map.height);
+                // Blocks, parks and zones
+                const blocks = map.cityLayout && map.cityLayout.blocks;
+                if (blocks) { ctx.fillStyle = MAP_PAL.block; for (const k of blocks) if (hit(k.x, k.y, k.w, k.h)) ctx.fillRect(k.x, k.y, k.w, k.h); }
+                if (map.floorZones && map.floorZones.length) {
+                    let pat = null; try { pat = ctx.createPattern(this.grain(), 'repeat'); if (pat && pat.setTransform && typeof DOMMatrix !== 'undefined') pat.setTransform(new DOMMatrix().scaleSelf(u * (opts.dpr || 1))); } catch (e) { pat = null; }
+                    for (const z of map.floorZones) {
+                        if (!hit(z.x, z.y, z.w, z.h)) continue;
+                        ctx.fillStyle = MAP_PAL.park; ctx.fillRect(z.x, z.y, z.w, z.h);
+                        if (pat) { ctx.fillStyle = pat; ctx.fillRect(z.x, z.y, z.w, z.h); }
+                    }
+                }
+                // Pavements and crosswalks: faint gold
+                if (map.pavements) { ctx.fillStyle = MAP_PAL.pave; for (const p of map.pavements) if (hit(p.x, p.y, p.w, p.h)) ctx.fillRect(p.x, p.y, p.w, p.h); }
+                // Buildings and walls: violet, rimmed in gold
+                const solids = (map.buildings || []).concat(map.walls || []);
+                ctx.fillStyle = MAP_PAL.building; ctx.beginPath();
+                for (const b of solids) if (hit(b.x, b.y, b.w, b.h)) ctx.rect(b.x, b.y, b.w, b.h);
+                ctx.fill();
+                ctx.strokeStyle = MAP_PAL.rim; ctx.lineWidth = 1.2 * u * (opts.dpr || 1); ctx.stroke();
+                // Roads: molten gold — a wide amber halo, a warm body, a gold core, a white-gold hairline
+                const roads = (opts.network && opts.network.roads || []).filter(r => hit(Math.min(r.x1, r.x2), Math.min(r.y1, r.y2), Math.abs(r.x2 - r.x1), Math.abs(r.y2 - r.y1)));
+                const stroke = (wid, style, op) => { ctx.globalCompositeOperation = op || 'lighter'; ctx.strokeStyle = style; ctx.lineWidth = wid; ctx.beginPath(); for (const r of roads) { ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); } ctx.stroke(); };
+                ctx.lineCap = 'round';
+                const T = roads.length ? Math.max(...roads.map(r => r.thickness || 200)) : 200;
+                stroke(T * 1.5, 'rgba(255, 140, 40, 0.07)');
+                stroke(T * 0.85, 'rgba(255, 160, 60, 0.14)');
+                stroke(Math.max(T * 0.22, 2.5 * u), 'rgba(255, 207, 106, 0.75)');
+                stroke(Math.max(T * 0.05, 1.2 * u * (opts.dpr || 1)), 'rgba(255, 243, 207, 0.95)');
+                if (map.crosswalks) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = MAP_PAL.cross; for (const k of map.crosswalks) if (hit(k.x, k.y, k.w, k.h)) ctx.fillRect(k.x, k.y, k.w, k.h); }
+                // Lamps: warm specks of light; glowing trees: violet motes
+                if (opts.lamps && opts.lamps.length && typeof glowSprite === 'function') {
+                    const spr = glowSprite('255, 200, 110', 0.2), R = Math.max(14, Math.min(6 * u * (opts.dpr || 1), 46));   // specks when zoomed out (capped in map units, so they never pile into white)
+                    ctx.globalAlpha = 0.32;
+                    for (const l of opts.lamps) if (!l.candle && hit(l.x, l.y, 0, 0)) ctx.drawImage(spr, l.x - R, l.y - R, R * 2, R * 2);
+                    ctx.globalAlpha = 1;
+                }
+                if (map.foliage && typeof glowSprite === 'function') {
+                    const spr = glowSprite('168, 85, 247', 0.3), R = Math.max(10, Math.min(5 * u * (opts.dpr || 1), 36));
+                    ctx.globalAlpha = 0.35;
+                    for (const f of map.foliage) if (f.isGlowing && hit(f.x, f.y, 0, 0)) ctx.drawImage(spr, f.x - R, f.y - R, R * 2, R * 2);
+                    ctx.globalAlpha = 1;
+                }
+                ctx.globalCompositeOperation = 'source-over';
+            },
+
+            /** The soft gold bloom over a finished cache (device px, identity transform): light pools where streets crowd. */
+            bloom(cv) {
+                const w = Math.max(1, cv.width >> 2), h = Math.max(1, cv.height >> 2);
+                const t = this._bloomCv || (this._bloomCv = document.createElement('canvas'));
+                t.width = w; t.height = h;
+                const tc = t.getContext('2d'); tc.imageSmoothingEnabled = true; tc.drawImage(cv, 0, 0, w, h);
+                const c = cv.getContext('2d');
+                c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.4; c.imageSmoothingEnabled = true;
+                c.drawImage(t, 0, 0, cv.width, cv.height);
+                c.restore();
+            }
+        };
         class UISystem {
             constructor(gameEngine) {
                 this.game = gameEngine;
@@ -34576,6 +34848,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.cacheMapId = null;
                 this.cacheBoundsMap = null;        // {x, y, w, h} in map-space
                 this.cacheFinalScale = 0;          // baseScale × zoom at build time
+                this.cacheBand = 0;                // the zoom band the cache was painted for (0.5 / 1 / 2 / 4)
+                this.dpr = 1;                      // device pixels per CSS pixel (canvases are sized in device px)
                 
                 this.mapView = {
                     zoom: 1.0,
@@ -34712,8 +34986,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const dy = e.clientY - this.mapView.lastY;
                     this.mapView.lastX = e.clientX;
                     this.mapView.lastY = e.clientY;
-                    this.mapView.offsetX += dx;
-                    this.mapView.offsetY += dy;
+                    this.mapView.offsetX += dx * this.dpr;
+                    this.mapView.offsetY += dy * this.dpr;
                     this.renderGoldenMap();
                 });
         
@@ -34748,8 +35022,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const dy = e.touches[0].clientY - this.mapView.lastY;
                         this.mapView.lastX = e.touches[0].clientX;
                         this.mapView.lastY = e.touches[0].clientY;
-                        this.mapView.offsetX += dx;
-                        this.mapView.offsetY += dy;
+                        this.mapView.offsetX += dx * this.dpr;
+                        this.mapView.offsetY += dy * this.dpr;
                         this.renderGoldenMap();
                     } else if (e.touches.length === 2) {
                         const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -34783,8 +35057,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const offsetX = (w - mapVisualWidth) / 2 + this.mapView.offsetX;
                 const offsetY = (h - mapVisualHeight) / 2 + this.mapView.offsetY;
                 
-                const worldX = (screenX - offsetX) / finalScale;
-                const worldY = (screenY - offsetY) / finalScale;
+                const worldX = (screenX * this.dpr - offsetX) / finalScale;      // screenX/Y arrive in CSS px
+                const worldY = (screenY * this.dpr - offsetY) / finalScale;
                 
                 return { x: worldX, y: worldY };
             }
@@ -35040,17 +35314,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!this.roadLevelPath || this.roadLevelPath.length < 2) return;
                 
                 const time = _frameTimeSec;
-                const dashOffset = time * 40; // Animated dash
+                const dashOffset = time * 40 * (this._u || 1); // Animated dash
                 
                 ctx.save();
                 
-                // Outer glow
-                ctx.strokeStyle = 'rgba(138, 43, 226, 0.5)';
-                ctx.lineWidth = 18;
+                // Outer glow (widths in CSS px: this._u is map units per CSS px)
+                const U = this._u || 1;
+                ctx.strokeStyle = 'rgba(138, 43, 226, 0.28)';
+                ctx.lineWidth = 14 * U;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                ctx.shadowColor = '#8a2be2';
-                ctx.shadowBlur = 25;
                 
                 ctx.beginPath();
                 ctx.moveTo(this.roadLevelPath[0].x, this.roadLevelPath[0].y);
@@ -35061,8 +35334,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Middle layer
                 ctx.strokeStyle = 'rgba(180, 100, 255, 0.7)';
-                ctx.lineWidth = 10;
-                ctx.shadowBlur = 15;
+                ctx.lineWidth = 6 * U;
                 
                 ctx.beginPath();
                 ctx.moveTo(this.roadLevelPath[0].x, this.roadLevelPath[0].y);
@@ -35072,10 +35344,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.stroke();
                 
                 // Core line with animated dash
-                ctx.strokeStyle = '#da70d6';
-                ctx.lineWidth = 4;
-                ctx.shadowBlur = 8;
-                ctx.setLineDash([20, 12]);
+                ctx.strokeStyle = '#efd9ff';
+                ctx.lineWidth = 2.2 * U;
+                ctx.setLineDash([10 * U, 7 * U]);
                 ctx.lineDashOffset = -dashOffset;
                 
                 ctx.beginPath();
@@ -35134,244 +35405,82 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             // --- DRAW DIRECT DISTANCE LINE (White dashed line with distance) ---
-            drawDistanceLine(ctx, iconScale) {
-                if (!this.navMarker) return;
-                
-                const player = this.game.player;
-                const marker = this.navMarker;
-                
-                // Calculate distance
-                const distPixels = Math.hypot(marker.x - player.x, marker.y - player.y);
-                const distMeters = Math.round(distPixels / 10); // 10 pixels = 1 meter (adjust as needed)
-                
+            drawDistanceLine(ctx) {
+                // Screen space (device px): a fine dashed line from you to the destination, its distance in a violet pill
+                if (!this.navMarker || !this._toScreen) return;
+                const D = this.dpr, a = this._toScreen(this.game.player.x, this.game.player.y), b = this._toScreen(this.navMarker.x, this.navMarker.y);
+                const distM = Math.round(Math.hypot(this.navMarker.x - this.game.player.x, this.navMarker.y - this.game.player.y) / 10);
+                const text = distM >= 1000 ? (distM / 1000).toFixed(1) + ' km' : distM + ' m';
                 ctx.save();
-                
-                // Animated dash for visual flow
-                const time = _frameTimeSec;
-                const dashOffset = time * 30;
-                
-                // Draw white dashed line from player to marker
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.lineWidth = 3 * iconScale;
-                ctx.setLineDash([15, 10]);
-                ctx.lineDashOffset = -dashOffset;
-                ctx.lineCap = 'round';
-                
-                ctx.beginPath();
-                ctx.moveTo(player.x, player.y);
-                ctx.lineTo(marker.x, marker.y);
-                ctx.stroke();
-                
-                // Draw distance label at midpoint
-                const midX = (player.x + marker.x) / 2;
-                const midY = (player.y + marker.y) / 2;
-                
-                // Format distance nicely
-                let distText;
-                if (distMeters >= 1000) {
-                    distText = (distMeters / 1000).toFixed(1) + ' km';
-                } else {
-                    distText = distMeters + ' m';
-                }
-                
-                // Background pill for text
-                const fontSize = 52 * iconScale;
-                ctx.font = `bold ${fontSize}px Orbitron`;
-                const textWidth = ctx.measureText(distText).width;
-                const pillPadding = 8 * iconScale;
-                const pillHeight = fontSize + pillPadding * 2;
-                const pillWidth = textWidth + pillPadding * 3;
-                
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-                ctx.beginPath();
-                ctx.roundRect(midX - pillWidth/2, midY - pillHeight/2, pillWidth, pillHeight, 4 * iconScale);
-                ctx.fill();
-                
-                // Border
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.lineWidth = 1 * iconScale;
-                ctx.setLineDash([]);
-                ctx.stroke();
-                
-                // Distance text
-                ctx.fillStyle = '#fff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(distText, midX, midY);
-                
+                ctx.strokeStyle = 'rgba(255, 243, 207, 0.55)'; ctx.lineWidth = 1.5 * D; ctx.lineCap = 'round';
+                ctx.setLineDash([7 * D, 6 * D]); ctx.lineDashOffset = -(_frameTimeSec * 24 * D);
+                ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.setLineDash([]);
+                const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+                ctx.font = `600 ${11 * D}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                const tw = ctx.measureText(text).width, pw = tw + 18 * D, ph = 20 * D;
+                ctx.fillStyle = 'rgba(28, 12, 52, 0.88)'; ctx.strokeStyle = 'rgba(217, 204, 255, 0.6)'; ctx.lineWidth = 1 * D;
+                ctx.beginPath(); ctx.roundRect(mx - pw / 2, my - ph / 2, pw, ph, ph / 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#f3e6c2'; ctx.fillText(text, mx, my + 0.5 * D);
                 ctx.restore();
             }
             
             // --- DRAW NAVIGATION MARKER (Ruby Colored) ---
-            drawNavMarker(ctx, iconScale) {
-                if (!this.navMarker) return;
-                
-                const time = _frameTime;
-                const pulse = (Math.sin(time / 300) + 1) / 2;
-                
+            drawNavMarker(ctx) {
+                // Your destination: a crimson pin with a gold flag (fixed size), a soft gold ring breathing under it
+                if (!this.navMarker || !this._toScreen) return;
+                const D = this.dpr, p = this._toScreen(this.navMarker.x, this.navMarker.y), k = this._zk;
+                const pulse = (Math.sin(_frameTime / 300) + 1) / 2;
                 ctx.save();
-                ctx.translate(this.navMarker.x, this.navMarker.y);
-                
-                // Ruby glow
-                ctx.shadowColor = '#e0115f'; // Ruby red
-                ctx.shadowBlur = 25 + pulse * 15;
-                
-                // Outer ring (pulsing)
-                const ringSize = (40 + pulse * 10) * iconScale;
-                ctx.strokeStyle = `rgba(224, 17, 95, ${0.6 + pulse * 0.3})`; // Ruby
-                ctx.lineWidth = 4 * iconScale;
-                ctx.beginPath();
-                ctx.arc(0, 0, ringSize, 0, Math.PI * 2);
-                ctx.stroke();
-                
-                // Inner diamond marker
-                ctx.fillStyle = '#e0115f'; // Ruby
-                ctx.beginPath();
-                const diamondSize = 20 * iconScale;
-                ctx.moveTo(0, -diamondSize);
-                ctx.lineTo(diamondSize * 0.6, 0);
-                ctx.lineTo(0, diamondSize);
-                ctx.lineTo(-diamondSize * 0.6, 0);
-                ctx.closePath();
-                ctx.fill();
-                
-                // White center dot
-                ctx.fillStyle = '#fff';
-                ctx.shadowBlur = 5;
-                ctx.beginPath();
-                ctx.arc(0, 0, 5 * iconScale, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Label
-                if (this.mapView.zoom > 1.2) {
-                    ctx.shadowBlur = 0;
-                    ctx.fillStyle = '#fff';
-                    ctx.font = `bold ${55 * iconScale}px Orbitron`;
-                    ctx.textAlign = 'center';
-                    ctx.fillText("DESTINATION", 0, -ringSize - 20 * iconScale);
-                }
-                
+                ctx.strokeStyle = `rgba(255, 207, 106, ${0.25 + 0.35 * (1 - pulse)})`; ctx.lineWidth = 1.5 * D;
+                ctx.beginPath(); ctx.arc(p.x, p.y, (8 + 10 * pulse) * D * k, 0, Math.PI * 2); ctx.stroke();
                 ctx.restore();
+                MapIcons.draw(ctx, 'dest', p.x, p.y, { dpr: D, css: MapIcons.SIZE.dest * k });
             }
             
             // --- DRAW MAP LEGEND ---
             drawMapLegend(ctx, w, h) {
-                const padding = 15;
-                const legendWidth = 160;
-                const legendHeight = 160;
-                const x = w - legendWidth - padding;
-                const y = padding;
-                
+                // Built from the same icons and sizes as the map; kept inside the free area between the sidebars
+                // On a short screen (a phone on its side) the whole legend scales down
+                const D = this.dpr * Math.max(0.62, Math.min(1, h / this.dpr / 640)), items = [['player', 'You'], ['car', 'Your vehicle'], ['dest', 'Destination'], ['objective', 'Objective'], ['client', 'Client'], ['transition', 'Way through'], ['danger', 'Danger zone']];
+                const lw = 150 * D, row = 21 * D, lh = (34 + items.length * 21) * D, area = this._freeArea(w, h);
+                const x = area.right - lw - 14 * D, y = area.bottom - lh - 14 * D;
                 ctx.save();
-                
-                // Background
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.strokeStyle = 'rgba(205, 127, 50, 0.6)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.roundRect(x, y, legendWidth, legendHeight, 8);
-                ctx.fill();
-                ctx.stroke();
-                
-                // Title
-                ctx.fillStyle = '#cd7f32';
-                ctx.font = 'bold 12px Orbitron';
-                ctx.textAlign = 'left';
-                ctx.fillText('LEGEND', x + 10, y + 20);
-                
-                // Legend items
-                const items = [
-                    { color: '#E6E6FA', label: 'You', shape: 'triangle' },
-                    { color: '#ff3366', label: 'Your Vehicle', shape: 'rect' },
-                    { color: '#e0115f', label: 'Destination', shape: 'diamond' },
-                    { color: '#FFD700', label: 'NPC', shape: 'circle' },
-                    { color: '#8f99fb', label: 'Transition', shape: 'circle' },
-                    { color: '#ff2200', label: 'Danger Zone', shape: 'hazard' }
-                ];
-                
-                let itemY = y + 38;
-                for (let item of items) {
-                    // Icon
-                    ctx.fillStyle = item.color;
-                    ctx.shadowColor = item.color;
-                    ctx.shadowBlur = 5;
-                    
-                    if (item.shape === 'triangle') {
-                        ctx.beginPath();
-                        ctx.moveTo(x + 18, itemY - 4);
-                        ctx.lineTo(x + 12, itemY + 4);
-                        ctx.lineTo(x + 24, itemY + 4);
-                        ctx.closePath();
-                        ctx.fill();
-                    } else if (item.shape === 'rect') {
-                        ctx.fillRect(x + 10, itemY - 4, 16, 8);
-                    } else if (item.shape === 'diamond') {
-                        ctx.beginPath();
-                        ctx.moveTo(x + 18, itemY - 5);
-                        ctx.lineTo(x + 23, itemY);
-                        ctx.lineTo(x + 18, itemY + 5);
-                        ctx.lineTo(x + 13, itemY);
-                        ctx.closePath();
-                        ctx.fill();
-                    } else if (item.shape === 'hazard') {
-                        // Dashed square icon
-                        ctx.strokeStyle = item.color;
-                        ctx.lineWidth = 1.5;
-                        ctx.setLineDash([3, 2]);
-                        ctx.strokeRect(x + 10, itemY - 5, 16, 10);
-                        ctx.setLineDash([]);
-                        // Small warning symbol inside
-                        ctx.font = 'bold 8px sans-serif';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('⚠', x + 18, itemY + 3);
-                    } else {
-                        ctx.beginPath();
-                        ctx.arc(x + 18, itemY, 5, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                    
-                    // Label
-                    ctx.shadowBlur = 0;
-                    ctx.fillStyle = '#ddd';
-                    ctx.font = '10px Montserrat';
-                    ctx.fillText(item.label, x + 35, itemY + 3);
-                    
-                    itemY += 20;
-                }
-                
+                ctx.fillStyle = 'rgba(16, 7, 32, 0.78)'; ctx.strokeStyle = 'rgba(217, 204, 255, 0.35)'; ctx.lineWidth = 1 * D;
+                ctx.setLineDash([2 * D, 3 * D]);
+                ctx.beginPath(); ctx.roundRect(x, y, lw, lh, 14 * D); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+                ctx.fillStyle = '#ffd76a'; ctx.font = `600 ${10 * D}px Montserrat, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillText('L E G E N D', x + 14 * D, y + 17 * D);
+                ctx.font = `${10.5 * D}px Montserrat, sans-serif`;
+                items.forEach(([k, label], i) => {
+                    const cy = y + (36 + i * 21) * D;
+                    MapIcons.draw(ctx, k, x + 24 * D, cy + (k === 'dest' ? 7 * D : 0), { dpr: this.dpr, css: (k === 'dest' ? 16 : 14) * D / this.dpr });
+                    ctx.fillStyle = '#e6dcff'; ctx.fillText(label, x + 44 * D, cy);
+                });
                 ctx.restore();
             }
             
             // --- DRAW ZOOM READOUT ---
             drawZoomReadout(ctx, w, h) {
-                const padding = 15;
-                
+                const D = this.dpr, area = this._freeArea(w, h), x = area.left + 14 * D, y = area.bottom - 40 * D;
                 ctx.save();
-                
-                // Background pill
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                ctx.strokeStyle = 'rgba(205, 127, 50, 0.5)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.roundRect(padding, h - 40, 90, 28, 5);
-                ctx.fill();
-                ctx.stroke();
-                
-                // Zoom text
-                ctx.fillStyle = '#cd7f32';
-                ctx.font = 'bold 12px Orbitron';
-                ctx.textAlign = 'left';
-                ctx.fillText(`${this.mapView.zoom.toFixed(1)}x`, padding + 12, h - 21);
-                
-                // Zoom icon
-                ctx.fillStyle = '#888';
-                ctx.font = '14px sans-serif';
-                ctx.fillText('🔍', padding + 55, h - 20);
-                
+                ctx.fillStyle = 'rgba(16, 7, 32, 0.78)'; ctx.strokeStyle = 'rgba(217, 204, 255, 0.35)'; ctx.lineWidth = 1 * D;
+                ctx.beginPath(); ctx.roundRect(x, y, 78 * D, 26 * D, 13 * D); ctx.fill(); ctx.stroke();
+                MapIcons.draw(ctx, 'search', x + 18 * D, y + 13 * D, { dpr: D });
+                ctx.fillStyle = '#ffd76a'; ctx.font = `600 ${11 * D}px Montserrat, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillText(`${this.mapView.zoom.toFixed(1)}×`, x + 34 * D, y + 13.5 * D);
                 ctx.restore();
             }
-        
-            // Inside UISystem class
+
+            /** The canvas area not under the sidebars (device px), so overlays never hide behind them. */
+            _freeArea(w, h) {
+                const D = this.dpr, cr = this.mapCanvas.getBoundingClientRect();
+                let left = 0, right = w;
+                const L = document.getElementById('map-sidebar-left'), R = document.getElementById('map-sidebar-right');
+                const vis = (el) => el && el.offsetParent !== null && getComputedStyle(el).visibility !== 'hidden';
+                if (vis(L)) { const r = L.getBoundingClientRect(); if (r.width > 0 && r.right < cr.width * 0.5) left = Math.max(0, (r.right - cr.left) * D); }
+                if (vis(R)) { const r = R.getBoundingClientRect(); if (r.width > 0 && r.left > cr.width * 0.5) right = Math.min(w, (r.left - cr.left) * D); }
+                return { left, right, top: 0, bottom: h };
+            }
         
             // --- 2. THE VIEWPORT-EXTENDED CACHE RENDERER ---
             // Renders static geometry (walls, roads, buildings, labels) into a
@@ -35379,129 +35488,31 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // geometry whose AABB intersects the cache region gets drawn — the
             // expensive shadowBlur / lighter-composite road passes are confined
             // to roughly one screenful instead of the entire map.
-            updateMapCache(visibleX, visibleY, visibleW, visibleH, finalScale) {
+            updateMapCache(visibleX, visibleY, visibleW, visibleH, finalScale, band, bandScale) {
+                // The static city, painted at a fixed zoom BAND (0.5 / 1 / 2 / 4 × the fit scale) over the view plus a
+                // margin, then stretched to the exact zoom: pinching and wheeling within a band reuse it; only a band
+                // change or panning past the margin repaints. Capped at 2560 px a side (Safari's canvas memory).
                 const mapData = this.game.activeMap;
-                
-                // 50% buffer on each side → cache is 2× viewport in each dim.
-                // Pan up to one viewport before triggering a rebuild.
-                const bufferX = visibleW * 0.5;
-                const bufferY = visibleH * 0.5;
-                const cacheBoundsX = visibleX - bufferX;
-                const cacheBoundsY = visibleY - bufferY;
-                const cacheBoundsW = visibleW + bufferX * 2;
-                const cacheBoundsH = visibleH + bufferY * 2;
-                
-                // Cache canvas in display pixels. Clamp to a sane max in case of
-                // extreme high-DPR or unusual viewport — typical is ~2k×3k.
-                const MAX_CACHE_DIM = 4096;
-                let canvasW = Math.ceil(cacheBoundsW * finalScale);
-                let canvasH = Math.ceil(cacheBoundsH * finalScale);
-                let effectiveScale = finalScale;
-                if (canvasW > MAX_CACHE_DIM || canvasH > MAX_CACHE_DIM) {
-                    const ratio = Math.min(MAX_CACHE_DIM / canvasW, MAX_CACHE_DIM / canvasH);
-                    canvasW = Math.ceil(canvasW * ratio);
-                    canvasH = Math.ceil(canvasH * ratio);
-                    effectiveScale = finalScale * ratio;
-                }
-                
-                this.cacheCanvas.width = canvasW;
-                this.cacheCanvas.height = canvasH;
-                
-                this.cacheBoundsMap = { x: cacheBoundsX, y: cacheBoundsY, w: cacheBoundsW, h: cacheBoundsH };
-                this.cacheFinalScale = effectiveScale;
+                const bufX = visibleW * 0.3, bufY = visibleH * 0.3;
+                const bx = visibleX - bufX, by = visibleY - bufY, bw = visibleW + bufX * 2, bh = visibleH + bufY * 2;
+                const MAX = 2560;
+                let cw = Math.ceil(bw * bandScale), ch = Math.ceil(bh * bandScale), eff = bandScale;
+                if (cw > MAX || ch > MAX) { const r = Math.min(MAX / cw, MAX / ch); cw = Math.ceil(cw * r); ch = Math.ceil(ch * r); eff = bandScale * r; }
+                this.cacheCanvas.width = cw; this.cacheCanvas.height = ch;
+                this.cacheBoundsMap = { x: bx, y: by, w: bw, h: bh };
+                this.cacheFinalScale = eff; this.cacheBand = band;
                 this.cacheMapId = mapData.id || null;
                 this.isCacheDirty = false;
-                
+                this.cacheBuilds = (this.cacheBuilds || 0) + 1;
                 const ctx = this.cacheCtx;
-                
-                // Map-space → cache pixels. After this transform, drawing at map
-                // coords (e.g. road.x1, road.y1) lands at the right cache pixel.
-                ctx.setTransform(
-                    effectiveScale, 0, 0, effectiveScale,
-                    -cacheBoundsX * effectiveScale,
-                    -cacheBoundsY * effectiveScale
-                );
-                
-                // AABB intersect helper — generous PAD covers line widths + glow
-                // bleed so we don't clip half-drawn roads at the cache edge.
-                const PAD = 100;
-                const intersects = (rx, ry, rw, rh) => (
-                    rx + rw + PAD >= cacheBoundsX &&
-                    rx - PAD <= cacheBoundsX + cacheBoundsW &&
-                    ry + rh + PAD >= cacheBoundsY &&
-                    ry - PAD <= cacheBoundsY + cacheBoundsH
-                );
-                
-                ctx.lineCap = 'round';
-                
-                // --- WALLS (Universal) ---
-                if (mapData.walls) {
-                    ctx.lineWidth = 6;
-                    mapData.walls.forEach(w => {
-                        if (!intersects(w.x, w.y, w.w, w.h)) return;
-                        ctx.fillStyle = '#4a2c18';
-                        ctx.fillRect(w.x, w.y, w.w, w.h);
-                        ctx.strokeStyle = '#cd7f32';
-                        ctx.strokeRect(w.x, w.y, w.w, w.h);
-                    });
-                }
-                
-                // --- OUTDOOR MAPS (Buildings + Roads + Labels) ---
-                if (mapData.type !== 'indoor') {
-                    // 1. Buildings (bottom layer)
-                    if (mapData.buildings) {
-                        ctx.lineWidth = 6;
-                        mapData.buildings.forEach(b => {
-                            if (!intersects(b.x, b.y, b.w, b.h)) return;
-                            ctx.fillStyle = '#4a2c18';
-                            ctx.fillRect(b.x, b.y, b.w, b.h);
-                            ctx.strokeStyle = '#cd7f32';
-                            ctx.strokeRect(b.x, b.y, b.w, b.h);
-                        });
-                    }
-                    
-                    // 2. Roads — pre-filter to only those touching the cache region.
-                    // Three-pass paint (red base, lighter orange core, gold hotspot
-                    // with shadowBlur) is the most expensive part of the whole render;
-                    // culling here is what makes large maps cheap.
-                    const roadIntersects = (r) => {
-                        const minX = Math.min(r.x1, r.x2);
-                        const minY = Math.min(r.y1, r.y2);
-                        const maxX = Math.max(r.x1, r.x2);
-                        const maxY = Math.max(r.y1, r.y2);
-                        return intersects(minX, minY, maxX - minX, maxY - minY);
-                    };
-                    const visibleRoads = this.game.traffic.network.roads.filter(roadIntersects);
-                    
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.lineWidth = 120;
-                    ctx.strokeStyle = '#550000';
-                    visibleRoads.forEach(r => this.drawRoadLine(ctx, r));
-                    
-                    ctx.globalCompositeOperation = 'lighter';
-                    ctx.lineWidth = 60;
-                    ctx.strokeStyle = '#ff4500';
-                    visibleRoads.forEach(r => this.drawRoadLine(ctx, r));
-                    
-                    ctx.lineWidth = 20;
-                    ctx.strokeStyle = '#FFD700';
-                    ctx.shadowColor = '#FFD700';
-                    ctx.shadowBlur = 20;
-                    visibleRoads.forEach(r => this.drawRoadLine(ctx, r));
-                    
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.shadowBlur = 0;
-                    
-                    // Building and road labels are NOT rendered into the cache.
-                    // They live on a separate text layer drawn in screen-space at
-                    // a screen-fixed font size — see drawMapTextLayer() in
-                    // renderGoldenMap. This keeps text always crisp regardless
-                    // of zoom and lets us tier visibility (hide labels when zoomed
-                    // out far enough that they'd be cluttered or unreadable).
-                }
-                
-                // Reset transform so subsequent direct cache writes (if any) start fresh.
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.fillStyle = MAP_PAL.base; ctx.fillRect(0, 0, cw, ch);
+                ctx.setTransform(eff, 0, 0, eff, -bx * eff, -by * eff);
+                MapArt.paintCity(ctx, mapData, { px: eff, dpr: this.dpr, bounds: this.cacheBoundsMap,
+                    network: mapData.type !== 'indoor' && this.game.traffic ? this.game.traffic.network : null,
+                    lamps: mapData.type !== 'indoor' ? this.game.lamps : null });
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                MapArt.bloom(this.cacheCanvas);
             }
         
             renderGoldenMap() {
@@ -35533,30 +35544,32 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Cache valid if: same map, same scale (within tolerance), and
                 // the visible region is fully inside cacheBoundsMap. Pan stays
                 // free until the visible window touches a cache edge.
-                const SCALE_TOL = 0.0005;
+                // Zoom band: the nearest of 0.5 / 1 / 2 / 4 (the cache is stretched at most ~1.4× either way)
+                const band = Math.max(0.5, Math.min(4, Math.pow(2, Math.round(Math.log2(this.mapView.zoom)))));
                 const b = this.cacheBoundsMap;
                 const cacheValid = !this.isCacheDirty &&
                     this.cacheMapId === mapData.id &&
                     b !== null &&
-                    Math.abs(this.cacheFinalScale - finalScale) < SCALE_TOL &&
+                    this.cacheBand === band &&
                     visibleX >= b.x &&
                     visibleY >= b.y &&
                     visibleX + visibleW <= b.x + b.w &&
                     visibleY + visibleH <= b.y + b.h;
                 
                 if (!cacheValid) {
-                    this.updateMapCache(visibleX, visibleY, visibleW, visibleH, finalScale);
+                    this.updateMapCache(visibleX, visibleY, visibleW, visibleH, finalScale, band, baseScale * band);
                 }
                 
-                // 1. Clear screen
-                ctx.fillStyle = '#020103';
+                // 1. Clear screen (deep violet beyond the map's edge)
+                ctx.fillStyle = MAP_PAL.base;
                 ctx.fillRect(0, 0, w, h);
+                ctx.imageSmoothingEnabled = true;
                 
                 // 2. Blit cache at the screen position corresponding to
                 //    cacheBoundsMap's top-left in map-space.
                 //    Round to integer pixels to avoid sub-pixel filtering smear during pan.
-                const cacheScreenX = Math.round(screenOriginX + this.cacheBoundsMap.x * finalScale);
-                const cacheScreenY = Math.round(screenOriginY + this.cacheBoundsMap.y * finalScale);
+                const cacheScreenX = screenOriginX + this.cacheBoundsMap.x * finalScale;
+                const cacheScreenY = screenOriginY + this.cacheBoundsMap.y * finalScale;
                 // If MAX_CACHE_DIM clamping reduced effective scale, the cache pixels
                 // need to be drawn at a slightly different size to land correctly.
                 // Compute target screen size from cache canvas dims and effective scale.
@@ -35592,105 +35605,49 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // is always pixel-crisp regardless of zoom level. Cost is low because
             // text rendering is fast and we cull anything off-screen.
             drawMapTextLayer(ctx, w, h, screenOriginX, screenOriginY, finalScale) {
+                // Labels in screen space at fixed CSS sizes: building names in champagne small caps, road names in
+                // gold italics; a dark violet keyline instead of a blur; nothing drawn where a label already sits.
                 const mapData = this.game.activeMap;
                 if (!mapData || mapData.type === 'indoor') return;
-                
-                // Zoom tier thresholds (tune as needed)
-                const ZOOM_BUILDINGS = 1.6;  // Below this, no building labels
-                const ZOOM_ROADS = 2.4;      // Below this, no road labels
-                const zoom = this.mapView.zoom;
-                
-                const showBuildings = zoom >= ZOOM_BUILDINGS && mapData.buildings;
-                const showRoads = zoom >= ZOOM_ROADS;
+                const D = this.dpr, zoom = this.mapView.zoom;
+                const showBuildings = zoom >= 1.4 && mapData.buildings, showRoads = zoom >= 1.0;
                 if (!showBuildings && !showRoads) return;
-                
-                // Convert a map-space (mx, my) point to screen pixels
-                const toScreenX = (mx) => screenOriginX + mx * finalScale;
-                const toScreenY = (my) => screenOriginY + my * finalScale;
-                
-                // Screen-space AABB cull — skip labels outside the canvas
-                const onScreen = (sx, sy, halfW, halfH) => (
-                    sx + halfW >= 0 && sx - halfW <= w &&
-                    sy + halfH >= 0 && sy - halfH <= h
-                );
-                
+                const sx = (mx) => screenOriginX + mx * finalScale, sy = (my) => screenOriginY + my * finalScale;
+                const placed = [];
+                const free = (x, y, hw, hh) => {
+                    if (x + hw < 0 || x - hw > w || y + hh < 0 || y - hh > h) return false;
+                    for (const r of placed) if (Math.abs(r[0] - x) < r[2] + hw && Math.abs(r[1] - y) < r[3] + hh) return false;
+                    placed.push([x, y, hw, hh]); return true;
+                };
                 ctx.save();
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                
-                // ── BUILDING LABELS ──
-                if (showBuildings) {
-                    // Font size eases up with zoom — at threshold 1.6× a ~14px
-                    // label is comfortable; at max 5× a ~22px label feels right
-                    // without dominating the map.
-                    const fontPx = Math.round(7 + (zoom - ZOOM_BUILDINGS) * 2.5);
-                    ctx.font = `bold ${fontPx}px Orbitron, sans-serif`;
-                    
-                    mapData.buildings.forEach(b => {
-                        if (!b.label || !b.label.trim()) return;
-                        const sx = toScreenX(b.x + b.w / 2);
-                        const sy = toScreenY(b.y + b.h / 2);
-                        if (!onScreen(sx, sy, 80, 20)) return;
-                        const text = b.label.toUpperCase();
-                        // Glow pass
-                        ctx.shadowColor = '#ffaa00';
-                        ctx.shadowBlur = 8;
-                        ctx.fillStyle = '#ffcc44';
-                        ctx.fillText(text, sx, sy);
-                        // Sharp overlay
-                        ctx.shadowBlur = 0;
-                        ctx.fillStyle = '#fff8e0';
-                        ctx.fillText(text, sx, sy);
-                    });
-                }
-                
-                // ── ROAD LABELS ──
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+                ctx.strokeStyle = 'rgba(11, 5, 22, 0.88)';
                 if (showRoads) {
-                    const fontPx = Math.round(6 + (zoom - ZOOM_ROADS) * 2);
-                    ctx.font = `bold ${fontPx}px Orbitron, sans-serif`;
-                    const LABEL_SPACING = 600; // Map-space spacing between repeats on long roads
-                    
-                    this.game.traffic.network.roads.forEach(road => {
-                        if (!road.name || !road.name.trim()) return;
-                        const isH = road.orientation === 'H';
-                        const longDim = isH ? road.w : road.h;
-                        const labelCount = Math.max(1, Math.round(longDim / LABEL_SPACING));
-                        const angle = isH ? 0 : -Math.PI / 2;
-                        const text = road.name.toUpperCase();
-                        const textWidth = ctx.measureText(text).width;
-                        
-                        for (let i = 0; i < labelCount; i++) {
-                            const t = (i + 0.5) / labelCount;
-                            const mx = isH ? (road.x + road.w * t) : (road.x + road.w / 2);
-                            const my = isH ? (road.y + road.h / 2) : (road.y + road.h * t);
-                            const sx = toScreenX(mx);
-                            const sy = toScreenY(my);
-                            // Generous cull radius — accounts for rotated bounding box
-                            if (!onScreen(sx, sy, textWidth / 2 + 20, 20)) continue;
-                            
-                            ctx.save();
-                            ctx.translate(sx, sy);
-                            ctx.rotate(angle);
-                            // Dark pill background for readability over road glow
-                            const padY = Math.ceil(fontPx * 0.65);
-                            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                            ctx.beginPath();
-                            ctx.roundRect(-textWidth/2 - 8, -padY, textWidth + 16, padY * 2, 6);
-                            ctx.fill();
-                            // Glow pass
-                            ctx.shadowColor = '#ff8800';
-                            ctx.shadowBlur = 6;
-                            ctx.fillStyle = '#ffaa44';
-                            ctx.fillText(text, 0, 0);
-                            // Sharp overlay
-                            ctx.shadowBlur = 0;
-                            ctx.fillStyle = '#ffeedd';
-                            ctx.fillText(text, 0, 0);
+                    const fs = Math.round((9 + Math.min(3, (zoom - 1) * 1.2)) * D);
+                    ctx.font = `italic 600 ${fs}px Montserrat, sans-serif`; ctx.lineWidth = 3 * D;
+                    for (const road of this.game.traffic.network.roads) {
+                        if (!road.name || !road.name.trim()) continue;
+                        const isH = road.orientation === 'H', text = road.name.toUpperCase().split('').join(' '), tw = ctx.measureText(text).width;
+                        const len = (isH ? road.w : road.h) * finalScale, n = Math.max(1, Math.floor(len / (tw + 260 * D)));
+                        for (let i = 0; i < n; i++) {
+                            const t = (i + 0.5) / n, x = sx(isH ? road.x + road.w * t : road.x + road.w / 2), y = sy(isH ? road.y + road.h / 2 : road.y + road.h * t);
+                            if (!free(x, y, isH ? tw / 2 + 6 * D : fs, isH ? fs : tw / 2 + 6 * D)) continue;
+                            ctx.save(); ctx.translate(x, y); if (!isH) ctx.rotate(-Math.PI / 2);
+                            ctx.strokeText(text, 0, 0); ctx.fillStyle = '#ffd76a'; ctx.fillText(text, 0, 0);
                             ctx.restore();
                         }
-                    });
+                    }
                 }
-                
+                if (showBuildings) {
+                    const fs = Math.round((9.5 + Math.min(3, (zoom - 1.4) * 1.1)) * D);
+                    ctx.font = `600 ${fs}px Montserrat, sans-serif`; ctx.lineWidth = 3 * D;
+                    for (const b of mapData.buildings) {
+                        if (!b.label || !b.label.trim()) continue;
+                        const text = b.label.toUpperCase(), tw = ctx.measureText(text).width, x = sx(b.x + b.w / 2), y = sy(b.y + b.h / 2);
+                        if (!free(x, y, tw / 2 + 4 * D, fs * 0.75)) continue;
+                        ctx.strokeText(text, x, y); ctx.fillStyle = '#f3e6c2'; ctx.fillText(text, x, y);
+                    }
+                }
                 ctx.restore();
             }
             
@@ -35702,8 +35659,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         
             drawScanlines(ctx, w, h) {
-                ctx.fillStyle = "rgba(0,0,0,0.5)";
-                for(let i=0; i<h; i+=4) { ctx.fillRect(0, i, w, 1); }
+                // A whisper of scanlines (cached tile), so the gold reads as a display, not as noise
+                if (!this._scanPat || this._scanDpr !== this.dpr) {
+                    const t = document.createElement('canvas'), D = this.dpr; t.width = 4; t.height = Math.max(2, Math.round(3 * D));
+                    const c = t.getContext('2d'); c.fillStyle = 'rgba(6, 2, 14, 0.16)'; c.fillRect(0, 0, 4, Math.max(1, Math.round(D)));
+                    this._scanPat = ctx.createPattern(t, 'repeat'); this._scanDpr = D;
+                }
+                ctx.save(); ctx.fillStyle = this._scanPat; ctx.fillRect(0, 0, w, h); ctx.restore();
             }
         
             toggleMap(show) {
@@ -35754,355 +35716,99 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             animateIcons() {
                 if (!this.isAnimating) return;
-                
-                const ctx = this.iconCtx;
-                const w = this.iconCanvas.width;
-                const h = this.iconCanvas.height;
-                const mapData = this.game.activeMap;
-                
-                // Get filter state from map sidebar
-                let filterEnabled = false;
-                let activeFilter = null;
-                if (typeof mapSidebar !== 'undefined') {
-                    filterEnabled = mapSidebar.filterEnabled;
-                    activeFilter = mapSidebar.activeFilter;
-                }
-                
-                // Helper to check if a marker category should be shown
-                const shouldShow = (category) => {
-                    if (!filterEnabled) return true; // Filter OFF = show all
-                    return activeFilter === category;
-                };
-                
-                // Clear icon layer
+                this.animationFrameId = requestAnimationFrame(() => this.animateIcons());
+                const ctx = this.iconCtx, w = this.iconCanvas.width, h = this.iconCanvas.height, mapData = this.game.activeMap, D = this.dpr;
+                if (!mapData) return;
+                let filterEnabled = false, activeFilter = null;
+                if (typeof mapSidebar !== 'undefined') { filterEnabled = mapSidebar.filterEnabled; activeFilter = mapSidebar.activeFilter; }
+                const shouldShow = (category) => !filterEnabled || activeFilter === category;
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.clearRect(0, 0, w, h);
-                
-                // Calculate transform (same as main map)
-                const scaleX = w / mapData.width;
-                const scaleY = h / mapData.height;
-                const baseScale = Math.min(scaleX, scaleY) * 0.9;
-                const finalScale = baseScale * this.mapView.zoom;
-                const mapVisualWidth = mapData.width * finalScale;
-                const mapVisualHeight = mapData.height * finalScale;
-                const iconScale = 1 / finalScale * (w / 1920);
-                
-                ctx.save();
-                ctx.translate((w - mapVisualWidth) / 2 + this.mapView.offsetX, (h - mapVisualHeight) / 2 + this.mapView.offsetY);
-                ctx.scale(finalScale, finalScale);
-                
-                // --- DRAW ANIMATED ICONS ---
-                
-                // 1. Transition Points (Always visible - essential navigation)
-                if (mapData.transitions) {
-                    const t = _frameTime / 300;
-                    const pulse = 1 + Math.sin(t) * 0.3;
-                    ctx.fillStyle = '#8f99fb'; ctx.shadowColor = '#8f99fb'; ctx.shadowBlur = 15;
-                    mapData.transitions.forEach(trans => {
-                        ctx.beginPath();
-                        ctx.arc(trans.x + trans.w/2, trans.y + trans.h/2, 25*iconScale*pulse, 0, Math.PI*2);
-                        ctx.fill();
-                    });
-                    ctx.shadowBlur = 0;
-                }
-                
-                // 2. Navigation Path (Simple road-level path - player set)
-                this.drawRoadLevelPath(ctx);
-                
-                // 2b. DEBUG: Draw car's actual waypoints (cyan over purple)
-                this.drawCarActualPath(ctx);
-                
-                // 3. Distance Line (Always visible)
-                this.drawDistanceLine(ctx, iconScale);
-                
-                // 4. Navigation Marker (Always visible - player set)
-                this.drawNavMarker(ctx, iconScale);
-                
-                // 5. NPCs (Filtered: clients)
-                if (this.game.npcs && shouldShow('clients')) {
-                    const npcPulse = 0.8 + Math.sin(_frameTime / 400) * 0.2;
-                    ctx.fillStyle = '#FFD700'; ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 10 + npcPulse * 8;
-                    this.game.npcs.forEach(npc => {
-                        ctx.beginPath();
-                        ctx.arc(npc.x, npc.y, 15 * iconScale * npcPulse, 0, Math.PI*2);
-                        ctx.fill();
-                    });
-                    ctx.shadowBlur = 0;
-                }
-                
-                // 6. Pedestrians (Always visible - ambient)
-                if (this.game.pedestrians && this.game.pedestrians.pedestrians && !filterEnabled) {
-                    const pedPulse = 0.9 + Math.sin(_frameTime / 600) * 0.1;
-                    ctx.fillStyle = '#88aacc'; ctx.shadowColor = '#88aacc'; ctx.shadowBlur = 5;
-                    this.game.pedestrians.pedestrians.forEach(ped => {
-                        if (!ped.dead) {
-                            ctx.beginPath();
-                            ctx.arc(ped.x, ped.y, 8 * iconScale * pedPulse, 0, Math.PI*2);
-                            ctx.fill();
-                        }
-                    });
-                    ctx.shadowBlur = 0;
-                }
-                
-                // 7. Owned Car (Always visible - player's vehicle)
-                if (this.game.ownedCar && this.game.ownedCar.visible) {
-                    const car = this.game.ownedCar;
-                    const carPulse = 0.9 + Math.sin(_frameTime / 500) * 0.1;
-                    ctx.save();
-                    ctx.translate(car.x, car.y);
-                    ctx.rotate(car.angle);
-                    ctx.fillStyle = '#ff3366'; ctx.shadowColor = '#ff3366'; ctx.shadowBlur = 15 + carPulse * 10;
-                    const carW = 26 * iconScale; const carL = 52 * iconScale;
-                    ctx.beginPath(); ctx.roundRect(-carL/2, -carW/2, carL, carW, 4); ctx.fill();
-                    ctx.fillStyle = '#fff'; ctx.shadowBlur = 5;
-                    ctx.fillRect(carL/2 - 2, -carW/2 + 2, 4, 6);
-                    ctx.fillRect(carL/2 - 2, carW/2 - 8, 4, 6);
-                    ctx.restore();
-                }
-                
-                // 8. Home Base / Spawn Point (Filtered: homebases)
-                if (shouldShow('homebases')) {
-                    // Try to get the parking_spot landmark (building location)
-                    // Fallback to spawn point if not available
-                    let homeX, homeY;
-                    if (this.game.landmarkRegistry && this.game.landmarkRegistry['parking_spot']) {
-                        const landmark = this.game.landmarkRegistry['parking_spot'];
-                        homeX = landmark.x;
-                        homeY = landmark.y;
-                    } else if (mapData.spawn) {
-                        homeX = mapData.spawn.x;
-                        homeY = mapData.spawn.y;
-                    } else {
-                        return; // No location to draw
-                    }
-                    
-                    const hbPulse = 0.9 + Math.sin(_frameTime / 600) * 0.15;
-                    
-                    // House icon - green with white glow
-                    ctx.fillStyle = '#00ff88'; 
-                    ctx.shadowColor = '#00ff88'; 
-                    ctx.shadowBlur = 20 + hbPulse * 10;
-                    
-                    // Draw a simple house shape
-                    const size = 40 * iconScale * hbPulse;
-                    ctx.beginPath();
-                    // Roof (triangle)
-                    ctx.moveTo(homeX, homeY - size * 0.8);
-                    ctx.lineTo(homeX - size * 0.7, homeY - size * 0.1);
-                    ctx.lineTo(homeX + size * 0.7, homeY - size * 0.1);
-                    ctx.closePath();
-                    ctx.fill();
-                    // Base (rectangle)
-                    ctx.fillRect(homeX - size * 0.5, homeY - size * 0.1, size, size * 0.8);
-                    
-                    // Door
-                    ctx.fillStyle = '#006633';
-                    ctx.fillRect(homeX - size * 0.15, homeY + size * 0.2, size * 0.3, size * 0.5);
-                    
-                    ctx.shadowBlur = 0;
-                }
-                
-                // 9. Objective Marker (Filtered: missions) - Golden objective marker
-                if (shouldShow('missions')) {
-                    this.drawObjectiveMarker(ctx);
-                }
-                
-                // 9. Player Marker (Animated pulse)
-                const p = this.game.player;
-                const playerPulse = 0.9 + Math.sin(_frameTime / 350) * 0.15;
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate(p.angle);
-                ctx.fillStyle = '#E6E6FA'; ctx.shadowColor = '#E6E6FA'; ctx.shadowBlur = 15 + playerPulse * 15;
-                const size = 50 * iconScale * playerPulse;
-                ctx.beginPath();
-                ctx.moveTo(size, 0);
-                ctx.lineTo(-size/2, -size/2);
-                ctx.lineTo(-size/4, 0);
-                ctx.lineTo(-size/2, size/2);
-                ctx.closePath();
-                ctx.fill();
-                ctx.restore();
-                
-                // 10. RESTRICTED ZONE — Crimson danger area with pulsing hazard border
-                // Always visible — critical gameplay landmark, not filtered
-                if (this.game.restrictedZone) {
-                    const rz = this.game.restrictedZone;
+                // The same transform as the map
+                const baseScale = Math.min(w / mapData.width, h / mapData.height) * 0.9, finalScale = baseScale * this.mapView.zoom;
+                const ox = (w - mapData.width * finalScale) / 2 + this.mapView.offsetX, oy = (h - mapData.height * finalScale) / 2 + this.mapView.offsetY;
+                this._toScreen = (mx, my) => ({ x: ox + mx * finalScale, y: oy + my * finalScale });
+                this._u = D / finalScale;                                   // map units per CSS px
+                this._zk = MapIcons.zoomK(this.mapView.zoom);               // icons grow a little with zoom, never with the screen
+                const S = this._toScreen, k = this._zk, on = (p, m = 40 * D) => p.x > -m && p.x < w + m && p.y > -m && p.y < h + m;
+
+                // ── Areas and routes, in map space ──
+                ctx.save(); ctx.translate(ox, oy); ctx.scale(finalScale, finalScale);
+                const rz = this.game.restrictedZone;
+                if (rz) {                                                   // the danger zone: a crimson wash and a slow dashed edge
                     const t = _frameTime / 400;
-                    const pulse = 0.9 + Math.sin(t) * 0.15;
-                    const cx = rz.x + rz.w / 2;
-                    const cy = rz.y + rz.h / 2;
-                    
-                    ctx.save();
-                    
-                    // Layer 1: Deep crimson fill over the zone
-                    ctx.fillStyle = rz.cleared ? 'rgba(40, 10, 0, 0.25)' : 'rgba(120, 0, 0, 0.3)';
+                    ctx.fillStyle = rz.cleared ? 'rgba(60, 14, 30, 0.28)' : 'rgba(150, 10, 40, 0.24)';
                     ctx.fillRect(rz.x, rz.y, rz.w, rz.h);
-                    
-                    // Layer 2: Inner glow (brighter when hostiles active)
-                    ctx.globalCompositeOperation = 'lighter';
-                    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rz.w, rz.h) * 0.5);
-                    if (rz.active && !rz.cleared) {
-                        grad.addColorStop(0, 'rgba(255, 30, 0, 0.12)');
-                        grad.addColorStop(0.6, 'rgba(180, 0, 0, 0.06)');
-                        grad.addColorStop(1, 'rgba(80, 0, 0, 0)');
-                    } else {
-                        grad.addColorStop(0, 'rgba(200, 60, 0, 0.06)');
-                        grad.addColorStop(1, 'rgba(60, 0, 0, 0)');
-                    }
-                    ctx.fillStyle = grad;
-                    ctx.fillRect(rz.x, rz.y, rz.w, rz.h);
-                    ctx.globalCompositeOperation = 'source-over';
-                    
-                    // Layer 3: Pulsing hazard border
-                    ctx.strokeStyle = rz.cleared ? 'rgba(200, 80, 0, 0.35)' : `rgba(255, 30, 0, ${0.4 + Math.sin(t * 1.5) * 0.2})`;
-                    ctx.lineWidth = 6 * pulse;
-                    ctx.setLineDash([20, 12]);
-                    ctx.lineDashOffset = _frameTime / 50;
-                    ctx.strokeRect(rz.x, rz.y, rz.w, rz.h);
-                    ctx.setLineDash([]);
-                    
-                    // Layer 4: Skull / danger icon at center
-                    const iconSize = 35 * iconScale * pulse;
-                    ctx.fillStyle = rz.cleared ? '#cc6600' : '#ff2200';
-                    ctx.shadowColor = rz.cleared ? '#cc6600' : '#ff2200';
-                    ctx.shadowBlur = 12 + pulse * 8;
-                    ctx.font = `bold ${Math.round(iconSize * 1.2)}px Orbitron`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('⚠', cx, cy);
-                    
-                    // Label below icon
-                    ctx.shadowBlur = 4;
-                    ctx.font = `bold ${Math.round(iconSize * 0.5)}px Orbitron`;
-                    ctx.fillStyle = '#ffaa44';
-                    ctx.fillText(rz.name, cx, cy + iconSize * 0.9);
-                    
-                    // Clear count badge (if cleared at least once)
-                    if (rz.clearCount > 0) {
-                        ctx.font = `bold ${Math.round(iconSize * 0.4)}px Orbitron`;
-                        ctx.fillStyle = '#ff8800';
-                        ctx.fillText(`×${rz.clearCount} CLEARED`, cx, cy + iconSize * 1.5);
-                    }
-                    
-                    ctx.shadowBlur = 0;
-                    ctx.restore();
+                    ctx.strokeStyle = rz.cleared ? 'rgba(255, 170, 90, 0.45)' : `rgba(255, 60, 70, ${0.5 + Math.sin(t * 1.5) * 0.2})`;
+                    ctx.lineWidth = 2 * this._u; ctx.setLineDash([10 * this._u, 7 * this._u]); ctx.lineDashOffset = _frameTime / 50 * this._u;
+                    ctx.strokeRect(rz.x, rz.y, rz.w, rz.h); ctx.setLineDash([]);
                 }
-                
-                // 11. Side Quest Mission Area (Textured red circle — no outline)
-                // Uses molten road-style layered fill similar to golden map roads
-                if (shouldShow('missions')) {
+                let quest = null;
+                if (shouldShow('missions')) {                               // the side quest's area: a soft molten-gold pool, no outline
                     const m = this.game.missions?.activeMission;
                     if (m && m.status === 'active') {
-                        let sqx, sqy;
-                        const mRadius = m.targetRadius || 100;
-                        
-                        // Determine target position
-                        if (m.type === MISSION_TYPES.DELIVERY && !m.pickedUp && this.game.deliveryVehicle) {
-                            sqx = this.game.deliveryVehicle.x;
-                            sqy = this.game.deliveryVehicle.y;
-                        } else {
-                            sqx = m.targetX;
-                            sqy = m.targetY;
-                        }
-                        
-                        if (sqx !== undefined && sqy !== undefined) {
-                            const t = _frameTime / 600;
-                            const pulse = 1 + Math.sin(t) * 0.08;
-                            const radius = (mRadius * iconScale) * pulse;
-                            
-                            ctx.save();
-                            
-                            // Layer 1: Deep red base fill
-                            ctx.globalCompositeOperation = 'source-over';
-                            ctx.fillStyle = 'rgba(85, 0, 0, 0.35)';
-                            ctx.beginPath();
-                            ctx.arc(sqx, sqy, radius, 0, Math.PI * 2);
-                            ctx.fill();
-                            
-                            // Layer 2: Orange mid-tone with lighter blend
-                            ctx.globalCompositeOperation = 'lighter';
-                            ctx.fillStyle = 'rgba(255, 69, 0, 0.12)';
-                            ctx.beginPath();
-                            ctx.arc(sqx, sqy, radius * 0.75, 0, Math.PI * 2);
-                            ctx.fill();
-                            
-                            // Layer 3: Inner gold hotspot
-                            ctx.fillStyle = 'rgba(255, 215, 0, 0.06)';
-                            ctx.beginPath();
-                            ctx.arc(sqx, sqy, radius * 0.4, 0, Math.PI * 2);
-                            ctx.fill();
-                            
-                            // Layer 4: Noise texture — scattered micro-dots for that molten look
-                            ctx.globalCompositeOperation = 'source-over';
-                            const dotCount = Math.floor(radius * 0.6);
-                            for (let d = 0; d < dotCount; d++) {
-                                const angle = (d / dotCount) * Math.PI * 2 + t * 0.3;
-                                const dist = Math.random() * radius * 0.9;
-                                const dx = sqx + Math.cos(angle) * dist;
-                                const dy = sqy + Math.sin(angle) * dist;
-                                const dotAlpha = 0.08 + Math.random() * 0.12;
-                                ctx.fillStyle = `rgba(255, ${Math.floor(80 + Math.random() * 80)}, 0, ${dotAlpha})`;
-                                ctx.fillRect(dx - 1, dy - 1, 2 + Math.random() * 2, 2 + Math.random() * 2);
-                            }
-                            
-                            // Layer 5: Soft radial edge glow (no hard outline)
-                            const gradient = ctx.createRadialGradient(sqx, sqy, radius * 0.7, sqx, sqy, radius);
-                            gradient.addColorStop(0, 'rgba(255, 69, 0, 0)');
-                            gradient.addColorStop(0.8, 'rgba(180, 30, 0, 0.08)');
-                            gradient.addColorStop(1, 'rgba(100, 0, 0, 0.2)');
-                            ctx.globalCompositeOperation = 'source-over';
-                            ctx.fillStyle = gradient;
-                            ctx.beginPath();
-                            ctx.arc(sqx, sqy, radius, 0, Math.PI * 2);
-                            ctx.fill();
-                            
-                            ctx.restore();
+                        let qx = m.targetX, qy = m.targetY;
+                        if (m.type === MISSION_TYPES.DELIVERY && !m.pickedUp && this.game.deliveryVehicle) { qx = this.game.deliveryVehicle.x; qy = this.game.deliveryVehicle.y; }
+                        if (qx !== undefined && qy !== undefined) {
+                            const r = (m.targetRadius || 100) * (1 + Math.sin(_frameTime / 600) * 0.06);
+                            const g = ctx.createRadialGradient(qx, qy, 0, qx, qy, r);
+                            g.addColorStop(0, 'rgba(255, 215, 120, 0.22)'); g.addColorStop(0.7, 'rgba(255, 150, 60, 0.12)'); g.addColorStop(1, 'rgba(160, 30, 60, 0)');
+                            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(qx, qy, r, 0, Math.PI * 2); ctx.fill();
+                            quest = { x: qx, y: qy };
                         }
                     }
                 }
-                
-                // 11. Story Objective Marker (Beautiful Red with White Stroke) - Filtered: missions
-                if (shouldShow('missions')) {
-                    const stepData = this.game.story?.currentStepData;
-                    if (stepData && stepData.targetMap === mapData.id) {
-                        let tx, ty;
-                        
-                        // Resolve coordinates from landmark or direct target
-                        if (typeof stepData.target === 'string') {
-                            const loc = this.game.getLandmark(stepData.target);
-                            if (loc) { tx = loc.x; ty = loc.y; }
-                        } else if (stepData.target) {
-                            tx = stepData.target.x; 
-                            ty = stepData.target.y;
-                        } else if (typeof stepData.targetX === 'number') {
-                            tx = stepData.targetX;
-                            ty = stepData.targetY;
-                        }
-                        
-                        if (tx !== undefined && ty !== undefined) {
-                            const t = _frameTime / 200;
-                            const pulse = 1 + Math.sin(t) * 0.2;
-                            
-                            // Semi-transparent red fill with white stroke
-                            ctx.strokeStyle = '#fff';
-                            ctx.lineWidth = 8 * iconScale;
-                            ctx.fillStyle = 'rgba(170, 0, 0, 0.4)';
-                            ctx.shadowColor = '#ff0000';
-                            ctx.shadowBlur = 30;
-                            
-                            ctx.beginPath();
-                            ctx.arc(tx, ty, (80 * iconScale) * pulse, 0, Math.PI * 2);
-                            ctx.fill();
-                            ctx.stroke();
-                            ctx.shadowBlur = 0;
-                        }
-                    }
-                }
-                
+                this.drawRoadLevelPath(ctx);
+                this.drawCarActualPath(ctx);
                 ctx.restore();
-                
-                // Continue animation
-                this.animationFrameId = requestAnimationFrame(() => this.animateIcons());
+
+                // ── Markers, in screen space at fixed sizes ──
+                if (mapData.transitions) for (const t of mapData.transitions) { const p = S(t.x + t.w / 2, t.y + t.h / 2); if (on(p)) MapIcons.draw(ctx, 'transition', p.x, p.y, { dpr: D, css: MapIcons.SIZE.transition * k }); }
+                // Points of interest from the buildings' categories
+                if (mapData.buildings) for (const b of mapData.buildings) {
+                    const cat = b.mapCategory; if (!cat) continue;
+                    const kind = cat === 'restaurant' ? 'pin:cup' : cat === 'medical' ? 'pin:cross' : 'pin:dot', key = cat === 'restaurant' ? 'restaurants' : null;
+                    if (filterEnabled && (!key || activeFilter !== key)) continue;
+                    const p = S(b.x + b.w / 2, b.y + b.h / 2); if (on(p)) MapIcons.draw(ctx, kind, p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k });
+                }
+                if (this.game.pedestrians && this.game.pedestrians.pedestrians && !filterEnabled) {   // the crowd: fine lavender motes
+                    ctx.fillStyle = 'rgba(217, 204, 255, 0.55)'; const r = 1.6 * D;
+                    ctx.beginPath(); for (const ped of this.game.pedestrians.pedestrians) { if (ped.dead) continue; const p = S(ped.x, ped.y); if (on(p, 4)) ctx.rect(p.x - r, p.y - r, r * 2, r * 2); } ctx.fill();
+                }
+                if (this.game.npcs && shouldShow('clients')) for (const n of this.game.npcs) { const p = S(n.x, n.y); if (on(p)) MapIcons.draw(ctx, 'client', p.x, p.y, { dpr: D, css: MapIcons.SIZE.client * k }); }
+                if (shouldShow('homebases')) {
+                    const L = this.game.landmarkRegistry && this.game.landmarkRegistry['parking_spot'], hx = L ? L.x : mapData.spawn && mapData.spawn.x, hy = L ? L.y : mapData.spawn && mapData.spawn.y;
+                    if (hx !== undefined) { const p = S(hx, hy); if (on(p)) MapIcons.draw(ctx, 'pin:home', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k }); }
+                }
+                if (rz) {
+                    const p = S(rz.x + rz.w / 2, rz.y + rz.h / 2), pulse = 1 + Math.sin(_frameTime / 400) * 0.05;
+                    if (on(p, 120 * D)) {
+                        MapIcons.draw(ctx, 'danger', p.x, p.y, { dpr: D, css: MapIcons.SIZE.danger * k, scale: pulse, alpha: rz.cleared ? 0.7 : 1 });
+                        ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.lineJoin = 'round'; ctx.lineWidth = 3 * D; ctx.strokeStyle = 'rgba(11, 5, 22, 0.9)';
+                        ctx.font = `600 ${10 * D}px Montserrat, sans-serif`;
+                        const ty = p.y + 18 * D * k, name = (rz.name || '').toUpperCase().split('').join(' ');
+                        ctx.strokeText(name, p.x, ty); ctx.fillStyle = rz.cleared ? '#ffcf8a' : '#ff8a96'; ctx.fillText(name, p.x, ty);
+                        if (rz.clearCount > 0) { const c2 = `×${rz.clearCount} CLEARED`; ctx.font = `${9 * D}px Montserrat, sans-serif`; ctx.strokeText(c2, p.x, ty + 13 * D); ctx.fillStyle = '#ffd76a'; ctx.fillText(c2, p.x, ty + 13 * D); }
+                        ctx.restore();
+                    }
+                }
+                if (quest) { const p = S(quest.x, quest.y); if (on(p)) MapIcons.draw(ctx, 'pin:sparkle', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k }); }
+                if (shouldShow('missions')) {
+                    this.drawObjectiveMarker(ctx);
+                    const sd = this.game.story?.currentStepData;                // the story's own target
+                    if (sd && sd.targetMap === mapData.id) {
+                        let tx, ty;
+                        if (typeof sd.target === 'string') { const l = this.game.getLandmark(sd.target); if (l) { tx = l.x; ty = l.y; } }
+                        else if (sd.target) { tx = sd.target.x; ty = sd.target.y; }
+                        else if (typeof sd.targetX === 'number') { tx = sd.targetX; ty = sd.targetY; }
+                        if (tx !== undefined) { const p = S(tx, ty); if (on(p)) MapIcons.draw(ctx, 'pin:star', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k }); }
+                    }
+                }
+                this.drawDistanceLine(ctx);
+                this.drawNavMarker(ctx);
+                if (this.game.ownedCar && this.game.ownedCar.visible) { const c = this.game.ownedCar, p = S(c.x, c.y); if (on(p)) MapIcons.draw(ctx, 'car', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: c.angle }); }
+                const pl = this.game.player, pp = S(pl.x, pl.y);                // you, on top
+                MapIcons.draw(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: pl.angle, scale: 0.94 + Math.sin(_frameTime / 350) * 0.06 });
             }
             
             // Center the map view on the player's current position
@@ -36144,14 +35850,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         
             resizeMap() {
-                this.mapCanvas.width = window.innerWidth;
-                this.mapCanvas.height = window.innerHeight;
-                // Also resize icon animation layer
-                this.iconCanvas.width = window.innerWidth;
-                this.iconCanvas.height = window.innerHeight;
+                // Canvases in device pixels (crisp on every screen); their CSS size stays the window's
+                const D = this.dpr = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+                const cw = window.innerWidth, ch = window.innerHeight;
+                for (const cv of [this.mapCanvas, this.iconCanvas]) {
+                    if (cv.width !== Math.round(cw * D) || cv.height !== Math.round(ch * D)) { cv.width = Math.round(cw * D); cv.height = Math.round(ch * D); }
+                    cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+                }
+                this.isCacheDirty = true;
             }
             
-        
             bindDragLogic(node, pill) {
                 node.addEventListener('mousedown', (e) => {
                     e.stopPropagation(); // Prevent clicking the pill itself
@@ -36201,91 +35909,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /* --- ADD TO UISystem class --- */
             
             drawObjectiveMarker(ctx) {
-                // 1. Get Current Mission Data
-                // We access the story state directly from the manager
+                // The story objective: a gold ring and star at a fixed size, breathing, with a slow gold halo
                 const story = this.game.story;
-                if (!story || !story.nsm) return;
-            
-                const state = story.state;
-                const stepData = story.nsm.getStepData(state.part, state.chapter, state.mission, state.step);
-                
-                if (!stepData) return;
-            
-                // 2. Check Validity
-                // Only show if the objective is on the CURRENT viewing map
-                // (Assuming activeMap.id matches the IDs in your STORY_DB like 'hub_949')
-                if (stepData.targetMap !== this.game.activeMap.id) return;
-            
-                // 3. Resolve Coordinates
-                let targetX = null;
-                let targetY = null;
-            
-                // A. Use Modular Landmark System (Preferred)
-                if (stepData.target && this.game.getLandmark) {
-                    const loc = this.game.getLandmark(stepData.target);
-                    if (loc) {
-                        targetX = loc.x;
-                        targetY = loc.y;
-                    }
-                } 
-                // B. Fallback to hardcoded X/Y if legacy data exists
-                else if (stepData.x !== undefined) {
-                    targetX = stepData.x;
-                    targetY = stepData.y;
-                }
-            
-                if (targetX === null || targetY === null) return;
-            
-                // 4. Draw the "Golden Marker"
-                const time = _frameTime;
-                const pulse = (Math.sin(time / 200) + 1) / 2; // Fast pulse (0 to 1)
-                
-                // Calculate size (Counter-scale with zoom so it stays visible)
-                // We divide by zoom so the marker stays roughly same screen size even when zoomed out
-                const zoomFactor = Math.max(1, this.mapView.zoom); 
-                const size = (80 + (pulse * 30)) / zoomFactor; 
-            
+                if (!story || !story.nsm || !this._toScreen) return;
+                const st = story.state, step = story.nsm.getStepData(st.part, st.chapter, st.mission, st.step);
+                if (!step || step.targetMap !== this.game.activeMap.id) return;
+                let tx = null, ty = null;
+                if (step.target && this.game.getLandmark) { const l = this.game.getLandmark(step.target); if (l) { tx = l.x; ty = l.y; } }
+                else if (step.x !== undefined) { tx = step.x; ty = step.y; }
+                if (tx === null || ty === null) return;
+                const D = this.dpr, p = this._toScreen(tx, ty), pulse = (Math.sin(_frameTime / 260) + 1) / 2;
                 ctx.save();
-                ctx.translate(targetX, targetY);
-                
-                // Glow
-                ctx.shadowColor = '#FFD700'; // Gold
-                ctx.shadowBlur = 30 + (pulse * 20);
-                
-                // 1. Rotating Outer Diamond
-                ctx.save();
-                ctx.rotate(time / 1500); 
-                ctx.strokeStyle = `rgba(255, 215, 0, ${0.6 + pulse * 0.4})`;
-                ctx.lineWidth = 6 / zoomFactor;
-                ctx.strokeRect(-size/2, -size/2, size, size);
+                ctx.strokeStyle = `rgba(255, 215, 106, ${0.15 + 0.35 * (1 - pulse)})`; ctx.lineWidth = 1.5 * D;
+                ctx.beginPath(); ctx.arc(p.x, p.y, (16 + 12 * pulse) * D * this._zk, 0, Math.PI * 2); ctx.stroke();
                 ctx.restore();
-            
-                // 2. Counter-Rotating Inner Diamond
-                ctx.save();
-                ctx.rotate(-time / 1500); 
-                const innerSize = size * 0.6;
-                ctx.strokeStyle = `rgba(255, 255, 255, 0.8)`;
-                ctx.lineWidth = 3 / zoomFactor;
-                ctx.strokeRect(-innerSize/2, -innerSize/2, innerSize, innerSize);
-                ctx.restore();
-                
-                // 3. Center Dot
-                ctx.fillStyle = '#fff';
-                ctx.beginPath();
-                ctx.arc(0, 0, 8 / zoomFactor, 0, Math.PI*2);
-                ctx.fill();
-                
-                // 4. Label (Optional)
-                // Only show if zoomed in closer
-                if (this.mapView.zoom > 1.5) {
-                    ctx.fillStyle = '#FFD700';
-                    ctx.font = `bold ${24/zoomFactor}px Orbitron`;
-                    ctx.textAlign = 'center';
-                    ctx.shadowBlur = 0;
-                    ctx.fillText("OBJECTIVE", 0, -size/1.5);
-                }
-            
-                ctx.restore();
+                MapIcons.draw(ctx, 'objective', p.x, p.y, { dpr: D, css: MapIcons.SIZE.objective * this._zk, scale: 0.95 + 0.08 * pulse });
             }
 
         }
@@ -55362,15 +55000,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.ctx.stroke();
                     
                     // Sweep trail (fading arc behind sweep line)
-                    const sweepGrad = this.ctx.createConicGradient(sweepAngle - 0.8, cx, cy);
-                    sweepGrad.addColorStop(0, 'rgba(0, 243, 255, 0)');
-                    sweepGrad.addColorStop(0.12, 'rgba(0, 243, 255, 0.08)');
-                    sweepGrad.addColorStop(0.13, 'rgba(0, 243, 255, 0)');
                     this.ctx.globalAlpha = 1.0;
-                    this.ctx.fillStyle = sweepGrad;
-                    this.ctx.beginPath();
-                    this.ctx.arc(cx, cy, RADAR_RADIUS, 0, Math.PI * 2);
-                    this.ctx.fill();
+                    if (this.ctx.createConicGradient) {
+                        const sweepGrad = this.ctx.createConicGradient(sweepAngle - 0.8, cx, cy);
+                        sweepGrad.addColorStop(0, 'rgba(0, 243, 255, 0)');
+                        sweepGrad.addColorStop(0.12, 'rgba(0, 243, 255, 0.08)');
+                        sweepGrad.addColorStop(0.13, 'rgba(0, 243, 255, 0)');
+                        this.ctx.fillStyle = sweepGrad;
+                        this.ctx.beginPath();
+                        this.ctx.arc(cx, cy, RADAR_RADIUS, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    } else {                                                      // no conic gradients (Safari < 16.4): a fan of thin wedges
+                        for (let k = 0; k < 6; k++) {
+                            this.ctx.fillStyle = `rgba(0, 243, 255, ${(0.08 * (k + 1) / 6).toFixed(3)})`;
+                            const a0 = sweepAngle - 0.8 + k * 0.13;
+                            this.ctx.beginPath(); this.ctx.moveTo(cx, cy); this.ctx.arc(cx, cy, RADAR_RADIUS, a0, a0 + 0.13); this.ctx.closePath(); this.ctx.fill();
+                        }
+                    }
                     
                     // Enemy blips (crimson)
                     this.ctx.globalAlpha = 0.9;
@@ -57826,16 +57472,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.setTransform(1, 0, 0, 1, 0, 0); 
                 ctx.globalAlpha = finalOpacity;
                 let layer = this.lightCanvas;
-                if (GameSettings.softShadows) {                              // soften by a half-size step (no ctx.filter)
-                    const sc = this._softCanvas || (this._softCanvas = document.createElement('canvas'));
-                    const sw = Math.max(1, lw >> 1), sh = Math.max(1, lh >> 1);
-                    if (sc.width !== sw || sc.height !== sh) { sc.width = sw; sc.height = sh; }
-                    const sx = sc.getContext('2d'); sx.imageSmoothingEnabled = true;
-                    sx.clearRect(0, 0, sw, sh); sx.drawImage(this.lightCanvas, 0, 0, sw, sh);
-                    layer = sc;
+                if (GameSettings.softShadows) {
+                    // Soft edges, the same in every browser and no ctx.filter (Safari before 18 has none): a separable
+                    // box blur on the half-resolution light layer — three whole-pixel shifts across, then three down,
+                    // each a third, added up. Six plain copies of a small canvas.
+                    const pair = this._softCanvas || (this._softCanvas = [document.createElement('canvas'), document.createElement('canvas')]);
+                    let src = this.lightCanvas;
+                    for (let pass = 0; pass < 2; pass++) {
+                        const cv = pair[pass];
+                        if (cv.width !== lw || cv.height !== lh) { cv.width = lw; cv.height = lh; }
+                        const sx = cv.getContext('2d');
+                        sx.globalCompositeOperation = 'copy'; sx.globalAlpha = 1 / 3;
+                        sx.drawImage(src, 0, 0);
+                        sx.globalCompositeOperation = 'lighter';
+                        if (pass === 0) { sx.drawImage(src, -1, 0); sx.drawImage(src, 1, 0); }
+                        else { sx.drawImage(src, 0, -1); sx.drawImage(src, 0, 1); }
+                        sx.globalCompositeOperation = 'source-over'; sx.globalAlpha = 1;
+                        src = cv;
+                    }
+                    layer = src;
                 }
                 ctx.imageSmoothingEnabled = true;
-                ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
+                if (layer === this.lightCanvas) ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
+                else ctx.drawImage(layer, 1, 1, lw - 2, lh - 2, 0, 0, this.canvas.width, this.canvas.height);   // the blur's outer pixel is half-covered: crop it
                 
                 // 8. NV SIGNAL BOOST
                 if (this.nvIntensity > 0.01) {
@@ -59740,48 +59399,37 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
             
             drawMap(recenter = false) {
-                const canvas = this.mapCanvas; const ctx = canvas.getContext('2d');
-                canvas.width = 280; canvas.height = 350; 
-                ctx.fillStyle = '#0a0a15'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                if (!game.activeMap) return;
-                const scaleX = canvas.width / game.activeMap.width; const scaleY = canvas.height / game.activeMap.height;
-                this.mapView.baseScale = Math.min(scaleX, scaleY);
-                const finalScale = this.mapView.baseScale * this.mapView.zoom;
-                let centerX, centerY;
-                if (recenter) { centerX = game.player.x * finalScale; centerY = game.player.y * finalScale; this.mapView.offsetX = (canvas.width / 2) - centerX; this.mapView.offsetY = (canvas.height / 2) - centerY; }
-                ctx.save(); ctx.translate(this.mapView.offsetX, this.mapView.offsetY); ctx.scale(finalScale, finalScale);
-                ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, game.activeMap.width, game.activeMap.height);
-                if (game.activeMap.floorZones) { game.activeMap.floorZones.forEach(z => { ctx.fillStyle = z.color; ctx.fillRect(z.x, z.y, z.w, z.h); }); }
-                if (game.traffic && game.traffic.network) { ctx.fillStyle = '#222'; game.traffic.network.roads.forEach(r => { if(r.isDiagonal){const c=r.getCorners();ctx.beginPath();ctx.moveTo(c[0].x,c[0].y);for(let i=1;i<c.length;i++)ctx.lineTo(c[i].x,c[i].y);ctx.closePath();ctx.fill();}else{ctx.fillRect(r.x, r.y, r.w, r.h);} }); }
-                if (game.activeMap.buildings) { ctx.fillStyle = '#333'; game.activeMap.buildings.forEach(b => { ctx.fillRect(b.x, b.y, b.w, b.h); }); }
-                
-                // Map POI Icons (restaurant, medical, etc.)
-                if (game.activeMap.buildings) {
-                    game.activeMap.buildings.forEach(b => {
-                        if (b.mapCategory === 'restaurant') {
-                            const ix = b.x + (b.w || 100) / 2;
-                            const iy = b.y + (b.h || 100) / 2;
-                            // Coffee cup icon
-                            ctx.save(); ctx.translate(ix, iy);
-                            ctx.fillStyle = '#ffaa00';
-                            ctx.beginPath(); ctx.moveTo(-20, -25); ctx.lineTo(-14, 16); ctx.quadraticCurveTo(0, 24, 14, 16); ctx.lineTo(20, -25); ctx.closePath(); ctx.fill();
-                            ctx.fillStyle = '#f5e6c8'; ctx.fillRect(-22, -30, 44, 8);
-                            ctx.strokeStyle = '#ffaa00'; ctx.lineWidth = 4;
-                            ctx.beginPath(); ctx.arc(24, -8, 12, -Math.PI/2, Math.PI/2); ctx.stroke();
-                            ctx.restore();
-                        } else if (b.mapCategory === 'medical') {
-                            const ix = b.x + (b.w || 100) / 2;
-                            const iy = b.y + (b.h || 100) / 2;
-                            ctx.fillStyle = '#00ff88'; ctx.fillRect(ix - 4, iy - 14, 8, 28); ctx.fillRect(ix - 14, iy - 4, 28, 8);
-                        }
-                    });
+                // The same city of light and icons as the golden map (ui/map-icons.js), sized to how the canvas is
+                // shown (it was a fixed 280×350 stretched to fit) at the screen's pixel ratio. Pan offsets are CSS px.
+                const canvas = this.mapCanvas, ctx = canvas.getContext('2d'), M = game.activeMap;
+                const D = Math.min(3, Math.max(1, window.devicePixelRatio || 1)), cw = canvas.clientWidth || 280, ch = canvas.clientHeight || 300;
+                if (canvas.width !== Math.round(cw * D) || canvas.height !== Math.round(ch * D)) { canvas.width = Math.round(cw * D); canvas.height = Math.round(ch * D); }
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.fillStyle = MAP_PAL.base; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                if (!M) return;
+                this.mapView.baseScale = Math.min(cw / M.width, ch / M.height);
+                const fs = this.mapView.baseScale * this.mapView.zoom;
+                if (recenter) { this.mapView.offsetX = cw / 2 - game.player.x * fs; this.mapView.offsetY = ch / 2 - game.player.y * fs; }
+                const ox = this.mapView.offsetX, oy = this.mapView.offsetY;
+                ctx.setTransform(D * fs, 0, 0, D * fs, D * ox, D * oy);
+                MapArt.paintCity(ctx, M, { px: D * fs, dpr: D, bounds: { x: -ox / fs, y: -oy / fs, w: cw / fs, h: ch / fs },
+                    network: M.type !== 'indoor' && game.traffic ? game.traffic.network : null, lamps: M.type !== 'indoor' ? game.lamps : null });
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                MapArt.bloom(canvas);
+                const S = (mx, my) => ({ x: D * (ox + mx * fs), y: D * (oy + my * fs) }), k = MapIcons.zoomK(this.mapView.zoom) * 0.85;
+                const on = (p) => p.x > -30 * D && p.x < canvas.width + 30 * D && p.y > -30 * D && p.y < canvas.height + 30 * D;
+                if (M.transitions) for (const t of M.transitions) { const p = S(t.x + t.w / 2, t.y + t.h / 2); if (on(p)) MapIcons.draw(ctx, 'transition', p.x, p.y, { dpr: D, css: MapIcons.SIZE.transition * k }); }
+                if (M.buildings) for (const b of M.buildings) {
+                    if (b.mapCategory !== 'restaurant' && b.mapCategory !== 'medical') continue;
+                    const p = S(b.x + (b.w || 100) / 2, b.y + (b.h || 100) / 2);
+                    if (on(p)) MapIcons.draw(ctx, b.mapCategory === 'restaurant' ? 'pin:cup' : 'pin:cross', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k });
                 }
-                ctx.fillStyle = '#444'; game.activeMap.walls.forEach(w => { ctx.fillRect(w.x, w.y, w.w, w.h); });
-                if (game.activeMap.transitions) { ctx.fillStyle = '#00ff88'; game.activeMap.transitions.forEach(t => { ctx.beginPath(); ctx.arc(t.x + t.w/2, t.y + t.h/2, 15, 0, Math.PI * 2); ctx.fill(); }); }
-                ctx.fillStyle = '#ff0000'; ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(game.player.x, game.player.y, 25, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(game.player.x, game.player.y); ctx.lineTo( game.player.x + Math.cos(game.player.angle) * 60, game.player.y + Math.sin(game.player.angle) * 60 ); ctx.stroke();
-                ctx.restore();
-                ctx.fillStyle = '#fff'; ctx.font = '12px Montserrat'; ctx.fillText(`ZOOM: ${this.mapView.zoom.toFixed(1)}x`, 10, canvas.height - 10);
+                if (game.ownedCar && game.ownedCar.visible) { const p = S(game.ownedCar.x, game.ownedCar.y); if (on(p)) MapIcons.draw(ctx, 'car', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: game.ownedCar.angle }); }
+                const pp = S(game.player.x, game.player.y);
+                MapIcons.draw(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: game.player.angle });
+                MapIcons.draw(ctx, 'search', 16 * D, canvas.height - 14 * D, { dpr: D, css: 12 });
+                ctx.fillStyle = '#ffd76a'; ctx.font = `600 ${10 * D}px Montserrat, sans-serif`; ctx.textBaseline = 'middle';
+                ctx.fillText(`${this.mapView.zoom.toFixed(1)}×`, 28 * D, canvas.height - 14 * D);
             },
             
             showHelp() { this.currentApp = 'help'; this.homeScreen.style.display = 'none'; document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none'); document.getElementById('screen-help').style.display = 'flex'; },

@@ -78,6 +78,7 @@ const SCRIPTS = [
     'traffic/traffic-manager.js',
     'world/parks.js',
     'world/ground-baker.js',
+    'ui/map-icons.js',
     'ui/ui-system.js',
     'ui/music-widget.js',
     'story/narrative-cutscenes.js',

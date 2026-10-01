@@ -813,48 +813,37 @@
             },
             
             drawMap(recenter = false) {
-                const canvas = this.mapCanvas; const ctx = canvas.getContext('2d');
-                canvas.width = 280; canvas.height = 350; 
-                ctx.fillStyle = '#0a0a15'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                if (!game.activeMap) return;
-                const scaleX = canvas.width / game.activeMap.width; const scaleY = canvas.height / game.activeMap.height;
-                this.mapView.baseScale = Math.min(scaleX, scaleY);
-                const finalScale = this.mapView.baseScale * this.mapView.zoom;
-                let centerX, centerY;
-                if (recenter) { centerX = game.player.x * finalScale; centerY = game.player.y * finalScale; this.mapView.offsetX = (canvas.width / 2) - centerX; this.mapView.offsetY = (canvas.height / 2) - centerY; }
-                ctx.save(); ctx.translate(this.mapView.offsetX, this.mapView.offsetY); ctx.scale(finalScale, finalScale);
-                ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, game.activeMap.width, game.activeMap.height);
-                if (game.activeMap.floorZones) { game.activeMap.floorZones.forEach(z => { ctx.fillStyle = z.color; ctx.fillRect(z.x, z.y, z.w, z.h); }); }
-                if (game.traffic && game.traffic.network) { ctx.fillStyle = '#222'; game.traffic.network.roads.forEach(r => { if(r.isDiagonal){const c=r.getCorners();ctx.beginPath();ctx.moveTo(c[0].x,c[0].y);for(let i=1;i<c.length;i++)ctx.lineTo(c[i].x,c[i].y);ctx.closePath();ctx.fill();}else{ctx.fillRect(r.x, r.y, r.w, r.h);} }); }
-                if (game.activeMap.buildings) { ctx.fillStyle = '#333'; game.activeMap.buildings.forEach(b => { ctx.fillRect(b.x, b.y, b.w, b.h); }); }
-                
-                // Map POI Icons (restaurant, medical, etc.)
-                if (game.activeMap.buildings) {
-                    game.activeMap.buildings.forEach(b => {
-                        if (b.mapCategory === 'restaurant') {
-                            const ix = b.x + (b.w || 100) / 2;
-                            const iy = b.y + (b.h || 100) / 2;
-                            // Coffee cup icon
-                            ctx.save(); ctx.translate(ix, iy);
-                            ctx.fillStyle = '#ffaa00';
-                            ctx.beginPath(); ctx.moveTo(-20, -25); ctx.lineTo(-14, 16); ctx.quadraticCurveTo(0, 24, 14, 16); ctx.lineTo(20, -25); ctx.closePath(); ctx.fill();
-                            ctx.fillStyle = '#f5e6c8'; ctx.fillRect(-22, -30, 44, 8);
-                            ctx.strokeStyle = '#ffaa00'; ctx.lineWidth = 4;
-                            ctx.beginPath(); ctx.arc(24, -8, 12, -Math.PI/2, Math.PI/2); ctx.stroke();
-                            ctx.restore();
-                        } else if (b.mapCategory === 'medical') {
-                            const ix = b.x + (b.w || 100) / 2;
-                            const iy = b.y + (b.h || 100) / 2;
-                            ctx.fillStyle = '#00ff88'; ctx.fillRect(ix - 4, iy - 14, 8, 28); ctx.fillRect(ix - 14, iy - 4, 28, 8);
-                        }
-                    });
+                // The same city of light and icons as the golden map (ui/map-icons.js), sized to how the canvas is
+                // shown (it was a fixed 280×350 stretched to fit) at the screen's pixel ratio. Pan offsets are CSS px.
+                const canvas = this.mapCanvas, ctx = canvas.getContext('2d'), M = game.activeMap;
+                const D = Math.min(3, Math.max(1, window.devicePixelRatio || 1)), cw = canvas.clientWidth || 280, ch = canvas.clientHeight || 300;
+                if (canvas.width !== Math.round(cw * D) || canvas.height !== Math.round(ch * D)) { canvas.width = Math.round(cw * D); canvas.height = Math.round(ch * D); }
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.fillStyle = MAP_PAL.base; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                if (!M) return;
+                this.mapView.baseScale = Math.min(cw / M.width, ch / M.height);
+                const fs = this.mapView.baseScale * this.mapView.zoom;
+                if (recenter) { this.mapView.offsetX = cw / 2 - game.player.x * fs; this.mapView.offsetY = ch / 2 - game.player.y * fs; }
+                const ox = this.mapView.offsetX, oy = this.mapView.offsetY;
+                ctx.setTransform(D * fs, 0, 0, D * fs, D * ox, D * oy);
+                MapArt.paintCity(ctx, M, { px: D * fs, dpr: D, bounds: { x: -ox / fs, y: -oy / fs, w: cw / fs, h: ch / fs },
+                    network: M.type !== 'indoor' && game.traffic ? game.traffic.network : null, lamps: M.type !== 'indoor' ? game.lamps : null });
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                MapArt.bloom(canvas);
+                const S = (mx, my) => ({ x: D * (ox + mx * fs), y: D * (oy + my * fs) }), k = MapIcons.zoomK(this.mapView.zoom) * 0.85;
+                const on = (p) => p.x > -30 * D && p.x < canvas.width + 30 * D && p.y > -30 * D && p.y < canvas.height + 30 * D;
+                if (M.transitions) for (const t of M.transitions) { const p = S(t.x + t.w / 2, t.y + t.h / 2); if (on(p)) MapIcons.draw(ctx, 'transition', p.x, p.y, { dpr: D, css: MapIcons.SIZE.transition * k }); }
+                if (M.buildings) for (const b of M.buildings) {
+                    if (b.mapCategory !== 'restaurant' && b.mapCategory !== 'medical') continue;
+                    const p = S(b.x + (b.w || 100) / 2, b.y + (b.h || 100) / 2);
+                    if (on(p)) MapIcons.draw(ctx, b.mapCategory === 'restaurant' ? 'pin:cup' : 'pin:cross', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k });
                 }
-                ctx.fillStyle = '#444'; game.activeMap.walls.forEach(w => { ctx.fillRect(w.x, w.y, w.w, w.h); });
-                if (game.activeMap.transitions) { ctx.fillStyle = '#00ff88'; game.activeMap.transitions.forEach(t => { ctx.beginPath(); ctx.arc(t.x + t.w/2, t.y + t.h/2, 15, 0, Math.PI * 2); ctx.fill(); }); }
-                ctx.fillStyle = '#ff0000'; ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(game.player.x, game.player.y, 25, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(game.player.x, game.player.y); ctx.lineTo( game.player.x + Math.cos(game.player.angle) * 60, game.player.y + Math.sin(game.player.angle) * 60 ); ctx.stroke();
-                ctx.restore();
-                ctx.fillStyle = '#fff'; ctx.font = '12px Montserrat'; ctx.fillText(`ZOOM: ${this.mapView.zoom.toFixed(1)}x`, 10, canvas.height - 10);
+                if (game.ownedCar && game.ownedCar.visible) { const p = S(game.ownedCar.x, game.ownedCar.y); if (on(p)) MapIcons.draw(ctx, 'car', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: game.ownedCar.angle }); }
+                const pp = S(game.player.x, game.player.y);
+                MapIcons.draw(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: game.player.angle });
+                MapIcons.draw(ctx, 'search', 16 * D, canvas.height - 14 * D, { dpr: D, css: 12 });
+                ctx.fillStyle = '#ffd76a'; ctx.font = `600 ${10 * D}px Montserrat, sans-serif`; ctx.textBaseline = 'middle';
+                ctx.fillText(`${this.mapView.zoom.toFixed(1)}×`, 28 * D, canvas.height - 14 * D);
             },
             
             showHelp() { this.currentApp = 'help'; this.homeScreen.style.display = 'none'; document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none'); document.getElementById('screen-help').style.display = 'flex'; },

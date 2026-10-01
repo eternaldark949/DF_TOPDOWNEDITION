@@ -774,7 +774,7 @@
                               display: flex; align-items: center; justify-content: center; font-size: 0.55rem; }
         .msg-typing { font-style: italic; color: #c07878; animation: pulseText 1s infinite alternate; }
         
-        #phone-map-canvas { width: 100%; height: 300px; background: #0a0a15; border-radius: 10px; border: 1px solid #333; }
+        #phone-map-canvas { width: 100%; height: 300px; background: #0b0614; border-radius: 12px; border: 1px solid rgba(217, 204, 255, 0.25); box-shadow: 0 0 18px rgba(139, 92, 246, 0.18) inset; }
         .help-section { background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 10px; margin-bottom: 10px; }
         .help-section h4 { color: rgba(200, 100, 80, 0.8); font-size: 0.85rem; margin-bottom: 8px; margin-top: 0; }
         .help-section p { color: #bbb; font-size: 0.75rem; line-height: 1.5; }
@@ -917,7 +917,7 @@
         #log-clear-btn:hover { background: rgba(255,80,80,0.15); color: #fff; }
 
         /* --- MAP INTERFACE --- */
-        #map-interface { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 50; display: none; }
+        #map-interface { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #0b0614; z-index: 50; display: none; }
         #golden-map-canvas { 
             position: absolute;
             left: 0;
@@ -926,7 +926,6 @@
             bottom: 0;
             width: 100%;
             height: 100%; 
-            filter: contrast(1.2) brightness(1.1);
             z-index: 1;
         }
         /* Map sidebars overlay the canvas */

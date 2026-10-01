@@ -1,3 +1,25 @@
+        /* roundRect for browsers without it (Safari before 16.4): on the 2D context and on Path2D, taking a
+           single radius or [all], [tl-br, tr-bl], [tl, tr-bl, br] or [tl, tr, br, bl] like the real one. */
+        (() => {
+            const shim = function (x, y, w, h, r = 0) {
+                let rs = Array.isArray(r) ? r.map(v => typeof v === 'object' ? (v.x || 0) : v) : [r];
+                if (rs.length === 1) rs = [rs[0], rs[0], rs[0], rs[0]];
+                else if (rs.length === 2) rs = [rs[0], rs[1], rs[0], rs[1]];
+                else if (rs.length === 3) rs = [rs[0], rs[1], rs[2], rs[1]];
+                const lim = Math.min(Math.abs(w), Math.abs(h)) / 2, [tl, tr, br, bl] = rs.map(v => Math.max(0, Math.min(v || 0, lim)));
+                if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
+                this.moveTo(x + tl, y);
+                this.arcTo(x + w, y, x + w, y + h, tr);
+                this.arcTo(x + w, y + h, x, y + h, br);
+                this.arcTo(x, y + h, x, y, bl);
+                this.arcTo(x, y, x + w, y, tl);
+                this.closePath();
+            };
+            if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = shim;
+            if (typeof Path2D !== 'undefined' && !Path2D.prototype.roundRect) Path2D.prototype.roundRect = shim;
+            if (typeof OffscreenCanvasRenderingContext2D !== 'undefined' && !OffscreenCanvasRenderingContext2D.prototype.roundRect) OffscreenCanvasRenderingContext2D.prototype.roundRect = shim;
+        })();
+
         /** Normalize an angle difference to [-PI, PI]. */
         function normalizeAngle(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
         
