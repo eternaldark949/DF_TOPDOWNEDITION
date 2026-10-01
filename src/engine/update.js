@@ -660,11 +660,11 @@
                 // ── ORPHAN SWEEP ──
                 // Catch any ProjectileEntity stuck in the GameEntity registry that isn't 
                 // in this.projectiles. These are ghost entities that can deal invisible damage.
-                const registeredProjectiles = GameEntity.registry.collidable.filter(e => 
-                    e.collisionLayer === GameEntity.LAYER.PROJECTILE && e.active
-                );
+                // (Twice a second is enough to catch a ghost; it was a full registry scan every tick.)
+                const registeredProjectiles = this.simStep % 30 ? [] : GameEntity.getByLayer('PROJECTILE').filter(e => e.active);
+                const live = registeredProjectiles.length ? new Set(this.projectiles) : null;
                 for (const rp of registeredProjectiles) {
-                    if (!this.projectiles.includes(rp)) {
+                    if (!live.has(rp)) {
                         // Orphan found — force-kill it
                         rp.active = false;
                         rp.markedForDestroy = true;
