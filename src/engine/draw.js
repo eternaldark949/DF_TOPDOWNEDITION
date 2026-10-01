@@ -1132,7 +1132,7 @@
                 if (rainK > 0.01) {
                     const rainLamps = this.activeMap._interiorLights ? [...this.lamps, ...this.activeMap._interiorLights] : this.lamps;
                     this.ctx.save(); this.ctx.globalAlpha = rainK;
-                    this.weather.drawRainOverlay(this.ctx, this.camera, rainLamps);
+                    this.weather.drawRainOverlay(this.ctx, this.view, rainLamps);   // the view, so Cinematic View's pan carries the rain too
                     this.ctx.restore();
                 }
                 

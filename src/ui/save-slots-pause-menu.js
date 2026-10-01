@@ -678,6 +678,7 @@
                 this.close();
                 game.pauseSystem.acquire('cinematic_view');
                 game.cineCam = { dx: 0, dy: 0, zoom: game.camera.zoom };          // draw() keeps going while it's set
+                if (game.weather) game.weather._cineDensity = 0;                     // re-measured on the first pan
                 this._cinePtrs?.clear(); this._cineGesture = false;
                 document.body.classList.add('cinematic-view');
                 const hint = document.getElementById('cinematic-hint');
@@ -700,12 +701,23 @@
                 c.dx -= sx * k; c.dy -= sy * k;
                 const R = CONFIG.CAMERA.CINE_PAN, d = Math.hypot(c.dx, c.dy);
                 if (d > R) { c.dx *= R / d; c.dy *= R / d; }
+                this._cineRain();
+            }
+
+            /** Held rain over wherever the photo now looks (world/weather.js fillView) */
+            _cineRain() {
+                const c = game.cineCam, W = game.weather;
+                if (!c || !W || !W.isRaining || !W.fillView) return;
+                const z0 = c.zoom, m = 200 / z0, hw = W.width / z0 / 2 + m, hh = W.height / z0 / 2 + m;
+                const cx = game.camera.x, cy = game.camera.y;              // where the real camera spawned its rain
+                W.fillView({ x: cx + c.dx, y: cy + c.dy, zoom: game.camera.zoom }, { l: cx - hw, r: cx + hw, t: cy - hh, b: cy + hh });
             }
 
             _cineZoom(f) {
                 if (!game.cineCam) return;
                 const [lo, hi] = CONFIG.CAMERA.CINE_ZOOM;
                 game.camera.zoom = Math.max(lo, Math.min(hi, game.camera.zoom * f));
+                this._cineRain();
             }
 
             /** The held frame as a PNG, colour grade and all: downloaded, or the share sheet where files can be shared (phones). */

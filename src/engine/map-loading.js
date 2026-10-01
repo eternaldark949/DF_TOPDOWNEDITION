@@ -296,7 +296,7 @@
                     // 5b. SET CUSTOM LAMP COLORS FOR V1 BUILDINGS
                     // V2 buildings auto-set their block lamp colors from accent color
                     city.setBlockLampColors({
-                        'block_2_2': '#b48cff',    // Moon City Nightclub - violet neon (its own lights keep their colours)
+                        'block_2_2': '#ff00aa',    // Moon City Nightclub - hot pink (its own lights keep their colours). Violet '#b48cff' was the first pick: swap back here to revert
                         'block_4_4': '#00f3ff',    // Dr. Yin's Clinic - medical cyan
                         'block_6_2': '#0088ff',    // Neural Systems - tech blue
                         'block_4_2': '#ff8800'     // Biggs Amusement Park - carnival amber

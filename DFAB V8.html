@@ -9689,6 +9689,37 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 });
                 ctx.globalAlpha = 1.0;
             }
+            /**
+             * Cinematic View's pan: rain over ground the real camera never spawned for. Tops the panned view
+             * up to the density round the camera with held drops (heights spread, nothing advances), so the
+             * still rain reaches wherever the photo looks. `covered` is the rect drops already exist in.
+             */
+            fillView(view, covered) {
+                if (!this.isRaining || !view) return;
+                const RC = CONFIG.WEATHER, zoom = view.zoom || 1, hw = this._halfW, hh = this._halfH;
+                const vw = this.width / zoom + 80, vh = this.height / zoom + 80, L = view.x - vw / 2, T = view.y - vh / 2;
+                const inC = (x, y) => covered && x > covered.l && x < covered.r && y > covered.t && y < covered.b;
+                if (!this._cineDensity) {                                            // drops per world px² round the camera, measured once
+                    let n = 0; for (const d of this.drops) if (inC(d.groundX, d.groundY)) n++;
+                    this._cineDensity = covered ? n / Math.max(1, (covered.r - covered.l) * (covered.b - covered.t)) : 0;
+                }
+                const want = Math.min(4000, Math.floor(this._cineDensity * vw * vh));
+                let have = 0; for (const d of this.drops) if (d.groundX > L && d.groundX < L + vw && d.groundY > T && d.groundY < T + vh) have++;
+                for (let k = 0, tries = 0; have < want && tries < want * 4 && this.drops.length < 6000; tries++) {
+                    const gx = L + Math.random() * vw, gy = T + Math.random() * vh;
+                    if (inC(gx, gy)) continue;                                      // that ground already has its rain
+                    const h0 = 0.05 + Math.random() * 0.95;
+                    const sx = (gx - view.x) * zoom + hw, sy = (gy - view.y) * zoom + hh, dx = sx - hw, dy = sy - hh;
+                    const par = h0 * h0 * RC.RAIN_PARALLAX;
+                    const stx = sx + dx * par - this.windVec.x * RC.RAIN_WIND_DRIFT * h0, sty = sy + dy * par - this.windVec.y * RC.RAIN_WIND_DRIFT * h0;
+                    const tx = sx - stx - this.windVec.x * RC.RAIN_WIND_DIR_STR, ty = sy - sty - this.windVec.y * RC.RAIN_WIND_DIR_STR, dist = Math.hypot(tx, ty);
+                    this.drops.push({ groundX: gx, groundY: gy, height: h0,
+                        fallSpeed: RC.RAIN_FALL_SPEED_MIN + Math.random() * (RC.RAIN_FALL_SPEED_MAX - RC.RAIN_FALL_SPEED_MIN),
+                        brightness: 0.35 + Math.random() * 0.65, dirX: dist > 0.1 ? tx / dist : 0, dirY: dist > 0.1 ? ty / dist : 1 });
+                    have++; k++;
+                }
+            }
+
             drawRainOverlay(ctx, camera, lamps) {
                 if (!this.isRaining || !camera) return;
                 ctx.save();
@@ -51588,7 +51619,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // 5b. SET CUSTOM LAMP COLORS FOR V1 BUILDINGS
                     // V2 buildings auto-set their block lamp colors from accent color
                     city.setBlockLampColors({
-                        'block_2_2': '#b48cff',    // Moon City Nightclub - violet neon (its own lights keep their colours)
+                        'block_2_2': '#ff00aa',    // Moon City Nightclub - hot pink (its own lights keep their colours). Violet '#b48cff' was the first pick: swap back here to revert
                         'block_4_4': '#00f3ff',    // Dr. Yin's Clinic - medical cyan
                         'block_6_2': '#0088ff',    // Neural Systems - tech blue
                         'block_4_2': '#ff8800'     // Biggs Amusement Park - carnival amber
@@ -56287,7 +56318,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (rainK > 0.01) {
                     const rainLamps = this.activeMap._interiorLights ? [...this.lamps, ...this.activeMap._interiorLights] : this.lamps;
                     this.ctx.save(); this.ctx.globalAlpha = rainK;
-                    this.weather.drawRainOverlay(this.ctx, this.camera, rainLamps);
+                    this.weather.drawRainOverlay(this.ctx, this.view, rainLamps);   // the view, so Cinematic View's pan carries the rain too
                     this.ctx.restore();
                 }
                 
@@ -62587,6 +62618,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.close();
                 game.pauseSystem.acquire('cinematic_view');
                 game.cineCam = { dx: 0, dy: 0, zoom: game.camera.zoom };          // draw() keeps going while it's set
+                if (game.weather) game.weather._cineDensity = 0;                     // re-measured on the first pan
                 this._cinePtrs?.clear(); this._cineGesture = false;
                 document.body.classList.add('cinematic-view');
                 const hint = document.getElementById('cinematic-hint');
@@ -62609,12 +62641,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 c.dx -= sx * k; c.dy -= sy * k;
                 const R = CONFIG.CAMERA.CINE_PAN, d = Math.hypot(c.dx, c.dy);
                 if (d > R) { c.dx *= R / d; c.dy *= R / d; }
+                this._cineRain();
+            }
+
+            /** Held rain over wherever the photo now looks (world/weather.js fillView) */
+            _cineRain() {
+                const c = game.cineCam, W = game.weather;
+                if (!c || !W || !W.isRaining || !W.fillView) return;
+                const z0 = c.zoom, m = 200 / z0, hw = W.width / z0 / 2 + m, hh = W.height / z0 / 2 + m;
+                const cx = game.camera.x, cy = game.camera.y;              // where the real camera spawned its rain
+                W.fillView({ x: cx + c.dx, y: cy + c.dy, zoom: game.camera.zoom }, { l: cx - hw, r: cx + hw, t: cy - hh, b: cy + hh });
             }
 
             _cineZoom(f) {
                 if (!game.cineCam) return;
                 const [lo, hi] = CONFIG.CAMERA.CINE_ZOOM;
                 game.camera.zoom = Math.max(lo, Math.min(hi, game.camera.zoom * f));
+                this._cineRain();
             }
 
             /** The held frame as a PNG, colour grade and all: downloaded, or the share sheet where files can be shared (phones). */
