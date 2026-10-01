@@ -433,7 +433,7 @@
             applyMovement(dx, dy) {
                 if (!this.visible) return;
                 
-                const speed = this.getCurrentSpeed();
+                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1);   // (moveMul: slowed, e.g. moving furniture)
                 gaitCommand(this, dx * speed, dy * speed);
                 this.x += dx * speed;
                 this.y += dy * speed;

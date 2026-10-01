@@ -673,6 +673,7 @@
                     this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
                     this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
                     this.clubLife.draw(this.ctx, cbE);     // Moon City's crowd
+                    if (this.furniture) this.furniture.draw(this.ctx);   // the hand's outline and side handles (engine/furniture.js)
                     if (!(this.scenes && this.scenes.crewOffstage)) this.teammates.forEach(tm => {
                         if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) return;
                         tm.draw(this.ctx, this.player);

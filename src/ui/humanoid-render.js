@@ -1182,7 +1182,7 @@
                 const name = POSES[config.pose] ? config.pose : 'idle';
                 if (name !== ps.name) { ps.name = name; ps.t = 0; }
                 ps.t += dt;
-                const target = !moving && ps.still > 0.4 ? 1 : 0;
+                const target = config.poseWhileMoving || (!moving && ps.still > 0.4) ? 1 : 0;   // (some poses hold while walking: pushing furniture)
                 ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
                 if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender, beat: name === 'dance' ? mapBeatN() : null }); poseW = ps.w; }
             }

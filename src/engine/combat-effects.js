@@ -227,6 +227,7 @@
                 // 1. VISIBILITY CHECKS
                 if (!this.player.visible && !this.isDriving) return;
                 if (this.paused) return;
+                if (this.furniture && this.furniture.busy()) return;   // her hands are on the furniture
                 if (!this.currentWeapon && this.weaponMode !== 'none') return;
             
                 // --- MELEE / PUNCH LOGIC (Unchanged) ---

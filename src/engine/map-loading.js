@@ -1027,6 +1027,7 @@
                 // -------------------------------------------------------
 
                 this.props = this.activeMap.props || [];
+                if (this.furniture) this.furniture.onMapLoaded(this);   // the apartment's layout as she left it (engine/furniture.js)
                 this.npcs = this.activeMap.npcs || [];
                 this.lamps = this.activeMap.lamps || [];
                 this.enemies = []; this.loot = []; 

@@ -215,6 +215,7 @@
                 WALL: 0.5, DOOR: 0.6,           // reach kept through a wall / a shut door
                 ERR_NEAR: 20, ERR_FAR: 150      // how far off their guess is, close up / at the edge of hearing
             },
+            WALK_TO_CAR: true,          // on foot, "Drive" walks 949 round to the driver's door first (engine/events.js _walkToCar)
             NAV: {
                 CELL: 20,                   // Grid cell size (px)
                 AGENT_RADIUS: 16,           // Obstacles are inflated by this (teammate radius 14 + margin)

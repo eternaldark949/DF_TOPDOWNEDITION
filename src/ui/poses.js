@@ -118,6 +118,11 @@
                 // everyone keeps time: a sway to a side each beat, a dip on every kick, a turn over four
                 // beats; the third dance sways at half time, slow and sultry, but still dips on the kick.
                 // Without music, a relaxed 120 BPM on each dancer's own phase.
+                // Both hands out on something heavy, leaning into it (moving furniture: engine/furniture.js)
+                push(t) {
+                    const b = breath(t);
+                    return { l: [13, -6.5], r: [13, 6.5], le: [6, -11], re: [6, 11], torso: 0, bounce: b * 0.15, head: [1.2, 0] };
+                },
                 dance(t, o) {
                     const B = o.beat != null ? o.beat : t * 2 + o.seed, v = Math.floor(o.seed) % 3;
                     const ph = Math.PI * B, s = Math.sin(v === 2 ? ph / 2 : ph), up = Math.abs(Math.sin(ph));

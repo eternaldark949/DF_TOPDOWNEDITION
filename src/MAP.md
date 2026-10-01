@@ -32,6 +32,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | File | What's in it |
 |---|---|
 | `world/navigation.js` | `NavGrid` pathfinding, companion tactics and steering |
+| `world/walker.js` | **`Walker.goTo(actor, x, y, { face, speed, arrive, timeout, via, onArrive, onFail })`**: walks any procedural humanoid along the nav grid (goals on furniture snap to the nearest free spot; `via` points route round things the grid doesn't know, like cars), eases in, turns to `face`, then onArrive (no progress for `timeout` ticks: onFail). Returns the scene runner's waitable `{ done(), ok(), cancel() }`. The player's walk feeds her movement input (engine/update.js), so collisions and facing behave and any real input takes over; everyone else steps in `Walker.update` |
 | `world/weather.js` | Weather conditions, climates, `WeatherSystem` (rain, wind, lightning, forecast) Wind: `windVec` points where the air travels, the way the rain slants (the city's prevailing wind is a northwesterly, sweeping down-right); rain, cloth, hair, clouds, curtains and leaves all move along it. Sky.ME's arrow points downwind. |
 | `world/weather-response.js` | How weather reaches a character: `weatherAt` (wind on hair and cloth, rain, storm), lightning flinches, umbrellas |
 | `world/particles-decals.js` | Leaf particles, decals. Leaves ride the full wind vector: they spawn off the upwind edge, ease to the wind's speed and flutter across it (no screen-south fall). |
@@ -136,7 +137,8 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `engine/pause-system.js` | `PauseSystem` |
 | `engine/game-engine.js` | `class GameEngine`: constructor, companions, and `engineMixin` (how the files below attach) |
-| `engine/events.js` | Input and UI event wiring; `interact()` — the one action for the pill and the E key; the handbrake button (held: `handbrakeHeld`); Space is the handbrake while driving |
+| `engine/events.js` | Input and UI event wiring; `interact()` — the one action for the pill and the E key; the handbrake button (held: `handbrakeHeld`); Space is the handbrake while driving. On foot, "Drive" first walks 949 round to the driver's door (`_walkToCar`, `CONFIG.WALK_TO_CAR`) |
+| `engine/furniture.js` | **Grab and move the apartment's furniture** (`FurnitureSystem`, apt_949): the hand pill (G) by a movable piece → four gold side handles (tap / directions, G to confirm) → `Walker.goTo` to that side → holding: 0.4× speed (`player.moveMul`), the piece follows and never enters walls or other pieces (SAT; if it would, neither moves), R / ⟲ ⟳ turn 15°, `push` pose. The layout is saved (`questState.aptLayout`) and reapplied on every visit; long-press the hand to reset |
 | `engine/combat-effects.js` | Screen shake, time slow, death, firing, boosters, player damage; spent casings as glitter (`spawnCasing`/`updateCasings`/`drawCasings`, max 24: flecks in the gun's `brass` colour, each twinkling on its own rhythm with a four-point glint) and the muzzle flash's star (`drawMuzzleStars`, flashes now carry `angle`) |
 | `engine/scope.js` | Scope view: with a sniper up to her eye, the world darkens to a lit lane along her line of fire (clipped at walls), the camera leans down it, the lane steadies; ambience quiets. Setting: Scope View |
 | `engine/noise.js` | Noise: `emitNoise` — gunshots, flits, punches, struck doors, shattered glass carry (`CONFIG.NOISE`), muffled by walls and shut doors; gangers in earshot hear roughly where and go to look; the ripple she sees |

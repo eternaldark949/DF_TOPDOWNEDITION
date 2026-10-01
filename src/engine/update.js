@@ -277,6 +277,7 @@
                 // The Double Nights lobby: guests and staff come and go; searched cases refill daily
                 this.lobbyLife.update(this);
                 this.clubLife.update(this);
+                Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
                     if (this._lostMap !== this.activeMap) { this._lostMap = this.activeMap; this._hasLost = this.props.some(p => p.interactionType === 'lost_luggage'); }
                     if (this._hasLost) this.refreshLostLuggage();
@@ -390,6 +391,13 @@
                 if (this.keys['a'] || this.keys['ArrowLeft']) inputX = -1; 
                 if (this.keys['d'] || this.keys['ArrowRight']) inputX = 1;
                 if (this.joystick.active) { inputX = this.joystick.dx; inputY = this.joystick.dy; }
+                // The apartment's hand (engine/furniture.js): the pill; choosing a side holds her still
+                if (this.furniture) { this.furniture.update(this); if (this.furniture.state === 'choose') { inputX = 0; inputY = 0; } }
+                // A walk owns 949 (world/walker.js): it supplies the movement, until any real input takes over
+                if (this.player._walk) {
+                    if (inputX || inputY || this.fireJoystick.active || this.isDriving) Walker.cancel(this.player);
+                    else { const s = Walker.stepPlayer(this); if (s) { inputX = s.x; inputY = s.y; } }
+                }
                 this.profiler.stop('Input:Process');
             
                 // --- 5. ENTITY UPDATES ---
@@ -1290,6 +1298,7 @@
                 if (this.useNewCollisionSystem) {
                     CollisionSystem.update(this.camera, this.canvas, this);
                 }
+                if (this.furniture) this.furniture.afterCollision(this);   // a held piece follows her (or holds her back)
                 this.profiler.stop('Physics:Collisions');
             
                 this.profiler.start('Logic:UI_Interact');

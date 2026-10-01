@@ -18,6 +18,8 @@
                 const armed = (this.weaponMode === 'normal' || this.weaponMode === 'sniper') && !this.weaponHolstered;
                 if (armed) currentStance = this.currentWeapon ? stanceForWeapon(this.currentWeapon.id) : (this.weaponMode === 'sniper' ? 'sniper' : 'pistol');
                 else if (this.weaponMode === 'none' && this.shootCooldown > 0) currentStance = 'punch';
+                const pushing = this.furniture && this.furniture.holding;
+                if (pushing) currentStance = 'idle';                                   // both hands on the furniture
 
                 // Gun kick: snaps back on the shot, recovers in game ticks (blended like
                 // everything else). Heavier weapons (stats.recoil) kick harder and longer.
@@ -57,7 +59,8 @@
                     // In the rain outdoors a hoodie's hood goes up (unless she's wearing a hat)
                     hat: cosmeticConfig.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie' ? { type: 'hood_up', color: outfit.top.color } : null),
                     jewelry: withFieldMask(this, cosmeticConfig.jewelry),   // masked in the field (core/appearances.js)
-                    pose: typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
+                    pose: pushing ? 'push' : typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
+                    poseWhileMoving: pushing,
                     // A drawn gun takes the hand; the umbrella waits
                     held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
                 });

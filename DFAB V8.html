@@ -2542,6 +2542,13 @@
             margin-top: 8px; font-family: Georgia, serif; font-style: italic; font-size: clamp(0.62rem, 2.8vw, 0.9rem);
             color: #e8c9b8; letter-spacing: 0.08em; text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
         }
+
+        /* The apartment's hand (engine/furniture.js): turn buttons beside the pill while holding */
+        #grab-rotate { display: none; gap: 8px; justify-content: flex-end; pointer-events: auto; }
+        .grab-rot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;
+            font-size: 1.2rem; color: var(--df-lavender-pale, #f1e8fe); background: rgba(20, 8, 30, 0.7); border: 1px dotted rgba(232, 194, 122, 0.7);
+            box-shadow: 0 0 10px rgba(232, 194, 122, 0.25); user-select: none; touch-action: none; }
+        .grab-rot:active { background: rgba(93, 20, 226, 0.5); }
         /* =========================================
            CINEMATIC DIALOGUE (ui/cinematic-dialogue.js)
            Subtitles over a soft scrim, portrait cameos, choices on the right,
@@ -3239,6 +3246,8 @@
             <div id="action-dock">
                 <button class="game-btn" id="btn-transition"></button>
                 <div class="game-btn" id="btn-interact"></div>
+                <div class="game-btn" id="btn-grab"></div>
+                <div id="grab-rotate"><div class="grab-rot" id="btn-rot-l" title="Turn left (Shift+R)">⟲</div><div class="grab-rot" id="btn-rot-r" title="Turn right (R)">⟳</div></div>
             </div>
             
             <div id="btn-fire">
@@ -4112,6 +4121,7 @@
                 WALL: 0.5, DOOR: 0.6,           // reach kept through a wall / a shut door
                 ERR_NEAR: 20, ERR_FAR: 150      // how far off their guess is, close up / at the edge of hearing
             },
+            WALK_TO_CAR: true,          // on foot, "Drive" walks 949 round to the driver's door first (engine/events.js _walkToCar)
             NAV: {
                 CELL: 20,                   // Grid cell size (px)
                 AGENT_RADIUS: 16,           // Obstacles are inflated by this (teammate radius 14 + margin)
@@ -6062,6 +6072,102 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             tm.y += (dy / d) * step;
         }
         
+        // ============================================================================
+        //  WALKER — "go to" for any procedural humanoid (the player, NPCs, teammates…)
+        //  Walker.goTo(actor, x, y, { face, speed, arrive, timeout, via, onArrive, onFail })
+        //  (`via`: [[x, y], …] points to pass on the way, e.g. round a car the nav grid doesn't know)
+        //  walks the actor along the nav grid (actorSteer), eases into the spot, turns to
+        //  `face` (an angle or an [x, y] point), then calls onArrive. No progress for
+        //  `timeout` ticks: onFail. Returns { done(), ok(), cancel() } — the scene runner's
+        //  waitable, so `yield Walker.goTo(npc, x, y)` works in scenes.
+        //  The player isn't moved here: while a walk owns her, engine/update.js feeds
+        //  stepPlayer()'s direction in as her movement input (so walls, cars, the map edge
+        //  and facing all behave), and any real input takes the controls back.
+        //  Everyone else is stepped by Walker.update(game), once a sim tick.
+        // ============================================================================
+        const Walker = {
+            walks: [],
+
+            goTo(actor, x, y, o = {}) {
+                this.cancel(actor);
+                const isPlayer = typeof game !== 'undefined' && actor === game.player;
+                // A goal on furniture or in a wall: the nearest spot a body can stand
+                const nav = typeof game !== 'undefined' && game.activeMap ? NavGrid.for(game.activeMap) : null;
+                if (nav && !nav.walkable(x, y)) { const f = nav.nearestFree(x, y, 6); if (f !== null && f !== undefined) { x = nav.cx(f); y = nav.cy(f); } }
+                const pts = (o.via || []).concat([[x, y]]);
+                const w = { actor, x: pts[0][0], y: pts[0][1], pts: pts.slice(1), face: o.face, speed: o.speed || 1.5, arrive: o.arrive ?? 6, timeout: o.timeout ?? 300,
+                            onArrive: o.onArrive, onFail: o.onFail, state: 'walk', best: Infinity, stuck: 0, isPlayer };
+                if (isPlayer) actor._walk = w; else this.walks.push(w);
+                return { done: () => w.state !== 'walk' && w.state !== 'turn', ok: () => w.state === 'arrived', cancel: () => this._end(w, 'cancelled') };
+            },
+
+            /** Stop whatever walk this actor is on (no callbacks). */
+            cancel(actor) {
+                if (actor && actor._walk) this._end(actor._walk, 'cancelled');
+                const w = this.walks.find(o => o.actor === actor);
+                if (w) this._end(w, 'cancelled');
+            },
+
+            isWalking(actor) { return !!(actor && (actor._walk || this.walks.some(o => o.actor === actor))); },
+
+            _end(w, state) {
+                if (w.state !== 'walk' && w.state !== 'turn') return;
+                w.state = state;
+                if (w.isPlayer && w.actor._walk === w) w.actor._walk = null;
+                const i = this.walks.indexOf(w); if (i >= 0) this.walks.splice(i, 1);
+                if (state === 'arrived' && w.onArrive) w.onArrive();
+                if (state === 'failed' && w.onFail) w.onFail();
+            },
+
+            /** Arrived or still turning to face: true while the walk is done moving (and handles the turn). */
+            _settle(w) {
+                const a = w.actor;
+                if (w.face != null) {
+                    const target = typeof w.face === 'number' ? w.face : Math.atan2(w.face[1] - a.y, w.face[0] - a.x);
+                    const da = Math.atan2(Math.sin(target - (a.angle || 0)), Math.cos(target - (a.angle || 0)));
+                    w.state = 'turn';
+                    if (Math.abs(da) > 0.03) { a.angle = (a.angle || 0) + Math.sign(da) * Math.min(Math.abs(da), 0.22); return; }
+                    a.angle = target;
+                }
+                this._end(w, 'arrived');
+            },
+
+            _progress(w, d) {
+                if (d < w.best - 1) { w.best = d; w.stuck = 0; return true; }            // (a pixel of real progress resets the clock)
+                if (++w.stuck > w.timeout) { this._end(w, 'failed'); return false; }
+                return true;
+            },
+
+            /** The player's walk this tick: a movement input {x, y} (|v| ≤ 1), or null once she's there. */
+            stepPlayer(game) {
+                const w = game.player._walk;
+                if (!w) return null;
+                const a = game.player, d = Math.hypot(w.x - a.x, w.y - a.y);
+                if (w.state !== 'turn' && d <= Math.max(w.arrive, 8) && w.pts.length) { [w.x, w.y] = w.pts.shift(); w.best = Infinity; w.stuck = 0; return this.stepPlayer(game); }   // a via point: on to the next
+                if (w.state === 'turn' || d <= w.arrive) { this._settle(w); return { x: 0, y: 0 }; }
+                if (!this._progress(w, d)) return null;
+                const s = actorSteer(a, w.x, w.y, 1, game.activeMap), m = Math.hypot(s.x, s.y) || 1;
+                const ease = Math.min(1, Math.max(0.3, d / 26));                 // slow into the spot
+                return { x: s.x / m * ease, y: s.y / m * ease };
+            },
+
+            /** Steps every non-player walk (NPCs, teammates, scene extras): once a sim tick. */
+            update(game) {
+                const map = game.activeMap; if (!map) return;
+                for (let i = this.walks.length - 1; i >= 0; i--) {
+                    const w = this.walks[i], a = w.actor;
+                    if (!a || a.dead) { this._end(w, 'cancelled'); continue; }
+                    let d = Math.hypot(w.x - a.x, w.y - a.y);
+                    if (w.state !== 'turn' && d <= Math.max(w.arrive, 8) && w.pts.length) { [w.x, w.y] = w.pts.shift(); w.best = Infinity; w.stuck = 0; d = Math.hypot(w.x - a.x, w.y - a.y); }
+                    if (w.state === 'turn' || d <= w.arrive) { gaitCommand(a, 0, 0); this._settle(w); continue; }
+                    if (!this._progress(w, d)) continue;
+                    const sp = w.speed * Math.min(1, Math.max(0.35, d / 20));
+                    const s = actorSteer(a, w.x, w.y, sp, map);
+                    gaitCommand(a, s.x, s.y); a.x += s.x; a.y += s.y;
+                    if (Math.abs(s.x) + Math.abs(s.y) > 0.05) a.angle = Math.atan2(s.y, s.x);
+                }
+            }
+        };
         /* roundRect for browsers without it (Safari before 16.4): on the 2D context and on Path2D, taking a
            single radius or [all], [tl-br, tr-bl], [tl, tr-bl, br] or [tl, tr, br, bl] like the real one. */
         (() => {
@@ -18238,7 +18344,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             applyMovement(dx, dy) {
                 if (!this.visible) return;
                 
-                const speed = this.getCurrentSpeed();
+                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1);   // (moveMul: slowed, e.g. moving furniture)
                 gaitCommand(this, dx * speed, dy * speed);
                 this.x += dx * speed;
                 this.y += dy * speed;
@@ -22180,6 +22286,234 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.globalAlpha = w.life;
                     drawProceduralHumanoid(ctx, w, { stance: 'idle', ...w.look });
                     ctx.restore();
+                }
+            }
+        }
+        // ============================================================================
+        //  FURNITURE — grab and move the apartment's furniture (apt_949 only)
+        //  The hand pill (#btn-grab, G) shows by a movable piece. Press it: four gold
+        //  handles appear on the piece's sides (the nearest picked); tap one, or press a
+        //  direction, then G / tap again. 949 walks to that side (Walker.goTo), faces it
+        //  and takes hold. Holding: she moves at 0.4× and the piece goes with her — push,
+        //  pull or slide — and never into a wall or another piece (if it would, neither
+        //  moves). R / ⟲ ⟳ turn it 15°. G, Esc or leaving lets go. The layout is kept
+        //  (questState.aptLayout) and comes back each visit; long-press the hand to reset.
+        //  Ticked from engine/update.js (update before input, afterCollision after the
+        //  collision pass), drawn after the characters (engine/draw.js).
+        // ============================================================================
+        const FURNITURE_GRAB = {
+            MAP: 'apt_949', RANGE: 90, MOVE_MUL: 0.4, GRIP_GAP: 16, TURN: Math.PI / 12,
+            // What can be moved, and what it's called on the pill
+            NAMES: { apt_sofa: 'Sofa', apt_coffee: 'Coffee Table', apt_chair: 'Armchair', apt_console: 'Console', apt_plant: 'Plant',
+                     apt_planter: 'Planter', apt_stool: 'Stool', apt_bed: 'Bed', apt_side: 'Side Table', apt_lounger: 'Lounger',
+                     apt_bistro: 'Bistro Set', apt_telescope: 'Telescope' }
+        };
+
+        class FurnitureSystem {
+            constructor(game) { this.game = game; this.state = 'idle'; this.target = null; this.side = 0; this.cand = null; }
+
+            /** Busy choosing a side, walking to it or holding something (blocks firing). */
+            busy() { return this.state !== 'idle'; }
+            get holding() { return this.state === 'hold'; }
+
+            _grabbable(p) { return p && p.decorType && FURNITURE_GRAB.NAMES[p.decorType] && !p.interactionType?.startsWith('lost'); }
+            _layout() { const q = this.game.questState || (this.game.questState = {}); return q.aptLayout || (q.aptLayout = {}); }
+
+            /** The apartment was just built: number its pieces, pin the movable ones heavy, put them where they were left. */
+            onMapLoaded(game) {
+                this.release(true);
+                if (!game.activeMap || game.activeMap.id !== FURNITURE_GRAB.MAP) return;
+                const L = (game.questState && game.questState.aptLayout) || {};
+                game.activeMap.props.forEach((p, i) => {
+                    p._aptIdx = i;
+                    if (!this._grabbable(p)) return;
+                    p.mass = 1e7;                                                 // furniture: it stays put unless she moves it
+                    p._home = [p.x, p.y, p.angle || 0];
+                    const s = L[i];
+                    if (s) { p.x = s[0] - p.width / 2; p.y = s[1] - p.height / 2; p.angle = s[2]; }
+                });
+            }
+
+            /** Put every piece back where the apartment had it. */
+            resetLayout() {
+                const g = this.game; this.release(true);
+                if (g.questState) g.questState.aptLayout = {};
+                for (const p of g.props || []) if (p._home) { [p.x, p.y, p.angle] = p._home; }
+                showMessage('FURNITURE BACK WHERE IT WAS');
+            }
+
+            // --- geometry -------------------------------------------------------------
+            _c(p) { return { x: p.x + p.width / 2, y: p.y + p.height / 2 }; }
+            _corners(cx, cy, w, h, a) {
+                const c = Math.cos(a), s = Math.sin(a), hw = w / 2, hh = h / 2;
+                return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, y]) => [cx + x * c - y * s, cy + x * s + y * c]);
+            }
+            _sat(A, B) {
+                for (const P of [A, B]) for (let i = 0; i < 4; i++) {
+                    const [x1, y1] = P[i], [x2, y2] = P[(i + 1) % 4], nx = y1 - y2, ny = x2 - x1;
+                    let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+                    for (const [x, y] of A) { const d = x * nx + y * ny; a0 = Math.min(a0, d); a1 = Math.max(a1, d); }
+                    for (const [x, y] of B) { const d = x * nx + y * ny; b0 = Math.min(b0, d); b1 = Math.max(b1, d); }
+                    if (a1 <= b0 || b1 <= a0) return false;
+                }
+                return true;
+            }
+            /** Would the piece, centred at (cx, cy) and turned to a, run into a wall, another piece or the map's edge? */
+            _blocked(p, cx, cy, a) {
+                const g = this.game, M = g.activeMap, A = this._corners(cx, cy, p.width - 2, p.height - 2, a);
+                for (const [x, y] of A) if (x < 0 || y < 0 || x > M.width || y > M.height) return true;
+                for (const w of M.walls || []) if (this._sat(A, [[w.x, w.y], [w.x + w.w, w.y], [w.x + w.w, w.y + w.h], [w.x, w.y + w.h]])) return true;
+                for (const o of g.props || []) {
+                    if (o === p || o.hasCollision === false || o.noNav) continue;
+                    const c = this._c(o);
+                    if (Math.abs(c.x - cx) > (o.width + o.height + p.width + p.height) / 1.4) continue;
+                    if (this._sat(A, this._corners(c.x, c.y, o.width, o.height, o.angle || 0))) return true;
+                }
+                return false;
+            }
+            /** Where she stands to hold side s (0 its +x face, 1 +y, 2 −x, 3 −y, in the piece's own frame). */
+            _grip(p, s) {
+                const c = this._c(p), a = p.angle || 0, gap = FURNITURE_GRAB.GRIP_GAP + (this.game.player.radius || 12);
+                const lx = s === 0 ? p.width / 2 + gap : s === 2 ? -p.width / 2 - gap : 0, ly = s === 1 ? p.height / 2 + gap : s === 3 ? -p.height / 2 - gap : 0;
+                return { x: c.x + lx * Math.cos(a) - ly * Math.sin(a), y: c.y + lx * Math.sin(a) + ly * Math.cos(a) };
+            }
+            _nearestSide(p, x, y) {
+                const c = this._c(p), a = p.angle || 0, dx = x - c.x, dy = y - c.y;
+                const lx = dx * Math.cos(a) + dy * Math.sin(a), ly = -dx * Math.sin(a) + dy * Math.cos(a);
+                return Math.abs(lx) / p.width > Math.abs(ly) / p.height ? (lx > 0 ? 0 : 2) : (ly > 0 ? 1 : 3);
+            }
+            _distTo(p, x, y) {                                                    // from (x, y) to the piece's edge
+                const c = this._c(p), a = p.angle || 0, dx = x - c.x, dy = y - c.y;
+                const lx = Math.abs(dx * Math.cos(a) + dy * Math.sin(a)) - p.width / 2, ly = Math.abs(-dx * Math.sin(a) + dy * Math.cos(a)) - p.height / 2;
+                return Math.hypot(Math.max(0, lx), Math.max(0, ly));
+            }
+
+            // --- the hand ------------------------------------------------------------
+            /** The hand pill / G: grab the nearest piece → confirm the side → let go. */
+            press() {
+                const g = this.game, pl = g.player;
+                if (this.state === 'idle') {
+                    if (!this.cand) return;
+                    this.target = this.cand; this.side = this._nearestSide(this.target, pl.x, pl.y); this.state = 'choose';
+                    if (typeof audioSys !== 'undefined') audioSys.sfx('ui');
+                } else if (this.state === 'choose') this._walkTo();
+                else this.release();
+            }
+
+            /** Choosing: pick the side facing a direction (arrows / WASD). */
+            chooseDir(dx, dy) {
+                if (this.state !== 'choose' || !this.target) return;
+                const a = this.target.angle || 0;
+                let best = 0, bd = -Infinity;
+                for (let s = 0; s < 4; s++) { const na = a + s * Math.PI / 2, d = Math.cos(na) * dx + Math.sin(na) * dy; if (d > bd) { bd = d; best = s; } }
+                this.side = best;
+            }
+
+            /** A tap / click while choosing: on a handle picks that side (tapping the picked one confirms). True if handled. */
+            tap(wx, wy) {
+                if (this.state !== 'choose' || !this.target) return false;
+                for (let s = 0; s < 4; s++) {
+                    const h = this._handle(this.target, s);
+                    if (Math.hypot(h.x - wx, h.y - wy) < 24) { if (s === this.side) this._walkTo(); else this.side = s; return true; }
+                }
+                return false;
+            }
+
+            _handle(p, s) { const gp = this._grip(p, s), c = this._c(p); return { x: gp.x + (c.x - gp.x) * 0.3, y: gp.y + (c.y - gp.y) * 0.3 }; }
+
+            _walkTo() {
+                const p = this.target, gp = this._grip(p, this.side), c = this._c(p);
+                this.state = 'walk';
+                Walker.goTo(this.game.player, gp.x, gp.y, { face: [c.x, c.y], arrive: 5, timeout: 240,
+                    onArrive: () => this._attach(), onFail: () => { showMessage("CAN'T REACH THAT SIDE"); this.release(true); } });
+            }
+
+            _attach() {
+                const g = this.game, p = this.target, c = this._c(p);
+                if (!p || this.state !== 'walk') return;
+                this.state = 'hold';
+                this.off = { x: c.x - g.player.x, y: c.y - g.player.y };
+                g.player.moveMul = FURNITURE_GRAB.MOVE_MUL;
+                if (typeof audioSys !== 'undefined') audioSys.sfx('ui');
+            }
+
+            /** Let go (and keep where it was left). */
+            release(silent) {
+                const g = this.game;
+                if (this.state === 'walk') Walker.cancel(g.player);
+                if (this.state === 'hold' && this.target && this.target._aptIdx !== undefined) {
+                    const c = this._c(this.target); this._layout()[this.target._aptIdx] = [Math.round(c.x), Math.round(c.y), +(this.target.angle || 0).toFixed(4)];
+                }
+                if (g.player) g.player.moveMul = 1;
+                this.state = 'idle'; this.target = null;
+            }
+
+            /** Turn the held piece 15° about its middle; she stays on her side. */
+            rotate(dir) {
+                if (this.state !== 'hold') return;
+                const g = this.game, p = this.target, c = this._c(p), na = (p.angle || 0) + dir * FURNITURE_GRAB.TURN;
+                if (this._blocked(p, c.x, c.y, na)) { showMessage('NO ROOM TO TURN IT'); return; }
+                const old = p.angle; p.angle = na;
+                const gp = this._grip(p, this.side), nav = NavGrid.for(g.activeMap);
+                if (nav && !nav.walkable(gp.x, gp.y)) { p.angle = old; showMessage('NO ROOM TO TURN IT'); return; }
+                g.player.x = gp.x; g.player.y = gp.y; resetHumanoidAnim(g.player);
+                this.off = { x: c.x - gp.x, y: c.y - gp.y };
+            }
+
+            // --- each tick ------------------------------------------------------------
+            /** Before input: the pill, the nearest candidate, and (holding) where she started this tick. */
+            update(game) {
+                const btn = this._btn || (this._btn = document.getElementById('btn-grab'));
+                const rot = this._rot || (this._rot = document.getElementById('grab-rotate'));
+                const here = game.activeMap && game.activeMap.id === FURNITURE_GRAB.MAP && !game.isDriving && !game.paused;
+                if (!here) { if (this.state !== 'idle') this.release(); if (btn) btn.style.display = 'none'; if (rot) rot.style.display = 'none'; this.cand = null; return; }
+                const pl = game.player;
+                if (this.state === 'walk' && !Walker.isWalking(pl)) { if (this.state === 'walk') this.release(true); }   // she walked off (real input took over)
+                if (this.state === 'idle') {
+                    let best = null, bd = FURNITURE_GRAB.RANGE;
+                    for (const p of game.props || []) { if (!this._grabbable(p)) continue; const d = this._distTo(p, pl.x, pl.y); if (d < bd) { bd = d; best = p; } }
+                    this.cand = best;
+                }
+                if (this.state === 'hold') this._prev = { x: pl.x, y: pl.y };
+                if (btn) {
+                    const name = this.target ? FURNITURE_GRAB.NAMES[this.target.decorType] : this.cand ? FURNITURE_GRAB.NAMES[this.cand.decorType] : '';
+                    btn.style.display = this.state !== 'idle' || this.cand ? 'flex' : 'none';
+                    if (btn.style.display === 'flex') setActionPill(btn, this.state === 'idle' ? 'Grab' : this.state === 'choose' ? 'Hold' : this.state === 'walk' ? 'Grab' : 'Let go', name, 'G');
+                }
+                if (rot) rot.style.display = this.state === 'hold' ? 'flex' : 'none';
+            }
+
+            /** After the collision pass: the held piece follows her, or (if it'd hit something) neither moves. */
+            afterCollision(game) {
+                if (this.state !== 'hold' || !this.target) return;
+                const p = this.target, pl = game.player, cx = pl.x + this.off.x, cy = pl.y + this.off.y;
+                if (this._blocked(p, cx, cy, p.angle || 0)) { if (this._prev) { pl.x = this._prev.x; pl.y = this._prev.y; } }
+                else { p.x = cx - p.width / 2; p.y = cy - p.height / 2; p.vx = p.vy = 0; p._still = 0; }
+                const c = this._c(p); pl.angle = Math.atan2(c.y - pl.y, c.x - pl.x);   // she keeps her hands on it
+            }
+
+            // --- drawing ---------------------------------------------------------------
+            draw(ctx) {
+                const g = this.game; if (!g.activeMap || g.activeMap.id !== FURNITURE_GRAB.MAP) return;
+                const p = this.target || this.cand; if (!p) return;
+                const c = this._c(p), a = p.angle || 0, t = _gameTimeSec;
+                ctx.save();
+                ctx.translate(c.x, c.y); ctx.rotate(a);
+                ctx.strokeStyle = `rgba(232, 194, 122, ${this.state === 'idle' ? 0.35 + 0.15 * Math.sin(t * 3) : 0.7})`;
+                ctx.lineWidth = this.state === 'idle' ? 1 : 1.6; ctx.setLineDash(this.state === 'idle' ? [4, 4] : []);
+                ctx.strokeRect(-p.width / 2 - 3, -p.height / 2 - 3, p.width + 6, p.height + 6);
+                ctx.setLineDash([]);
+                ctx.restore();
+                if (this.state === 'choose' || this.state === 'walk') {
+                    for (let s = 0; s < 4; s++) {                                     // a gold chevron on each side, pointing in
+                        const h = this._handle(p, s), ang = a + s * Math.PI / 2 + Math.PI, on = s === this.side, k = on ? 1.35 + 0.15 * Math.sin(t * 6) : 1;
+                        ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(ang); ctx.scale(k, k);
+                        if (on) { ctx.globalAlpha = 0.45; drawGlow(ctx, 0, 0, 16, '232, 194, 122', 0); ctx.globalAlpha = 1; }
+                        ctx.beginPath(); ctx.moveTo(-5, -7); ctx.lineTo(4, 0); ctx.lineTo(-5, 7); ctx.lineTo(-2, 0); ctx.closePath();
+                        ctx.fillStyle = on ? '#fff1c2' : 'rgba(232, 194, 122, 0.75)'; ctx.fill();
+                        ctx.strokeStyle = 'rgba(40, 20, 10, 0.6)'; ctx.lineWidth = 0.8; ctx.stroke();
+                        ctx.restore();
+                    }
                 }
             }
         }
@@ -37826,6 +38160,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // everyone keeps time: a sway to a side each beat, a dip on every kick, a turn over four
                 // beats; the third dance sways at half time, slow and sultry, but still dips on the kick.
                 // Without music, a relaxed 120 BPM on each dancer's own phase.
+                // Both hands out on something heavy, leaning into it (moving furniture: engine/furniture.js)
+                push(t) {
+                    const b = breath(t);
+                    return { l: [13, -6.5], r: [13, 6.5], le: [6, -11], re: [6, 11], torso: 0, bounce: b * 0.15, head: [1.2, 0] };
+                },
                 dance(t, o) {
                     const B = o.beat != null ? o.beat : t * 2 + o.seed, v = Math.floor(o.seed) % 3;
                     const ph = Math.PI * B, s = Math.sin(v === 2 ? ph / 2 : ph), up = Math.abs(Math.sin(ph));
@@ -40199,7 +40538,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const name = POSES[config.pose] ? config.pose : 'idle';
                 if (name !== ps.name) { ps.name = name; ps.t = 0; }
                 ps.t += dt;
-                const target = !moving && ps.still > 0.4 ? 1 : 0;
+                const target = config.poseWhileMoving || (!moving && ps.still > 0.4) ? 1 : 0;   // (some poses hold while walking: pushing furniture)
                 ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
                 if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender, beat: name === 'dance' ? mapBeatN() : null }); poseW = ps.w; }
             }
@@ -42697,7 +43036,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const ACTION_VERBS = {
             talk: 'talk', bond: 'heart', adopt: 'heart', search: 'hand', 'pick up': 'hand', buy: 'coin', shop: 'coin',
             rest: 'moon', craft: 'gear', loadout: 'gear', read: 'page', lights: 'bulb', refill: 'cross',
-            hail: 'car', hijack: 'car', drive: 'car', enter: 'door', exit: 'exit', leave: 'exit', go: 'portal'
+            hail: 'car', hijack: 'car', drive: 'car', grab: 'hand', hold: 'hand', 'let go': 'hand', enter: 'door', exit: 'exit', leave: 'exit', go: 'portal'
         };
 
         /** Set a pill's verb, what it's for, and its keycap; the DOM is only touched when they change. */
@@ -45491,6 +45830,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.graveyardGhosts = []; // Procedural humanoid ghosts in the cemetery
                 this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (world/lobby-life.js)
                 this.clubLife = new ClubLife();   // Moon City's crowd (world/club-life.js)
+                this.furniture = new FurnitureSystem(this);   // grab and move the apartment's furniture (engine/furniture.js)
                 
                 // Time slow system for dramatic moments (boss kills, etc.)
                 this.timeSlowState = {
@@ -45775,8 +46115,33 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.startDialogue(this.activeInteraction);
                     }
                 } else {
+                    if (this._walkToCar()) return;                     // she walks round to the driver's door first
                     this.toggleVehicle();
                 }
+            },
+
+            /** Getting in on foot: walk to the driver's door (Walker.goTo), face the car, then get in.
+             *  True when a walk started (or is already on); close enough, or turned off, gets in at once. */
+            _walkToCar() {
+                const car = this.car;
+                if (!CONFIG.WALK_TO_CAR || this.isDriving || !car || this.activeMap.type === 'indoor') return false;
+                if (this.player._walk && this.player._walk.toCar) return true;
+                // In the car's frame: +x forward, -y the driver's side (traffic-vehicle.js seat layout)
+                const a = car.angle, ca = Math.cos(a), sa = Math.sin(a), nav = NavGrid.for(this.activeMap);
+                const hl = (car.length || 80) / 2, hw = (car.width || 40) / 2;
+                const W = (lx, ly) => [car.x + lx * ca - ly * sa, car.y + lx * sa + ly * ca];
+                const L = (x, y) => [(x - car.x) * ca + (y - car.y) * sa, -(x - car.x) * sa + (y - car.y) * ca];
+                let side = -1, [dx, dy] = W(hl * 0.2, -(hw + 20));                                   // the driver's door
+                if (nav && !nav.walkable(dx, dy)) { side = 1; [dx, dy] = W(hl * 0.2, hw + 20); }      // blocked: in from the other side
+                const door = { x: dx, y: dy };
+                if (Math.hypot(door.x - this.player.x, door.y - this.player.y) < 30) return false;
+                // On the far side? Round the nose or the tail (the nav grid doesn't know about cars)
+                const [plx, ply] = L(this.player.x, this.player.y), via = [], ex = plx >= 0 ? hl + 30 : -(hl + 30), ew = hw + 32;
+                if (Math.sign(ply) !== side && Math.abs(plx) < hl + 20) via.push(W(ex, Math.sign(ply || 1) * ew), W(ex, side * ew));
+                const h = Walker.goTo(this.player, door.x, door.y, { face: [car.x, car.y], arrive: 7, timeout: 240, via,
+                    onArrive: () => { if (!this.isDriving && this.car === car && Math.hypot(car.x - this.player.x, car.y - this.player.y) < 90) this.toggleVehicle(); } });
+                if (this.player._walk) this.player._walk.toCar = true;
+                return !!h;
             },
 
             initEvents() {
@@ -45784,6 +46149,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 window.addEventListener('keydown', (e) => { 
                     this.keys[e.key] = true; 
                     if (e.key === 'h' || e.key === 'H') this.useBooster();
+                    // Furniture (engine/furniture.js): G grabs / confirms / lets go, R turns, directions pick a side
+                    if (this.furniture && this.running && !this.paused) {
+                        if (e.key === 'g' || e.key === 'G') this.furniture.press();
+                        if ((e.key === 'r' || e.key === 'R') && this.furniture.holding) this.furniture.rotate(e.shiftKey ? -1 : 1);
+                        if (this.furniture.state === 'choose') {
+                            const D = { ArrowUp: [0, -1], w: [0, -1], W: [0, -1], ArrowDown: [0, 1], s: [0, 1], S: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0], ArrowRight: [1, 0], d: [1, 0], D: [1, 0] }[e.key];
+                            if (D) { this.furniture.chooseDir(D[0], D[1]); e.preventDefault(); }
+                        }
+                    }
                     if (e.key === 'j' || e.key === 'J') this.useBoosterOnAlly();
                     
                     // AUTO-DRIVE TOGGLE (only while driving)
@@ -45831,6 +46205,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const toggleAction = (e) => { e.preventDefault(); this.interact(); };
 
                 this.interactBtn.addEventListener('click', toggleAction); this.interactBtn.addEventListener('touchstart', toggleAction);
+                // The hand (engine/furniture.js): tap to grab / confirm / let go; hold it a moment to reset the layout
+                const grabBtn = document.getElementById('btn-grab');
+                if (grabBtn) {
+                    let held = null, long = false;
+                    grabBtn.addEventListener('pointerdown', (e) => {
+                        e.preventDefault(); e.stopPropagation(); long = false;
+                        held = setTimeout(() => { long = true; if (this.furniture.state === 'idle') this.furniture.resetLayout(); }, 900);
+                    });
+                    const up = (e) => { if (held === null) return; clearTimeout(held); held = null; e.preventDefault(); if (!long) this.furniture.press(); };
+                    grabBtn.addEventListener('pointerup', up);
+                    grabBtn.addEventListener('pointercancel', () => { clearTimeout(held); held = null; });
+                    for (const [id, dir] of [['btn-rot-l', -1], ['btn-rot-r', 1]]) {
+                        const b = document.getElementById(id);
+                        if (b) b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); this.furniture.rotate(dir); });
+                    }
+                }
+                // Choosing a side: a tap on a handle (world space) picks it, before anything else hears the tap
+                this.canvas.addEventListener('pointerdown', (e) => {
+                    if (!this.furniture || this.furniture.state !== 'choose') return;
+                    const rect = this.canvas.getBoundingClientRect(), sx = rect.width ? this.canvas.width / rect.width : 1, sy = rect.height ? this.canvas.height / rect.height : 1;
+                    const w = this.viewToWorld((e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy);
+                    if (this.furniture.tap(w.x, w.y)) { e.preventDefault(); e.stopImmediatePropagation(); }
+                }, true);
                 // Weather debug: cycles Clear → Drizzle → Rain → Storm → Auto.
                 // The first four pin the sky (schedule paused) so you can inspect
                 // a condition without it rolling out from under you; Auto hands
@@ -46472,6 +46869,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // 1. VISIBILITY CHECKS
                 if (!this.player.visible && !this.isDriving) return;
                 if (this.paused) return;
+                if (this.furniture && this.furniture.busy()) return;   // her hands are on the furniture
                 if (!this.currentWeapon && this.weaponMode !== 'none') return;
             
                 // --- MELEE / PUNCH LOGIC (Unchanged) ---
@@ -51855,6 +52253,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // -------------------------------------------------------
 
                 this.props = this.activeMap.props || [];
+                if (this.furniture) this.furniture.onMapLoaded(this);   // the apartment's layout as she left it (engine/furniture.js)
                 this.npcs = this.activeMap.npcs || [];
                 this.lamps = this.activeMap.lamps || [];
                 this.enemies = []; this.loot = []; 
@@ -53385,6 +53784,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // The Double Nights lobby: guests and staff come and go; searched cases refill daily
                 this.lobbyLife.update(this);
                 this.clubLife.update(this);
+                Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
                     if (this._lostMap !== this.activeMap) { this._lostMap = this.activeMap; this._hasLost = this.props.some(p => p.interactionType === 'lost_luggage'); }
                     if (this._hasLost) this.refreshLostLuggage();
@@ -53498,6 +53898,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.keys['a'] || this.keys['ArrowLeft']) inputX = -1; 
                 if (this.keys['d'] || this.keys['ArrowRight']) inputX = 1;
                 if (this.joystick.active) { inputX = this.joystick.dx; inputY = this.joystick.dy; }
+                // The apartment's hand (engine/furniture.js): the pill; choosing a side holds her still
+                if (this.furniture) { this.furniture.update(this); if (this.furniture.state === 'choose') { inputX = 0; inputY = 0; } }
+                // A walk owns 949 (world/walker.js): it supplies the movement, until any real input takes over
+                if (this.player._walk) {
+                    if (inputX || inputY || this.fireJoystick.active || this.isDriving) Walker.cancel(this.player);
+                    else { const s = Walker.stepPlayer(this); if (s) { inputX = s.x; inputY = s.y; } }
+                }
                 this.profiler.stop('Input:Process');
             
                 // --- 5. ENTITY UPDATES ---
@@ -54398,6 +54805,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.useNewCollisionSystem) {
                     CollisionSystem.update(this.camera, this.canvas, this);
                 }
+                if (this.furniture) this.furniture.afterCollision(this);   // a held piece follows her (or holds her back)
                 this.profiler.stop('Physics:Collisions');
             
                 this.profiler.start('Logic:UI_Interact');
@@ -55302,6 +55710,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
                     this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
                     this.clubLife.draw(this.ctx, cbE);     // Moon City's crowd
+                    if (this.furniture) this.furniture.draw(this.ctx);   // the hand's outline and side handles (engine/furniture.js)
                     if (!(this.scenes && this.scenes.crewOffstage)) this.teammates.forEach(tm => {
                         if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) return;
                         tm.draw(this.ctx, this.player);
@@ -58738,6 +59147,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const armed = (this.weaponMode === 'normal' || this.weaponMode === 'sniper') && !this.weaponHolstered;
                 if (armed) currentStance = this.currentWeapon ? stanceForWeapon(this.currentWeapon.id) : (this.weaponMode === 'sniper' ? 'sniper' : 'pistol');
                 else if (this.weaponMode === 'none' && this.shootCooldown > 0) currentStance = 'punch';
+                const pushing = this.furniture && this.furniture.holding;
+                if (pushing) currentStance = 'idle';                                   // both hands on the furniture
 
                 // Gun kick: snaps back on the shot, recovers in game ticks (blended like
                 // everything else). Heavier weapons (stats.recoil) kick harder and longer.
@@ -58777,7 +59188,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // In the rain outdoors a hoodie's hood goes up (unless she's wearing a hat)
                     hat: cosmeticConfig.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie' ? { type: 'hood_up', color: outfit.top.color } : null),
                     jewelry: withFieldMask(this, cosmeticConfig.jewelry),   // masked in the field (core/appearances.js)
-                    pose: typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
+                    pose: pushing ? 'push' : typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
+                    poseWhileMoving: pushing,
                     // A drawn gun takes the hand; the umbrella waits
                     held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
                 });
@@ -61016,6 +61428,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         document.addEventListener('keydown', (e) => {
             // 1. Handle ESCAPE - Pause Menu Priority
             if (e.key === 'Escape') {
+                // Holding furniture / choosing a side: Esc lets go
+                if (game.furniture && game.furniture.busy()) { game.furniture.release(); return; }
                 // Cinematic view: Esc brings the pause menu back
                 if (document.body.classList.contains('cinematic-view')) { pauseMenu.exitCinematic(); return; }
                 // If pause menu is open, close it
