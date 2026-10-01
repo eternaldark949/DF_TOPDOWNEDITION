@@ -32,9 +32,9 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | File | What's in it |
 |---|---|
 | `world/navigation.js` | `NavGrid` pathfinding, companion tactics and steering |
-| `world/weather.js` | Weather conditions, climates, `WeatherSystem` (rain, wind, lightning, forecast) |
+| `world/weather.js` | Weather conditions, climates, `WeatherSystem` (rain, wind, lightning, forecast) Wind: `windVec` points where the air travels, the way the rain slants (the city's prevailing wind is a northwesterly, sweeping down-right); rain, cloth, hair, clouds, curtains and leaves all move along it. Sky.ME's arrow points downwind. |
 | `world/weather-response.js` | How weather reaches a character: `weatherAt` (wind on hair and cloth, rain, storm), lightning flinches, umbrellas |
-| `world/particles-decals.js` | Leaf particles, decals |
+| `world/particles-decals.js` | Leaf particles, decals. Leaves ride the full wind vector: they spawn off the upwind edge, ease to the wind's speed and flutter across it (no screen-south fall). |
 | `world/lobby-life.js` | The Double Nights lobby's crowd: guests (portals, the doors, the desk queue, lounges, elevators, rolling luggage) and AI staff (gold bellhops with carts, Blood Moon concierges, a silver valet) — ambient walkers, not NPCs |
 | `world/rooms.js` | Room System, the standard for indoor maps: per-room visibility (soft violet veil, gentle reveal, light spilling through open doors, dim-through-glass from outside), fading room lights, `outdoorness`, sky light on outdoor rooms; windows, doors (hinged doors with swing physics, sliding glass, open arches; bullets strike and push them — `hitDoors`; shut doors block sight — `doorBlocks`), rooms of several rects, silk linens, `RoomSystem`, `ROOM_DEFS` — every indoor map has rooms (arenas and the ethereal plane aside); the checklist for giving a map rooms is in its header |
 | `world/maps.js` | `MAP_DATA`: every map's size, floor zones, walls, transitions, landmarks (optional `wallStyle`, and `navProps` to route paths round big furniture) |
@@ -62,7 +62,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 |---|---|
 | `entities/props-decor.js` | `StaticEntity`, apartment (incl. the crafting workbench, `apt_craft`), clinic, House of Death (`hod_*`), Double Nights lobby (`dn_*`), penthouse suite (`ps_*`), Sanctum (`sc_*`) and Moon City Nightclub (`mc_*`) furniture art, the graveyard's carved stones (`gy_stone`, 8 variants, cached sprites), the MiniSpree vending machine and the health station (one design on every map), `PropEntity`  `PropEntity`: art drawn in the box's rotated frame; `fixedRotation` for fixtures; speed cap, spin cap, NaN restore, sleep counter. |
 | `entities/vehicles-minigames.js` | `VehicleEntity`, bumper cars, Ferris wheel, bumper-car minigame |
-| `entities/lamps.js` | `LampEntity` (all lamp types) |
+| `entities/lamps.js` | `LampEntity` (all lamp types) Street lamps wear `LAMP_STYLES` (antique cast iron, baked sprites per colour, lit state and zoom size): `antique_twin` (lampType 2, the city's streets) and `antique_crook` (lampType 1, parks and the graveyard); add a style for new variations. |
 | `entities/actors.js` | `ActorEntity`, `PlayerEntity`, projectiles, triggers |
 | `entities/static-builders-profiler.js` | Turning walls/buildings into colliders, perf bench, profiler |
 | `entities/street-objects.js` | Neon signs, loot, pavement, foliage; `FLORA_KINDS` / `floraSprite` (each tree, blossom, bush and palm painted once into a sprite) |

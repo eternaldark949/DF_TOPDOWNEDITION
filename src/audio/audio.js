@@ -609,7 +609,6 @@
             van_interior: { track: 'van 2', volume: 0.45 },
             // Grave Stories: the southern graveyard in Southern Dimensions City (its walls, engine/map-loading.js 11d)
             hub_949: { track: 'grave stories (1)', volume: 0.5, area: { x: 500, y: 8800, w: 3000, h: 2000 }, fade: 600 },
-            // ('we ponder main' and 'map' ship in the build as extras, not placed yet)
         };
         const CLUB_BPM = 140;
         const CLUB_PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];   // the club's lights: violet, lavender, rose, gold

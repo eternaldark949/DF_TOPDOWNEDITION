@@ -970,11 +970,9 @@
                 }
 
                 // --- WIND ---
-                // The arrow points INTO the wind — at the direction the air is
-                // coming from — so it agrees with the label beside it rather
-                // than opposing it. This matches the wind-barb convention, where
-                // the staff points upwind toward the source.
-                const arrowDeg = f.windBearing % 360;
+                // The arrow points DOWNWIND — where the air (and the rain) is going —
+                // like the arrows on a weather map; the label names where it comes from.
+                const arrowDeg = (f.windBearing + 180) % 360;
                 const prevailing = (typeof f.windPrevailing === 'number')
                     ? ['N','NE','E','SE','S','SW','W','NW'][Math.round(f.windPrevailing / 45) % 8]
                     : null;
