@@ -252,7 +252,7 @@
                         // V2 buildings (auto-detected from BuildingV2Registry)
                         moon_city: {
                             landmarkId: 'club_entrance',
-                            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff00aa' }
+                            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' }
                         },
                         neural_sys: {
                             landmarkId: 'neural_systems',
@@ -296,7 +296,7 @@
                     // 5b. SET CUSTOM LAMP COLORS FOR V1 BUILDINGS
                     // V2 buildings auto-set their block lamp colors from accent color
                     city.setBlockLampColors({
-                        'block_2_2': '#ff00aa',    // Moon City Nightclub - hot pink
+                        'block_2_2': '#b48cff',    // Moon City Nightclub - violet neon (its own lights keep their colours)
                         'block_4_4': '#00f3ff',    // Dr. Yin's Clinic - medical cyan
                         'block_6_2': '#0088ff',    // Neural Systems - tech blue
                         'block_4_2': '#ff8800'     // Biggs Amusement Park - carnival amber
@@ -648,7 +648,7 @@
                     
                     // Keep the landmark forecourts (Silver Queen's portico and carpet, Double Nights' drive and fountain) clear of street trees
                     for (const b of mapData.buildings || []) {
-                        const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : null;
+                        const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : b.style === 'moon_city' ? b._mcForecourt() : null;
                         if (!court) continue;
                         const inCourt = (o) => o.x > court.x && o.x < court.x + court.w && o.y > court.y && o.y < court.y + court.h;
                         mapData.foliage = mapData.foliage.filter(f => !inCourt(f));

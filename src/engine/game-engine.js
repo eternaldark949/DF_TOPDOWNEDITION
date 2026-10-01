@@ -83,6 +83,7 @@
                 this.flitVFX = []; // Active flit visual effects (ghost afterimages, lightning trails)
                 this.graveyardGhosts = []; // Procedural humanoid ghosts in the cemetery
                 this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (world/lobby-life.js)
+                this.clubLife = new ClubLife();   // Moon City's crowd (world/club-life.js)
                 
                 // Time slow system for dramatic moments (boss kills, etc.)
                 this.timeSlowState = {

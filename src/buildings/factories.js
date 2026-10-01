@@ -225,6 +225,7 @@
         function createMoonCityNightclub(x, y, config = {}) {
             return new BuildingV2({
                 id: 'moon_city',
+                style: 'moon_city',                    // buildings/moon-city.js: lacquer, neon fins, the skylight, the canopy
                 x: x,
                 y: y,
                 label: 'Moon City Nightclub',
@@ -245,14 +246,14 @@
                 windowMarginX: 30,
                 windowMarginY: 20,
                 
-                // Colors - deep magenta/neon pink club theme
-                roofColor: '#28122a',           // Rich purple roof
-                roofLightColor: '#341838',      // Lighter purple
-                wallColor: '#221428',           // Very dark magenta walls
-                wallLightColor: '#2c1a30',      // Dark plum
-                accentColor: '#ff00aa',         // Hot pink neon accent
-                windowColor: '#0f0515',         // Dark tinted glass (UV purple)
-                windowLitColor: '#ff00aa',      // Hot pink glow (matches neon)
+                // Colours: the house brand (the interior's) — black lacquer, violet neon, champagne gold
+                roofColor: '#120a18',
+                roofLightColor: '#1a1022',
+                wallColor: '#140c1a',           // black lacquer, a breath of plum
+                wallLightColor: '#1a1022',
+                accentColor: '#b48cff',         // violet neon (the street lamps round the block glow it too)
+                windowColor: '#0c0612',         // smoked glass
+                windowLitColor: '#c8a8ff',
                 windowFrameColor: '#0a050a',    // Near-black frames
                 balconyColor: '#1a0a1a',        // Dark purple railings
                 
@@ -269,11 +270,11 @@
                 ],
                 
                 // Attachments
-                sign: { text: 'CLUB', color: '#ff00aa', size: 40 },
+                sign: { text: 'Moon City', color: '#c8a8ff', size: 40 },
                 door: {
                     target: config.doorTarget || 'moon_city_nightclub',
                     label: 'Enter Club',
-                    lightColor: '#ff00aa'
+                    lightColor: '#ff3a6a'
                 },
                 
                 ...config

@@ -515,13 +515,13 @@
                 { x: 0, y: 0, w: 600, h: 300 },
                 { x: 0, y: 300, w: 280, h: 200 }
             ],
-            accentColor: '#ff00aa',
+            accentColor: '#b48cff',
             label: 'Moon City Nightclub',
             type: 'club',
             category: 'entertainment',
             floors: 4,
-            sign: { text: 'CLUB', color: '#ff00aa', size: 40 },
-            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff00aa' }
+            sign: { text: 'CLUB', color: '#c8a8ff', size: 40 },
+            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' }
         });
         
         // Generic V2 buildings for auto-fill (not unique — can be placed multiple times)

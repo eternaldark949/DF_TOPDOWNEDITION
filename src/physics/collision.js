@@ -335,6 +335,7 @@
                 // (every live enemy too, on screen or not, so no one ghosts through a closed door)
                 if (game && game.roomSystem && game.roomSystem.active) {
                     let doorActors = actors;
+                    if (game.clubLife && game.clubLife.walkers.length) doorActors = doorActors.concat(game.clubLife.doorActors());   // the club's crowd pushes the restroom doors
                     if (game.enemies && game.enemies.length) {
                         const seen = new Set(actors);
                         doorActors = actors.concat(game.enemies.filter(e => e && !e.dead && e.active !== false && !seen.has(e)));
