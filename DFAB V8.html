@@ -8337,7 +8337,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             _music(game, paused) {
                 const ctx = this.audio.ctx, now = ctx.currentTime;
-                const spec = game.activeMap && MAP_MUSIC[game.activeMap.id];
+                let spec = game.activeMap && MAP_MUSIC[game.activeMap.id];
+                // A track that belongs to one area of a map (`area`, e.g. the graveyard): full inside,
+                // rising over `fade` px as 949 (or her car) comes up to it, silent and stopped beyond
+                let areaK = 1;
+                if (spec && spec.area) {
+                    const A = spec.area, who = game.isDriving && game.car ? game.car : game.player;
+                    const dx = who ? Math.max(A.x - who.x, 0, who.x - (A.x + A.w)) : 1e9, dy = who ? Math.max(A.y - who.y, 0, who.y - (A.y + A.h)) : 1e9;
+                    const t = Math.max(0, 1 - Math.hypot(dx, dy) / (spec.fade || 500));
+                    areaK = t * t * (3 - 2 * t);
+                    if (areaK <= 0) spec = null;
+                }
                 const M = this._mus || (this._mus = (() => {
                     const f = ctx.createBiquadFilter(), g = ctx.createGain();
                     f.type = 'lowpass'; f.frequency.value = 18000; f.Q.value = 0.5; g.gain.value = 0;
@@ -8360,7 +8370,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // How loud and how bright, from where 949 is
                 let level = 0, cut = 18000;
                 if (spec && M.name === spec.track) {
-                    level = spec.volume ?? 0.5;
+                    level = (spec.volume ?? 0.5) * areaK;
                     const rs = game.roomSystem, room = rs && rs.active ? rs.currentRoom : null;
                     if (room && spec.room && room.id !== spec.room) {
                         let open = 0;                                        // an open door straight to the speakers' room
@@ -8502,7 +8512,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
         /* A soundtrack per map: `track` names a file in assets/audio (without the extension),
-           `room` is where its speakers are (it's fullest there), `volume` its level. */
+           `room` is where its speakers are (it's fullest there), `volume` its level; `area` {x, y, w, h}
+           keeps it to one part of the map, fading in over `fade` px as you come up to it. */
         const MAP_MUSIC = {
             apt_949: { track: 'silver queen tst', room: 'main_room', volume: 0.5 },   // the Silver Queen suite
             // Swig (the club's cut): a 24-bar loop at 140 BPM, the kick on the first sample; the club's lights dance to it
@@ -8512,7 +8523,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             keepers_parlor: { track: 'the visitor', volume: 0.5 },
             // The Sanctum: the Triumvirate
             church_boss: { track: 'triumvirate boss fight', volume: 0.55 },
-            // ('house on the hill' ships in the build, not placed yet)
+            // The van, on the way to the job (the intro): over the rain on the roof and the road
+            van_interior: { track: 'van 2', volume: 0.45 },
+            // Grave Stories: the southern graveyard in Southern Dimensions City (its walls, engine/map-loading.js 11d)
+            hub_949: { track: 'grave stories (1)', volume: 0.5, area: { x: 500, y: 8800, w: 3000, h: 2000 }, fade: 600 },
+            // ('we ponder main' and 'map' ship in the build as extras, not placed yet)
         };
         const CLUB_BPM = 140;
         const CLUB_PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];   // the club's lights: violet, lavender, rose, gold

@@ -48,7 +48,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 ## audio/
 | File | What's in it |
 |---|---|
-| `audio/audio.js` | `AudioSystem` (sound effects, master bus, music bus for the Music slider), `AmbienceSystem` (rain, wind, city, room tone, fireplace, doors) and `MAP_MUSIC` — each map's soundtrack; `engine(state)`, the driven car's electric hum (`ENGINE_HUM` per brand); `sfx('crunch')` for car hits and `tyres(level)`, the driven car's squeal (the apartment plays the Silver Queen track, fullest in the living room) |
+| `audio/audio.js` | `AudioSystem` (sound effects, master bus, music bus for the Music slider), `AmbienceSystem` (rain, wind, city, room tone, fireplace, doors) and `MAP_MUSIC` — each map's soundtrack; `engine(state)`, the driven car's electric hum (`ENGINE_HUM` per brand); `sfx('crunch')` for car hits and `tyres(level)`, the driven car's squeal (the apartment plays the Silver Queen track, fullest in the living room; the intro's van plays 'van 2'; a track can belong to one `area` of a map — the city's southern graveyard plays 'grave stories (1)', rising as you come up to its walls) |
 
 ## physics/
 | File | What's in it |
