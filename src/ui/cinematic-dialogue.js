@@ -56,11 +56,13 @@
             }
 
             // ── Black ────────────────────────────────────────────────────────
-            /** Fade the black layer to `to` (0..1) over `frames` ticks (0 = at once). */
-            black(to, frames) {
+            /** Fade the black layer to `to` (0..1) over `frames` ticks (0 = at once). ease 'out': quick at
+             *  first, settling softly (the picture is there almost at once, the last of the dark lingers). */
+            black(to, frames, ease) {
                 this._build();
                 this.blackEl.style.transition = 'none';
                 this.blackTo = to; this.blackStep = frames ? Math.abs(to - this.blackT) / frames : 1;
+                this.blackFrom = this.blackT; this.blackP = 0; this.blackN = frames || 1; this.blackEase = ease || null;
                 if (!frames) this.blackT = to;
                 this.blackEl.style.opacity = this.blackT;
             }
@@ -184,7 +186,7 @@
                 const hint = document.createElement('div'); hint.className = 'hint'; hint.textContent = 'tap to continue'; this.cardEl.appendChild(hint);
                 const S = this.cardS = { els, i: 0, t: 0, every: opts.every || 70, hold: opts.hold || 0, held: 0, out: 0, done: false, hint };
                 this.tapped = false;
-                return { done: () => S.done };
+                return { done: () => S.done, leaving: () => S.done || S.out > 0 };   // leaving: the tap is in, it's fading out
             }
 
             marker(place, time, opts = {}) {
@@ -218,7 +220,11 @@
                 const tap = this.tapped; this.tapped = false;
                 // Black
                 if (this.fading()) {
-                    this.blackT += Math.sign(this.blackTo - this.blackT) * Math.min(this.blackStep, Math.abs(this.blackTo - this.blackT));
+                    if (this.blackEase === 'out') {
+                        this.blackP = Math.min(1, this.blackP + 1 / this.blackN);
+                        const k = 1 - Math.pow(1 - this.blackP, 3);
+                        this.blackT = this.blackP >= 1 ? this.blackTo : this.blackFrom + (this.blackTo - this.blackFrom) * k;
+                    } else this.blackT += Math.sign(this.blackTo - this.blackT) * Math.min(this.blackStep, Math.abs(this.blackTo - this.blackT));
                     this.blackEl.style.opacity = this.blackT;
                 }
                 // Memory grade

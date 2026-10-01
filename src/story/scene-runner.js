@@ -236,7 +236,7 @@
                     frame: () => self.active ? self.active.frame : 0,
                     wait: n => n,
                     waitTap: () => ui.waitTap(),
-                    fade(dir, frames = 45) { ui.black(dir === 'out' ? 1 : 0, frames); return { done: () => !ui.fading() }; },
+                    fade(dir, frames = 45, ease) { ui.black(dir === 'out' ? 1 : 0, frames, ease); return { done: () => !ui.fading() }; },
                     card(lines, opts = {}) { return ui.card(lines, opts); },
                     marker(place, time, opts) { ui.marker(place, time, opts); },
                     map(id, opts = {}) {

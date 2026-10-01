@@ -37,15 +37,16 @@
 
             // ── The epigraph ───────────────────────────────────────────────
             yield 40;
-            yield s.card(PROLOGUE_EPIGRAPH, { sign: '~ Unknown', every: 52 });
-            yield 30;
+            const epigraph = s.card(PROLOGUE_EPIGRAPH, { sign: '~ Unknown', every: 52 });
+            yield { done: epigraph.leaving };                            // the tap: the hill comes up as the words go
+            yield 14;
 
-            // ── The hill: fade up at its foot, climb toward the house while they talk ──
-            s.map('keepers_hill', { cam: 'hill_foot', zoom: 0.9 });
+            // ── The hill: fade up low on it, climb toward the house while they talk ──
+            s.map('keepers_hill', { cam: 'hill_low', zoom: 0.9 });
             const climb = s.cam.to('keeper_house', { zoom: 0.7, frames: 1260, ease: 'inOut', dy: 40 });
-            yield s.fade('in', 150);
+            yield s.fade('in', 80, 'out');
             s.marker('Somewhere between the realms…', '6125', { hold: 460 });
-            yield 200;
+            yield 100;
             yield s.say('traveler', 'So, tell me what happened. All the way from the beginning.', { offscreen: true, auto: true });
             yield 40;
             yield s.say('keeper', 'It’s a long story.', { offscreen: true, auto: true });

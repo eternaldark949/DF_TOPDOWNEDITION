@@ -90,7 +90,7 @@
             'keepers_hill': {
                 id: 'keepers_hill', width: 1800, height: 2800, type: 'indoor', label: 'Somewhere between the realms', floorColor: '#140a26',
                 ambientDarkness: 0.4, zones: [], walls: [], transitions: [], spawn: { x: 900, y: 2450 },
-                landmarks: [ { id: 'hill_foot', x: 900, y: 2330 }, { id: 'hill_mid', x: 900, y: 1500 }, { id: 'keeper_house', x: 900, y: 600 }, { id: 'keeper_porch', x: 900, y: 760 } ]
+                landmarks: [ { id: 'hill_foot', x: 900, y: 2330 }, { id: 'hill_low', x: 900, y: 2120 }, { id: 'hill_mid', x: 900, y: 1500 }, { id: 'keeper_house', x: 900, y: 600 }, { id: 'keeper_porch', x: 900, y: 760 } ]
             },
             'keepers_parlor': {
                 id: 'keepers_parlor', width: 900, height: 700, type: 'indoor', label: "The Keeper's parlor", floorColor: '#140c10',
