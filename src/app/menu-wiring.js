@@ -62,8 +62,9 @@
             // 2. Reset all game state to new-game defaults
             game.resetGameState();
             
-            // 3. Fade out the Menu Text
+            // 3. Fade out the Menu Text, and meanwhile paint the Keeper's hill and decode its music
             mainMenuDiv.style.opacity = '0'; 
+            setTimeout(() => game.preloadKeeper(), 60);
             
             // 4. Wait for fade (500ms), then Swap Layers & Start
             setTimeout(() => { 

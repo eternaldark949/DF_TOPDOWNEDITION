@@ -883,18 +883,18 @@
             for (const j of jewelry) if (WD.jewelry[j.type].at === 'face') WD.jewelry[j.type].portrait(ctx, P, j);
 
             // ─── HAIR (FRONT LAYER — on top of face) ───
+            // The fringe stops at the brow: the front layer is clipped out of a window over the
+            // eyes and lower face (even-odd), so every style frames the face and never covers the eyes.
             if (hair) {
                 const renderer = PORTRAIT_HAIR_RENDERERS[hair.type];
-                if (renderer) renderer(ctx, hair.color, cx, cy, fw, fh);
-            }
-
-            // An expressive brow shows through the fringe (stylised, like drawn portraits)
-            if (drawBrows && (X.brow.lift || X.brow.tilt || X.brow.arch || X.brow.raise)) {
-                ctx.save();
-                ctx.lineCap = 'round';
-                ctx.globalAlpha = 0.6; ctx.strokeStyle = skinColor; ctx.lineWidth = fw * 0.15; drawBrows();   // outline so it reads on dark hair
-                ctx.globalAlpha = 1; ctx.strokeStyle = browColor; ctx.lineWidth = fw * 0.1; drawBrows();
-                ctx.restore();
+                if (renderer) {
+                    ctx.save();
+                    ctx.beginPath(); ctx.rect(-w, -h, w * 3, h * 3);
+                    ctx.ellipse(cx, cy + fh * 0.2, fw * 0.95, fh * 0.6, 0, 0, Math.PI * 2);
+                    ctx.clip('evenodd');
+                    renderer(ctx, hair.color, cx, cy, fw, fh);
+                    ctx.restore();
+                }
             }
 
             // ─── JEWELRY AND HAT ───
