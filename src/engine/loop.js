@@ -256,7 +256,7 @@
                 // Real-time length of one tick. GAME_SPEED 0.5 → 33.3ms → 30 ticks/sec.
                 // A time slow (triggerTimeSlow) stretches it the same way: evenly spaced, interpolated ticks.
                 if (this.finisher || this.finCam) this.updateFinisher(elapsed);   // the finisher's beats run on real time (engine/finisher.js)
-                const slow = this.updateTimeSlow(elapsed);
+                const slow = this._loopScale = Math.min(this.updateTimeSlow(elapsed), this.scopeTimeScale(elapsed));   // a finisher's slow, or the scope's (engine/scope.js)
                 const stepMs = CONFIG.LOOP.STEP_MS / Math.max(0.05, (CONFIG.LOOP.GAME_SPEED || 1) * slow);
                 const interp = CONFIG.LOOP.INTERPOLATE;
 
