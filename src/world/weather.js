@@ -757,6 +757,13 @@
                 this.isRaining = !this.indoorSuppressed
                               && this.intensity > WC.SCHED_RAIN_THRESHOLD;
 
+                // 3b. How wet the streets are (0..1): soaks in over ~10 s of rain, dries over ~2
+                //     minutes after. Outdoors only matters to the reader (wet reflections), so it
+                //     keeps counting while she's inside.
+                const wetTarget = this.intensity > WC.SCHED_RAIN_THRESHOLD ? Math.min(1, 0.45 + this.intensity) : 0;
+                const w0 = this.wetness || 0;
+                this.wetness = wetTarget > w0 ? Math.min(wetTarget, w0 + (wetTarget - w0) * 0.006 + 0.0005) : Math.max(wetTarget, w0 - 1 / 7200);
+
                 // 4. Storms make their own lightning.
                 if (this.isRaining && cfg.lightning > 0 && this.lightningCooldown <= 0) {
                     if (Math.random() < cfg.lightning * this.intensity) {
