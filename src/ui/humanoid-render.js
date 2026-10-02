@@ -1850,8 +1850,8 @@
             }
             
             // DEBUG: Red circle at entity center point
-            if (typeof game !== 'undefined' && game.debugMode) {
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+            if (typeof game !== 'undefined' && game.dbg && game.dbg('colliders')) {
+                ctx.fillStyle = 'rgba(255, 106, 184, 0.9)';
                 ctx.beginPath();
                 ctx.arc(0, 0, 3, 0, Math.PI * 2);
                 ctx.fill();

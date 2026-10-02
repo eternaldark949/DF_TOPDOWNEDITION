@@ -1264,3 +1264,61 @@
                 radial-gradient(2px 2px at 88% 15%, rgba(232, 194, 122, 0.5), transparent), radial-gradient(1px 1px at 45% 90%, rgba(232, 194, 122, 0.6), transparent);
             background-size: 100% 50%; }
         @keyframes ttbBreathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+        /* ── Dev overlay (ui/dev-overlay.js): the profiler pill and the debug layer panel ── */
+        #dev-prof {
+            position: fixed; z-index: 2500; top: calc(128px + env(safe-area-inset-top, 0px)); left: calc(14px + env(safe-area-inset-left, 0px));
+            padding: 6px 10px; border-radius: 16px; cursor: pointer; user-select: none; font-family: ui-monospace, Consolas, monospace;
+            background: linear-gradient(100deg, rgba(4, 1, 6, 0.8), rgba(22, 6, 46, 0.74)); border: 1px solid rgba(202, 176, 250, 0.35);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: var(--df-lavender-pale); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+        }
+        #dev-prof .dp-head { display: flex; align-items: baseline; gap: 4px; }
+        #dev-prof .dp-head b { font-size: 0.95rem; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; min-width: 1.6em; text-align: right; }
+        #dev-prof .dp-head span { font-size: 0.5rem; letter-spacing: 2px; text-transform: uppercase; color: var(--df-lilac-grey); margin-right: 6px; }
+        #dev-prof[data-tier="mint"] .dp-ms { color: #9be8dc; }
+        #dev-prof[data-tier="gold"] .dp-ms { color: var(--df-gold); }
+        #dev-prof[data-tier="crimson"] .dp-ms { color: #ff6a78; }
+        #dev-prof .dp-spark { width: 96px; height: 22px; align-self: center; border-left: 1px solid rgba(202, 176, 250, 0.2); padding-left: 4px; }
+        #dev-prof .dp-rows { display: none; }
+        #dev-prof.full { width: 260px; max-height: calc(100vh - 160px); overflow-y: auto; }
+        #dev-prof.full .dp-rows { display: block; margin-top: 8px; }
+        #dev-prof .dp-total { display: flex; justify-content: space-between; padding-bottom: 5px; margin-bottom: 4px; font-size: 0.6rem; letter-spacing: 2px; text-transform: uppercase; color: var(--df-cream); border-bottom: 1px solid rgba(216, 198, 162, 0.35); }
+        #dev-prof .dp-row { display: grid; grid-template-columns: 1fr 38px 56px; align-items: center; gap: 6px; font-size: 0.6rem; line-height: 1.75; color: rgba(225, 214, 245, 0.72); }
+        #dev-prof .dp-row.top { color: #fff; }
+        #dev-prof .dp-l i { font-style: normal; color: var(--df-lilac-grey); font-size: 0.5rem; margin-right: 4px; text-transform: uppercase; }
+        #dev-prof .dp-t { text-align: right; font-variant-numeric: tabular-nums; }
+        #dev-prof .dp-bar { height: 3px; border-radius: 2px; background: rgba(202, 176, 250, 0.14); overflow: hidden; }
+        #dev-prof .dp-bar i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, var(--df-lavender), #fff); }
+        #dev-prof .dp-row.top .dp-bar i { background: linear-gradient(90deg, var(--df-gold), #fff4d8); box-shadow: 0 0 5px rgba(255, 194, 72, 0.7); }
+        #dev-prof .dp-counts, #dev-layers .dl-counts { display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(202, 176, 250, 0.18); font-size: 0.55rem; color: var(--df-lilac-grey); }
+        #dev-prof .dp-counts b, #dev-layers .dl-counts b { color: var(--df-lavender-pale); font-weight: 600; }
+
+        #dev-layers {
+            position: fixed; z-index: 2500; top: calc(160px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); width: 178px;
+            padding: 8px 10px; border-radius: 16px; user-select: none; font-family: var(--font-ui);
+            background: linear-gradient(100deg, rgba(4, 1, 6, 0.8), rgba(22, 6, 46, 0.74)); border: 1px solid rgba(202, 176, 250, 0.35);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        }
+        #dev-layers .dl-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.58rem; letter-spacing: 4px; text-transform: uppercase; color: var(--df-cream); margin-bottom: 6px; }
+        #dev-layers .dl-fold { background: none; border: none; color: var(--df-lilac-grey); cursor: pointer; font-size: 0.8rem; transition: transform 0.2s; }
+        #dev-layers.folded .dl-fold { transform: rotate(-90deg); }
+        #dev-layers.folded .dl-chips, #dev-layers.folded .dl-counts { display: none; }
+        #dev-layers .dl-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+        #dev-layers .dl-chip { padding: 3px 9px; border-radius: 999px; cursor: pointer; font: 600 0.52rem var(--font-ui); letter-spacing: 1.5px; text-transform: uppercase;
+            background: rgba(20, 8, 34, 0.5); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); color: color-mix(in srgb, var(--c) 70%, #8a7f99); }
+        #dev-layers .dl-chip.on { background: color-mix(in srgb, var(--c) 22%, rgba(20, 8, 34, 0.6)); border-color: var(--c); color: #fff; box-shadow: 0 0 8px color-mix(in srgb, var(--c) 45%, transparent); }
+        body.landscape #dev-prof { top: calc(146px + env(safe-area-inset-top, 0px)); left: calc(22px + env(safe-area-inset-left, 0px)); }
+        body.landscape #dev-prof.full { max-height: calc(100vh - 160px); }
+        /* Portrait: the layer panel sits low on the left, clear of the controls; the full profiler stops above it */
+        #dev-layers { top: auto; right: auto; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); left: calc(14px + env(safe-area-inset-left, 0px)); }
+        body.dev-debug #dev-prof.full { max-height: calc(100vh - 128px - 118px - 190px); }
+        /* Landscape: the layer panel tucks in beside the pause button, under the wave readout when there is one */
+        body.landscape #dev-layers { bottom: auto; left: auto; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(140px + env(safe-area-inset-right, 0px)); width: 320px; }
+        body.landscape.wave-hud #dev-layers { top: calc(58px + env(safe-area-inset-top, 0px)); }
+        body.landscape.dev-debug #dev-prof.full { max-height: calc(100vh - 160px); }
+        @media (min-width: 900px) and (min-height: 600px) {
+            body:not(.landscape) #dev-layers { bottom: auto; left: auto; top: calc(160px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); }
+            body.dev-debug:not(.landscape) #dev-prof.full { max-height: calc(100vh - 160px); }
+        }
+        @media (max-width: 360px) { #dev-prof .dp-spark { display: none; } }
+        body.cinematic-view #dev-prof, body.cinematic-view #dev-layers { display: none !important; }

@@ -20,7 +20,13 @@
                     if (rs && rs.active && rs.doorBlocks(x, y, e.x, e.y)) r *= N.DOOR;
                     if (d > r) continue;
                     const k = d / r;                                          // 0 close … 1 at the edge of hearing
-                    if (e.hearNoise(x, y, 1 - k, N.ERR_NEAR + (N.ERR_FAR - N.ERR_NEAR) * k)) heard++;
+                    if (e.hearNoise(x, y, 1 - k, N.ERR_NEAR + (N.ERR_FAR - N.ERR_NEAR) * k)) { heard++; if (this.debugMode) (this._dbgHeard || (this._dbgHeard = [])).push(e); }
+                }
+                // Debug view's Hearing layer: what this sound reached and who heard it
+                if (this.debugMode) {
+                    const L = this._dbgNoises || (this._dbgNoises = []);
+                    if (L.length < 24) L.push({ x, y, reach, kind, t: _gameTimeSec, heard: (this._dbgHeard || []).map(e => ({ x: e.x, y: e.y })) });
+                    this._dbgHeard = null;
                 }
                 if (fromPlayer) {
                     if (heard) this._lastContactAt = _gameTimeSec;

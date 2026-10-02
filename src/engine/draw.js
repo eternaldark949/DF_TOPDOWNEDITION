@@ -203,7 +203,7 @@
                 }
                 
                 // Roads (Asphalt) — baked with the ground in the city; the debug overlay still draws live
-                if (!bakedGround || this.debugMode) this.traffic.drawNetwork(this.ctx, this.debugMode);
+                if (!bakedGround || this.dbg('traffic')) this.traffic.drawNetwork(this.ctx, this.dbg('traffic'));
                 
                 // Puddle Reflections (draw on roads, before buildings/entities)
                 if (this.puddles && this.weather?.isRaining && this.activeMap?.type === 'outdoor') {
@@ -856,7 +856,7 @@
                 }
                 
                 // DEBUG: Draw red center dots for in-car occupants ON TOP of the car overlay
-                if (this.debugMode && this.isDriving && this.car && this.car.seatLayout) {
+                if (this.dbg('traffic') && this.isDriving && this.car && this.car.seatLayout) {
                     for (let i = 1; i < this.car.seatLayout.length; i++) {
                         const occ = this.car.seatOccupants[i];
                         if (!occ || occ === true || !occ.inCar) continue;
@@ -982,10 +982,10 @@
                 
                 // Debug: nav grid, companion paths and eyeline spots
                 // (with the debug overlay, or on its own via `game.navDebug = true`)
-                if (this.debugMode || this.navDebug) this.drawNavDebug(this.ctx);
+                if (this.dbg('nav') || this.navDebug) this.drawNavDebug(this.ctx);
 
                 // Debug: visualize ALL projectile positions (catches invisible ghosts)
-                if (this.debugMode) {
+                if (this.dbg('projectiles')) {
                     // Show game array projectiles as green dots
                     this.ctx.save();
                     for (const p of this.projectiles) {
@@ -1047,14 +1047,6 @@
                         }
                         this.ctx.restore();
                     }
-                    
-                    // HUD counter (screen space)
-                    this.ctx.save();
-                    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-                    this.ctx.fillStyle = '#0f0';
-                    this.ctx.font = '12px monospace';
-                    this.ctx.fillText(`PROJ array: ${this.projectiles.length}  |  registry: ${regProjs.length}`, 10, this.canvas.height - 30);
-                    this.ctx.restore();
                 }
                 
                 this.weather.draw(this.ctx);
@@ -1076,42 +1068,10 @@
                 // Health bars and damage numbers, above the darkness so they read at night
                 this.drawCombatOverlays(this.ctx, cullBounds.entities);
                 
-                // Profiler (independent of debug mode)
-                if (this.showProfiler) {
-                    this.profiler.draw(this.ctx, 20, 150); 
-                }
-                
-                // Debug Overlay (traffic network, entity stats, lighting debug)
+                // Debug view (ui/dev-overlay.js): lamp rays, then rooms, vision, hearing, colliders, labels
                 if (this.debugMode) {
-                    this.drawDebugLighting(this.ctx);
-                    
-                    // Entity System Stats (Screen Space)
-                    if (this.useNewCollisionSystem) {
-                        this.ctx.save();
-                        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-                        
-                        // Background panel
-                        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-                        this.ctx.fillRect(10, 400, 180, 105);
-                        this.ctx.strokeStyle = '#00ff88';
-                        this.ctx.lineWidth = 1;
-                        this.ctx.strokeRect(10, 400, 180, 105);
-                        
-                        // Stats
-                        this.ctx.font = 'bold 12px Consolas';
-                        this.ctx.fillStyle = '#00ff88';
-                        this.ctx.fillText('ENTITY SYSTEM', 20, 418);
-                        
-                        this.ctx.font = '11px Consolas';
-                        this.ctx.fillStyle = '#00ffaa';
-                        this.ctx.fillText(`Entities: ${GameEntity.registry.all.length}`, 20, 435);
-                        this.ctx.fillText(`Collidable: ${GameEntity.registry.collidable.length}`, 20, 450);
-                        this.ctx.fillText(`Checks: ${CollisionSystem.stats.totalChecks}`, 20, 465);
-                        this.ctx.fillText(`Resolved: ${CollisionSystem.stats.collisionsResolved}`, 20, 480);
-                        this.ctx.fillText(`Pedestrians: ${this.pedestrians.pedestrians.length}`, 20, 495);
-                        
-                        this.ctx.restore();
-                    }
+                    if (this.dbg('lights')) this.drawDebugLighting(this.ctx);
+                    this.drawDebugLayers(this.ctx);
                 }
             
                 this.ctx.restore();
@@ -1380,6 +1340,7 @@
                 // sweep is always visible while it runs.
                 PerfBench.draw(this.ctx, 20, this.canvas.height - 110);
                 this.profiler.tick(); 
+                DevOverlay.frame(this);                   // the profiler pill and debug counts (DOM)
             },
 
         });

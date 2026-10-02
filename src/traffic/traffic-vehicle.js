@@ -265,7 +265,7 @@
                 // Status Shadows (AI state: red pushing through, orange waiting at a box, yellow nudging) —
                 // a debug view now that queues are real; underglow and the rest stay
                 if (!farLOD) {
-                    const showState = typeof game !== 'undefined' && game.debugMode;
+                    const showState = typeof game !== 'undefined' && game.dbg && game.dbg('traffic');
                     if (!showState) { /* no state halos */ }
                     else if (this.isAggressive) {
                         const pulse = (Math.sin(_frameTime / 150) + 1) / 2; 
