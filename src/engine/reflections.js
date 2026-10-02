@@ -31,7 +31,9 @@
             house_of_death: { rects: [[574, 1014, 652, 486, 0.42], [574, 444, 652, 556, 0.58], [1574, 14, 212, 416, 0.38]],
                               cutCircles: [[900, 720, 152]], cuts: [[840, 1014, 120, 486]], waterProps: 'hod_fountain', glowShift: 58 },
             moon_city_nightclub: { rects: [[590, 310, 420, 380, 0.55]], glowShift: 40 },
-            ethereal_plane: { rects: [[100, 100, 1000, 1000, 0.85]], mirror: true, glowShift: 70 }
+            ethereal_plane: { rects: [[100, 100, 1000, 1000, 0.85]], mirror: true, glowShift: 70 },
+            demoness_palace: { rects: [[600, 380, 600, 606, 0.6], [600, 1000, 600, 386, 0.5], [900, 14, 486, 352, 0.4]],
+                               cuts: [[860, 760, 80, 226], [860, 1000, 80, 386]], water: [[900, 695, 70], [450, 190, 34]], glowShift: 60 }
         };
 
         engineMixin({

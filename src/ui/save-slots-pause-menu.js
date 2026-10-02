@@ -31,6 +31,7 @@
                     'neural_sys_interior': 'Neural Systems',
                     'biggs_arena': 'Biggs Park',
                     'house_of_death': 'The House of Death',
+                    'demoness_palace': 'The Demoness Palace',
                 };
                 
                 this._migrateV1Save();

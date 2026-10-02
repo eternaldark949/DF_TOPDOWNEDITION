@@ -1544,6 +1544,7 @@
                 let coneColor = 'rgba(255, 255, 255, 0.05)';
                 if (this.state === 'SUSPICIOUS') coneColor = 'rgba(255, 255, 0, 0.15)';
                 if (this.state === 'ALERT' || this.state === 'SUPPRESSING') coneColor = 'rgba(255, 0, 0, 0.2)';
+                if (this.hunter) coneColor = this.state === 'ALERT' || this.state === 'SUPPRESSING' ? 'rgba(255, 40, 60, 0.07)' : 'rgba(255, 60, 60, 0.035)';   // a hunter's red sight
                 const pl = typeof game !== 'undefined' && game.player;
                 const wantRange = pl && pl.buffSystem ? pl.buffSystem.getStat('detectionRange', this.visionRange) : this.visionRange;
                 this._coneRange = this._coneRange === undefined ? wantRange : this._coneRange + (wantRange - this._coneRange) * 0.08;
@@ -1734,7 +1735,19 @@
                 ],
                 gunnerSpawns: [[760, 700], [1380, 560], [280, 820], [700, 380]]
             },
-            { id: 'sealed_1', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
+            {
+                id: 'demoness_palace', label: 'The Demoness Palace', mapId: 'demoness_palace',
+                blurb: 'Obsidian and gold, lit by embers. Her hunters see in the dark and cross a room in a blink, and every fifth wave she hunts you herself.',
+                spawns: [
+                    [150, 180], [760, 180], [1000, 150], [1300, 150], [1600, 310],     // garden, shrine, bath
+                    [140, 520], [460, 900], [1350, 520], [1650, 900],                  // the galleries
+                    [690, 490], [1110, 960], [420, 1300], [120, 1250], [1300, 1300], [1700, 1300]   // throne hall, dressing room, kennels
+                ],
+                gunnerSpawns: [],
+                // Waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave
+                waves: (w) => ({ hunters: Math.min(3 + w, 10), alphas: w >= 3 ? 1 + Math.floor((w - 3) / 4) : 0, demoness: w % 5 === 0,
+                                 hp: 55 + w * 8, speed: 2.6 + Math.min(w * 0.08, 1) })
+            },
             { id: 'sealed_2', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
             { id: 'sealed_3', label: 'Sealed', locked: true, blurb: 'Coming soon.' }
         ];
@@ -1828,9 +1841,10 @@
                 const id = this.entry.id;
                 if (this.wave > (this.highestWaves[id] || 0)) this.highestWaves[id] = this.wave;
                 this.hostiles = [];
+                this._waveStartedAt = _gameTimeSec;
+                if (this.entry.waves) { this._spawnHunters(game, this.entry.waves(this.wave)); return; }
                 const cfg = this.getWaveConfig(this.wave);
                 const nav = game.activeMap;
-                this._waveStartedAt = _gameTimeSec;
 
                 for (const pt of this._spawnPoints(game, this.entry.spawns, cfg.gangerCount)) {
                     const ganger = new Ganger(pt.x, pt.y, {
@@ -1860,6 +1874,34 @@
                 this._waveSize = this.hostiles.length;
             }
 
+            /** A palace wave: hunters, an alpha or two, and every fifth wave the Demoness with her intro */
+            _spawnHunters(game, W) {
+                for (const pt of this._spawnPoints(game, this.entry.spawns, W.hunters)) {
+                    const h = new Hunter(pt.x, pt.y, { hp: W.hp, speed: W.speed });
+                    h._gauntletWave = this.wave; h.navMap = game.activeMap;
+                    this._lead(h, game, GAUNTLET_LEAD_ERR);
+                    this.hostiles.push(h); game.enemies.push(h);
+                }
+                for (const pt of this._spawnPoints(game, this.entry.spawns, W.alphas)) {
+                    const a = new Hunter(pt.x, pt.y, { hp: Math.round(W.hp * 1.9), speed: W.speed + 0.2, alpha: true, dashes: 2, dashCD: 180, claw: 18 });
+                    a._gauntletWave = this.wave; a.navMap = game.activeMap;
+                    this._lead(a, game, GAUNTLET_LEAD_ERR);
+                    this.hostiles.push(a); game.enemies.push(a);
+                }
+                let text = `WAVE ${this.wave} — ${W.hunters} HUNTERS` + (W.alphas ? ` + ${W.alphas} ALPHA${W.alphas > 1 ? 'S' : ''}` : '');
+                if (W.demoness) {
+                    for (const h of this.hostiles) h.dormant = true;               // her hunters hold still while she makes her entrance
+                    const d = new Demoness(900, 480, { hp: 700 + this.wave * 40 });
+                    d._gauntletWave = this.wave;
+                    this.hostiles.push(d);
+                    game.bossIntro([d], { title: 'THE DEMONESS', seenFlag: 'demonessIntroSeen' });   // (bossIntro adds her to the enemies)
+                    text += ' — AND SHE COMES';
+                }
+                showMessage(text);
+                game.triggerShake(8);
+                this._waveSize = this.hostiles.length;
+            }
+
             /**
              * The wave readout (#ui-wave, top centre): the wave, how many are left and a
              * bar that drains, the countdown between waves, the summary at the end. The
@@ -1883,10 +1925,12 @@
                         : `<span class="w-title">Wave 1</span><span class="w-sep">◆</span><span class="w-sub">In ${n}</span>`;
                 } else {
                     const left = this.hostiles.length, gun = this.hostiles.filter(h => h instanceof GatlingGunner).length;
-                    key = 'w' + this.wave + ':' + left + ':' + gun;
+                    const her = typeof Demoness !== 'undefined' && this.hostiles.some(h => h instanceof Demoness && !h.dead);
+                    key = 'w' + this.wave + ':' + left + ':' + gun + ':' + her;
                     frac = this._waveSize ? left / this._waveSize : 0;
                     html = `<span class="w-title">Wave ${this.wave}</span><span class="w-sep">◆</span><span class="w-sub">${left} left</span>`
-                         + (gun ? `<span class="w-chip">${gun > 1 ? gun + ' gunners' : 'Gunner'}</span>` : '');
+                         + (gun ? `<span class="w-chip">${gun > 1 ? gun + ' gunners' : 'Gunner'}</span>` : '')
+                         + (her ? `<span class="w-chip">The Demoness</span>` : '');
                 }
                 if (key === this._hudKey) return;
                 this._hudKey = key;
@@ -1915,6 +1959,8 @@
                     return;
                 }
 
+                // Her intro over: her hunters wake
+                if (!game._bossIntro) for (const h of this.hostiles) if (h.dormant && !(typeof Demoness !== 'undefined' && h instanceof Demoness)) h.dormant = false;
                 // Prune dead
                 const before = this.hostiles.length;
                 this.hostiles = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));

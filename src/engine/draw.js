@@ -668,6 +668,7 @@
                 this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
                 this.drawNoiseRipples(this.ctx);
                 this.drawCorpses(this.ctx, cullBounds.entities);         // the fallen, under the living (engine/finisher.js)
+                this.drawHunterDashes(this.ctx);                         // crimson flits (engine/palace-art.js)
                 
                 // PERFORMANCE: AABB viewport culling for entities
                 {
@@ -1075,6 +1076,7 @@
                 // Health bars and damage numbers, above the darkness so they read at night
                 this.drawCombatOverlays(this.ctx, cullBounds.entities);
                 this.drawStatusMarks(this.ctx, cullBounds.entities);
+                this.drawHunterEyes(this.ctx);
                 
                 // Debug view (ui/dev-overlay.js): lamp rays, then rooms, vision, hearing, colliders, labels
                 if (this.debugMode) {

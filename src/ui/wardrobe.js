@@ -427,6 +427,23 @@
                     ctx.beginPath(); ctx.moveTo(hx + 1.5, -8.3); ctx.quadraticCurveTo(hx + 3.5, 0, hx + 1.5, 8.3); ctx.stroke();
                     ctx.fillStyle = c.color || '#8f8cf0'; ctx.beginPath(); ctx.ellipse(hx - 7.5, 0, 2.2, 3, 0, 0, Math.PI * 2); ctx.fill();   // knot at the back
                 }, portrait(ctx, P, c) { const { cx, cy, fw, fh } = P; ctx.strokeStyle = c.color || '#8f8cf0'; ctx.lineWidth = fh * 0.13; ctx.beginPath(); ctx.ellipse(cx, cy - fh * 0.2, fw * 1.02, fh * 0.9, 0, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke(); } },
+                demon_horns: { hides: 'none', draw(ctx, hx, c) {                // two black horns sweeping back from the brow, gilt at the tips
+                    for (const s of [-1, 1]) {
+                        ctx.fillStyle = c.color || '#160406';
+                        ctx.beginPath(); ctx.moveTo(hx + 2.5, s * 3.2); ctx.quadraticCurveTo(hx - 3, s * 9.5, hx - 11, s * 9);
+                        ctx.quadraticCurveTo(hx - 4, s * 6.8, hx - 0.5, s * 2); ctx.closePath(); ctx.fill();
+                        ctx.strokeStyle = 'rgba(176,18,46,0.7)'; ctx.lineWidth = 0.6; ctx.stroke();
+                        ctx.fillStyle = c.trim || '#e3a64a'; ctx.beginPath(); ctx.arc(hx - 10.6, s * 9, 0.9, 0, Math.PI * 2); ctx.fill();
+                    }
+                }, portrait(ctx, P, c) {
+                    const { cx, cy, fw, fh } = P;
+                    for (const s of [-1, 1]) {
+                        ctx.fillStyle = c.color || '#160406'; ctx.beginPath();
+                        ctx.moveTo(cx + s * fw * 0.35, cy - fh * 0.75); ctx.quadraticCurveTo(cx + s * fw * 0.9, cy - fh * 1.25, cx + s * fw * 1.15, cy - fh * 1.55);
+                        ctx.quadraticCurveTo(cx + s * fw * 0.7, cy - fh * 1.05, cx + s * fw * 0.2, cy - fh * 0.85); ctx.closePath(); ctx.fill();
+                        ctx.fillStyle = c.trim || '#e3a64a'; ctx.beginPath(); ctx.arc(cx + s * fw * 1.15, cy - fh * 1.55, fw * 0.05, 0, Math.PI * 2); ctx.fill();
+                    }
+                } },
                 tiara: { hides: 'none', draw(ctx, hx, c) {
                     const gold = c.color || '#e8c27a';
                     ctx.strokeStyle = gold; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(hx, 0, 6.8, -1.1, 1.1); ctx.stroke();

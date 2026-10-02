@@ -546,6 +546,49 @@
                     ];
                     break;
 
+                case 'demoness_palace': {
+                    // Her palace: decor art in drawPalaceDecorProp (dp_*), floor and glow in engine/palace-art.js
+                    const F = decorPropsIn('#2a0c14');
+                    const brazier = (x, y) => F(x, y, 26, 26, 'dp_brazier');
+                    e.props = [
+                        // Throne Hall: the throne under the red oculus, a black reflecting pool, four pillars, braziers
+                        F(866, 396, 68, 52, 'dp_throne'), F(820, 640, 160, 110, 'dp_pool'),
+                        F(650, 430, 36, 36, 'dp_pillar'), F(1114, 430, 36, 36, 'dp_pillar'), F(650, 900, 36, 36, 'dp_pillar'), F(1114, 900, 36, 36, 'dp_pillar'),
+                        brazier(720, 560), brazier(1054, 560), brazier(720, 820), brazier(1054, 820),
+                        // Blood Garden: a fountain of dark water, rose beds, thorn hedges
+                        F(405, 145, 90, 90, 'dp_fountain'),
+                        F(80, 60, 110, 40, 'dp_roses'), F(680, 60, 110, 40, 'dp_roses'), F(80, 290, 110, 40, 'dp_roses'), F(680, 290, 110, 40, 'dp_roses'),
+                        F(250, 170, 22, 60, 'dp_hedge'), F(620, 170, 22, 60, 'dp_hedge'),
+                        // Shrine: an altar of horns and candles
+                        F(1095, 50, 100, 44, 'dp_altar'), F(950, 260, 30, 30, 'dp_statue'), F(1320, 260, 30, 30, 'dp_statue'),
+                        // Bath of Embers: a sunken pool of glowing coals
+                        F(1470, 100, 240, 150, 'dp_embers'),
+                        // Galleries: statues of her conquests
+                        ...[460, 640, 820].map(y => F(300, y, 30, 30, 'dp_statue')), ...[460, 640, 820].map(y => F(1470, y, 30, 30, 'dp_statue')),
+                        // Dressing Room: a tall mirror, a vanity, a wardrobe
+                        F(40, 1020, 80, 16, 'dp_mirror', { noNav: true }), F(240, 1180, 90, 40, 'dp_vanity'), F(440, 1020, 120, 30, 'dp_wardrobe'),
+                        // Entrance Hall: braziers by the door
+                        brazier(760, 1300), brazier(1014, 1300),
+                        // The Kennels: cages where her hunters rest
+                        ...[1260, 1400, 1540, 1680].map(x => F(x, 1040, 80, 60, 'dp_cage'))
+                    ];
+                    e.npcs = [];
+                    const L = (x, y, color, lightRadius, lampType = 4, extra = {}) => Object.assign(new LampEntity({ x, y, lampType, color, lightRadius, ...extra }), extra);
+                    const ember = (x, y, r = 300) => L(x, y, '#ff6a3a', r, 4, { candle: true });
+                    e.lamps = [
+                        ember(733, 573), ember(1067, 573), ember(733, 833), ember(1067, 833),           // the throne hall's braziers
+                        L(900, 520, '#ff3a5a', 340), L(900, 700, '#b0204a', 260),                     // the red moon on the throne, its glow in the pool
+                        L(450, 190, '#ff4a6a', 300), L(150, 80, '#a02040', 220), L(730, 300, '#a02040', 220),   // the garden: the fountain, the roses
+                        ember(1145, 72, 260), L(1145, 200, '#ff7a3a', 240),                          // the altar
+                        L(1590, 175, '#ff5a1a', 320),                                                 // the bath of embers
+                        L(300, 520, '#c03050', 260), L(300, 840, '#c03050', 260), L(1500, 520, '#c03050', 260), L(1500, 840, '#c03050', 260),   // the galleries
+                        L(285, 1200, '#ff8a6a', 240), L(80, 1060, '#ffb0c0', 180),                    // the dressing room, the mirror
+                        ember(773, 1313), ember(1027, 1313), L(900, 1100, '#ff5a4a', 260),            // the entrance
+                        L(1500, 1200, '#ff3a1a', 300)                                                 // the kennels
+                    ];
+                    break;
+                }
+
                 case 'house_of_death': {
                     // The gauntlet's house: furniture art in drawHouseDecorProp (hod_*) and the
                     // apartment's pieces (apt_*); floor art in drawHouseInterior, glows in drawHouseGlow.

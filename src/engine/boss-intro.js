@@ -17,13 +17,14 @@
 
             bossIntro(bosses, opts = {}) {
                 const qs = this.questState || {};
-                let short = !!(opts.short || qs.sanctumIntroSeen || qs.churchBossDefeated);
+                const flag = opts.seenFlag || 'sanctumIntroSeen';                 // each boss remembers its own first awakening
+                let short = !!(opts.short || qs[flag] || (!opts.seenFlag && qs.churchBossDefeated));
                 for (const b of bosses) {
                     b.makeDormant();
                     b.navMap = this.activeMap;                    // no clear line: route round the pews for one
                     this.enemies.push(b);
                 }
-                qs.sanctumIntroSeen = true;
+                qs[flag] = true;
                 const names = bosses.map(b => b.bossName).filter(Boolean);
                 if (this._bossIntro) short = true;                  // one already running: this set just wakes in place
                 (this._bossIntros || (this._bossIntros = [])).push(this._bossIntro = { bosses, short, f: 0, title: opts.title || 'THE TRIUMVIRATE', names, skipped: false,

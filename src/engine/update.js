@@ -608,8 +608,9 @@
                     // Unified projectile collection — handles single shots, arrays, or null
                     if (result) {
                         const shots = Array.isArray(result) ? result : [result];
-                        if (shots.some(s => s instanceof ProjectileEntity)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false);   // their gunfire draws their friends
+                        if (shots.some(s => s instanceof ProjectileEntity && !s.melee)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false);   // their gunfire draws their friends
                         for (const shot of shots) {
+                            if (shot instanceof ProjectileEntity && shot.melee) { this.projectiles.push(shot); continue; }   // a claw: no flash, no casing
                             if (shot instanceof ProjectileEntity) {
                                 this.projectiles.push(shot);
                                 const shotAng = Math.atan2(shot.vy, shot.vx);
@@ -625,6 +626,18 @@
                         this.weather.spawnExplosion(enemy.x, enemy.y, '#a469ff', 7, 2.4);   // a soft violet puff: the body stays
                         this.triggerShake(10); 
                         this.addCorpse(enemy);                                    // the body falls and stays a while (engine/finisher.js)
+                        if (typeof Demoness !== 'undefined' && enemy instanceof Demoness) {
+                            // The Demoness falls: dark element, and the first time, the Maiden's Kukri (if she hasn't one)
+                            const qs = this.questState || (this.questState = {}), first = !qs.demonessDefeated;
+                            qs.demonessDefeated = (qs.demonessDefeated || 0) + 1;
+                            this.loot.push(new Loot(enemy.x + 14, enemy.y, 'dark_element'));
+                            if (first && !this.inventory.items.some(i => i.id === 'maiden_kukri')) {
+                                const k = createItemFromRegistry('maiden_kukri', this);
+                                this.loot.push({ x: enemy.x - 12, y: enemy.y + 6, type: 'weapon_drop', item: k, angle: 0.6, dropTime: 0,
+                                                 draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } });
+                                showMessage("THE DEMONESS FALLS — SHE LEAVES THE MAIDEN'S KUKRI");
+                            } else showMessage('THE DEMONESS FALLS');
+                        }
                         const finReason = this.finisherReason(enemy);
                         this.spawnLoot(enemy.x, enemy.y);
                         

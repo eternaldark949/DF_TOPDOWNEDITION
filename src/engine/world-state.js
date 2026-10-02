@@ -159,7 +159,8 @@
                         'auto_shop': "TORQUE AUTO",
                         'neural_sys_interior': "NEURAL SYSTEMS",
                         'biggs_arena': "BIGGS AMUSEMENT PARK",
-                        'house_of_death': 'THE HOUSE OF DEATH'
+                        'house_of_death': 'THE HOUSE OF DEATH',
+                        'demoness_palace': 'THE DEMONESS PALACE'
                     };
             
                     const locName = displayNames[t.target] || "UNKNOWN LOCATION";

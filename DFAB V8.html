@@ -12164,6 +12164,51 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             })(),
             // The House of Death (gauntlet). Three loops round the grand hall, so no one gets cornered:
             // foyer–kitchen–dining–hall, foyer–gallery–courtyard–hall, dining–library–chapel–bedroom–courtyard.
+            'demoness_palace': (() => {
+                const WOOD = '#3a0e16', GLASS = 'rgba(255, 120, 90, 0.28)';
+                const hinged = (x, y, o, rooms, hingeSide = 'left') => ({ x, y, w: o === 'V' ? 14 : 80, h: o === 'V' ? 80 : 14, type: 'hinged', orientation: o, rooms, color: WOOD, hingeSide, triggerRadius: 60 });
+                const arch = (x, y, w, o, rooms) => ({ x, y, w: o === 'V' ? 14 : w, h: o === 'V' ? w : 14, type: 'arch', orientation: o, rooms });
+                const EMBER = '255, 110, 70', ROSE = '255, 80, 120';
+                return {
+                    rooms: {
+                        garden:   { x: 14,   y: 14,   w: 872, h: 352, type: 'outdoor', label: 'Blood Garden' },
+                        shrine:   { x: 900,  y: 14,   w: 486, h: 352, type: 'indoor',  label: 'Shrine' },
+                        bath:     { x: 1400, y: 14,   w: 386, h: 352, type: 'indoor',  label: 'Bath of Embers' },
+                        westgal:  { x: 14,   y: 380,  w: 572, h: 606, type: 'indoor',  label: 'West Gallery' },
+                        throne:   { x: 600,  y: 380,  w: 600, h: 606, type: 'indoor',  label: 'Throne Hall' },
+                        eastgal:  { x: 1214, y: 380,  w: 572, h: 606, type: 'indoor',  label: 'East Gallery' },
+                        dressing: { x: 14,   y: 1000, w: 572, h: 386, type: 'indoor',  label: 'Dressing Room' },
+                        entrance: { x: 600,  y: 1000, w: 600, h: 400, type: 'indoor',  label: 'Entrance Hall' },
+                        kennels:  { x: 1214, y: 1000, w: 572, h: 386, type: 'indoor',  label: 'The Kennels' }
+                    },
+                    doors: [
+                        arch(820, 986, 160, 'H', ['entrance', 'throne']),
+                        hinged(586, 1150, 'V', ['entrance', 'dressing']),
+                        hinged(1200, 1150, 'V', ['entrance', 'kennels'], 'right'),
+                        hinged(586, 640, 'V', ['throne', 'westgal']),
+                        hinged(1200, 640, 'V', ['throne', 'eastgal'], 'right'),
+                        arch(220, 986, 140, 'H', ['westgal', 'dressing']),
+                        arch(1440, 986, 140, 'H', ['eastgal', 'kennels']),
+                        { ...hinged(700, 366, 'H', ['garden', 'throne']), w: 90 },
+                        hinged(1040, 366, 'H', ['shrine', 'throne'], 'right'),
+                        arch(260, 366, 140, 'H', ['garden', 'westgal']),
+                        hinged(1386, 180, 'V', ['shrine', 'bath']),
+                        hinged(1560, 366, 'H', ['bath', 'eastgal'])
+                    ],
+                    windows: [
+                        // a red moon through the throne hall's oculus, rose glass in the galleries
+                        { x: 0, y: 560, w: 14, h: 80, facing: 'E', projectionLength: 140, tint: ROSE },
+                        { x: 1786, y: 560, w: 14, h: 80, facing: 'W', projectionLength: 140, tint: ROSE },
+                        { x: 1520, y: 0, w: 80, h: 14, facing: 'S', projectionLength: 120, tint: EMBER },
+                        { x: 1060, y: 0, w: 80, h: 14, facing: 'S', projectionLength: 140, tint: ROSE }
+                    ],
+                    linens: [
+                        // crimson silks hanging in the galleries
+                        ...[480, 620, 760, 900].map(y => ({ x: 18, y, length: 70, width: 14, anchor: 'left', color: 'rgba(150, 10, 40, 0.18)', lightColor: 'rgba(255, 90, 90, 0.03)', segments: 4 })),
+                        ...[480, 620, 760, 900].map(y => ({ x: 1782, y, length: 70, width: 14, anchor: 'right', color: 'rgba(150, 10, 40, 0.18)', lightColor: 'rgba(255, 90, 90, 0.03)', segments: 4 }))
+                    ]
+                };
+            })(),
             'house_of_death': (() => {
                 const WOOD = '#6b3a45', GLASS = 'rgba(170, 150, 230, 0.32)';   // oxblood leaves (light enough to read), violet glass
                 const hinged = (x, y, o, rooms, hingeSide = 'left') => ({ x, y, w: o === 'V' ? 14 : 80, h: o === 'V' ? 80 : 14, type: 'hinged', orientation: o, rooms, color: WOOD, hingeSide, triggerRadius: 60 });
@@ -12613,6 +12658,35 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { id: 'house_foyer', x: 900, y: 1300 }, { id: 'house_hall', x: 900, y: 720 },
                     { id: 'house_chapel', x: 900, y: 200 }, { id: 'house_courtyard', x: 1510, y: 720 }
                 ]
+            },
+            // The Demoness Palace (a gauntlet): obsidian and gold, ember-lit; her hunters see in the dark
+            'demoness_palace': {
+                id: 'demoness_palace', width: 1800, height: 1400, type: 'indoor',
+                label: 'The Demoness Palace', floorColor: '#0c0508',
+                ambientDarkness: 0.88,
+                navProps: 'all',
+                wallStyle: { fill: '#140810', stroke: 'rgba(230,150,90,0.42)' },   // obsidian, ember-gold trim
+                spawn: { x: 900, y: 1320 },
+                zones: [
+                    { x: 14, y: 14, w: 872, h: 352, color: '#160a0c' },        // Blood Garden: dark earth
+                    { x: 900, y: 14, w: 486, h: 352, color: '#120810' },       // Shrine
+                    { x: 1400, y: 14, w: 386, h: 352, color: '#1a0c0c' },      // Bath of Embers
+                    { x: 14, y: 380, w: 572, h: 606, color: '#110710' },       // West Gallery
+                    { x: 600, y: 380, w: 600, h: 606, color: '#0b0509' },      // Throne Hall: obsidian
+                    { x: 1214, y: 380, w: 572, h: 606, color: '#110710' },     // East Gallery
+                    { x: 14, y: 1000, w: 572, h: 386, color: '#160a10' },      // Dressing Room
+                    { x: 600, y: 1000, w: 600, h: 386, color: '#0e070b' },     // Entrance Hall
+                    { x: 1214, y: 1000, w: 572, h: 386, color: '#140a08' },    // the Kennels
+                ],
+                walls: [
+                    { x: 0, y: 0, w: 1800, h: 14 }, { x: 0, y: 0, w: 14, h: 1400 }, { x: 1786, y: 0, w: 14, h: 1400 },
+                    { x: 0, y: 1386, w: 830, h: 14 }, { x: 970, y: 1386, w: 830, h: 14 },
+                    { x: 14, y: 366, w: 1772, h: 14 }, { x: 14, y: 986, w: 1772, h: 14 },      // the two cross walls
+                    { x: 586, y: 380, w: 14, h: 1006 }, { x: 1200, y: 380, w: 14, h: 1006 },  // the spines
+                    { x: 886, y: 14, w: 14, h: 352 }, { x: 1386, y: 14, w: 14, h: 352 },      // garden | shrine | bath
+                ],
+                transitions: [ { x: 830, y: 1370, w: 140, h: 30, target: 'hub_949', label: 'Leave the Palace' } ],
+                landmarks: [ { id: 'palace_throne', x: 900, y: 520 }, { id: 'palace_garden', x: 450, y: 190 } ]
             },
             'ollo_test': {
                 id: 'ollo_test', width: 2000, height: 1500, type: 'outdoor',
@@ -13212,6 +13286,49 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         new LampEntity({ x: 450, y: 820, lampType: 3, color: '#ffaa44', lightRadius: 350 }),
                     ];
                     break;
+
+                case 'demoness_palace': {
+                    // Her palace: decor art in drawPalaceDecorProp (dp_*), floor and glow in engine/palace-art.js
+                    const F = decorPropsIn('#2a0c14');
+                    const brazier = (x, y) => F(x, y, 26, 26, 'dp_brazier');
+                    e.props = [
+                        // Throne Hall: the throne under the red oculus, a black reflecting pool, four pillars, braziers
+                        F(866, 396, 68, 52, 'dp_throne'), F(820, 640, 160, 110, 'dp_pool'),
+                        F(650, 430, 36, 36, 'dp_pillar'), F(1114, 430, 36, 36, 'dp_pillar'), F(650, 900, 36, 36, 'dp_pillar'), F(1114, 900, 36, 36, 'dp_pillar'),
+                        brazier(720, 560), brazier(1054, 560), brazier(720, 820), brazier(1054, 820),
+                        // Blood Garden: a fountain of dark water, rose beds, thorn hedges
+                        F(405, 145, 90, 90, 'dp_fountain'),
+                        F(80, 60, 110, 40, 'dp_roses'), F(680, 60, 110, 40, 'dp_roses'), F(80, 290, 110, 40, 'dp_roses'), F(680, 290, 110, 40, 'dp_roses'),
+                        F(250, 170, 22, 60, 'dp_hedge'), F(620, 170, 22, 60, 'dp_hedge'),
+                        // Shrine: an altar of horns and candles
+                        F(1095, 50, 100, 44, 'dp_altar'), F(950, 260, 30, 30, 'dp_statue'), F(1320, 260, 30, 30, 'dp_statue'),
+                        // Bath of Embers: a sunken pool of glowing coals
+                        F(1470, 100, 240, 150, 'dp_embers'),
+                        // Galleries: statues of her conquests
+                        ...[460, 640, 820].map(y => F(300, y, 30, 30, 'dp_statue')), ...[460, 640, 820].map(y => F(1470, y, 30, 30, 'dp_statue')),
+                        // Dressing Room: a tall mirror, a vanity, a wardrobe
+                        F(40, 1020, 80, 16, 'dp_mirror', { noNav: true }), F(240, 1180, 90, 40, 'dp_vanity'), F(440, 1020, 120, 30, 'dp_wardrobe'),
+                        // Entrance Hall: braziers by the door
+                        brazier(760, 1300), brazier(1014, 1300),
+                        // The Kennels: cages where her hunters rest
+                        ...[1260, 1400, 1540, 1680].map(x => F(x, 1040, 80, 60, 'dp_cage'))
+                    ];
+                    e.npcs = [];
+                    const L = (x, y, color, lightRadius, lampType = 4, extra = {}) => Object.assign(new LampEntity({ x, y, lampType, color, lightRadius, ...extra }), extra);
+                    const ember = (x, y, r = 300) => L(x, y, '#ff6a3a', r, 4, { candle: true });
+                    e.lamps = [
+                        ember(733, 573), ember(1067, 573), ember(733, 833), ember(1067, 833),           // the throne hall's braziers
+                        L(900, 520, '#ff3a5a', 340), L(900, 700, '#b0204a', 260),                     // the red moon on the throne, its glow in the pool
+                        L(450, 190, '#ff4a6a', 300), L(150, 80, '#a02040', 220), L(730, 300, '#a02040', 220),   // the garden: the fountain, the roses
+                        ember(1145, 72, 260), L(1145, 200, '#ff7a3a', 240),                          // the altar
+                        L(1590, 175, '#ff5a1a', 320),                                                 // the bath of embers
+                        L(300, 520, '#c03050', 260), L(300, 840, '#c03050', 260), L(1500, 520, '#c03050', 260), L(1500, 840, '#c03050', 260),   // the galleries
+                        L(285, 1200, '#ff8a6a', 240), L(80, 1060, '#ffb0c0', 180),                    // the dressing room, the mirror
+                        ember(773, 1313), ember(1027, 1313), L(900, 1100, '#ff5a4a', 260),            // the entrance
+                        L(1500, 1200, '#ff3a1a', 300)                                                 // the kennels
+                    ];
+                    break;
+                }
 
                 case 'house_of_death': {
                     // The gauntlet's house: furniture art in drawHouseDecorProp (hod_*) and the
@@ -16434,6 +16551,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (p.decorType.startsWith('gy_')) return drawGraveStone(ctx, p);
             if (p.decorType.startsWith('dn_')) return drawLobbyDecorProp(ctx, p);
             if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
+            if (p.decorType.startsWith('dp_')) return drawPalaceDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
@@ -24648,6 +24766,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let coneColor = 'rgba(255, 255, 255, 0.05)';
                 if (this.state === 'SUSPICIOUS') coneColor = 'rgba(255, 255, 0, 0.15)';
                 if (this.state === 'ALERT' || this.state === 'SUPPRESSING') coneColor = 'rgba(255, 0, 0, 0.2)';
+                if (this.hunter) coneColor = this.state === 'ALERT' || this.state === 'SUPPRESSING' ? 'rgba(255, 40, 60, 0.07)' : 'rgba(255, 60, 60, 0.035)';   // a hunter's red sight
                 const pl = typeof game !== 'undefined' && game.player;
                 const wantRange = pl && pl.buffSystem ? pl.buffSystem.getStat('detectionRange', this.visionRange) : this.visionRange;
                 this._coneRange = this._coneRange === undefined ? wantRange : this._coneRange + (wantRange - this._coneRange) * 0.08;
@@ -24838,7 +24957,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ],
                 gunnerSpawns: [[760, 700], [1380, 560], [280, 820], [700, 380]]
             },
-            { id: 'sealed_1', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
+            {
+                id: 'demoness_palace', label: 'The Demoness Palace', mapId: 'demoness_palace',
+                blurb: 'Obsidian and gold, lit by embers. Her hunters see in the dark and cross a room in a blink, and every fifth wave she hunts you herself.',
+                spawns: [
+                    [150, 180], [760, 180], [1000, 150], [1300, 150], [1600, 310],     // garden, shrine, bath
+                    [140, 520], [460, 900], [1350, 520], [1650, 900],                  // the galleries
+                    [690, 490], [1110, 960], [420, 1300], [120, 1250], [1300, 1300], [1700, 1300]   // throne hall, dressing room, kennels
+                ],
+                gunnerSpawns: [],
+                // Waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave
+                waves: (w) => ({ hunters: Math.min(3 + w, 10), alphas: w >= 3 ? 1 + Math.floor((w - 3) / 4) : 0, demoness: w % 5 === 0,
+                                 hp: 55 + w * 8, speed: 2.6 + Math.min(w * 0.08, 1) })
+            },
             { id: 'sealed_2', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
             { id: 'sealed_3', label: 'Sealed', locked: true, blurb: 'Coming soon.' }
         ];
@@ -24932,9 +25063,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const id = this.entry.id;
                 if (this.wave > (this.highestWaves[id] || 0)) this.highestWaves[id] = this.wave;
                 this.hostiles = [];
+                this._waveStartedAt = _gameTimeSec;
+                if (this.entry.waves) { this._spawnHunters(game, this.entry.waves(this.wave)); return; }
                 const cfg = this.getWaveConfig(this.wave);
                 const nav = game.activeMap;
-                this._waveStartedAt = _gameTimeSec;
 
                 for (const pt of this._spawnPoints(game, this.entry.spawns, cfg.gangerCount)) {
                     const ganger = new Ganger(pt.x, pt.y, {
@@ -24964,6 +25096,34 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._waveSize = this.hostiles.length;
             }
 
+            /** A palace wave: hunters, an alpha or two, and every fifth wave the Demoness with her intro */
+            _spawnHunters(game, W) {
+                for (const pt of this._spawnPoints(game, this.entry.spawns, W.hunters)) {
+                    const h = new Hunter(pt.x, pt.y, { hp: W.hp, speed: W.speed });
+                    h._gauntletWave = this.wave; h.navMap = game.activeMap;
+                    this._lead(h, game, GAUNTLET_LEAD_ERR);
+                    this.hostiles.push(h); game.enemies.push(h);
+                }
+                for (const pt of this._spawnPoints(game, this.entry.spawns, W.alphas)) {
+                    const a = new Hunter(pt.x, pt.y, { hp: Math.round(W.hp * 1.9), speed: W.speed + 0.2, alpha: true, dashes: 2, dashCD: 180, claw: 18 });
+                    a._gauntletWave = this.wave; a.navMap = game.activeMap;
+                    this._lead(a, game, GAUNTLET_LEAD_ERR);
+                    this.hostiles.push(a); game.enemies.push(a);
+                }
+                let text = `WAVE ${this.wave} — ${W.hunters} HUNTERS` + (W.alphas ? ` + ${W.alphas} ALPHA${W.alphas > 1 ? 'S' : ''}` : '');
+                if (W.demoness) {
+                    for (const h of this.hostiles) h.dormant = true;               // her hunters hold still while she makes her entrance
+                    const d = new Demoness(900, 480, { hp: 700 + this.wave * 40 });
+                    d._gauntletWave = this.wave;
+                    this.hostiles.push(d);
+                    game.bossIntro([d], { title: 'THE DEMONESS', seenFlag: 'demonessIntroSeen' });   // (bossIntro adds her to the enemies)
+                    text += ' — AND SHE COMES';
+                }
+                showMessage(text);
+                game.triggerShake(8);
+                this._waveSize = this.hostiles.length;
+            }
+
             /**
              * The wave readout (#ui-wave, top centre): the wave, how many are left and a
              * bar that drains, the countdown between waves, the summary at the end. The
@@ -24987,10 +25147,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         : `<span class="w-title">Wave 1</span><span class="w-sep">◆</span><span class="w-sub">In ${n}</span>`;
                 } else {
                     const left = this.hostiles.length, gun = this.hostiles.filter(h => h instanceof GatlingGunner).length;
-                    key = 'w' + this.wave + ':' + left + ':' + gun;
+                    const her = typeof Demoness !== 'undefined' && this.hostiles.some(h => h instanceof Demoness && !h.dead);
+                    key = 'w' + this.wave + ':' + left + ':' + gun + ':' + her;
                     frac = this._waveSize ? left / this._waveSize : 0;
                     html = `<span class="w-title">Wave ${this.wave}</span><span class="w-sep">◆</span><span class="w-sub">${left} left</span>`
-                         + (gun ? `<span class="w-chip">${gun > 1 ? gun + ' gunners' : 'Gunner'}</span>` : '');
+                         + (gun ? `<span class="w-chip">${gun > 1 ? gun + ' gunners' : 'Gunner'}</span>` : '')
+                         + (her ? `<span class="w-chip">The Demoness</span>` : '');
                 }
                 if (key === this._hudKey) return;
                 this._hudKey = key;
@@ -25019,6 +25181,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     return;
                 }
 
+                // Her intro over: her hunters wake
+                if (!game._bossIntro) for (const h of this.hostiles) if (h.dormant && !(typeof Demoness !== 'undefined' && h instanceof Demoness)) h.dormant = false;
                 // Prune dead
                 const before = this.hostiles.length;
                 this.hostiles = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));
@@ -25066,6 +25230,176 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     showMessage(`GAUNTLET OVER — WAVE ${this.wave} — ${this.totalKills} KILLS`);
                     this._hud(game, true);
                 } else this._hud(game);
+            }
+        }
+
+        /* =====================================================================
+           HUNTERS — the Demoness's own (the Demoness Palace gauntlet)
+           ---------------------------------------------------------------------
+           A Hunter is a Ganger that was made for the dark:
+             · night vision — her hiding in shadow doesn't blind it, and in the
+               dark it still notices her (visibility floored at 0.55); its eyes
+               burn ember, its sight cone shows red (the tell)
+             · a dash — a crimson flit to close on her (ALERT, 150–420 px), or a
+               sidestep when it's hit; a short cooldown, a noise she can hear
+             · a claw — a swipe up close, with its sidearm for the rest
+           The Hunter Alpha is tougher and dashes twice. The Demoness (a boss):
+           horns, wings, a gown; chained dashes, a whip-claw at reach, she hunts
+           by sound when she loses Stella; can't be executed; her intro under
+           THE DEMONESS; her first defeat leaves the Maiden's Kukri.
+           ===================================================================== */
+        class Hunter extends Ganger {
+            constructor(x, y, cfg = {}) {
+                super(x, y, { hp: cfg.hp || 70, speed: cfg.speed || 2.8, visionRange: cfg.visionRange || 520, weaponId: cfg.weaponId || 'pistol_ganger' });
+                this.hunter = true;
+                this.nightVision = true;
+                this.alpha = !!cfg.alpha;
+                this.dashMax = cfg.dashes || 1; this.dashCDBase = cfg.dashCD || 230;
+                this.dashCD = 90 + Math.random() * 120; this._chain = 0;
+                this.clawCD = 0; this.clawDmg = cfg.claw || 14; this.clawReach = cfg.clawReach || 44;
+                this.huntSpeed = cfg.huntSpeed || 2.4;
+                this.look = cfg.look || Hunter.makeLook(this.alpha);
+            }
+
+            static makeLook(alpha) {
+                const r = Math.random;
+                return {
+                    gender: r() < 0.5 ? 'female' : 'male', skinColor: ['#3a1a1a', '#5a2a24', '#2a1414', '#6a3a30'][r() * 4 | 0], eyeColor: '#ff5a1a', blood: 'ink',
+                    build: alpha ? 'broad' : r() < 0.5 ? 'athletic' : 'slim', height: alpha ? 1.08 : 0.98 + r() * 0.06,
+                    top: { type: 'coat', color: alpha ? '#2a0610' : '#120a0e', inner: '#2a0a12', trim: alpha ? '#e3a64a' : '#7a0618' },
+                    bottom: { type: 'leggings', color: '#0c0608' }, shoes: { type: 'boots', color: '#0a0406' },
+                    hat: { type: 'hood_up', color: alpha ? '#3a0614' : '#1a0a10' }
+                };
+            }
+
+            update(player, walls, buildings, markers, traffic, map, enemies) {
+                if (this.dead) return null;
+                if (this.dormant || this._execBy) return null;
+                // Night vision: she isn't hidden from it, and in the dark it still picks her out
+                const seen = Object.create(player);
+                seen.isHidden = false; seen.visibility = Math.max(player.visibility ?? 0, 0.55);
+                let res = super.update(seen, walls, buildings, markers, traffic, map, enemies);
+                if (this.dead || typeof game === 'undefined') return res;
+                const g = game, dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy);
+                this.dashCD--; this.clawCD--;
+                const engaged = this.state === 'ALERT' || this.state === 'SUPPRESSING';
+                // A dash at her, from across the room (twice for an alpha, the second hard on the first)
+                if (engaged && this.dashCD <= 0 && d > 150 && d < 420) {
+                    const ux = dx / d, uy = dy / d;
+                    if (this._dash(player.x - ux * 70, player.y - uy * 70, walls, buildings)) {
+                        this._chain = (this._chain || 0) + 1;
+                        this.dashCD = this._chain < this.dashMax ? 22 : this.dashCDBase * (0.8 + Math.random() * 0.4);
+                        if (this._chain >= this.dashMax) this._chain = 0;
+                    } else this.dashCD = 30;
+                }
+                // Hit: a sidestep out of the line of fire
+                if (this._hitT && _gameTimeSec - this._hitT < 0.02 && this.dashCD > 40 && this.dashCD < this.dashCDBase && Math.random() < 0.5) {
+                    const s = Math.random() < 0.5 ? 1 : -1, ux = dx / (d || 1), uy = dy / (d || 1);
+                    if (this._dash(this.x - uy * 90 * s, this.y + ux * 90 * s, walls, buildings)) this.dashCD = Math.max(this.dashCD, 120);
+                }
+                // A claw up close
+                if (engaged && d < this.clawReach && this.clawCD <= 0) {
+                    this.clawCD = 45;
+                    this._clawT = _gameTimeSec;
+                    const a = Math.atan2(dy, dx);
+                    const claw = new ProjectileEntity({ x: player.x - Math.cos(a) * 4, y: player.y - Math.sin(a) * 4, angle: a, radius: 18, speed: 0.5, life: 3,
+                                                        damage: this.clawDmg, isEnemy: true, owner: this, color: 'rgba(0,0,0,0)', melee: true });
+                    res = res ? [].concat(res, claw) : claw;
+                }
+                return res;
+            }
+
+            /** A crimson flit: to (tx, ty) if the way is clear (never into a wall); a noise she can hear */
+            _dash(tx, ty, walls, buildings) {
+                const g = typeof game !== 'undefined' ? game : null; if (!g) return false;
+                const nav = NavGrid.for(g.activeMap);
+                if (nav && !nav.walkable(tx, ty)) return false;
+                if (isLineBlocked(this.x, this.y, tx, ty, walls, buildings)) return false;
+                if (g.roomSystem && g.roomSystem.active && g.roomSystem.doorBlocks(this.x, this.y, tx, ty)) return false;
+                const L = g.hunterDashes || (g.hunterDashes = []);
+                L.push({ x0: this.x, y0: this.y, x1: tx, y1: ty, t0: _gameTimeSec, a: this.angle, look: this.look, boss: !!this.bossName, seed: Math.random() * 100 });
+                if (L.length > 12) L.shift();
+                this.x = tx; this.y = ty;
+                g.emitNoise(tx, ty, 220, 'dash', false);
+                return true;
+            }
+        }
+
+        class Demoness extends Hunter {
+            constructor(x, y, cfg = {}) {
+                super(x, y, { hp: cfg.hp || 900, speed: 3.0, visionRange: 640, dashes: 2, dashCD: 150, claw: 22, clawReach: 50, huntSpeed: 2.9, look: Demoness.look() });
+                this.bossName = 'Lilitu, the Demoness';
+                this.maxHp = this.hp;
+                this._noExecute = true;
+                this.whipCD = 60; this.telegraphThreshold = 30;
+                this._eyeK = 1; this._eyeT = 1; this._riseK = 1; this._riseT = 1; this._igniteFlash = 0;
+            }
+
+            static look() {
+                return {
+                    gender: 'female', skinColor: '#8a0707', eyeColor: '#ff5a1a', blood: 'ink', build: 'curvy', height: 1.14,
+                    hair: { type: 'demon_dancer', color: '#0a0000' },
+                    hat: { type: 'demon_horns', color: '#160406', trim: '#e3a64a' },
+                    top: { type: 'sleeved_crop', color: '#0a0406', trim: '#e3a64a' },
+                    bottom: { type: 'long_skirt', color: '#0a0406', trim: '#b0122e' },
+                    train: { type: 'dress_train', color: '#2a0610' },
+                    shoes: { type: 'heels', color: '#0a0406' }
+                };
+            }
+
+            makeDormant() { this.dormant = true; this._eyeT = 0; this._eyeK = 0; this._riseT = 0; this._riseK = 0; }
+            awaken() {
+                this.dormant = false; this._eyeT = 1; this._riseT = 1;
+                const p = typeof game !== 'undefined' && game.player;
+                if (p) { this.state = 'SEARCHING'; this.suspicion = 70; this.investigateTarget = { x: p.x, y: p.y }; }
+            }
+
+            update(player, walls, buildings, markers, traffic, map, enemies) {
+                this._eyeK += (this._eyeT - this._eyeK) * 0.08; this._riseK += (this._riseT - this._riseK) * 0.05;
+                this._igniteFlash = Math.max(0, (this._igniteFlash || 0) - 0.03);
+                if (this.dead || this.dormant) return null;
+                // She hunts by sound: lose her and she goes still, listening, then she's gone to the noise
+                let res = super.update(player, walls, buildings, markers, traffic, map, enemies);
+                if (this.dead || typeof game === 'undefined') return res;
+                const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy);
+                this.whipCD--;
+                if ((this.state === 'ALERT' || this.state === 'SUPPRESSING') && this.whipCD <= 0 && d > 55 && d < 120 && !isLineBlocked(this.x, this.y, player.x, player.y, walls, buildings)) {
+                    this.whipCD = 75; this._whipT = _gameTimeSec; this._whipTo = { x: player.x, y: player.y };
+                    const a = Math.atan2(dy, dx);
+                    const whip = new ProjectileEntity({ x: player.x - Math.cos(a) * 4, y: player.y - Math.sin(a) * 4, angle: a, radius: 20, speed: 0.5, life: 3,
+                                                        damage: 18, isEnemy: true, owner: this, color: 'rgba(0,0,0,0)', melee: true });
+                    res = res ? [].concat(res, whip) : whip;
+                }
+                if (this.state === 'SEARCHING' && this.investigateTarget && this.dashCD <= 0) {
+                    const t = this.investigateTarget, dd = Math.hypot(t.x - this.x, t.y - this.y);
+                    if (dd > 160 && dd < 460 && this._dash(t.x, t.y, walls, buildings)) this.dashCD = this.dashCDBase;
+                }
+                return res;
+            }
+
+            draw(ctx) {
+                if (this.dead) return;
+                // Her wings, behind her: two membranes of black and crimson that breathe as she moves
+                const t = _gameTimeSec, flap = 0.12 * Math.sin(t * 3 + this.x * 0.01), rise = 0.6 + 0.4 * (this._riseK ?? 1);
+                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle); ctx.scale(rise, rise);
+                for (const s of [-1, 1]) {
+                    ctx.save(); ctx.rotate(s * (0.25 + flap));
+                    ctx.fillStyle = 'rgba(14,2,6,0.92)'; ctx.strokeStyle = 'rgba(176,18,46,0.75)'; ctx.lineWidth = 1.2;
+                    ctx.beginPath(); ctx.moveTo(-4, s * 5);
+                    ctx.quadraticCurveTo(-14, s * 30, -34, s * 40); ctx.lineTo(-30, s * 30); ctx.lineTo(-38, s * 26); ctx.lineTo(-30, s * 18); ctx.lineTo(-34, s * 10);
+                    ctx.quadraticCurveTo(-18, s * 8, -6, s * 3); ctx.closePath(); ctx.fill(); ctx.stroke();
+                    ctx.strokeStyle = 'rgba(227,166,74,0.5)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-5, s * 5); ctx.lineTo(-34, s * 40); ctx.moveTo(-5, s * 5); ctx.lineTo(-38, s * 26); ctx.stroke();
+                    ctx.restore();
+                }
+                ctx.restore();
+                super.draw(ctx);
+                // the whip-claw: a crimson lash to where she struck
+                if (this._whipT && _gameTimeSec - this._whipT < 0.18 && this._whipTo) {
+                    const k = 1 - (_gameTimeSec - this._whipT) / 0.18;
+                    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(255,60,90,${0.8 * k})`; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+                    const mx = (this.x + this._whipTo.x) / 2 + Math.cos(this.angle + 1.57) * 18, my = (this.y + this._whipTo.y) / 2 + Math.sin(this.angle + 1.57) * 18;
+                    ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.quadraticCurveTo(mx, my, this._whipTo.x, this._whipTo.y); ctx.stroke(); ctx.restore();
+                }
             }
         }
 
@@ -39669,6 +40003,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.beginPath(); ctx.moveTo(hx + 1.5, -8.3); ctx.quadraticCurveTo(hx + 3.5, 0, hx + 1.5, 8.3); ctx.stroke();
                     ctx.fillStyle = c.color || '#8f8cf0'; ctx.beginPath(); ctx.ellipse(hx - 7.5, 0, 2.2, 3, 0, 0, Math.PI * 2); ctx.fill();   // knot at the back
                 }, portrait(ctx, P, c) { const { cx, cy, fw, fh } = P; ctx.strokeStyle = c.color || '#8f8cf0'; ctx.lineWidth = fh * 0.13; ctx.beginPath(); ctx.ellipse(cx, cy - fh * 0.2, fw * 1.02, fh * 0.9, 0, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke(); } },
+                demon_horns: { hides: 'none', draw(ctx, hx, c) {                // two black horns sweeping back from the brow, gilt at the tips
+                    for (const s of [-1, 1]) {
+                        ctx.fillStyle = c.color || '#160406';
+                        ctx.beginPath(); ctx.moveTo(hx + 2.5, s * 3.2); ctx.quadraticCurveTo(hx - 3, s * 9.5, hx - 11, s * 9);
+                        ctx.quadraticCurveTo(hx - 4, s * 6.8, hx - 0.5, s * 2); ctx.closePath(); ctx.fill();
+                        ctx.strokeStyle = 'rgba(176,18,46,0.7)'; ctx.lineWidth = 0.6; ctx.stroke();
+                        ctx.fillStyle = c.trim || '#e3a64a'; ctx.beginPath(); ctx.arc(hx - 10.6, s * 9, 0.9, 0, Math.PI * 2); ctx.fill();
+                    }
+                }, portrait(ctx, P, c) {
+                    const { cx, cy, fw, fh } = P;
+                    for (const s of [-1, 1]) {
+                        ctx.fillStyle = c.color || '#160406'; ctx.beginPath();
+                        ctx.moveTo(cx + s * fw * 0.35, cy - fh * 0.75); ctx.quadraticCurveTo(cx + s * fw * 0.9, cy - fh * 1.25, cx + s * fw * 1.15, cy - fh * 1.55);
+                        ctx.quadraticCurveTo(cx + s * fw * 0.7, cy - fh * 1.05, cx + s * fw * 0.2, cy - fh * 0.85); ctx.closePath(); ctx.fill();
+                        ctx.fillStyle = c.trim || '#e3a64a'; ctx.beginPath(); ctx.arc(cx + s * fw * 1.15, cy - fh * 1.55, fw * 0.05, 0, Math.PI * 2); ctx.fill();
+                    }
+                } },
                 tiara: { hides: 'none', draw(ctx, hx, c) {
                     const gold = c.color || '#e8c27a';
                     ctx.strokeStyle = gold; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(hx, 0, 6.8, -1.1, 1.1); ctx.stroke();
@@ -48063,13 +48414,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             bossIntro(bosses, opts = {}) {
                 const qs = this.questState || {};
-                let short = !!(opts.short || qs.sanctumIntroSeen || qs.churchBossDefeated);
+                const flag = opts.seenFlag || 'sanctumIntroSeen';                 // each boss remembers its own first awakening
+                let short = !!(opts.short || qs[flag] || (!opts.seenFlag && qs.churchBossDefeated));
                 for (const b of bosses) {
                     b.makeDormant();
                     b.navMap = this.activeMap;                    // no clear line: route round the pews for one
                     this.enemies.push(b);
                 }
-                qs.sanctumIntroSeen = true;
+                qs[flag] = true;
                 const names = bosses.map(b => b.bossName).filter(Boolean);
                 if (this._bossIntro) short = true;                  // one already running: this set just wakes in place
                 (this._bossIntros || (this._bossIntros = [])).push(this._bossIntro = { bosses, short, f: 0, title: opts.title || 'THE TRIUMVIRATE', names, skipped: false,
@@ -48526,7 +48878,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             house_of_death: { rects: [[574, 1014, 652, 486, 0.42], [574, 444, 652, 556, 0.58], [1574, 14, 212, 416, 0.38]],
                               cutCircles: [[900, 720, 152]], cuts: [[840, 1014, 120, 486]], waterProps: 'hod_fountain', glowShift: 58 },
             moon_city_nightclub: { rects: [[590, 310, 420, 380, 0.55]], glowShift: 40 },
-            ethereal_plane: { rects: [[100, 100, 1000, 1000, 0.85]], mirror: true, glowShift: 70 }
+            ethereal_plane: { rects: [[100, 100, 1000, 1000, 0.85]], mirror: true, glowShift: 70 },
+            demoness_palace: { rects: [[600, 380, 600, 606, 0.6], [600, 1000, 600, 386, 0.5], [900, 14, 486, 352, 0.4]],
+                               cuts: [[860, 760, 80, 226], [860, 1000, 80, 386]], water: [[900, 695, 70], [450, 190, 34]], glowShift: 60 }
         };
 
         engineMixin({
@@ -49004,7 +49358,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             van_interior: { def: 'metal' },
             ethereal_plane: { def: 'marble' },
             church_boss: { def: 'stone' },
-            keepers_hill: { def: 'grass' }
+            keepers_hill: { def: 'grass' },
+            demoness_palace: { def: 'stone', rects: [[860, 760, 80, 226, 'carpet'], [860, 1000, 80, 386, 'carpet'], [14, 1000, 572, 386, 'carpet'],
+                               [600, 380, 600, 606, 'marble'], [600, 1000, 600, 386, 'marble'], [14, 14, 872, 352, 'grass']] }
         };
 
         engineMixin({
@@ -54723,7 +55079,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         'auto_shop': "TORQUE AUTO",
                         'neural_sys_interior': "NEURAL SYSTEMS",
                         'biggs_arena': "BIGGS AMUSEMENT PARK",
-                        'house_of_death': 'THE HOUSE OF DEATH'
+                        'house_of_death': 'THE HOUSE OF DEATH',
+                        'demoness_palace': 'THE DEMONESS PALACE'
                     };
             
                     const locName = displayNames[t.target] || "UNKNOWN LOCATION";
@@ -55985,8 +56342,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Unified projectile collection — handles single shots, arrays, or null
                     if (result) {
                         const shots = Array.isArray(result) ? result : [result];
-                        if (shots.some(s => s instanceof ProjectileEntity)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false);   // their gunfire draws their friends
+                        if (shots.some(s => s instanceof ProjectileEntity && !s.melee)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false);   // their gunfire draws their friends
                         for (const shot of shots) {
+                            if (shot instanceof ProjectileEntity && shot.melee) { this.projectiles.push(shot); continue; }   // a claw: no flash, no casing
                             if (shot instanceof ProjectileEntity) {
                                 this.projectiles.push(shot);
                                 const shotAng = Math.atan2(shot.vy, shot.vx);
@@ -56002,6 +56360,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.weather.spawnExplosion(enemy.x, enemy.y, '#a469ff', 7, 2.4);   // a soft violet puff: the body stays
                         this.triggerShake(10); 
                         this.addCorpse(enemy);                                    // the body falls and stays a while (engine/finisher.js)
+                        if (typeof Demoness !== 'undefined' && enemy instanceof Demoness) {
+                            // The Demoness falls: dark element, and the first time, the Maiden's Kukri (if she hasn't one)
+                            const qs = this.questState || (this.questState = {}), first = !qs.demonessDefeated;
+                            qs.demonessDefeated = (qs.demonessDefeated || 0) + 1;
+                            this.loot.push(new Loot(enemy.x + 14, enemy.y, 'dark_element'));
+                            if (first && !this.inventory.items.some(i => i.id === 'maiden_kukri')) {
+                                const k = createItemFromRegistry('maiden_kukri', this);
+                                this.loot.push({ x: enemy.x - 12, y: enemy.y + 6, type: 'weapon_drop', item: k, angle: 0.6, dropTime: 0,
+                                                 draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } });
+                                showMessage("THE DEMONESS FALLS — SHE LEAVES THE MAIDEN'S KUKRI");
+                            } else showMessage('THE DEMONESS FALLS');
+                        }
                         const finReason = this.finisherReason(enemy);
                         this.spawnLoot(enemy.x, enemy.y);
                         
@@ -57640,6 +58010,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
                 this.drawNoiseRipples(this.ctx);
                 this.drawCorpses(this.ctx, cullBounds.entities);         // the fallen, under the living (engine/finisher.js)
+                this.drawHunterDashes(this.ctx);                         // crimson flits (engine/palace-art.js)
                 
                 // PERFORMANCE: AABB viewport culling for entities
                 {
@@ -58047,6 +58418,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Health bars and damage numbers, above the darkness so they read at night
                 this.drawCombatOverlays(this.ctx, cullBounds.entities);
                 this.drawStatusMarks(this.ctx, cullBounds.entities);
+                this.drawHunterEyes(this.ctx);
                 
                 // Debug view (ui/dev-overlay.js): lamp rays, then rooms, vision, hearing, colliders, labels
                 if (this.debugMode) {
@@ -58344,7 +58716,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             keepers_parlor:      { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },
             van_interior:        { floor: (g, c) => g.drawVanInterior(c),     glow: (g, c) => g.drawVanGlow(c) },     // chapter 1's ride (engine/van-art.js)
             hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) },
-            ethereal_plane:      { glow: (g, c) => g.drawEtherealGlow(c) }      // engine/reflections.js: its mirror floor gives this back
+            ethereal_plane:      { glow: (g, c) => g.drawEtherealGlow(c) },
+            demoness_palace:     { floor: (g, c) => g.drawPalaceInterior(c), glow: (g, c) => g.drawPalaceGlow(c) }   // engine/palace-art.js      // engine/reflections.js: its mirror floor gives this back
         };
 
         engineMixin({
@@ -59737,6 +60110,235 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         });
 
+        // The Demoness Palace: its floor (painted once), its glow after the darkness, and its decor
+        // (dp_*). Obsidian and gold, crimson silk, ember light. Methods are added to
+        // GameEngine.prototype (see engineMixin in game-engine.js); the decor drawer is a plain
+        // function that entities/props-decor.js dispatches to.
+
+        const PALACE = { obsidian: '#0b0509', obsidianHi: '#1c0d16', gold: '#e3a64a', goldDim: 'rgba(227,166,74,0.45)', blood: '#7a0618',
+                      crimson: '#b0122e', ember: '#ff6a3a', bone: '#e9d8c6', thorn: '#2a0e12', rose: '#c0143e', water: '#14060c' };
+
+        engineMixin({
+            drawPalaceInterior(ctx) {
+                if (!this._palaceFloor) this._palaceFloor = this._paintPalaceFloor();
+                ctx.drawImage(this._palaceFloor, 0, 0);
+            },
+
+            _paintPalaceFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1800; cv.height = 1400;
+                const c = cv.getContext('2d'), r = seededRandom(666);
+                const fill = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+                fill(0, 0, 1800, 1400, '#0a0407');
+                // Obsidian slabs with gold seams (throne hall, entrance, galleries)
+                const slabs = (x0, y0, x1, y1, s, base) => {
+                    for (let y = y0; y < y1; y += s) for (let x = x0; x < x1; x += s) { const v = r() * 6 | 0; c.fillStyle = `rgb(${base[0] + v},${base[1] + v * 0.4 | 0},${base[2] + v})`; c.fillRect(x, y, s, s); }
+                    c.strokeStyle = 'rgba(227,166,74,0.16)'; c.lineWidth = 1; c.beginPath();
+                    for (let x = x0; x <= x1; x += s) { c.moveTo(x, y0); c.lineTo(x, y1); }
+                    for (let y = y0; y <= y1; y += s) { c.moveTo(x0, y); c.lineTo(x1, y); }
+                    c.stroke();
+                    for (let i = 0; i < (x1 - x0) * (y1 - y0) / 9000; i++) {                       // veins of ember in the stone
+                        let x = x0 + r() * (x1 - x0), y = y0 + r() * (y1 - y0); c.strokeStyle = `rgba(255,110,70,${0.04 + r() * 0.07})`; c.lineWidth = 0.6 + r();
+                        c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (r() - 0.3) * 60; y += (r() - 0.5) * 40; c.lineTo(x, y); } c.stroke();
+                    }
+                };
+                slabs(600, 380, 1200, 986, 60, [12, 6, 10]);
+                slabs(600, 1000, 1200, 1386, 60, [14, 7, 11]);
+                slabs(14, 380, 586, 986, 48, [16, 8, 14]); slabs(1214, 380, 1786, 986, 48, [16, 8, 14]);
+                // The throne hall: a gold inlaid sigil before the throne, and a crimson runner from the arch
+                c.save(); c.translate(900, 520);
+                c.strokeStyle = PALACE.gold; c.lineWidth = 2; c.beginPath(); c.arc(0, 0, 96, 0, Math.PI * 2); c.stroke();
+                c.lineWidth = 1; c.beginPath(); c.arc(0, 0, 84, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 4 / 5; c[i ? 'lineTo' : 'moveTo'](Math.cos(a) * 82, Math.sin(a) * 82); } c.closePath(); c.stroke();
+                for (let i = 0; i < 20; i++) { const a = i * Math.PI / 10; c.fillStyle = i % 2 ? PALACE.gold : PALACE.crimson; c.beginPath(); c.arc(Math.cos(a) * 90, Math.sin(a) * 90, 2, 0, Math.PI * 2); c.fill(); }
+                c.restore();
+                fill(860, 760, 80, 226, '#4a0612'); fill(864, 760, 2, 226, PALACE.goldDim); fill(934, 760, 2, 226, PALACE.goldDim);
+                fill(860, 1000, 80, 386, '#4a0612'); fill(864, 1000, 2, 386, PALACE.goldDim); fill(934, 1000, 2, 386, PALACE.goldDim);
+                // The garden: dark earth, a path of bone-white stones to the fountain
+                for (let i = 0; i < 900; i++) { c.fillStyle = r() < 0.5 ? 'rgba(60,10,16,0.35)' : 'rgba(0,0,0,0.3)'; c.fillRect(14 + r() * 872, 14 + r() * 352, 2 + r() * 4, 2 + r() * 3); }
+                for (let y = 30; y < 366; y += 26) { c.fillStyle = 'rgba(233,216,198,0.18)'; c.beginPath(); c.ellipse(450 + (r() - 0.5) * 8, y, 14, 9, 0, 0, Math.PI * 2); c.fill(); }
+                // Shrine: black stone and a ring of gold; the bath: ash-dark tiles
+                slabs(900, 14, 1386, 366, 44, [10, 5, 9]);
+                c.strokeStyle = PALACE.goldDim; c.lineWidth = 2; c.beginPath(); c.arc(1145, 210, 110, 0, Math.PI * 2); c.stroke();
+                slabs(1400, 14, 1786, 366, 40, [20, 10, 8]);
+                // Dressing room: rose carpet; the kennels: scored stone and straw
+                fill(14, 1000, 572, 386, '#2a0a16'); for (let i = 0; i < 500; i++) { c.fillStyle = 'rgba(255,120,160,0.03)'; c.fillRect(14 + r() * 572, 1000 + r() * 386, 3, 3); }
+                slabs(1214, 1000, 1786, 1386, 50, [18, 12, 8]);
+                for (let i = 0; i < 260; i++) { c.strokeStyle = 'rgba(200,160,90,0.12)'; c.lineWidth = 1; const x = 1230 + r() * 540, y = 1110 + r() * 260, a = r() * 6.28; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * 8, y + Math.sin(a) * 8); c.stroke(); }
+                return cv;
+            },
+
+            /** After the darkness: braziers, the red moon, the embers, the fountain, drifting sparks */
+            drawPalaceGlow(ctx) {
+                const t = _frameTime / 1000, glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                for (const p of this.props || []) {
+                    if (!p.decorType || !p.decorType.startsWith('dp_')) continue;
+                    const cx = p.x + p.width / 2, cy = p.y + p.height / 2, f = 0.8 + 0.2 * Math.sin(t * 9 + cx);
+                    if (p.decorType === 'dp_brazier') { glow(cx, cy, 46, '255, 110, 60', 0.5 * f); glow(cx, cy, 14, '255, 220, 160', 0.7 * f); }
+                    else if (p.decorType === 'dp_embers') glow(cx, cy, 140, '255, 90, 30', 0.28 + 0.06 * Math.sin(t * 1.3));
+                    else if (p.decorType === 'dp_fountain') glow(cx, cy, 60, '255, 60, 100', 0.25 + 0.05 * Math.sin(t * 2));
+                    else if (p.decorType === 'dp_altar') { glow(cx - 30, cy, 18, '255, 180, 110', 0.5 * f); glow(cx + 30, cy, 18, '255, 180, 110', 0.5 * f); glow(cx, cy, 50, '255, 70, 90', 0.25); }
+                    else if (p.decorType === 'dp_throne') glow(cx, cy - 6, 70, '255, 40, 80', 0.22 + 0.06 * Math.sin(t * 0.9));
+                    else if (p.decorType === 'dp_pool') glow(cx, cy, 70, '200, 20, 60', 0.14);
+                    else if (p.decorType === 'dp_cage') glow(cx, cy, 30, '255, 60, 20', 0.12);
+                }
+                // The red moon through the oculus, over the throne
+                glow(900, 470, 170, '255, 40, 70', 0.12 + 0.03 * Math.sin(t * 0.5));
+                // Sparks rising from the braziers and the embers
+                for (let i = 0; i < 36; i++) {
+                    const src = i % 3 === 0 ? [1590, 175] : [[733, 573], [1067, 573], [733, 833], [1067, 833]][i % 4];
+                    const ph = (t * (0.25 + (i % 5) * 0.05) + i * 0.137) % 1;
+                    const x = src[0] + Math.sin(t * 2 + i) * 10 * ph + ((i * 37) % 30 - 15), y = src[1] - ph * 90;
+                    ctx.globalAlpha = (1 - ph) * 0.7; ctx.fillStyle = i % 2 ? '#ffb070' : '#ff6a3a';
+                    ctx.beginPath(); ctx.arc(x, y, 1.2, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.restore();
+            }
+        });
+
+        // The hunters (entities/hunters.js): their dashes and their eyes
+        engineMixin({
+            /** The hunters' crimson flits: a fading ghost where they were, jagged red lines to where they are (world space) */
+            drawHunterDashes(ctx) {
+                const L = this.hunterDashes; if (!L || !L.length) return;
+                const now = _gameTimeSec;
+                for (let i = L.length - 1; i >= 0; i--) {
+                    const D = L[i], age = now - D.t0;
+                    if (age > 0.6) { L.splice(i, 1); continue; }
+                    const k = 1 - age / 0.6;
+                    // the ghost: a silhouette in crimson, fading
+                    ctx.save(); ctx.globalAlpha = 0.45 * k; ctx.fillStyle = D.boss ? '#ff2a4a' : '#c0142e';
+                    ctx.translate(D.x0, D.y0); ctx.rotate(D.a);
+                    ctx.beginPath(); ctx.ellipse(-2, 0, 7, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(1, 0, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                    // the trail: three jagged lines, re-jittered as they fade
+                    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+                    const dx = D.x1 - D.x0, dy = D.y1 - D.y0, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, n = 9;
+                    for (let j = 0; j < 3; j++) {
+                        ctx.strokeStyle = j ? `rgba(255,60,80,${0.5 * k})` : `rgba(255,190,170,${0.8 * k})`; ctx.lineWidth = j ? 2.2 : 1;
+                        ctx.beginPath(); ctx.moveTo(D.x0, D.y0);
+                        for (let s = 1; s < n; s++) {
+                            const f = s / n, jit = Math.sin(D.seed + s * 2.3 + j * 7 + Math.floor(now * 30)) * 7 * (1 - Math.abs(f - 0.5) * 1.4);
+                            ctx.lineTo(D.x0 + dx * f + nx * jit, D.y0 + dy * f + ny * jit);
+                        }
+                        ctx.lineTo(D.x1, D.y1); ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+            },
+
+            /** After the darkness: hunters' eyes burn ember (night vision's tell) */
+            drawHunterEyes(ctx) {
+                for (const e of this.enemies || []) {
+                    if (!e || e.dead || !e.hunter) continue;
+                    const k = e.bossName ? (e._eyeK ?? 1) : 1; if (k < 0.05) continue;
+                    const fx = Math.cos(e.angle), fy = Math.sin(e.angle), S = e.bossName ? 1.15 : 1;
+                    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                    for (const s of [-1, 1]) {
+                        const x = e.x + fx * 6 * S - fy * 2.6 * s * S, y = e.y + fy * 6 * S + fx * 2.6 * s * S;
+                        ctx.globalAlpha = 0.9 * k; ctx.fillStyle = '#ffb070'; ctx.beginPath(); ctx.arc(x, y, 1.1, 0, Math.PI * 2); ctx.fill();
+                        ctx.globalAlpha = 0.5 * k; drawGlow(ctx, x, y, 6 + 10 * (e._igniteFlash || 0), '255, 90, 40', 0.3);
+                    }
+                    ctx.restore();
+                }
+            }
+        });
+
+        /** Her palace's pieces, drawn on the floor pass (dispatched from entities/props-decor.js) */
+        function drawPalaceDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, cx = x + w / 2, cy = y + h / 2, t = _frameTime / 1000, C = PALACE;
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => { ctx.beginPath(); ctx.roundRect(X, Y, W, H, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } };
+            const circ = (X, Y, r, fill, stroke, lw = 1) => { ctx.beginPath(); ctx.arc(X, Y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } };
+            const shadow = (r = 4) => rr(x + 3, y + 3, w, h, r, 'rgba(0,0,0,0.4)');
+            switch (p.decorType) {
+                case 'dp_throne': {
+                    shadow(10);
+                    rr(x, y, w, h, 10, '#1a0710', C.gold, 1.5);                                   // the seat
+                    ctx.fillStyle = '#4a0612'; ctx.beginPath(); ctx.roundRect(x + 10, y + 14, w - 20, h - 20, 6); ctx.fill();   // crimson velvet
+                    // the back: a crest of black horns rising behind the seat, gilded at the tips
+                    for (const s of [-1, 1]) {
+                        ctx.fillStyle = '#120408'; ctx.beginPath();
+                        ctx.moveTo(cx + s * 8, y + 6); ctx.quadraticCurveTo(cx + s * 34, y - 6, cx + s * 40, y - 26); ctx.quadraticCurveTo(cx + s * 22, y - 8, cx + s * 4, y + 12); ctx.fill();
+                        circ(cx + s * 40, y - 26, 2.4, C.gold);
+                    }
+                    circ(cx, y + 4, 5, C.crimson, C.gold, 1.2);
+                    break;
+                }
+                case 'dp_pool': {
+                    rr(x - 4, y - 4, w + 8, h + 8, 30, '#22101a', C.goldDim, 2);                   // the gold rim
+                    rr(x, y, w, h, 26, C.water);
+                    ctx.strokeStyle = 'rgba(255,80,120,0.12)'; ctx.lineWidth = 1;
+                    for (let i = 0; i < 3; i++) { const k = ((t * 0.3 + i / 3) % 1); ctx.globalAlpha = 1 - k; ctx.beginPath(); ctx.ellipse(cx, cy, 10 + k * 60, 6 + k * 36, 0, 0, Math.PI * 2); ctx.stroke(); }
+                    ctx.globalAlpha = 1;
+                    break;
+                }
+                case 'dp_pillar': {
+                    shadow(18); circ(cx, cy, w / 2, '#160810', C.gold, 1.4); circ(cx, cy, w / 2 - 6, '#24101a');
+                    ctx.strokeStyle = 'rgba(176,18,46,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, w / 2 - 3, t * 0.2, t * 0.2 + 4); ctx.stroke();
+                    break;
+                }
+                case 'dp_brazier': {
+                    shadow(13); circ(cx, cy, w / 2, '#1c0a0a', C.gold, 1.4); circ(cx, cy, w / 2 - 4, '#3a0c06');
+                    const f = 0.7 + 0.3 * Math.sin(t * 13 + cx);
+                    circ(cx, cy, 7 * f, '#ff6a3a'); circ(cx, cy, 3.5 * f, '#ffe0a0');
+                    break;
+                }
+                case 'dp_fountain': {
+                    circ(cx, cy, w / 2, '#1e0c12', C.goldDim, 2); circ(cx, cy, w / 2 - 8, C.water);
+                    circ(cx, cy, 10, '#2a1018', C.gold, 1.2);                                      // the spout
+                    ctx.strokeStyle = 'rgba(255,60,100,0.3)'; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + t * 0.4; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 10, cy + Math.sin(a) * 10); ctx.quadraticCurveTo(cx + Math.cos(a) * 24, cy + Math.sin(a) * 24 - 6, cx + Math.cos(a) * 32, cy + Math.sin(a) * 32); ctx.stroke(); }
+                    break;
+                }
+                case 'dp_roses': {
+                    rr(x, y, w, h, 8, '#1a0a0c', 'rgba(0,0,0,0.4)');
+                    const R = seededRandom((x * 31 + y) | 0);
+                    for (let i = 0; i < 16; i++) { const px = x + 8 + R() * (w - 16), py = y + 6 + R() * (h - 12); circ(px, py, 3 + R() * 2, '#1e3a1a'); circ(px + 1, py - 1, 2.2 + R(), i % 3 ? C.rose : '#ff4a6a'); }
+                    break;
+                }
+                case 'dp_hedge': {
+                    rr(x, y, w, h, 6, '#140a0a');
+                    ctx.strokeStyle = C.thorn; ctx.lineWidth = 1.2; for (let i = 0; i < 10; i++) { const py = y + 4 + i * (h - 8) / 9; ctx.beginPath(); ctx.moveTo(x + 2, py); ctx.lineTo(x + w - 2, py + 3); ctx.stroke(); }
+                    break;
+                }
+                case 'dp_altar': {
+                    shadow(6); rr(x, y, w, h, 6, '#160810', C.gold, 1.4);
+                    ctx.fillStyle = '#e9d8c6'; ctx.beginPath(); ctx.ellipse(cx, cy, 12, 9, 0, 0, Math.PI * 2); ctx.fill();   // a skull of bone, horned
+                    ctx.fillStyle = '#120408'; ctx.beginPath(); ctx.arc(cx - 4, cy - 1, 2.4, 0, 6.28); ctx.arc(cx + 4, cy - 1, 2.4, 0, 6.28); ctx.fill();
+                    for (const s of [-1, 1]) { ctx.strokeStyle = '#2a1010'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx + s * 8, cy - 6); ctx.quadraticCurveTo(cx + s * 20, cy - 16, cx + s * 16, cy - 22); ctx.stroke(); }
+                    for (const s of [-1, 1]) { circ(cx + s * 30, cy, 3, C.bone); const f = 0.75 + 0.25 * Math.sin(t * 11 + s); circ(cx + s * 30, cy - 4, 2.4 * f, '#ffb46a'); }
+                    break;
+                }
+                case 'dp_statue': {
+                    shadow(15); circ(cx, cy, w / 2, '#241018', 'rgba(0,0,0,0.5)');
+                    circ(cx, cy - 2, w / 2 - 6, '#3a1c24');                                        // a kneeling figure, from above
+                    circ(cx, cy - 6, 4, '#4a2a30');
+                    break;
+                }
+                case 'dp_embers': {
+                    rr(x - 4, y - 4, w + 8, h + 8, 24, '#2a0e08', C.goldDim, 2);
+                    const g = ctx.createRadialGradient(cx, cy, 10, cx, cy, Math.max(w, h) / 2);
+                    g.addColorStop(0, '#ff8a3a'); g.addColorStop(0.5, '#b0300a'); g.addColorStop(1, '#3a0a04');
+                    ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x, y, w, h, 20); ctx.fill();
+                    const R = seededRandom(17);
+                    for (let i = 0; i < 40; i++) { const px = x + 10 + R() * (w - 20), py = y + 10 + R() * (h - 20), f = 0.5 + 0.5 * Math.sin(t * (3 + R() * 4) + i); circ(px, py, 1.5 + R() * 2, `rgba(255,${180 + (f * 60 | 0)},120,${0.4 + 0.5 * f})`); }
+                    break;
+                }
+                case 'dp_mirror': {
+                    rr(x, y, w, h, 3, '#e3a64a'); rr(x + 3, y + 3, w - 6, h - 6, 2, 'rgba(200,190,220,0.5)');
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(x + 8, y + 4, 12, 2);
+                    break;
+                }
+                case 'dp_vanity': { shadow(); rr(x, y, w, h, 5, '#2a0c16', C.goldDim, 1.2); circ(x + 20, cy, 5, '#ff8aa8'); circ(x + 40, cy, 4, '#e3a64a'); circ(x + 60, cy - 4, 3, '#b0122e'); break; }
+                case 'dp_wardrobe': { shadow(); rr(x, y, w, h, 4, '#1a0710', C.gold, 1.2); ctx.fillStyle = C.goldDim; ctx.fillRect(cx - 1, y + 3, 2, h - 6); break; }
+                case 'dp_cage': {
+                    shadow(); rr(x, y, w, h, 4, 'rgba(20,8,6,0.8)');
+                    ctx.strokeStyle = '#6a3a1a'; ctx.lineWidth = 1.6; for (let i = 0; i <= 8; i++) { const px = x + i * w / 8; ctx.beginPath(); ctx.moveTo(px, y); ctx.lineTo(px, y + h); ctx.stroke(); }
+                    rr(x, y, w, h, 4, null, '#8a4a2a', 2);
+                    break;
+                }
+                default: rr(x, y, w, h, 4, '#2a0c14');
+            }
+        }
         // GameEngine — the Keeper's hill and parlor (the prologue's fireside). Scene-only places:
         // everything is painted here, with no props to bump into.
         //   keepers_hill   a lone hill above a sea of clouds, deep green with pink flowers, the house at the top
@@ -63693,6 +64295,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     'neural_sys_interior': 'Neural Systems',
                     'biggs_arena': 'Biggs Park',
                     'house_of_death': 'The House of Death',
+                    'demoness_palace': 'The Demoness Palace',
                 };
                 
                 this._migrateV1Save();
