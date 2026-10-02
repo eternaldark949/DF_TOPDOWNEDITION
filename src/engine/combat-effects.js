@@ -227,9 +227,13 @@
              * @param {number} slowPercent - How much to slow (0.4 = 60% slower, meaning 40% speed)
              * @param {number} durationSeconds - How long the slow lasts in real seconds
              * @param {boolean} smoothTransition - Whether to ease in/out (default true)
+             * @param {{inMs: number, outMs: number}} [ramp] - Timed ramps on real ms instead of the
+             *   exponential ease: in on an ease-out cubic (a brake that lands softly), hold, then
+             *   out on a smoothstep (it builds gently and settles). The finisher uses this.
              */
-            triggerTimeSlow(slowPercent = 0.4, durationSeconds = 4, smoothTransition = true) {
+            triggerTimeSlow(slowPercent = 0.4, durationSeconds = 4, smoothTransition = true, ramp = null) {
                 this.timeSlowState.active = true;
+                this.timeSlowState.ramp = ramp ? { inMs: ramp.inMs, outMs: ramp.outMs, phase: 'in', t: 0, from: this.timeSlowState.scale } : null;
                 this.timeSlowState.targetScale = slowPercent;
                 // Duration is in frames at 60fps, but we want real seconds
                 // So we need to account for the slow - more frames needed when slowed
@@ -242,6 +246,13 @@
                 }
             },
             
+            /** Ease time back to normal now, from wherever it is, over outMs (real ms): a smoothstep */
+            endTimeSlow(outMs = 300) {
+                const ts = this.timeSlowState; if (!ts.active) return;
+                ts.duration = 0; ts.targetScale = 1;
+                ts.ramp = { inMs: 0, outMs, phase: 'out', t: 0, from: ts.scale };
+            },
+
             /**
              * Advance the time slow by one rendered frame (real ms) and return the
              * time scale. The loop stretches its tick length by 1/scale, so slowed
@@ -254,8 +265,26 @@
                 const ts = this.timeSlowState;
                 if (!ts.active || this.paused) return ts.active ? ts.scale : 1;
                 const f = elapsedMs / CONFIG.LOOP.STEP_MS;                 // in 60 Hz frames
+                const R = ts.ramp;
+                if (R) {                                                   // timed ramps (real ms): in, hold, out
+                    R.t += elapsedMs;
+                    if (R.phase === 'in') {
+                        const u = Math.min(1, R.t / Math.max(1, R.inMs)), e = 1 - Math.pow(1 - u, 3);
+                        ts.scale = R.from + (ts.targetScale - R.from) * e;
+                        if (u >= 1) { R.phase = 'hold'; ts.scale = ts.targetScale; }
+                    }
+                    ts.duration -= f;
+                    if (R.phase !== 'out' && ts.duration <= 0) { R.phase = 'out'; R.t = 0; R.from = ts.scale; }
+                    if (R.phase === 'out') {
+                        const u = Math.min(1, R.t / Math.max(1, R.outMs)), e = u * u * (3 - 2 * u);
+                        ts.scale = R.from + (1 - R.from) * e;
+                        if (u >= 1) { ts.scale = 1; ts.targetScale = 1; ts.active = false; ts.ramp = null; }
+                    }
+                    return ts.scale;
+                }
                 if (ts.scale !== ts.targetScale) {
-                    ts.scale += (ts.targetScale - ts.scale) * Math.min(1, ts.transitionSpeed * f);
+                    // the share of the gap closed per 60 Hz frame, made the same at any frame rate
+                    ts.scale += (ts.targetScale - ts.scale) * (1 - Math.pow(1 - Math.min(1, ts.transitionSpeed), f));
                     if (Math.abs(ts.scale - ts.targetScale) < 0.01) ts.scale = ts.targetScale;
                 }
                 ts.duration -= f;                                          // real time, not slowed

@@ -19,7 +19,9 @@
             T_BODY: 1100,          // ms on the body
             T_STELLA: 1100,        // ms on Stella, twirling
             ZOOM_BODY: 1.6, ZOOM_STELLA: 1.8,
-            CORPSES: 24, LIE: 12, FADE: 1.5
+            CORPSES: 24, LIE: 12, FADE: 1.5,
+            RAMP_IN: 150, RAMP_OUT: 600,   // ms: a hard brake on the kill, then time builds back on an S-curve
+            CUT_OUT: 250                   // ms: back to speed when she acts (fires, flits) mid-finisher
         };
 
         engineMixin({
@@ -115,8 +117,8 @@
                 this.finisher = { reason, x: e.x, y: e.y, ms: 0, subtle, col, burst: false, twirl: 0,
                                   tBody: subtle ? 500 : FINISHER.T_BODY, tStella: subtle ? 800 : FINISHER.T_STELLA };
                 this.finCam = { dx: 0, dy: 0, z: 1 };
-                this.triggerTimeSlow(subtle ? 0.5 : FINISHER.SLOW, (this.finisher.tBody + this.finisher.tStella) / 1000, true);
-                this.timeSlowState.transitionSpeed = 0.18;
+                this.triggerTimeSlow(subtle ? 0.5 : FINISHER.SLOW, (this.finisher.tBody + this.finisher.tStella) / 1000, true,
+                                     { inMs: FINISHER.RAMP_IN, outMs: FINISHER.RAMP_OUT });
                 this._finShot = this.shotsFired || 0;
                 if (this.muzzleFlashes && this.muzzleFlashes.length) this.muzzleFlashes[this.muzzleFlashes.length - 1].life += 6;   // the last star lingers
             },
@@ -152,7 +154,7 @@
             endFinisher(cut) {
                 const F = this.finisher; if (!F) return;
                 this.finisher = null;
-                if (cut) { this.timeSlowState.duration = 0; this.timeSlowState.targetScale = 1; this.timeSlowState.transitionSpeed = 0.3; }
+                if (cut) this.endTimeSlow(FINISHER.CUT_OUT);
                 else if (typeof pauseMenuController !== 'undefined' && pauseMenuController.capturePrompt)
                     pauseMenuController.capturePrompt({ x: (F.x + this.player.x) / 2, y: (F.y + this.player.y) / 2, zoom: 1.5 });
             },
