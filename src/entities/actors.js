@@ -640,7 +640,7 @@
                 this.dotDamage = config.dotDamage || 5;
                 this.dotTicks = config.dotTicks || 12;
                 this.dotInterval = config.dotInterval || 10;
-                this.spawnTime = _frameTime;
+                this.spawnTime = _gameTimeMs();                     // game time: a pause doesn't age it
                 this.fxTrail = null; this.trail = null; this._wispN = 0;
             }
 
@@ -720,7 +720,7 @@
                 this._customOnHit = config.onHit || null;
                 
                 // Hard age cap — prevents ghost projectiles from persisting
-                this.spawnTime = _frameTime;
+                this.spawnTime = _gameTimeMs();                     // game time: a pause doesn't age it
                 this.fxTrail = null; this.trail = null; this._wispN = 0;
             }
             

@@ -369,7 +369,7 @@
                     this.decals.shift(); // Remove oldest
                 }
                 
-                const now = _frameTime;
+                const now = _gameTimeMs();                          // game time: decals don't age while paused
                 
                 switch (type) {
                     case 'skid': {
@@ -457,7 +457,7 @@
             draw(ctx, cullBounds) {
                 if (this.decals.length === 0) return;
                 
-                const now = _frameTime;
+                const now = _gameTimeMs();                          // game time: decals don't age while paused
                 const maxAge = this.maxAgeMs;
                 const fadeStart = this.fadeStart;
                 

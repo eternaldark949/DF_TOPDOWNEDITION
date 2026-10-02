@@ -773,7 +773,7 @@
                     // ── DEFENSIVE GUARDS (eliminate ghost projectiles) ──
                     
                     // Hard age cap: no projectile survives beyond 5 seconds
-                    if (_frameTime - p.spawnTime > 5000) {
+                    if (_gameTimeMs() - p.spawnTime > 5000) {
                         p.destroy();
                         this.projectiles.splice(i, 1);
                         continue;

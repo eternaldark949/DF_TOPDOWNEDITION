@@ -5470,6 +5470,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         /** Sim tick counter — advanced once per fixed update step in GameEngine.update(). */
         let _simTick = 0;
+        /** Game time in ms from sim ticks: frozen while paused, so lifetimes measured with it (projectiles, decals) survive a pause */
+        function _gameTimeMs() { return _simTick * CONFIG.LOOP.STEP_MS; }
 
         /** Smooth GAME time in seconds for draw code: advances with sim ticks (so it
          *  follows CONFIG.LOOP.GAME_SPEED and stops while paused), blended between
@@ -10639,7 +10641,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.decals.shift(); // Remove oldest
                 }
                 
-                const now = _frameTime;
+                const now = _gameTimeMs();                          // game time: decals don't age while paused
                 
                 switch (type) {
                     case 'skid': {
@@ -10727,7 +10729,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             draw(ctx, cullBounds) {
                 if (this.decals.length === 0) return;
                 
-                const now = _frameTime;
+                const now = _gameTimeMs();                          // game time: decals don't age while paused
                 const maxAge = this.maxAgeMs;
                 const fadeStart = this.fadeStart;
                 
@@ -14013,7 +14015,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                     
                     // Skip aged-out projectiles (hard 5s cap)
-                    if (typeof _frameTime !== 'undefined' && proj.spawnTime && _frameTime - proj.spawnTime > 5000) {
+                    if (proj.spawnTime != null && _gameTimeMs() - proj.spawnTime > 5000) {
                         proj.destroy();
                         continue;
                     }
@@ -18858,7 +18860,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.dotDamage = config.dotDamage || 5;
                 this.dotTicks = config.dotTicks || 12;
                 this.dotInterval = config.dotInterval || 10;
-                this.spawnTime = _frameTime;
+                this.spawnTime = _gameTimeMs();                     // game time: a pause doesn't age it
                 this.fxTrail = null; this.trail = null; this._wispN = 0;
             }
 
@@ -18938,7 +18940,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._customOnHit = config.onHit || null;
                 
                 // Hard age cap — prevents ghost projectiles from persisting
-                this.spawnTime = _frameTime;
+                this.spawnTime = _gameTimeMs();                     // game time: a pause doesn't age it
                 this.fxTrail = null; this.trail = null; this._wispN = 0;
             }
             
@@ -47261,46 +47263,27 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
             
             /**
-             * Update the time slow state each frame.
-             * Called from the game loop before other updates.
-             * @returns {boolean} Whether to skip this frame's update
+             * Advance the time slow by one rendered frame (real ms) and return the
+             * time scale. The loop stretches its tick length by 1/scale, so slowed
+             * ticks stay evenly spaced and RenderInterp blends them: smooth slow
+             * motion, not dropped frames. It holds still while paused.
+             * @param {number} elapsedMs - real time since the last frame
+             * @returns {number} the time scale (1 = normal)
              */
-            updateTimeSlow() {
+            updateTimeSlow(elapsedMs = CONFIG.LOOP.STEP_MS) {
                 const ts = this.timeSlowState;
-                
-                if (!ts.active) return false;
-                
-                // Smoothly interpolate to target scale
+                if (!ts.active || this.paused) return ts.active ? ts.scale : 1;
+                const f = elapsedMs / CONFIG.LOOP.STEP_MS;                 // in 60 Hz frames
                 if (ts.scale !== ts.targetScale) {
-                    ts.scale += (ts.targetScale - ts.scale) * ts.transitionSpeed;
-                    // Snap if close enough
-                    if (Math.abs(ts.scale - ts.targetScale) < 0.01) {
-                        ts.scale = ts.targetScale;
-                    }
+                    ts.scale += (ts.targetScale - ts.scale) * Math.min(1, ts.transitionSpeed * f);
+                    if (Math.abs(ts.scale - ts.targetScale) < 0.01) ts.scale = ts.targetScale;
                 }
-                
-                // Count down duration (in real frames, not slowed)
-                ts.duration--;
-                
-                // When duration expires, transition back to normal
+                ts.duration -= f;                                          // real time, not slowed
                 if (ts.duration <= 0) {
                     ts.targetScale = 1.0;
-                    // Check if we've returned to normal
-                    if (ts.scale >= 0.99) {
-                        ts.scale = 1.0;
-                        ts.active = false;
-                        return false;
-                    }
+                    if (ts.scale >= 0.99) { ts.scale = 1.0; ts.active = false; }
                 }
-                
-                // Frame skipping based on time scale
-                // At 0.4 scale, we run ~40% of frames
-                // Use a random threshold for smooth appearance
-                if (Math.random() > ts.scale) {
-                    return true; // Skip this frame's game logic
-                }
-                
-                return false;
+                return ts.scale;
             },
             
 
@@ -54566,7 +54549,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // ── DEFENSIVE GUARDS (eliminate ghost projectiles) ──
                     
                     // Hard age cap: no projectile survives beyond 5 seconds
-                    if (_frameTime - p.spawnTime > 5000) {
+                    if (_gameTimeMs() - p.spawnTime > 5000) {
                         p.destroy();
                         this.projectiles.splice(i, 1);
                         continue;
@@ -60146,16 +60129,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._accumulator = (this._accumulator || 0) + elapsed;
 
                 // Real-time length of one tick. GAME_SPEED 0.5 → 33.3ms → 30 ticks/sec.
-                const stepMs = CONFIG.LOOP.STEP_MS / Math.max(0.05, CONFIG.LOOP.GAME_SPEED || 1);
+                // A time slow (triggerTimeSlow) stretches it the same way: evenly spaced, interpolated ticks.
+                const slow = this.updateTimeSlow(elapsed);
+                const stepMs = CONFIG.LOOP.STEP_MS / Math.max(0.05, (CONFIG.LOOP.GAME_SPEED || 1) * slow);
                 const interp = CONFIG.LOOP.INTERPOLATE;
 
                 let steps = 0;
                 while (this._accumulator >= stepMs && steps < CONFIG.LOOP.MAX_STEPS) {
                     if (interp) RenderInterp.snapshot(this);
-                    // Time slow may skip individual simulation steps
-                    if (!this.updateTimeSlow()) {
-                        this.update();
-                    }
+                    this.update();
                     this._accumulator -= stepMs;
                     steps++;
                 }

@@ -252,16 +252,15 @@
                 this._accumulator = (this._accumulator || 0) + elapsed;
 
                 // Real-time length of one tick. GAME_SPEED 0.5 → 33.3ms → 30 ticks/sec.
-                const stepMs = CONFIG.LOOP.STEP_MS / Math.max(0.05, CONFIG.LOOP.GAME_SPEED || 1);
+                // A time slow (triggerTimeSlow) stretches it the same way: evenly spaced, interpolated ticks.
+                const slow = this.updateTimeSlow(elapsed);
+                const stepMs = CONFIG.LOOP.STEP_MS / Math.max(0.05, (CONFIG.LOOP.GAME_SPEED || 1) * slow);
                 const interp = CONFIG.LOOP.INTERPOLATE;
 
                 let steps = 0;
                 while (this._accumulator >= stepMs && steps < CONFIG.LOOP.MAX_STEPS) {
                     if (interp) RenderInterp.snapshot(this);
-                    // Time slow may skip individual simulation steps
-                    if (!this.updateTimeSlow()) {
-                        this.update();
-                    }
+                    this.update();
                     this._accumulator -= stepMs;
                     steps++;
                 }

@@ -243,46 +243,27 @@
             },
             
             /**
-             * Update the time slow state each frame.
-             * Called from the game loop before other updates.
-             * @returns {boolean} Whether to skip this frame's update
+             * Advance the time slow by one rendered frame (real ms) and return the
+             * time scale. The loop stretches its tick length by 1/scale, so slowed
+             * ticks stay evenly spaced and RenderInterp blends them: smooth slow
+             * motion, not dropped frames. It holds still while paused.
+             * @param {number} elapsedMs - real time since the last frame
+             * @returns {number} the time scale (1 = normal)
              */
-            updateTimeSlow() {
+            updateTimeSlow(elapsedMs = CONFIG.LOOP.STEP_MS) {
                 const ts = this.timeSlowState;
-                
-                if (!ts.active) return false;
-                
-                // Smoothly interpolate to target scale
+                if (!ts.active || this.paused) return ts.active ? ts.scale : 1;
+                const f = elapsedMs / CONFIG.LOOP.STEP_MS;                 // in 60 Hz frames
                 if (ts.scale !== ts.targetScale) {
-                    ts.scale += (ts.targetScale - ts.scale) * ts.transitionSpeed;
-                    // Snap if close enough
-                    if (Math.abs(ts.scale - ts.targetScale) < 0.01) {
-                        ts.scale = ts.targetScale;
-                    }
+                    ts.scale += (ts.targetScale - ts.scale) * Math.min(1, ts.transitionSpeed * f);
+                    if (Math.abs(ts.scale - ts.targetScale) < 0.01) ts.scale = ts.targetScale;
                 }
-                
-                // Count down duration (in real frames, not slowed)
-                ts.duration--;
-                
-                // When duration expires, transition back to normal
+                ts.duration -= f;                                          // real time, not slowed
                 if (ts.duration <= 0) {
                     ts.targetScale = 1.0;
-                    // Check if we've returned to normal
-                    if (ts.scale >= 0.99) {
-                        ts.scale = 1.0;
-                        ts.active = false;
-                        return false;
-                    }
+                    if (ts.scale >= 0.99) { ts.scale = 1.0; ts.active = false; }
                 }
-                
-                // Frame skipping based on time scale
-                // At 0.4 scale, we run ~40% of frames
-                // Use a random threshold for smooth appearance
-                if (Math.random() > ts.scale) {
-                    return true; // Skip this frame's game logic
-                }
-                
-                return false;
+                return ts.scale;
             },
             
 

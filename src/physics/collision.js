@@ -120,7 +120,7 @@
                     }
                     
                     // Skip aged-out projectiles (hard 5s cap)
-                    if (typeof _frameTime !== 'undefined' && proj.spawnTime && _frameTime - proj.spawnTime > 5000) {
+                    if (proj.spawnTime != null && _gameTimeMs() - proj.spawnTime > 5000) {
                         proj.destroy();
                         continue;
                     }

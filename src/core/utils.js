@@ -33,6 +33,8 @@
 
         /** Sim tick counter — advanced once per fixed update step in GameEngine.update(). */
         let _simTick = 0;
+        /** Game time in ms from sim ticks: frozen while paused, so lifetimes measured with it (projectiles, decals) survive a pause */
+        function _gameTimeMs() { return _simTick * CONFIG.LOOP.STEP_MS; }
 
         /** Smooth GAME time in seconds for draw code: advances with sim ticks (so it
          *  follows CONFIG.LOOP.GAME_SPEED and stops while paused), blended between
