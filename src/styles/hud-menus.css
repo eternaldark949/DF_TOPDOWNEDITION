@@ -960,6 +960,48 @@
         #cine-flash span { font-family: var(--font-ui); letter-spacing: 6px; font-size: 0.9rem; color: #1a0a20; }
         #cine-flash.go { animation: cineFlash 1.1s ease-out forwards; }
         @keyframes cineFlash { 0% { opacity: 0.85; } 25% { opacity: 0.35; background: rgba(255,255,255,0.35); } 70% { opacity: 0.6; background: transparent; } 100% { opacity: 0; background: transparent; } }
+        #cine-bar button.on { background: var(--df-lavender-pale); color: var(--df-violet-ink); border-color: #fff; }
+
+        /* The grade drawer (app/boot.js syncGradeDrawer): above the bar; a bottom sheet on phones, a side column in landscape */
+        #cine-grade {
+            position: fixed; left: 50%; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 12px); z-index: 3002;
+            width: min(380px, calc(100vw - 32px)); max-height: min(62vh, 470px); overflow-y: auto; box-sizing: border-box; padding: 12px 16px 14px;
+            border: 2px dotted rgba(202, 176, 250, 0.4); border-radius: 22px; opacity: 0; pointer-events: none; transition: opacity 0.3s ease, transform 0.3s ease;
+            background: linear-gradient(100deg, rgba(4, 1, 6, 0.86) 0%, rgba(22, 6, 46, 0.82) 60%, rgba(40, 12, 96, 0.7) 100%);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-family: var(--font-ui); color: #e6dff0; scrollbar-width: thin;
+        }
+        body.cinematic-view.cine-grade-open #cine-grade { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+        body.cine-grade-open #cinematic-hint { display: none; }
+        #cine-grade .cg-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 6px;
+            font: 600 0.66rem var(--font-ui); letter-spacing: 4px; text-transform: uppercase; color: var(--df-cream);
+            border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, transparent, rgba(216, 198, 162, 0.55) 15%, rgba(255, 255, 255, 0.5) 50%, rgba(216, 198, 162, 0.55) 85%, transparent) 1; }
+        #cine-grade .cg-head button { background: none; border: none; color: var(--df-lilac-grey); font-size: 0.9rem; cursor: pointer; padding: 2px 4px; }
+        #cine-grade .cg-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        #cine-grade .df-chip { cursor: pointer; background: rgba(20, 8, 34, 0.5); padding: 5px 12px; }
+        #cine-grade .df-chip.active { background: var(--df-lavender-pale); }
+        #cine-grade .cg-row { display: grid; grid-template-columns: 74px 1fr 34px; align-items: center; gap: 8px; margin: 4px 0; }
+        #cine-grade .cg-label { font-size: 0.6rem; letter-spacing: 2px; text-transform: uppercase; color: var(--df-lilac-grey); }
+        #cine-grade .cg-val { font-size: 0.66rem; color: var(--df-champagne); text-align: right; font-variant-numeric: tabular-nums; }
+        #cine-grade .cg-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; outline: none; cursor: pointer; touch-action: none;
+            background: var(--cg-track, linear-gradient(90deg, rgba(202, 176, 250, 0.25), rgba(202, 176, 250, 0.6))); }
+        #cine-grade .cg-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; transform: rotate(45deg); border-radius: 2px;
+            background: var(--df-lavender-pale); border: 1px solid #fff; box-shadow: 0 0 8px rgba(202, 176, 250, 0.8); }
+        #cine-grade .cg-slider::-moz-range-thumb { width: 12px; height: 12px; border-radius: 2px; background: var(--df-lavender-pale); border: 1px solid #fff; }
+        #cine-grade .cg-colour { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        #cine-grade .cg-colour .cg-label { margin-right: 4px; }
+        body.landscape #cine-grade { left: auto; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: auto; top: 12px; transform: translateX(12px); max-height: calc(100vh - 84px); width: 330px; }
+        body.landscape.cinematic-view.cine-grade-open #cine-grade { transform: none; }
+
+        /* "Capture?" — a moment worth a photo (pauseMenu.capturePrompt) */
+        #capture-pill {
+            position: fixed; left: 50%; top: calc(18% + env(safe-area-inset-top, 0px)); transform: translate(-50%, -6px); z-index: 2600; opacity: 0; pointer-events: none;
+            padding: 8px 18px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.75); cursor: pointer;
+            background: radial-gradient(ellipse 85% 140% at 30% 40%, var(--df-lavender-pale) 0%, #dac1fc 55%, #b896f6 100%);
+            color: var(--df-violet-ink); font: 600 0.72rem var(--font-ui); letter-spacing: 3px; text-transform: uppercase; box-shadow: 0 0 22px rgba(202, 176, 250, 0.55);
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+        #capture-pill.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+        body.cinematic-view #capture-pill { display: none; }
         @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
 
         /* --- SAVE SLOT OVERLAY --- */

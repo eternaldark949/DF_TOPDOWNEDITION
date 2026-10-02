@@ -1,73 +1,118 @@
-        // ═══ COLOR GRADE PANEL SYSTEM ═══
+        // ═══ COLOUR GRADE ═══
+        // The grade lives in Cinematic View's drawer (#cine-grade, ui/save-slots-pause-menu.js).
+        // Exposure / brightness / contrast / saturation join the canvas filter chain each frame
+        // (engine/draw.js); temperature and tint are a soft-light wash; the vignette a canvas shadow.
+        // A saved photo bakes all three in (gradePhotoPass).
         const GAME_GRADE_DEFAULTS = {exposure:0, brightness:100, contrast:100, saturate:100, temp:0, tint:0, vignette:0};
         const GAME_GRADE_PRESETS = [
-            {name:'Reset', values:{...GAME_GRADE_DEFAULTS}},
-            {name:'Amber Night', values:{exposure:5,brightness:95,contrast:130,saturate:110,temp:40,tint:-10,vignette:35}},
-            {name:'Violet Noir', values:{exposure:-5,brightness:90,contrast:140,saturate:80,temp:-25,tint:30,vignette:45}},
-            {name:'Crimson', values:{exposure:0,brightness:92,contrast:135,saturate:120,temp:30,tint:15,vignette:30}},
-            {name:'Cold Teal', values:{exposure:-8,brightness:95,contrast:125,saturate:75,temp:-45,tint:-15,vignette:25}},
-            {name:'Dreampunk', values:{exposure:3,brightness:93,contrast:145,saturate:95,temp:15,tint:20,vignette:50}},
+            {key:'none', name:'Reset', values:{...GAME_GRADE_DEFAULTS}},
+            {key:'amber_night', name:'Amber Night', values:{exposure:5,brightness:95,contrast:130,saturate:110,temp:40,tint:-10,vignette:35}},
+            {key:'violet_noir', name:'Violet Noir', values:{exposure:-5,brightness:90,contrast:140,saturate:80,temp:-25,tint:30,vignette:45}},
+            {key:'crimson', name:'Crimson', values:{exposure:0,brightness:92,contrast:135,saturate:120,temp:30,tint:15,vignette:30}},
+            {key:'cold_teal', name:'Cold Teal', values:{exposure:-8,brightness:95,contrast:125,saturate:75,temp:-45,tint:-15,vignette:25}},
+            {key:'dreampunk', name:'Dreampunk', values:{exposure:3,brightness:93,contrast:145,saturate:95,temp:15,tint:20,vignette:50}},
         ];
-        let _gameGradeActive = 0;
+        // [key, label, min, max, track]
+        const GAME_GRADE_SLIDERS = [
+            ['exposure', 'Exposure', -100, 100], ['brightness', 'Brightness', 50, 150], ['contrast', 'Contrast', 50, 200],
+            ['saturate', 'Saturation', 0, 200], ['temp', 'Temp', -100, 100, 'linear-gradient(to right,#4488ff,#5a4a6a,#ffaa44)'],
+            ['tint', 'Tint', -100, 100, 'linear-gradient(to right,#44cc66,#5a4a6a,#cc44aa)'], ['vignette', 'Vignette', 0, 100]
+        ];
+        let _gameGradeActive = 0;             // preset index, or -1 once a slider has been moved
         let _gameGrade = {...GAME_GRADE_DEFAULTS};
-        
-        function initGameGradePresets() {
-            const c = document.getElementById('ggpPresets'); if (!c) return; c.innerHTML = '';
-            GAME_GRADE_PRESETS.forEach((p, i) => {
-                const btn = document.createElement('span'); btn.className = 'ggp-preset' + (i === _gameGradeActive ? ' active' : '');
-                btn.textContent = p.name; btn.onclick = () => applyGameGradePreset(i); c.appendChild(btn);
-            });
-        }
+
+        /** A preset by index: becomes the grade, the setting and what the drawer shows */
         function applyGameGradePreset(idx) {
-            _gameGradeActive = idx;
-            _gameGrade = {...GAME_GRADE_PRESETS[idx].values};
-            Object.keys(GAME_GRADE_DEFAULTS).forEach(k => {
-                const el = document.getElementById('ggp' + k.charAt(0).toUpperCase() + k.slice(1));
-                if (el) el.value = _gameGrade[k];
-                const val = document.getElementById('ggp' + k.charAt(0).toUpperCase() + k.slice(1) + 'Val');
-                if (val) val.textContent = _gameGrade[k];
-            });
-            updateGameGrade();
-            initGameGradePresets();
+            const p = GAME_GRADE_PRESETS[idx] || GAME_GRADE_PRESETS[0];
+            _gameGradeActive = GAME_GRADE_PRESETS.indexOf(p);
+            _gameGrade = {...p.values};
+            GameSettings.colorGrade = p.key; GameSettings.gradeCustom = null;
+            applyGameGradeToCanvas(); syncGradeDrawer();
         }
-        function updateGameGrade() {
-            Object.keys(GAME_GRADE_DEFAULTS).forEach(k => {
-                const el = document.getElementById('ggp' + k.charAt(0).toUpperCase() + k.slice(1));
-                if (el) { _gameGrade[k] = +el.value;
-                    const val = document.getElementById('ggp' + k.charAt(0).toUpperCase() + k.slice(1) + 'Val');
-                    if (val) val.textContent = el.value;
-                }
-            });
-            applyGameGradeToCanvas();
+        /** One slider moved: the grade becomes custom (kept in saves as gradeCustom) */
+        function setGameGradeValue(k, v) {
+            _gameGrade[k] = +v; _gameGradeActive = -1;
+            GameSettings.colorGrade = 'custom'; GameSettings.gradeCustom = {..._gameGrade};
+            applyGameGradeToCanvas(); syncGradeDrawer(k);
+        }
+        /** After a load (or at boot): whatever the settings say, back on screen */
+        function restoreGameGrade() {
+            if (GameSettings.colorGrade === 'custom' && GameSettings.gradeCustom) {
+                _gameGrade = {...GAME_GRADE_DEFAULTS, ...GameSettings.gradeCustom}; _gameGradeActive = -1;
+                applyGameGradeToCanvas(); syncGradeDrawer();
+            } else applyGameGradePreset(Math.max(0, GAME_GRADE_PRESETS.findIndex(p => p.key === GameSettings.colorGrade)));
+        }
+        /** The temperature / tint wash: rgb and opacity (shared by the overlay and saved photos) */
+        function gradeWash(g = _gameGrade) {
+            if (!g.temp && !g.tint) return null;
+            const tr = g.temp > 0 ? Math.round(g.temp * 2.5) : 0;
+            const tb = g.temp < 0 ? Math.round(-g.temp * 2.5) : 0;
+            const tg = g.tint < 0 ? Math.round(-g.tint * 1.5) : 0;
+            const tm = g.tint > 0 ? Math.round(g.tint * 1.5) : 0;
+            return { rgb: `rgb(${Math.min(255, 128 + tr - tb + tm)},${Math.min(255, 128 + tg - tm)},${Math.min(255, 128 + tb - tr + tm)})`,
+                     alpha: Math.max(Math.abs(g.temp), Math.abs(g.tint)) / 200 };
         }
         function applyGameGradeToCanvas() {
             const c = document.getElementById('game-canvas'); if (!c) return;
             const g = _gameGrade;
-            // NOTE: brightness/contrast/saturate/exposure are merged into the game's
-            // per-frame CSS filter chain (section 6 of render pipeline). We only
-            // handle temperature, tint, and vignette here via DOM overlays.
-            
-            // Temperature + tint overlay
             let ov = document.getElementById('grade-overlay');
             if (!ov) { ov = document.createElement('div'); ov.id = 'grade-overlay'; ov.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;mix-blend-mode:soft-light;'; c.parentElement.appendChild(ov); }
-            if (g.temp !== 0 || g.tint !== 0) {
-                const tr = g.temp > 0 ? Math.round(g.temp * 2.5) : 0;
-                const tb = g.temp < 0 ? Math.round(-g.temp * 2.5) : 0;
-                const tg = g.tint < 0 ? Math.round(-g.tint * 1.5) : 0;
-                const tm = g.tint > 0 ? Math.round(g.tint * 1.5) : 0;
-                ov.style.background = 'rgb(' + Math.min(255, 128 + tr - tb + tm) + ',' + Math.min(255, 128 + tg - tm) + ',' + Math.min(255, 128 + tb - tr + tm) + ')';
-                ov.style.opacity = Math.max(Math.abs(g.temp), Math.abs(g.tint)) / 200;
-                ov.style.display = 'block';
-            } else { ov.style.display = 'none'; }
-            // Vignette
-            if (g.vignette > 0) { c.style.boxShadow = 'inset 0 0 ' + (g.vignette * 2) + 'px ' + g.vignette + 'px rgba(0,0,0,' + (g.vignette / 100) + ')'; }
-            else { c.style.boxShadow = 'none'; }
+            const w = gradeWash(g);
+            if (w) { ov.style.background = w.rgb; ov.style.opacity = w.alpha; ov.style.display = 'block'; }
+            else ov.style.display = 'none';
+            c.style.boxShadow = g.vignette > 0 ? 'inset 0 0 ' + (g.vignette * 2) + 'px ' + g.vignette + 'px rgba(0,0,0,' + (g.vignette / 100) + ')' : 'none';
+        }
+        /** Bake the wash and vignette into a photo (out: a canvas already holding the filtered frame) */
+        function gradePhotoPass(out, cssW) {
+            const ctx = out.getContext('2d'), g = _gameGrade, w = gradeWash(g);
+            if (w) {
+                ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = w.alpha;
+                ctx.fillStyle = w.rgb; ctx.fillRect(0, 0, out.width, out.height); ctx.restore();
+            }
+            if (g.vignette > 0) {
+                // the inset box-shadow, in backing pixels: blur 2v + spread v (CSS px) from every edge
+                const k = out.width / (cssW || out.width), reach = g.vignette * 3 * k;
+                const a = g.vignette / 100;
+                ctx.save();
+                for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [
+                    [0, 0, 0, reach, 0, 0, out.width, reach], [0, out.height, 0, out.height - reach, 0, out.height - reach, out.width, reach],
+                    [0, 0, reach, 0, 0, 0, reach, out.height], [out.width, 0, out.width - reach, 0, out.width - reach, 0, reach, out.height]]) {
+                    const gr = ctx.createLinearGradient(x0, y0, x1, y1);
+                    gr.addColorStop(0, `rgba(0,0,0,${a})`); gr.addColorStop(0.33, `rgba(0,0,0,${a * 0.85})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+                    ctx.fillStyle = gr; ctx.fillRect(rx, ry, rw, rh);
+                }
+                ctx.restore();
+            }
+        }
+        /** Build (once) and refresh the drawer: preset chips, sliders, colour chips */
+        function syncGradeDrawer(skipKey) {
+            const box = document.getElementById('cine-grade'); if (!box) return;
+            const P = box.querySelector('.cg-presets'), S = box.querySelector('.cg-sliders');
+            if (P && !P.childElementCount) {
+                GAME_GRADE_PRESETS.forEach((p, i) => {
+                    const b = document.createElement('button'); b.className = 'df-chip cg-preset'; b.dataset.preset = i; b.textContent = p.name; P.appendChild(b);
+                });
+            }
+            if (S && !S.childElementCount) {
+                for (const [k, label, lo, hi, track] of GAME_GRADE_SLIDERS) {
+                    const row = document.createElement('label'); row.className = 'cg-row';
+                    row.innerHTML = `<span class="cg-label">${label}</span><input type="range" class="cg-slider" data-k="${k}" min="${lo}" max="${hi}" step="1"${track ? ` style="--cg-track:${track}"` : ''}><span class="cg-val" data-v="${k}"></span>`;
+                    S.appendChild(row);
+                }
+            }
+            P?.querySelectorAll('.cg-preset').forEach(b => b.classList.toggle('active', +b.dataset.preset === _gameGradeActive));
+            S?.querySelectorAll('.cg-slider').forEach(el => { if (el.dataset.k !== skipKey) el.value = _gameGrade[el.dataset.k]; });
+            S?.querySelectorAll('.cg-val').forEach(el => { el.textContent = _gameGrade[el.dataset.v]; });
+            const full = !!GameSettings.photoFullColour;
+            box.querySelector('[data-cg="seen"]')?.classList.toggle('active', !full);
+            box.querySelector('[data-cg="full"]')?.classList.toggle('active', full);
         }
         
         const saveSlotManager = new SaveSlotManager();
         const pauseMenu = new PauseMenuController();
         window.pauseMenuController = pauseMenu;
         FullscreenManager.init();
+        restoreGameGrade();
         
         // --- MENU LOGIC ---
         const settingsList = document.getElementById('settings-menu-list');

@@ -1178,6 +1178,48 @@
         #cine-flash span { font-family: var(--font-ui); letter-spacing: 6px; font-size: 0.9rem; color: #1a0a20; }
         #cine-flash.go { animation: cineFlash 1.1s ease-out forwards; }
         @keyframes cineFlash { 0% { opacity: 0.85; } 25% { opacity: 0.35; background: rgba(255,255,255,0.35); } 70% { opacity: 0.6; background: transparent; } 100% { opacity: 0; background: transparent; } }
+        #cine-bar button.on { background: var(--df-lavender-pale); color: var(--df-violet-ink); border-color: #fff; }
+
+        /* The grade drawer (app/boot.js syncGradeDrawer): above the bar; a bottom sheet on phones, a side column in landscape */
+        #cine-grade {
+            position: fixed; left: 50%; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 12px); z-index: 3002;
+            width: min(380px, calc(100vw - 32px)); max-height: min(62vh, 470px); overflow-y: auto; box-sizing: border-box; padding: 12px 16px 14px;
+            border: 2px dotted rgba(202, 176, 250, 0.4); border-radius: 22px; opacity: 0; pointer-events: none; transition: opacity 0.3s ease, transform 0.3s ease;
+            background: linear-gradient(100deg, rgba(4, 1, 6, 0.86) 0%, rgba(22, 6, 46, 0.82) 60%, rgba(40, 12, 96, 0.7) 100%);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-family: var(--font-ui); color: #e6dff0; scrollbar-width: thin;
+        }
+        body.cinematic-view.cine-grade-open #cine-grade { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+        body.cine-grade-open #cinematic-hint { display: none; }
+        #cine-grade .cg-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 6px;
+            font: 600 0.66rem var(--font-ui); letter-spacing: 4px; text-transform: uppercase; color: var(--df-cream);
+            border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, transparent, rgba(216, 198, 162, 0.55) 15%, rgba(255, 255, 255, 0.5) 50%, rgba(216, 198, 162, 0.55) 85%, transparent) 1; }
+        #cine-grade .cg-head button { background: none; border: none; color: var(--df-lilac-grey); font-size: 0.9rem; cursor: pointer; padding: 2px 4px; }
+        #cine-grade .cg-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        #cine-grade .df-chip { cursor: pointer; background: rgba(20, 8, 34, 0.5); padding: 5px 12px; }
+        #cine-grade .df-chip.active { background: var(--df-lavender-pale); }
+        #cine-grade .cg-row { display: grid; grid-template-columns: 74px 1fr 34px; align-items: center; gap: 8px; margin: 4px 0; }
+        #cine-grade .cg-label { font-size: 0.6rem; letter-spacing: 2px; text-transform: uppercase; color: var(--df-lilac-grey); }
+        #cine-grade .cg-val { font-size: 0.66rem; color: var(--df-champagne); text-align: right; font-variant-numeric: tabular-nums; }
+        #cine-grade .cg-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; outline: none; cursor: pointer; touch-action: none;
+            background: var(--cg-track, linear-gradient(90deg, rgba(202, 176, 250, 0.25), rgba(202, 176, 250, 0.6))); }
+        #cine-grade .cg-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; transform: rotate(45deg); border-radius: 2px;
+            background: var(--df-lavender-pale); border: 1px solid #fff; box-shadow: 0 0 8px rgba(202, 176, 250, 0.8); }
+        #cine-grade .cg-slider::-moz-range-thumb { width: 12px; height: 12px; border-radius: 2px; background: var(--df-lavender-pale); border: 1px solid #fff; }
+        #cine-grade .cg-colour { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        #cine-grade .cg-colour .cg-label { margin-right: 4px; }
+        body.landscape #cine-grade { left: auto; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: auto; top: 12px; transform: translateX(12px); max-height: calc(100vh - 84px); width: 330px; }
+        body.landscape.cinematic-view.cine-grade-open #cine-grade { transform: none; }
+
+        /* "Capture?" — a moment worth a photo (pauseMenu.capturePrompt) */
+        #capture-pill {
+            position: fixed; left: 50%; top: calc(18% + env(safe-area-inset-top, 0px)); transform: translate(-50%, -6px); z-index: 2600; opacity: 0; pointer-events: none;
+            padding: 8px 18px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.75); cursor: pointer;
+            background: radial-gradient(ellipse 85% 140% at 30% 40%, var(--df-lavender-pale) 0%, #dac1fc 55%, #b896f6 100%);
+            color: var(--df-violet-ink); font: 600 0.72rem var(--font-ui); letter-spacing: 3px; text-transform: uppercase; box-shadow: 0 0 22px rgba(202, 176, 250, 0.55);
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+        #capture-pill.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+        body.cinematic-view #capture-pill { display: none; }
         @keyframes cineHint { 0% { opacity: 0; } 15% { opacity: 0.85; } 65% { opacity: 0.85; } 100% { opacity: 0; } }
 
         /* --- SAVE SLOT OVERLAY --- */
@@ -1960,23 +2002,11 @@
         #dock-buttons.visible { display: flex; }
         
         /* Color Grade Panel */
-        #game-grade-panel { display:none; position:absolute; top:210px; right:70px; width:230px; background:rgba(10,10,15,0.95); border:1px solid rgba(212,168,75,0.3); border-radius:8px; padding:10px; z-index:200; backdrop-filter:blur(8px); box-shadow:0 8px 30px rgba(0,0,0,0.6); pointer-events:auto; }
-        #game-grade-panel.visible { display:block; }
-        .ggp-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-        .ggp-title span { font-family:var(--font-tech); font-size:10px; letter-spacing:2px; color:#d4a84b; }
-        .ggp-title button { background:none; border:none; color:#888; cursor:pointer; font-size:14px; pointer-events:auto; }
-        .ggp-row { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
-        .ggp-label { font-family:var(--font-tech); font-size:7px; color:#888; width:52px; text-align:right; flex-shrink:0; text-transform:uppercase; letter-spacing:0.5px; }
         .ggp-slider { flex:1; -webkit-appearance:none; appearance:none; height:10px; border-radius:2px; outline:none; cursor:pointer; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.06); pointer-events:auto; }
         .ggp-slider::-webkit-slider-thumb { -webkit-appearance:none; width:10px; height:16px; border-radius:2px; background:#ccc; border:1px solid #000; cursor:pointer; }
         .amb-slider-wrap { display:flex; align-items:center; gap:10px; }
         .amb-slider { flex:0 0 auto; width:120px; touch-action:none; }
         .amb-val { min-width:2.2em; text-align:right; font-size:0.8em; opacity:0.8; }
-        .ggp-val { font-size:8px; color:#888; width:24px; text-align:left; font-family:monospace; }
-        .ggp-presets { display:flex; gap:4px; margin-top:8px; flex-wrap:wrap; }
-        .ggp-preset { padding:3px 6px; font-family:var(--font-tech); font-size:7px; border-radius:3px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:#888; cursor:pointer; text-transform:uppercase; letter-spacing:0.5px; pointer-events:auto; }
-        .ggp-preset:hover { border-color:#d4a84b; color:#d4a84b; }
-        .ggp-preset.active { border-color:#d4a84b; color:#d4a84b; background:rgba(212,168,75,0.1); }
         .game-btn { pointer-events: auto; position: relative; background: rgba(0, 0, 0, 0.6); border: 1px solid var(--glow-color); color: var(--text-color); padding: 8px 16px; font-family: var(--font-ui); text-transform: uppercase; font-size: 0.75rem; border-radius: 4px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
         .game-btn:active { background: var(--glow-color); color: #000; }
 
@@ -2990,7 +3020,6 @@
         body.landscape #ui-currency, body.landscape #ui-scrap { font-size: 0.78rem; }
         body.landscape #utility-dock { top: 16px; right: 72px; flex-direction: row-reverse; align-items: flex-start; }
         body.landscape #dock-buttons { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; max-width: 56vw; max-height: 70vh; overflow-y: auto; }
-        body.landscape #game-grade-panel { top: 64px; right: 120px; max-height: 80vh; overflow-y: auto; }
 
         /* --- The cat's paw: the same arc, dropped 90px so it fits a short screen --- */
         body.landscape #btn-fire, body.landscape #btn-emote { bottom: 50px; right: 60px; }
@@ -3440,24 +3469,8 @@
                     <button class="game-btn" id="btn-open-map" style="border-color: #FFD700; color: #FFD700;">🗺️ Map</button>
                     <button class="game-btn" id="btn-inventory" style="border-color: #a469ff; color: #a469ff;">🎒 Items</button>
                     <button class="game-btn" id="btn-toggle-weather">☁ Weather</button>
-                    <button class="game-btn" id="btn-colorgrade" style="border-color: #d4a84b; color: #d4a84b;">🎨 Grade</button>
-                    <button class="game-btn" id="btn-profiler" style="border-color: #00f3ff; color: #00f3ff;">📊 Profiler</button>
-                    <button class="game-btn" id="btn-debug">⚡ Debug</button>
                     <button class="game-btn" id="btn-game-exit">✕ Exit</button>
                 </div>
-            </div>
-            
-            <!-- COLOR GRADE PANEL -->
-            <div id="game-grade-panel">
-                <div class="ggp-title"><span>COLOR GRADE</span><button onclick="document.getElementById('game-grade-panel').classList.remove('visible')">✕</button></div>
-                <div class="ggp-row"><span class="ggp-label">Exposure</span><input type="range" class="ggp-slider" id="ggpExposure" min="-100" max="100" value="0" oninput="updateGameGrade()"><span class="ggp-val" id="ggpExposureVal">0</span></div>
-                <div class="ggp-row"><span class="ggp-label">Brightness</span><input type="range" class="ggp-slider" id="ggpBrightness" min="50" max="150" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpBrightnessVal">100</span></div>
-                <div class="ggp-row"><span class="ggp-label">Contrast</span><input type="range" class="ggp-slider" id="ggpContrast" min="50" max="200" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpContrastVal">100</span></div>
-                <div class="ggp-row"><span class="ggp-label">Saturation</span><input type="range" class="ggp-slider" id="ggpSaturate" min="0" max="200" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpSaturateVal">100</span></div>
-                <div class="ggp-row"><span class="ggp-label">Temp</span><input type="range" class="ggp-slider" id="ggpTemp" min="-100" max="100" value="0" oninput="updateGameGrade()" style="background:linear-gradient(to right,#4488ff,#888,#ffaa44)"><span class="ggp-val" id="ggpTempVal">0</span></div>
-                <div class="ggp-row"><span class="ggp-label">Tint</span><input type="range" class="ggp-slider" id="ggpTint" min="-100" max="100" value="0" oninput="updateGameGrade()" style="background:linear-gradient(to right,#44cc66,#888,#cc44aa)"><span class="ggp-val" id="ggpTintVal">0</span></div>
-                <div class="ggp-row"><span class="ggp-label">Vignette</span><input type="range" class="ggp-slider" id="ggpVignette" min="0" max="100" value="0" oninput="updateGameGrade()"><span class="ggp-val" id="ggpVignetteVal">0</span></div>
-                <div class="ggp-presets" id="ggpPresets"></div>
             </div>
             
             <!-- The action dock (ui/action-dock.js): context pills above the right-hand cluster -->
@@ -4068,6 +4081,14 @@
                     <span class="settings-label">Color Grade</span>
                     <span class="settings-value" id="set-colorgrade" data-key="colorGrade">NONE</span>
                 </div>
+                <div class="settings-row">
+                    <span class="settings-label">Fine-tune Grade</span>
+                    <span class="settings-value" id="set-gradedrawer" data-key="gradeDrawer">OPEN ›</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Stealth Grey</span>
+                    <span class="settings-value val-on" id="set-stealthgray" data-key="stealthGray">ON</span>
+                </div>
                 
                 <div class="settings-section-label">Display</div>
                 <div class="settings-row">
@@ -4098,6 +4119,20 @@
                     <span class="settings-label">Frame Limit</span>
                     <span class="settings-value" id="set-fps" data-key="fpsLimit">NONE</span>
                 </div>
+
+                <div class="settings-section-label">Developer</div>
+                <div class="settings-row">
+                    <span class="settings-label">Profiler</span>
+                    <span class="settings-value" id="set-profiler" data-key="profiler">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Debug View</span>
+                    <span class="settings-value" id="set-debug" data-key="debugView">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Resolution Bench</span>
+                    <span class="settings-value" id="set-bench" data-key="perfBench">RUN ›</span>
+                </div>
                 
                 <div class="settings-back-btn" id="pause-settings-back">◁ BACK</div>
             </div>
@@ -4108,10 +4143,17 @@
     <div id="cinematic-hint">Drag to pan · pinch to zoom · tap to return</div>
     <div id="cine-bar" aria-label="Cinematic view">
         <button data-cine="save" title="Save picture">📷 SAVE</button>
+        <button data-cine="grade" title="Colour grade">🎨</button>
         <button data-cine="out" title="Zoom out">−</button>
         <button data-cine="in" title="Zoom in">+</button>
         <button data-cine="reset" title="Recentre">⟲</button>
         <button data-cine="back" title="Back to the menu">✕</button>
+    </div>
+    <div id="cine-grade" aria-label="Colour grade">
+        <div class="cg-head"><span>Colour grade</span><button data-cg="close" title="Close">✕</button></div>
+        <div class="cg-presets"></div>
+        <div class="cg-sliders"></div>
+        <div class="cg-colour"><span class="cg-label">Colour</span><button class="df-chip" data-cg="seen" title="Stealth greys the picture as you see it">As seen</button><button class="df-chip" data-cg="full" title="Full colour, even in the shadows">Full colour</button></div>
     </div>
     <div id="cine-flash"><span>SAVED</span></div>
     
@@ -7276,7 +7318,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             bloom: true,                    // Post-process light bleed
             wetReflections: true,           // Elongated light reflections on wet surfaces
             atmosphereTint: '',             // Color wash: '' | 'amber' | 'violet' | 'crimson' | 'teal'
-            colorGrade: 'none',             // 'none' | 'amber_night' | 'violet_noir' | 'crimson' | 'cold_teal' | 'dreampunk'
+            colorGrade: 'none',             // 'none' | 'amber_night' | 'violet_noir' | 'crimson' | 'cold_teal' | 'dreampunk' | 'custom'
+            gradeCustom: null,              // the seven slider values when colorGrade is 'custom' (app/boot.js)
+            stealthGray: true,              // the world greys as Stella slips into shadow
+            photoFullColour: false,         // Cinematic View: lift the stealth grey for a photo
+            profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.
@@ -46591,22 +46637,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         showMessage('WEATHER: ' + WEATHER_CONDITIONS[next].label.toUpperCase() + ' (LOCKED)');
                     }
                 });
-                document.getElementById('btn-colorgrade').addEventListener('click', (e) => { e.preventDefault(); const p = document.getElementById('game-grade-panel'); p.classList.toggle('visible'); if (p.classList.contains('visible')) initGameGradePresets(); });
-                document.getElementById('btn-debug').addEventListener('click', (e) => { e.preventDefault(); this.debugMode = !this.debugMode; showMessage("DEBUG OVERLAY: " + (this.debugMode ? "ON" : "OFF")); });
-                document.getElementById('btn-profiler').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    // Shift-click runs the resolution sweep instead of toggling the
-                    // panel — keeps the benchmark one gesture away without adding
-                    // another button to the debug bar.
-                    if (e.shiftKey) {
-                        this.showProfiler = true;
-                        PerfBench.run();
-                        return;
-                    }
-                    this.showProfiler = !this.showProfiler;
-                    showMessage("PROFILER: " + (this.showProfiler ? "ON" : "OFF"));
-                });
-                
                 // Weapon Mode Toggle Button
                 document.getElementById('btn-weapon-mode').addEventListener('click', (e) => {
                     e.preventDefault();
@@ -50819,6 +50849,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         wetReflections: GameSettings.wetReflections,
                         atmosphereTint: GameSettings.atmosphereTint,
                         colorGrade: GameSettings.colorGrade,
+                        gradeCustom: GameSettings.gradeCustom,
+                        stealthGray: GameSettings.stealthGray,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
@@ -51438,6 +51470,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         GameSettings.wetReflections = save.settings.wetReflections !== false;
                         GameSettings.atmosphereTint = save.settings.atmosphereTint ?? '';
                         GameSettings.colorGrade = save.settings.colorGrade || 'none';
+                        GameSettings.gradeCustom = save.settings.gradeCustom || null;
+                        GameSettings.stealthGray = save.settings.stealthGray !== false;
+                        if (typeof restoreGameGrade === 'function') restoreGameGrade();       // the grade back on screen, not just in the setting
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;
                         GameSettings.flitRing = save.settings.flitRing !== false;
@@ -56566,7 +56601,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // A scene has the stage: Stella is off-camera, so her stealth doesn't grey the story out
                         this.targetGrayscale = 0; this.visualGrayscale = 0;
                     } else if (this.player.visibility !== undefined) {
-                        this.targetGrayscale = (1.0 - this.player.visibility) * 100;
+                        this.targetGrayscale = GameSettings.stealthGray === false ? 0 : (1.0 - this.player.visibility) * 100;
                         this.visualGrayscale += (this.targetGrayscale - this.visualGrayscale) * 0.05;
                         if (this.visualGrayscale < 0.5) this.visualGrayscale = 0;
                     }
@@ -56576,7 +56611,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const con = (1.35 - 0.08 * dayG + (0.15 * this.nvIntensity)) * ggContrast; 
                     const sepia = (0.18 - 0.12 * dayG) * (1.0 - this.nvIntensity);
                     const bright = (1.1 + 0.2 * dayG + (1.4 * this.nvIntensity)) * ggBright * ggExposure;
-                    const effectiveGray = Math.max(this.visualGrayscale, this.nvIntensity * 100);
+                    // Cinematic View's "Full colour" chip lifts the stealth grey for the photo (night vision stays)
+                    const stealthGray = this.cineCam && GameSettings.photoFullColour ? 0 : this.visualGrayscale;
+                    const effectiveGray = Math.max(stealthGray, this.nvIntensity * 100);
                     filterChain = `grayscale(${effectiveGray.toFixed(0)}%) contrast(${con.toFixed(2)}) saturate(${sat.toFixed(2)}) sepia(${sepia.toFixed(2)}) brightness(${bright.toFixed(2)})`;
                     // Ms. Jean Soda: subtle pink warmth even outside NV
                     if (this.player.buffSystem.isActive('jeanSoda')) {
@@ -62574,7 +62611,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._cinePtrs = new Map();
                 const cineOn = () => document.body.classList.contains('cinematic-view');
                 window.addEventListener('pointerdown', (e) => {
-                    if (!cineOn() || e.target.closest?.('#cine-bar')) return;
+                    if (!cineOn() || e.target.closest?.('#cine-bar, #cine-grade')) return;
                     e.preventDefault(); e.stopPropagation();
                     this._cinePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now() });
                     if (this._cinePtrs.size > 1) this._cineGesture = true;            // a pinch is never a tap
@@ -62608,17 +62645,32 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 window.addEventListener('pointerup', up, true);
                 window.addEventListener('pointercancel', up, true);
                 window.addEventListener('wheel', (e) => {
-                    if (!cineOn()) return;
+                    if (!cineOn() || e.target.closest?.('#cine-grade')) return;
                     e.preventDefault(); this._cineZoom(Math.exp(-e.deltaY * 0.0015));
                 }, { capture: true, passive: false });
                 const bar = document.getElementById('cine-bar');
                 bar?.addEventListener('click', (e) => {
                     const act = e.target.closest('[data-cine]')?.dataset.cine;
                     if (act === 'save') this.saveCinePicture();
+                    else if (act === 'grade') this._cineGrade(!document.body.classList.contains('cine-grade-open'));
                     else if (act === 'in') this._cineZoom(1.2);
                     else if (act === 'out') this._cineZoom(1 / 1.2);
                     else if (act === 'reset') { const c = game.cineCam; if (c) { c.dx = c.dy = 0; game.camera.zoom = c.zoom; } }
                     else if (act === 'back') this.exitCinematic();
+                });
+
+                // The grade drawer: presets, sliders, the colour chips (app/boot.js holds the grade)
+                const drawer = document.getElementById('cine-grade');
+                drawer?.addEventListener('click', (e) => {
+                    const pre = e.target.closest('[data-preset]');
+                    if (pre) { applyGameGradePreset(+pre.dataset.preset); return; }
+                    const act = e.target.closest('[data-cg]')?.dataset.cg;
+                    if (act === 'close') this._cineGrade(false);
+                    else if (act === 'seen' || act === 'full') { GameSettings.photoFullColour = act === 'full'; syncGradeDrawer(); }
+                });
+                drawer?.addEventListener('input', (e) => {
+                    const k = e.target.dataset?.k;
+                    if (k) setGameGradeValue(k, e.target.value);
                 });
 
                 // Click backdrop to close
@@ -62773,10 +62825,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             // The world held still with every bit of HUD faded away; a tap or Esc brings the menu back
-            enterCinematic() {
+            //   opts.grade: open with the grade drawer showing; opts.back: 'settings' returns there
+            //   opts.focus {x, y, zoom}: frame a spot (the finisher's capture prompt)
+            enterCinematic(opts = {}) {
                 this.close();
                 game.pauseSystem.acquire('cinematic_view');
                 game.cineCam = { dx: 0, dy: 0, zoom: game.camera.zoom };          // draw() keeps going while it's set
+                const f = opts.focus;
+                if (f) {
+                    const R = CONFIG.CAMERA.CINE_PAN, [lo, hi] = CONFIG.CAMERA.CINE_ZOOM;
+                    let dx = f.x - game.camera.x, dy = f.y - game.camera.y; const d = Math.hypot(dx, dy);
+                    if (d > R) { dx *= R / d; dy *= R / d; }
+                    game.cineCam.dx = dx; game.cineCam.dy = dy;
+                    if (f.zoom) game.camera.zoom = Math.max(lo, Math.min(hi, f.zoom));
+                }
+                this._cineBack = opts.back || null;
+                this._cineGrade(!!opts.grade);
                 if (game.weather) game.weather._cineDensity = 0;                     // re-measured on the first pan
                 this._cinePtrs?.clear(); this._cineGesture = false;
                 document.body.classList.add('cinematic-view');
@@ -62787,10 +62851,38 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             exitCinematic() {
                 if (!document.body.classList.contains('cinematic-view')) return;
                 document.body.classList.remove('cinematic-view');
+                this._cineGrade(false);
                 document.getElementById('cinematic-hint')?.classList.remove('show');
                 if (game.cineCam) { game.camera.zoom = game.cineCam.zoom; game.cineCam = null; }
                 game.pauseSystem.release('cinematic_view');
                 this.open();
+                if (this._cineBack === 'settings') this.openSettings();
+                this._cineBack = null;
+            }
+
+            /** Show or hide the grade drawer over the held frame */
+            _cineGrade(on) {
+                document.body.classList.toggle('cine-grade-open', on);
+                document.querySelector('#cine-bar [data-cine="grade"]')?.classList.toggle('on', on);
+                if (on) syncGradeDrawer();
+            }
+
+            /** A small "Capture?" pill for a moment worth a photo (the finisher): tapping it opens Cinematic View framed on the spot */
+            capturePrompt(focus, ms = 2600) {
+                if (GameSettings.capturePrompt === false) return;
+                let pill = document.getElementById('capture-pill');
+                if (!pill) {
+                    pill = document.createElement('button'); pill.id = 'capture-pill'; pill.textContent = '📷 Capture?';
+                    document.body.appendChild(pill);
+                    pill.addEventListener('click', (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        pill.classList.remove('show');
+                        if (!game.paused && !game.scenes?.running) this.enterCinematic({ focus: pill._focus });
+                    });
+                }
+                pill._focus = focus;
+                pill.classList.remove('show'); void pill.offsetWidth; pill.classList.add('show');
+                clearTimeout(this._capT); this._capT = setTimeout(() => pill.classList.remove('show'), ms);
             }
 
             /** Pan by a screen-space drag (CSS px), kept within CINE_PAN world px of where the view began. */
@@ -62827,6 +62919,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const f = src.style.filter;
                 if (f && f !== 'none' && 'filter' in ctx) ctx.filter = f;
                 ctx.drawImage(src, 0, 0);
+                ctx.filter = 'none';
+                gradePhotoPass(out, src.clientWidth);                              // the temperature / tint wash and vignette, as on screen
                 const flash = document.getElementById('cine-flash');
                 if (flash) { flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go'); }
                 const d = new Date(), z = (n) => String(n).padStart(2, '0');
@@ -62933,6 +63027,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._updateValueEl('set-wetreflections', GameSettings.wetReflections ? 'on' : 'off');
                 this._updateValueEl('set-atmosphere', GameSettings.atmosphereTint || 'off');
                 this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
+                this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
+                this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
+                this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
+                this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
                 this._updateValueEl('set-audio', GameSettings.audioEnabled ? 'on' : 'off');
                 syncAmbienceSliders();
                 this._updateValueEl('set-fullscreen', !FullscreenManager.supported()
@@ -63007,13 +63105,39 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this._updateValueEl(el.id, GameSettings.atmosphereTint || 'off');
                     
                 } else if (key === 'colorGrade') {
-                    const gradeOrder = ['none', 'amber_night', 'violet_noir', 'crimson', 'cold_teal', 'dreampunk'];
-                    const gi = gradeOrder.indexOf(GameSettings.colorGrade);
-                    GameSettings.colorGrade = gradeOrder[(gi + 1) % gradeOrder.length];
+                    // Cycle the presets (a custom grade steps on to the first); the drawer fine-tunes
+                    const gi = GAME_GRADE_PRESETS.findIndex(p => p.key === GameSettings.colorGrade);
+                    applyGameGradePreset((gi + 1) % GAME_GRADE_PRESETS.length);
                     this._updateValueEl(el.id, GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
-                    // Apply via custom grade panel system
-                    const presetIdx = gi + 1 < gradeOrder.length ? gi + 1 : 0;
-                    applyGameGradePreset(presetIdx);
+
+                } else if (key === 'gradeDrawer') {
+                    // The grade drawer lives in Cinematic View, over the world with no HUD in the way
+                    this.closeSettings();
+                    this.enterCinematic({ grade: true, back: 'settings' });
+
+                } else if (key === 'stealthGray') {
+                    GameSettings.stealthGray = GameSettings.stealthGray === false;
+                    this._updateValueEl(el.id, GameSettings.stealthGray ? 'on' : 'off');
+
+                } else if (key === 'profiler') {
+                    const order = ['off', 'compact', 'full'];
+                    GameSettings.profilerMode = order[(order.indexOf(GameSettings.profilerMode || 'off') + 1) % order.length];
+                    game.showProfiler = GameSettings.profilerMode !== 'off';
+                    if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
+                    this._updateValueEl(el.id, GameSettings.profilerMode);
+
+                } else if (key === 'debugView') {
+                    game.debugMode = !game.debugMode;
+                    if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
+                    this._updateValueEl(el.id, game.debugMode ? 'on' : 'off');
+
+                } else if (key === 'perfBench') {
+                    // The resolution sweep (entities/static-builders-profiler.js PerfBench): back in the game to measure it
+                    GameSettings.profilerMode = GameSettings.profilerMode === 'off' || !GameSettings.profilerMode ? 'compact' : GameSettings.profilerMode;
+                    game.showProfiler = true;
+                    if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
+                    this.closeSettings(); this.close();
+                    PerfBench.run();
                     
                 } else if (key === 'fpsLimit') {
                     // Cycle: NONE → 60 → 30 → NONE
@@ -63051,76 +63175,121 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
         
-        // ═══ COLOR GRADE PANEL SYSTEM ═══
+        // ═══ COLOUR GRADE ═══
+        // The grade lives in Cinematic View's drawer (#cine-grade, ui/save-slots-pause-menu.js).
+        // Exposure / brightness / contrast / saturation join the canvas filter chain each frame
+        // (engine/draw.js); temperature and tint are a soft-light wash; the vignette a canvas shadow.
+        // A saved photo bakes all three in (gradePhotoPass).
         const GAME_GRADE_DEFAULTS = {exposure:0, brightness:100, contrast:100, saturate:100, temp:0, tint:0, vignette:0};
         const GAME_GRADE_PRESETS = [
-            {name:'Reset', values:{...GAME_GRADE_DEFAULTS}},
-            {name:'Amber Night', values:{exposure:5,brightness:95,contrast:130,saturate:110,temp:40,tint:-10,vignette:35}},
-            {name:'Violet Noir', values:{exposure:-5,brightness:90,contrast:140,saturate:80,temp:-25,tint:30,vignette:45}},
-            {name:'Crimson', values:{exposure:0,brightness:92,contrast:135,saturate:120,temp:30,tint:15,vignette:30}},
-            {name:'Cold Teal', values:{exposure:-8,brightness:95,contrast:125,saturate:75,temp:-45,tint:-15,vignette:25}},
-            {name:'Dreampunk', values:{exposure:3,brightness:93,contrast:145,saturate:95,temp:15,tint:20,vignette:50}},
+            {key:'none', name:'Reset', values:{...GAME_GRADE_DEFAULTS}},
+            {key:'amber_night', name:'Amber Night', values:{exposure:5,brightness:95,contrast:130,saturate:110,temp:40,tint:-10,vignette:35}},
+            {key:'violet_noir', name:'Violet Noir', values:{exposure:-5,brightness:90,contrast:140,saturate:80,temp:-25,tint:30,vignette:45}},
+            {key:'crimson', name:'Crimson', values:{exposure:0,brightness:92,contrast:135,saturate:120,temp:30,tint:15,vignette:30}},
+            {key:'cold_teal', name:'Cold Teal', values:{exposure:-8,brightness:95,contrast:125,saturate:75,temp:-45,tint:-15,vignette:25}},
+            {key:'dreampunk', name:'Dreampunk', values:{exposure:3,brightness:93,contrast:145,saturate:95,temp:15,tint:20,vignette:50}},
         ];
-        let _gameGradeActive = 0;
+        // [key, label, min, max, track]
+        const GAME_GRADE_SLIDERS = [
+            ['exposure', 'Exposure', -100, 100], ['brightness', 'Brightness', 50, 150], ['contrast', 'Contrast', 50, 200],
+            ['saturate', 'Saturation', 0, 200], ['temp', 'Temp', -100, 100, 'linear-gradient(to right,#4488ff,#5a4a6a,#ffaa44)'],
+            ['tint', 'Tint', -100, 100, 'linear-gradient(to right,#44cc66,#5a4a6a,#cc44aa)'], ['vignette', 'Vignette', 0, 100]
+        ];
+        let _gameGradeActive = 0;             // preset index, or -1 once a slider has been moved
         let _gameGrade = {...GAME_GRADE_DEFAULTS};
-        
-        function initGameGradePresets() {
-            const c = document.getElementById('ggpPresets'); if (!c) return; c.innerHTML = '';
-            GAME_GRADE_PRESETS.forEach((p, i) => {
-                const btn = document.createElement('span'); btn.className = 'ggp-preset' + (i === _gameGradeActive ? ' active' : '');
-                btn.textContent = p.name; btn.onclick = () => applyGameGradePreset(i); c.appendChild(btn);
-            });
-        }
+
+        /** A preset by index: becomes the grade, the setting and what the drawer shows */
         function applyGameGradePreset(idx) {
-            _gameGradeActive = idx;
-            _gameGrade = {...GAME_GRADE_PRESETS[idx].values};
-            Object.keys(GAME_GRADE_DEFAULTS).forEach(k => {
-                const el = document.getElementById('ggp' + k.charAt(0).toUpperCase() + k.slice(1));
-                if (el) el.value = _gameGrade[k];
-                const val = document.getElementById('ggp' + k.charAt(0).toUpperCase() + k.slice(1) + 'Val');
-                if (val) val.textContent = _gameGrade[k];
-            });
-            updateGameGrade();
-            initGameGradePresets();
+            const p = GAME_GRADE_PRESETS[idx] || GAME_GRADE_PRESETS[0];
+            _gameGradeActive = GAME_GRADE_PRESETS.indexOf(p);
+            _gameGrade = {...p.values};
+            GameSettings.colorGrade = p.key; GameSettings.gradeCustom = null;
+            applyGameGradeToCanvas(); syncGradeDrawer();
         }
-        function updateGameGrade() {
-            Object.keys(GAME_GRADE_DEFAULTS).forEach(k => {
-                const el = document.getElementById('ggp' + k.charAt(0).toUpperCase() + k.slice(1));
-                if (el) { _gameGrade[k] = +el.value;
-                    const val = document.getElementById('ggp' + k.charAt(0).toUpperCase() + k.slice(1) + 'Val');
-                    if (val) val.textContent = el.value;
-                }
-            });
-            applyGameGradeToCanvas();
+        /** One slider moved: the grade becomes custom (kept in saves as gradeCustom) */
+        function setGameGradeValue(k, v) {
+            _gameGrade[k] = +v; _gameGradeActive = -1;
+            GameSettings.colorGrade = 'custom'; GameSettings.gradeCustom = {..._gameGrade};
+            applyGameGradeToCanvas(); syncGradeDrawer(k);
+        }
+        /** After a load (or at boot): whatever the settings say, back on screen */
+        function restoreGameGrade() {
+            if (GameSettings.colorGrade === 'custom' && GameSettings.gradeCustom) {
+                _gameGrade = {...GAME_GRADE_DEFAULTS, ...GameSettings.gradeCustom}; _gameGradeActive = -1;
+                applyGameGradeToCanvas(); syncGradeDrawer();
+            } else applyGameGradePreset(Math.max(0, GAME_GRADE_PRESETS.findIndex(p => p.key === GameSettings.colorGrade)));
+        }
+        /** The temperature / tint wash: rgb and opacity (shared by the overlay and saved photos) */
+        function gradeWash(g = _gameGrade) {
+            if (!g.temp && !g.tint) return null;
+            const tr = g.temp > 0 ? Math.round(g.temp * 2.5) : 0;
+            const tb = g.temp < 0 ? Math.round(-g.temp * 2.5) : 0;
+            const tg = g.tint < 0 ? Math.round(-g.tint * 1.5) : 0;
+            const tm = g.tint > 0 ? Math.round(g.tint * 1.5) : 0;
+            return { rgb: `rgb(${Math.min(255, 128 + tr - tb + tm)},${Math.min(255, 128 + tg - tm)},${Math.min(255, 128 + tb - tr + tm)})`,
+                     alpha: Math.max(Math.abs(g.temp), Math.abs(g.tint)) / 200 };
         }
         function applyGameGradeToCanvas() {
             const c = document.getElementById('game-canvas'); if (!c) return;
             const g = _gameGrade;
-            // NOTE: brightness/contrast/saturate/exposure are merged into the game's
-            // per-frame CSS filter chain (section 6 of render pipeline). We only
-            // handle temperature, tint, and vignette here via DOM overlays.
-            
-            // Temperature + tint overlay
             let ov = document.getElementById('grade-overlay');
             if (!ov) { ov = document.createElement('div'); ov.id = 'grade-overlay'; ov.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;mix-blend-mode:soft-light;'; c.parentElement.appendChild(ov); }
-            if (g.temp !== 0 || g.tint !== 0) {
-                const tr = g.temp > 0 ? Math.round(g.temp * 2.5) : 0;
-                const tb = g.temp < 0 ? Math.round(-g.temp * 2.5) : 0;
-                const tg = g.tint < 0 ? Math.round(-g.tint * 1.5) : 0;
-                const tm = g.tint > 0 ? Math.round(g.tint * 1.5) : 0;
-                ov.style.background = 'rgb(' + Math.min(255, 128 + tr - tb + tm) + ',' + Math.min(255, 128 + tg - tm) + ',' + Math.min(255, 128 + tb - tr + tm) + ')';
-                ov.style.opacity = Math.max(Math.abs(g.temp), Math.abs(g.tint)) / 200;
-                ov.style.display = 'block';
-            } else { ov.style.display = 'none'; }
-            // Vignette
-            if (g.vignette > 0) { c.style.boxShadow = 'inset 0 0 ' + (g.vignette * 2) + 'px ' + g.vignette + 'px rgba(0,0,0,' + (g.vignette / 100) + ')'; }
-            else { c.style.boxShadow = 'none'; }
+            const w = gradeWash(g);
+            if (w) { ov.style.background = w.rgb; ov.style.opacity = w.alpha; ov.style.display = 'block'; }
+            else ov.style.display = 'none';
+            c.style.boxShadow = g.vignette > 0 ? 'inset 0 0 ' + (g.vignette * 2) + 'px ' + g.vignette + 'px rgba(0,0,0,' + (g.vignette / 100) + ')' : 'none';
+        }
+        /** Bake the wash and vignette into a photo (out: a canvas already holding the filtered frame) */
+        function gradePhotoPass(out, cssW) {
+            const ctx = out.getContext('2d'), g = _gameGrade, w = gradeWash(g);
+            if (w) {
+                ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = w.alpha;
+                ctx.fillStyle = w.rgb; ctx.fillRect(0, 0, out.width, out.height); ctx.restore();
+            }
+            if (g.vignette > 0) {
+                // the inset box-shadow, in backing pixels: blur 2v + spread v (CSS px) from every edge
+                const k = out.width / (cssW || out.width), reach = g.vignette * 3 * k;
+                const a = g.vignette / 100;
+                ctx.save();
+                for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [
+                    [0, 0, 0, reach, 0, 0, out.width, reach], [0, out.height, 0, out.height - reach, 0, out.height - reach, out.width, reach],
+                    [0, 0, reach, 0, 0, 0, reach, out.height], [out.width, 0, out.width - reach, 0, out.width - reach, 0, reach, out.height]]) {
+                    const gr = ctx.createLinearGradient(x0, y0, x1, y1);
+                    gr.addColorStop(0, `rgba(0,0,0,${a})`); gr.addColorStop(0.33, `rgba(0,0,0,${a * 0.85})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+                    ctx.fillStyle = gr; ctx.fillRect(rx, ry, rw, rh);
+                }
+                ctx.restore();
+            }
+        }
+        /** Build (once) and refresh the drawer: preset chips, sliders, colour chips */
+        function syncGradeDrawer(skipKey) {
+            const box = document.getElementById('cine-grade'); if (!box) return;
+            const P = box.querySelector('.cg-presets'), S = box.querySelector('.cg-sliders');
+            if (P && !P.childElementCount) {
+                GAME_GRADE_PRESETS.forEach((p, i) => {
+                    const b = document.createElement('button'); b.className = 'df-chip cg-preset'; b.dataset.preset = i; b.textContent = p.name; P.appendChild(b);
+                });
+            }
+            if (S && !S.childElementCount) {
+                for (const [k, label, lo, hi, track] of GAME_GRADE_SLIDERS) {
+                    const row = document.createElement('label'); row.className = 'cg-row';
+                    row.innerHTML = `<span class="cg-label">${label}</span><input type="range" class="cg-slider" data-k="${k}" min="${lo}" max="${hi}" step="1"${track ? ` style="--cg-track:${track}"` : ''}><span class="cg-val" data-v="${k}"></span>`;
+                    S.appendChild(row);
+                }
+            }
+            P?.querySelectorAll('.cg-preset').forEach(b => b.classList.toggle('active', +b.dataset.preset === _gameGradeActive));
+            S?.querySelectorAll('.cg-slider').forEach(el => { if (el.dataset.k !== skipKey) el.value = _gameGrade[el.dataset.k]; });
+            S?.querySelectorAll('.cg-val').forEach(el => { el.textContent = _gameGrade[el.dataset.v]; });
+            const full = !!GameSettings.photoFullColour;
+            box.querySelector('[data-cg="seen"]')?.classList.toggle('active', !full);
+            box.querySelector('[data-cg="full"]')?.classList.toggle('active', full);
         }
         
         const saveSlotManager = new SaveSlotManager();
         const pauseMenu = new PauseMenuController();
         window.pauseMenuController = pauseMenu;
         FullscreenManager.init();
+        restoreGameGrade();
         
         // --- MENU LOGIC ---
         const settingsList = document.getElementById('settings-menu-list');

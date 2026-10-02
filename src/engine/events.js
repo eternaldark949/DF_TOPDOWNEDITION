@@ -191,22 +191,6 @@
                         showMessage('WEATHER: ' + WEATHER_CONDITIONS[next].label.toUpperCase() + ' (LOCKED)');
                     }
                 });
-                document.getElementById('btn-colorgrade').addEventListener('click', (e) => { e.preventDefault(); const p = document.getElementById('game-grade-panel'); p.classList.toggle('visible'); if (p.classList.contains('visible')) initGameGradePresets(); });
-                document.getElementById('btn-debug').addEventListener('click', (e) => { e.preventDefault(); this.debugMode = !this.debugMode; showMessage("DEBUG OVERLAY: " + (this.debugMode ? "ON" : "OFF")); });
-                document.getElementById('btn-profiler').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    // Shift-click runs the resolution sweep instead of toggling the
-                    // panel — keeps the benchmark one gesture away without adding
-                    // another button to the debug bar.
-                    if (e.shiftKey) {
-                        this.showProfiler = true;
-                        PerfBench.run();
-                        return;
-                    }
-                    this.showProfiler = !this.showProfiler;
-                    showMessage("PROFILER: " + (this.showProfiler ? "ON" : "OFF"));
-                });
-                
                 // Weapon Mode Toggle Button
                 document.getElementById('btn-weapon-mode').addEventListener('click', (e) => {
                     e.preventDefault();

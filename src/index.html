@@ -385,24 +385,8 @@
                     <button class="game-btn" id="btn-open-map" style="border-color: #FFD700; color: #FFD700;">🗺️ Map</button>
                     <button class="game-btn" id="btn-inventory" style="border-color: #a469ff; color: #a469ff;">🎒 Items</button>
                     <button class="game-btn" id="btn-toggle-weather">☁ Weather</button>
-                    <button class="game-btn" id="btn-colorgrade" style="border-color: #d4a84b; color: #d4a84b;">🎨 Grade</button>
-                    <button class="game-btn" id="btn-profiler" style="border-color: #00f3ff; color: #00f3ff;">📊 Profiler</button>
-                    <button class="game-btn" id="btn-debug">⚡ Debug</button>
                     <button class="game-btn" id="btn-game-exit">✕ Exit</button>
                 </div>
-            </div>
-            
-            <!-- COLOR GRADE PANEL -->
-            <div id="game-grade-panel">
-                <div class="ggp-title"><span>COLOR GRADE</span><button onclick="document.getElementById('game-grade-panel').classList.remove('visible')">✕</button></div>
-                <div class="ggp-row"><span class="ggp-label">Exposure</span><input type="range" class="ggp-slider" id="ggpExposure" min="-100" max="100" value="0" oninput="updateGameGrade()"><span class="ggp-val" id="ggpExposureVal">0</span></div>
-                <div class="ggp-row"><span class="ggp-label">Brightness</span><input type="range" class="ggp-slider" id="ggpBrightness" min="50" max="150" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpBrightnessVal">100</span></div>
-                <div class="ggp-row"><span class="ggp-label">Contrast</span><input type="range" class="ggp-slider" id="ggpContrast" min="50" max="200" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpContrastVal">100</span></div>
-                <div class="ggp-row"><span class="ggp-label">Saturation</span><input type="range" class="ggp-slider" id="ggpSaturate" min="0" max="200" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpSaturateVal">100</span></div>
-                <div class="ggp-row"><span class="ggp-label">Temp</span><input type="range" class="ggp-slider" id="ggpTemp" min="-100" max="100" value="0" oninput="updateGameGrade()" style="background:linear-gradient(to right,#4488ff,#888,#ffaa44)"><span class="ggp-val" id="ggpTempVal">0</span></div>
-                <div class="ggp-row"><span class="ggp-label">Tint</span><input type="range" class="ggp-slider" id="ggpTint" min="-100" max="100" value="0" oninput="updateGameGrade()" style="background:linear-gradient(to right,#44cc66,#888,#cc44aa)"><span class="ggp-val" id="ggpTintVal">0</span></div>
-                <div class="ggp-row"><span class="ggp-label">Vignette</span><input type="range" class="ggp-slider" id="ggpVignette" min="0" max="100" value="0" oninput="updateGameGrade()"><span class="ggp-val" id="ggpVignetteVal">0</span></div>
-                <div class="ggp-presets" id="ggpPresets"></div>
             </div>
             
             <!-- The action dock (ui/action-dock.js): context pills above the right-hand cluster -->
@@ -1013,6 +997,14 @@
                     <span class="settings-label">Color Grade</span>
                     <span class="settings-value" id="set-colorgrade" data-key="colorGrade">NONE</span>
                 </div>
+                <div class="settings-row">
+                    <span class="settings-label">Fine-tune Grade</span>
+                    <span class="settings-value" id="set-gradedrawer" data-key="gradeDrawer">OPEN ›</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Stealth Grey</span>
+                    <span class="settings-value val-on" id="set-stealthgray" data-key="stealthGray">ON</span>
+                </div>
                 
                 <div class="settings-section-label">Display</div>
                 <div class="settings-row">
@@ -1043,6 +1035,20 @@
                     <span class="settings-label">Frame Limit</span>
                     <span class="settings-value" id="set-fps" data-key="fpsLimit">NONE</span>
                 </div>
+
+                <div class="settings-section-label">Developer</div>
+                <div class="settings-row">
+                    <span class="settings-label">Profiler</span>
+                    <span class="settings-value" id="set-profiler" data-key="profiler">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Debug View</span>
+                    <span class="settings-value" id="set-debug" data-key="debugView">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Resolution Bench</span>
+                    <span class="settings-value" id="set-bench" data-key="perfBench">RUN ›</span>
+                </div>
                 
                 <div class="settings-back-btn" id="pause-settings-back">◁ BACK</div>
             </div>
@@ -1053,10 +1059,17 @@
     <div id="cinematic-hint">Drag to pan · pinch to zoom · tap to return</div>
     <div id="cine-bar" aria-label="Cinematic view">
         <button data-cine="save" title="Save picture">📷 SAVE</button>
+        <button data-cine="grade" title="Colour grade">🎨</button>
         <button data-cine="out" title="Zoom out">−</button>
         <button data-cine="in" title="Zoom in">+</button>
         <button data-cine="reset" title="Recentre">⟲</button>
         <button data-cine="back" title="Back to the menu">✕</button>
+    </div>
+    <div id="cine-grade" aria-label="Colour grade">
+        <div class="cg-head"><span>Colour grade</span><button data-cg="close" title="Close">✕</button></div>
+        <div class="cg-presets"></div>
+        <div class="cg-sliders"></div>
+        <div class="cg-colour"><span class="cg-label">Colour</span><button class="df-chip" data-cg="seen" title="Stealth greys the picture as you see it">As seen</button><button class="df-chip" data-cg="full" title="Full colour, even in the shadows">Full colour</button></div>
     </div>
     <div id="cine-flash"><span>SAVED</span></div>
     

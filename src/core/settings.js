@@ -142,7 +142,11 @@
             bloom: true,                    // Post-process light bleed
             wetReflections: true,           // Elongated light reflections on wet surfaces
             atmosphereTint: '',             // Color wash: '' | 'amber' | 'violet' | 'crimson' | 'teal'
-            colorGrade: 'none',             // 'none' | 'amber_night' | 'violet_noir' | 'crimson' | 'cold_teal' | 'dreampunk'
+            colorGrade: 'none',             // 'none' | 'amber_night' | 'violet_noir' | 'crimson' | 'cold_teal' | 'dreampunk' | 'custom'
+            gradeCustom: null,              // the seven slider values when colorGrade is 'custom' (app/boot.js)
+            stealthGray: true,              // the world greys as Stella slips into shadow
+            photoFullColour: false,         // Cinematic View: lift the stealth grey for a photo
+            profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.

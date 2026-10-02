@@ -122,6 +122,8 @@
                         wetReflections: GameSettings.wetReflections,
                         atmosphereTint: GameSettings.atmosphereTint,
                         colorGrade: GameSettings.colorGrade,
+                        gradeCustom: GameSettings.gradeCustom,
+                        stealthGray: GameSettings.stealthGray,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
@@ -741,6 +743,9 @@
                         GameSettings.wetReflections = save.settings.wetReflections !== false;
                         GameSettings.atmosphereTint = save.settings.atmosphereTint ?? '';
                         GameSettings.colorGrade = save.settings.colorGrade || 'none';
+                        GameSettings.gradeCustom = save.settings.gradeCustom || null;
+                        GameSettings.stealthGray = save.settings.stealthGray !== false;
+                        if (typeof restoreGameGrade === 'function') restoreGameGrade();       // the grade back on screen, not just in the setting
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;
                         GameSettings.flitRing = save.settings.flitRing !== false;

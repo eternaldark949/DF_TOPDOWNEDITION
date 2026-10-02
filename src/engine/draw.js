@@ -1225,7 +1225,7 @@
                         // A scene has the stage: Stella is off-camera, so her stealth doesn't grey the story out
                         this.targetGrayscale = 0; this.visualGrayscale = 0;
                     } else if (this.player.visibility !== undefined) {
-                        this.targetGrayscale = (1.0 - this.player.visibility) * 100;
+                        this.targetGrayscale = GameSettings.stealthGray === false ? 0 : (1.0 - this.player.visibility) * 100;
                         this.visualGrayscale += (this.targetGrayscale - this.visualGrayscale) * 0.05;
                         if (this.visualGrayscale < 0.5) this.visualGrayscale = 0;
                     }
@@ -1235,7 +1235,9 @@
                     const con = (1.35 - 0.08 * dayG + (0.15 * this.nvIntensity)) * ggContrast; 
                     const sepia = (0.18 - 0.12 * dayG) * (1.0 - this.nvIntensity);
                     const bright = (1.1 + 0.2 * dayG + (1.4 * this.nvIntensity)) * ggBright * ggExposure;
-                    const effectiveGray = Math.max(this.visualGrayscale, this.nvIntensity * 100);
+                    // Cinematic View's "Full colour" chip lifts the stealth grey for the photo (night vision stays)
+                    const stealthGray = this.cineCam && GameSettings.photoFullColour ? 0 : this.visualGrayscale;
+                    const effectiveGray = Math.max(stealthGray, this.nvIntensity * 100);
                     filterChain = `grayscale(${effectiveGray.toFixed(0)}%) contrast(${con.toFixed(2)}) saturate(${sat.toFixed(2)}) sepia(${sepia.toFixed(2)}) brightness(${bright.toFixed(2)})`;
                     // Ms. Jean Soda: subtle pink warmth even outside NV
                     if (this.player.buffSystem.isActive('jeanSoda')) {

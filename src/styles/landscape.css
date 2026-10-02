@@ -14,7 +14,6 @@
         body.landscape #ui-currency, body.landscape #ui-scrap { font-size: 0.78rem; }
         body.landscape #utility-dock { top: 16px; right: 72px; flex-direction: row-reverse; align-items: flex-start; }
         body.landscape #dock-buttons { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; max-width: 56vw; max-height: 70vh; overflow-y: auto; }
-        body.landscape #game-grade-panel { top: 64px; right: 120px; max-height: 80vh; overflow-y: auto; }
 
         /* --- The cat's paw: the same arc, dropped 90px so it fits a short screen --- */
         body.landscape #btn-fire, body.landscape #btn-emote { bottom: 50px; right: 60px; }
