@@ -127,6 +127,7 @@
                 this.active = false;
                 this._applyScale(this._savedScale);
                 showMessage('PERFBENCH CANCELLED');
+                this.results = null;
             },
 
             _applyScale(sc) {
@@ -264,34 +265,38 @@
             },
 
             /** Live overlay while a sweep is running, and the verdict afterwards. */
-            draw(ctx, x, y) {
-                if (!this.active && !this.results) return;
-                ctx.save();
-                ctx.font = '11px monospace';
-                ctx.textAlign = 'left';
-
+            /**
+             * The bench's card (DOM, bottom centre): progress with Cancel while it runs, the verdict
+             * with OK when it's done (OK clears it). Called every frame from draw(); it only touches
+             * the DOM when what it shows changes. (ctx, x, y are kept for the old call.)
+             */
+            draw() {
+                let el = this._card;
+                if (!this.active && !this.results) { if (el) { el.remove(); this._card = null; } return; }
+                if (!el) {
+                    el = this._card = document.createElement('div'); el.id = 'bench-card';
+                    el.addEventListener('click', (e) => {
+                        const act = e.target.closest('[data-bench]')?.dataset.bench;
+                        if (act === 'cancel') this.cancel();
+                        else if (act === 'ok') this.results = null;
+                        if (act) { e.stopPropagation(); this.draw(); }
+                    });
+                    document.body.appendChild(el);
+                }
+                let key, html;
                 if (this.active) {
                     const step = this.steps[this.stepIndex];
-                    const lines = [
-                        'PERFBENCH RUNNING — hold still',
-                        `step ${this.stepIndex + 1}/${this.steps.length}  scale ${step ? step.scale : '?'}`,
-                        this._status
-                    ];
-                    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-                    ctx.fillRect(x - 6, y - 14, 260, lines.length * 14 + 10);
-                    ctx.fillStyle = '#ffcc55';
-                    lines.forEach((t, i) => ctx.fillText(t, x, y + i * 14));
+                    key = 'run' + this.stepIndex + this._status;
+                    html = `<div class="bc-head">Resolution bench<span>step ${this.stepIndex + 1}/${this.steps.length} · scale ${step ? step.scale : '?'}</span></div>`
+                         + `<div class="bc-body">Measuring — hold still<br><i>${this._status}</i></div>`
+                         + `<div class="bc-btns"><button class="df-btn ghost" data-bench="cancel">Cancel</button></div>`;
                 } else {
-                    const v = this.verdict().split('\n');
-                    const w = 400;
-                    ctx.fillStyle = 'rgba(0,0,0,0.8)';
-                    ctx.fillRect(x - 6, y - 14, w, v.length * 14 + 14);
-                    ctx.fillStyle = '#66ff99';
-                    ctx.fillText('PERFBENCH RESULT (full table in console)', x, y);
-                    ctx.fillStyle = '#ddd';
-                    v.forEach((t, i) => ctx.fillText(t, x, y + 16 + i * 14));
+                    key = 'done';
+                    const v = this.verdict().split('\n').map(t => `<div>${t.replace(/</g, '&lt;')}</div>`).join('');
+                    html = `<div class="bc-head">Resolution bench<span>full table in the console</span></div><div class="bc-body">${v}</div>`
+                         + `<div class="bc-btns"><button class="df-btn" data-bench="ok">OK</button></div>`;
                 }
-                ctx.restore();
+                if (el._key !== key) { el._key = key; el.innerHTML = html; }
             }
         };
         if (typeof window !== 'undefined') window.PerfBench = PerfBench;

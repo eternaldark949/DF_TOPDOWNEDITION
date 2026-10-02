@@ -19,7 +19,6 @@
             pp:        ['ui-currency'],
             stats:     ['ui-time', 'ui-scrap', 'ui-resonance'],
             location:  ['ui-location'],
-            dock:      ['utility-dock'],
             action:    ['action-dock'],
             autodrive: ['btn-autodrive'],
             handbrake: ['btn-handbrake'],

@@ -897,6 +897,8 @@
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
+                this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
+                this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
                 this._updateValueEl('set-audio', GameSettings.audioEnabled ? 'on' : 'off');
                 syncAmbienceSliders();
                 this._updateValueEl('set-fullscreen', !FullscreenManager.supported()
@@ -1006,6 +1008,20 @@
                     game.debugMode = !game.debugMode;
                     if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
                     this._updateValueEl(el.id, game.debugMode ? 'on' : 'off');
+
+                } else if (key === 'devWeather') {
+                    // Clear → Drizzle → Rain → Storm pin the sky (the schedule waits); Auto hands it back
+                    const W = game.weather, cycle = ['auto', 'clear', 'drizzle', 'rain', 'storm'];
+                    const cur = W.scheduleLocked ? W.condition : 'auto';
+                    const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+                    if (next === 'auto') W.unlockSchedule(true); else W.lockSchedule(next);
+                    this._updateValueEl(el.id, next);
+
+                } else if (key === 'devWeaponMode') {
+                    // Sniper mode: penetrating rounds
+                    game.weaponMode = game.weaponMode === 'sniper' ? 'normal' : 'sniper';
+                    showMessage(game.weaponMode === 'sniper' ? 'SNIPER MODE: PENETRATING ROUNDS ACTIVE' : 'NORMAL MODE: STANDARD ROUNDS ACTIVE');
+                    this._updateValueEl(el.id, game.weaponMode);
 
                 } else if (key === 'perfBench') {
                     // The resolution sweep (entities/static-builders-profiler.js PerfBench): back in the game to measure it

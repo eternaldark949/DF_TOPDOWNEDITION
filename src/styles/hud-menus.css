@@ -1322,3 +1322,21 @@
         }
         @media (max-width: 360px) { #dev-prof .dp-spark { display: none; } }
         body.cinematic-view #dev-prof, body.cinematic-view #dev-layers { display: none !important; }
+
+        /* The resolution bench's card (PerfBench.draw): progress with Cancel, then the verdict with OK */
+        #bench-card {
+            position: fixed; z-index: 2550; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+            width: min(420px, calc(100vw - 32px)); box-sizing: border-box; padding: 12px 16px 14px; border-radius: 22px;
+            border: 2px dotted rgba(202, 176, 250, 0.4); font-family: var(--font-ui); color: #e6dff0;
+            background: linear-gradient(100deg, rgba(4, 1, 6, 0.9) 0%, rgba(22, 6, 46, 0.86) 60%, rgba(40, 12, 96, 0.74) 100%);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 6px 26px rgba(0, 0, 0, 0.45);
+        }
+        #bench-card .bc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding-bottom: 6px; margin-bottom: 8px;
+            font: 600 0.64rem var(--font-ui); letter-spacing: 4px; text-transform: uppercase; color: var(--df-cream);
+            border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, transparent, rgba(216, 198, 162, 0.55) 15%, rgba(255, 255, 255, 0.5) 50%, rgba(216, 198, 162, 0.55) 85%, transparent) 1; }
+        #bench-card .bc-head span { font-size: 0.52rem; letter-spacing: 2px; color: var(--df-lilac-grey); }
+        #bench-card .bc-body { font: 0.68rem/1.55 ui-monospace, Consolas, monospace; color: var(--df-lavender-pale); max-height: 40vh; overflow-y: auto; }
+        #bench-card .bc-body i { color: var(--df-gold); font-style: normal; }
+        #bench-card .bc-btns { display: flex; justify-content: flex-end; margin-top: 10px; }
+        body.landscape #bench-card { bottom: auto; top: calc(56px + env(safe-area-inset-top, 0px)); }
+        body.cinematic-view #bench-card { display: none; }

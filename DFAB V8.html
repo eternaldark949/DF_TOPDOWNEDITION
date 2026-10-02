@@ -1540,6 +1540,24 @@
         }
         @media (max-width: 360px) { #dev-prof .dp-spark { display: none; } }
         body.cinematic-view #dev-prof, body.cinematic-view #dev-layers { display: none !important; }
+
+        /* The resolution bench's card (PerfBench.draw): progress with Cancel, then the verdict with OK */
+        #bench-card {
+            position: fixed; z-index: 2550; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+            width: min(420px, calc(100vw - 32px)); box-sizing: border-box; padding: 12px 16px 14px; border-radius: 22px;
+            border: 2px dotted rgba(202, 176, 250, 0.4); font-family: var(--font-ui); color: #e6dff0;
+            background: linear-gradient(100deg, rgba(4, 1, 6, 0.9) 0%, rgba(22, 6, 46, 0.86) 60%, rgba(40, 12, 96, 0.74) 100%);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 6px 26px rgba(0, 0, 0, 0.45);
+        }
+        #bench-card .bc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding-bottom: 6px; margin-bottom: 8px;
+            font: 600 0.64rem var(--font-ui); letter-spacing: 4px; text-transform: uppercase; color: var(--df-cream);
+            border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, transparent, rgba(216, 198, 162, 0.55) 15%, rgba(255, 255, 255, 0.5) 50%, rgba(216, 198, 162, 0.55) 85%, transparent) 1; }
+        #bench-card .bc-head span { font-size: 0.52rem; letter-spacing: 2px; color: var(--df-lilac-grey); }
+        #bench-card .bc-body { font: 0.68rem/1.55 ui-monospace, Consolas, monospace; color: var(--df-lavender-pale); max-height: 40vh; overflow-y: auto; }
+        #bench-card .bc-body i { color: var(--df-gold); font-style: normal; }
+        #bench-card .bc-btns { display: flex; justify-content: flex-end; margin-top: 10px; }
+        body.landscape #bench-card { bottom: auto; top: calc(56px + env(safe-area-inset-top, 0px)); }
+        body.cinematic-view #bench-card { display: none; }
         /* =========================================
            PAUSE SETTINGS PANEL
            ========================================= */
@@ -2066,12 +2084,6 @@
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(164, 105, 255, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(164, 105, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(164, 105, 255, 0); } }
         
 
-        #utility-dock { position: absolute; top: 210px; right: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; z-index: 35; pointer-events: auto; }
-        #dock-toggle { width: 36px; height: 36px; border-radius: 8px; background: rgba(0, 0, 0, 0.7); border: 1px solid #666; color: #aaa; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.3s; }
-        #dock-toggle:hover { border-color: var(--glow-color); color: var(--glow-color); }
-        #dock-toggle.open { background: rgba(164, 105, 255, 0.2); border-color: var(--glow-color); color: var(--glow-color); }
-        #dock-buttons { display: none; flex-direction: column; gap: 6px; background: rgba(0, 0, 0, 0.8); padding: 10px; border-radius: 8px; border: 1px solid #333; animation: dockSlide 0.2s ease-out; }
-        #dock-buttons.visible { display: flex; }
         
         /* Color Grade Panel */
         .ggp-slider { flex:1; -webkit-appearance:none; appearance:none; height:10px; border-radius:2px; outline:none; cursor:pointer; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.06); pointer-events:auto; }
@@ -3090,8 +3102,6 @@
         body.landscape #ui-stats { top: 64px; right: 18px; }
         body.landscape #ui-time { font-size: 1rem; margin-bottom: 2px; }
         body.landscape #ui-currency, body.landscape #ui-scrap { font-size: 0.78rem; }
-        body.landscape #utility-dock { top: 16px; right: 72px; flex-direction: row-reverse; align-items: flex-start; }
-        body.landscape #dock-buttons { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; max-width: 56vw; max-height: 70vh; overflow-y: auto; }
 
         /* --- The cat's paw: the same arc, dropped 90px so it fits a short screen --- */
         body.landscape #btn-fire, body.landscape #btn-emote { bottom: 50px; right: 60px; }
@@ -3537,17 +3547,6 @@
                 </div>
             </div>
 
-            <div id="utility-dock">
-                <div id="dock-toggle">⚙</div> 
-                <div id="dock-buttons">
-                    <button class="game-btn" id="btn-weapon-mode" style="border-color: #00f3ff; color: #00f3ff;">🔫 Normal</button>
-                    <button class="game-btn" id="btn-save-game" style="border-color: #00ff00; color: #00ff00;">💾 Save</button> 
-                    <button class="game-btn" id="btn-open-map" style="border-color: #FFD700; color: #FFD700;">🗺️ Map</button>
-                    <button class="game-btn" id="btn-inventory" style="border-color: #a469ff; color: #a469ff;">🎒 Items</button>
-                    <button class="game-btn" id="btn-toggle-weather">☁ Weather</button>
-                    <button class="game-btn" id="btn-game-exit">✕ Exit</button>
-                </div>
-            </div>
             
             <!-- The action dock (ui/action-dock.js): context pills above the right-hand cluster -->
             <div id="action-dock">
@@ -4212,6 +4211,14 @@
                 <div class="settings-row">
                     <span class="settings-label">Debug View</span>
                     <span class="settings-value" id="set-debug" data-key="debugView">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Weather</span>
+                    <span class="settings-value" id="set-weather" data-key="devWeather">AUTO</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Weapon Mode</span>
+                    <span class="settings-value" id="set-weaponmode" data-key="devWeaponMode">NORMAL</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Resolution Bench</span>
@@ -19497,6 +19504,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.active = false;
                 this._applyScale(this._savedScale);
                 showMessage('PERFBENCH CANCELLED');
+                this.results = null;
             },
 
             _applyScale(sc) {
@@ -19634,34 +19642,38 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
 
             /** Live overlay while a sweep is running, and the verdict afterwards. */
-            draw(ctx, x, y) {
-                if (!this.active && !this.results) return;
-                ctx.save();
-                ctx.font = '11px monospace';
-                ctx.textAlign = 'left';
-
+            /**
+             * The bench's card (DOM, bottom centre): progress with Cancel while it runs, the verdict
+             * with OK when it's done (OK clears it). Called every frame from draw(); it only touches
+             * the DOM when what it shows changes. (ctx, x, y are kept for the old call.)
+             */
+            draw() {
+                let el = this._card;
+                if (!this.active && !this.results) { if (el) { el.remove(); this._card = null; } return; }
+                if (!el) {
+                    el = this._card = document.createElement('div'); el.id = 'bench-card';
+                    el.addEventListener('click', (e) => {
+                        const act = e.target.closest('[data-bench]')?.dataset.bench;
+                        if (act === 'cancel') this.cancel();
+                        else if (act === 'ok') this.results = null;
+                        if (act) { e.stopPropagation(); this.draw(); }
+                    });
+                    document.body.appendChild(el);
+                }
+                let key, html;
                 if (this.active) {
                     const step = this.steps[this.stepIndex];
-                    const lines = [
-                        'PERFBENCH RUNNING — hold still',
-                        `step ${this.stepIndex + 1}/${this.steps.length}  scale ${step ? step.scale : '?'}`,
-                        this._status
-                    ];
-                    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-                    ctx.fillRect(x - 6, y - 14, 260, lines.length * 14 + 10);
-                    ctx.fillStyle = '#ffcc55';
-                    lines.forEach((t, i) => ctx.fillText(t, x, y + i * 14));
+                    key = 'run' + this.stepIndex + this._status;
+                    html = `<div class="bc-head">Resolution bench<span>step ${this.stepIndex + 1}/${this.steps.length} · scale ${step ? step.scale : '?'}</span></div>`
+                         + `<div class="bc-body">Measuring — hold still<br><i>${this._status}</i></div>`
+                         + `<div class="bc-btns"><button class="df-btn ghost" data-bench="cancel">Cancel</button></div>`;
                 } else {
-                    const v = this.verdict().split('\n');
-                    const w = 400;
-                    ctx.fillStyle = 'rgba(0,0,0,0.8)';
-                    ctx.fillRect(x - 6, y - 14, w, v.length * 14 + 14);
-                    ctx.fillStyle = '#66ff99';
-                    ctx.fillText('PERFBENCH RESULT (full table in console)', x, y);
-                    ctx.fillStyle = '#ddd';
-                    v.forEach((t, i) => ctx.fillText(t, x, y + 16 + i * 14));
+                    key = 'done';
+                    const v = this.verdict().split('\n').map(t => `<div>${t.replace(/</g, '&lt;')}</div>`).join('');
+                    html = `<div class="bc-head">Resolution bench<span>full table in the console</span></div><div class="bc-body">${v}</div>`
+                         + `<div class="bc-btns"><button class="df-btn" data-bench="ok">OK</button></div>`;
                 }
-                ctx.restore();
+                if (el._key !== key) { el._key = key; el.innerHTML = html; }
             }
         };
         if (typeof window !== 'undefined') window.PerfBench = PerfBench;
@@ -45331,7 +45343,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             pp:        ['ui-currency'],
             stats:     ['ui-time', 'ui-scrap', 'ui-resonance'],
             location:  ['ui-location'],
-            dock:      ['utility-dock'],
             action:    ['action-dock'],
             autodrive: ['btn-autodrive'],
             handbrake: ['btn-handbrake'],
@@ -46776,72 +46787,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const w = this.viewToWorld((e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy);
                     if (this.furniture.tap(w.x, w.y)) { e.preventDefault(); e.stopImmediatePropagation(); }
                 }, true);
-                // Weather debug: cycles Clear → Drizzle → Rain → Storm → Auto.
-                // The first four pin the sky (schedule paused) so you can inspect
-                // a condition without it rolling out from under you; Auto hands
-                // control back to the scheduler and immediately rolls.
-                document.getElementById('btn-toggle-weather').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const cycle = ['clear', 'drizzle', 'rain', 'storm', 'auto'];
-                    const cur = this.weather.scheduleLocked ? this.weather.condition : 'auto';
-                    const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
-                    if (next === 'auto') {
-                        this.weather.unlockSchedule(true);
-                        showMessage('WEATHER: AUTO');
-                    } else {
-                        this.weather.lockSchedule(next);
-                        showMessage('WEATHER: ' + WEATHER_CONDITIONS[next].label.toUpperCase() + ' (LOCKED)');
-                    }
-                });
-                // Weapon Mode Toggle Button
-                document.getElementById('btn-weapon-mode').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const btn = document.getElementById('btn-weapon-mode');
-                    if (this.weaponMode === 'normal') {
-                        this.weaponMode = 'sniper';
-                        btn.innerHTML = '🎯 Sniper';
-                        btn.style.borderColor = '#ffd700';
-                        btn.style.color = '#ffd700';
-                        showMessage("SNIPER MODE: PENETRATING ROUNDS ACTIVE");
-                    } else {
-                        this.weaponMode = 'normal';
-                        btn.innerHTML = '🔫 Normal';
-                        btn.style.borderColor = '#00f3ff';
-                        btn.style.color = '#00f3ff';
-                        showMessage("NORMAL MODE: STANDARD ROUNDS ACTIVE");
-                    }
-                });
-                
-                // Add this inside initEvents()
-
-                // 1. In-Game Save Button
-                document.getElementById('btn-save-game').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.saveGame();
-                });
-                
-                // Inside initEvents() ...
-
-                // 3. Map Button (Dock)
-                document.getElementById('btn-open-map').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    // Close the dock first so it's not open when we return
-                    document.getElementById('dock-toggle').classList.remove('open');
-                    document.getElementById('dock-buttons').classList.remove('visible');
-                    
-                    // Open the Golden Map
-                    Screens.open('map');
-                });
-                
-                document.getElementById('btn-inventory').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    // Close the dock so it doesn't block the view
-                    document.getElementById('dock-toggle').classList.remove('open');
-                    document.getElementById('dock-buttons').classList.remove('visible');
-                    
-                    // Open Inventory
-                    Screens.open('inventory');
-                });
                 
                 // 2. Main Menu Load Button — opens save slot selector
                 document.getElementById('btn-load-game').addEventListener('click', () => {
@@ -46924,22 +46869,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     btnPause.addEventListener('mousedown', togglePause);
                     btnPause.addEventListener('touchstart', togglePause);
 
-                
-                // Utility dock toggle
-                const dockToggle = document.getElementById('dock-toggle');
-                const dockButtons = document.getElementById('dock-buttons');
-                dockToggle.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    dockToggle.classList.toggle('open');
-                    dockButtons.classList.toggle('visible');
-                });
-                // Close dock when clicking outside
-                document.addEventListener('click', (e) => {
-                    if (!e.target.closest('#utility-dock')) {
-                        dockToggle.classList.remove('open');
-                        dockButtons.classList.remove('visible');
-                    }
-                });
                 
                 this.transitionBtn.addEventListener('click', (e) => { e.preventDefault(); this.triggerTransition(); });
                 this.transitionBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.triggerTransition(); });
@@ -60911,7 +60840,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         });
         document.getElementById('btn-story-747').addEventListener('click', () => { showMessage("TIMELINE 747 LOCKED."); });
         document.getElementById('btn-story-back').addEventListener('click', () => { storyModeList.classList.add('hidden'); mainMenuList.classList.remove('hidden'); });
-        document.getElementById('btn-game-exit').addEventListener('click', () => { game.stop(); });
         document.getElementById('btn-exit').addEventListener('click', () => showMessage("TERMINATING SESSION"));
         
         /* --- PHONE SYSTEM --- */
@@ -63690,6 +63618,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
+                this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
+                this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
                 this._updateValueEl('set-audio', GameSettings.audioEnabled ? 'on' : 'off');
                 syncAmbienceSliders();
                 this._updateValueEl('set-fullscreen', !FullscreenManager.supported()
@@ -63799,6 +63729,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     game.debugMode = !game.debugMode;
                     if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
                     this._updateValueEl(el.id, game.debugMode ? 'on' : 'off');
+
+                } else if (key === 'devWeather') {
+                    // Clear → Drizzle → Rain → Storm pin the sky (the schedule waits); Auto hands it back
+                    const W = game.weather, cycle = ['auto', 'clear', 'drizzle', 'rain', 'storm'];
+                    const cur = W.scheduleLocked ? W.condition : 'auto';
+                    const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+                    if (next === 'auto') W.unlockSchedule(true); else W.lockSchedule(next);
+                    this._updateValueEl(el.id, next);
+
+                } else if (key === 'devWeaponMode') {
+                    // Sniper mode: penetrating rounds
+                    game.weaponMode = game.weaponMode === 'sniper' ? 'normal' : 'sniper';
+                    showMessage(game.weaponMode === 'sniper' ? 'SNIPER MODE: PENETRATING ROUNDS ACTIVE' : 'NORMAL MODE: STANDARD ROUNDS ACTIVE');
+                    this._updateValueEl(el.id, game.weaponMode);
 
                 } else if (key === 'perfBench') {
                     // The resolution sweep (entities/static-builders-profiler.js PerfBench): back in the game to measure it
