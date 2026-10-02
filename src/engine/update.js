@@ -55,6 +55,7 @@
                     if(this.muzzleFlashes[i].life <= 0) this.muzzleFlashes.splice(i, 1);
                 }
                 this.updateCasings();
+                this.updateShotFx();
             
                 this.updateTime();
                 this.updateUI();
@@ -453,7 +454,7 @@
                         this.projectiles.push(shot);
                         const shotAng = Math.atan2(shot.vy, shot.vx);
                         this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: flashRadius, color: flashColor, life: 3, angle: shotAng });
-                        this.spawnCasing(shot.x, shot.y, shotAng, tm.equippedWeaponId);
+                        this.weaponFx(shot.x, shot.y, shotAng, tm.equippedWeaponId, shot, tm);
                         if (tm.hireType === 'permanent') captionSystem.teammateCombatQuip(tm.name);
                         else captionSystem.dancerFollowQuip(tm.name);
                     };
@@ -609,7 +610,7 @@
                                 this.projectiles.push(shot);
                                 const shotAng = Math.atan2(shot.vy, shot.vx);
                                 this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: 50, color: shot.color, life: 3, angle: shotAng });
-                                if (enemy.equippedWeaponId !== undefined) this.spawnCasing(shot.x, shot.y, shotAng, enemy.equippedWeaponId || 'pistol_ganger');
+                                if (enemy.equippedWeaponId !== undefined) this.weaponFx(shot.x, shot.y, shotAng, enemy.equippedWeaponId || 'pistol_ganger', shot, enemy);
                             }
                         }
                     }

@@ -641,6 +641,7 @@
                 this.dotTicks = config.dotTicks || 12;
                 this.dotInterval = config.dotInterval || 10;
                 this.spawnTime = _frameTime;
+                this.fxTrail = null; this.trail = null; this._wispN = 0;
             }
 
             constructor(config) {
@@ -720,6 +721,7 @@
                 
                 // Hard age cap — prevents ghost projectiles from persisting
                 this.spawnTime = _frameTime;
+                this.fxTrail = null; this.trail = null; this._wispN = 0;
             }
             
             /**
@@ -834,11 +836,53 @@
             
                 super.update(dt);
                 this.life--;
+                // A signature trail (its gun's `fx`, engine/combat-effects.js weaponFx): the last 8 points it flew through
+                if (this.fxTrail && (this.vx || this.vy)) {
+                    const T = this.trail; T.push(this.x, this.y); if (T.length > 16) T.splice(0, 2);
+                    if (this.fxTrail.trail === 'wisp' && (this._wispN = (this._wispN || 0) + 1) % 2 === 0 && typeof game !== 'undefined') game.spawnWisp(this.x, this.y, this.fxTrail);
+                }
                 if (this.life <= 0) {
                     this.vx = 0;
                     this.vy = 0;
                     this.destroy();
                 }
+            }
+
+            /**
+             * The crackle (Anavia) or static (the EMP blaster) behind a shot: a jagged line through its last
+             * points, re-jittered a few times a second so it flickers, soft colour under a bright core.
+             */
+            _drawCrackle(ctx) {
+                const T = this.trail, n = T.length / 2, fx = this.fxTrail;
+                if (n < 2 || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
+                const stat = fx.trail === 'static', amp = stat ? 3.4 : 2.4, seed = ((this._seed ??= Math.random() * 1000) + Math.floor(_frameTime / 45)) | 0;
+                const rnd = (i) => { const v = Math.sin((seed + i) * 12.9898) * 43758.5453; return (v - Math.floor(v)) - 0.5; };
+                const passes = stat ? 2 : 1;
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                for (let pass = 0; pass < passes; pass++) {
+                    const pts = [];
+                    for (let i = 0; i < n; i++) {
+                        const x = T[i * 2], y = T[i * 2 + 1], j = (i === n - 1) ? 0 : amp * (1 - i / n * 0.5);
+                        const nx = i < n - 1 ? -(T[i * 2 + 3] - y) : 0, ny = i < n - 1 ? (T[i * 2 + 2] - x) : 0, nl = Math.hypot(nx, ny) || 1;
+                        const o = rnd(i * 7 + pass * 31) * 2 * j;
+                        pts.push([x + nx / nl * o, y + ny / nl * o]);
+                    }
+                    for (const [w, col, a] of [[2.2, fx.col, 0.35], [0.7, fx.core, 0.85]]) {
+                        ctx.strokeStyle = col; ctx.lineWidth = w;
+                        for (let i = 1; i < pts.length; i++) {                           // fades toward the tail
+                            ctx.globalAlpha = a * (i / pts.length) * (stat ? 0.8 : 1);
+                            ctx.beginPath(); ctx.moveTo(pts[i - 1][0], pts[i - 1][1]); ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke();
+                        }
+                    }
+                    if (rnd(99 + pass) > 0.25) {                                       // now and then a spark off the side
+                        const k = 1 + ((Math.abs(rnd(5 + pass)) * (pts.length - 2)) | 0), [bx, by] = pts[k];
+                        ctx.globalAlpha = 0.6; ctx.strokeStyle = fx.core; ctx.lineWidth = 0.5;
+                        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + rnd(11) * 9, by + rnd(13) * 9); ctx.stroke();
+                    }
+                }
+                ctx.restore();
             }
             
             draw(ctx) {
@@ -847,6 +891,7 @@
                 // Ghost projectile safety — don't render or process dead-in-flight bullets
                 if (!this.sticky && this.vx === 0 && this.vy === 0) return;
                 
+                if (this.fxTrail && this.fxTrail.trail !== 'wisp' && this.trail) this._drawCrackle(ctx);
                 ctx.save();
                 
                 if (this.isFireball) {

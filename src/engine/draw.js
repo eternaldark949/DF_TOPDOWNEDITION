@@ -137,6 +137,7 @@
                 // Lamps under the sky follow the street-lamp schedule; indoor lamps always burn
                 const skyLampDay = dayC.lampsOn ? 0 : 1;
                 const daylight = this.activeMap.type === 'outdoor' ? skyLampDay : 0;
+                this._lampDaylight = daylight;                                // (the glitter casings catch the lamps by night)
                 // For windows: they always project based on world time, even in indoor maps
                 const windowDaylight = dayC.daylight;
                 this._windowDaylight = windowDaylight; // Store for lighting system access
@@ -803,6 +804,7 @@
                 }
                 
                 this.drawMuzzleStars(this.ctx);                              // the flash's star at each muzzle
+                this.drawShotFx(this.ctx, cullBounds.world);                 // barrel smoke, embers, golden wisps (engine/combat-effects.js)
 
                 // Passenger lean-out rendering — draw in-car companions at their seat positions
                 // Uses drawProceduralHumanoid with isDriving flag for unified lean-out animation
