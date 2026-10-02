@@ -145,8 +145,8 @@
             spawnWisp(x, y, fx) {
                 if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
                 const F = this.shotFx || (this.shotFx = []);
-                F.push({ k: 'wisp', x, y, vx: (Math.random() - 0.5) * 0.2, vy: (Math.random() - 0.5) * 0.2, t: 0, life: 42, r: 2.2, col: fx.col, ph: Math.random() * 6.28 });
-                if (Math.random() < 0.55) F.push({ k: 'dust', x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 4, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, t: 0, life: 36, col: fx.dust, ph: Math.random() * 6.28 });
+                F.push({ k: 'wisp', x, y, vx: (Math.random() - 0.5) * 0.2, vy: (Math.random() - 0.5) * 0.2, t: 0, life: 50, r: 3, col: fx.col, ph: Math.random() * 6.28 });
+                if (Math.random() < 0.85) F.push({ k: 'dust', x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 4, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, t: 0, life: 36, col: fx.dust, ph: Math.random() * 6.28 });
                 while (F.length > 160) F.shift();
             },
             updateShotFx() {
@@ -160,7 +160,7 @@
                     if (p.k === 'smoke' || p.k === 'wisp') {                             // drifts downwind, curls, swells
                         p.vx = p.vx * 0.94 + W.x * 0.012 + Math.cos(p.t * 0.15 + p.ph) * 0.03;
                         p.vy = p.vy * 0.94 + W.y * 0.012 + Math.sin(p.t * 0.15 + p.ph) * 0.03;
-                        p.r += p.k === 'smoke' ? 0.055 : 0.1;
+                        p.r += p.k === 'smoke' ? 0.055 : 0.14;
                     } else { p.vx *= 0.93; p.vy *= 0.93; p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
                     p.x += p.vx; p.y += p.vy;
                 }
@@ -173,7 +173,7 @@
                 for (const p of F) {
                     if (p.t <= 0 || (p.k !== 'smoke' && p.k !== 'wisp')) continue;
                     if (p.x < cb.left || p.x > cb.right || p.y < cb.top || p.y > cb.bottom) continue;
-                    const u = p.t / p.life, a = (p.k === 'smoke' ? 0.2 : 0.36) * Math.sin(Math.min(1, u * 4) * Math.PI / 2) * (1 - u);
+                    const u = p.t / p.life, a = (p.k === 'smoke' ? 0.2 : 0.55) * Math.sin(Math.min(1, u * 4) * Math.PI / 2) * (1 - u);
                     ctx.globalAlpha = a;
                     const R = p.r * 2.2;
                     ctx.drawImage(puffSprite(p.col), p.x - R, p.y - R, R * 2, R * 2);
@@ -185,7 +185,7 @@
                     const u = p.t / p.life, fl = 0.55 + 0.45 * Math.sin(_frameTime * 0.03 + p.ph);
                     ctx.globalAlpha = (1 - u) * fl;
                     ctx.fillStyle = p.col;
-                    const z = p.k === 'ember' ? 0.9 * (1 - u * 0.5) : 0.55;
+                    const z = p.k === 'ember' ? 0.9 * (1 - u * 0.5) : 0.75;
                     ctx.fillRect(p.x - z / 2, p.y - z / 2, z, z);
                     if (p.k === 'ember' && u < 0.4) { ctx.globalAlpha *= 0.35; ctx.fillRect(p.x - p.vx * 2 - z / 2, p.y - p.vy * 2 - z / 2, z, z); }   // its streak
                 }
