@@ -124,6 +124,7 @@ const SCRIPTS = [
     'engine/status-effects.js',
     'engine/executions.js',
     'engine/sneak.js',
+    'engine/npc-posts.js',
     'ui/dev-overlay.js',
     'engine/scope.js',
     'engine/tuning-ui.js',

@@ -10,7 +10,7 @@
         //  Single source of truth: createMapEntities reads these too.
         // ============================================================================
         const HUB_NPC_ANCHORS = [
-            { name: 'Mirabel', x: 2000, y: 1850 },
+            // Mirabel: off the hub for now — she's in her lounge at Moon City (moon_city_nightclub)
             { name: 'Anavia',  x: 550,  y: 1650, role: 'vip' },
         ];
         const HUB_NPC_CLEARANCE = 90; // px half-extent kept building-free per anchor
