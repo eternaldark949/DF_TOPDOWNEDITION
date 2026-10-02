@@ -8767,6 +8767,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            Everything is generated in code; it all runs through masterGain, so
            the existing audio toggle mutes it.
            ===================================================================== */
+        // Footsteps, splashes and slashes vary on their own random stream, so they never shift the game's
+        const _sndRand = (() => { let x = 987654321; return () => (x = (x * 16807) % 2147483647) / 2147483647; })();
+
         class AmbienceSystem {
             constructor(audio) {
                 this.audio = audio;
@@ -9041,7 +9044,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(out);
                     g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, amp), now + 0.004);
                     g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-                    src.start(now, Math.random() * 2.5, dur + 0.03);
+                    src.start(now, _sndRand() * 2.5, dur + 0.03);
                 };
                 const tone = (f0, f1, dur, amp, type = 'sine') => {
                     const os = ctx.createOscillator(), g = ctx.createGain(); os.type = type;
@@ -9050,7 +9053,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     g.gain.setValueAtTime(Math.max(0.0002, amp), now); g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
                     os.start(now); os.stop(now + dur + 0.02);
                 };
-                const soft = mat === 'carpet' ? 0.35 : mat === 'grass' ? 0.5 : 1, j = 0.9 + Math.random() * 0.2;
+                const soft = mat === 'carpet' ? 0.35 : mat === 'grass' ? 0.5 : 1, j = 0.9 + _sndRand() * 0.2;
                 if (mat === 'water') {                                   // into a puddle: a slap and a spray
                     burst('lowpass', 900 * j, 0.7, 0.14, 0.32 * v, 0.9);
                     burst('bandpass', 2600 * j, 0.8, 0.2, 0.18 * v);
@@ -9087,13 +9090,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 bf.frequency.setValueAtTime(1800, now); bf.frequency.exponentialRampToValueAtTime(5200, now + 0.14);
                 const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(this.foley);
                 g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.22, now + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
-                src.start(now, Math.random() * 2.5, 0.2);
+                src.start(now, _sndRand() * 2.5, 0.2);
                 if (hit) {                                                    // the cut: a wet thud and a bright ring off the blade
                     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
                     const s2 = ctx.createBufferSource(); s2.buffer = this.brown; const g2 = ctx.createGain();
                     s2.connect(lp); lp.connect(g2); g2.connect(this.foley);
                     g2.gain.setValueAtTime(0.0001, now + 0.05); g2.gain.exponentialRampToValueAtTime(0.3, now + 0.06); g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-                    s2.start(now + 0.05, Math.random() * 2.5, 0.15);
+                    s2.start(now + 0.05, _sndRand() * 2.5, 0.15);
                     const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'sine';
                     o.frequency.setValueAtTime(3400, now + 0.05); o.frequency.exponentialRampToValueAtTime(3100, now + 0.4);
                     o.connect(g3); g3.connect(this.foley); g3.gain.setValueAtTime(0.025, now + 0.05); g3.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
@@ -9114,7 +9117,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(out);
                 const a = (big ? 0.3 : 0.18) * near;
                 g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(a, now + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, now + (big ? 0.45 : 0.25));
-                src.start(now, Math.random() * 2.5, 0.5);
+                src.start(now, _sndRand() * 2.5, 0.5);
             }
 
             /** Door sounds: 'creak' | 'latch' | 'whoosh', quieter with distance from the player. */
