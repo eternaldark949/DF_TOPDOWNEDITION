@@ -216,6 +216,8 @@
             NOISE: {
                 pistol: 700, rifle: 800, sniper: 950, punch: 90,
                 flit: 160, door: 220, glass: 360, enemyShot: 800,
+                stepHeels: 90, stepBoots: 70, stepSoft: 45, puddleStep: 160,   // her footsteps (engine/footsteps.js): × floor (carpet/grass 0.5, marble 1.3, metal 1.4) × pace
+                execute: 70, executeBlade: 55,  // a takedown is quiet, not silent (engine/executions.js)
                 WALL: 0.5, DOOR: 0.6,           // reach kept through a wall / a shut door
                 ERR_NEAR: 20, ERR_FAR: 150      // how far off their guess is, close up / at the edge of hearing
             },

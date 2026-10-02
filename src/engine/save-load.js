@@ -128,6 +128,8 @@
                         photoReflections: GameSettings.photoReflections,
                         soundRings: GameSettings.soundRings,
                         finisher: GameSettings.finisher,
+                        footsteps: GameSettings.footsteps,
+                        enemyRings: GameSettings.enemyRings,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
@@ -753,6 +755,8 @@
                         GameSettings.photoReflections = save.settings.photoReflections !== false;
                         if (save.settings.soundRings) GameSettings.soundRings = save.settings.soundRings;
                         if (save.settings.finisher) GameSettings.finisher = save.settings.finisher;
+                        GameSettings.footsteps = save.settings.footsteps !== false;
+                        GameSettings.enemyRings = save.settings.enemyRings !== false;
                         if (typeof restoreGameGrade === 'function') restoreGameGrade();       // the grade back on screen, not just in the setting
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;

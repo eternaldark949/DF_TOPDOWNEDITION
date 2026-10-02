@@ -119,6 +119,7 @@ const SCRIPTS = [
     'engine/noise.js',
     'engine/finisher.js',
     'engine/reflections.js',
+    'engine/footsteps.js',
     'ui/dev-overlay.js',
     'engine/scope.js',
     'engine/tuning-ui.js',

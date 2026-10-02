@@ -7,11 +7,12 @@
              * (walls and shut doors muffle it) hears roughly where it came from and goes to look.
              * `fromPlayer` sounds leave a faint ripple, so she learns what gives her away.
              */
-            emitNoise(x, y, reach, kind, fromPlayer = true) {
+            emitNoise(x, y, reach, kind, fromPlayer = true, opts = {}) {
                 if (!reach || !this.activeMap) return 0;
                 const N = CONFIG.NOISE, walls = this.activeMap.walls, cols = getColliders(this.activeMap), rs = this.roomSystem;
                 let heard = 0;
-                for (const e of this.enemies) {
+                // opts.hear === false: a sound only she can hear (a guard's own footsteps don't alert the others)
+                if (opts.hear !== false) for (const e of this.enemies) {
                     if (!e || e.dead || typeof e.hearNoise !== 'function') continue;
                     const d = Math.hypot(e.x - x, e.y - y);
                     if (d > reach) continue;
@@ -28,10 +29,15 @@
                     if (L.length < 24) L.push({ x, y, reach, kind, t: _gameTimeSec, heard: (this._dbgHeard || []).map(e => ({ x: e.x, y: e.y })) });
                     this._dbgHeard = null;
                 }
+                const R = this.noiseRipples || (this.noiseRipples = []);
                 if (fromPlayer) {
                     if (heard) this._lastContactAt = _gameTimeSec;
-                    const R = this.noiseRipples || (this.noiseRipples = []);
-                    if (R.length < 12) R.push({ x, y, reach, t: 0, seed: Math.random() * 100 });
+                    // opts.ring === false: no ripple (her footsteps; a puddle step keeps one, small)
+                    if (opts.ring !== false && R.filter(r => !r.enemy).length < 12) R.push({ x, y, reach, t: 0, seed: Math.random() * 100 });
+                } else if (opts.ring !== false && GameSettings.enemyRings !== false && this.player
+                           && Math.hypot(this.player.x - x, this.player.y - y) <= reach && R.filter(r => r.enemy).length < 6) {
+                    // theirs, in ember, when it reaches her: gunfire, a dash, a guard's hard steps
+                    R.push({ x, y, reach: Math.min(reach, 260), t: 0, seed: Math.random() * 100, enemy: true });
                 }
                 return heard;
             },
@@ -55,7 +61,7 @@
                 for (const r of R) {
                     const t = this._ringT(r), e = 1 - Math.pow(1 - t, 2);   // ease out
                     ctx.globalAlpha = 0.26 * (1 - t);
-                    ctx.strokeStyle = '#d8c6ff';
+                    ctx.strokeStyle = r.enemy ? '#ff8a5c' : '#d8c6ff';
                     ctx.beginPath(); ctx.arc(r.x, r.y, 12 + (r.reach - 12) * e, 0, Math.PI * 2); ctx.stroke();
                 }
                 ctx.restore();
@@ -129,11 +135,11 @@
                         }
                     }
                     // a whisper of light on the outer edge, brighter where the ripple crests
-                    ctx.globalAlpha = 0.2 * k;
-                    ctx.strokeStyle = '#d8c6ff'; ctx.lineWidth = 1;
+                    ctx.globalAlpha = (r.enemy ? 0.45 : 0.2) * k;
+                    ctx.strokeStyle = r.enemy ? '#ff7a4a' : '#d8c6ff'; ctx.lineWidth = r.enemy ? 1.4 : 1;
                     ctx.stroke(outer);
                     ctx.globalAlpha = 0.07 * k;
-                    ctx.fillStyle = '#efe4ff'; ctx.fill(band, 'evenodd');
+                    ctx.fillStyle = r.enemy ? '#ffb08a' : '#efe4ff'; ctx.fill(band, 'evenodd');
                     ctx.globalAlpha = 1;
                 }
                 ctx.restore();

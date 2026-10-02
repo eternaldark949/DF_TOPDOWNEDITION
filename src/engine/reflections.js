@@ -120,6 +120,19 @@
                 return P;
             },
 
+            /** Is (x, y) in a puddle that's showing? Its strength (0 = dry ground) */
+            _inPuddle(x, y) {
+                const wet = this._wetHere(); if (wet < 0.05) return 0;
+                for (const p of this.puddlesFor(this.activeMap)) {
+                    if (Math.abs(p.x - x) > p.r + 4 || Math.abs(p.y - y) > p.r + 4) continue;
+                    const k = this._puddleK(p, wet); if (k <= 0) continue;
+                    const g = 0.65 + 0.35 * k, c = Math.cos(-p.ang), sn = Math.sin(-p.ang), dx = x - p.x, dy = y - p.y;
+                    const lx = dx * c - dy * sn, ly = dx * sn + dy * c;
+                    if (p.lobes.some(L => ((lx - L.dx) / (L.rx * g)) ** 2 + ((ly - L.dy) / (L.ry * g)) ** 2 <= 1)) return k;
+                }
+                return 0;
+            },
+
             /** How much of a puddle shows at this wetness (0..1) */
             _puddleK(p, wet) { return Math.max(0, Math.min(1, (wet - (1 - p.d) * 0.75) / 0.25)); },
 
@@ -431,6 +444,11 @@
                         const car = m.kind === 'car';
                         if (R.length < 80) R.push({ x: e.x, y: e.y, t: 0, life: car ? 30 : 34, r: car ? 26 : 15, big: true });
                         if (this.weather && this.weather.spawnSpray) this.weather.spawnSpray(e.x, e.y, Math.atan2(e.y - py, e.x - px) + Math.PI, 'rgba(206, 214, 255, 0.55)', car ? 8 : 4);
+                        // tyres hiss through it (her own and others' footsteps splash in engine/footsteps.js)
+                        if (car && typeof ambience !== 'undefined' && ambience.splash) {
+                            const pl = this.player, d = Math.hypot(e.x - pl.x, e.y - pl.y);
+                            ambience.splash(Math.max(0, 1 - d / 600), (e.x - pl.x) / 400, Math.hypot(e.x - px, e.y - py) > 4);
+                        }
                         break;
                     }
                 }
