@@ -226,7 +226,7 @@
                     this.autodriveBtn.classList.remove('engaged');
                     if (this.handbrakeBtn) { this.handbrakeBtn.style.display = 'none'; this.handbrakeBtn.classList.remove('held'); }
                     this.handbrakeHeld = false; this.car.handbrake = false;
-                    this.holsterBtn.style.display = 'flex';
+                    this.holsterBtn.style.display = 'flex'; { const sb = document.getElementById('btn-sneak'); if (sb) sb.style.display = 'flex'; }
                     this.fireBtn.style.display = this.weaponHolstered ? 'none' : 'flex';
                     this.emoteBtn.style.display = this.weaponHolstered ? 'flex' : 'none';
                     if (this.car.controlMode === 'AI') this.car.disableAutoDrive();
@@ -319,7 +319,7 @@
 
                     this.autodriveBtn.style.display = 'flex';
                     if (this.handbrakeBtn) this.handbrakeBtn.style.display = 'flex';
-                    this.holsterBtn.style.display = 'none';
+                    this.holsterBtn.style.display = 'none'; { const sb = document.getElementById('btn-sneak'); if (sb) sb.style.display = 'none'; }
                     this.fireBtn.style.display = 'flex';
                     this.emoteBtn.style.display = 'none';
                     this.setInteract('Exit', 'Vehicle');
@@ -657,7 +657,7 @@
                 }
             
                 // 4. CLAMP & UI UPDATE
-                this.player.visibility = Math.min(1.0, Math.max(0.0, visibility));
+                this.player.visibility = Math.min(1.0, Math.max(0.0, visibility * (this.sneaking ? SNEAK.VISIBILITY : 1)));   // sneaking: harder to make out (engine/sneak.js)
                 
                 // Calculate percentage (100% Hidden = 0% Visible)
                 const hiddenPercent = Math.round((1.0 - this.player.visibility) * 100);

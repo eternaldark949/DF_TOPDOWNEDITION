@@ -123,6 +123,7 @@ const SCRIPTS = [
     'engine/footsteps.js',
     'engine/status-effects.js',
     'engine/executions.js',
+    'engine/sneak.js',
     'ui/dev-overlay.js',
     'engine/scope.js',
     'engine/tuning-ui.js',

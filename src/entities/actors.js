@@ -433,7 +433,7 @@
             applyMovement(dx, dy) {
                 if (!this.visible) return;
                 
-                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1);   // (moveMul: slowed, e.g. moving furniture)
+                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1) * (this._game && this._game.sneaking ? SNEAK.SPEED : 1);   // (moveMul: slowed, e.g. moving furniture; sneaking: engine/sneak.js)
                 gaitCommand(this, dx * speed, dy * speed);
                 this.x += dx * speed;
                 this.y += dy * speed;

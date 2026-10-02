@@ -39,6 +39,11 @@
                     };
                 },
                 breathe(t) { const b = breath(t); return { bounce: b * 0.35, torso: b * 0.01 }; },
+                // Sneaking (engine/sneak.js): low and careful — the body drawn back and down, hands in close, head forward
+                sneak(t) {
+                    const b = breath(t);
+                    return { l: [4.5, -5.5], r: [5, 5.5], le: [0, -9], re: [0, 9], bounce: -2.6 + b * 0.2, head: [1.2, 0], torso: 0.04, hint: 'neutral' };
+                },
                 // A body going down (engine/finisher.js drawCorpses): a jolt back from the hit, the knees go,
                 // the arms fly out and back, the head lolls; over ~0.6 s, then still. The caller rotates the
                 // body to face the shot and stretches it along its length as it lies back.

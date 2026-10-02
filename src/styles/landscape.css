@@ -21,6 +21,7 @@
         body.landscape #btn-handbrake { bottom: 30px; right: 6px; width: 50px; height: 50px; font-size: 0.5rem; }
         body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
         body.landscape #btn-holster, body.landscape #emote-frown { bottom: 120px; }
+        body.landscape #btn-sneak { bottom: 172px; right: 25px; }
 
         /* --- The action dock: beside the arc, not above it --- */
         body.landscape #action-dock { right: 212px; bottom: 18px; }

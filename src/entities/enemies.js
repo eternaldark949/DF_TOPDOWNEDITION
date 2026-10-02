@@ -1156,8 +1156,9 @@
                 let canSee = false;
                 // Up close they sense her, unless she comes from behind, slowly or hidden, out of the light (an execution)
                 const toHer = Math.atan2(player.y - this.y, player.x - this.x);
-                const pg = player._gait, sneaking = Math.abs(normalizeAngle(toHer - this.angle)) > Math.PI * 0.6
-                    && ((pg ? pg.speed : 0) < 2.3 || player.isHidden) && (player.visibility ?? 0) < 0.6;
+                const pg = player._gait, hg = typeof game !== 'undefined' ? game : null;
+                const sneaking = Math.abs(normalizeAngle(toHer - this.angle)) > Math.PI * 0.6
+                    && ((hg && hg.sneaking && player === hg.player) || player.isHidden || ((pg ? pg.speed : 0) < 2.3 && (player.visibility ?? 0) < 0.75));
                 if (distToPlayer < 50 && isVisible && !sneaking) {
                     canSee = true;
                     this.suspicion += 5;

@@ -9,19 +9,35 @@
         // so she has to choose her moment. Bosses can't be executed.
 
         engineMixin({
+            /** The cue: a thin gold reticle under whoever she could take right now (world space, under the bodies) */
+            drawExecuteCue(ctx) {
+                const e = this._execTarget; if (!e || e.dead || this._exec) return;
+                const t = _gameTimeSec, r = 15 + Math.sin(t * 6) * 1.2;
+                ctx.save(); ctx.translate(e.x, e.y);
+                ctx.strokeStyle = 'rgba(255, 215, 120, 0.85)'; ctx.lineWidth = 1.2;
+                ctx.beginPath(); ctx.ellipse(0, 3, r, r * 0.62, 0, 0, Math.PI * 2); ctx.stroke();
+                ctx.rotate(t * 0.8);
+                for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(r + 2, 0); ctx.lineTo(r + 7, 0); ctx.stroke(); }
+                ctx.restore();
+            },
+
             /** Whoever she could execute right now (nearest), or null */
             executionTarget() {
                 const pl = this.player;
                 if (!pl || this.isDriving || this._exec || (this.scenes && this.scenes.running) || this.furniture && this.furniture.busy()) return null;
                 const blade = this.weaponMode === 'melee';
                 const reach = blade ? 66 : 56, walls = this.activeMap.walls, cols = getColliders(this.activeMap);
+                // she has to come quietly: sneaking (engine/sneak.js), or creeping slowly out of the bright light
+                const g = pl._gait, quiet = this.sneaking || ((g ? g.speed : 0) < 2.3 && (pl.visibility ?? 0) < 0.75);
+                if (!quiet) return null;
                 let best = null, bd = 1e9;
                 for (const e of this.enemies) {
                     if (!e || e.dead || e.bossName || e._noExecute || typeof Ganger === 'undefined' || !(e instanceof Ganger)) continue;
                     const d = Math.hypot(e.x - pl.x, e.y - pl.y);
                     if (d > reach || d >= bd) continue;
-                    const unaware = e.state === 'IDLE' || (e.state === 'SUSPICIOUS' && e.suspicion < 40);
-                    if (!unaware) continue;
+                    // unaware of her: not in a fight, and not looking at her right now (idle, wary or searching elsewhere)
+                    if (e.state === 'ALERT' || e.state === 'SUPPRESSING') continue;
+                    if (e.canSeePoint && e.canSeePoint(pl.x, pl.y, walls, cols)) continue;
                     // she's at its back (within ±70° of straight behind)
                     const toHer = Math.atan2(pl.y - e.y, pl.x - e.x);
                     if (Math.abs(normalizeAngle(toHer - e.angle)) < Math.PI - 1.22) continue;

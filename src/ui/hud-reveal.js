@@ -12,7 +12,7 @@
             health:    ['ui-health', 'ui-shield-bar', 'ui-flit-bar-container'],
             move:      ['input-zone-left'],
             fire:      ['btn-fire'],
-            holster:   ['btn-holster', 'btn-emote'],
+            holster:   ['btn-holster', 'btn-emote', 'btn-sneak'],
             heal:      ['btn-heal'],
             flit:      ['btn-flit', 'joystick-ring'],
             nv:        ['btn-nv'],

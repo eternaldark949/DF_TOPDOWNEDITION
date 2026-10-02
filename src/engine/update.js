@@ -58,6 +58,7 @@
                 this.updateCorpses();
                 this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
                 this.updateExecution();                                // a takedown in progress (engine/executions.js)
+                this.updateSneak();
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
                 this.updateShotFx();
             

@@ -1722,7 +1722,7 @@
 
         /* 2. Utility Buttons (Heal, NV, Flit, Auto) */
         /* Updated: Tighter spacing ("Cat's Paw") & Darker Background */
-        #btn-heal, #btn-nv, #btn-flit, #btn-autodrive, #btn-zib-skip, #btn-holster {
+        #btn-heal, #btn-nv, #btn-flit, #btn-autodrive, #btn-zib-skip, #btn-holster, #btn-sneak {
             width: 44px; 
             height: 44px;
             border-radius: 50%;
@@ -1809,6 +1809,13 @@
             box-shadow: 0 0 12px rgba(255, 170, 68, 0.4);
         }
         #btn-holster:active { background: rgba(255, 170, 68, 0.4); transform: scale(0.95); }
+        /* Sneak (engine/sneak.js): the outer toe of the paw, left of NV (clear of the action dock); lavender while she's low */
+        #btn-sneak {
+            position: absolute; bottom: 232px; right: 180px;
+            color: #cab0fa; font-size: 0.55rem; font-weight: bold; letter-spacing: 0.5px; text-align: center; line-height: 1.1;
+        }
+        #btn-sneak.active { background: rgba(150, 110, 230, 0.55); color: #fff; box-shadow: 0 0 0 1.5px rgba(222, 204, 255, 0.9), 0 0 18px rgba(202, 176, 250, 0.8); }
+        #btn-sneak:active { transform: scale(0.95); }
 
         /* Emote Joystick (replaces fire button when holstered)
            Pattern matches #btn-fire: stationary outer ring + inner knob that moves. */
@@ -3111,6 +3118,7 @@
         body.landscape #btn-handbrake { bottom: 30px; right: 6px; width: 50px; height: 50px; font-size: 0.5rem; }
         body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
         body.landscape #btn-holster, body.landscape #emote-frown { bottom: 120px; }
+        body.landscape #btn-sneak { bottom: 172px; right: 25px; }
 
         /* --- The action dock: beside the arc, not above it --- */
         body.landscape #action-dock { right: 212px; bottom: 18px; }
@@ -3572,6 +3580,7 @@
             <div id="btn-handbrake" aria-label="Handbrake"><span>HAND<br>BRAKE</span></div>
             <div id="btn-zib-skip" style="display:none;">SKIP<br><span style="font-size:0.5rem;opacity:0.7">(T)</span></div>
             <div id="btn-holster">HOLSTER</div>
+            <div id="btn-sneak" aria-label="Sneak">SNEAK</div>
             <div id="btn-nv">👁️</div>
 
             <div id="input-zone-left"></div> 
@@ -18996,7 +19005,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             applyMovement(dx, dy) {
                 if (!this.visible) return;
                 
-                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1);   // (moveMul: slowed, e.g. moving furniture)
+                const speed = this.getCurrentSpeed() * (this.moveMul ?? 1) * (this._game && this._game.sneaking ? SNEAK.SPEED : 1);   // (moveMul: slowed, e.g. moving furniture; sneaking: engine/sneak.js)
                 gaitCommand(this, dx * speed, dy * speed);
                 this.x += dx * speed;
                 this.y += dy * speed;
@@ -24378,8 +24387,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let canSee = false;
                 // Up close they sense her, unless she comes from behind, slowly or hidden, out of the light (an execution)
                 const toHer = Math.atan2(player.y - this.y, player.x - this.x);
-                const pg = player._gait, sneaking = Math.abs(normalizeAngle(toHer - this.angle)) > Math.PI * 0.6
-                    && ((pg ? pg.speed : 0) < 2.3 || player.isHidden) && (player.visibility ?? 0) < 0.6;
+                const pg = player._gait, hg = typeof game !== 'undefined' ? game : null;
+                const sneaking = Math.abs(normalizeAngle(toHer - this.angle)) > Math.PI * 0.6
+                    && ((hg && hg.sneaking && player === hg.player) || player.isHidden || ((pg ? pg.speed : 0) < 2.3 && (player.visibility ?? 0) < 0.75));
                 if (distToPlayer < 50 && isVisible && !sneaking) {
                     canSee = true;
                     this.suspicion += 5;
@@ -39085,6 +39095,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     };
                 },
                 breathe(t) { const b = breath(t); return { bounce: b * 0.35, torso: b * 0.01 }; },
+                // Sneaking (engine/sneak.js): low and careful — the body drawn back and down, hands in close, head forward
+                sneak(t) {
+                    const b = breath(t);
+                    return { l: [4.5, -5.5], r: [5, 5.5], le: [0, -9], re: [0, 9], bounce: -2.6 + b * 0.2, head: [1.2, 0], torso: 0.04, hint: 'neutral' };
+                },
                 // A body going down (engine/finisher.js drawCorpses): a jolt back from the hit, the knees go,
                 // the arms fly out and back, the head lolls; over ~0.6 s, then still. The caller rotates the
                 // body to face the shot and stretches it along its length as it lies back.
@@ -45843,7 +45858,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             health:    ['ui-health', 'ui-shield-bar', 'ui-flit-bar-container'],
             move:      ['input-zone-left'],
             fire:      ['btn-fire'],
-            holster:   ['btn-holster', 'btn-emote'],
+            holster:   ['btn-holster', 'btn-emote', 'btn-sneak'],
             heal:      ['btn-heal'],
             flit:      ['btn-flit', 'joystick-ring'],
             nv:        ['btn-nv'],
@@ -47226,6 +47241,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                     }
                     if (e.key === 'j' || e.key === 'J') this.useBoosterOnAlly();
+                    if ((e.key === 'c' || e.key === 'C') && this.running && !this.paused && !e.ctrlKey && !e.metaKey) this.toggleSneak();   // engine/sneak.js
                     
                     // AUTO-DRIVE TOGGLE (only while driving)
                     if ((e.key === 'q' || e.key === 'Q') && this.isDriving && this.running && !this.paused) {
@@ -47428,6 +47444,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.zibSkipBtn.addEventListener('mousedown', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
                 this.zibSkipBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
 
+                const sneakBtn = document.getElementById('btn-sneak');
+                if (sneakBtn) { const tog = (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSneak(); }; sneakBtn.addEventListener('mousedown', tog); sneakBtn.addEventListener('touchstart', tog, { passive: false }); }
                 const toggleHolster = (e) => {
                     e.preventDefault();
                     this.weaponHolstered = !this.weaponHolstered;
@@ -49419,15 +49437,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const pace = Math.min(1, speed / 3);
                 if (typeof ambience !== 'undefined' && ambience.footstep) {
                     const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z;
-                    ambience.footstep(shoe, mat, { gain: isHer ? 0.4 + 0.6 * pace : 0.3 + 0.4 * pace, wet, near: isHer ? 1 : Math.max(0, 1 - d / 520) * 0.75, pan: isHer ? 0 : (e.x - pl.x) / Math.max(200, hw) });
+                    ambience.footstep(shoe, mat, { gain: isHer ? (this.sneaking ? 0.2 : 0.4 + 0.6 * pace) : 0.3 + 0.4 * pace, wet, near: isHer ? 1 : Math.max(0, 1 - d / 520) * 0.75, pan: isHer ? 0 : (e.x - pl.x) / Math.max(200, hw) });
                 }
                 if (isHer) {
                     // her steps carry: shoe × floor × pace; a puddle gives her away (with a small ring)
                     const N = CONFIG.NOISE;
-                    if (mat === 'water') { this.emitNoise(e.x, e.y, N.puddleStep, 'puddle', true, { ring: true }); return; }
+                    const sneak = this.sneaking;
+                    if (mat === 'water') { this.emitNoise(e.x, e.y, Math.round(N.puddleStep * (sneak ? SNEAK.PUDDLE_NOISE : 1)), 'puddle', true, { ring: true }); return; }
                     let reach = shoe === 'heels' ? N.stepHeels : shoe === 'boots' ? N.stepBoots : N.stepSoft;
                     reach *= mat === 'carpet' || mat === 'grass' ? 0.5 : mat === 'marble' ? 1.3 : mat === 'metal' ? 1.4 : 1;
                     reach *= speed < 1.4 ? 0.5 : speed > 3.2 ? 1.3 : 1;
+                    if (sneak) reach *= SNEAK.STEP_NOISE;
                     this.emitNoise(e.x, e.y, Math.round(reach), 'step', true, { ring: false });
                 } else if (e instanceof Ganger && (mat === 'marble' || mat === 'metal' || mat === 'wood') && (shoe === 'boots' || shoe === 'heels') && (e._stepN = (e._stepN || 0) + 1) % 2 === 0) {
                     // a guard's hard steps: a faint ember ring where you can hear them (nobody else is alerted)
@@ -49578,19 +49598,35 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // so she has to choose her moment. Bosses can't be executed.
 
         engineMixin({
+            /** The cue: a thin gold reticle under whoever she could take right now (world space, under the bodies) */
+            drawExecuteCue(ctx) {
+                const e = this._execTarget; if (!e || e.dead || this._exec) return;
+                const t = _gameTimeSec, r = 15 + Math.sin(t * 6) * 1.2;
+                ctx.save(); ctx.translate(e.x, e.y);
+                ctx.strokeStyle = 'rgba(255, 215, 120, 0.85)'; ctx.lineWidth = 1.2;
+                ctx.beginPath(); ctx.ellipse(0, 3, r, r * 0.62, 0, 0, Math.PI * 2); ctx.stroke();
+                ctx.rotate(t * 0.8);
+                for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(r + 2, 0); ctx.lineTo(r + 7, 0); ctx.stroke(); }
+                ctx.restore();
+            },
+
             /** Whoever she could execute right now (nearest), or null */
             executionTarget() {
                 const pl = this.player;
                 if (!pl || this.isDriving || this._exec || (this.scenes && this.scenes.running) || this.furniture && this.furniture.busy()) return null;
                 const blade = this.weaponMode === 'melee';
                 const reach = blade ? 66 : 56, walls = this.activeMap.walls, cols = getColliders(this.activeMap);
+                // she has to come quietly: sneaking (engine/sneak.js), or creeping slowly out of the bright light
+                const g = pl._gait, quiet = this.sneaking || ((g ? g.speed : 0) < 2.3 && (pl.visibility ?? 0) < 0.75);
+                if (!quiet) return null;
                 let best = null, bd = 1e9;
                 for (const e of this.enemies) {
                     if (!e || e.dead || e.bossName || e._noExecute || typeof Ganger === 'undefined' || !(e instanceof Ganger)) continue;
                     const d = Math.hypot(e.x - pl.x, e.y - pl.y);
                     if (d > reach || d >= bd) continue;
-                    const unaware = e.state === 'IDLE' || (e.state === 'SUSPICIOUS' && e.suspicion < 40);
-                    if (!unaware) continue;
+                    // unaware of her: not in a fight, and not looking at her right now (idle, wary or searching elsewhere)
+                    if (e.state === 'ALERT' || e.state === 'SUPPRESSING') continue;
+                    if (e.canSeePoint && e.canSeePoint(pl.x, pl.y, walls, cols)) continue;
                     // she's at its back (within ±70° of straight behind)
                     const toHer = Math.atan2(pl.y - e.y, pl.x - e.x);
                     if (Math.abs(normalizeAngle(toHer - e.angle)) < Math.PI - 1.22) continue;
@@ -49640,6 +49676,31 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.triggerShake(3);
                 }
                 if (t > 0.45) this._exec = null;
+            }
+        });
+        // GameEngine — Sneak. Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
+        //
+        // A toggle (the SNEAK button by HOLSTER, or C): she drops into a low, careful crouch and
+        // moves at 55%. Her steps carry a third as far (a puddle still splashes, a little), she's
+        // a quarter harder to make out, and an unaware back is hers to take (engine/executions.js).
+        // Driving, a scene or the furniture ends it.
+
+        const SNEAK = { SPEED: 0.55, STEP_NOISE: 0.35, PUDDLE_NOISE: 0.6, VISIBILITY: 0.75 };
+
+        engineMixin({
+            setSneak(on) {
+                on = !!on && !this.isDriving;
+                if (this.sneaking === on) return;
+                this.sneaking = on;
+                const b = document.getElementById('btn-sneak');
+                if (b) b.classList.toggle('active', on);
+                document.body.classList.toggle('sneaking', on);
+            },
+            toggleSneak() { this.setSneak(!this.sneaking); },
+
+            /** Once per tick: what ends a sneak, and the speed it allows */
+            updateSneak() {
+                if (this.sneaking && (this.isDriving || (this.scenes && this.scenes.running) || (this.furniture && this.furniture.busy()))) this.setSneak(false);
             }
         });
         // ═══ DEV OVERLAY — the profiler pill and the debug layers ═══
@@ -55146,7 +55207,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.autodriveBtn.classList.remove('engaged');
                     if (this.handbrakeBtn) { this.handbrakeBtn.style.display = 'none'; this.handbrakeBtn.classList.remove('held'); }
                     this.handbrakeHeld = false; this.car.handbrake = false;
-                    this.holsterBtn.style.display = 'flex';
+                    this.holsterBtn.style.display = 'flex'; { const sb = document.getElementById('btn-sneak'); if (sb) sb.style.display = 'flex'; }
                     this.fireBtn.style.display = this.weaponHolstered ? 'none' : 'flex';
                     this.emoteBtn.style.display = this.weaponHolstered ? 'flex' : 'none';
                     if (this.car.controlMode === 'AI') this.car.disableAutoDrive();
@@ -55239,7 +55300,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                     this.autodriveBtn.style.display = 'flex';
                     if (this.handbrakeBtn) this.handbrakeBtn.style.display = 'flex';
-                    this.holsterBtn.style.display = 'none';
+                    this.holsterBtn.style.display = 'none'; { const sb = document.getElementById('btn-sneak'); if (sb) sb.style.display = 'none'; }
                     this.fireBtn.style.display = 'flex';
                     this.emoteBtn.style.display = 'none';
                     this.setInteract('Exit', 'Vehicle');
@@ -55577,7 +55638,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             
                 // 4. CLAMP & UI UPDATE
-                this.player.visibility = Math.min(1.0, Math.max(0.0, visibility));
+                this.player.visibility = Math.min(1.0, Math.max(0.0, visibility * (this.sneaking ? SNEAK.VISIBILITY : 1)));   // sneaking: harder to make out (engine/sneak.js)
                 
                 // Calculate percentage (100% Hidden = 0% Visible)
                 const hiddenPercent = Math.round((1.0 - this.player.visibility) * 100);
@@ -55792,6 +55853,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.updateCorpses();
                 this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
                 this.updateExecution();                                // a takedown in progress (engine/executions.js)
+                this.updateSneak();
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
                 this.updateShotFx();
             
@@ -58011,6 +58073,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.drawNoiseRipples(this.ctx);
                 this.drawCorpses(this.ctx, cullBounds.entities);         // the fallen, under the living (engine/finisher.js)
                 this.drawHunterDashes(this.ctx);                         // crimson flits (engine/palace-art.js)
+                this.drawExecuteCue(this.ctx);                           // a gold reticle under an unaware back (engine/executions.js)
                 
                 // PERFORMANCE: AABB viewport culling for entities
                 {
@@ -61664,8 +61727,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // In the rain outdoors a hoodie's hood goes up (unless she's wearing a hat)
                     hat: cosmeticConfig.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie' ? { type: 'hood_up', color: outfit.top.color } : null),
                     jewelry: withFieldMask(this, cosmeticConfig.jewelry),   // masked in the field (core/appearances.js)
-                    pose: pushing ? 'push' : typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : undefined,
-                    poseWhileMoving: pushing,
+                    pose: pushing ? 'push' : typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : this.sneaking ? 'sneak' : undefined,
+                    poseWhileMoving: pushing || this.sneaking,
                     // A drawn gun takes the hand; the umbrella waits
                     held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
                 });

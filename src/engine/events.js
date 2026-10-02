@@ -106,6 +106,7 @@
                         }
                     }
                     if (e.key === 'j' || e.key === 'J') this.useBoosterOnAlly();
+                    if ((e.key === 'c' || e.key === 'C') && this.running && !this.paused && !e.ctrlKey && !e.metaKey) this.toggleSneak();   // engine/sneak.js
                     
                     // AUTO-DRIVE TOGGLE (only while driving)
                     if ((e.key === 'q' || e.key === 'Q') && this.isDriving && this.running && !this.paused) {
@@ -308,6 +309,8 @@
                 this.zibSkipBtn.addEventListener('mousedown', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
                 this.zibSkipBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
 
+                const sneakBtn = document.getElementById('btn-sneak');
+                if (sneakBtn) { const tog = (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSneak(); }; sneakBtn.addEventListener('mousedown', tog); sneakBtn.addEventListener('touchstart', tog, { passive: false }); }
                 const toggleHolster = (e) => {
                     e.preventDefault();
                     this.weaponHolstered = !this.weaponHolstered;
