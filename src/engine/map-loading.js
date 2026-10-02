@@ -1042,6 +1042,7 @@
                 } 
                 
                 this.decals.clear(); 
+                this.corpses = []; this.finisher = null; this.finCam = null;
                 
                 // Deactivate current map entities (non-target maps have empty arrays from lazy creation)
                 const targetMapData = maps[mapId];

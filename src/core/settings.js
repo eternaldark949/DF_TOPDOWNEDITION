@@ -146,6 +146,8 @@
             gradeCustom: null,              // the seven slider values when colorGrade is 'custom' (app/boot.js)
             stealthGray: true,              // the world greys as Stella slips into shadow
             photoFullColour: false,         // Cinematic View: lift the stealth grey for a photo
+            finisher: 'full',               // 'full' | 'subtle' | 'off' (engine/finisher.js)
+            capturePrompt: true,            // the "Capture?" pill after a finisher
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
             

@@ -651,10 +651,10 @@
             }
             
             // Explosion: Radial burst of particles (combat/destruction)
-            spawnExplosion(x, y, color = 'rgba(0, 243, 255, 1)') {
-                for(let i=0; i<15; i++) {
+            spawnExplosion(x, y, color = 'rgba(0, 243, 255, 1)', count = 15, speed = 6) {
+                for(let i=0; i<count; i++) {
                     const ang = Math.random() * Math.PI * 2;
-                    const spd = Math.random() * 6;
+                    const spd = Math.random() * speed;
                     const p = this._particlePool.acquire();
                     p.type = 'explosion';
                     p.x = x; p.y = y;

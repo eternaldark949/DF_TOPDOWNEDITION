@@ -80,7 +80,8 @@
                 }
 
                 actor._hpShowT = now;                                        // show their health bar for a while
-                actor._hitT = now; actor._hitDir = dir;                      // the humanoid flinches away from the hit
+                actor._hitT = now; actor._hitDir = dir;                      // the humanoid flinches away from the hit (and a body falls that way)
+                actor._hits = (actor._hits || 0) + 1; actor._engaged = true;
 
                 // Blood in the character's own colour, sprayed along the hit
                 const B = bloodOf(actor);

@@ -55,6 +55,7 @@
                     if(this.muzzleFlashes[i].life <= 0) this.muzzleFlashes.splice(i, 1);
                 }
                 this.updateCasings();
+                this.updateCorpses();
                 this.updateShotFx();
             
                 this.updateTime();
@@ -618,8 +619,10 @@
                     if (enemy.dead) { 
                         this.awardKill(enemy);                                    // Resonance for the kill (core/resonance.js)
                         audioSys.sfx('explode'); 
-                        this.weather.spawnExplosion(enemy.x, enemy.y, '#a469ff'); 
+                        this.weather.spawnExplosion(enemy.x, enemy.y, '#a469ff', 7, 2.4);   // a soft violet puff: the body stays
                         this.triggerShake(10); 
+                        this.addCorpse(enemy);                                    // the body falls and stays a while (engine/finisher.js)
+                        const finReason = this.finisherReason(enemy);
                         this.spawnLoot(enemy.x, enemy.y);
                         
                         // Bounty target killed — complete mission with bonus loot
@@ -640,11 +643,12 @@
                             
                             if (remainingGunners > 0) {
                                 showMessage("REMAINING GUNNERS ENRAGED!");
-                            } else {
+                            } else if (!finReason) {
                                 // Last GatlingGunner killed - trigger dramatic time slow!
                                 this.triggerTimeSlow(0.4, 4, true);
                             }
                         }
+                        if (finReason) this.startFinisher(enemy, finReason);     // earned: slow motion, the body, then her twirl
                         this.enemies.splice(i, 1); 
                     }
                 }

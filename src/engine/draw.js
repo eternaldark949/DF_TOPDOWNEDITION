@@ -47,7 +47,9 @@
             
                 this.ctx.save();
                 this.ctx.translate(this.canvas.width/2, this.canvas.height/2);
-                this.ctx.scale(this.camera.zoom, this.camera.zoom);
+                const fc = this.finCam;                                   // the finisher's camera (engine/finisher.js): offset and push-in
+                const viewZoom = this.camera.zoom * (fc ? fc.z : 1);
+                this.ctx.scale(viewZoom, viewZoom);
             
                 // Camera Logic: Cutscene Director vs Player Tracking
                 let camX, camY;
@@ -70,7 +72,8 @@
                     this.camera.y = camY;
                 }
                 if (this.cineCam) { camX += this.cineCam.dx; camY += this.cineCam.dy; }   // Cinematic View's pan
-                this.view = { x: camX, y: camY, zoom: this.camera.zoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
+                if (fc) { camX += fc.dx; camY += fc.dy; }
+                this.view = { x: camX, y: camY, zoom: viewZoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
                 
                 this.ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
                 // World → screen matrix for this frame: lets the hair physics work out any
@@ -662,6 +665,7 @@
             
                 this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
                 this.drawNoiseRipples(this.ctx);
+                this.drawCorpses(this.ctx, cullBounds.entities);         // the fallen, under the living (engine/finisher.js)
                 
                 // PERFORMANCE: AABB viewport culling for entities
                 {

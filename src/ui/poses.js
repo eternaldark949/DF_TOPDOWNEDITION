@@ -39,6 +39,19 @@
                     };
                 },
                 breathe(t) { const b = breath(t); return { bounce: b * 0.35, torso: b * 0.01 }; },
+                // A body going down (engine/finisher.js drawCorpses): a jolt back from the hit, the knees go,
+                // the arms fly out and back, the head lolls; over ~0.6 s, then still. The caller rotates the
+                // body to face the shot and stretches it along its length as it lies back.
+                die(t, o) {
+                    const k = Math.min(1, t / 0.6), e = 1 - Math.pow(1 - k, 3);
+                    const jolt = t < 0.18 ? Math.sin(t / 0.18 * Math.PI) * 2.5 : 0;
+                    const side = (o.seed % 2) < 1 ? 1 : -1;
+                    return {
+                        l: [-9 * e, -13 * e - 1], r: [-7 * e, 12 * e + 1], le: [-3 * e, -11 * e], re: [-2 * e, 10.5 * e],
+                        lf: [7 * e, -2.5 * e], rf: [5.5 * e, 3 * e], bounce: -6.5 * e - jolt,
+                        head: [-4 * e, 0.8 * side * e], turn: 0.45 * side * e, torso: 0.14 * side * e, hip: -0.08 * side * e, hint: 'neutral'
+                    };
+                },
                 // Seated (drawn over a chair or couch): feet out in front, hands in the lap, leaning back a little
                 sit(t, o) {
                     const b = breath(t);

@@ -1184,6 +1184,7 @@
                 ps.t += dt;
                 const target = config.poseWhileMoving || (!moving && ps.still > 0.4) ? 1 : 0;   // (some poses hold while walking: pushing furniture)
                 ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
+                if (config.poseInstant) ps.w = target;                     // a fall can't wait for the pose to fade in
                 if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender, beat: name === 'dance' ? mapBeatN() : null }); poseW = ps.w; }
             }
             const pf = (key, i) => (pose && pose[key] ? pose[key][i] * poseW : 0);
@@ -1513,7 +1514,9 @@
                     if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
                         const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
                         const laser = game.inventory && game.inventory.getEquippedAttachment()?.effect === 'laser_sight';
-                        drawWeapon(ctx, weaponId, wx, wy, 0, scale, laser);
+                        // the finisher's twirl (engine/finisher.js): the gun spins round her trigger finger
+                        const tw = game.twirlAngle ? game.twirlAngle() : 0;
+                        drawWeapon(ctx, weaponId, wx, wy, tw, scale, laser && !tw);
                         // Muzzle in the player's frame — laser sight and shots start here
                         const mz = weaponMuzzleLocal(weaponId);
                         entity._muzzleLocal = { x: wx + mz.x * scale, y: wy + mz.y * scale };

@@ -893,6 +893,7 @@
                 this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
                 this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
                 this._updateValueEl('set-soundrings', GameSettings.soundRings || 'mirage');
+                this._updateValueEl('set-finisher', GameSettings.finisher || 'full');
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
@@ -979,6 +980,11 @@
                     // The grade drawer lives in Cinematic View, over the world with no HUD in the way
                     this.closeSettings();
                     this.enterCinematic({ grade: true, back: 'settings' });
+
+                } else if (key === 'finisher') {
+                    const order = ['full', 'subtle', 'off'];
+                    GameSettings.finisher = order[(order.indexOf(GameSettings.finisher || 'full') + 1) % order.length];
+                    this._updateValueEl(el.id, GameSettings.finisher);
 
                 } else if (key === 'soundRings') {
                     const order = ['mirage', 'simple', 'off'];
