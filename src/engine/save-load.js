@@ -124,6 +124,7 @@
                         colorGrade: GameSettings.colorGrade,
                         gradeCustom: GameSettings.gradeCustom,
                         stealthGray: GameSettings.stealthGray,
+                        soundRings: GameSettings.soundRings,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
@@ -745,6 +746,7 @@
                         GameSettings.colorGrade = save.settings.colorGrade || 'none';
                         GameSettings.gradeCustom = save.settings.gradeCustom || null;
                         GameSettings.stealthGray = save.settings.stealthGray !== false;
+                        if (save.settings.soundRings) GameSettings.soundRings = save.settings.soundRings;
                         if (typeof restoreGameGrade === 'function') restoreGameGrade();       // the grade back on screen, not just in the setting
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;

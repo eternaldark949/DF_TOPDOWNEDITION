@@ -146,6 +146,7 @@
             gradeCustom: null,              // the seven slider values when colorGrade is 'custom' (app/boot.js)
             stealthGray: true,              // the world greys as Stella slips into shadow
             photoFullColour: false,         // Cinematic View: lift the stealth grey for a photo
+            soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
             
             // --- AUDIO ---
@@ -218,6 +219,7 @@
                     this.softShadows = false;
                     this.bloom = false;
                     this.wetReflections = false;
+                    this.soundRings = 'simple';
                 } else if (preset === 'medium') {
                     this.lightingQuality = 'medium';
                     this.trafficDensity = 'medium';

@@ -1081,6 +1081,9 @@
                 // 5. SCREEN SPACE UI (Overlays)
                 this.profiler.start('Render:PostFX');
                 
+                // Sound rings as a mirage over the lit scene (engine/noise.js)
+                this.drawMirageRings(this.ctx);
+
                 // Wet-world post-processing (after lighting, before rain)
                 const ambient = this.getAmbientDarkness();
                 if (ambient > 0.2) {
