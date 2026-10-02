@@ -262,6 +262,20 @@
         
         /* Stealth Indicator */
         #ui-stealth-indicator { position: absolute; top: 12%; left: 50%; transform: translateX(-50%); font-family: 'Montserrat', sans-serif; font-size: 1.1rem; font-weight: 600; letter-spacing: 4px; pointer-events: none; display: none; z-index: 20; white-space: nowrap; background: linear-gradient(180deg, #FFFFFF 0%, #C0C0C0 40%, #909090 70%, #B0B0B0 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 6px rgba(192, 192, 192, 0.6)) drop-shadow(0 0 15px rgba(160, 160, 160, 0.3)); }
+        /* The gauntlet's wave readout (HordeGauntlet._hud): champagne caps over a slim draining bar; the stealth word steps down beneath it */
+        #ui-wave { position: absolute; top: 12%; left: 50%; transform: translate(-50%, -6px); z-index: 20; pointer-events: none; opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease;
+            display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 16px 7px; border-radius: 999px;
+            background: linear-gradient(100deg, rgba(4, 1, 6, 0.62), rgba(22, 6, 46, 0.58)); border: 1px solid rgba(202, 176, 250, 0.32); }
+        #ui-wave.show { opacity: 1; transform: translate(-50%, 0); }
+        #ui-wave .w-line { display: flex; align-items: center; gap: 9px; white-space: nowrap; font: 600 0.72rem var(--font-ui); letter-spacing: 4px; text-transform: uppercase; }
+        #ui-wave .w-title { color: var(--df-cream); text-shadow: 0 0 8px rgba(255, 236, 200, 0.35); }
+        #ui-wave .w-sep { color: var(--df-gold); font-size: 0.5rem; text-shadow: 0 0 6px rgba(255, 194, 72, 0.8); }
+        #ui-wave .w-sub { color: var(--df-lavender-pale); }
+        #ui-wave .w-chip { font-size: 0.52rem; letter-spacing: 2px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(208, 16, 28, 0.75); color: #ff8a92; }
+        #ui-wave .w-bar { width: 100%; min-width: 120px; height: 2px; border-radius: 1px; background: rgba(202, 176, 250, 0.18); overflow: hidden; }
+        #ui-wave .w-bar i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, var(--df-lavender), #fff); box-shadow: 0 0 6px rgba(241, 232, 254, 0.8); transition: transform 0.35s ease; }
+        #ui-wave.between .w-bar { opacity: 0; }
+        body.wave-hud #ui-stealth-indicator { top: calc(12% + 52px); }
         
         /* HUD Bars */
         #ui-health { 
@@ -3051,6 +3065,9 @@
         body.landscape #comms-bar { left: 22%; right: 22%; height: 54px; }
         body.landscape #comms-bar.active { top: 10px; }
         body.landscape #ui-stealth-indicator { top: 30px; font-size: 0.95rem; }
+        body.landscape #ui-wave { top: 12px; }
+        body.landscape #ui-wave .w-line { font-size: 0.64rem; }
+        body.landscape.wave-hud #ui-stealth-indicator { top: 60px; }
 
         /* --- Cinema --- */
         body.landscape #cinematic-bars.active .cine-bar { height: 9vh; }
@@ -3423,6 +3440,7 @@
             </div>
             
             <div id="ui-stealth-indicator">HIDDEN (100%)</div>
+            <div id="ui-wave" aria-live="polite"></div>
 
             <div id="ui-health">
                 <div id="health-bar" style="width: 100%;"></div>
@@ -24622,6 +24640,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.totalKills = 0;
                 this.entry = GAUNTLET_MAPS[0];
                 this.mapId = this.entry.mapId;
+                document.getElementById('ui-wave')?.classList.remove('show');   // a fresh game: no readout left over
+                document.body.classList.remove('wave-hud');
             }
 
             /** Best wave on any map (old saves kept a single number). */
@@ -24724,6 +24744,44 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const gunnerText = cfg.gunnerCount > 0 ? ` + ${cfg.gunnerCount} GUNNER${cfg.gunnerCount > 1 ? 'S' : ''}` : '';
                 showMessage(`WAVE ${this.wave} — ${cfg.gangerCount} GANGERS${gunnerText}`);
                 game.triggerShake(8);
+                this._waveSize = this.hostiles.length;
+            }
+
+            /**
+             * The wave readout (#ui-wave, top centre): the wave, how many are left and a
+             * bar that drains, the countdown between waves, the summary at the end. The
+             * message modal still announces each beat; this keeps the count where a loot
+             * pickup or a flit message can't cover it. Writes the DOM only on change.
+             */
+            _hud(game, ended) {
+                const el = this._el || (this._el = document.getElementById('ui-wave'));
+                if (!el) return;
+                let key, html = '', frac = 0;
+                if (ended) {
+                    key = 'end' + this.wave;
+                    html = `<span class="w-title">Gauntlet over</span><span class="w-sep">◆</span><span class="w-sub">Wave ${this.wave} · ${this.totalKills} kills</span>`;
+                } else if (!this.active || game.activeMap.id !== this.mapId || (game.scenes && game.scenes.running)) {
+                    key = '';
+                } else if (this.waveDelay > 0) {
+                    const n = Math.ceil(this.waveDelay / 60);
+                    key = 'gap' + this.wave + ':' + n;
+                    html = this.wave > 0
+                        ? `<span class="w-title">Wave ${this.wave} cleared</span><span class="w-sep">◆</span><span class="w-sub">Next in ${n}</span>`
+                        : `<span class="w-title">Wave 1</span><span class="w-sep">◆</span><span class="w-sub">In ${n}</span>`;
+                } else {
+                    const left = this.hostiles.length, gun = this.hostiles.filter(h => h instanceof GatlingGunner).length;
+                    key = 'w' + this.wave + ':' + left + ':' + gun;
+                    frac = this._waveSize ? left / this._waveSize : 0;
+                    html = `<span class="w-title">Wave ${this.wave}</span><span class="w-sep">◆</span><span class="w-sub">${left} left</span>`
+                         + (gun ? `<span class="w-chip">${gun > 1 ? gun + ' gunners' : 'Gunner'}</span>` : '');
+                }
+                if (key === this._hudKey) return;
+                this._hudKey = key;
+                if (!key) { el.classList.remove('show'); document.body.classList.remove('wave-hud'); return; }
+                el.innerHTML = `<div class="w-line">${html}</div><div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
+                el.classList.toggle('between', !frac);
+                el.classList.add('show'); document.body.classList.add('wave-hud');
+                if (ended) { clearTimeout(this._endT); this._endT = setTimeout(() => { if (!this.active) { this._hudKey = ''; el.classList.remove('show'); document.body.classList.remove('wave-hud'); } }, 6000); }
             }
 
             update(game) {
@@ -24740,6 +24798,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (this.waveDelay <= 0) {
                         this.spawnWave(game);
                     }
+                    this._hud(game);
                     return;
                 }
 
@@ -24767,6 +24826,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     showMessage(`WAVE ${this.wave} CLEARED — +${reward} PERSONICS, +${scrapReward} SCRAP`);
                     this.waveDelay = 210; // 3.5 seconds between waves
                 }
+                this._hud(game);
             }
 
             end(game) {
@@ -24787,7 +24847,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 if (this.wave > 0) {
                     showMessage(`GAUNTLET OVER — WAVE ${this.wave} — ${this.totalKills} KILLS`);
-                }
+                    this._hud(game, true);
+                } else this._hud(game);
             }
         }
 

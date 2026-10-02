@@ -45,6 +45,9 @@
         body.landscape #comms-bar { left: 22%; right: 22%; height: 54px; }
         body.landscape #comms-bar.active { top: 10px; }
         body.landscape #ui-stealth-indicator { top: 30px; font-size: 0.95rem; }
+        body.landscape #ui-wave { top: 12px; }
+        body.landscape #ui-wave .w-line { font-size: 0.64rem; }
+        body.landscape.wave-hud #ui-stealth-indicator { top: 60px; }
 
         /* --- Cinema --- */
         body.landscape #cinematic-bars.active .cine-bar { height: 9vh; }

@@ -44,6 +44,20 @@
         
         /* Stealth Indicator */
         #ui-stealth-indicator { position: absolute; top: 12%; left: 50%; transform: translateX(-50%); font-family: 'Montserrat', sans-serif; font-size: 1.1rem; font-weight: 600; letter-spacing: 4px; pointer-events: none; display: none; z-index: 20; white-space: nowrap; background: linear-gradient(180deg, #FFFFFF 0%, #C0C0C0 40%, #909090 70%, #B0B0B0 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 6px rgba(192, 192, 192, 0.6)) drop-shadow(0 0 15px rgba(160, 160, 160, 0.3)); }
+        /* The gauntlet's wave readout (HordeGauntlet._hud): champagne caps over a slim draining bar; the stealth word steps down beneath it */
+        #ui-wave { position: absolute; top: 12%; left: 50%; transform: translate(-50%, -6px); z-index: 20; pointer-events: none; opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease;
+            display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 16px 7px; border-radius: 999px;
+            background: linear-gradient(100deg, rgba(4, 1, 6, 0.62), rgba(22, 6, 46, 0.58)); border: 1px solid rgba(202, 176, 250, 0.32); }
+        #ui-wave.show { opacity: 1; transform: translate(-50%, 0); }
+        #ui-wave .w-line { display: flex; align-items: center; gap: 9px; white-space: nowrap; font: 600 0.72rem var(--font-ui); letter-spacing: 4px; text-transform: uppercase; }
+        #ui-wave .w-title { color: var(--df-cream); text-shadow: 0 0 8px rgba(255, 236, 200, 0.35); }
+        #ui-wave .w-sep { color: var(--df-gold); font-size: 0.5rem; text-shadow: 0 0 6px rgba(255, 194, 72, 0.8); }
+        #ui-wave .w-sub { color: var(--df-lavender-pale); }
+        #ui-wave .w-chip { font-size: 0.52rem; letter-spacing: 2px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(208, 16, 28, 0.75); color: #ff8a92; }
+        #ui-wave .w-bar { width: 100%; min-width: 120px; height: 2px; border-radius: 1px; background: rgba(202, 176, 250, 0.18); overflow: hidden; }
+        #ui-wave .w-bar i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, var(--df-lavender), #fff); box-shadow: 0 0 6px rgba(241, 232, 254, 0.8); transition: transform 0.35s ease; }
+        #ui-wave.between .w-bar { opacity: 0; }
+        body.wave-hud #ui-stealth-indicator { top: calc(12% + 52px); }
         
         /* HUD Bars */
         #ui-health { 

@@ -1748,6 +1748,8 @@
                 this.totalKills = 0;
                 this.entry = GAUNTLET_MAPS[0];
                 this.mapId = this.entry.mapId;
+                document.getElementById('ui-wave')?.classList.remove('show');   // a fresh game: no readout left over
+                document.body.classList.remove('wave-hud');
             }
 
             /** Best wave on any map (old saves kept a single number). */
@@ -1850,6 +1852,44 @@
                 const gunnerText = cfg.gunnerCount > 0 ? ` + ${cfg.gunnerCount} GUNNER${cfg.gunnerCount > 1 ? 'S' : ''}` : '';
                 showMessage(`WAVE ${this.wave} — ${cfg.gangerCount} GANGERS${gunnerText}`);
                 game.triggerShake(8);
+                this._waveSize = this.hostiles.length;
+            }
+
+            /**
+             * The wave readout (#ui-wave, top centre): the wave, how many are left and a
+             * bar that drains, the countdown between waves, the summary at the end. The
+             * message modal still announces each beat; this keeps the count where a loot
+             * pickup or a flit message can't cover it. Writes the DOM only on change.
+             */
+            _hud(game, ended) {
+                const el = this._el || (this._el = document.getElementById('ui-wave'));
+                if (!el) return;
+                let key, html = '', frac = 0;
+                if (ended) {
+                    key = 'end' + this.wave;
+                    html = `<span class="w-title">Gauntlet over</span><span class="w-sep">◆</span><span class="w-sub">Wave ${this.wave} · ${this.totalKills} kills</span>`;
+                } else if (!this.active || game.activeMap.id !== this.mapId || (game.scenes && game.scenes.running)) {
+                    key = '';
+                } else if (this.waveDelay > 0) {
+                    const n = Math.ceil(this.waveDelay / 60);
+                    key = 'gap' + this.wave + ':' + n;
+                    html = this.wave > 0
+                        ? `<span class="w-title">Wave ${this.wave} cleared</span><span class="w-sep">◆</span><span class="w-sub">Next in ${n}</span>`
+                        : `<span class="w-title">Wave 1</span><span class="w-sep">◆</span><span class="w-sub">In ${n}</span>`;
+                } else {
+                    const left = this.hostiles.length, gun = this.hostiles.filter(h => h instanceof GatlingGunner).length;
+                    key = 'w' + this.wave + ':' + left + ':' + gun;
+                    frac = this._waveSize ? left / this._waveSize : 0;
+                    html = `<span class="w-title">Wave ${this.wave}</span><span class="w-sep">◆</span><span class="w-sub">${left} left</span>`
+                         + (gun ? `<span class="w-chip">${gun > 1 ? gun + ' gunners' : 'Gunner'}</span>` : '');
+                }
+                if (key === this._hudKey) return;
+                this._hudKey = key;
+                if (!key) { el.classList.remove('show'); document.body.classList.remove('wave-hud'); return; }
+                el.innerHTML = `<div class="w-line">${html}</div><div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
+                el.classList.toggle('between', !frac);
+                el.classList.add('show'); document.body.classList.add('wave-hud');
+                if (ended) { clearTimeout(this._endT); this._endT = setTimeout(() => { if (!this.active) { this._hudKey = ''; el.classList.remove('show'); document.body.classList.remove('wave-hud'); } }, 6000); }
             }
 
             update(game) {
@@ -1866,6 +1906,7 @@
                     if (this.waveDelay <= 0) {
                         this.spawnWave(game);
                     }
+                    this._hud(game);
                     return;
                 }
 
@@ -1893,6 +1934,7 @@
                     showMessage(`WAVE ${this.wave} CLEARED — +${reward} PERSONICS, +${scrapReward} SCRAP`);
                     this.waveDelay = 210; // 3.5 seconds between waves
                 }
+                this._hud(game);
             }
 
             end(game) {
@@ -1913,7 +1955,8 @@
                 }
                 if (this.wave > 0) {
                     showMessage(`GAUNTLET OVER — WAVE ${this.wave} — ${this.totalKills} KILLS`);
-                }
+                    this._hud(game, true);
+                } else this._hud(game);
             }
         }
 

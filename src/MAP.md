@@ -71,7 +71,7 @@ Order matters: a file can only use, when it loads, what the files above it decla
 | `entities/street-objects.js` | Neon signs, loot, pavement, foliage; `FLORA_KINDS` / `floraSprite` (each tree, blossom, bush and palm painted once into a sprite) |
 | `entities/npc.js` | `NPC` companions and characters, quips and emotes (their looks: `core/appearances.js`) |
 | `entities/pedestrians.js` | Pedestrians and their manager |
-| `entities/enemies.js` | Velvet cat, drones, gunners (and the Sanctum's three wardens, `WARDENS`: personas with their own art, twice her size, sight-gated fire), gangers, restricted zone, horde gauntlet (`GAUNTLET_MAPS`: its maps — the House of Death, and sealed placeholders — picked from Grum's menu, `openGauntletMenu` in engine/shops-menus.js) |
+| `entities/enemies.js` | Velvet cat, drones, gunners (and the Sanctum's three wardens, `WARDENS`: personas with their own art, twice her size, sight-gated fire), gangers, restricted zone, horde gauntlet (`GAUNTLET_MAPS`: its maps — the House of Death, and sealed placeholders — picked from Grum's menu, `openGauntletMenu` in engine/shops-menus.js); the wave readout `#ui-wave` (`HordeGauntlet._hud`: wave, how many left with a draining bar, gunner chip, the countdown between waves, a 6 s summary at the end; the stealth word steps down beneath it via `body.wave-hud`) |
 
 ## buildings/
 | File | What's in it |
