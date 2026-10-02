@@ -3,6 +3,7 @@
         engineMixin({
             /** Interact with whatever is in reach (the action pill, or E on a keyboard): talk, use, enter or leave the car. */
             interact() {
+                if (this.activeInteraction && this.activeInteraction.type === 'execute') { this.execute(this.activeInteraction.target); return; }
                 if (this.activeInteraction) {
                     if(this.activeInteraction.interactionType === 'medbay_refill') {
                         this.refillStims();

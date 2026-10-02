@@ -121,6 +121,7 @@ const SCRIPTS = [
     'engine/reflections.js',
     'engine/footsteps.js',
     'engine/status-effects.js',
+    'engine/executions.js',
     'ui/dev-overlay.js',
     'engine/scope.js',
     'engine/tuning-ui.js',

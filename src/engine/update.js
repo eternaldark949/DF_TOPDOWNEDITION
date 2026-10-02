@@ -57,6 +57,7 @@
                 this.updateCasings();
                 this.updateCorpses();
                 this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
+                this.updateExecution();                                // a takedown in progress (engine/executions.js)
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
                 this.updateShotFx();
             
@@ -1384,9 +1385,14 @@
                 }
             
                 // Update Button State
+                const execT = this._execTarget = this.executionTarget();             // an unaware back, in reach (engine/executions.js)
                 if (this.isDriving) { 
                     this.setInteract('Exit', 'Vehicle'); this.interactBtn.style.display = 'flex'; this.activeInteraction = null; 
                 } 
+                else if (execT) {
+                    this.setInteract('Execute', this.weaponMode === 'melee' ? 'Blade' : 'Quietly'); this.interactBtn.style.display = 'flex';
+                    this.activeInteraction = { type: 'execute', target: execT };
+                }
                 else if (nearInteractable) { 
                     this.interactBtn.style.display = 'flex'; this.activeInteraction = nearInteractable; 
                     if (nearInteractable instanceof PropEntity) {

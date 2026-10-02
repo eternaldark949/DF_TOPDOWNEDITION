@@ -1129,6 +1129,7 @@
             // ... [update method from previous turn] ...
             update(player, walls, buildings, markers, trafficCars, map, enemies) {
                 if (this.dead) return null;
+                if (this._execBy) return null;                                      // being executed (engine/executions.js): frozen
                 // Flit: Afterimage — for a moment they still see you where you flitted from
                 const ai = typeof game !== 'undefined' && game._afterimage;
                 if (ai && _gameTimeSec < ai.until && player === game.player) player = Object.assign(Object.create(player), { x: ai.x, y: ai.y });
@@ -1153,7 +1154,11 @@
                 
                 // --- 1. DETECTION LOGIC ---
                 let canSee = false;
-                if (distToPlayer < 50 && isVisible) {
+                // Up close they sense her, unless she comes from behind, slowly or hidden, out of the light (an execution)
+                const toHer = Math.atan2(player.y - this.y, player.x - this.x);
+                const pg = player._gait, sneaking = Math.abs(normalizeAngle(toHer - this.angle)) > Math.PI * 0.6
+                    && ((pg ? pg.speed : 0) < 2.3 || player.isHidden) && (player.visibility ?? 0) < 0.6;
+                if (distToPlayer < 50 && isVisible && !sneaking) {
                     canSee = true;
                     this.suspicion += 5;
                 } else if (isVisible && distToPlayer <= effectiveVisionRange && this.canSeePoint(player.x, player.y, walls, buildings)) {
