@@ -212,6 +212,8 @@
                     const r = f.radius * 1.6;
                     if (inView(f.x, f.y, r)) lc.drawImage(white, f.x - r, f.y - r, r * 2, r * 2);
                 }
+                // Reflections in the wet street lift the dark where they shine (engine/reflections.js)
+                this.liftReflections(lc, lw, lh);
             
                 // Laser Sight beam cuts through darkness (same geometry as the visible beam)
                 const lsGeom = this.getLaserSight();
@@ -522,60 +524,6 @@
                 ctx.restore();
             },
             
-            /**
-             * Wet streets (Settings → Wet Reflections): only while the ground is wet (weather.wetness:
-             * it soaks in with the rain and dries over a couple of minutes after), outdoors, at night.
-             * Each light lays a reflection down the street below it, the way a lamp does on wet
-             * asphalt: a narrow column broken into bands that shimmer sideways (more in the rain),
-             * fading as it reaches away, patchy where the ground is less wet. Street lamps, and
-             * cars' headlights (warm) and tail lights (red). Additive, after the darkness layer.
-             */
-            drawWetReflections(ctx) {
-                if (!GameSettings.wetReflections) return;
-                const W = this.weather, rs = this.roomSystem;
-                const out = this.activeMap.type === 'outdoor' ? 1 : (rs && rs.active ? rs.outdoorness : 0);
-                const wet = (W ? (W.wetness || 0) : 0) * out;
-                if (wet < 0.02) return;
-                const ambient = this.getAmbientDarkness();
-                if (ambient < 0.2) return;                                     // by day the lamps are out
-                const night = Math.min(1, (ambient - 0.2) / 0.3);
-                ctx.save();
-                const V = this.viewTransform(ctx), z = V.zoom || this.camera.zoom;
-                ctx.globalCompositeOperation = 'lighter';
-                const halfW = this.canvas.width / 2 / z + 200, halfH = this.canvas.height / 2 / z + 300;
-                const t = _gameTimeSec, rain = W && W.isRaining ? W.intensity : 0;
-                const N = 7;
-                const streak = (x, y, col, L, w, a) => {
-                    if (a < 0.004 || x < V.x - halfW || x > V.x + halfW || y < V.y - halfH - L || y > V.y + halfH) return;
-                    const spr = puffSprite(col);
-                    for (let i = 0; i < N; i++) {
-                        const f = (i + 0.5) / N, yy = y + 5 + f * L;
-                        const shimmer = Math.sin(t * 1.7 + i * 1.9 + x * 0.05) * (1.2 + rain * 3.2) + Math.sin(t * 4.1 + i * 3.1) * rain * 1.2;
-                        const patch = 0.5 + 0.5 * Math.sin(x * 0.13 + yy * 0.071 + i * 2.3) * Math.sin(yy * 0.023 - x * 0.031);   // less wet here, more there
-                        const ww = w * (1 - f * 0.4) * (0.85 + 0.3 * Math.sin(t * 2.3 + i + x));
-                        const hh = (L / N) * 0.8;
-                        ctx.globalAlpha = Math.min(1, a * Math.pow(1 - f, 1.25) * (0.35 + 0.65 * patch));
-                        ctx.drawImage(spr, x + shimmer - ww / 2, yy - hh / 2, ww, hh);
-                    }
-                };
-                const base = wet * night;
-                for (const l of this.lamps || []) {
-                    const k = (rs && rs.active ? rs.lampLight(l) : 1) * lampFlicker(l);
-                    if (k < 0.01) continue;
-                    const r = l.radius || 200, col = /^#[0-9a-f]{6}$/i.test(l.color || '') ? l.color : '#ffeebb';
-                    streak(l.x, l.y, col, r * 0.95, Math.max(10, r * 0.2), 0.5 * k * (l.intensity || 0.8) * base);
-                }
-                if (this.traffic && this.traffic.vehicles) {
-                    const cars = this.isDriving && this.car ? [this.car, ...this.traffic.vehicles] : this.traffic.vehicles;
-                    for (const v of cars) {
-                        if (!v || v.dead || v.visible === false) continue;
-                        const c = Math.cos(v.angle), s = Math.sin(v.angle), h = (v.length || 40) / 2, fade = v.fade ?? 1;
-                        streak(v.x + c * h, v.y + s * h, v.headlightColor && /^#[0-9a-f]{6}$/i.test(v.headlightColor) ? v.headlightColor : '#fff2d6', 80, 15, 0.42 * base * fade);
-                        streak(v.x - c * h, v.y - s * h, '#ff3048', 55, 11, 0.36 * base * fade);
-                    }
-                }
-                ctx.restore();
-            },
             
             drawAtmospherePass(ctx) {
                 const tintMap = {

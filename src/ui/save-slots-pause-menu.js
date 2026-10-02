@@ -531,6 +531,7 @@
                     const act = e.target.closest('[data-cg]')?.dataset.cg;
                     if (act === 'close') this._cineGrade(false);
                     else if (act === 'seen' || act === 'full') { GameSettings.photoFullColour = act === 'full'; syncGradeDrawer(); }
+                    else if (act === 'refl-on' || act === 'refl-off') { GameSettings.photoReflections = act === 'refl-on'; syncGradeDrawer(); }
                 });
                 drawer?.addEventListener('input', (e) => {
                     const k = e.target.dataset?.k;
@@ -888,7 +889,7 @@
                     this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
-                this._updateValueEl('set-wetreflections', GameSettings.wetReflections ? 'on' : 'off');
+                this._updateValueEl('set-wetreflections', GameSettings.reflections || 'high');
                 this._updateValueEl('set-atmosphere', GameSettings.atmosphereTint || 'off');
                 this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
                 this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
@@ -943,9 +944,11 @@
                     GameSettings.bloom = !GameSettings.bloom;
                     this._updateValueEl(el.id, GameSettings.bloom ? 'on' : 'off');
                     
-                } else if (key === 'wetReflections') {
-                    GameSettings.wetReflections = !GameSettings.wetReflections;
-                    this._updateValueEl(el.id, GameSettings.wetReflections ? 'on' : 'off');
+                } else if (key === 'reflections') {
+                    const order = ['high', 'medium', 'off'];
+                    GameSettings.reflections = order[(order.indexOf(GameSettings.reflections || 'high') + 1) % order.length];
+                    GameSettings.wetReflections = GameSettings.reflections !== 'off';
+                    this._updateValueEl(el.id, GameSettings.reflections);
                     
                 } else if (key === 'fullscreen') {
                     if (!FullscreenManager.supported()) {

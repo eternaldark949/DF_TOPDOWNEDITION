@@ -106,6 +106,9 @@
             const full = !!GameSettings.photoFullColour;
             box.querySelector('[data-cg="seen"]')?.classList.toggle('active', !full);
             box.querySelector('[data-cg="full"]')?.classList.toggle('active', full);
+            const refl = GameSettings.photoReflections !== false;
+            box.querySelector('[data-cg="refl-on"]')?.classList.toggle('active', refl);
+            box.querySelector('[data-cg="refl-off"]')?.classList.toggle('active', !refl);
         }
         
         const saveSlotManager = new SaveSlotManager();

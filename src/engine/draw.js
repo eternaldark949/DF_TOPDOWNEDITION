@@ -208,10 +208,11 @@
                 // Roads (Asphalt) — baked with the ground in the city; the debug overlay still draws live
                 if (!bakedGround || this.dbg('traffic')) this.traffic.drawNetwork(this.ctx, this.dbg('traffic'));
                 
-                // Puddle Reflections (draw on roads, before buildings/entities)
-                if (this.puddles && this.weather?.isRaining && this.activeMap?.type === 'outdoor') {
-                    this.puddles.draw(this.ctx);
-                }
+                // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
+                // the wet asphalt, on the ground before buildings and people so they walk over it
+                this.prepareReflections();
+                this.drawPuddles(this.ctx);
+                this.drawReflections(this.ctx);
             
                 this.profiler.stop('Render:World');
                 
@@ -1090,10 +1091,7 @@
 
                 // Wet-world post-processing (after lighting, before rain)
                 const ambient = this.getAmbientDarkness();
-                if (ambient > 0.2) {
-                    this.drawWetReflections(this.ctx);
-                    this.drawBloomPass(this.ctx);
-                }
+                if (ambient > 0.2) this.drawBloomPass(this.ctx);
                 this.drawAtmospherePass(this.ctx);
                 
                 // Rain on screen: outdoors, or fading in as she steps out onto a veranda
