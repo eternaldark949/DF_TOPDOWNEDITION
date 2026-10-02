@@ -48342,7 +48342,56 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             BANDS: 30               // shimmer bands in the composite (High)
         };
 
+        // Floors that mirror, per map (stage 3): rects [x, y, w, h, strength], cut-outs (rugs and
+        // runners don't shine), water [x, y, r] (always mirrors, ripples), mirror = colour reflections of
+        // what stands on it; glowShift: how far down the room's hanging lights (its INTERIOR_ART glow:
+        // chandeliers, candles, portals, beams) appear in the floor
+        const REFLECT_SURFACES = {
+            hotel_lobby: { rects: [[50, 50, 900, 1100, 0.55]], cuts: [[440, 612, 120, 538]], water: [[500, 320, 82]], glowShift: 64 },
+            house_of_death: { rects: [[574, 1014, 652, 486, 0.42], [574, 444, 652, 556, 0.58], [1574, 14, 212, 416, 0.38]],
+                              cutCircles: [[900, 720, 152]], cuts: [[840, 1014, 120, 486]], waterProps: 'hod_fountain', glowShift: 58 },
+            moon_city_nightclub: { rects: [[590, 310, 420, 380, 0.55]], glowShift: 40 },
+            ethereal_plane: { rects: [[100, 100, 1000, 1000, 0.85]], mirror: true, glowShift: 70 }
+        };
+
         engineMixin({
+            /** This map's mirroring floors, resolved (fountain props found once) */
+            _surfaces() {
+                const map = this.activeMap, S = REFLECT_SURFACES[map.id];
+                if (!S) return null;
+                if (map._reflSurf && map._reflSurf.props === this.props) return map._reflSurf;
+                const water = (S.water || []).slice();
+                if (S.waterProps) for (const p of this.props || []) if (p.decorType === S.waterProps) water.push([p.x + p.width / 2, p.y + p.height / 2, Math.min(p.width, p.height) * 0.42]);
+                return (map._reflSurf = { ...S, water, props: this.props });
+            },
+
+            /**
+             * The Ethereal Plane's light (after the darkness): the pillars' crowns burn violet, each
+             * spirit wears a pale aura, motes drift up from the floor. Its mirror floor gives it all back.
+             */
+            drawEtherealGlow(ctx) {
+                const t = _frameTime / 1000;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                for (const p of this.props || []) {
+                    const cx = p.x + p.width / 2, top = p.y + 8, f = 0.8 + 0.2 * Math.sin(t * 1.6 + cx);
+                    glowA(ctx, cx, top, 46, '190, 120, 255', 0.55 * f);
+                    glowA(ctx, cx, top, 14, '245, 225, 255', 0.8 * f);
+                }
+                for (const n of this.npcs || []) {
+                    if (n.role !== 'spirit') continue;
+                    const f = 0.75 + 0.25 * Math.sin(t * 2.3 + n.x * 0.01);
+                    glowA(ctx, n.x, n.y, 40, '170, 210, 255', 0.45 * f);
+                    glowA(ctx, n.x, n.y - 4, 12, '235, 245, 255', 0.6 * f);
+                }
+                for (let i = 0; i < 40; i++) {
+                    const x = 130 + ((i * 263) % 940) + Math.sin(t * 0.4 + i) * 18, y = 1080 - ((t * (8 + i % 6) + i * 131) % 960);
+                    const a = 0.5 + 0.5 * Math.sin(t * 2.4 + i * 1.9);
+                    ctx.globalAlpha = 0.55 * a; ctx.fillStyle = i % 3 ? '#d8b8ff' : '#bfe4ff';
+                    ctx.beginPath(); ctx.arc(x, y, 1.4, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.restore();
+            },
+
             /** Which quality reflections run at right now: 'high' | 'medium' | null */
             reflectQuality() {
                 if (this.cineCam) return GameSettings.photoReflections === false ? null : 'high';
@@ -48407,7 +48456,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             prepareReflections() {
                 this._refl = null;
                 const q = this.reflectQuality(), wet = this._wetHere();
-                if (!q || wet < 0.02 || !this.view) return;
+                const surf = this._surfaces();
+                if (!q || !this.view || (wet < 0.02 && !surf)) return;
                 const W = this.canvas.width, H = this.canvas.height, s = q === 'high' ? 0.5 : 0.25;
                 const rw = Math.max(1, Math.round(W * s)), rh = Math.max(1, Math.round(H * s));
                 let R = this._reflCv, M = this._reflMask;
@@ -48421,7 +48471,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // 1. The mask: wet asphalt, then the puddles at full strength
                 mc.setTransform(1, 0, 0, 1, 0, 0); mc.clearRect(0, 0, rw, rh); toView(mc);
-                const net = this.activeMap.id === 'hub_949' && this.traffic && this.traffic.network;
+                const net = wet >= 0.02 && this.activeMap.id === 'hub_949' && this.traffic && this.traffic.network;
                 if (net) {
                     mc.fillStyle = `rgba(255,255,255,${(REFLECT.ROAD * Math.min(1, wet * 1.3)).toFixed(3)})`;
                     for (const road of net.roads) {
@@ -48431,12 +48481,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 mc.fillStyle = `rgba(255,255,255,${(REFLECT.PAVE * Math.min(1, wet * 1.3)).toFixed(3)})`;
-                for (const p of this.activeMap.pavements || []) {
+                if (wet >= 0.02) for (const p of this.activeMap.pavements || []) {
                     if (p.x > v.x + hw || p.x + p.w < v.x - hw || p.y > v.y + hh || p.y + p.h < v.y - hh) continue;
                     mc.fillRect(p.x, p.y, p.w, p.h);
                 }
-                let any = !!net || !!(this.activeMap.pavements && this.activeMap.pavements.length);
-                for (const p of this.puddlesFor(this.activeMap)) {
+                let any = !!net || !!(wet >= 0.02 && this.activeMap.pavements && this.activeMap.pavements.length);
+                if (surf) {                                                    // polished floors and water
+                    any = true;
+                    for (const [x, y, w, h, k] of surf.rects) { mc.fillStyle = `rgba(255,255,255,${k})`; mc.fillRect(x, y, w, h); }
+                    mc.globalCompositeOperation = 'destination-out'; mc.fillStyle = '#fff';
+                    for (const [x, y, w, h] of surf.cuts || []) mc.fillRect(x, y, w, h);
+                    for (const [x, y, r] of surf.cutCircles || []) { mc.beginPath(); mc.arc(x, y, r, 0, Math.PI * 2); mc.fill(); }
+                    mc.globalCompositeOperation = 'source-over'; mc.fillStyle = 'rgba(255,255,255,0.95)';
+                    for (const [x, y, r] of surf.water) { mc.beginPath(); mc.arc(x, y, r, 0, Math.PI * 2); mc.fill(); }
+                }
+                for (const p of wet >= 0.02 ? this.puddlesFor(this.activeMap) : []) {
                     if (!near(p.x, p.y, p.r)) continue;
                     const k = this._puddleK(p, wet); if (k <= 0) continue;
                     any = true;
@@ -48513,12 +48572,32 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         glow(c.x - ca * h + px, c.y - sa * h + py + 12, '#ff3048', 10, 34, 0.75 * f);
                     }
                 }
+                // The room's hanging lights in its floor: its whole glow pass, a little lower down
+                const art = surf && typeof INTERIOR_ART !== 'undefined' && INTERIOR_ART[this.activeMap.id];
+                if (art && art.glow) {
+                    // (twice: a polished floor gives back the light at about its full strength)
+                    for (let pass = 0; pass < 2; pass++) {
+                        rc.save(); rc.translate(0, surf.glowShift || 0);
+                        try { art.glow(this, rc); } catch (e) { /* a glow that can't mirror is left out */ }
+                        rc.restore();
+                    }
+                    rc.globalCompositeOperation = 'lighter';
+                }
                 for (const fl of this.muzzleFlashes || []) glow(fl.x, fl.y + 16, fl.color && /^#[0-9a-f]{6}$/i.test(fl.color) ? fl.color : '#fff1d0', 40, 60, 0.8);
                 for (const pj of this.projectiles || []) if (pj.active !== false) glow(pj.x, pj.y + 12, /^#[0-9a-f]{6}$/i.test(pj.color || '') ? pj.color : '#ffffff', 12, 26, 0.6);
                 // Whoever stands between a light and its reflection blocks it: their mirrored shape
                 rc.globalCompositeOperation = 'destination-out';
                 for (const m of this._reflMovers(near)) this._reflShape(rc, m, 0.85);
                 rc.globalCompositeOperation = 'source-over';
+                // A mirror floor gives back colour too: whoever stands on it, and the things set on it
+                if (surf && surf.mirror) {
+                    for (const m of this._reflMovers(near)) { rc.fillStyle = m.col && /^#[0-9a-f]{6}$/i.test(m.col) ? m.col : '#b48cff'; this._reflShape(rc, m, 0.5); }
+                    for (const pr of this.props || []) {
+                        if (!near(pr.x, pr.y, 200)) continue;
+                        rc.globalAlpha = 0.42; rc.fillStyle = pr.color || '#6a3aa0';
+                        rc.fillRect(pr.x, pr.y + pr.height, pr.width, pr.height * 0.75);
+                    }
+                }
                 rc.globalAlpha = 1;
 
                 // 3. Only where the ground is wet enough to mirror
@@ -48563,9 +48642,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * raindrops and splashes; a faint rim.
              */
             drawPuddles(ctx) {
-                const wet = this._wetHere();
-                if (wet < 0.02 || !this.reflectQuality()) return;
+                const wet = this._wetHere(), surf = this._surfaces();
+                if ((wet < 0.02 && !surf) || !this.reflectQuality()) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 80, hh = this.canvas.height / 2 / z + 80;
+                if (surf) {
+                    // people mirrored in polished floors (softer than in a puddle) and rings on the water
+                    const fl = new Path2D();
+                    for (const [x, y, w, h] of surf.rects) fl.rect(x, y, w, h);
+                    for (const [x, y, r] of surf.water) { fl.moveTo(x + r, y); fl.arc(x, y, r, 0, Math.PI * 2); }
+                    const nearS = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m - 60 && y < v.y + hh + m;
+                    ctx.save(); ctx.clip(fl);
+                    if (!surf.mirror) { ctx.fillStyle = 'rgba(2, 1, 6, 1)'; for (const m of this._reflMovers(nearS)) this._reflShape(ctx, m, 0.26); }
+                    ctx.restore(); ctx.globalAlpha = 1;
+                    if (wet < 0.02) { this._drawRipples(ctx, true); return; }
+                }
                 const night = Math.min(1, Math.max(0, (this.getAmbientDarkness() - 0.15) / 0.35)), day = 1 - night;
                 const clip = new Path2D(), rim = new Path2D();
                 let n = 0;
@@ -48592,20 +48682,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fillStyle = night > 0.5 ? 'rgba(2, 1, 6, 1)' : 'rgba(26, 22, 36, 1)';
                     for (const m of this._reflMovers(near)) this._reflShape(ctx, m, 0.42 + 0.2 * day);
                     for (const m of this._reflMovers(near)) if (m.col && /^#[0-9a-f]{6}$/i.test(m.col)) { ctx.fillStyle = m.col; this._reflShape(ctx, m, 0.12); }
-                    const R = this._ripples;
-                    if (R && R.length) {
-                        ctx.lineWidth = 1;
-                        for (const r of R) {
-                            const f = r.t / r.life;
-                            ctx.globalAlpha = (1 - f) * (r.big ? 0.55 : 0.4);
-                            ctx.strokeStyle = night > 0.5 ? '#d8c6ff' : '#ffffff';
-                            ctx.beginPath(); ctx.ellipse(r.x, r.y, 1 + f * r.r, (1 + f * r.r) * 0.8, 0, 0, Math.PI * 2); ctx.stroke();
-                            if (r.big && f < 0.6) { ctx.beginPath(); ctx.ellipse(r.x, r.y, 1 + f * r.r * 0.55, (1 + f * r.r * 0.55) * 0.8, 0, 0, Math.PI * 2); ctx.stroke(); }
-                        }
-                    }
+                    this._drawRipples(ctx, night > 0.5);
                     ctx.restore();
                     ctx.globalAlpha = 1;
                     ctx.strokeStyle = `rgba(214, 196, 255, ${(0.12 * Math.min(1, wet * 1.5)).toFixed(3)})`; ctx.lineWidth = 1; ctx.stroke(rim);
+                }
+                ctx.restore();
+            },
+
+            /** The rings on the water: raindrops, splashes, the fountain */
+            _drawRipples(ctx, night) {
+                const R = this._ripples; if (!R || !R.length) return;
+                ctx.save(); ctx.lineWidth = 1; ctx.strokeStyle = night ? '#d8c6ff' : '#ffffff';
+                for (const r of R) {
+                    const f = r.t / r.life;
+                    ctx.globalAlpha = (1 - f) * (r.big ? 0.55 : 0.4);
+                    ctx.beginPath(); ctx.ellipse(r.x, r.y, 1 + f * r.r, (1 + f * r.r) * 0.8, 0, 0, Math.PI * 2); ctx.stroke();
+                    if (r.big && f < 0.6) { ctx.beginPath(); ctx.ellipse(r.x, r.y, 1 + f * r.r * 0.55, (1 + f * r.r * 0.55) * 0.8, 0, 0, Math.PI * 2); ctx.stroke(); }
                 }
                 ctx.restore();
             },
@@ -48617,8 +48710,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             updatePuddles() {
                 const R = this._ripples || (this._ripples = []);
                 for (let i = R.length - 1; i >= 0; i--) if (++R[i].t >= R[i].life) R.splice(i, 1);
-                const wet = this._wetHere();
-                if (wet < 0.05 || !this.reflectQuality() || !this.view) return;
+                const wet = this._wetHere(), surf = this._surfaces();
+                if (!this.reflectQuality() || !this.view) return;
+                // the fountains and pools stir by themselves
+                if (surf) for (const [x, y, r] of surf.water) if (Math.random() < 0.12 && R.length < 70) {
+                    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r * 0.8;
+                    R.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, t: 0, life: 40, r: 7 + Math.random() * 6 });
+                }
+                if (wet < 0.05) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 40, hh = this.canvas.height / 2 / z + 40;
                 const vis = [];
                 for (const p of this.puddlesFor(this.activeMap)) {
@@ -56571,11 +56670,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Roads (Asphalt) — baked with the ground in the city; the debug overlay still draws live
                 if (!bakedGround || this.dbg('traffic')) this.traffic.drawNetwork(this.ctx, this.dbg('traffic'));
                 
-                // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
-                // the wet asphalt, on the ground before buildings and people so they walk over it
-                this.prepareReflections();
-                this.drawPuddles(this.ctx);
-                this.drawReflections(this.ctx);
             
                 this.profiler.stop('Render:World');
                 
@@ -56686,6 +56780,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                     }
                 }
+
+                // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
+                // the wet asphalt, on the ground and the floors (after the painted interiors) before buildings and people so they walk over it
+                this.prepareReflections();
+                this.drawPuddles(this.ctx);
+                this.drawReflections(this.ctx);
                 
                 // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)
                 if (this.activeMap.buildings && this.activeMap.type === 'outdoor') {
@@ -57731,7 +57831,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             keepers_hill:        { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },   // the prologue's fireside (engine/keeper-art.js)
             keepers_parlor:      { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },
             van_interior:        { floor: (g, c) => g.drawVanInterior(c),     glow: (g, c) => g.drawVanGlow(c) },     // chapter 1's ride (engine/van-art.js)
-            hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) }
+            hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) },
+            ethereal_plane:      { glow: (g, c) => g.drawEtherealGlow(c) }      // engine/reflections.js: its mirror floor gives this back
         };
 
         engineMixin({

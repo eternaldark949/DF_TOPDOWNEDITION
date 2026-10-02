@@ -16,7 +16,8 @@
             keepers_hill:        { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },   // the prologue's fireside (engine/keeper-art.js)
             keepers_parlor:      { floor: (g, c) => g.drawKeeperInterior(c),  glow: (g, c) => g.drawKeeperGlow(c) },
             van_interior:        { floor: (g, c) => g.drawVanInterior(c),     glow: (g, c) => g.drawVanGlow(c) },     // chapter 1's ride (engine/van-art.js)
-            hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) }
+            hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) },
+            ethereal_plane:      { glow: (g, c) => g.drawEtherealGlow(c) }      // engine/reflections.js: its mirror floor gives this back
         };
 
         engineMixin({

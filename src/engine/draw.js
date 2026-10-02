@@ -208,11 +208,6 @@
                 // Roads (Asphalt) — baked with the ground in the city; the debug overlay still draws live
                 if (!bakedGround || this.dbg('traffic')) this.traffic.drawNetwork(this.ctx, this.dbg('traffic'));
                 
-                // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
-                // the wet asphalt, on the ground before buildings and people so they walk over it
-                this.prepareReflections();
-                this.drawPuddles(this.ctx);
-                this.drawReflections(this.ctx);
             
                 this.profiler.stop('Render:World');
                 
@@ -323,6 +318,12 @@
                         }
                     }
                 }
+
+                // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
+                // the wet asphalt, on the ground and the floors (after the painted interiors) before buildings and people so they walk over it
+                this.prepareReflections();
+                this.drawPuddles(this.ctx);
+                this.drawReflections(this.ctx);
                 
                 // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)
                 if (this.activeMap.buildings && this.activeMap.type === 'outdoor') {
