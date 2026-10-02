@@ -150,6 +150,7 @@
             photoFullColour: false,         // Cinematic View: lift the stealth grey for a photo
             finisher: 'full',               // 'full' | 'subtle' | 'off' (engine/finisher.js)
             capturePrompt: true,            // the "Capture?" pill after a finisher
+            kukriFromArmory: true,          // the Maiden's Kukri is in the armory (false: only the Demoness drops it)
             footsteps: true,                // footsteps by shoe and floor, splashes (engine/footsteps.js)
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)

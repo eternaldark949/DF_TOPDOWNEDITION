@@ -56,6 +56,7 @@
                 }
                 this.updateCasings();
                 this.updateCorpses();
+                this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
                 this.updateShotFx();
             

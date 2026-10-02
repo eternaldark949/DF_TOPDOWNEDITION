@@ -7434,6 +7434,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             photoFullColour: false,         // Cinematic View: lift the stealth grey for a photo
             finisher: 'full',               // 'full' | 'subtle' | 'off' (engine/finisher.js)
             capturePrompt: true,            // the "Capture?" pill after a finisher
+            kukriFromArmory: true,          // the Maiden's Kukri is in the armory (false: only the Demoness drops it)
             footsteps: true,                // footsteps by shoe and floor, splashes (engine/footsteps.js)
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
@@ -9074,6 +9075,30 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (mat === 'wood') tone(210 * j, 150, 0.07, 0.05 * v);                                     // hollow boards
                 else if (mat === 'metal') tone(820 * j, 780, 0.16, 0.05 * v, 'triangle');                   // a plate that rings
                 if (o.wet && mat !== 'carpet') burst('bandpass', 2600 * j, 0.8, 0.08, 0.09 * v);            // rain on the ground
+            }
+
+            /** A blade through the air (and, on a hit, into someone) */
+            slash(hit) {
+                if (!this.ready) return;
+                const ctx = this.audio.ctx, now = ctx.currentTime;
+                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
+                const src = ctx.createBufferSource(); src.buffer = this.pink;
+                const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.Q.value = 1.4;
+                bf.frequency.setValueAtTime(1800, now); bf.frequency.exponentialRampToValueAtTime(5200, now + 0.14);
+                const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(this.foley);
+                g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.22, now + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
+                src.start(now, Math.random() * 2.5, 0.2);
+                if (hit) {                                                    // the cut: a wet thud and a bright ring off the blade
+                    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+                    const s2 = ctx.createBufferSource(); s2.buffer = this.brown; const g2 = ctx.createGain();
+                    s2.connect(lp); lp.connect(g2); g2.connect(this.foley);
+                    g2.gain.setValueAtTime(0.0001, now + 0.05); g2.gain.exponentialRampToValueAtTime(0.3, now + 0.06); g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+                    s2.start(now + 0.05, Math.random() * 2.5, 0.15);
+                    const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'sine';
+                    o.frequency.setValueAtTime(3400, now + 0.05); o.frequency.exponentialRampToValueAtTime(3100, now + 0.4);
+                    o.connect(g3); g3.connect(this.foley); g3.gain.setValueAtTime(0.025, now + 0.05); g3.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+                    o.start(now + 0.05); o.stop(now + 0.42);
+                }
             }
 
             /** A car's tyres through a puddle: a long hiss-splash, quieter with distance */
@@ -18512,12 +18537,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * @param {number} knockbackY - Y knockback force (optional)
              * @returns {boolean} - Whether damage was applied
              */
-            takeDamage(amount, knockbackX = 0, knockbackY = 0) {
-                if (this.dead || this.invincibleTimer > 0) return false;
+            takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
+                if (this.dead || (this.invincibleTimer > 0 && !(opts && opts.type === 'bleed'))) return false;
                 
                 this.hp -= amount;
-                // Damage number, health bar, blood, flinch (engine/combat-fx.js)
-                if (typeof game !== 'undefined' && game && game.onActorHit) game.onActorHit(this, amount, knockbackX, knockbackY);
+                // Damage number, health bar, blood, flinch (engine/combat-fx.js); opts.type: the kind of damage
+                if (typeof game !== 'undefined' && game && game.onActorHit) game.onActorHit(this, amount, knockbackX, knockbackY, opts);
                 
                 // Apply knockback
                 if (knockbackX || knockbackY) {
@@ -39876,6 +39901,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 glow: [[5.6, 1, 4.2, '#ffd76a'], [17.6, 1, 3.6, '#ffe7a0']],
                 run: [-1.6, 12, 1, '#fffaea']
             },
+            maiden_kukri: {                                                                     // the Maiden's Kukri: a curved golden blade, a dark grip, a ring pommel
+                stance: 'knife', muzzle: [19, 1.6], rail: [8, 0], brass: null, melee: true,
+                parts: [
+                    _c(-5.2, 0, 1.9, 'gold'), _hole(-5.2, 0, 0.85),                             // the ring pommel
+                    _r(-4, 3, 0, 2.6, 'abyss', 1.1),                                            // the grip, wrapped dark
+                    _r(-2.6, -2, 0, 2.8, 'gold', 0.3), _r(0.4, 1, 0, 2.8, 'gold', 0.3),         // gold bands on it
+                    _r(3, 4.2, 0, 4.6, 'gold', 0.5),                                            // the guard
+                    { poly: [[4, -1.3], [8.5, -1.7], [12.5, -1.3], [16, -0.2], [18.6, 1.4], [19.4, 2.6], [17.2, 2.6], [13.6, 2.1], [9.4, 1.6], [4, 1.1]], m: 'gold' },   // the forward-curved blade
+                    { poly: [[5, 0.4], [9.5, 0.9], [13.8, 1.4], [17.4, 2.2], [13.6, 1.8], [9.4, 1.3], [5, 0.9]], m: 'champagne' },   // its bright edge
+                    _ce(3.6, 0, 0.6, '#ffe7a0')                                                 // a gem in the guard
+                ],
+                glow: [[3.6, 0, 1.6, '#ffd76a'], [18, 2, 1.4, '#fff1c4']],
+                run: [5, 18, 1.4, '#fffaea']                                                    // the glint along the edge
+            },
             empg: {                                                                             // the EMP blaster (catalog): a bulbous body, twin orbs at the front
                 stance: 'pistol', muzzle: [14.6, 1], rail: [9, 5.4], brass: null, fx: { trail: 'static', col: '#b48cff', core: '#efe4ff' }, 
                 parts: [
@@ -39898,7 +39937,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function weaponModel(id) {
             id = id || '';
             return WEAPON_MODELS[id] || (id.includes('sniper') ? WEAPON_MODELS.sniper_sara : id.includes('rifle') ? WEAPON_MODELS.rifle_rb98
-                : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
+                : id.includes('kukri') ? WEAPON_MODELS.maiden_kukri : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
         }
 
         const _weaponSprites = new Map();
@@ -41529,6 +41568,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const mz = weaponMuzzleLocal(weaponId);
                         entity._muzzleLocal = { x: wx + mz.x * scale, y: wy + mz.y * scale };
                         entity._muzzleReady = anim > 0.95;
+                    } else if (game.weaponMode === 'melee') {
+                        // a blade, held low and forward; a slash sweeps it across (engine/status-effects.js meleeSlash)
+                        const S = game.slashAngle ? game.slashAngle() : null;
+                        const ang = S ? S.a : 0.35;
+                        drawWeapon(ctx, weaponId, wx + (S ? S.reach : 0), wyBase + 1, ang, scale * 0.95, false);
+                        entity._muzzleLocal = null; entity._muzzleReady = false;
                     }
 
                     ctx.restore();
@@ -43155,6 +43200,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 weaponMode: 'sniper',
                 stats: { fireRate: 50, recoil: 15, damage: 65, projectileColor: '#DC143C', projectileSpeed: 40, flashRadius: 60, penetrating: true }
             },
+            'maiden_kukri': {
+                name: "Maiden's Kukri", type: 'weapon', icon: '🗡',
+                desc: 'A curved golden knife, light as a promise. Cuts that keep bleeding.',
+                weaponMode: 'melee',
+                // a slash in an arc before her: damage, then bleeding (engine/status-effects.js); quiet, not silent
+                stats: { fireRate: 16, damage: 28, reach: 38, arc: 1.5, bleedDps: 6, bleedSecs: 3, noise: 60, damageType: 'melee' }
+            },
             'laser_sight': {
                 name: 'Laser Sight', type: 'attachment', icon: '⊕',
                 desc: 'Faint red targeting beam when equipped.',
@@ -43285,7 +43337,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         
         // Default loadout for new games
-        const DEFAULT_LOADOUT = ['pistol_fpx', 'sniper_sara', 'rifle_rb98', 'pistol_anavia', 'sniper_sr86'];
+        const DEFAULT_LOADOUT = ['pistol_fpx', 'sniper_sara', 'rifle_rb98', 'pistol_anavia', 'sniper_sr86', 'maiden_kukri'];
         
         // Factory: create a live InventoryItem from registry ID
         function createItemFromRegistry(id, game) {
@@ -47528,6 +47580,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.furniture && this.furniture.busy()) return;   // her hands are on the furniture
                 if (!this.currentWeapon && this.weaponMode !== 'none') return;
                 this.shotsFired = (this.shotsFired || 0) + 1;             // (a finisher steps aside when she fires again)
+                if (this.weaponMode === 'melee') { if (!this.isDriving) this.meleeSlash(); return; }   // a blade (engine/status-effects.js)
             
                 // --- MELEE / PUNCH LOGIC (Unchanged) ---
                 if (this.weaponMode === 'none') {
@@ -47891,15 +47944,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.updateUI) this.updateUI();
             },
 
-            /** A hit landed on `actor` (HP already reduced). kbX/kbY = knockback, used as the hit direction. */
-            onActorHit(actor, amount, kbX = 0, kbY = 0) {
+            /**
+             * A hit landed on `actor` (HP already reduced). kbX/kbY = knockback, used as the hit direction.
+             * opts.type: the kind of damage — 'bleed' ticks are small crimson numbers, a drip of blood,
+             * no flinch (engine/status-effects.js); anything else as before.
+             */
+            onActorHit(actor, amount, kbX = 0, kbY = 0, opts = null) {
                 if (!(amount > 0) || !actor) return;
-                const now = _gameTimeSec;
+                const now = _gameTimeSec, type = opts && opts.type;
+                const texts = this.floatingTexts || (this.floatingTexts = []);
+                if (type === 'bleed') {
+                    const recent = texts.find(t => t.target === actor && t.bleed && now - t.t0 < 0.6);
+                    if (recent) { recent.value += amount; recent.t0 = now; }
+                    else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ff3a5c', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true }); if (texts.length > 40) texts.shift(); }
+                    actor._hpShowT = now;
+                    const B = bloodOf(actor);
+                    if (B && this.decals) this.decals.addDecal('blood', actor.x + (Math.random() - 0.5) * 8, actor.y + (Math.random() - 0.5) * 8, { size: 1.6 + Math.random() * 1.4, color: B.decal, dir: Math.random() * 6.28, glow: B.glow });
+                    if (B && this.weather) this.weather.spawnSpray(actor.x, actor.y, Math.random() * 6.28, `rgba(${B.drop}, 1)`, 2);
+                    return;
+                }
                 const dir = (kbX || kbY) ? Math.atan2(kbY, kbX) : Math.random() * Math.PI * 2;
 
                 // Damage number — hits on the same target within 0.15 s add up into one
-                const texts = this.floatingTexts || (this.floatingTexts = []);
-                const recent = texts.find(t => t.target === actor && now - t.t0 < 0.15);
+                const recent = texts.find(t => t.target === actor && !t.bleed && now - t.t0 < 0.15);
                 if (recent) { recent.value += amount; recent.t0 = now; recent.pop = now; }
                 else {
                     const color = actor === this.player ? '#ff5a6a' : (actor.role === 'teammate' ? '#ffb347' : '#ffffff');
@@ -47957,7 +48024,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (!inView(x, y)) continue;
                     const pop = Math.max(0, 1 - (now - t.pop) / 0.12);
                     ctx.globalAlpha = 1 - Math.pow(age / life, 2);
-                    ctx.font = `bold ${Math.round((t.big ? 10 : 11) + pop * 4 + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
+                    ctx.font = `bold ${Math.round((t.big ? 10 : t.bleed ? 8 : 11) + pop * (t.bleed ? 1 : 4) + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
                     const s = t.text || String(Math.round(t.value));
                     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(s, x, y);
                     ctx.fillStyle = t.color; ctx.fillText(s, x, y);
@@ -48998,6 +49065,138 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // a guard's hard steps: a faint ember ring where you can hear them (nobody else is alerted)
                     this.emitNoise(e.x, e.y, 120, 'enemyStep', false, { hear: false });
                 }
+            }
+        });
+        // GameEngine — Status effects and melee. Methods are added to GameEngine.prototype (see
+        // engineMixin in game-engine.js).
+        //
+        // Damage now has a type (takeDamage's opts.type: ballistic, energy, melee, bleed…), and an
+        // actor can carry statuses that tick on game time. Bleeding is the first: each stack (up to
+        // three) drains dps for its seconds, a fresh cut refreshes it, the ticks show as small
+        // crimson numbers and leave a trail of drips; a blood-drop mark rides above them.
+        //
+        // Melee weapons (weaponMode 'melee', the Maiden's Kukri first) slash in an arc before her:
+        // no projectile, nothing through walls, damage and bleeding, a gold arc, a quiet noise.
+
+        const STATUS = { BLEED_MAX: 3, BLEED_TICK: 0.5 };
+
+        engineMixin({
+            /** Put a status on an actor: 'bleed' {dps, secs, by} */
+            applyStatus(actor, kind, o = {}) {
+                if (!actor || actor.dead) return;
+                const S = actor._status || (actor._status = {}), now = _gameTimeSec;
+                if (kind === 'bleed') {
+                    const b = S.bleed;
+                    if (b && now < b.until) { b.stacks = Math.min(STATUS.BLEED_MAX, b.stacks + 1); b.until = now + (o.secs || 3); b.dps = Math.max(b.dps, o.dps || 5); b.by = o.by || b.by; }
+                    else S.bleed = { stacks: 1, dps: o.dps || 5, until: now + (o.secs || 3), next: now + STATUS.BLEED_TICK, by: o.by || null };
+                }
+            },
+
+            /** Once per tick: statuses run their course */
+            updateStatuses() {
+                const now = _gameTimeSec;
+                const tick = (a) => {
+                    const S = a && a._status; if (!S || a.dead) return;
+                    const b = S.bleed;
+                    if (b) {
+                        while (now >= b.next && b.next <= b.until) {
+                            b.next += STATUS.BLEED_TICK;
+                            if (b.by) { a.lastHitBy = b.by; a.lastHitMelee = true; }
+                            a.takeDamage(b.dps * STATUS.BLEED_TICK * b.stacks, 0, 0, { type: 'bleed' });
+                            if (a.dead) break;
+                        }
+                        if (now > b.until) delete S.bleed;
+                    }
+                };
+                for (const e of this.enemies || []) tick(e);
+                for (const t of this.teammates || []) tick(t);
+            },
+
+            /** The marks above whoever carries a status (world space, with the health bars) */
+            drawStatusMarks(ctx, cull) {
+                const now = _gameTimeSec;
+                for (const e of this.enemies || []) {
+                    const b = e._status && e._status.bleed; if (!b || e.dead) continue;
+                    if (cull && (e.x < cull.left - 40 || e.x > cull.right + 40 || e.y < cull.top - 40 || e.y > cull.bottom + 40)) continue;
+                    const x = e.x + 18, y = e.y - 32, pulse = 0.75 + 0.25 * Math.sin(now * 8);
+                    ctx.save(); ctx.globalAlpha = pulse;
+                    for (let i = 0; i < b.stacks; i++) {                          // a drop per stack
+                        const dx = x + i * 5;
+                        ctx.fillStyle = '#ff2a4a'; ctx.beginPath();
+                        ctx.moveTo(dx, y - 4); ctx.quadraticCurveTo(dx + 3, y, dx, y + 2.4); ctx.quadraticCurveTo(dx - 3, y, dx, y - 4); ctx.fill();
+                    }
+                    ctx.restore();
+                }
+            },
+
+            /**
+             * A melee weapon's slash: everyone in the arc before her within reach (and not behind a
+             * wall) takes the blade's damage and starts to bleed. A gold arc, a swish, a quiet noise.
+             */
+            meleeSlash() {
+                const W = this.currentWeapon, st = (W && W.stats) || {}, pl = this.player;
+                this.shootCooldown = st.fireRate || 16;
+                const side = this._slashSide = -(this._slashSide || 1);
+                this._slashT = _gameTimeSec;
+                const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
+                const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
+                let hit = 0;
+                for (const e of this.enemies) {
+                    if (!e || e.dead) continue;
+                    const dx = e.x - pl.x, dy = e.y - pl.y, d = Math.hypot(dx, dy);
+                    if (d > reach + (e.radius || 14)) continue;
+                    if (Math.abs(normalizeAngle(Math.atan2(dy, dx) - ang)) > arc / 2 + (d < 18 ? 0.6 : 0)) continue;
+                    if (isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols)) continue;
+                    e.lastHitBy = pl; e.lastHitMelee = true;
+                    const kx = dx / (d || 1) * 3, ky = dy / (d || 1) * 3;
+                    const dmg = Math.round(st.damage || 25);
+                    e.takeDamage(dmg, kx, ky, { type: st.damageType || 'melee' });
+                    if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps, secs: st.bleedSecs || 3, by: pl });
+                    if (!e.dead && typeof Ganger !== 'undefined' && e instanceof Ganger) { e.suspicion = 100; e.state = 'ALERT'; e.angle = Math.atan2(-dy, -dx); }
+                    hit++;
+                }
+                // the gold arc and its sparkle
+                const L = this.slashes || (this.slashes = []);
+                L.push({ x: pl.x, y: pl.y, a: ang, side, t0: _gameTimeSec, reach, arc, hit: hit > 0 });
+                if (L.length > 8) L.shift();
+                const fx = this.shotFx || (this.shotFx = []);
+                for (let i = 0; i < (hit ? 8 : 3); i++) {
+                    const a = ang + (Math.random() - 0.5) * arc, r = reach * (0.5 + Math.random() * 0.5);
+                    fx.push({ k: 'dust', x: pl.x + Math.cos(a) * r, y: pl.y + Math.sin(a) * r, vx: Math.cos(a) * 0.4, vy: Math.sin(a) * 0.4, t: -i, life: 30, col: '#ffd76a', ph: Math.random() * 6.28 });
+                }
+                if (typeof ambience !== 'undefined' && ambience.slash) ambience.slash(hit > 0);
+                this.emitNoise(pl.x, pl.y, st.noise || 60, 'slash');
+                if (hit) this.triggerShake(2);
+                return hit;
+            },
+
+            /** The blade's swing for the renderer: angle across the slash, and how far it reaches out (null at rest) */
+            slashAngle() {
+                if (this._slashT === undefined) return null;
+                const t = (_gameTimeSec - this._slashT) / 0.22;
+                if (t < 0 || t > 1) return null;
+                const e = t < 0.6 ? 1 - Math.pow(1 - t / 0.6, 3) : 1, back = t < 0.6 ? 0 : (t - 0.6) / 0.4;
+                const s = this._slashSide || 1;
+                return { a: -s * (-1.25 + 2.5 * e) * (1 - back * 0.7), reach: 6 * Math.sin(Math.min(1, t * 1.6) * Math.PI) };
+            },
+
+            /** Slash arcs: a crescent of gold light where the blade went (world space) */
+            drawSlashes(ctx) {
+                const L = this.slashes; if (!L || !L.length) return;
+                const now = _gameTimeSec;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                for (let i = L.length - 1; i >= 0; i--) {
+                    const s = L[i], age = now - s.t0;
+                    if (age > 0.3) { L.splice(i, 1); continue; }
+                    const k = 1 - age / 0.3, a0 = s.a - s.arc / 2, a1 = s.a + s.arc / 2;
+                    const from = s.side > 0 ? a0 : a1, to = s.side > 0 ? a1 : a0, prog = Math.min(1, age / 0.13);
+                    const end = from + (to - from) * prog, r = s.reach * 0.92;
+                    for (const [w, col, al] of [[7, '255, 200, 100', 0.25], [3, '255, 231, 160', 0.6], [1.2, '255, 250, 230', 0.9]]) {
+                        ctx.strokeStyle = `rgba(${col}, ${al * k})`; ctx.lineWidth = w; ctx.lineCap = 'round';
+                        ctx.beginPath(); ctx.arc(s.x, s.y, r, Math.min(from, end), Math.max(from, end)); ctx.stroke();
+                    }
+                }
+                ctx.restore();
             }
         });
         // ═══ DEV OVERLAY — the profiler pill and the debug layers ═══
@@ -52617,6 +52816,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Rebuild inventory from saved item IDs (if save has items)
                         if (invData.items && invData.items.length > 0) {
                             this.inventory.loadItemsFromIds(invData.items);
+                            // The Maiden's Kukri waits in the armory for now (GameSettings.kukriFromArmory); later only the Demoness gives it
+                            if (GameSettings.kukriFromArmory !== false && !invData.items.includes('maiden_kukri')) { const k = createItemFromRegistry('maiden_kukri', this); if (k) this.inventory.items.push(k); }
                             console.log(`[LOAD] Rebuilt inventory: ${invData.items.length} items (${invData.items.join(', ')})`);
                         }
                         // If save had empty items array, keep the default loadout from constructor
@@ -55145,6 +55346,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 this.updateCasings();
                 this.updateCorpses();
+                this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
                 this.updateShotFx();
             
@@ -57488,6 +57690,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 this.drawMuzzleStars(this.ctx);                              // the flash's star at each muzzle
                 this.drawShotFx(this.ctx, cullBounds.world);                 // barrel smoke, embers, golden wisps (engine/combat-effects.js)
+                this.drawSlashes(this.ctx);                                  // a blade's gold arc (engine/status-effects.js)
 
                 // Passenger lean-out rendering — draw in-car companions at their seat positions
                 // Uses drawProceduralHumanoid with isDriving flag for unified lean-out animation
@@ -57750,6 +57953,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.drawScopeView(this.ctx);
                 // Health bars and damage numbers, above the darkness so they read at night
                 this.drawCombatOverlays(this.ctx, cullBounds.entities);
+                this.drawStatusMarks(this.ctx, cullBounds.entities);
                 
                 // Debug view (ui/dev-overlay.js): lamp rays, then rooms, vision, hearing, colliders, labels
                 if (this.debugMode) {

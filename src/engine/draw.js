@@ -811,6 +811,7 @@
                 
                 this.drawMuzzleStars(this.ctx);                              // the flash's star at each muzzle
                 this.drawShotFx(this.ctx, cullBounds.world);                 // barrel smoke, embers, golden wisps (engine/combat-effects.js)
+                this.drawSlashes(this.ctx);                                  // a blade's gold arc (engine/status-effects.js)
 
                 // Passenger lean-out rendering — draw in-car companions at their seat positions
                 // Uses drawProceduralHumanoid with isDriving flag for unified lean-out animation
@@ -1073,6 +1074,7 @@
                 this.drawScopeView(this.ctx);
                 // Health bars and damage numbers, above the darkness so they read at night
                 this.drawCombatOverlays(this.ctx, cullBounds.entities);
+                this.drawStatusMarks(this.ctx, cullBounds.entities);
                 
                 // Debug view (ui/dev-overlay.js): lamp rays, then rooms, vision, hearing, colliders, labels
                 if (this.debugMode) {

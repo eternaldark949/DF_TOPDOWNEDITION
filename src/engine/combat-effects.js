@@ -330,6 +330,7 @@
                 if (this.furniture && this.furniture.busy()) return;   // her hands are on the furniture
                 if (!this.currentWeapon && this.weaponMode !== 'none') return;
                 this.shotsFired = (this.shotsFired || 0) + 1;             // (a finisher steps aside when she fires again)
+                if (this.weaponMode === 'melee') { if (!this.isDriving) this.meleeSlash(); return; }   // a blade (engine/status-effects.js)
             
                 // --- MELEE / PUNCH LOGIC (Unchanged) ---
                 if (this.weaponMode === 'none') {

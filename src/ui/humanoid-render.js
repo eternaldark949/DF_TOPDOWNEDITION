@@ -1521,6 +1521,12 @@
                         const mz = weaponMuzzleLocal(weaponId);
                         entity._muzzleLocal = { x: wx + mz.x * scale, y: wy + mz.y * scale };
                         entity._muzzleReady = anim > 0.95;
+                    } else if (game.weaponMode === 'melee') {
+                        // a blade, held low and forward; a slash sweeps it across (engine/status-effects.js meleeSlash)
+                        const S = game.slashAngle ? game.slashAngle() : null;
+                        const ang = S ? S.a : 0.35;
+                        drawWeapon(ctx, weaponId, wx + (S ? S.reach : 0), wyBase + 1, ang, scale * 0.95, false);
+                        entity._muzzleLocal = null; entity._muzzleReady = false;
                     }
 
                     ctx.restore();

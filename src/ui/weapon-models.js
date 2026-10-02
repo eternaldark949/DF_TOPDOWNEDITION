@@ -152,6 +152,20 @@
                 glow: [[5.6, 1, 4.2, '#ffd76a'], [17.6, 1, 3.6, '#ffe7a0']],
                 run: [-1.6, 12, 1, '#fffaea']
             },
+            maiden_kukri: {                                                                     // the Maiden's Kukri: a curved golden blade, a dark grip, a ring pommel
+                stance: 'knife', muzzle: [19, 1.6], rail: [8, 0], brass: null, melee: true,
+                parts: [
+                    _c(-5.2, 0, 1.9, 'gold'), _hole(-5.2, 0, 0.85),                             // the ring pommel
+                    _r(-4, 3, 0, 2.6, 'abyss', 1.1),                                            // the grip, wrapped dark
+                    _r(-2.6, -2, 0, 2.8, 'gold', 0.3), _r(0.4, 1, 0, 2.8, 'gold', 0.3),         // gold bands on it
+                    _r(3, 4.2, 0, 4.6, 'gold', 0.5),                                            // the guard
+                    { poly: [[4, -1.3], [8.5, -1.7], [12.5, -1.3], [16, -0.2], [18.6, 1.4], [19.4, 2.6], [17.2, 2.6], [13.6, 2.1], [9.4, 1.6], [4, 1.1]], m: 'gold' },   // the forward-curved blade
+                    { poly: [[5, 0.4], [9.5, 0.9], [13.8, 1.4], [17.4, 2.2], [13.6, 1.8], [9.4, 1.3], [5, 0.9]], m: 'champagne' },   // its bright edge
+                    _ce(3.6, 0, 0.6, '#ffe7a0')                                                 // a gem in the guard
+                ],
+                glow: [[3.6, 0, 1.6, '#ffd76a'], [18, 2, 1.4, '#fff1c4']],
+                run: [5, 18, 1.4, '#fffaea']                                                    // the glint along the edge
+            },
             empg: {                                                                             // the EMP blaster (catalog): a bulbous body, twin orbs at the front
                 stance: 'pistol', muzzle: [14.6, 1], rail: [9, 5.4], brass: null, fx: { trail: 'static', col: '#b48cff', core: '#efe4ff' }, 
                 parts: [
@@ -174,7 +188,7 @@
         function weaponModel(id) {
             id = id || '';
             return WEAPON_MODELS[id] || (id.includes('sniper') ? WEAPON_MODELS.sniper_sara : id.includes('rifle') ? WEAPON_MODELS.rifle_rb98
-                : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
+                : id.includes('kukri') ? WEAPON_MODELS.maiden_kukri : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
         }
 
         const _weaponSprites = new Map();

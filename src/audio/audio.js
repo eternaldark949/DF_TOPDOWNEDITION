@@ -617,6 +617,30 @@
                 if (o.wet && mat !== 'carpet') burst('bandpass', 2600 * j, 0.8, 0.08, 0.09 * v);            // rain on the ground
             }
 
+            /** A blade through the air (and, on a hit, into someone) */
+            slash(hit) {
+                if (!this.ready) return;
+                const ctx = this.audio.ctx, now = ctx.currentTime;
+                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
+                const src = ctx.createBufferSource(); src.buffer = this.pink;
+                const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.Q.value = 1.4;
+                bf.frequency.setValueAtTime(1800, now); bf.frequency.exponentialRampToValueAtTime(5200, now + 0.14);
+                const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(this.foley);
+                g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.22, now + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
+                src.start(now, Math.random() * 2.5, 0.2);
+                if (hit) {                                                    // the cut: a wet thud and a bright ring off the blade
+                    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+                    const s2 = ctx.createBufferSource(); s2.buffer = this.brown; const g2 = ctx.createGain();
+                    s2.connect(lp); lp.connect(g2); g2.connect(this.foley);
+                    g2.gain.setValueAtTime(0.0001, now + 0.05); g2.gain.exponentialRampToValueAtTime(0.3, now + 0.06); g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+                    s2.start(now + 0.05, Math.random() * 2.5, 0.15);
+                    const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'sine';
+                    o.frequency.setValueAtTime(3400, now + 0.05); o.frequency.exponentialRampToValueAtTime(3100, now + 0.4);
+                    o.connect(g3); g3.connect(this.foley); g3.gain.setValueAtTime(0.025, now + 0.05); g3.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+                    o.start(now + 0.05); o.stop(now + 0.42);
+                }
+            }
+
             /** A car's tyres through a puddle: a long hiss-splash, quieter with distance */
             splash(near, pan, big) {
                 if (!this.ready || GameSettings.footsteps === false || near <= 0.03) return;

@@ -95,12 +95,12 @@
              * @param {number} knockbackY - Y knockback force (optional)
              * @returns {boolean} - Whether damage was applied
              */
-            takeDamage(amount, knockbackX = 0, knockbackY = 0) {
-                if (this.dead || this.invincibleTimer > 0) return false;
+            takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
+                if (this.dead || (this.invincibleTimer > 0 && !(opts && opts.type === 'bleed'))) return false;
                 
                 this.hp -= amount;
-                // Damage number, health bar, blood, flinch (engine/combat-fx.js)
-                if (typeof game !== 'undefined' && game && game.onActorHit) game.onActorHit(this, amount, knockbackX, knockbackY);
+                // Damage number, health bar, blood, flinch (engine/combat-fx.js); opts.type: the kind of damage
+                if (typeof game !== 'undefined' && game && game.onActorHit) game.onActorHit(this, amount, knockbackX, knockbackY, opts);
                 
                 // Apply knockback
                 if (knockbackX || knockbackY) {
