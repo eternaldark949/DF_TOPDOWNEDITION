@@ -48462,6 +48462,31 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     rc.globalAlpha = Math.min(1, a);
                     rc.drawImage(puffSprite(col), x - w / 2, y - h / 2, w, h);
                 };
+                // Lit windows, neon and signs: each building's facade mirrored about the line where it
+                // meets the street (foreshortened), billboards about their front edge
+                const dark = this.getAmbientDarkness();
+                if (night > 0.01 && q === 'high' && CONFIG.BUILDINGS.LEAN) {
+                    for (const b of this.activeMap.buildings || []) {
+                        if (!b.isV2 || !b.drawEmissive) continue;
+                        const gy = b.y + b.h;
+                        if (gy < v.y - hh - 40 || gy > v.y + hh + 260 || b.x > v.x + hw || b.x + b.w < v.x - hw) continue;
+                        rc.save(); rc.globalCompositeOperation = 'lighter';
+                        rc.translate(0, gy); rc.scale(1, -0.75); rc.translate(0, -gy);
+                        try { b.drawEmissive(rc, dark); } catch (e) { /* a facade that can't mirror is left out */ }
+                        rc.restore();
+                    }
+                    for (const bb of this.activeMap.billboards || []) {
+                        const gy = bb.y;
+                        if (gy < v.y - hh - 40 || gy > v.y + hh + 200 || bb.x > v.x + hw + 100 || bb.x < v.x - hw - 100) continue;
+                        rc.save(); rc.translate(0, gy); rc.scale(1, -0.75); rc.translate(0, -gy);
+                        try { bb.drawEmissive(rc, dark); } catch (e) { /* ditto */ }
+                        rc.restore();
+                    }
+                    // a facade mirrors softer than a lamp: wet stone, not glass
+                    rc.globalCompositeOperation = 'destination-out'; rc.globalAlpha = 0.55;
+                    rc.setTransform(1, 0, 0, 1, 0, 0); rc.fillRect(0, 0, rw, rh); toView(rc);
+                    rc.globalAlpha = 1; rc.globalCompositeOperation = 'lighter';
+                }
                 const rs = this.roomSystem;
                 if (night > 0.01) {
                     const LH = REFLECT.LAMP_H;
@@ -48490,6 +48515,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 for (const fl of this.muzzleFlashes || []) glow(fl.x, fl.y + 16, fl.color && /^#[0-9a-f]{6}$/i.test(fl.color) ? fl.color : '#fff1d0', 40, 60, 0.8);
                 for (const pj of this.projectiles || []) if (pj.active !== false) glow(pj.x, pj.y + 12, /^#[0-9a-f]{6}$/i.test(pj.color || '') ? pj.color : '#ffffff', 12, 26, 0.6);
+                // Whoever stands between a light and its reflection blocks it: their mirrored shape
+                rc.globalCompositeOperation = 'destination-out';
+                for (const m of this._reflMovers(near)) this._reflShape(rc, m, 0.85);
+                rc.globalCompositeOperation = 'source-over';
                 rc.globalAlpha = 1;
 
                 // 3. Only where the ground is wet enough to mirror
@@ -48500,26 +48529,132 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._refl = { R, q, wet };
             },
 
-            /** The puddles themselves on the ground (darker, glossy, a faint rim), in the world pass */
+            /** Everyone and everything that stands on the street near the view, for reflections and splashes */
+            _reflMovers(near) {
+                const out = [];
+                const walker = (e, col) => { if (e && !e.dead && e.visible !== false && !e.inCar && near(e.x, e.y, 40)) out.push({ e, x: e.x, y: e.y, kind: 'walker', col }); };
+                const lookCol = (e) => { const L = e.look || e.appearance; return (L && L.top && L.top.color) || null; };
+                if (!this.isDriving) walker(this.player, '#c9a6ff');
+                for (const t of this.teammates || []) if (t.recruited) walker(t, lookCol(t));
+                for (const n of this.npcs || []) walker(n, lookCol(n));
+                for (const e of this.enemies || []) walker(e, lookCol(e));
+                for (const p of (this.pedestrians && this.pedestrians.pedestrians) || []) walker(p, lookCol(p));
+                const cars = this.traffic && this.traffic.vehicles ? (this.isDriving && this.car ? [this.car, ...this.traffic.vehicles] : this.traffic.vehicles) : [];
+                for (const c of cars) if (c && !c.dead && c.visible !== false && near(c.x, c.y, 60)) out.push({ e: c, x: c.x, y: c.y, kind: 'car', col: c.bodyColor || c.color || null });
+                return out;
+            },
+
+            /** A mirrored shape below where it stands: a figure (body, then head) or a car's flank */
+            _reflShape(c, m, a) {
+                c.globalAlpha = a;
+                if (m.kind === 'walker') {
+                    c.beginPath(); c.ellipse(m.x, m.y + 17, 5.5, 14, 0, 0, Math.PI * 2); c.fill();
+                    c.beginPath(); c.arc(m.x, m.y + 33, 5.5, 0, Math.PI * 2); c.fill();
+                } else {
+                    const e = m.e, L = e.length || 40, Wd = e.width || 20;
+                    c.save(); c.translate(m.x, m.y + Wd * 0.55); c.rotate(e.angle || 0);
+                    c.beginPath(); c.rect(-L / 2, -Wd / 2, L, Wd); c.fill(); c.restore();
+                }
+            },
+
+            /**
+             * The puddles on the ground, in the world pass: dark and glossy at night, holding a
+             * pale sky by day; the mirrored shapes of whoever stands at them; the rings of
+             * raindrops and splashes; a faint rim.
+             */
             drawPuddles(ctx) {
                 const wet = this._wetHere();
                 if (wet < 0.02 || !this.reflectQuality()) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 80, hh = this.canvas.height / 2 / z + 80;
+                const night = Math.min(1, Math.max(0, (this.getAmbientDarkness() - 0.15) / 0.35)), day = 1 - night;
+                const clip = new Path2D(), rim = new Path2D();
+                let n = 0;
                 ctx.save();
                 for (const p of this.puddlesFor(this.activeMap)) {
                     if (p.x < v.x - hw - p.r || p.x > v.x + hw + p.r || p.y < v.y - hh - p.r || p.y > v.y + hh + p.r) continue;
                     const k = this._puddleK(p, wet); if (k <= 0) continue;
-                    const g = 0.65 + 0.35 * k;
-                    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
-                    ctx.fillStyle = `rgba(6, 4, 18, ${(0.55 * k).toFixed(3)})`;
-                    ctx.beginPath();
-                    for (const L of p.lobes) { ctx.moveTo(L.dx + L.rx * g, L.dy); ctx.ellipse(L.dx, L.dy, L.rx * g, L.ry * g, 0, 0, Math.PI * 2); }
-                    ctx.fill();
-                    ctx.strokeStyle = `rgba(214, 196, 255, ${(0.12 * k).toFixed(3)})`; ctx.lineWidth = 1;
-                    ctx.stroke();
+                    const g = 0.65 + 0.35 * k, c = Math.cos(p.ang), sn = Math.sin(p.ang);
+                    const path = new Path2D();
+                    for (const L of p.lobes) {
+                        const lx = p.x + L.dx * c - L.dy * sn, ly = p.y + L.dx * sn + L.dy * c;
+                        path.moveTo(lx + Math.cos(p.ang) * L.rx * g, ly + Math.sin(p.ang) * L.rx * g);
+                        path.ellipse(lx, ly, L.rx * g, L.ry * g, p.ang, 0, Math.PI * 2);
+                    }
+                    // night: a dark glossy pool; day: the pale sky in it
+                    ctx.fillStyle = `rgba(6, 4, 18, ${(0.55 * k * night).toFixed(3)})`; ctx.fill(path);
+                    if (day > 0.01) { ctx.fillStyle = `rgba(178, 190, 226, ${(0.3 * k * day).toFixed(3)})`; ctx.fill(path); }
+                    clip.addPath(path); rim.addPath(path); n++;
+                }
+                if (n) {
+                    // the mirrored shapes of whoever stands at the water, and the rings on it
+                    ctx.save(); ctx.clip(clip);
+                    const near = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m - 60 && y < v.y + hh + m;
+                    ctx.fillStyle = night > 0.5 ? 'rgba(2, 1, 6, 1)' : 'rgba(26, 22, 36, 1)';
+                    for (const m of this._reflMovers(near)) this._reflShape(ctx, m, 0.42 + 0.2 * day);
+                    for (const m of this._reflMovers(near)) if (m.col && /^#[0-9a-f]{6}$/i.test(m.col)) { ctx.fillStyle = m.col; this._reflShape(ctx, m, 0.12); }
+                    const R = this._ripples;
+                    if (R && R.length) {
+                        ctx.lineWidth = 1;
+                        for (const r of R) {
+                            const f = r.t / r.life;
+                            ctx.globalAlpha = (1 - f) * (r.big ? 0.55 : 0.4);
+                            ctx.strokeStyle = night > 0.5 ? '#d8c6ff' : '#ffffff';
+                            ctx.beginPath(); ctx.ellipse(r.x, r.y, 1 + f * r.r, (1 + f * r.r) * 0.8, 0, 0, Math.PI * 2); ctx.stroke();
+                            if (r.big && f < 0.6) { ctx.beginPath(); ctx.ellipse(r.x, r.y, 1 + f * r.r * 0.55, (1 + f * r.r * 0.55) * 0.8, 0, 0, Math.PI * 2); ctx.stroke(); }
+                        }
+                    }
                     ctx.restore();
+                    ctx.globalAlpha = 1;
+                    ctx.strokeStyle = `rgba(214, 196, 255, ${(0.12 * Math.min(1, wet * 1.5)).toFixed(3)})`; ctx.lineWidth = 1; ctx.stroke(rim);
                 }
                 ctx.restore();
+            },
+
+            /**
+             * Once per tick: raindrops ring the puddles in view (more in heavier rain), and
+             * anyone walking or driving through one splashes it (rings and spray).
+             */
+            updatePuddles() {
+                const R = this._ripples || (this._ripples = []);
+                for (let i = R.length - 1; i >= 0; i--) if (++R[i].t >= R[i].life) R.splice(i, 1);
+                const wet = this._wetHere();
+                if (wet < 0.05 || !this.reflectQuality() || !this.view) return;
+                const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 40, hh = this.canvas.height / 2 / z + 40;
+                const vis = [];
+                for (const p of this.puddlesFor(this.activeMap)) {
+                    if (p.x < v.x - hw || p.x > v.x + hw || p.y < v.y - hh || p.y > v.y + hh) continue;
+                    const k = this._puddleK(p, wet); if (k > 0.2) vis.push([p, k]);
+                }
+                if (!vis.length) return;
+                const W = this.weather, rain = W && W.isRaining ? W.intensity : 0;
+                // raindrops
+                let drops = rain * 2.2 + (Math.random() < (rain * 2.2) % 1 ? 1 : 0);
+                while (drops-- >= 1 && R.length < 70) {
+                    const [p, k] = vis[(Math.random() * vis.length) | 0], L = p.lobes[(Math.random() * p.lobes.length) | 0];
+                    const g = 0.65 + 0.35 * k, a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 0.8;
+                    const lx = L.dx + Math.cos(a) * L.rx * g * rr, ly = L.dy + Math.sin(a) * L.ry * g * rr, c = Math.cos(p.ang), sn = Math.sin(p.ang);
+                    R.push({ x: p.x + lx * c - ly * sn, y: p.y + lx * sn + ly * c, t: 0, life: 26 + (Math.random() * 12 | 0), r: 5 + Math.random() * 4 });
+                }
+                // splashes: footsteps every so often, tyres often
+                const inside = (p, k, x, y) => {
+                    const g = 0.65 + 0.35 * k, c = Math.cos(-p.ang), sn = Math.sin(-p.ang), dx = x - p.x, dy = y - p.y;
+                    const lx = dx * c - dy * sn, ly = dx * sn + dy * c;
+                    return p.lobes.some(L => ((lx - L.dx) / (L.rx * g)) ** 2 + ((ly - L.dy) / (L.ry * g)) ** 2 <= 1);
+                };
+                const near = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m && y < v.y + hh + m;
+                for (const m of this._reflMovers(near)) {
+                    const e = m.e, px = e._splX ?? e.x, py = e._splY ?? e.y, sp = Math.hypot(e.x - px, e.y - py);
+                    e._splX = e.x; e._splY = e.y;
+                    const every = m.kind === 'car' ? 3 : 15;
+                    if (sp < (m.kind === 'car' ? 1.2 : 0.5) || ((e._splT = (e._splT || 0) + 1) % every)) continue;
+                    for (const [p, k] of vis) {
+                        if (Math.abs(p.x - e.x) > p.r + 10 || Math.abs(p.y - e.y) > p.r + 10 || !inside(p, k, e.x, e.y)) continue;
+                        const car = m.kind === 'car';
+                        if (R.length < 80) R.push({ x: e.x, y: e.y, t: 0, life: car ? 30 : 34, r: car ? 26 : 15, big: true });
+                        if (this.weather && this.weather.spawnSpray) this.weather.spawnSpray(e.x, e.y, Math.atan2(e.y - py, e.x - px) + Math.PI, 'rgba(206, 214, 255, 0.55)', car ? 8 : 4);
+                        break;
+                    }
+                }
             },
 
             /**
@@ -54696,6 +54831,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 this.updateCasings();
                 this.updateCorpses();
+                this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
                 this.updateShotFx();
             
                 this.updateTime();

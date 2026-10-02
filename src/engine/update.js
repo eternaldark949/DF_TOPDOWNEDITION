@@ -56,6 +56,7 @@
                 }
                 this.updateCasings();
                 this.updateCorpses();
+                this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
                 this.updateShotFx();
             
                 this.updateTime();
