@@ -13,18 +13,20 @@
         body.landscape #ui-time { font-size: 1rem; margin-bottom: 2px; }
         body.landscape #ui-currency, body.landscape #ui-scrap { font-size: 0.78rem; }
 
-        /* --- The cat's paw: the same arc, dropped 90px so it fits a short screen --- */
-        body.landscape #btn-fire, body.landscape #btn-emote { bottom: 50px; right: 60px; }
-        body.landscape #btn-heal, body.landscape #emote-smile { bottom: 145px; }
-        body.landscape #btn-nv, body.landscape #emote-zany { bottom: 125px; }
-        body.landscape #btn-flit, body.landscape #emote-cry { bottom: 65px; }
-        body.landscape #btn-handbrake { bottom: 30px; right: 6px; width: 50px; height: 50px; font-size: 0.5rem; }
+        /* --- The cat's paw: the same arc, dropped 90px so it fits a short screen, and moved in
+               from the edge by a thumb's width (--paw-shift) so it sits under the right thumb --- */
+        body.landscape { --paw-shift: 56px; }
+        body.landscape #btn-fire, body.landscape #btn-emote { bottom: 50px; right: calc(60px + var(--paw-shift)); }
+        body.landscape #btn-heal, body.landscape #emote-smile { bottom: 145px; right: calc(78px + var(--paw-shift)); }
+        body.landscape #btn-nv, body.landscape #emote-zany { bottom: 125px; right: calc(130px + var(--paw-shift)); }
+        body.landscape #btn-flit, body.landscape #emote-cry { bottom: 65px; right: calc(150px + var(--paw-shift)); }
+        body.landscape #btn-handbrake { bottom: 30px; right: calc(6px + var(--paw-shift)); width: 50px; height: 50px; font-size: 0.5rem; }
         body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
-        body.landscape #btn-holster, body.landscape #emote-frown { bottom: 120px; }
-        body.landscape #btn-sneak { bottom: 172px; right: 25px; }
+        body.landscape #btn-holster, body.landscape #emote-frown { bottom: 120px; right: calc(25px + var(--paw-shift)); }
+        body.landscape #btn-sneak { bottom: 172px; right: calc(25px + var(--paw-shift)); }
 
         /* --- The action dock: beside the arc, not above it --- */
-        body.landscape #action-dock { right: 212px; bottom: 18px; }
+        body.landscape #action-dock { right: calc(212px + var(--paw-shift)); bottom: 18px; }
         body.landscape #action-dock .action-pill { height: 42px; min-width: 112px; max-width: 34vw; }
         body.landscape #action-dock .ap-name { max-width: 20vw; }
 
