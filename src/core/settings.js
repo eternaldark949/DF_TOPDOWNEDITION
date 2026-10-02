@@ -158,6 +158,10 @@
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.
+            audioBuffer: (() => {           // 'low' | 'balanced' | 'smooth': the output buffer (audio/audio.js); read at launch, kept per device
+                try { const v = localStorage.getItem('dfab_audio_buffer'); if (v === 'low' || v === 'balanced' || v === 'smooth') return v; } catch (e) { /* private mode */ }
+                return 'balanced';
+            })(),
             ambienceVolume: (() => {        // Rain, wind, city, room tone, fireplace (0..1); kept outside saves too
                 try {
                     const v = parseFloat(localStorage.getItem('dfab_ambience_volume'));

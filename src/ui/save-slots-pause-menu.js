@@ -898,6 +898,7 @@
                 this._updateValueEl('set-finisher', GameSettings.finisher || 'full');
                 this._updateValueEl('set-enemyrings', GameSettings.enemyRings !== false ? 'on' : 'off');
                 this._updateValueEl('set-footsteps', GameSettings.footsteps !== false ? 'on' : 'off');
+                this._updateValueEl('set-audiobuffer', this._audioBufferLabel());
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
@@ -911,6 +912,12 @@
                 this._updateValueEl('set-fps', GameSettings.fpsLimit === 0 ? 'none' : String(GameSettings.fpsLimit));
             }
             
+            /** The Audio Buffer setting, with a note while it waits for a restart */
+            _audioBufferLabel() {
+                const want = GameSettings.audioBuffer || 'balanced';
+                return typeof audioSys !== 'undefined' && audioSys.bufferMode !== want ? want + ' · restart' : want;
+            }
+
             _updateValueEl(id, value) {
                 const el = document.getElementById(id);
                 if (!el) return;
@@ -988,6 +995,14 @@
                     // The grade drawer lives in Cinematic View, over the world with no HUD in the way
                     this.closeSettings();
                     this.enterCinematic({ grade: true, back: 'settings' });
+
+                } else if (key === 'audioBuffer') {
+                    // Low latency → Balanced → Smooth (bigger buffer, fewer crackles); the audio
+                    // context only takes it at launch, so it says so until then
+                    const order = ['low', 'balanced', 'smooth'];
+                    GameSettings.audioBuffer = order[(order.indexOf(GameSettings.audioBuffer || 'balanced') + 1) % order.length];
+                    try { localStorage.setItem('dfab_audio_buffer', GameSettings.audioBuffer); } catch (e) { /* private mode */ }
+                    this._updateValueEl(el.id, this._audioBufferLabel());
 
                 } else if (key === 'enemyRings' || key === 'footsteps') {
                     GameSettings[key] = GameSettings[key] === false;

@@ -126,7 +126,28 @@
                          + `<span class="dp-bar"><i style="transform:scaleX(${Math.min(1, r.time / max).toFixed(3)})"></i></span></div>`;
                 });
                 html += `<div class="dp-counts">${this._countLine(game)}</div>`;
+                html += `<div class="dp-counts dp-audio">${this._audioLine()}</div>`;
                 this._rowsEl.innerHTML = html;
+            },
+
+            /**
+             * The audio thread, as far as the page can see it: the context's state, buffer mode and
+             * latency, voices playing now (and the peak over the last second), sounds started a
+             * second, main-thread ms a second spent starting them, and, where Chrome reports it,
+             * glitches (output underruns: the crackles and pops).
+             */
+            _audioLine() {
+                if (typeof audioSys === 'undefined' || !audioSys.stats) return '';
+                const c = audioSys.ctx, S = audioSys.stats;
+                const lat = Math.round(((c.baseLatency || 0) + (c.outputLatency || 0)) * 1000);
+                const parts = [['audio', c.state === 'running' ? audioSys.bufferMode : c.state], ['latency', lat + ' ms'],
+                               ['voices', `${S.live} / ${S.peakSec ?? S.peak}`], ['new/s', S.perSec], ['start ms/s', S.ms.toFixed(1)]];
+                const st = c.playbackStats || c.playoutStats;                // the playback-stats API, where the browser has it
+                if (st) {
+                    const ev = st.underrunEvents ?? st.fallbackFramesEvents, dur = st.underrunDuration ?? st.fallbackDuration;
+                    if (ev !== undefined) parts.push(['glitches', ev + (dur ? ` (${Math.round(dur * 1000)} ms)` : '')]);
+                } else parts.push(['glitches', 'n/a']);
+                return parts.map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('');
             },
 
             _countLine(game) {

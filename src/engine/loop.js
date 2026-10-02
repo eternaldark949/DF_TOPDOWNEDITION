@@ -195,7 +195,9 @@
             },
             loop() {
                 if (!this.running) return;
-                ambience.update(this);
+                const _a0 = performance.now();
+                ambience.update(this);                                   // the beds, the music, the motor (Audio:Ambience in the profiler)
+                if (this.profiler) this.profiler.add('Audio:Ambience', performance.now() - _a0);
                 
                 /* FPS LIMITER — skip frame if too soon.
                    Scheduled against a running due-time rather than the last
