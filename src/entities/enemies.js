@@ -1129,6 +1129,7 @@
             // ... [update method from previous turn] ...
             update(player, walls, buildings, markers, trafficCars, map, enemies) {
                 if (this.dead) return null;
+                if (this._execBy) return null;                                      // being executed (engine/executions.js): frozen
                 // Flit: Afterimage — for a moment they still see you where you flitted from
                 const ai = typeof game !== 'undefined' && game._afterimage;
                 if (ai && _gameTimeSec < ai.until && player === game.player) player = Object.assign(Object.create(player), { x: ai.x, y: ai.y });
@@ -1153,7 +1154,12 @@
                 
                 // --- 1. DETECTION LOGIC ---
                 let canSee = false;
-                if (distToPlayer < 50 && isVisible) {
+                // Up close they sense her, unless she comes from behind, slowly or hidden, out of the light (an execution)
+                const toHer = Math.atan2(player.y - this.y, player.x - this.x);
+                const pg = player._gait, hg = typeof game !== 'undefined' ? game : null;
+                const sneaking = Math.abs(normalizeAngle(toHer - this.angle)) > Math.PI * 0.6
+                    && ((hg && hg.sneaking && player === hg.player) || player.isHidden || ((pg ? pg.speed : 0) < 2.3 && (player.visibility ?? 0) < 0.75));
+                if (distToPlayer < 50 && isVisible && !sneaking) {
                     canSee = true;
                     this.suspicion += 5;
                 } else if (isVisible && distToPlayer <= effectiveVisionRange && this.canSeePoint(player.x, player.y, walls, buildings)) {
@@ -1539,6 +1545,7 @@
                 let coneColor = 'rgba(255, 255, 255, 0.05)';
                 if (this.state === 'SUSPICIOUS') coneColor = 'rgba(255, 255, 0, 0.15)';
                 if (this.state === 'ALERT' || this.state === 'SUPPRESSING') coneColor = 'rgba(255, 0, 0, 0.2)';
+                if (this.hunter) coneColor = this.state === 'ALERT' || this.state === 'SUPPRESSING' ? 'rgba(255, 40, 60, 0.07)' : 'rgba(255, 60, 60, 0.035)';   // a hunter's red sight
                 const pl = typeof game !== 'undefined' && game.player;
                 const wantRange = pl && pl.buffSystem ? pl.buffSystem.getStat('detectionRange', this.visionRange) : this.visionRange;
                 this._coneRange = this._coneRange === undefined ? wantRange : this._coneRange + (wantRange - this._coneRange) * 0.08;
@@ -1729,7 +1736,19 @@
                 ],
                 gunnerSpawns: [[760, 700], [1380, 560], [280, 820], [700, 380]]
             },
-            { id: 'sealed_1', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
+            {
+                id: 'demoness_palace', label: 'The Demoness Palace', mapId: 'demoness_palace',
+                blurb: 'Obsidian and gold, lit by embers. Her hunters see in the dark and cross a room in a blink, and every fifth wave she hunts you herself.',
+                spawns: [
+                    [150, 180], [760, 180], [1000, 150], [1300, 150], [1600, 310],     // garden, shrine, bath
+                    [140, 520], [460, 900], [1350, 520], [1650, 900],                  // the galleries
+                    [690, 490], [1110, 960], [420, 1300], [120, 1250], [1300, 1300], [1700, 1300]   // throne hall, dressing room, kennels
+                ],
+                gunnerSpawns: [],
+                // Waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave
+                waves: (w) => ({ hunters: Math.min(3 + w, 10), alphas: w >= 3 ? 1 + Math.floor((w - 3) / 4) : 0, demoness: w % 5 === 0,
+                                 hp: 55 + w * 8, speed: 2.6 + Math.min(w * 0.08, 1) })
+            },
             { id: 'sealed_2', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
             { id: 'sealed_3', label: 'Sealed', locked: true, blurb: 'Coming soon.' }
         ];
@@ -1748,6 +1767,8 @@
                 this.totalKills = 0;
                 this.entry = GAUNTLET_MAPS[0];
                 this.mapId = this.entry.mapId;
+                document.getElementById('ui-wave')?.classList.remove('show');   // a fresh game: no readout left over
+                document.body.classList.remove('wave-hud');
             }
 
             /** Best wave on any map (old saves kept a single number). */
@@ -1821,9 +1842,10 @@
                 const id = this.entry.id;
                 if (this.wave > (this.highestWaves[id] || 0)) this.highestWaves[id] = this.wave;
                 this.hostiles = [];
+                this._waveStartedAt = _gameTimeSec;
+                if (this.entry.waves) { this._spawnHunters(game, this.entry.waves(this.wave)); return; }
                 const cfg = this.getWaveConfig(this.wave);
                 const nav = game.activeMap;
-                this._waveStartedAt = _gameTimeSec;
 
                 for (const pt of this._spawnPoints(game, this.entry.spawns, cfg.gangerCount)) {
                     const ganger = new Ganger(pt.x, pt.y, {
@@ -1850,6 +1872,74 @@
                 const gunnerText = cfg.gunnerCount > 0 ? ` + ${cfg.gunnerCount} GUNNER${cfg.gunnerCount > 1 ? 'S' : ''}` : '';
                 showMessage(`WAVE ${this.wave} — ${cfg.gangerCount} GANGERS${gunnerText}`);
                 game.triggerShake(8);
+                this._waveSize = this.hostiles.length;
+            }
+
+            /** A palace wave: hunters, an alpha or two, and every fifth wave the Demoness with her intro */
+            _spawnHunters(game, W) {
+                for (const pt of this._spawnPoints(game, this.entry.spawns, W.hunters)) {
+                    const h = new Hunter(pt.x, pt.y, { hp: W.hp, speed: W.speed });
+                    h._gauntletWave = this.wave; h.navMap = game.activeMap;
+                    this._lead(h, game, GAUNTLET_LEAD_ERR);
+                    this.hostiles.push(h); game.enemies.push(h);
+                }
+                for (const pt of this._spawnPoints(game, this.entry.spawns, W.alphas)) {
+                    const a = new Hunter(pt.x, pt.y, { hp: Math.round(W.hp * 1.9), speed: W.speed + 0.2, alpha: true, dashes: 2, dashCD: 180, claw: 18 });
+                    a._gauntletWave = this.wave; a.navMap = game.activeMap;
+                    this._lead(a, game, GAUNTLET_LEAD_ERR);
+                    this.hostiles.push(a); game.enemies.push(a);
+                }
+                let text = `WAVE ${this.wave} — ${W.hunters} HUNTERS` + (W.alphas ? ` + ${W.alphas} ALPHA${W.alphas > 1 ? 'S' : ''}` : '');
+                if (W.demoness) {
+                    for (const h of this.hostiles) h.dormant = true;               // her hunters hold still while she makes her entrance
+                    const d = new Demoness(900, 480, { hp: 700 + this.wave * 40 });
+                    d._gauntletWave = this.wave;
+                    this.hostiles.push(d);
+                    game.bossIntro([d], { title: 'THE DEMONESS', seenFlag: 'demonessIntroSeen' });   // (bossIntro adds her to the enemies)
+                    text += ' — AND SHE COMES';
+                }
+                showMessage(text);
+                game.triggerShake(8);
+                this._waveSize = this.hostiles.length;
+            }
+
+            /**
+             * The wave readout (#ui-wave, top centre): the wave, how many are left and a
+             * bar that drains, the countdown between waves, the summary at the end. The
+             * message modal still announces each beat; this keeps the count where a loot
+             * pickup or a flit message can't cover it. Writes the DOM only on change.
+             */
+            _hud(game, ended) {
+                const el = this._el || (this._el = document.getElementById('ui-wave'));
+                if (!el) return;
+                let key, html = '', frac = 0;
+                if (ended) {
+                    key = 'end' + this.wave;
+                    html = `<span class="w-title">Gauntlet over</span><span class="w-sep">◆</span><span class="w-sub">Wave ${this.wave} · ${this.totalKills} kills</span>`;
+                } else if (!this.active || game.activeMap.id !== this.mapId || (game.scenes && game.scenes.running)) {
+                    key = '';
+                } else if (this.waveDelay > 0) {
+                    const n = Math.ceil(this.waveDelay / 60);
+                    key = 'gap' + this.wave + ':' + n;
+                    html = this.wave > 0
+                        ? `<span class="w-title">Wave ${this.wave} cleared</span><span class="w-sep">◆</span><span class="w-sub">Next in ${n}</span>`
+                        : `<span class="w-title">Wave 1</span><span class="w-sep">◆</span><span class="w-sub">In ${n}</span>`;
+                } else {
+                    const left = this.hostiles.length, gun = this.hostiles.filter(h => h instanceof GatlingGunner).length;
+                    const her = typeof Demoness !== 'undefined' && this.hostiles.some(h => h instanceof Demoness && !h.dead);
+                    key = 'w' + this.wave + ':' + left + ':' + gun + ':' + her;
+                    frac = this._waveSize ? left / this._waveSize : 0;
+                    html = `<span class="w-title">Wave ${this.wave}</span><span class="w-sep">◆</span><span class="w-sub">${left} left</span>`
+                         + (gun ? `<span class="w-chip">${gun > 1 ? gun + ' gunners' : 'Gunner'}</span>` : '')
+                         + (her ? `<span class="w-chip">The Demoness</span>` : '');
+                }
+                if (key === this._hudKey) return;
+                this._hudKey = key;
+                if (!key) { el.classList.remove('show'); document.body.classList.remove('wave-hud'); return; }
+                el.innerHTML = `<div class="w-line">${html}</div><div class="w-bar"><i style="transform:scaleX(${frac.toFixed(3)})"></i></div>`;
+                el.classList.toggle('between', !frac);
+                el.classList.add('show'); document.body.classList.add('wave-hud');
+                if (ended) { clearTimeout(this._endT); this._endT = setTimeout(() => { if (!this.active) { this._hudKey = ''; el.classList.remove('show'); document.body.classList.remove('wave-hud'); } }, 6000); }
             }
 
             update(game) {
@@ -1866,9 +1956,12 @@
                     if (this.waveDelay <= 0) {
                         this.spawnWave(game);
                     }
+                    this._hud(game);
                     return;
                 }
 
+                // Her intro over: her hunters wake
+                if (!game._bossIntro) for (const h of this.hostiles) if (h.dormant && !(typeof Demoness !== 'undefined' && h instanceof Demoness)) h.dormant = false;
                 // Prune dead
                 const before = this.hostiles.length;
                 this.hostiles = this.hostiles.filter(h => !h.dead && game.enemies.includes(h));
@@ -1893,6 +1986,7 @@
                     showMessage(`WAVE ${this.wave} CLEARED — +${reward} PERSONICS, +${scrapReward} SCRAP`);
                     this.waveDelay = 210; // 3.5 seconds between waves
                 }
+                this._hud(game);
             }
 
             end(game) {
@@ -1913,7 +2007,8 @@
                 }
                 if (this.wave > 0) {
                     showMessage(`GAUNTLET OVER — WAVE ${this.wave} — ${this.totalKills} KILLS`);
-                }
+                    this._hud(game, true);
+                } else this._hud(game);
             }
         }
 

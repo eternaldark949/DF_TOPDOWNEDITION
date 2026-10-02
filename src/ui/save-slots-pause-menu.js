@@ -31,6 +31,7 @@
                     'neural_sys_interior': 'Neural Systems',
                     'biggs_arena': 'Biggs Park',
                     'house_of_death': 'The House of Death',
+                    'demoness_palace': 'The Demoness Palace',
                 };
                 
                 this._migrateV1Save();
@@ -475,7 +476,7 @@
                 this._cinePtrs = new Map();
                 const cineOn = () => document.body.classList.contains('cinematic-view');
                 window.addEventListener('pointerdown', (e) => {
-                    if (!cineOn() || e.target.closest?.('#cine-bar')) return;
+                    if (!cineOn() || e.target.closest?.('#cine-bar, #cine-grade')) return;
                     e.preventDefault(); e.stopPropagation();
                     this._cinePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now() });
                     if (this._cinePtrs.size > 1) this._cineGesture = true;            // a pinch is never a tap
@@ -509,17 +510,33 @@
                 window.addEventListener('pointerup', up, true);
                 window.addEventListener('pointercancel', up, true);
                 window.addEventListener('wheel', (e) => {
-                    if (!cineOn()) return;
+                    if (!cineOn() || e.target.closest?.('#cine-grade')) return;
                     e.preventDefault(); this._cineZoom(Math.exp(-e.deltaY * 0.0015));
                 }, { capture: true, passive: false });
                 const bar = document.getElementById('cine-bar');
                 bar?.addEventListener('click', (e) => {
                     const act = e.target.closest('[data-cine]')?.dataset.cine;
                     if (act === 'save') this.saveCinePicture();
+                    else if (act === 'grade') this._cineGrade(!document.body.classList.contains('cine-grade-open'));
                     else if (act === 'in') this._cineZoom(1.2);
                     else if (act === 'out') this._cineZoom(1 / 1.2);
                     else if (act === 'reset') { const c = game.cineCam; if (c) { c.dx = c.dy = 0; game.camera.zoom = c.zoom; } }
                     else if (act === 'back') this.exitCinematic();
+                });
+
+                // The grade drawer: presets, sliders, the colour chips (app/boot.js holds the grade)
+                const drawer = document.getElementById('cine-grade');
+                drawer?.addEventListener('click', (e) => {
+                    const pre = e.target.closest('[data-preset]');
+                    if (pre) { applyGameGradePreset(+pre.dataset.preset); return; }
+                    const act = e.target.closest('[data-cg]')?.dataset.cg;
+                    if (act === 'close') this._cineGrade(false);
+                    else if (act === 'seen' || act === 'full') { GameSettings.photoFullColour = act === 'full'; syncGradeDrawer(); }
+                    else if (act === 'refl-on' || act === 'refl-off') { GameSettings.photoReflections = act === 'refl-on'; syncGradeDrawer(); }
+                });
+                drawer?.addEventListener('input', (e) => {
+                    const k = e.target.dataset?.k;
+                    if (k) setGameGradeValue(k, e.target.value);
                 });
 
                 // Click backdrop to close
@@ -674,10 +691,22 @@
             }
 
             // The world held still with every bit of HUD faded away; a tap or Esc brings the menu back
-            enterCinematic() {
+            //   opts.grade: open with the grade drawer showing; opts.back: 'settings' returns there
+            //   opts.focus {x, y, zoom}: frame a spot (the finisher's capture prompt)
+            enterCinematic(opts = {}) {
                 this.close();
                 game.pauseSystem.acquire('cinematic_view');
                 game.cineCam = { dx: 0, dy: 0, zoom: game.camera.zoom };          // draw() keeps going while it's set
+                const f = opts.focus;
+                if (f) {
+                    const R = CONFIG.CAMERA.CINE_PAN, [lo, hi] = CONFIG.CAMERA.CINE_ZOOM;
+                    let dx = f.x - game.camera.x, dy = f.y - game.camera.y; const d = Math.hypot(dx, dy);
+                    if (d > R) { dx *= R / d; dy *= R / d; }
+                    game.cineCam.dx = dx; game.cineCam.dy = dy;
+                    if (f.zoom) game.camera.zoom = Math.max(lo, Math.min(hi, f.zoom));
+                }
+                this._cineBack = opts.back || null;
+                this._cineGrade(!!opts.grade);
                 if (game.weather) game.weather._cineDensity = 0;                     // re-measured on the first pan
                 this._cinePtrs?.clear(); this._cineGesture = false;
                 document.body.classList.add('cinematic-view');
@@ -688,10 +717,38 @@
             exitCinematic() {
                 if (!document.body.classList.contains('cinematic-view')) return;
                 document.body.classList.remove('cinematic-view');
+                this._cineGrade(false);
                 document.getElementById('cinematic-hint')?.classList.remove('show');
                 if (game.cineCam) { game.camera.zoom = game.cineCam.zoom; game.cineCam = null; }
                 game.pauseSystem.release('cinematic_view');
                 this.open();
+                if (this._cineBack === 'settings') this.openSettings();
+                this._cineBack = null;
+            }
+
+            /** Show or hide the grade drawer over the held frame */
+            _cineGrade(on) {
+                document.body.classList.toggle('cine-grade-open', on);
+                document.querySelector('#cine-bar [data-cine="grade"]')?.classList.toggle('on', on);
+                if (on) syncGradeDrawer();
+            }
+
+            /** A small "Capture?" pill for a moment worth a photo (the finisher): tapping it opens Cinematic View framed on the spot */
+            capturePrompt(focus, ms = 2600) {
+                if (GameSettings.capturePrompt === false) return;
+                let pill = document.getElementById('capture-pill');
+                if (!pill) {
+                    pill = document.createElement('button'); pill.id = 'capture-pill'; pill.textContent = '📷 Capture?';
+                    document.body.appendChild(pill);
+                    pill.addEventListener('click', (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        pill.classList.remove('show');
+                        if (!game.paused && !game.scenes?.running) this.enterCinematic({ focus: pill._focus });
+                    });
+                }
+                pill._focus = focus;
+                pill.classList.remove('show'); void pill.offsetWidth; pill.classList.add('show');
+                clearTimeout(this._capT); this._capT = setTimeout(() => pill.classList.remove('show'), ms);
             }
 
             /** Pan by a screen-space drag (CSS px), kept within CINE_PAN world px of where the view began. */
@@ -728,6 +785,8 @@
                 const f = src.style.filter;
                 if (f && f !== 'none' && 'filter' in ctx) ctx.filter = f;
                 ctx.drawImage(src, 0, 0);
+                ctx.filter = 'none';
+                gradePhotoPass(out, src.clientWidth);                              // the temperature / tint wash and vignette, as on screen
                 const flash = document.getElementById('cine-flash');
                 if (flash) { flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go'); }
                 const d = new Date(), z = (n) => String(n).padStart(2, '0');
@@ -831,9 +890,19 @@
                     this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
-                this._updateValueEl('set-wetreflections', GameSettings.wetReflections ? 'on' : 'off');
+                this._updateValueEl('set-wetreflections', GameSettings.reflections || 'high');
                 this._updateValueEl('set-atmosphere', GameSettings.atmosphereTint || 'off');
                 this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
+                this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
+                this._updateValueEl('set-soundrings', GameSettings.soundRings || 'mirage');
+                this._updateValueEl('set-finisher', GameSettings.finisher || 'full');
+                this._updateValueEl('set-enemyrings', GameSettings.enemyRings !== false ? 'on' : 'off');
+                this._updateValueEl('set-footsteps', GameSettings.footsteps !== false ? 'on' : 'off');
+                this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
+                this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
+                this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
+                this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
+                this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
                 this._updateValueEl('set-audio', GameSettings.audioEnabled ? 'on' : 'off');
                 syncAmbienceSliders();
                 this._updateValueEl('set-fullscreen', !FullscreenManager.supported()
@@ -878,9 +947,11 @@
                     GameSettings.bloom = !GameSettings.bloom;
                     this._updateValueEl(el.id, GameSettings.bloom ? 'on' : 'off');
                     
-                } else if (key === 'wetReflections') {
-                    GameSettings.wetReflections = !GameSettings.wetReflections;
-                    this._updateValueEl(el.id, GameSettings.wetReflections ? 'on' : 'off');
+                } else if (key === 'reflections') {
+                    const order = ['high', 'medium', 'off'];
+                    GameSettings.reflections = order[(order.indexOf(GameSettings.reflections || 'high') + 1) % order.length];
+                    GameSettings.wetReflections = GameSettings.reflections !== 'off';
+                    this._updateValueEl(el.id, GameSettings.reflections);
                     
                 } else if (key === 'fullscreen') {
                     if (!FullscreenManager.supported()) {
@@ -908,13 +979,67 @@
                     this._updateValueEl(el.id, GameSettings.atmosphereTint || 'off');
                     
                 } else if (key === 'colorGrade') {
-                    const gradeOrder = ['none', 'amber_night', 'violet_noir', 'crimson', 'cold_teal', 'dreampunk'];
-                    const gi = gradeOrder.indexOf(GameSettings.colorGrade);
-                    GameSettings.colorGrade = gradeOrder[(gi + 1) % gradeOrder.length];
+                    // Cycle the presets (a custom grade steps on to the first); the drawer fine-tunes
+                    const gi = GAME_GRADE_PRESETS.findIndex(p => p.key === GameSettings.colorGrade);
+                    applyGameGradePreset((gi + 1) % GAME_GRADE_PRESETS.length);
                     this._updateValueEl(el.id, GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
-                    // Apply via custom grade panel system
-                    const presetIdx = gi + 1 < gradeOrder.length ? gi + 1 : 0;
-                    applyGameGradePreset(presetIdx);
+
+                } else if (key === 'gradeDrawer') {
+                    // The grade drawer lives in Cinematic View, over the world with no HUD in the way
+                    this.closeSettings();
+                    this.enterCinematic({ grade: true, back: 'settings' });
+
+                } else if (key === 'enemyRings' || key === 'footsteps') {
+                    GameSettings[key] = GameSettings[key] === false;
+                    this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
+
+                } else if (key === 'finisher') {
+                    const order = ['full', 'subtle', 'off'];
+                    GameSettings.finisher = order[(order.indexOf(GameSettings.finisher || 'full') + 1) % order.length];
+                    this._updateValueEl(el.id, GameSettings.finisher);
+
+                } else if (key === 'soundRings') {
+                    const order = ['mirage', 'simple', 'off'];
+                    GameSettings.soundRings = order[(order.indexOf(GameSettings.soundRings || 'mirage') + 1) % order.length];
+                    this._updateValueEl(el.id, GameSettings.soundRings);
+
+                } else if (key === 'stealthGray') {
+                    GameSettings.stealthGray = GameSettings.stealthGray === false;
+                    this._updateValueEl(el.id, GameSettings.stealthGray ? 'on' : 'off');
+
+                } else if (key === 'profiler') {
+                    const order = ['off', 'compact', 'full'];
+                    GameSettings.profilerMode = order[(order.indexOf(GameSettings.profilerMode || 'off') + 1) % order.length];
+                    game.showProfiler = GameSettings.profilerMode !== 'off';
+                    if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
+                    this._updateValueEl(el.id, GameSettings.profilerMode);
+
+                } else if (key === 'debugView') {
+                    game.debugMode = !game.debugMode;
+                    if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
+                    this._updateValueEl(el.id, game.debugMode ? 'on' : 'off');
+
+                } else if (key === 'devWeather') {
+                    // Clear → Drizzle → Rain → Storm pin the sky (the schedule waits); Auto hands it back
+                    const W = game.weather, cycle = ['auto', 'clear', 'drizzle', 'rain', 'storm'];
+                    const cur = W.scheduleLocked ? W.condition : 'auto';
+                    const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+                    if (next === 'auto') W.unlockSchedule(true); else W.lockSchedule(next);
+                    this._updateValueEl(el.id, next);
+
+                } else if (key === 'devWeaponMode') {
+                    // Sniper mode: penetrating rounds
+                    game.weaponMode = game.weaponMode === 'sniper' ? 'normal' : 'sniper';
+                    showMessage(game.weaponMode === 'sniper' ? 'SNIPER MODE: PENETRATING ROUNDS ACTIVE' : 'NORMAL MODE: STANDARD ROUNDS ACTIVE');
+                    this._updateValueEl(el.id, game.weaponMode);
+
+                } else if (key === 'perfBench') {
+                    // The resolution sweep (entities/static-builders-profiler.js PerfBench): back in the game to measure it
+                    GameSettings.profilerMode = GameSettings.profilerMode === 'off' || !GameSettings.profilerMode ? 'compact' : GameSettings.profilerMode;
+                    game.showProfiler = true;
+                    if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
+                    this.closeSettings(); this.close();
+                    PerfBench.run();
                     
                 } else if (key === 'fpsLimit') {
                     // Cycle: NONE → 60 → 30 → NONE

@@ -1147,6 +1147,51 @@
             })(),
             // The House of Death (gauntlet). Three loops round the grand hall, so no one gets cornered:
             // foyer–kitchen–dining–hall, foyer–gallery–courtyard–hall, dining–library–chapel–bedroom–courtyard.
+            'demoness_palace': (() => {
+                const WOOD = '#3a0e16', GLASS = 'rgba(255, 120, 90, 0.28)';
+                const hinged = (x, y, o, rooms, hingeSide = 'left') => ({ x, y, w: o === 'V' ? 14 : 80, h: o === 'V' ? 80 : 14, type: 'hinged', orientation: o, rooms, color: WOOD, hingeSide, triggerRadius: 60 });
+                const arch = (x, y, w, o, rooms) => ({ x, y, w: o === 'V' ? 14 : w, h: o === 'V' ? w : 14, type: 'arch', orientation: o, rooms });
+                const EMBER = '255, 110, 70', ROSE = '255, 80, 120';
+                return {
+                    rooms: {
+                        garden:   { x: 14,   y: 14,   w: 872, h: 352, type: 'outdoor', label: 'Blood Garden' },
+                        shrine:   { x: 900,  y: 14,   w: 486, h: 352, type: 'indoor',  label: 'Shrine' },
+                        bath:     { x: 1400, y: 14,   w: 386, h: 352, type: 'indoor',  label: 'Bath of Embers' },
+                        westgal:  { x: 14,   y: 380,  w: 572, h: 606, type: 'indoor',  label: 'West Gallery' },
+                        throne:   { x: 600,  y: 380,  w: 600, h: 606, type: 'indoor',  label: 'Throne Hall' },
+                        eastgal:  { x: 1214, y: 380,  w: 572, h: 606, type: 'indoor',  label: 'East Gallery' },
+                        dressing: { x: 14,   y: 1000, w: 572, h: 386, type: 'indoor',  label: 'Dressing Room' },
+                        entrance: { x: 600,  y: 1000, w: 600, h: 400, type: 'indoor',  label: 'Entrance Hall' },
+                        kennels:  { x: 1214, y: 1000, w: 572, h: 386, type: 'indoor',  label: 'The Kennels' }
+                    },
+                    doors: [
+                        arch(820, 986, 160, 'H', ['entrance', 'throne']),
+                        hinged(586, 1150, 'V', ['entrance', 'dressing']),
+                        hinged(1200, 1150, 'V', ['entrance', 'kennels'], 'right'),
+                        hinged(586, 640, 'V', ['throne', 'westgal']),
+                        hinged(1200, 640, 'V', ['throne', 'eastgal'], 'right'),
+                        arch(220, 986, 140, 'H', ['westgal', 'dressing']),
+                        arch(1440, 986, 140, 'H', ['eastgal', 'kennels']),
+                        { ...hinged(700, 366, 'H', ['garden', 'throne']), w: 90 },
+                        hinged(1040, 366, 'H', ['shrine', 'throne'], 'right'),
+                        arch(260, 366, 140, 'H', ['garden', 'westgal']),
+                        hinged(1386, 180, 'V', ['shrine', 'bath']),
+                        hinged(1560, 366, 'H', ['bath', 'eastgal'])
+                    ],
+                    windows: [
+                        // a red moon through the throne hall's oculus, rose glass in the galleries
+                        { x: 0, y: 560, w: 14, h: 80, facing: 'E', projectionLength: 140, tint: ROSE },
+                        { x: 1786, y: 560, w: 14, h: 80, facing: 'W', projectionLength: 140, tint: ROSE },
+                        { x: 1520, y: 0, w: 80, h: 14, facing: 'S', projectionLength: 120, tint: EMBER },
+                        { x: 1060, y: 0, w: 80, h: 14, facing: 'S', projectionLength: 140, tint: ROSE }
+                    ],
+                    linens: [
+                        // crimson silks hanging in the galleries
+                        ...[480, 620, 760, 900].map(y => ({ x: 18, y, length: 70, width: 14, anchor: 'left', color: 'rgba(150, 10, 40, 0.18)', lightColor: 'rgba(255, 90, 90, 0.03)', segments: 4 })),
+                        ...[480, 620, 760, 900].map(y => ({ x: 1782, y, length: 70, width: 14, anchor: 'right', color: 'rgba(150, 10, 40, 0.18)', lightColor: 'rgba(255, 90, 90, 0.03)', segments: 4 }))
+                    ]
+                };
+            })(),
             'house_of_death': (() => {
                 const WOOD = '#6b3a45', GLASS = 'rgba(170, 150, 230, 0.32)';   // oxblood leaves (light enough to read), violet glass
                 const hinged = (x, y, o, rooms, hingeSide = 'left') => ({ x, y, w: o === 'V' ? 14 : 80, h: o === 'V' ? 80 : 14, type: 'hinged', orientation: o, rooms, color: WOOD, hingeSide, triggerRadius: 60 });

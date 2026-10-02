@@ -162,7 +162,7 @@
 
         /* 2. Utility Buttons (Heal, NV, Flit, Auto) */
         /* Updated: Tighter spacing ("Cat's Paw") & Darker Background */
-        #btn-heal, #btn-nv, #btn-flit, #btn-autodrive, #btn-zib-skip, #btn-holster {
+        #btn-heal, #btn-nv, #btn-flit, #btn-autodrive, #btn-zib-skip, #btn-holster, #btn-sneak {
             width: 44px; 
             height: 44px;
             border-radius: 50%;
@@ -249,6 +249,13 @@
             box-shadow: 0 0 12px rgba(255, 170, 68, 0.4);
         }
         #btn-holster:active { background: rgba(255, 170, 68, 0.4); transform: scale(0.95); }
+        /* Sneak (engine/sneak.js): the outer toe of the paw, left of NV (clear of the action dock); lavender while she's low */
+        #btn-sneak {
+            position: absolute; bottom: 232px; right: 180px;
+            color: #cab0fa; font-size: 0.55rem; font-weight: bold; letter-spacing: 0.5px; text-align: center; line-height: 1.1;
+        }
+        #btn-sneak.active { background: rgba(150, 110, 230, 0.55); color: #fff; box-shadow: 0 0 0 1.5px rgba(222, 204, 255, 0.9), 0 0 18px rgba(202, 176, 250, 0.8); }
+        #btn-sneak:active { transform: scale(0.95); }
 
         /* Emote Joystick (replaces fire button when holstered)
            Pattern matches #btn-fire: stationary outer ring + inner knob that moves. */
@@ -524,31 +531,13 @@
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(164, 105, 255, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(164, 105, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(164, 105, 255, 0); } }
         
 
-        #utility-dock { position: absolute; top: 210px; right: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; z-index: 35; pointer-events: auto; }
-        #dock-toggle { width: 36px; height: 36px; border-radius: 8px; background: rgba(0, 0, 0, 0.7); border: 1px solid #666; color: #aaa; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.3s; }
-        #dock-toggle:hover { border-color: var(--glow-color); color: var(--glow-color); }
-        #dock-toggle.open { background: rgba(164, 105, 255, 0.2); border-color: var(--glow-color); color: var(--glow-color); }
-        #dock-buttons { display: none; flex-direction: column; gap: 6px; background: rgba(0, 0, 0, 0.8); padding: 10px; border-radius: 8px; border: 1px solid #333; animation: dockSlide 0.2s ease-out; }
-        #dock-buttons.visible { display: flex; }
         
         /* Color Grade Panel */
-        #game-grade-panel { display:none; position:absolute; top:210px; right:70px; width:230px; background:rgba(10,10,15,0.95); border:1px solid rgba(212,168,75,0.3); border-radius:8px; padding:10px; z-index:200; backdrop-filter:blur(8px); box-shadow:0 8px 30px rgba(0,0,0,0.6); pointer-events:auto; }
-        #game-grade-panel.visible { display:block; }
-        .ggp-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-        .ggp-title span { font-family:var(--font-tech); font-size:10px; letter-spacing:2px; color:#d4a84b; }
-        .ggp-title button { background:none; border:none; color:#888; cursor:pointer; font-size:14px; pointer-events:auto; }
-        .ggp-row { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
-        .ggp-label { font-family:var(--font-tech); font-size:7px; color:#888; width:52px; text-align:right; flex-shrink:0; text-transform:uppercase; letter-spacing:0.5px; }
         .ggp-slider { flex:1; -webkit-appearance:none; appearance:none; height:10px; border-radius:2px; outline:none; cursor:pointer; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.06); pointer-events:auto; }
         .ggp-slider::-webkit-slider-thumb { -webkit-appearance:none; width:10px; height:16px; border-radius:2px; background:#ccc; border:1px solid #000; cursor:pointer; }
         .amb-slider-wrap { display:flex; align-items:center; gap:10px; }
         .amb-slider { flex:0 0 auto; width:120px; touch-action:none; }
         .amb-val { min-width:2.2em; text-align:right; font-size:0.8em; opacity:0.8; }
-        .ggp-val { font-size:8px; color:#888; width:24px; text-align:left; font-family:monospace; }
-        .ggp-presets { display:flex; gap:4px; margin-top:8px; flex-wrap:wrap; }
-        .ggp-preset { padding:3px 6px; font-family:var(--font-tech); font-size:7px; border-radius:3px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:#888; cursor:pointer; text-transform:uppercase; letter-spacing:0.5px; pointer-events:auto; }
-        .ggp-preset:hover { border-color:#d4a84b; color:#d4a84b; }
-        .ggp-preset.active { border-color:#d4a84b; color:#d4a84b; background:rgba(212,168,75,0.1); }
         .game-btn { pointer-events: auto; position: relative; background: rgba(0, 0, 0, 0.6); border: 1px solid var(--glow-color); color: var(--text-color); padding: 8px 16px; font-family: var(--font-ui); text-transform: uppercase; font-size: 0.75rem; border-radius: 4px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
         .game-btn:active { background: var(--glow-color); color: #000; }
 

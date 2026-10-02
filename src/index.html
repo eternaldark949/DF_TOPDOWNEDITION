@@ -339,6 +339,7 @@
             </div>
             
             <div id="ui-stealth-indicator">HIDDEN (100%)</div>
+            <div id="ui-wave" aria-live="polite"></div>
 
             <div id="ui-health">
                 <div id="health-bar" style="width: 100%;"></div>
@@ -377,33 +378,6 @@
                 </div>
             </div>
 
-            <div id="utility-dock">
-                <div id="dock-toggle">⚙</div> 
-                <div id="dock-buttons">
-                    <button class="game-btn" id="btn-weapon-mode" style="border-color: #00f3ff; color: #00f3ff;">🔫 Normal</button>
-                    <button class="game-btn" id="btn-save-game" style="border-color: #00ff00; color: #00ff00;">💾 Save</button> 
-                    <button class="game-btn" id="btn-open-map" style="border-color: #FFD700; color: #FFD700;">🗺️ Map</button>
-                    <button class="game-btn" id="btn-inventory" style="border-color: #a469ff; color: #a469ff;">🎒 Items</button>
-                    <button class="game-btn" id="btn-toggle-weather">☁ Weather</button>
-                    <button class="game-btn" id="btn-colorgrade" style="border-color: #d4a84b; color: #d4a84b;">🎨 Grade</button>
-                    <button class="game-btn" id="btn-profiler" style="border-color: #00f3ff; color: #00f3ff;">📊 Profiler</button>
-                    <button class="game-btn" id="btn-debug">⚡ Debug</button>
-                    <button class="game-btn" id="btn-game-exit">✕ Exit</button>
-                </div>
-            </div>
-            
-            <!-- COLOR GRADE PANEL -->
-            <div id="game-grade-panel">
-                <div class="ggp-title"><span>COLOR GRADE</span><button onclick="document.getElementById('game-grade-panel').classList.remove('visible')">✕</button></div>
-                <div class="ggp-row"><span class="ggp-label">Exposure</span><input type="range" class="ggp-slider" id="ggpExposure" min="-100" max="100" value="0" oninput="updateGameGrade()"><span class="ggp-val" id="ggpExposureVal">0</span></div>
-                <div class="ggp-row"><span class="ggp-label">Brightness</span><input type="range" class="ggp-slider" id="ggpBrightness" min="50" max="150" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpBrightnessVal">100</span></div>
-                <div class="ggp-row"><span class="ggp-label">Contrast</span><input type="range" class="ggp-slider" id="ggpContrast" min="50" max="200" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpContrastVal">100</span></div>
-                <div class="ggp-row"><span class="ggp-label">Saturation</span><input type="range" class="ggp-slider" id="ggpSaturate" min="0" max="200" value="100" oninput="updateGameGrade()"><span class="ggp-val" id="ggpSaturateVal">100</span></div>
-                <div class="ggp-row"><span class="ggp-label">Temp</span><input type="range" class="ggp-slider" id="ggpTemp" min="-100" max="100" value="0" oninput="updateGameGrade()" style="background:linear-gradient(to right,#4488ff,#888,#ffaa44)"><span class="ggp-val" id="ggpTempVal">0</span></div>
-                <div class="ggp-row"><span class="ggp-label">Tint</span><input type="range" class="ggp-slider" id="ggpTint" min="-100" max="100" value="0" oninput="updateGameGrade()" style="background:linear-gradient(to right,#44cc66,#888,#cc44aa)"><span class="ggp-val" id="ggpTintVal">0</span></div>
-                <div class="ggp-row"><span class="ggp-label">Vignette</span><input type="range" class="ggp-slider" id="ggpVignette" min="0" max="100" value="0" oninput="updateGameGrade()"><span class="ggp-val" id="ggpVignetteVal">0</span></div>
-                <div class="ggp-presets" id="ggpPresets"></div>
-            </div>
             
             <!-- The action dock (ui/action-dock.js): context pills above the right-hand cluster -->
             <div id="action-dock">
@@ -429,6 +403,7 @@
             <div id="btn-handbrake" aria-label="Handbrake"><span>HAND<br>BRAKE</span></div>
             <div id="btn-zib-skip" style="display:none;">SKIP<br><span style="font-size:0.5rem;opacity:0.7">(T)</span></div>
             <div id="btn-holster">HOLSTER</div>
+            <div id="btn-sneak" aria-label="Sneak">SNEAK</div>
             <div id="btn-nv">👁️</div>
 
             <div id="input-zone-left"></div> 
@@ -740,41 +715,41 @@
                 <div id="inventory-list"></div>
             </div>
             <!-- AUGMENTS MANAGEMENT SCREEN (hidden by default) -->
-            <div id="skills-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
-                <div id="skills-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;"></div>
+            <div id="skills-screen" class="df-screen" style="display:none;">
+                <div id="skills-screen-content"></div>
             </div>
-            <div id="augments-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
-                <div id="augments-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+            <div id="augments-screen" class="df-screen" style="display:none;">
+                <div id="augments-screen-content">
                     <!-- Populated dynamically -->
                 </div>
             </div>
             <!-- CONTACTS SCREEN (hidden by default) -->
-            <div id="contacts-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
-                <div id="contacts-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+            <div id="contacts-screen" class="df-screen" style="display:none;">
+                <div id="contacts-screen-content">
                     <!-- Populated dynamically -->
                 </div>
             </div>
             <!-- TEAM MANAGEMENT SCREEN (hidden by default) -->
-            <div id="team-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
-                <div id="team-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+            <div id="team-screen" class="df-screen" style="display:none;">
+                <div id="team-screen-content">
                     <!-- Populated dynamically by renderTeamScreen() -->
                 </div>
             </div>
             <!-- CHARACTER SCREEN (hidden by default) -->
-            <div id="character-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
-                <div id="character-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+            <div id="character-screen" class="df-screen" style="display:none;">
+                <div id="character-screen-content">
                     <!-- Populated dynamically by renderCharacterScreen() -->
                 </div>
             </div>
             <!-- STORY/MISSIONS SCREEN (hidden by default) -->
-            <div id="story-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
-                <div id="story-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+            <div id="story-screen" class="df-screen" style="display:none;">
+                <div id="story-screen-content">
                     <!-- Populated dynamically by renderStoryScreen() -->
                 </div>
             </div>
             <!-- COLLECTION SCREEN (hidden by default) -->
-            <div id="collection-screen" style="display:none; padding: 10px; overflow-y: auto; max-height: 70vh;">
-                <div id="collection-screen-content" style="font-family: Montserrat, sans-serif; color: #ddd;">
+            <div id="collection-screen" class="df-screen" style="display:none;">
+                <div id="collection-screen-content">
                     <!-- Populated dynamically by renderCollectionScreen() -->
                 </div>
             </div>
@@ -1002,8 +977,20 @@
                     <span class="settings-value val-on" id="set-bloom" data-key="bloom">ON</span>
                 </div>
                 <div class="settings-row">
-                    <span class="settings-label">Wet Reflections</span>
-                    <span class="settings-value val-on" id="set-wetreflections" data-key="wetReflections">ON</span>
+                    <span class="settings-label">Reflections</span>
+                    <span class="settings-value val-high" id="set-wetreflections" data-key="reflections">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Enemy Sound Rings</span>
+                    <span class="settings-value val-on" id="set-enemyrings" data-key="enemyRings">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Finisher</span>
+                    <span class="settings-value" id="set-finisher" data-key="finisher">FULL</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Sound Rings</span>
+                    <span class="settings-value" id="set-soundrings" data-key="soundRings">MIRAGE</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Atmosphere</span>
@@ -1012,6 +999,14 @@
                 <div class="settings-row">
                     <span class="settings-label">Color Grade</span>
                     <span class="settings-value" id="set-colorgrade" data-key="colorGrade">NONE</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Fine-tune Grade</span>
+                    <span class="settings-value" id="set-gradedrawer" data-key="gradeDrawer">OPEN ›</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Stealth Grey</span>
+                    <span class="settings-value val-on" id="set-stealthgray" data-key="stealthGray">ON</span>
                 </div>
                 
                 <div class="settings-section-label">Display</div>
@@ -1030,6 +1025,10 @@
                     <span class="settings-value val-on" id="set-audio" data-key="audioEnabled">ON</span>
                 </div>
                 <div class="settings-row">
+                    <span class="settings-label">Footsteps</span>
+                    <span class="settings-value val-on" id="set-footsteps" data-key="footsteps">ON</span>
+                </div>
+                <div class="settings-row">
                     <span class="settings-label">Ambience</span>
                     <span class="amb-slider-wrap"><input type="range" class="ggp-slider amb-slider" id="set-ambience" min="0" max="100" step="5" value="70"><span class="amb-val" id="set-ambience-val">70</span></span>
                 </div>
@@ -1043,6 +1042,28 @@
                     <span class="settings-label">Frame Limit</span>
                     <span class="settings-value" id="set-fps" data-key="fpsLimit">NONE</span>
                 </div>
+
+                <div class="settings-section-label">Developer</div>
+                <div class="settings-row">
+                    <span class="settings-label">Profiler</span>
+                    <span class="settings-value" id="set-profiler" data-key="profiler">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Debug View</span>
+                    <span class="settings-value" id="set-debug" data-key="debugView">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Weather</span>
+                    <span class="settings-value" id="set-weather" data-key="devWeather">AUTO</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Weapon Mode</span>
+                    <span class="settings-value" id="set-weaponmode" data-key="devWeaponMode">NORMAL</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Resolution Bench</span>
+                    <span class="settings-value" id="set-bench" data-key="perfBench">RUN ›</span>
+                </div>
                 
                 <div class="settings-back-btn" id="pause-settings-back">◁ BACK</div>
             </div>
@@ -1053,10 +1074,18 @@
     <div id="cinematic-hint">Drag to pan · pinch to zoom · tap to return</div>
     <div id="cine-bar" aria-label="Cinematic view">
         <button data-cine="save" title="Save picture">📷 SAVE</button>
+        <button data-cine="grade" title="Colour grade">🎨</button>
         <button data-cine="out" title="Zoom out">−</button>
         <button data-cine="in" title="Zoom in">+</button>
         <button data-cine="reset" title="Recentre">⟲</button>
         <button data-cine="back" title="Back to the menu">✕</button>
+    </div>
+    <div id="cine-grade" aria-label="Colour grade">
+        <div class="cg-head"><span>Colour grade</span><button data-cg="close" title="Close">✕</button></div>
+        <div class="cg-presets"></div>
+        <div class="cg-sliders"></div>
+        <div class="cg-colour"><span class="cg-label">Colour</span><button class="df-chip" data-cg="seen" title="Stealth greys the picture as you see it">As seen</button><button class="df-chip" data-cg="full" title="Full colour, even in the shadows">Full colour</button></div>
+        <div class="cg-colour"><span class="cg-label">Reflect</span><button class="df-chip" data-cg="refl-on" title="Puddles and the wet street mirror the lights">On</button><button class="df-chip" data-cg="refl-off">Off</button></div>
     </div>
     <div id="cine-flash"><span>SAVED</span></div>
     

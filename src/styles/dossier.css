@@ -1,0 +1,202 @@
+        /* =====================================================================
+           DOSSIER — the sidebar screens (Story, Contacts, Team, Character,
+           Augments, Skills, Collection) in ETERNAL's menu scheme (--df-*,
+           base.css). Shared pieces: sections, cards, chips, tabs, bars, rows,
+           buttons, avatars, empty states. Renderers: engine/screens-ui.js,
+           engine/tuning-ui.js (Skills).
+           ===================================================================== */
+        .df-screen { display: none; padding: 6px 14px 28px; overflow-y: auto; max-height: 72vh; scrollbar-width: thin; scrollbar-color: rgba(202, 176, 250, 0.35) transparent; }
+        .df-screen > div { font-family: var(--font-ui); color: #e6dff0; max-width: 980px; margin: 0 auto; }
+        .df-screen::-webkit-scrollbar { width: 6px; }
+        .df-screen::-webkit-scrollbar-thumb { background: rgba(202, 176, 250, 0.3); border-radius: 3px; }
+
+        /* Section header: cream letter-spaced caps over a champagne hairline that fades at both ends */
+        .df-section {
+            display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+            margin: 22px 0 12px; padding-bottom: 7px;
+            font: 600 0.72rem var(--font-ui); letter-spacing: 4px; text-transform: uppercase; color: var(--df-cream);
+            border-bottom: 1px solid transparent;
+            border-image: linear-gradient(90deg, transparent, rgba(216, 198, 162, 0.55) 12%, rgba(255, 255, 255, 0.55) 50%, rgba(216, 198, 162, 0.55) 88%, transparent) 1;
+        }
+        .df-section:first-child { margin-top: 6px; }
+        .df-section .count { font-size: 0.6rem; letter-spacing: 2px; color: var(--df-lilac-grey); }
+        .df-section .glint { color: var(--df-gold); text-shadow: 0 0 6px rgba(255, 194, 72, 0.7); margin-right: 8px; font-size: 0.6rem; }
+        .df-sub { font-size: 0.72rem; color: rgba(225, 214, 245, 0.75); line-height: 1.55; }
+        .df-hint { font-size: 0.7rem; color: var(--df-champagne); line-height: 1.5; font-style: italic; }
+
+        /* Card: dotted lavender rim, ink → deep violet */
+        .df-card {
+            position: relative; min-width: 0; box-sizing: border-box; margin-bottom: 10px; padding: 14px 18px;
+            border: 2px dotted rgba(202, 176, 250, 0.4); border-radius: 22px;
+            background: linear-gradient(100deg, rgba(4, 1, 6, 0.92) 0%, rgba(22, 6, 46, 0.86) 60%, rgba(40, 12, 96, 0.72) 100%);
+            transition: box-shadow 0.25s, border-color 0.25s, transform 0.25s;
+        }
+        .df-card.clickable { cursor: pointer; }
+        .df-card.clickable:hover, .df-card.selected { box-shadow: 0 0 18px rgba(142, 85, 245, 0.28); border-color: rgba(202, 176, 250, 0.75); }
+        .df-card.lit {
+            border-color: rgba(255, 255, 255, 0.85);
+            background: radial-gradient(ellipse 85% 140% at 30% 40%, var(--df-lavender-pale) 0%, #dac1fc 55%, #b896f6 100%);
+            color: var(--df-violet-ink); box-shadow: 0 0 26px rgba(202, 176, 250, 0.32);
+        }
+        .df-card.locked { border-color: rgba(208, 16, 28, 0.55); opacity: 0.72; }
+        .df-card.gold { border-color: rgba(216, 198, 162, 0.55); background: linear-gradient(100deg, rgba(10, 4, 6, 0.92) 0%, rgba(40, 24, 18, 0.7) 100%); }
+        .df-card.accent { border-left: 3px solid var(--acc, var(--df-lavender)); }
+        .df-card .eyebrow { font: 600 0.58rem var(--font-ui); letter-spacing: 3px; text-transform: uppercase; color: var(--df-champagne); margin-bottom: 4px; }
+        .df-card .title { font: 600 0.88rem var(--font-ui); letter-spacing: 2px; text-transform: uppercase; color: var(--df-lavender); }
+        .df-card .title.script { font: 400 1.7rem var(--font-script); letter-spacing: 0.5px; text-transform: none; color: var(--df-lavender-pale); text-shadow: 0 0 12px rgba(202, 176, 250, 0.45); }
+        .df-card .desc { font-size: 0.74rem; color: rgba(225, 214, 245, 0.8); line-height: 1.6; margin-top: 6px; }
+        .df-card .desc.quote { font-style: italic; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .df-card.lit .eyebrow { color: #7d5bbd; }
+        .df-card.lit .title { color: #4a22a8; }
+        .df-card.lit .title.script { color: #3a1d78; text-shadow: none; }
+        .df-card.lit .desc { color: var(--df-violet-ink); }
+        .df-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .df-head > .grow { flex: 1; min-width: 0; }
+        .df-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 10px; }
+        .df-grid > .df-card { margin-bottom: 0; }
+        .df-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        /* Chips */
+        .df-chip {
+            display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+            padding: 3px 11px; border-radius: 999px; border: 1px solid rgba(202, 176, 250, 0.45);
+            font: 600 0.56rem var(--font-ui); letter-spacing: 2px; text-transform: uppercase; color: var(--df-lavender);
+        }
+        .df-chip.active { background: var(--df-lavender-pale); border-color: #fff; color: var(--df-violet-ink); box-shadow: 0 0 10px rgba(241, 232, 254, 0.45); }
+        .df-chip.done { background: var(--df-violet-mid); border-color: var(--df-violet-mid); color: #fff; }
+        .df-chip.locked { border-color: rgba(208, 16, 28, 0.7); color: #ff8a92; }
+        .df-chip.available, .df-chip.gold { border-color: rgba(255, 194, 72, 0.7); color: var(--df-gold); }
+        .df-chip.mint { border-color: rgba(120, 220, 205, 0.7); color: #9be8dc; }
+        .df-chip.crimson { border-color: rgba(208, 16, 28, 0.75); color: #ff8a92; }
+        .df-chip.info { border-color: rgba(185, 174, 196, 0.5); color: var(--df-lilac-grey); }
+        .df-card.lit .df-chip { border-color: rgba(58, 29, 120, 0.4); color: var(--df-violet-ink); }
+        .df-card.lit .df-chip.active { background: var(--df-violet); border-color: var(--df-violet); color: #fff; box-shadow: none; }
+        .df-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+        /* Tabs: the sidebar's lit pill */
+        .df-tabs { display: flex; gap: 6px; justify-content: center; margin: 4px 0 14px; flex-wrap: wrap; }
+        .df-tab {
+            position: relative; padding: 9px 26px; cursor: pointer; user-select: none;
+            font: 600 0.66rem var(--font-ui); letter-spacing: 4px; text-transform: uppercase; color: var(--df-lilac-grey);
+            transition: color 0.2s;
+        }
+        .df-tab::before { content: ''; position: absolute; inset: 2px 0; border-radius: 15px; z-index: -1; opacity: 0; transition: opacity 0.25s;
+            background: linear-gradient(90deg, transparent 0%, rgba(176, 150, 210, 0.75) 14%, #f2ecf4 42%, #f2ecf4 58%, rgba(176, 150, 210, 0.75) 86%, transparent 100%); }
+        .df-tab { z-index: 0; isolation: isolate; }
+        .df-tab:hover { color: var(--df-lavender-pale); }
+        .df-tab.active { color: #1b0d2e; }
+        .df-tab.active::before { opacity: 1; }
+        .df-tab.small { padding: 6px 16px; font-size: 0.56rem; letter-spacing: 3px; }
+        .df-tab.disabled { opacity: 0.35; cursor: default; }
+
+        /* Bars: a soft track, a gradient fill, a diamond at the tip */
+        .df-bar-label { display: flex; justify-content: space-between; font: 600 0.55rem var(--font-ui); letter-spacing: 2px; color: var(--df-champagne); margin: 8px 0 4px; text-transform: uppercase; }
+        .df-bar-label span:last-child { color: var(--df-lavender-pale); letter-spacing: 1px; }
+        .df-bar { position: relative; height: 6px; border-radius: 3px; background: rgba(202, 176, 250, 0.14); }
+        .df-bar > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; width: var(--v, 0%);
+            background: linear-gradient(90deg, var(--df-violet-deep), var(--df-violet) 55%, var(--df-lavender)); transition: width 0.3s; }
+        .df-bar > i::after { content: ''; position: absolute; right: -4px; top: 50%; width: 7px; height: 7px; transform: translateY(-50%) rotate(45deg);
+            background: #fffdfa; box-shadow: 0 0 6px rgba(255, 194, 72, 0.8), 0 0 10px rgba(202, 176, 250, 0.6); }
+        .df-bar.gold > i { background: linear-gradient(90deg, #6b4a12, #c8962a 55%, var(--df-gold)); }
+        .df-bar.crimson > i { background: linear-gradient(90deg, #4a0410, #a10c22 55%, #ff4a5e); }
+        .df-bar.mint > i { background: linear-gradient(90deg, #0f3a36, #3aa596 55%, #9be8dc); }
+        .df-bar.zero > i::after { display: none; }
+        .df-card.lit .df-bar { background: rgba(58, 29, 120, 0.18); }
+        .df-card.lit .df-bar-label { color: #7d5bbd; }
+        .df-card.lit .df-bar-label span:last-child { color: var(--df-violet-ink); }
+
+        /* Label / value rows */
+        .df-rows { display: grid; grid-template-columns: 1fr 1fr; column-gap: 26px; }
+        .df-rows.one { grid-template-columns: 1fr; }
+        .df-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px dotted rgba(202, 176, 250, 0.16); }
+        .df-row .k { font: 600 0.56rem var(--font-ui); letter-spacing: 2.5px; text-transform: uppercase; color: var(--df-champagne); flex-shrink: 0; }
+        .df-row .v { font-size: 0.78rem; color: var(--df-lavender-pale); text-align: right; }
+        .df-row .v .unit { font-size: 0.56rem; color: var(--df-lilac-grey); margin-left: 3px; }
+        .df-row .v .was { font-size: 0.66rem; color: var(--df-lilac-grey); text-decoration: line-through; margin-right: 6px; }
+        .df-row .v.up { color: #9be8dc; } .df-row .v.down { color: #ff8a92; }
+        .df-row .v .diamond { color: var(--df-gold); font-size: 0.55rem; margin-left: 5px; }
+
+        /* Buttons: the lavender back pill */
+        .df-btn {
+            flex-shrink: 0; cursor: pointer; padding: 7px 18px; border-radius: 20px;
+            font: 700 0.6rem var(--font-ui); letter-spacing: 2.5px; text-transform: uppercase; color: #1b0d2e;
+            border: 2px dotted rgba(255, 255, 255, 0.75);
+            background: radial-gradient(ellipse 70% 120% at 50% 50%, #e2d8ee 0%, var(--df-lavender) 75%, #b39be0 100%);
+            box-shadow: 0 0 12px rgba(202, 176, 250, 0.3); transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+        }
+        .df-btn:hover { box-shadow: 0 0 18px rgba(202, 176, 250, 0.55); }
+        .df-btn:active { transform: scale(0.96); }
+        .df-btn.ghost { background: transparent; color: var(--df-lavender); border-color: rgba(202, 176, 250, 0.55); box-shadow: none; }
+        .df-btn.danger { background: transparent; color: #ff8a92; border-color: rgba(208, 16, 28, 0.7); box-shadow: none; }
+        .df-btn.confirm { background: var(--df-crimson); color: #fff; border-color: rgba(255, 200, 200, 0.8); box-shadow: 0 0 14px rgba(208, 16, 28, 0.55); }
+        .df-arrow { width: 34px; height: 34px; border-radius: 50%; border: 2px dotted rgba(202, 176, 250, 0.55); color: var(--df-lavender);
+            display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.7rem; transition: box-shadow 0.2s; user-select: none; }
+        .df-arrow:hover { box-shadow: 0 0 12px rgba(142, 85, 245, 0.45); }
+        .df-arrow.disabled { opacity: 0.25; cursor: default; box-shadow: none; }
+        .df-pager { display: flex; justify-content: center; align-items: center; gap: 18px; margin: 4px 0 6px; font: 600 0.6rem var(--font-ui); letter-spacing: 3px; color: var(--df-lilac-grey); }
+
+        /* Avatars: a painted bust in the sidebar portrait's peach dotted frame */
+        .df-avatar { position: relative; flex-shrink: 0; width: 48px; height: 48px; border-radius: 50%; padding: 2px; border: 2px dotted var(--df-peach); }
+        .df-avatar img, .df-avatar .mono { width: 100%; height: 100%; border-radius: 50%; display: block; object-fit: cover; }
+        .df-avatar .mono { display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 40%, rgba(60, 20, 30, 0.9), #050103 75%);
+            font: 400 1.5rem var(--font-script); color: var(--df-lavender-pale); }
+        .df-avatar .dot { position: absolute; right: -1px; bottom: 1px; width: 11px; height: 11px; border-radius: 50%; background: var(--acc, var(--df-lavender)); border: 2px solid #0b0414; box-shadow: 0 0 6px var(--acc, var(--df-lavender)); }
+        .df-avatar.big { width: 92px; height: 92px; }
+        .df-person { display: flex; align-items: center; gap: 14px; }
+        .df-person .who { flex: 1; min-width: 0; }
+        .df-person .name { font: 600 0.84rem var(--font-ui); letter-spacing: 2px; text-transform: uppercase; color: var(--df-lavender); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .df-person .role { font: 600 0.54rem var(--font-ui); letter-spacing: 2.5px; text-transform: uppercase; color: var(--acc, var(--df-champagne)); margin-top: 2px; }
+
+        /* Empty states */
+        .df-empty { text-align: center; padding: 26px 12px; color: rgba(185, 174, 196, 0.6); font-style: italic; font-size: 0.8rem; }
+        .df-empty::before { content: '◆'; display: block; font-style: normal; color: rgba(255, 194, 72, 0.5); font-size: 0.7rem; margin-bottom: 8px; text-shadow: 0 0 8px rgba(255, 194, 72, 0.4); }
+        .df-empty .df-hint { margin-top: 6px; }
+
+        /* Tiles (augment slots) */
+        .df-tiles { display: flex; gap: 10px; flex-wrap: wrap; }
+        .df-tile { width: 92px; height: 92px; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; padding: 6px;
+            background: radial-gradient(circle at 50% 40%, rgba(60, 20, 30, 0.9), #050103 75%); border: 2px solid rgba(202, 176, 250, 0.55); box-shadow: 0 0 14px rgba(142, 85, 245, 0.25); }
+        .df-tile .ico { font-size: 1.5rem; }
+        .df-tile .lbl { font: 600 0.5rem var(--font-ui); letter-spacing: 1.5px; text-transform: uppercase; color: var(--df-lavender); line-height: 1.2; }
+        .df-tile.empty { background: transparent; border: 2px dotted rgba(202, 176, 250, 0.25); box-shadow: none; }
+        .df-tile.empty .lbl { color: rgba(185, 174, 196, 0.45); }
+
+        /* Skills: rank pips as diamonds */
+        .df-pips { display: inline-flex; gap: 4px; margin-right: 10px; vertical-align: middle; }
+        .df-pips i { width: 8px; height: 8px; transform: rotate(45deg); border: 1px dotted rgba(202, 176, 250, 0.5); }
+        .df-pips i.on { background: var(--df-gold); border: 1px solid #fff3cf; box-shadow: 0 0 6px rgba(255, 194, 72, 0.7); }
+        .df-node { display: flex; align-items: baseline; gap: 4px; padding: 7px 0; border-bottom: 1px dotted rgba(202, 176, 250, 0.14); font-size: 0.72rem; color: rgba(225, 214, 245, 0.55); line-height: 1.45; }
+        .df-node.on { color: #e6dff0; }
+        .df-node b { color: var(--df-lavender); font-weight: 600; letter-spacing: 0.5px; }
+        .df-node:last-child { border-bottom: 0; }
+
+        /* Collection: the open note sits in a lit frame */
+        #collection-note-inline .df-reader { border-radius: 22px; padding: 4px; border: 2px dotted rgba(255, 255, 255, 0.7); box-shadow: 0 0 24px rgba(202, 176, 250, 0.3); }
+        #collection-note-inline .df-reader > div { border-radius: 18px; }
+        .df-card .note-ico { font-size: 1.5rem; flex-shrink: 0; width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(circle at 50% 40%, rgba(60, 20, 30, 0.9), #050103 75%); }
+
+        @media (max-width: 700px) {
+            .df-screen { padding: 4px 6px 24px; max-height: 76vh; }
+            .df-rows, .df-pair { grid-template-columns: 1fr; }
+            .df-grid { grid-template-columns: minmax(0, 1fr); }
+            .df-screen { padding: 4px 0 24px; }
+            #freelancer-menu .screen-main-content { padding-left: 6px; padding-right: 6px; margin-left: 32px; margin-right: 32px; }
+            .df-head > .grow { min-width: 62%; }
+            .df-chip { white-space: normal; line-height: 1.3; }
+            .df-person { gap: 10px; }
+            .df-avatar.big { width: 72px; height: 72px; }
+            .df-card { padding: 12px 14px; border-radius: 18px; }
+            .df-tab { padding: 8px 18px; }
+            .df-card .title.script { font-size: 1.45rem; }
+            .df-tile { width: 76px; height: 76px; }
+            .df-card .eyebrow { letter-spacing: 1.6px; font-size: 0.54rem; }
+            .df-head { flex-wrap: wrap; }
+        }
+        body.landscape .df-screen { max-height: 78vh; }
+        .df-card.dim { opacity: 0.78; }
+        .df-card.lit .df-btn.ghost { color: var(--df-violet-ink); border-color: rgba(58, 29, 120, 0.55); }
+        .df-card.lit .df-btn.ghost:hover { background: rgba(58, 29, 120, 0.1); }
+        #collection-note-inline #note-body, #collection-note-inline #note-signature { max-width: 760px; margin-left: auto; margin-right: auto; }
+        /* While the sidebar screens are up, the HUD doesn't ghost through the backdrop */
+        body.screen-menu-open #game-ui { opacity: 0 !important; transition: opacity 0.2s; }

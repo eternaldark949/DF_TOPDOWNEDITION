@@ -212,6 +212,8 @@
                     const r = f.radius * 1.6;
                     if (inView(f.x, f.y, r)) lc.drawImage(white, f.x - r, f.y - r, r * 2, r * 2);
                 }
+                // Reflections in the wet street lift the dark where they shine (engine/reflections.js)
+                this.liftReflections(lc, lw, lh);
             
                 // Laser Sight beam cuts through darkness (same geometry as the visible beam)
                 const lsGeom = this.getLaserSight();
@@ -522,47 +524,6 @@
                 ctx.restore();
             },
             
-            drawWetReflections(ctx) {
-                if (!GameSettings.wetReflections || !this.lamps || this.lamps.length === 0) return;
-                const ambient = this.getAmbientDarkness();
-                if (ambient < 0.2) return; // No reflections in daylight
-                ctx.save();
-                const V = this.viewTransform(ctx), camX = V.x, camY = V.y;   // the frame's one view (draw.js)
-                ctx.globalCompositeOperation = 'lighter';
-                const halfW = (this.canvas.width / 2) / this.camera.zoom;
-                const halfH = (this.canvas.height / 2) / this.camera.zoom;
-                const rs = this.roomSystem;
-                for (const l of this.lamps) {
-                    if (l.x < camX - halfW - 300 || l.x > camX + halfW + 300 ||
-                        l.y < camY - halfH - 300 || l.y > camY + halfH + 300) continue;
-                    const k = (rs && rs.active ? rs.lampLight(l) : 1) * lampFlicker(l);
-                    if (k < 0.01) continue;
-                    const r = l.radius || 200;
-                    if (!l._wet || l._wetAt !== l.x + ',' + l.y + ',' + r) {         // lamps don't move: build once
-                        const color = /^#[0-9a-f]{6}$/i.test(l.color || '') ? l.color : '#ffeebb';
-                        const [cr, cg, cb] = hexToRgb(color).split(',').map(Number);
-                        const intensity = l.intensity || 0.8;
-                        const reflectH = r * 1.2;
-                        const grad = ctx.createRadialGradient(l.x, l.y + r * 0.3, 0, l.x, l.y + r * 0.3, reflectH);
-                        grad.addColorStop(0, `rgba(${cr},${cg},${cb},${0.06 * intensity})`);
-                        grad.addColorStop(0.3, `rgba(${cr},${cg},${cb},${0.03 * intensity})`);
-                        grad.addColorStop(1, 'rgba(0,0,0,0)');
-                        const hot = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, r * 0.25);
-                        hot.addColorStop(0, `rgba(${Math.min(255, cr + 40)},${Math.min(255, cg + 40)},${Math.min(255, cb + 40)},${0.08 * intensity})`);
-                        hot.addColorStop(1, 'rgba(0,0,0,0)');
-                        l._wet = { grad, hot, reflectH, reflectW: r * 0.4 }; l._wetAt = l.x + ',' + l.y + ',' + r;
-                    }
-                    const w = l._wet;
-                    ctx.globalAlpha = Math.min(1, k);
-                    ctx.fillStyle = w.grad;
-                    ctx.beginPath(); ctx.ellipse(l.x, l.y + r * 0.3, w.reflectW, w.reflectH, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = w.hot;
-                    ctx.beginPath(); ctx.arc(l.x, l.y, r * 0.25, 0, Math.PI * 2); ctx.fill();
-                }
-                ctx.globalAlpha = 1;
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.restore();
-            },
             
             drawAtmospherePass(ctx) {
                 const tintMap = {

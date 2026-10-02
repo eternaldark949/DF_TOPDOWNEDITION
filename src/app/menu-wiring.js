@@ -75,6 +75,5 @@
         });
         document.getElementById('btn-story-747').addEventListener('click', () => { showMessage("TIMELINE 747 LOCKED."); });
         document.getElementById('btn-story-back').addEventListener('click', () => { storyModeList.classList.add('hidden'); mainMenuList.classList.remove('hidden'); });
-        document.getElementById('btn-game-exit').addEventListener('click', () => { game.stop(); });
         document.getElementById('btn-exit').addEventListener('click', () => showMessage("TERMINATING SESSION"));
         

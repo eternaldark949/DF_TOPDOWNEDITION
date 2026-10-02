@@ -55,6 +55,12 @@
                     if(this.muzzleFlashes[i].life <= 0) this.muzzleFlashes.splice(i, 1);
                 }
                 this.updateCasings();
+                this.updateCorpses();
+                this.updateStatuses();                                 // bleeding and the rest (engine/status-effects.js)
+                this.updateExecution();                                // a takedown in progress (engine/executions.js)
+                this.updateSneak();
+                this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
+                this.updateShotFx();
             
                 this.updateTime();
                 this.updateUI();
@@ -453,7 +459,7 @@
                         this.projectiles.push(shot);
                         const shotAng = Math.atan2(shot.vy, shot.vx);
                         this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: flashRadius, color: flashColor, life: 3, angle: shotAng });
-                        this.spawnCasing(shot.x, shot.y, shotAng, tm.equippedWeaponId);
+                        this.weaponFx(shot.x, shot.y, shotAng, tm.equippedWeaponId, shot, tm);
                         if (tm.hireType === 'permanent') captionSystem.teammateCombatQuip(tm.name);
                         else captionSystem.dancerFollowQuip(tm.name);
                     };
@@ -603,13 +609,14 @@
                     // Unified projectile collection — handles single shots, arrays, or null
                     if (result) {
                         const shots = Array.isArray(result) ? result : [result];
-                        if (shots.some(s => s instanceof ProjectileEntity)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false);   // their gunfire draws their friends
+                        if (shots.some(s => s instanceof ProjectileEntity && !s.melee)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false);   // their gunfire draws their friends
                         for (const shot of shots) {
+                            if (shot instanceof ProjectileEntity && shot.melee) { this.projectiles.push(shot); continue; }   // a claw: no flash, no casing
                             if (shot instanceof ProjectileEntity) {
                                 this.projectiles.push(shot);
                                 const shotAng = Math.atan2(shot.vy, shot.vx);
                                 this.muzzleFlashes.push({ x: shot.x, y: shot.y, radius: 50, color: shot.color, life: 3, angle: shotAng });
-                                if (enemy.equippedWeaponId !== undefined) this.spawnCasing(shot.x, shot.y, shotAng, enemy.equippedWeaponId || 'pistol_ganger');
+                                if (enemy.equippedWeaponId !== undefined) this.weaponFx(shot.x, shot.y, shotAng, enemy.equippedWeaponId || 'pistol_ganger', shot, enemy);
                             }
                         }
                     }
@@ -617,8 +624,22 @@
                     if (enemy.dead) { 
                         this.awardKill(enemy);                                    // Resonance for the kill (core/resonance.js)
                         audioSys.sfx('explode'); 
-                        this.weather.spawnExplosion(enemy.x, enemy.y, '#a469ff'); 
+                        this.weather.spawnExplosion(enemy.x, enemy.y, '#a469ff', 7, 2.4);   // a soft violet puff: the body stays
                         this.triggerShake(10); 
+                        this.addCorpse(enemy);                                    // the body falls and stays a while (engine/finisher.js)
+                        if (typeof Demoness !== 'undefined' && enemy instanceof Demoness) {
+                            // The Demoness falls: dark element, and the first time, the Maiden's Kukri (if she hasn't one)
+                            const qs = this.questState || (this.questState = {}), first = !qs.demonessDefeated;
+                            qs.demonessDefeated = (qs.demonessDefeated || 0) + 1;
+                            this.loot.push(new Loot(enemy.x + 14, enemy.y, 'dark_element'));
+                            if (first && !this.inventory.items.some(i => i.id === 'maiden_kukri')) {
+                                const k = createItemFromRegistry('maiden_kukri', this);
+                                this.loot.push({ x: enemy.x - 12, y: enemy.y + 6, type: 'weapon_drop', item: k, angle: 0.6, dropTime: 0,
+                                                 draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } });
+                                showMessage("THE DEMONESS FALLS — SHE LEAVES THE MAIDEN'S KUKRI");
+                            } else showMessage('THE DEMONESS FALLS');
+                        }
+                        const finReason = this.finisherReason(enemy);
                         this.spawnLoot(enemy.x, enemy.y);
                         
                         // Bounty target killed — complete mission with bonus loot
@@ -639,11 +660,12 @@
                             
                             if (remainingGunners > 0) {
                                 showMessage("REMAINING GUNNERS ENRAGED!");
-                            } else {
+                            } else if (!finReason) {
                                 // Last GatlingGunner killed - trigger dramatic time slow!
                                 this.triggerTimeSlow(0.4, 4, true);
                             }
                         }
+                        if (finReason) this.startFinisher(enemy, finReason);     // earned: slow motion, the body, then her twirl
                         this.enemies.splice(i, 1); 
                     }
                 }
@@ -772,7 +794,7 @@
                     // ── DEFENSIVE GUARDS (eliminate ghost projectiles) ──
                     
                     // Hard age cap: no projectile survives beyond 5 seconds
-                    if (_frameTime - p.spawnTime > 5000) {
+                    if (_gameTimeMs() - p.spawnTime > 5000) {
                         p.destroy();
                         this.projectiles.splice(i, 1);
                         continue;
@@ -1377,9 +1399,14 @@
                 }
             
                 // Update Button State
+                const execT = this._execTarget = this.executionTarget();             // an unaware back, in reach (engine/executions.js)
                 if (this.isDriving) { 
                     this.setInteract('Exit', 'Vehicle'); this.interactBtn.style.display = 'flex'; this.activeInteraction = null; 
                 } 
+                else if (execT) {
+                    this.setInteract('Execute', this.weaponMode === 'melee' ? 'Blade' : 'Quietly'); this.interactBtn.style.display = 'flex';
+                    this.activeInteraction = { type: 'execute', target: execT };
+                }
                 else if (nearInteractable) { 
                     this.interactBtn.style.display = 'flex'; this.activeInteraction = nearInteractable; 
                     if (nearInteractable instanceof PropEntity) {

@@ -1417,6 +1417,7 @@
             if (p.decorType.startsWith('gy_')) return drawGraveStone(ctx, p);
             if (p.decorType.startsWith('dn_')) return drawLobbyDecorProp(ctx, p);
             if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
+            if (p.decorType.startsWith('dp_')) return drawPalaceDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);

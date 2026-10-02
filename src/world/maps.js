@@ -383,6 +383,35 @@
                     { id: 'house_chapel', x: 900, y: 200 }, { id: 'house_courtyard', x: 1510, y: 720 }
                 ]
             },
+            // The Demoness Palace (a gauntlet): obsidian and gold, ember-lit; her hunters see in the dark
+            'demoness_palace': {
+                id: 'demoness_palace', width: 1800, height: 1400, type: 'indoor',
+                label: 'The Demoness Palace', floorColor: '#0c0508',
+                ambientDarkness: 0.88,
+                navProps: 'all',
+                wallStyle: { fill: '#140810', stroke: 'rgba(230,150,90,0.42)' },   // obsidian, ember-gold trim
+                spawn: { x: 900, y: 1320 },
+                zones: [
+                    { x: 14, y: 14, w: 872, h: 352, color: '#160a0c' },        // Blood Garden: dark earth
+                    { x: 900, y: 14, w: 486, h: 352, color: '#120810' },       // Shrine
+                    { x: 1400, y: 14, w: 386, h: 352, color: '#1a0c0c' },      // Bath of Embers
+                    { x: 14, y: 380, w: 572, h: 606, color: '#110710' },       // West Gallery
+                    { x: 600, y: 380, w: 600, h: 606, color: '#0b0509' },      // Throne Hall: obsidian
+                    { x: 1214, y: 380, w: 572, h: 606, color: '#110710' },     // East Gallery
+                    { x: 14, y: 1000, w: 572, h: 386, color: '#160a10' },      // Dressing Room
+                    { x: 600, y: 1000, w: 600, h: 386, color: '#0e070b' },     // Entrance Hall
+                    { x: 1214, y: 1000, w: 572, h: 386, color: '#140a08' },    // the Kennels
+                ],
+                walls: [
+                    { x: 0, y: 0, w: 1800, h: 14 }, { x: 0, y: 0, w: 14, h: 1400 }, { x: 1786, y: 0, w: 14, h: 1400 },
+                    { x: 0, y: 1386, w: 830, h: 14 }, { x: 970, y: 1386, w: 830, h: 14 },
+                    { x: 14, y: 366, w: 1772, h: 14 }, { x: 14, y: 986, w: 1772, h: 14 },      // the two cross walls
+                    { x: 586, y: 380, w: 14, h: 1006 }, { x: 1200, y: 380, w: 14, h: 1006 },  // the spines
+                    { x: 886, y: 14, w: 14, h: 352 }, { x: 1386, y: 14, w: 14, h: 352 },      // garden | shrine | bath
+                ],
+                transitions: [ { x: 830, y: 1370, w: 140, h: 30, target: 'hub_949', label: 'Leave the Palace' } ],
+                landmarks: [ { id: 'palace_throne', x: 900, y: 520 }, { id: 'palace_garden', x: 450, y: 190 } ]
+            },
             'ollo_test': {
                 id: 'ollo_test', width: 2000, height: 1500, type: 'outdoor',
                 climate: 'plaza',   // Driest profile in the game

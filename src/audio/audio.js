@@ -307,6 +307,9 @@
            Everything is generated in code; it all runs through masterGain, so
            the existing audio toggle mutes it.
            ===================================================================== */
+        // Footsteps, splashes and slashes vary on their own random stream, so they never shift the game's
+        const _sndRand = (() => { let x = 987654321; return () => (x = (x * 16807) % 2147483647) / 2147483647; })();
+
         class AmbienceSystem {
             constructor(audio) {
                 this.audio = audio;
@@ -557,6 +560,104 @@
                 o.connect(g); g.connect(this.bus);
                 g.gain.setValueAtTime(v, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
                 o.start(now); o.stop(now + 0.07);
+            }
+
+            /**
+             * A footstep (engine/footsteps.js): the shoe sets the attack, the floor its colour.
+             *   shoe: heels | boots | sneakers | loafers   mat: marble | wood | carpet | stone | concrete | asphalt | grass | metal | water
+             *   o.gain (0..1 loudness: pace), o.wet (rain on hard ground), o.near (distance 0..1), o.pan (-1..1)
+             * Its own bus at full level (Settings → Footsteps), its own voice cap.
+             */
+            footstep(shoe, mat, o = {}) {
+                if (!this.ready || GameSettings.footsteps === false) return;
+                const near = o.near ?? 1; if (near <= 0.03) return;
+                if ((this.stepVoices || 0) >= 6) return;
+                this.stepVoices = (this.stepVoices || 0) + 1; setTimeout(() => { this.stepVoices--; }, 160);
+                const ctx = this.audio.ctx, now = ctx.currentTime;
+                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
+                let out = this.foley;
+                if (ctx.createStereoPanner && o.pan) { const pn = ctx.createStereoPanner(); pn.pan.value = Math.max(-1, Math.min(1, o.pan)); pn.connect(this.foley); out = pn; }
+                const v = near * (0.55 + 0.45 * (o.gain ?? 0.7));
+                const burst = (type, f, Q, dur, amp, rate = 1, buf = this.pink) => {
+                    const src = ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
+                    const bf = ctx.createBiquadFilter(); bf.type = type; bf.frequency.value = f; bf.Q.value = Q;
+                    const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(out);
+                    g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, amp), now + 0.004);
+                    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+                    src.start(now, _sndRand() * 2.5, dur + 0.03);
+                };
+                const tone = (f0, f1, dur, amp, type = 'sine') => {
+                    const os = ctx.createOscillator(), g = ctx.createGain(); os.type = type;
+                    os.frequency.setValueAtTime(f0, now); os.frequency.exponentialRampToValueAtTime(f1, now + dur);
+                    os.connect(g); g.connect(out);
+                    g.gain.setValueAtTime(Math.max(0.0002, amp), now); g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+                    os.start(now); os.stop(now + dur + 0.02);
+                };
+                const soft = mat === 'carpet' ? 0.35 : mat === 'grass' ? 0.5 : 1, j = 0.9 + _sndRand() * 0.2;
+                if (mat === 'water') {                                   // into a puddle: a slap and a spray
+                    burst('lowpass', 900 * j, 0.7, 0.14, 0.32 * v, 0.9);
+                    burst('bandpass', 2600 * j, 0.8, 0.2, 0.18 * v);
+                    return;
+                }
+                if (mat === 'grass') burst('highpass', 2400 * j, 0.6, 0.09, 0.09 * v);                     // a brush through the blades
+                else if (mat === 'carpet') burst('lowpass', 420 * j, 0.7, 0.06, 0.14 * v, 0.8);           // a dull pat
+                if (shoe === 'heels') {
+                    if (mat !== 'grass' && mat !== 'carpet') {
+                        burst('bandpass', 4200 * j, 2.2, 0.03, 0.26 * v * (mat === 'marble' ? 1.25 : 1));   // the click
+                        if (mat === 'marble') tone(2400 * j, 2200 * j, 0.09, 0.03 * v);                    // a ring off the stone
+                    } else burst('bandpass', 1500 * j, 1.2, 0.03, 0.08 * v * soft);
+                } else if (shoe === 'boots') {
+                    burst('lowpass', 650 * j, 0.8, 0.07, 0.28 * v * soft, 0.9, this.brown);                // the heel's weight
+                    tone(95 * j, 55, 0.09, 0.12 * v * soft);
+                    if (mat !== 'carpet' && mat !== 'grass') burst('bandpass', 2400 * j, 1, 0.025, 0.07 * v);   // the scuff
+                } else if (shoe === 'sneakers') {
+                    burst('bandpass', 900 * j, 1, 0.05, 0.12 * v * soft);                                  // a soft tap
+                } else {
+                    burst('bandpass', 1700 * j, 1.5, 0.04, 0.16 * v * soft);                               // loafers: a neat tap
+                }
+                if (mat === 'wood') tone(210 * j, 150, 0.07, 0.05 * v);                                     // hollow boards
+                else if (mat === 'metal') tone(820 * j, 780, 0.16, 0.05 * v, 'triangle');                   // a plate that rings
+                if (o.wet && mat !== 'carpet') burst('bandpass', 2600 * j, 0.8, 0.08, 0.09 * v);            // rain on the ground
+            }
+
+            /** A blade through the air (and, on a hit, into someone) */
+            slash(hit) {
+                if (!this.ready) return;
+                const ctx = this.audio.ctx, now = ctx.currentTime;
+                if (!this.foley) { this.foley = ctx.createGain(); this.foley.gain.value = 0.9; this.foley.connect(this.audio.masterGain); }
+                const src = ctx.createBufferSource(); src.buffer = this.pink;
+                const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.Q.value = 1.4;
+                bf.frequency.setValueAtTime(1800, now); bf.frequency.exponentialRampToValueAtTime(5200, now + 0.14);
+                const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(this.foley);
+                g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.22, now + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.17);
+                src.start(now, _sndRand() * 2.5, 0.2);
+                if (hit) {                                                    // the cut: a wet thud and a bright ring off the blade
+                    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+                    const s2 = ctx.createBufferSource(); s2.buffer = this.brown; const g2 = ctx.createGain();
+                    s2.connect(lp); lp.connect(g2); g2.connect(this.foley);
+                    g2.gain.setValueAtTime(0.0001, now + 0.05); g2.gain.exponentialRampToValueAtTime(0.3, now + 0.06); g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+                    s2.start(now + 0.05, _sndRand() * 2.5, 0.15);
+                    const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'sine';
+                    o.frequency.setValueAtTime(3400, now + 0.05); o.frequency.exponentialRampToValueAtTime(3100, now + 0.4);
+                    o.connect(g3); g3.connect(this.foley); g3.gain.setValueAtTime(0.025, now + 0.05); g3.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+                    o.start(now + 0.05); o.stop(now + 0.42);
+                }
+            }
+
+            /** A car's tyres through a puddle: a long hiss-splash, quieter with distance */
+            splash(near, pan, big) {
+                if (!this.ready || GameSettings.footsteps === false || near <= 0.03) return;
+                if (!this._voice(null, 0.5)) return;
+                const ctx = this.audio.ctx, now = ctx.currentTime;
+                let out = this.audio.masterGain;
+                if (ctx.createStereoPanner && pan) { const pn = ctx.createStereoPanner(); pn.pan.value = Math.max(-1, Math.min(1, pan)); pn.connect(out); out = pn; }
+                const src = ctx.createBufferSource(); src.buffer = this.pink;
+                const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.Q.value = 0.7;
+                bf.frequency.setValueAtTime(big ? 1400 : 2200, now); bf.frequency.exponentialRampToValueAtTime(big ? 600 : 1200, now + 0.4);
+                const g = ctx.createGain(); src.connect(bf); bf.connect(g); g.connect(out);
+                const a = (big ? 0.3 : 0.18) * near;
+                g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(a, now + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, now + (big ? 0.45 : 0.25));
+                src.start(now, _sndRand() * 2.5, 0.5);
             }
 
             /** Door sounds: 'creak' | 'latch' | 'whoosh', quieter with distance from the player. */

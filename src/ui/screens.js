@@ -63,10 +63,12 @@
                 if (!m || show === this.menuOpen()) return;
                 if (show) {
                     m.style.display = 'flex';
+                    document.body.classList.add('screen-menu-open');      // the HUD steps out from behind it (styles/dossier.css)
                     game.pauseSystem.acquire('inventory_menu');
                     game.renderSidebarPortrait();
                 } else {
                     m.style.display = 'none';
+                    document.body.classList.remove('screen-menu-open');
                     game.pauseSystem.release('inventory_menu');
                     document.querySelectorAll('#inventory-list .ui-pill.expanded').forEach(p => p.classList.remove('expanded'));
                 }

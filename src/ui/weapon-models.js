@@ -11,6 +11,8 @@
              muzzle   barrel tip (shots and the laser leave from here: weaponMuzzleLocal)
              rail     where the laser module sits (its front end)
              brass    the glitter colour of the spent casings each shot throws (null: an energy gun)
+             fx       its signature (engine/combat-effects.js): trail 'crackle' | 'static' | 'wisp' behind the shot,
+                      or barrel 'smoke' (after N quick shots with `after`) | 'embers' off the muzzle; col / core / dust / hot
              glow     live lights [x, y, r, colour], breathing slowly in a wave down the gun
              run      a spark that glides down a light line [x0, x1, y, colour]
            ===================================================================== */
@@ -61,7 +63,7 @@
                 run: [3.4, 9.6, 1, '#9fbaff']
             },
             pistol_anavia: {                                                                    // periwinkle and lavender, a light for a core
-                stance: 'pistol', muzzle: [13.4, 1], rail: [10, 4.5], brass: null,
+                stance: 'pistol', muzzle: [13.4, 1], rail: [10, 4.5], brass: null, fx: { trail: 'crackle', col: '#a9b4ff', core: '#f1ecff' }, 
                 parts: [
                     _c(-1.8, 1, 2.3, 'lavender'), _c(-2, 1, 1, 'periwinkle'),
                     _r(0.6, 11.4, 1, 4.8, 'lavender', 2),
@@ -85,7 +87,7 @@
                 glow: [[0.65, 1, 2.6, '#ff6ab8']]
             },
             rifle_rb98: {                                                                       // pearl and teal
-                stance: 'rifle', muzzle: [29.3, 1.5], rail: [21, 4.3], brass: '#6ff5e2',
+                stance: 'rifle', muzzle: [29.3, 1.5], rail: [21, 4.3], brass: '#6ff5e2', fx: { barrel: 'smoke', after: 4, col: '#cfeee9' }, 
                 parts: [
                     _cap(-10, -4.6, 1.5, 4.6, 'pearl'),                                         // the rear pad
                     _r(-5.6, 13.2, 1.5, 5.8, 'pearl', 2.2),                                    // the body
@@ -100,7 +102,7 @@
                 run: [-3.4, 11.4, 1.5, '#c8fff6']
             },
             sniper_sara: {                                                                      // YourGirlSara: molten orange, rose bronze and obsidian
-                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 2.9], brass: '#ff9a3c',
+                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 2.9], brass: '#ff9a3c', fx: { barrel: 'embers', col: '#ff9a3c', hot: '#ffe0a0' }, 
                 parts: [
                     _cap(-12, -2, 0.5, 5.4, 'abyss'),                                          // the rounded rear hump
                     _e(-10, -4, 0.5, 0.7, '#ff6a1a'),
@@ -120,7 +122,7 @@
                 run: [24.5, 50, 0.5, '#ffd09a']
             },
             sniper_sr86: {                                                                      // SR-86: obsidian, crimson and pearl (catalog sketch): one width, stock to muzzle
-                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 3.9], brass: '#ff4d68',
+                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 3.9], brass: '#ff4d68', fx: { barrel: 'smoke', col: '#d9d2de' }, 
                 parts: [
                     _r(-12, -2, 0.5, 5, 'abyss', [2.5, 0.4, 0.4, 2.5]),                         // the thumb-hump rear, rounded at the back
                     _r(-9.6, -4, 0.5, 1, 'crimson'),
@@ -139,7 +141,7 @@
                 run: [25, 50, 1.7, '#ff9aae']
             },
             golden_child: {                                                                     // gold and champagne, a light in its heart
-                stance: 'pistol', muzzle: [20, 1], rail: [13, 5.8], brass: null,
+                stance: 'pistol', muzzle: [20, 1], rail: [13, 5.8], brass: null, fx: { trail: 'wisp', col: '#f3e4c6', dust: '#ffd76a' }, 
                 parts: [
                     _cap(-3.6, 14, 1, 8.4, 'gold'),
                     _e(-1.6, 12, 1, 0.5, '#ffe7a0'), _g(-2, 12.4, 1, 2),
@@ -150,8 +152,22 @@
                 glow: [[5.6, 1, 4.2, '#ffd76a'], [17.6, 1, 3.6, '#ffe7a0']],
                 run: [-1.6, 12, 1, '#fffaea']
             },
+            maiden_kukri: {                                                                     // the Maiden's Kukri: a curved golden blade, a dark grip, a ring pommel
+                stance: 'knife', muzzle: [19, 1.6], rail: [8, 0], brass: null, melee: true,
+                parts: [
+                    _c(-5.2, 0, 1.9, 'gold'), _hole(-5.2, 0, 0.85),                             // the ring pommel
+                    _r(-4, 3, 0, 2.6, 'abyss', 1.1),                                            // the grip, wrapped dark
+                    _r(-2.6, -2, 0, 2.8, 'gold', 0.3), _r(0.4, 1, 0, 2.8, 'gold', 0.3),         // gold bands on it
+                    _r(3, 4.2, 0, 4.6, 'gold', 0.5),                                            // the guard
+                    { poly: [[4, -1.3], [8.5, -1.7], [12.5, -1.3], [16, -0.2], [18.6, 1.4], [19.4, 2.6], [17.2, 2.6], [13.6, 2.1], [9.4, 1.6], [4, 1.1]], m: 'gold' },   // the forward-curved blade
+                    { poly: [[5, 0.4], [9.5, 0.9], [13.8, 1.4], [17.4, 2.2], [13.6, 1.8], [9.4, 1.3], [5, 0.9]], m: 'champagne' },   // its bright edge
+                    _ce(3.6, 0, 0.6, '#ffe7a0')                                                 // a gem in the guard
+                ],
+                glow: [[3.6, 0, 1.6, '#ffd76a'], [18, 2, 1.4, '#fff1c4']],
+                run: [5, 18, 1.4, '#fffaea']                                                    // the glint along the edge
+            },
             empg: {                                                                             // the EMP blaster (catalog): a bulbous body, twin orbs at the front
-                stance: 'pistol', muzzle: [14.6, 1], rail: [9, 5.4], brass: null,
+                stance: 'pistol', muzzle: [14.6, 1], rail: [9, 5.4], brass: null, fx: { trail: 'static', col: '#b48cff', core: '#efe4ff' }, 
                 parts: [
                     _c(-2, 1, 2.4, 'abyss'),
                     _cap(-1.2, 12.4, 1, 7.4, 'violet'),
@@ -172,7 +188,7 @@
         function weaponModel(id) {
             id = id || '';
             return WEAPON_MODELS[id] || (id.includes('sniper') ? WEAPON_MODELS.sniper_sara : id.includes('rifle') ? WEAPON_MODELS.rifle_rb98
-                : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
+                : id.includes('kukri') ? WEAPON_MODELS.maiden_kukri : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
         }
 
         const _weaponSprites = new Map();

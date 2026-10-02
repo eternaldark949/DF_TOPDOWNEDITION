@@ -1184,6 +1184,7 @@
                 ps.t += dt;
                 const target = config.poseWhileMoving || (!moving && ps.still > 0.4) ? 1 : 0;   // (some poses hold while walking: pushing furniture)
                 ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
+                if (config.poseInstant) ps.w = target;                     // a fall can't wait for the pose to fade in
                 if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender, beat: name === 'dance' ? mapBeatN() : null }); poseW = ps.w; }
             }
             const pf = (key, i) => (pose && pose[key] ? pose[key][i] * poseW : 0);
@@ -1513,11 +1514,19 @@
                     if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
                         const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
                         const laser = game.inventory && game.inventory.getEquippedAttachment()?.effect === 'laser_sight';
-                        drawWeapon(ctx, weaponId, wx, wy, 0, scale, laser);
+                        // the finisher's twirl (engine/finisher.js): the gun spins round her trigger finger
+                        const tw = game.twirlAngle ? game.twirlAngle() : 0;
+                        drawWeapon(ctx, weaponId, wx, wy, tw, scale, laser && !tw);
                         // Muzzle in the player's frame — laser sight and shots start here
                         const mz = weaponMuzzleLocal(weaponId);
                         entity._muzzleLocal = { x: wx + mz.x * scale, y: wy + mz.y * scale };
                         entity._muzzleReady = anim > 0.95;
+                    } else if (game.weaponMode === 'melee') {
+                        // a blade, held low and forward; a slash sweeps it across (engine/status-effects.js meleeSlash)
+                        const S = game.slashAngle ? game.slashAngle() : null;
+                        const ang = S ? S.a : 0.35;
+                        drawWeapon(ctx, weaponId, wx + (S ? S.reach : 0), wyBase + 1, ang, scale * 0.95, false);
+                        entity._muzzleLocal = null; entity._muzzleReady = false;
                     }
 
                     ctx.restore();
@@ -1850,8 +1859,8 @@
             }
             
             // DEBUG: Red circle at entity center point
-            if (typeof game !== 'undefined' && game.debugMode) {
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+            if (typeof game !== 'undefined' && game.dbg && game.dbg('colliders')) {
+                ctx.fillStyle = 'rgba(255, 106, 184, 0.9)';
                 ctx.beginPath();
                 ctx.arc(0, 0, 3, 0, Math.PI * 2);
                 ctx.fill();

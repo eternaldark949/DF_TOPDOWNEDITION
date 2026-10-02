@@ -3,6 +3,7 @@
         engineMixin({
             /** Interact with whatever is in reach (the action pill, or E on a keyboard): talk, use, enter or leave the car. */
             interact() {
+                if (this.activeInteraction && this.activeInteraction.type === 'execute') { this.execute(this.activeInteraction.target); return; }
                 if (this.activeInteraction) {
                     if(this.activeInteraction.interactionType === 'medbay_refill') {
                         this.refillStims();
@@ -105,6 +106,7 @@
                         }
                     }
                     if (e.key === 'j' || e.key === 'J') this.useBoosterOnAlly();
+                    if ((e.key === 'c' || e.key === 'C') && this.running && !this.paused && !e.ctrlKey && !e.metaKey) this.toggleSneak();   // engine/sneak.js
                     
                     // AUTO-DRIVE TOGGLE (only while driving)
                     if ((e.key === 'q' || e.key === 'Q') && this.isDriving && this.running && !this.paused) {
@@ -174,88 +176,6 @@
                     const w = this.viewToWorld((e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy);
                     if (this.furniture.tap(w.x, w.y)) { e.preventDefault(); e.stopImmediatePropagation(); }
                 }, true);
-                // Weather debug: cycles Clear → Drizzle → Rain → Storm → Auto.
-                // The first four pin the sky (schedule paused) so you can inspect
-                // a condition without it rolling out from under you; Auto hands
-                // control back to the scheduler and immediately rolls.
-                document.getElementById('btn-toggle-weather').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const cycle = ['clear', 'drizzle', 'rain', 'storm', 'auto'];
-                    const cur = this.weather.scheduleLocked ? this.weather.condition : 'auto';
-                    const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
-                    if (next === 'auto') {
-                        this.weather.unlockSchedule(true);
-                        showMessage('WEATHER: AUTO');
-                    } else {
-                        this.weather.lockSchedule(next);
-                        showMessage('WEATHER: ' + WEATHER_CONDITIONS[next].label.toUpperCase() + ' (LOCKED)');
-                    }
-                });
-                document.getElementById('btn-colorgrade').addEventListener('click', (e) => { e.preventDefault(); const p = document.getElementById('game-grade-panel'); p.classList.toggle('visible'); if (p.classList.contains('visible')) initGameGradePresets(); });
-                document.getElementById('btn-debug').addEventListener('click', (e) => { e.preventDefault(); this.debugMode = !this.debugMode; showMessage("DEBUG OVERLAY: " + (this.debugMode ? "ON" : "OFF")); });
-                document.getElementById('btn-profiler').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    // Shift-click runs the resolution sweep instead of toggling the
-                    // panel — keeps the benchmark one gesture away without adding
-                    // another button to the debug bar.
-                    if (e.shiftKey) {
-                        this.showProfiler = true;
-                        PerfBench.run();
-                        return;
-                    }
-                    this.showProfiler = !this.showProfiler;
-                    showMessage("PROFILER: " + (this.showProfiler ? "ON" : "OFF"));
-                });
-                
-                // Weapon Mode Toggle Button
-                document.getElementById('btn-weapon-mode').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const btn = document.getElementById('btn-weapon-mode');
-                    if (this.weaponMode === 'normal') {
-                        this.weaponMode = 'sniper';
-                        btn.innerHTML = '🎯 Sniper';
-                        btn.style.borderColor = '#ffd700';
-                        btn.style.color = '#ffd700';
-                        showMessage("SNIPER MODE: PENETRATING ROUNDS ACTIVE");
-                    } else {
-                        this.weaponMode = 'normal';
-                        btn.innerHTML = '🔫 Normal';
-                        btn.style.borderColor = '#00f3ff';
-                        btn.style.color = '#00f3ff';
-                        showMessage("NORMAL MODE: STANDARD ROUNDS ACTIVE");
-                    }
-                });
-                
-                // Add this inside initEvents()
-
-                // 1. In-Game Save Button
-                document.getElementById('btn-save-game').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.saveGame();
-                });
-                
-                // Inside initEvents() ...
-
-                // 3. Map Button (Dock)
-                document.getElementById('btn-open-map').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    // Close the dock first so it's not open when we return
-                    document.getElementById('dock-toggle').classList.remove('open');
-                    document.getElementById('dock-buttons').classList.remove('visible');
-                    
-                    // Open the Golden Map
-                    Screens.open('map');
-                });
-                
-                document.getElementById('btn-inventory').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    // Close the dock so it doesn't block the view
-                    document.getElementById('dock-toggle').classList.remove('open');
-                    document.getElementById('dock-buttons').classList.remove('visible');
-                    
-                    // Open Inventory
-                    Screens.open('inventory');
-                });
                 
                 // 2. Main Menu Load Button — opens save slot selector
                 document.getElementById('btn-load-game').addEventListener('click', () => {
@@ -339,22 +259,6 @@
                     btnPause.addEventListener('touchstart', togglePause);
 
                 
-                // Utility dock toggle
-                const dockToggle = document.getElementById('dock-toggle');
-                const dockButtons = document.getElementById('dock-buttons');
-                dockToggle.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    dockToggle.classList.toggle('open');
-                    dockButtons.classList.toggle('visible');
-                });
-                // Close dock when clicking outside
-                document.addEventListener('click', (e) => {
-                    if (!e.target.closest('#utility-dock')) {
-                        dockToggle.classList.remove('open');
-                        dockButtons.classList.remove('visible');
-                    }
-                });
-                
                 this.transitionBtn.addEventListener('click', (e) => { e.preventDefault(); this.triggerTransition(); });
                 this.transitionBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.triggerTransition(); });
                 // Fire button is now a joystick - handlers in initFireJoystick()
@@ -405,6 +309,8 @@
                 this.zibSkipBtn.addEventListener('mousedown', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
                 this.zibSkipBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
 
+                const sneakBtn = document.getElementById('btn-sneak');
+                if (sneakBtn) { const tog = (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSneak(); }; sneakBtn.addEventListener('mousedown', tog); sneakBtn.addEventListener('touchstart', tog, { passive: false }); }
                 const toggleHolster = (e) => {
                     e.preventDefault();
                     this.weaponHolstered = !this.weaponHolstered;

@@ -122,6 +122,14 @@
                         wetReflections: GameSettings.wetReflections,
                         atmosphereTint: GameSettings.atmosphereTint,
                         colorGrade: GameSettings.colorGrade,
+                        gradeCustom: GameSettings.gradeCustom,
+                        stealthGray: GameSettings.stealthGray,
+                        reflections: GameSettings.reflections,
+                        photoReflections: GameSettings.photoReflections,
+                        soundRings: GameSettings.soundRings,
+                        finisher: GameSettings.finisher,
+                        footsteps: GameSettings.footsteps,
+                        enemyRings: GameSettings.enemyRings,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
@@ -599,6 +607,8 @@
                         // Rebuild inventory from saved item IDs (if save has items)
                         if (invData.items && invData.items.length > 0) {
                             this.inventory.loadItemsFromIds(invData.items);
+                            // The Maiden's Kukri waits in the armory for now (GameSettings.kukriFromArmory); later only the Demoness gives it
+                            if (GameSettings.kukriFromArmory !== false && !invData.items.includes('maiden_kukri')) { const k = createItemFromRegistry('maiden_kukri', this); if (k) this.inventory.items.push(k); }
                             console.log(`[LOAD] Rebuilt inventory: ${invData.items.length} items (${invData.items.join(', ')})`);
                         }
                         // If save had empty items array, keep the default loadout from constructor
@@ -741,6 +751,15 @@
                         GameSettings.wetReflections = save.settings.wetReflections !== false;
                         GameSettings.atmosphereTint = save.settings.atmosphereTint ?? '';
                         GameSettings.colorGrade = save.settings.colorGrade || 'none';
+                        GameSettings.gradeCustom = save.settings.gradeCustom || null;
+                        GameSettings.stealthGray = save.settings.stealthGray !== false;
+                        GameSettings.reflections = save.settings.reflections || (GameSettings.wetReflections ? 'high' : 'off');
+                        GameSettings.photoReflections = save.settings.photoReflections !== false;
+                        if (save.settings.soundRings) GameSettings.soundRings = save.settings.soundRings;
+                        if (save.settings.finisher) GameSettings.finisher = save.settings.finisher;
+                        GameSettings.footsteps = save.settings.footsteps !== false;
+                        GameSettings.enemyRings = save.settings.enemyRings !== false;
+                        if (typeof restoreGameGrade === 'function') restoreGameGrade();       // the grade back on screen, not just in the setting
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;
                         GameSettings.flitRing = save.settings.flitRing !== false;

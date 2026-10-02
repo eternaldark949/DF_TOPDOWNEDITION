@@ -21,11 +21,26 @@
             return cv;
         }
 
+        const _puffs = new Map();
+        /** A soft round puff (64×64) in `color`, for barrel smoke and golden wisps. */
+        function puffSprite(color) {
+            let cv = _puffs.get(color);
+            if (cv) return cv;
+            cv = document.createElement('canvas'); cv.width = cv.height = 64;
+            const c = cv.getContext('2d'), rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '220, 210, 225';
+            const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+            g.addColorStop(0, `rgba(${rgb}, 0.9)`); g.addColorStop(0.45, `rgba(${rgb}, 0.45)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
+            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+            _puffs.set(color, cv);
+            return cv;
+        }
+
         engineMixin({
             /**
              * A spent casing flies from the gun's ejection port (to the right of the barrel, a little
              * back), spins and settles, and lies there glinting like a fleck of glitter in the gun's
-             * colour (its model's `brass`, ui/weapon-models.js; none for energy guns). At most 24.
+             * colour (its model's `brass`, ui/weapon-models.js; none for energy guns). As it lands it
+             * scatters two finer flecks, and it lingers (CONFIG-free: 25 s, at most 60, oldest first).
              */
             spawnCasing(x, y, angle, weaponId) {
                 const col = weaponId ? weaponModel(weaponId).brass : null;
@@ -34,7 +49,7 @@
                 const sniper = weaponId.includes('sniper'), back = sniper ? 30 : 8, v = 1.7 + Math.random() * 1.1;
                 L.push({ x: x - c * back, y: y - s * back, vx: -s * v - c * (0.35 + Math.random() * 0.4), vy: c * v - s * (0.35 + Math.random() * 0.4),
                          a: angle, spin: (Math.random() - 0.5) * 0.9, t: 0, big: sniper, col, ph: Math.random() * 6.28, rate: 0.004 + Math.random() * 0.005 });
-                if (L.length > 24) L.shift();
+                while (L.length > 60) L.shift();
             },
             updateCasings() {
                 const L = this.casings;
@@ -42,33 +57,137 @@
                 for (let i = L.length - 1; i >= 0; i--) {
                     const k = L[i]; k.t++;
                     if (k.t < 26) { k.x += k.vx; k.y += k.vy; k.vx *= 0.86; k.vy *= 0.86; k.a += k.spin; k.spin *= 0.9; }
-                    if (k.t > 420) L.splice(i, 1);
+                    else if (k.t === 26) {                                               // landed: two finer flecks, and the lamp it lies under
+                        k.sub = [(Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5];
+                        this._casingLamp(k);
+                    }
+                    if (k.t > 1500) L.splice(i, 1);
                 }
+            },
+            /** Once, as a casing lands: the nearest lamp whose pool it lies in lends it its colour (k.lc) and strength (k.lk). */
+            _casingLamp(k) {
+                let best = null, bk = 0;
+                const consider = (l) => {
+                    if (!l || l._forcedOff) return;
+                    const r = (l.radius || 200) * 0.6, d = Math.hypot(l.x - k.x, l.y - k.y);
+                    if (d < r) { const s = 1 - d / r; if (s > bk) { bk = s; best = l; } }
+                };
+                for (const l of this.lamps || []) consider(l);
+                for (const l of (this.activeMap && this.activeMap._interiorLights) || []) consider(l);
+                if (best && /^#[0-9a-f]{6}$/i.test(best.color || '')) { k.lc = best.color; k.lk = bk; }
             },
             /**
              * Casings on the ground (after decals, under everyone) as glitter: a fleck in the gun's colour
-             * that twinkles on its own rhythm, and at the top of each twinkle a four-point glint.
+             * that twinkles on its own rhythm, and at the top of each twinkle a four-point glint. Under a
+             * burning lamp it catches that lamp's light: it twinkles brighter and oftener, the glint in the lamp's colour.
              */
             drawCasings(ctx, cb) {
                 const L = this.casings;
                 if (!L || !L.length || _zoomLOD >= 1) return;
+                const day = this._lampDaylight ?? 0, night = Math.max(0, Math.min(1, (0.35 - day) / 0.15));
                 ctx.save();
                 ctx.globalCompositeOperation = 'lighter';
                 ctx.lineCap = 'round';
                 for (const k of L) {
                     if (k.x < cb.left || k.x > cb.right || k.y < cb.top || k.y > cb.bottom) continue;
-                    const fade = k.t > 360 ? (420 - k.t) / 60 : 1, spin = k.t < 26 ? 1 : 0;
-                    const tw = Math.pow(Math.abs(Math.sin(_frameTime * k.rate + k.ph)), 6), s = k.big ? 1.3 : 1;
-                    ctx.globalAlpha = fade * (0.45 + 0.55 * Math.max(tw, spin * 0.7));
+                    const fade = k.t > 1380 ? (1500 - k.t) / 120 : 1, spin = k.t < 26 ? 1 : 0;
+                    const lit = k.lc ? k.lk * night : 0;                                // how much lamp light it catches
+                    const tw = Math.pow(Math.abs(Math.sin(_frameTime * k.rate * (1 + lit * 1.5) + k.ph)), 6 - lit * 3), s = k.big ? 1.3 : 1;
+                    ctx.globalAlpha = fade * (0.45 + 0.55 * Math.max(tw, spin * 0.7)) * (1 + lit * 0.4);
                     ctx.fillStyle = k.col;
                     ctx.fillRect(k.x - 0.6 * s, k.y - 0.6 * s, 1.2 * s, 1.2 * s);        // the fleck
+                    if (k.sub) {                                                         // its two finer flecks, twinkling out of step
+                        const tw2 = Math.pow(Math.abs(Math.sin(_frameTime * k.rate * 1.3 + k.ph + 2)), 4);
+                        ctx.globalAlpha = fade * (0.3 + 0.6 * tw2) * (1 + lit * 0.5);
+                        ctx.fillRect(k.x + k.sub[0] - 0.35, k.y + k.sub[1] - 0.35, 0.7, 0.7);
+                        ctx.fillStyle = lit > 0.2 ? k.lc : k.col;
+                        ctx.fillRect(k.x + k.sub[2] - 0.35, k.y + k.sub[3] - 0.35, 0.7, 0.7);
+                    }
                     if (tw > 0.35) {                                                     // the glint
-                        const r = (1.2 + 2.6 * tw) * s;
-                        ctx.globalAlpha = fade * tw;
+                        const r = (1.2 + 2.6 * tw) * s * (1 + lit * 0.6);
+                        ctx.globalAlpha = fade * Math.min(1, tw * (1 + lit * 0.5));
                         ctx.fillStyle = '#ffffff'; ctx.fillRect(k.x - 0.35, k.y - 0.35, 0.7, 0.7);
-                        ctx.strokeStyle = k.col; ctx.lineWidth = 0.45;
+                        ctx.strokeStyle = lit > 0.15 ? k.lc : k.col; ctx.lineWidth = 0.45;
                         ctx.beginPath(); ctx.moveTo(k.x - r, k.y); ctx.lineTo(k.x + r, k.y); ctx.moveTo(k.x, k.y - r); ctx.lineTo(k.x, k.y + r); ctx.stroke();
                     }
+                }
+                ctx.restore();
+            },
+
+            /**
+             * A gun's signature beyond the flash (its model's `fx`, ui/weapon-models.js), at every shot:
+             * casings for the guns that throw them, a trail tag on the shot for the guns that don't
+             * (crackle / static / wisp: entities/actors.js), and smoke or embers off the barrel.
+             */
+            weaponFx(x, y, angle, weaponId, shot, shooter) {
+                this.spawnCasing(x, y, angle, weaponId);
+                const fx = weaponId ? weaponModel(weaponId).fx : null;
+                if (!fx || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
+                if (fx.trail && shot) { shot.fxTrail = fx; shot.trail = []; }
+                if (fx.barrel) {
+                    if (fx.after) {                                                      // only once the gun's been worked hard
+                        const o = shooter || this.player, now = _gameTimeSec;
+                        o._streak = (now - (o._streakT || -9) < 0.6 ? (o._streak || 0) : 0) + 1; o._streakT = now;
+                        if (o._streak < fx.after) return;
+                    }
+                    const c = Math.cos(angle), s = Math.sin(angle), F = this.shotFx || (this.shotFx = []);
+                    if (fx.barrel === 'smoke') {
+                        for (let i = 0; i < 6; i++) F.push({ k: 'smoke', x: x + c * (2 + i * 1.5), y: y + s * (2 + i * 1.5), vx: c * 0.22 + (Math.random() - 0.5) * 0.2, vy: s * 0.22 + (Math.random() - 0.5) * 0.2,
+                                                             t: -i * 7, life: 64, r: 0.9, col: fx.col, ph: Math.random() * 6.28 });
+                    } else if (fx.barrel === 'embers') {
+                        for (let i = 0; i < 7; i++) { const a = angle + (Math.random() - 0.5) * 1.6, v = 0.4 + Math.random() * 1.1;
+                            F.push({ k: 'ember', x: x + c * 2, y: y + s * 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 30 + Math.random() * 25, col: Math.random() < 0.35 ? fx.hot : fx.col, ph: Math.random() * 6.28 }); }
+                    }
+                    while (F.length > 160) F.shift();
+                }
+            },
+            /** A golden wisp puff behind a 'wisp' shot (called by the shot as it flies). */
+            spawnWisp(x, y, fx) {
+                if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
+                const F = this.shotFx || (this.shotFx = []);
+                F.push({ k: 'wisp', x, y, vx: (Math.random() - 0.5) * 0.2, vy: (Math.random() - 0.5) * 0.2, t: 0, life: 50, r: 3, col: fx.col, ph: Math.random() * 6.28 });
+                if (Math.random() < 0.85) F.push({ k: 'dust', x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 4, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, t: 0, life: 36, col: fx.dust, ph: Math.random() * 6.28 });
+                while (F.length > 160) F.shift();
+            },
+            updateShotFx() {
+                const F = this.shotFx;
+                if (!F || !F.length) return;
+                const W = this.weather && this.weather.windVec ? this.weather.windVec : { x: 0, y: 0 };
+                for (let i = F.length - 1; i >= 0; i--) {
+                    const p = F[i]; p.t++;
+                    if (p.t <= 0) continue;                                              // (a smoke puff still waiting its turn)
+                    if (p.t > p.life) { F.splice(i, 1); continue; }
+                    if (p.k === 'smoke' || p.k === 'wisp') {                             // drifts downwind, curls, swells
+                        p.vx = p.vx * 0.94 + W.x * 0.012 + Math.cos(p.t * 0.15 + p.ph) * 0.03;
+                        p.vy = p.vy * 0.94 + W.y * 0.012 + Math.sin(p.t * 0.15 + p.ph) * 0.03;
+                        p.r += p.k === 'smoke' ? 0.055 : 0.14;
+                    } else { p.vx *= 0.93; p.vy *= 0.93; p.vx += W.x * 0.004; p.vy += W.y * 0.004; }
+                    p.x += p.vx; p.y += p.vy;
+                }
+            },
+            /** Barrel smoke and wisps (soft, normal blend), then embers and gold dust (additive). After the muzzle stars. */
+            drawShotFx(ctx, cb) {
+                const F = this.shotFx;
+                if (!F || !F.length || _zoomLOD >= 2) return;
+                ctx.save();
+                for (const p of F) {
+                    if (p.t <= 0 || (p.k !== 'smoke' && p.k !== 'wisp')) continue;
+                    if (p.x < cb.left || p.x > cb.right || p.y < cb.top || p.y > cb.bottom) continue;
+                    const u = p.t / p.life, a = (p.k === 'smoke' ? 0.2 : 0.55) * Math.sin(Math.min(1, u * 4) * Math.PI / 2) * (1 - u);
+                    ctx.globalAlpha = a;
+                    const R = p.r * 2.2;
+                    ctx.drawImage(puffSprite(p.col), p.x - R, p.y - R, R * 2, R * 2);
+                }
+                ctx.globalCompositeOperation = 'lighter';
+                for (const p of F) {
+                    if (p.t <= 0 || (p.k !== 'ember' && p.k !== 'dust')) continue;
+                    if (p.x < cb.left || p.x > cb.right || p.y < cb.top || p.y > cb.bottom) continue;
+                    const u = p.t / p.life, fl = 0.55 + 0.45 * Math.sin(_frameTime * 0.03 + p.ph);
+                    ctx.globalAlpha = (1 - u) * fl;
+                    ctx.fillStyle = p.col;
+                    const z = p.k === 'ember' ? 0.9 * (1 - u * 0.5) : 0.75;
+                    ctx.fillRect(p.x - z / 2, p.y - z / 2, z, z);
+                    if (p.k === 'ember' && u < 0.4) { ctx.globalAlpha *= 0.35; ctx.fillRect(p.x - p.vx * 2 - z / 2, p.y - p.vy * 2 - z / 2, z, z); }   // its streak
                 }
                 ctx.restore();
             },
@@ -124,46 +243,27 @@
             },
             
             /**
-             * Update the time slow state each frame.
-             * Called from the game loop before other updates.
-             * @returns {boolean} Whether to skip this frame's update
+             * Advance the time slow by one rendered frame (real ms) and return the
+             * time scale. The loop stretches its tick length by 1/scale, so slowed
+             * ticks stay evenly spaced and RenderInterp blends them: smooth slow
+             * motion, not dropped frames. It holds still while paused.
+             * @param {number} elapsedMs - real time since the last frame
+             * @returns {number} the time scale (1 = normal)
              */
-            updateTimeSlow() {
+            updateTimeSlow(elapsedMs = CONFIG.LOOP.STEP_MS) {
                 const ts = this.timeSlowState;
-                
-                if (!ts.active) return false;
-                
-                // Smoothly interpolate to target scale
+                if (!ts.active || this.paused) return ts.active ? ts.scale : 1;
+                const f = elapsedMs / CONFIG.LOOP.STEP_MS;                 // in 60 Hz frames
                 if (ts.scale !== ts.targetScale) {
-                    ts.scale += (ts.targetScale - ts.scale) * ts.transitionSpeed;
-                    // Snap if close enough
-                    if (Math.abs(ts.scale - ts.targetScale) < 0.01) {
-                        ts.scale = ts.targetScale;
-                    }
+                    ts.scale += (ts.targetScale - ts.scale) * Math.min(1, ts.transitionSpeed * f);
+                    if (Math.abs(ts.scale - ts.targetScale) < 0.01) ts.scale = ts.targetScale;
                 }
-                
-                // Count down duration (in real frames, not slowed)
-                ts.duration--;
-                
-                // When duration expires, transition back to normal
+                ts.duration -= f;                                          // real time, not slowed
                 if (ts.duration <= 0) {
                     ts.targetScale = 1.0;
-                    // Check if we've returned to normal
-                    if (ts.scale >= 0.99) {
-                        ts.scale = 1.0;
-                        ts.active = false;
-                        return false;
-                    }
+                    if (ts.scale >= 0.99) { ts.scale = 1.0; ts.active = false; }
                 }
-                
-                // Frame skipping based on time scale
-                // At 0.4 scale, we run ~40% of frames
-                // Use a random threshold for smooth appearance
-                if (Math.random() > ts.scale) {
-                    return true; // Skip this frame's game logic
-                }
-                
-                return false;
+                return ts.scale;
             },
             
 
@@ -229,6 +329,10 @@
                 if (this.paused) return;
                 if (this.furniture && this.furniture.busy()) return;   // her hands are on the furniture
                 if (!this.currentWeapon && this.weaponMode !== 'none') return;
+                // Fists or a blade at an unaware back: the strike is an execution (engine/executions.js)
+                if ((this.weaponMode === 'none' || this.weaponMode === 'melee') && this._execTarget && !this.isDriving) { this.execute(this._execTarget); return; }
+                this.shotsFired = (this.shotsFired || 0) + 1;             // (a finisher steps aside when she fires again)
+                if (this.weaponMode === 'melee') { if (!this.isDriving) this.meleeSlash(); return; }   // a blade (engine/status-effects.js)
             
                 // --- MELEE / PUNCH LOGIC (Unchanged) ---
                 if (this.weaponMode === 'none') {
@@ -346,7 +450,7 @@
                     life: 3,
                     angle
                 });
-                if (onFoot) this.spawnCasing(px, py, angle, this.currentWeapon.id);
+                if (onFoot) this.weaponFx(px, py, angle, this.currentWeapon.id, this.projectiles[this.projectiles.length - 1], this.player);
             },
 
             // Inside GameEngine class

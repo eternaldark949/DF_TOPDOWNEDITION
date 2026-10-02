@@ -47,7 +47,9 @@
             
                 this.ctx.save();
                 this.ctx.translate(this.canvas.width/2, this.canvas.height/2);
-                this.ctx.scale(this.camera.zoom, this.camera.zoom);
+                const fc = this.finCam;                                   // the finisher's camera (engine/finisher.js): offset and push-in
+                const viewZoom = this.camera.zoom * (fc ? fc.z : 1);
+                this.ctx.scale(viewZoom, viewZoom);
             
                 // Camera Logic: Cutscene Director vs Player Tracking
                 let camX, camY;
@@ -70,7 +72,8 @@
                     this.camera.y = camY;
                 }
                 if (this.cineCam) { camX += this.cineCam.dx; camY += this.cineCam.dy; }   // Cinematic View's pan
-                this.view = { x: camX, y: camY, zoom: this.camera.zoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
+                if (fc) { camX += fc.dx; camY += fc.dy; }
+                this.view = { x: camX, y: camY, zoom: viewZoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
                 
                 this.ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
                 // World → screen matrix for this frame: lets the hair physics work out any
@@ -137,6 +140,7 @@
                 // Lamps under the sky follow the street-lamp schedule; indoor lamps always burn
                 const skyLampDay = dayC.lampsOn ? 0 : 1;
                 const daylight = this.activeMap.type === 'outdoor' ? skyLampDay : 0;
+                this._lampDaylight = daylight;                                // (the glitter casings catch the lamps by night)
                 // For windows: they always project based on world time, even in indoor maps
                 const windowDaylight = dayC.daylight;
                 this._windowDaylight = windowDaylight; // Store for lighting system access
@@ -202,12 +206,8 @@
                 }
                 
                 // Roads (Asphalt) — baked with the ground in the city; the debug overlay still draws live
-                if (!bakedGround || this.debugMode) this.traffic.drawNetwork(this.ctx, this.debugMode);
+                if (!bakedGround || this.dbg('traffic')) this.traffic.drawNetwork(this.ctx, this.dbg('traffic'));
                 
-                // Puddle Reflections (draw on roads, before buildings/entities)
-                if (this.puddles && this.weather?.isRaining && this.activeMap?.type === 'outdoor') {
-                    this.puddles.draw(this.ctx);
-                }
             
                 this.profiler.stop('Render:World');
                 
@@ -318,6 +318,12 @@
                         }
                     }
                 }
+
+                // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
+                // the wet asphalt, on the ground and the floors (after the painted interiors) before buildings and people so they walk over it
+                this.prepareReflections();
+                this.drawPuddles(this.ctx);
+                this.drawReflections(this.ctx);
                 
                 // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)
                 if (this.activeMap.buildings && this.activeMap.type === 'outdoor') {
@@ -661,6 +667,9 @@
             
                 this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
                 this.drawNoiseRipples(this.ctx);
+                this.drawCorpses(this.ctx, cullBounds.entities);         // the fallen, under the living (engine/finisher.js)
+                this.drawHunterDashes(this.ctx);                         // crimson flits (engine/palace-art.js)
+                this.drawExecuteCue(this.ctx);                           // a gold reticle under an unaware back (engine/executions.js)
                 
                 // PERFORMANCE: AABB viewport culling for entities
                 {
@@ -803,6 +812,8 @@
                 }
                 
                 this.drawMuzzleStars(this.ctx);                              // the flash's star at each muzzle
+                this.drawShotFx(this.ctx, cullBounds.world);                 // barrel smoke, embers, golden wisps (engine/combat-effects.js)
+                this.drawSlashes(this.ctx);                                  // a blade's gold arc (engine/status-effects.js)
 
                 // Passenger lean-out rendering — draw in-car companions at their seat positions
                 // Uses drawProceduralHumanoid with isDriving flag for unified lean-out animation
@@ -854,7 +865,7 @@
                 }
                 
                 // DEBUG: Draw red center dots for in-car occupants ON TOP of the car overlay
-                if (this.debugMode && this.isDriving && this.car && this.car.seatLayout) {
+                if (this.dbg('traffic') && this.isDriving && this.car && this.car.seatLayout) {
                     for (let i = 1; i < this.car.seatLayout.length; i++) {
                         const occ = this.car.seatOccupants[i];
                         if (!occ || occ === true || !occ.inCar) continue;
@@ -980,10 +991,10 @@
                 
                 // Debug: nav grid, companion paths and eyeline spots
                 // (with the debug overlay, or on its own via `game.navDebug = true`)
-                if (this.debugMode || this.navDebug) this.drawNavDebug(this.ctx);
+                if (this.dbg('nav') || this.navDebug) this.drawNavDebug(this.ctx);
 
                 // Debug: visualize ALL projectile positions (catches invisible ghosts)
-                if (this.debugMode) {
+                if (this.dbg('projectiles')) {
                     // Show game array projectiles as green dots
                     this.ctx.save();
                     for (const p of this.projectiles) {
@@ -1045,14 +1056,6 @@
                         }
                         this.ctx.restore();
                     }
-                    
-                    // HUD counter (screen space)
-                    this.ctx.save();
-                    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-                    this.ctx.fillStyle = '#0f0';
-                    this.ctx.font = '12px monospace';
-                    this.ctx.fillText(`PROJ array: ${this.projectiles.length}  |  registry: ${regProjs.length}`, 10, this.canvas.height - 30);
-                    this.ctx.restore();
                 }
                 
                 this.weather.draw(this.ctx);
@@ -1073,43 +1076,13 @@
                 this.drawScopeView(this.ctx);
                 // Health bars and damage numbers, above the darkness so they read at night
                 this.drawCombatOverlays(this.ctx, cullBounds.entities);
+                this.drawStatusMarks(this.ctx, cullBounds.entities);
+                this.drawHunterEyes(this.ctx);
                 
-                // Profiler (independent of debug mode)
-                if (this.showProfiler) {
-                    this.profiler.draw(this.ctx, 20, 150); 
-                }
-                
-                // Debug Overlay (traffic network, entity stats, lighting debug)
+                // Debug view (ui/dev-overlay.js): lamp rays, then rooms, vision, hearing, colliders, labels
                 if (this.debugMode) {
-                    this.drawDebugLighting(this.ctx);
-                    
-                    // Entity System Stats (Screen Space)
-                    if (this.useNewCollisionSystem) {
-                        this.ctx.save();
-                        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-                        
-                        // Background panel
-                        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-                        this.ctx.fillRect(10, 400, 180, 105);
-                        this.ctx.strokeStyle = '#00ff88';
-                        this.ctx.lineWidth = 1;
-                        this.ctx.strokeRect(10, 400, 180, 105);
-                        
-                        // Stats
-                        this.ctx.font = 'bold 12px Consolas';
-                        this.ctx.fillStyle = '#00ff88';
-                        this.ctx.fillText('ENTITY SYSTEM', 20, 418);
-                        
-                        this.ctx.font = '11px Consolas';
-                        this.ctx.fillStyle = '#00ffaa';
-                        this.ctx.fillText(`Entities: ${GameEntity.registry.all.length}`, 20, 435);
-                        this.ctx.fillText(`Collidable: ${GameEntity.registry.collidable.length}`, 20, 450);
-                        this.ctx.fillText(`Checks: ${CollisionSystem.stats.totalChecks}`, 20, 465);
-                        this.ctx.fillText(`Resolved: ${CollisionSystem.stats.collisionsResolved}`, 20, 480);
-                        this.ctx.fillText(`Pedestrians: ${this.pedestrians.pedestrians.length}`, 20, 495);
-                        
-                        this.ctx.restore();
-                    }
+                    if (this.dbg('lights')) this.drawDebugLighting(this.ctx);
+                    this.drawDebugLayers(this.ctx);
                 }
             
                 this.ctx.restore();
@@ -1119,12 +1092,12 @@
                 // 5. SCREEN SPACE UI (Overlays)
                 this.profiler.start('Render:PostFX');
                 
+                // Sound rings as a mirage over the lit scene (engine/noise.js)
+                this.drawMirageRings(this.ctx);
+
                 // Wet-world post-processing (after lighting, before rain)
                 const ambient = this.getAmbientDarkness();
-                if (ambient > 0.2) {
-                    this.drawWetReflections(this.ctx);
-                    this.drawBloomPass(this.ctx);
-                }
+                if (ambient > 0.2) this.drawBloomPass(this.ctx);
                 this.drawAtmospherePass(this.ctx);
                 
                 // Rain on screen: outdoors, or fading in as she steps out onto a veranda
@@ -1223,7 +1196,7 @@
                         // A scene has the stage: Stella is off-camera, so her stealth doesn't grey the story out
                         this.targetGrayscale = 0; this.visualGrayscale = 0;
                     } else if (this.player.visibility !== undefined) {
-                        this.targetGrayscale = (1.0 - this.player.visibility) * 100;
+                        this.targetGrayscale = GameSettings.stealthGray === false ? 0 : (1.0 - this.player.visibility) * 100;
                         this.visualGrayscale += (this.targetGrayscale - this.visualGrayscale) * 0.05;
                         if (this.visualGrayscale < 0.5) this.visualGrayscale = 0;
                     }
@@ -1233,7 +1206,9 @@
                     const con = (1.35 - 0.08 * dayG + (0.15 * this.nvIntensity)) * ggContrast; 
                     const sepia = (0.18 - 0.12 * dayG) * (1.0 - this.nvIntensity);
                     const bright = (1.1 + 0.2 * dayG + (1.4 * this.nvIntensity)) * ggBright * ggExposure;
-                    const effectiveGray = Math.max(this.visualGrayscale, this.nvIntensity * 100);
+                    // Cinematic View's "Full colour" chip lifts the stealth grey for the photo (night vision stays)
+                    const stealthGray = this.cineCam && GameSettings.photoFullColour ? 0 : this.visualGrayscale;
+                    const effectiveGray = Math.max(stealthGray, this.nvIntensity * 100);
                     filterChain = `grayscale(${effectiveGray.toFixed(0)}%) contrast(${con.toFixed(2)}) saturate(${sat.toFixed(2)}) sepia(${sepia.toFixed(2)}) brightness(${bright.toFixed(2)})`;
                     // Ms. Jean Soda: subtle pink warmth even outside NV
                     if (this.player.buffSystem.isActive('jeanSoda')) {
@@ -1376,6 +1351,7 @@
                 // sweep is always visible while it runs.
                 PerfBench.draw(this.ctx, 20, this.canvas.height - 110);
                 this.profiler.tick(); 
+                DevOverlay.frame(this);                   // the profiler pill and debug counts (DOM)
             },
 
         });

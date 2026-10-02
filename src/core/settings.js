@@ -140,9 +140,21 @@
             filmGrain: true,                // Film grain overlay
             softShadows: true,              // Soft shadow edges: the light layer at half resolution, blurred (on for high quality)
             bloom: true,                    // Post-process light bleed
-            wetReflections: true,           // Elongated light reflections on wet surfaces
+            wetReflections: true,           // (old saves) false → reflections 'off'
+            reflections: 'high',            // 'high' | 'medium' | 'off': puddles and the wet street mirror the lights (engine/reflections.js)
+            photoReflections: true,         // Cinematic View's own toggle
             atmosphereTint: '',             // Color wash: '' | 'amber' | 'violet' | 'crimson' | 'teal'
-            colorGrade: 'none',             // 'none' | 'amber_night' | 'violet_noir' | 'crimson' | 'cold_teal' | 'dreampunk'
+            colorGrade: 'none',             // 'none' | 'amber_night' | 'violet_noir' | 'crimson' | 'cold_teal' | 'dreampunk' | 'custom'
+            gradeCustom: null,              // the seven slider values when colorGrade is 'custom' (app/boot.js)
+            stealthGray: true,              // the world greys as Stella slips into shadow
+            photoFullColour: false,         // Cinematic View: lift the stealth grey for a photo
+            finisher: 'full',               // 'full' | 'subtle' | 'off' (engine/finisher.js)
+            capturePrompt: true,            // the "Capture?" pill after a finisher
+            kukriFromArmory: true,          // the Maiden's Kukri is in the armory (false: only the Demoness drops it)
+            footsteps: true,                // footsteps by shoe and floor, splashes (engine/footsteps.js)
+            enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
+            soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
+            profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.
@@ -214,6 +226,8 @@
                     this.softShadows = false;
                     this.bloom = false;
                     this.wetReflections = false;
+                    this.reflections = 'off';
+                    this.soundRings = 'simple';
                 } else if (preset === 'medium') {
                     this.lightingQuality = 'medium';
                     this.trafficDensity = 'medium';
@@ -224,6 +238,7 @@
                     this.softShadows = false;
                     this.bloom = true;
                     this.wetReflections = false;
+                    this.reflections = 'medium';
                 }
                 // 'high' is the default — no changes needed
             },

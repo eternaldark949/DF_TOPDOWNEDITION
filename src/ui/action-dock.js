@@ -18,14 +18,15 @@
                 heart:  s('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
                 cross:  s('<path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z"/>'),
                 car:    s('<path d="M4 15l1.5-5A2 2 0 0 1 7.4 8.5h9.2a2 2 0 0 1 1.9 1.5L20 15v3H4z"/><circle cx="7.5" cy="15.5" r="1.2"/><circle cx="16.5" cy="15.5" r="1.2"/>'),
-                portal: s('<ellipse cx="12" cy="12" rx="6" ry="8.5"/><path d="M12 7c2 1.5 2 8.5 0 10M9 9.5c1.8.5 4.2.5 6 0"/>')
+                portal: s('<ellipse cx="12" cy="12" rx="6" ry="8.5"/><path d="M12 7c2 1.5 2 8.5 0 10M9 9.5c1.8.5 4.2.5 6 0"/>'),
+                blade:  s('<path d="M5 19l3-3M7 17c4-1 9-6 11-12-6 2-11 7-12 11z"/><path d="M4 20l2-2"/>')
             };
         })();
 
         const ACTION_VERBS = {
             talk: 'talk', bond: 'heart', adopt: 'heart', search: 'hand', 'pick up': 'hand', buy: 'coin', shop: 'coin',
             rest: 'moon', craft: 'gear', loadout: 'gear', read: 'page', lights: 'bulb', refill: 'cross',
-            hail: 'car', hijack: 'car', drive: 'car', grab: 'hand', hold: 'hand', 'let go': 'hand', enter: 'door', exit: 'exit', leave: 'exit', go: 'portal'
+            hail: 'car', hijack: 'car', drive: 'car', grab: 'hand', hold: 'hand', 'let go': 'hand', enter: 'door', exit: 'exit', leave: 'exit', go: 'portal', execute: 'blade'
         };
 
         /** Set a pill's verb, what it's for, and its keycap; the DOM is only touched when they change. */

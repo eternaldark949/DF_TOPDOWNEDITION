@@ -53,6 +53,13 @@
                 weaponMode: 'sniper',
                 stats: { fireRate: 50, recoil: 15, damage: 65, projectileColor: '#DC143C', projectileSpeed: 40, flashRadius: 60, penetrating: true }
             },
+            'maiden_kukri': {
+                name: "Maiden's Kukri", type: 'weapon', icon: '🗡',
+                desc: 'A curved golden knife, light as a promise. Cuts that keep bleeding.',
+                weaponMode: 'melee',
+                // a slash in an arc before her: damage, then bleeding (engine/status-effects.js); quiet, not silent
+                stats: { fireRate: 16, damage: 28, reach: 38, arc: 1.5, bleedDps: 6, bleedSecs: 3, noise: 60, damageType: 'melee' }
+            },
             'laser_sight': {
                 name: 'Laser Sight', type: 'attachment', icon: '⊕',
                 desc: 'Faint red targeting beam when equipped.',
@@ -183,7 +190,7 @@
         }
         
         // Default loadout for new games
-        const DEFAULT_LOADOUT = ['pistol_fpx', 'sniper_sara', 'rifle_rb98', 'pistol_anavia', 'sniper_sr86'];
+        const DEFAULT_LOADOUT = ['pistol_fpx', 'sniper_sara', 'rifle_rb98', 'pistol_anavia', 'sniper_sr86', 'maiden_kukri'];
         
         // Factory: create a live InventoryItem from registry ID
         function createItemFromRegistry(id, game) {

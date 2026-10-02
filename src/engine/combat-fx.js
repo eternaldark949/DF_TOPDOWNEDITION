@@ -63,15 +63,29 @@
                 if (this.updateUI) this.updateUI();
             },
 
-            /** A hit landed on `actor` (HP already reduced). kbX/kbY = knockback, used as the hit direction. */
-            onActorHit(actor, amount, kbX = 0, kbY = 0) {
+            /**
+             * A hit landed on `actor` (HP already reduced). kbX/kbY = knockback, used as the hit direction.
+             * opts.type: the kind of damage — 'bleed' ticks are small crimson numbers, a drip of blood,
+             * no flinch (engine/status-effects.js); anything else as before.
+             */
+            onActorHit(actor, amount, kbX = 0, kbY = 0, opts = null) {
                 if (!(amount > 0) || !actor) return;
-                const now = _gameTimeSec;
+                const now = _gameTimeSec, type = opts && opts.type;
+                const texts = this.floatingTexts || (this.floatingTexts = []);
+                if (type === 'bleed') {
+                    const recent = texts.find(t => t.target === actor && t.bleed && now - t.t0 < 0.6);
+                    if (recent) { recent.value += amount; recent.t0 = now; }
+                    else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ff3a5c', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true }); if (texts.length > 40) texts.shift(); }
+                    actor._hpShowT = now;
+                    const B = bloodOf(actor);
+                    if (B && this.decals) this.decals.addDecal('blood', actor.x + (Math.random() - 0.5) * 8, actor.y + (Math.random() - 0.5) * 8, { size: 1.6 + Math.random() * 1.4, color: B.decal, dir: Math.random() * 6.28, glow: B.glow });
+                    if (B && this.weather) this.weather.spawnSpray(actor.x, actor.y, Math.random() * 6.28, `rgba(${B.drop}, 1)`, 2);
+                    return;
+                }
                 const dir = (kbX || kbY) ? Math.atan2(kbY, kbX) : Math.random() * Math.PI * 2;
 
                 // Damage number — hits on the same target within 0.15 s add up into one
-                const texts = this.floatingTexts || (this.floatingTexts = []);
-                const recent = texts.find(t => t.target === actor && now - t.t0 < 0.15);
+                const recent = texts.find(t => t.target === actor && !t.bleed && now - t.t0 < 0.15);
                 if (recent) { recent.value += amount; recent.t0 = now; recent.pop = now; }
                 else {
                     const color = actor === this.player ? '#ff5a6a' : (actor.role === 'teammate' ? '#ffb347' : '#ffffff');
@@ -80,7 +94,8 @@
                 }
 
                 actor._hpShowT = now;                                        // show their health bar for a while
-                actor._hitT = now; actor._hitDir = dir;                      // the humanoid flinches away from the hit
+                actor._hitT = now; actor._hitDir = dir;                      // the humanoid flinches away from the hit (and a body falls that way)
+                actor._hits = (actor._hits || 0) + 1; actor._engaged = true;
 
                 // Blood in the character's own colour, sprayed along the hit
                 const B = bloodOf(actor);
@@ -128,7 +143,7 @@
                     if (!inView(x, y)) continue;
                     const pop = Math.max(0, 1 - (now - t.pop) / 0.12);
                     ctx.globalAlpha = 1 - Math.pow(age / life, 2);
-                    ctx.font = `bold ${Math.round((t.big ? 10 : 11) + pop * 4 + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
+                    ctx.font = `bold ${Math.round((t.big ? 10 : t.bleed ? 8 : 11) + pop * (t.bleed ? 1 : 4) + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
                     const s = t.text || String(Math.round(t.value));
                     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(s, x, y);
                     ctx.fillStyle = t.color; ctx.fillText(s, x, y);

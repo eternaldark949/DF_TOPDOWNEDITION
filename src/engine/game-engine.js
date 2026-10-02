@@ -147,7 +147,7 @@
                 this.decals = new DecalSystem();
                 this.puddles = null; // PuddleSystem disabled for performance (will revisit)
                 this.leafParticles = new LeafParticleSystem(this); // Floating leaves
-                this.projectiles = []; this.props = []; this.npcs = []; this.enemies = []; this.loot = []; this.lamps = []; this.lastKnownMarkers = []; this.muzzleFlashes = []; this.casings = [];
+                this.projectiles = []; this.props = []; this.npcs = []; this.enemies = []; this.loot = []; this.lamps = []; this.lastKnownMarkers = []; this.muzzleFlashes = []; this.casings = []; this.shotFx = [];
                 this.stickyOrbs = []; // Golden Child DOT orbs attached to enemies
                 this.traffic = new TrafficManager(); // <--- ADD THIS LINE
                 this.pedestrians = new PedestrianManager(); // Roaming civilians
