@@ -1379,62 +1379,7 @@
         }
         .save-slot-import-msg.show { opacity: 1; }
 
-        /* --- AUGMENT SHOP OVERLAY --- */
-        #augment-shop {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 10, 20, 0.95);
-            display: none; z-index: 500;
-            flex-direction: column; align-items: center; justify-content: center;
-            font-family: var(--font-ui);
-        }
-        #augment-shop.active { display: flex; }
-        .aug-shop-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.4rem; color: #00f3ff;
-            letter-spacing: 3px; margin-bottom: 5px;
-            text-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
-        }
-        .aug-shop-subtitle {
-            font-size: 0.75rem; color: #888;
-            letter-spacing: 2px; margin-bottom: 20px;
-        }
-        .aug-shop-balance {
-            font-size: 0.85rem; color: #ffd700;
-            margin-bottom: 15px;
-            text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-        }
-        .aug-shop-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 12px; max-width: 750px; width: 90%;
-            max-height: 50vh; overflow-y: auto;
-            padding: 5px;
-        }
-        .aug-card {
-            background: rgba(0, 243, 255, 0.05);
-            border: 1px solid rgba(0, 243, 255, 0.15);
-            border-radius: 8px; padding: 14px;
-            cursor: pointer; transition: all 0.2s;
-        }
-        .aug-card:hover {
-            background: rgba(0, 243, 255, 0.1);
-            border-color: rgba(0, 243, 255, 0.4);
-        }
-        .aug-card.owned { border-color: rgba(0, 255, 100, 0.3); }
-        .aug-card-name {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.8rem; color: #00f3ff;
-            margin-bottom: 5px;
-        }
-        .aug-card-desc { font-size: 0.75rem; color: #aaa; margin-bottom: 8px; line-height: 1.3; }
-        .aug-card-price { font-size: 0.8rem; color: #ffd700; }
-        .aug-card-owned { font-size: 0.75rem; color: #00ff66; }
-        .aug-shop-close {
-            margin-top: 20px; padding: 10px 30px;
-            background: transparent; border: 1px solid #555; color: #fff;
-            cursor: pointer; font-family: var(--font-ui); font-size: 0.85rem;
-            text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s;
-        }
-        .aug-shop-close:hover { border-color: #fff; background: rgba(255,255,255,0.05); }
+        /* (The augment shop and the other shops: styles/shops.css) */
 
 
 /* ── Resonance: Dr. Yin's tuning overlay (engine/tuning-ui.js) ── */
@@ -3095,6 +3040,123 @@
         #collection-note-inline #note-body, #collection-note-inline #note-signature { max-width: 760px; margin-left: auto; margin-right: auto; }
         /* While the sidebar screens are up, the HUD doesn't ghost through the backdrop */
         body.screen-menu-open #game-ui { opacity: 0 !important; transition: opacity 0.2s; }
+        /* =====================================================================
+           SHOPS — Dr. Yin's augments, the workbench, Torque, Neural Systems and
+           Zib.ME share one frame in the dossier scheme (--df-*, dossier.css cards,
+           chips, tabs and buttons). Markup: index.html (.df-shop); renderers:
+           engine/screens-ui.js, engine/shops-menus.js.
+           ===================================================================== */
+        .df-shop {
+            position: fixed; inset: 0; z-index: 300; display: none;
+            align-items: center; justify-content: center; padding: 18px; box-sizing: border-box;
+            background:
+                radial-gradient(ellipse 55% 45% at 50% 0%, var(--df-wine), transparent 70%),
+                radial-gradient(ellipse 50% 60% at 45% 100%, rgba(40, 4, 30, 0.6), transparent 70%),
+                rgba(5, 1, 3, 0.93);
+            font-family: var(--font-ui); color: #e6dff0;
+            animation: df-shop-in 0.22s ease-out;
+        }
+        .df-shop.open { display: flex; }
+        @keyframes df-shop-in { from { opacity: 0; } to { opacity: 1; } }
+        .df-shop-panel {
+            position: relative; width: min(760px, 100%); max-height: 100%; display: flex; flex-direction: column;
+            border-radius: 28px; border: 2px dotted rgba(202, 176, 250, 0.35);
+            background: linear-gradient(170deg, rgba(14, 4, 12, 0.96) 0%, rgba(10, 3, 22, 0.94) 60%, rgba(24, 6, 52, 0.9) 100%);
+            box-shadow: 0 0 40px rgba(93, 20, 226, 0.25), inset 0 0 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+        .df-shop.narrow .df-shop-panel { width: min(540px, 100%); }
+
+        /* Header: script title, small caps line, the balance capsule */
+        .df-shop-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; padding: 16px 24px 10px; flex-shrink: 0;
+            border-bottom: 1px solid transparent;
+            border-image: linear-gradient(90deg, transparent, rgba(216, 198, 162, 0.45) 12%, rgba(255, 255, 255, 0.4) 50%, rgba(216, 198, 162, 0.45) 88%, transparent) 1; }
+        .df-shop-titles { min-width: 0; }
+        .df-shop-title { font: 400 2.3rem var(--font-script); line-height: 1; color: var(--df-lavender-pale);
+            text-shadow: 0 0 14px rgba(202, 176, 250, 0.55), 0 0 2px rgba(255, 255, 255, 0.6); white-space: nowrap; }
+        .df-shop-sub { font: 600 0.56rem var(--font-ui); letter-spacing: 3.5px; text-transform: uppercase; color: var(--df-champagne); margin-top: 6px; }
+        .df-shop-balance { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px;
+            border: 1px solid rgba(255, 194, 72, 0.55); background: rgba(40, 24, 8, 0.55);
+            font: 700 0.78rem var(--font-ui); letter-spacing: 1px; color: var(--df-gold); text-shadow: 0 0 8px rgba(255, 194, 72, 0.35); }
+        .df-shop-balance .gem { font-size: 0.55rem; text-shadow: 0 0 6px rgba(255, 194, 72, 0.9); }
+        .df-shop-balance .unit { font-size: 0.56rem; letter-spacing: 2px; color: var(--df-champagne); }
+        .df-shop-balance.scrap { border-color: rgba(185, 174, 196, 0.6); background: rgba(20, 16, 28, 0.6); color: var(--df-lavender-pale); text-shadow: none; }
+        .df-shop-balance.scrap .gem { color: var(--df-lilac-grey); text-shadow: none; }
+
+        .df-shop .df-tabs { margin: 10px 14px 0; flex-shrink: 0; }
+        .df-shop-tabs-scroll { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; justify-content: flex-start; padding-bottom: 2px; }
+        .df-shop-tabs-scroll::-webkit-scrollbar { display: none; }
+        .df-shop-tabs-scroll .df-tab { flex-shrink: 0; }
+
+        .df-shop-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 22px 14px; scrollbar-width: thin; scrollbar-color: rgba(202, 176, 250, 0.35) transparent; }
+        .df-shop-body::-webkit-scrollbar { width: 6px; }
+        .df-shop-body::-webkit-scrollbar-thumb { background: rgba(202, 176, 250, 0.3); border-radius: 3px; }
+        .df-shop-foot { flex-shrink: 0; display: flex; justify-content: center; padding: 10px 16px 16px; }
+        .df-shop-foot .screen-back-btn { min-width: 160px; }
+
+        /* Cards in a shop: the price / action column on the right */
+        .df-shop .df-card { margin-bottom: 9px; }
+        .df-shop .df-card .df-head { align-items: center; }
+        .df-shop-side { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; flex-shrink: 0; }
+        .df-price { font: 700 0.8rem var(--font-ui); letter-spacing: 1px; color: var(--df-gold); white-space: nowrap; }
+        .df-price .unit { font-size: 0.55rem; letter-spacing: 2px; color: var(--df-champagne); margin-left: 3px; }
+        .df-price.short { color: #ff8a92; }
+        .df-price.short .unit { color: #ff8a92; opacity: 0.8; }
+        .df-card.lit .df-price { color: #7a4d06; } .df-card.lit .df-price .unit { color: #7d5bbd; }
+        .df-shop .df-card.bought { animation: df-bought 0.75s ease-out; }
+        @keyframes df-bought { 0% { box-shadow: 0 0 0 rgba(255, 194, 72, 0); } 30% { box-shadow: 0 0 34px rgba(255, 194, 72, 0.75); border-color: var(--df-gold); } 100% { box-shadow: 0 0 0 rgba(255, 194, 72, 0); } }
+        .df-shop .df-card.unaffordable .title { opacity: 0.75; }
+        .df-shop .df-btn[disabled] { opacity: 0.4; cursor: default; box-shadow: none; }
+        .df-shop .df-btn.small { padding: 5px 13px; font-size: 0.55rem; letter-spacing: 2px; }
+        .df-btn-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+
+        /* Swatches (Neural Systems, Torque) */
+        .df-swatch { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; border: 2px solid rgba(255, 255, 255, 0.25); box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.35); }
+        .df-swatch.sq { border-radius: 9px; }
+        .df-swatch.small { width: 12px; height: 12px; border-width: 1px; vertical-align: middle; display: inline-block; }
+        .df-swatches { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 6px; }
+        .df-swatch-pick { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px dotted rgba(255, 255, 255, 0.35); padding: 0;
+            font: 700 0.7rem var(--font-ui); color: var(--df-lilac-grey); transition: transform 0.15s, box-shadow 0.2s; }
+        .df-swatch-pick:hover { transform: scale(1.08); }
+        .df-swatch-pick.on { border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(202, 176, 250, 0.55), 0 0 14px rgba(202, 176, 250, 0.6); }
+        .df-swatch-pick.sq { border-radius: 10px; }
+        .df-chip.pick { cursor: pointer; }
+        .df-chip .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+        /* Torque's car preview */
+        .df-car-preview { display: flex; align-items: center; gap: 22px; }
+        .df-car { position: relative; width: 104px; height: 50px; border-radius: 14px 18px 10px 10px; border: 1px solid rgba(255, 255, 255, 0.2); flex-shrink: 0;
+            box-shadow: inset 0 -8px 14px rgba(0, 0, 0, 0.35), inset 0 6px 10px rgba(255, 255, 255, 0.12); }
+        .df-car::before { content: ''; position: absolute; left: 30%; right: 22%; top: 9px; bottom: 9px; border-radius: 8px; background: rgba(20, 16, 40, 0.75); box-shadow: inset 0 0 6px rgba(160, 180, 255, 0.35); }
+        .df-car .glow { position: absolute; bottom: -6px; left: 8px; right: 8px; height: 5px; border-radius: 3px; }
+        .df-car .lamp { position: absolute; right: -3px; width: 7px; height: 7px; border-radius: 50%; }
+
+        @media (max-width: 700px) {
+            .df-shop { padding: 8px; }
+            .df-shop-panel { border-radius: 22px; }
+            .df-shop-head { padding: 12px 16px 8px; flex-wrap: wrap; }
+            .df-shop-title { font-size: 1.9rem; }
+            .df-shop-body { padding: 6px 10px 12px; }
+            .df-shop .df-card { padding: 11px 13px; }
+            .df-shop .df-card .df-head { flex-wrap: nowrap; }
+            .df-shop .df-card .df-head > .grow { min-width: 0; }
+            .df-shop .note-ico { width: 38px; height: 38px; font-size: 1.2rem; }
+            .df-shop .df-tab { padding: 7px 14px; letter-spacing: 2.5px; }
+        }
+        /* Landscape phones: a shorter header, the back pill beside the title */
+        body.landscape .df-shop { padding: 6px 10px; }
+        body.landscape .df-shop-head { padding: 8px 18px 6px; }
+        body.landscape .df-shop-title { font-size: 1.6rem; }
+        body.landscape .df-shop-sub { margin-top: 3px; }
+        body.landscape .df-shop .df-tabs { margin-top: 6px; margin-bottom: 8px; }
+        body.landscape .df-shop-head { padding-right: 150px; align-items: center; }                     /* room for the back pill, up here */
+        body.landscape .df-shop-foot { position: absolute; top: 12px; right: 16px; padding: 0; z-index: 2; }
+        body.landscape .df-shop-foot .screen-back-btn { height: 32px; min-width: 118px; padding: 0 16px; font-size: 0.62rem; letter-spacing: 2px; }
+        body.landscape .df-shop-body { padding-bottom: 10px; }
+        body.landscape .df-shop .df-card { padding: 10px 16px; }
+        body.landscape .df-shop .df-section { margin: 12px 0 8px; }
+        body.landscape .df-shop .df-section:first-child { margin-top: 4px; }
+        body.landscape .df-shop-panel { width: min(860px, 100%); }
         /* =========================================
            LANDSCAPE (a phone on its side)
            body.landscape is set by resize() (engine/combat-effects.js) when the window is wider
@@ -3163,7 +3225,6 @@
         body.landscape .screen-sidebar-left { background: linear-gradient(270deg, rgba(5, 1, 3, 0.9) 0%, rgba(5, 1, 3, 0.97) 30%); }
         body.landscape .screen-sidebar-right { background: linear-gradient(90deg, rgba(5, 1, 3, 0.9) 0%, rgba(5, 1, 3, 0.97) 30%); }
         body.landscape #sleep-menu, body.landscape #vending-menu { max-height: 94vh; overflow-y: auto; box-sizing: border-box; padding: 16px 24px !important; }
-        body.landscape #augment-shop { overflow-y: auto; justify-content: flex-start; }
         body.landscape .save-slot-panel { max-height: 92vh; overflow-y: auto; }
         body.landscape #main-menu { margin-top: 5vh; padding-bottom: 20px; }
         body.landscape .title-script { font-size: 3.6rem; }
@@ -3193,35 +3254,38 @@
 </head>
 <body>
 
-    <!-- AUGMENT SHOP (Dr. Yin's) -->
-    <div id="augment-shop">
-        <div class="aug-shop-title">CYBERNETIC AUGMENTS</div>
-        <div class="aug-shop-subtitle">DR. YIN'S CLINIC</div>
-        <div class="aug-shop-balance" id="aug-shop-balance">BALANCE: 0 PP</div>
-        <div class="aug-shop-grid" id="aug-shop-grid"></div>
-        <button class="aug-shop-close" id="aug-shop-close">CLOSE</button>
+    <!-- AUGMENT SHOP (Dr. Yin's) and the WORKBENCH — styles/shops.css -->
+    <div id="augment-shop" class="df-shop">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Augments</div><div class="df-shop-sub">Dr. Yin's Clinic · Empereal Medbay</div></div>
+                <div class="df-shop-balance" id="aug-shop-balance"></div>
+            </div>
+            <div class="df-shop-body" id="aug-shop-grid"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="aug-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
+        </div>
+    </div>
+    <div id="craft-shop" class="df-shop narrow">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Workbench</div><div class="df-shop-sub">Apt 949 · Main Room</div></div>
+                <div class="df-shop-balance" id="craft-shop-balance"></div>
+            </div>
+            <div class="df-shop-body" id="craft-shop-grid"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="craft-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
+        </div>
     </div>
 
     <!-- AUTO SHOP (Torque's) -->
-    <div id="auto-shop-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
-        <div style="max-width:700px; margin:30px auto; padding:20px;">
-            <!-- Header -->
-            <div style="font-family:Orbitron,sans-serif; font-size:1.2rem; letter-spacing:4px; color:#ff8800; text-shadow:0 0 10px rgba(255,136,0,0.4); margin-bottom:2px;">TORQUE AUTO</div>
-            <div style="font-size:0.6rem; color:#666; letter-spacing:2px; margin-bottom:8px;">SERVICE BAY — SOUTHERN DIMENSIONS CITY</div>
-            <div id="auto-shop-balance" style="font-family:Orbitron,sans-serif; font-size:0.7rem; color:#ffd700; letter-spacing:1px; margin-bottom:16px;">BALANCE: 0 PP</div>
-            
-            <!-- Tabs -->
-            <div id="auto-shop-tabs" style="display:flex; gap:4px; margin-bottom:16px;">
-                <button class="auto-tab" data-tab="browse" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:8px 16px; background:rgba(255,136,0,0.15); border:1px solid rgba(255,136,0,0.4); color:#ff8800; cursor:pointer; flex:1;">BROWSE</button>
-                <button class="auto-tab" data-tab="garage" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:8px 16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">MY GARAGE</button>
-                <button class="auto-tab" data-tab="customize" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:8px 16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">CUSTOMIZE</button>
+    <div id="auto-shop-overlay" class="df-shop">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Torque Auto</div><div class="df-shop-sub">Service Bay · Southern Dimensions City</div></div>
+                <div class="df-shop-balance" id="auto-shop-balance"></div>
             </div>
-            
-            <!-- Content -->
-            <div id="auto-shop-content"></div>
-            
-            <!-- Close -->
-            <button id="auto-shop-close" style="font-family:Orbitron,sans-serif; font-size:0.65rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.15); color:#888; cursor:pointer; width:100%; margin-top:16px;">CLOSE</button>
+            <div class="df-tabs" id="auto-shop-tabs"><span class="df-tab auto-tab" data-tab="browse">Browse</span><span class="df-tab auto-tab" data-tab="garage">Garage</span><span class="df-tab auto-tab" data-tab="customize">Customize</span></div>
+            <div class="df-shop-body" id="auto-shop-content"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="auto-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
         </div>
     </div>
 
@@ -3235,41 +3299,27 @@
             <div class="tun-close" onclick="game.closeTuning()">CLOSE</div>
         </div>
     </div>
-    <div id="cosmetics-shop-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(5,5,20,0.95); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
-        <div style="max-width:700px; margin:30px auto; padding:20px;">
-            <!-- Header -->
-            <div style="font-family:Orbitron,sans-serif; font-size:1.2rem; letter-spacing:4px; color:#0088ff; text-shadow:0 0 12px rgba(0,136,255,0.4); margin-bottom:2px;">NEURAL SYSTEMS</div>
-            <div style="font-size:0.6rem; color:#666; letter-spacing:2px; margin-bottom:4px;">IDENTITY SEQUENCING LAB — SOUTHERN DIMENSIONS CITY</div>
-            <div id="cosmetics-shop-balance" style="font-family:Orbitron,sans-serif; font-size:0.7rem; color:#ffd700; letter-spacing:1px; margin-bottom:16px;">BALANCE: 0 PP</div>
-            
-            <!-- Tabs -->
-            <div id="cosmetics-shop-tabs" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:16px;">
-                <button class="cosmetics-tab" data-tab="wig" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(0,136,255,0.15); border:1px solid rgba(0,136,255,0.4); color:#0088ff; cursor:pointer; flex:1;">W.I.G.s</button>
-                <button class="cosmetics-tab" data-tab="skin" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">S.K.I.N.s</button>
-                <button class="cosmetics-tab" data-tab="outfit" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">O.U.T.F.I.T.s</button>
-                <button class="cosmetics-tab" data-tab="vocal" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">V.O.C.A.L.s</button>
-                <button class="cosmetics-tab" data-tab="accessory" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">A.C.C.E.S.S.</button>
-                <button class="cosmetics-tab" data-tab="hat" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">H.A.T.s</button>
-                <button class="cosmetics-tab" data-tab="jewelry" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">J.E.W.E.L.s</button>
+    <div id="cosmetics-shop-overlay" class="df-shop">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Neural Systems</div><div class="df-shop-sub">Identity Sequencing Lab · Southern Dimensions City</div></div>
+                <div class="df-shop-balance" id="cosmetics-shop-balance"></div>
             </div>
-            
-            <!-- Content -->
-            <div id="cosmetics-shop-content"></div>
-            
-            <!-- Close -->
-            <button id="cosmetics-shop-close" style="font-family:Orbitron,sans-serif; font-size:0.65rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.15); color:#888; cursor:pointer; width:100%; margin-top:16px;">CLOSE</button>
+            <div class="df-tabs df-shop-tabs-scroll" id="cosmetics-shop-tabs"><span class="df-tab small cosmetics-tab" data-tab="wig">Wigs</span><span class="df-tab small cosmetics-tab" data-tab="skin">Skins</span><span class="df-tab small cosmetics-tab" data-tab="outfit">Outfits</span><span class="df-tab small cosmetics-tab" data-tab="vocal">Vocals</span><span class="df-tab small cosmetics-tab" data-tab="accessory">Carry</span><span class="df-tab small cosmetics-tab" data-tab="hat">Hats</span><span class="df-tab small cosmetics-tab" data-tab="jewelry">Jewels</span></div>
+            <div class="df-shop-body" id="cosmetics-shop-content"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="cosmetics-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
         </div>
     </div>
 
     <!-- ZIB TAXI DESTINATION PICKER -->
-    <div id="zib-menu" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(10,5,30,0.94); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
-        <div style="max-width:500px; margin:40px auto; padding:20px;">
-            <div style="font-family:Orbitron,sans-serif; font-size:1.1rem; letter-spacing:4px; color:#8a2be2; text-shadow:0 0 12px rgba(138,43,226,0.5); margin-bottom:2px;">ZIB</div>
-            <div style="font-size:0.55rem; color:#666; letter-spacing:2px; margin-bottom:4px;">AUTONOMOUS TRANSIT — SOUTHERN DIMENSIONS CITY</div>
-            <div id="zib-balance" style="font-family:Orbitron,sans-serif; font-size:0.65rem; color:#ffd700; letter-spacing:1px; margin-bottom:16px;">BALANCE: 0 PP</div>
-            <div style="font-size:0.6rem; color:#888; letter-spacing:1px; margin-bottom:10px; border-bottom:1px solid rgba(138,43,226,0.15); padding-bottom:6px;">SELECT DESTINATION</div>
-            <div id="zib-destinations"></div>
-            <button id="zib-close" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.12); color:#888; cursor:pointer; width:100%; margin-top:14px;">CANCEL</button>
+    <div id="zib-menu" class="df-shop narrow">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Zib.ME</div><div class="df-shop-sub">Autonomous Transit · Where to?</div></div>
+                <div class="df-shop-balance" id="zib-balance"></div>
+            </div>
+            <div class="df-shop-body" id="zib-destinations"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="zib-close"><span class="btn-arrow">◀</span> Cancel</button></div>
         </div>
     </div>
 
@@ -51038,43 +51088,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.pauseSystem.acquire('auto_shop');
                 this._autoShopTab = 'browse';
                 const overlay = document.getElementById('auto-shop-overlay');
-                overlay.style.display = 'block';
-                document.getElementById('auto-shop-balance').textContent = `BALANCE: ${this.currency} PERSONICS`;
-
-                // Wire tabs
-                const self = this;
+                this._shopShow('auto-shop-overlay', true);
+                this._shopBalance('auto-shop-balance', this.currency);
                 overlay.querySelectorAll('.auto-tab').forEach(btn => {
-                    btn.onclick = () => {
-                        self._autoShopTab = btn.dataset.tab;
-                        // Update tab visual
-                        overlay.querySelectorAll('.auto-tab').forEach(t => {
-                            t.style.background = 'rgba(255,255,255,0.03)';
-                            t.style.borderColor = 'rgba(255,255,255,0.1)';
-                            t.style.color = '#888';
-                        });
-                        btn.style.background = 'rgba(255,136,0,0.15)';
-                        btn.style.borderColor = 'rgba(255,136,0,0.4)';
-                        btn.style.color = '#ff8800';
-                        self.renderAutoShopTab();
-                    };
+                    btn.onclick = () => { this._autoShopTab = btn.dataset.tab; audioSys.sfx('ui'); this.renderAutoShopTab(); };
                 });
-
-                // Wire close
                 document.getElementById('auto-shop-close').onclick = () => this.closeAutoShop();
-
-                // Set initial active tab visual
-                const activeBtn = overlay.querySelector('.auto-tab[data-tab="browse"]');
-                if (activeBtn) {
-                    activeBtn.style.background = 'rgba(255,136,0,0.15)';
-                    activeBtn.style.borderColor = 'rgba(255,136,0,0.4)';
-                    activeBtn.style.color = '#ff8800';
-                }
-
                 this.renderAutoShopTab();
             },
 
             closeAutoShop() {
-                document.getElementById('auto-shop-overlay').style.display = 'none';
+                this._shopShow('auto-shop-overlay', false);
                 this._customizeOriginal = null;
                 this._customizePending = null;
                 this.pauseSystem.release('auto_shop');
@@ -51090,6 +51114,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this._customizePending = null;
                 }
 
+                document.querySelectorAll('#auto-shop-overlay .auto-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === this._autoShopTab));
+                this._shopBalance('auto-shop-balance', this.currency);
                 switch (this._autoShopTab) {
                     case 'browse': this._renderBrowseTab(container); break;
                     case 'garage': this._renderGarageTab(container); break;
@@ -51099,403 +51125,175 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             // ── BROWSE TAB: Purchase new vehicles ──
             _renderBrowseTab(container) {
-                const self = this;
+                const TIER = { 'ultra-luxury': ['gold', 'Ultra Luxury'], 'mid-luxury': ['mint', 'Mid Luxury'], 'economy': ['info', 'Economy'] };
+                // the fastest car on sale sets the speed bars' scale
+                let topSpeed = 0;
+                for (const b in VEHICLE_BRANDS) for (const m in VEHICLE_BRANDS[b].models) topSpeed = Math.max(topSpeed, VEHICLE_BRANDS[b].baseStats.maxSpeed * VEHICLE_BRANDS[b].models[m].speedMod);
                 let html = '';
-                const sLabel = `font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; margin:12px 0 8px; padding-bottom:4px; border-bottom:1px solid rgba(255,255,255,0.06);`;
-
                 for (const brandKey in VEHICLE_BRANDS) {
-                    const brand = VEHICLE_BRANDS[brandKey];
-                    const tierColors = { 'ultra-luxury': '#d4af37', 'mid-luxury': '#00f3ff', 'economy': '#aaa' };
-                    const tierCol = tierColors[brand.tier] || '#888';
-
-                    html += `<div style="${sLabel} color:${tierCol};">${brandKey.toUpperCase()} <span style="font-size:0.45rem; color:#555; letter-spacing:1px;">${brand.tier.toUpperCase()}</span></div>`;
-
+                    const brand = VEHICLE_BRANDS[brandKey], [tc, tl] = TIER[brand.tier] || ['info', brand.tier];
+                    html += `<div class="df-section"><span><span class="glint">◆</span>${brandKey}</span><span class="df-chip ${tc}">${tl}</span></div>`;
                     for (const modelKey in brand.models) {
-                        const model = brand.models[modelKey];
-                        const price = CAR_PRICES[brandKey]?.[modelKey];
+                        const model = brand.models[modelKey], price = CAR_PRICES[brandKey]?.[modelKey];
                         if (!price) continue;
-
-                        // Check if already owned
-                        const alreadyOwned = this.garage.cars.some(c => c.brand === brandKey && c.model === modelKey);
-                        const canAfford = this.currency >= price;
-
-                        html += `<div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:4px; padding:10px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center;">`;
-                        html += `<div>`;
-                        html += `<div style="font-size:0.8rem; color:#ddd;">${model.name}</div>`;
-                        html += `<div style="font-size:0.55rem; color:#777;">SPD ${(brand.baseStats.maxSpeed * model.speedMod).toFixed(1)} · SEATS ${model.seats || brand.baseStats.seats || 4} · ${modelKey.toUpperCase()}</div>`;
-                        html += `</div>`;
-
-                        if (alreadyOwned) {
-                            html += `<span style="font-family:Orbitron,sans-serif; font-size:0.5rem; color:#00ff66; letter-spacing:1px;">OWNED</span>`;
-                        } else {
-                            html += `<button class="auto-buy-btn" data-brand="${brandKey}" data-model="${modelKey}" style="font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:1px; padding:5px 12px; border-radius:3px; cursor:pointer; background:${canAfford ? 'rgba(255,136,0,0.12)' : 'rgba(255,255,255,0.03)'}; border:1px solid ${canAfford ? 'rgba(255,136,0,0.3)' : 'rgba(255,255,255,0.08)'}; color:${canAfford ? '#ff8800' : '#555'};">${price.toLocaleString()} PP</button>`;
-                        }
-                        html += `</div>`;
+                        const owned = this.garage.cars.some(c => c.brand === brandKey && c.model === modelKey), afford = this.currency >= price;
+                        const spd = brand.baseStats.maxSpeed * model.speedMod, seats = model.seats || brand.baseStats.seats || 4;
+                        html += `<div class="df-card${owned ? ' lit' : afford ? '' : ' unaffordable'}" data-key="${brandKey}:${modelKey}"><div class="df-head">`;
+                        html += `<div class="note-ico">${ACTION_ICONS && ACTION_ICONS.car ? `<span style="width:24px;height:24px;color:var(--df-gold);display:inline-flex">${ACTION_ICONS.car}</span>` : '🚗'}</div>`;
+                        html += `<div class="grow"><div class="eyebrow">${brandKey} · ${modelKey}</div><div class="title">${model.name}</div>`;
+                        html += `<div class="df-bar-label"><span>Top speed</span><span>${spd.toFixed(1)}</span></div><div class="df-bar${owned ? '' : ' gold'}" style="--v:${Math.round(spd / topSpeed * 100)}%"><i></i></div>`;
+                        html += `<div class="df-chips" style="margin-top:8px;"><span class="df-chip">${seats} seats</span></div></div>`;
+                        html += `<div class="df-shop-side">${owned ? '<span class="df-chip active">✓ Owned</span>' : `${this._priceHtml(price, this.currency)}<button class="df-btn small auto-buy-btn" data-brand="${brandKey}" data-model="${modelKey}"${afford ? '' : ' disabled'}>Buy</button>`}</div>`;
+                        html += `</div></div>`;
                     }
                 }
-
                 container.innerHTML = html;
-
-                // Wire buy buttons
-                container.querySelectorAll('.auto-buy-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const brandKey = btn.dataset.brand;
-                        const modelKey = btn.dataset.model;
-                        const price = CAR_PRICES[brandKey]?.[modelKey] || 0;
-
-                        if (btn.dataset.confirm === 'true') {
-                            // Second tap — buy
-                            if (self.currency < price) { showMessage('INSUFFICIENT FUNDS.'); return; }
-                            self.currency -= price;
-                            const idx = self.garage.addCar(brandKey, modelKey);
-                            if (idx >= 0) {
-                                const name = self.garage.getDisplayName(idx);
-                                showMessage(`PURCHASED: ${name.toUpperCase()}`);
-                                document.getElementById('auto-shop-balance').textContent = `BALANCE: ${self.currency} PERSONICS`;
-                                self.updateUI();
-                                self._renderBrowseTab(container);
-                            }
-                        } else {
-                            // First tap — confirm
-                            btn.dataset.confirm = 'true';
-                            btn._origText = btn.textContent;
-                            btn._origStyle = btn.style.cssText;
-                            btn.textContent = 'CONFIRM?';
-                            btn.style.background = 'rgba(255,136,0,0.25)';
-                            btn.style.borderColor = '#ff8800';
-                            btn.style.color = '#ff8800';
-                            setTimeout(() => {
-                                if (btn.dataset.confirm === 'true') {
-                                    btn.dataset.confirm = '';
-                                    btn.textContent = btn._origText;
-                                    btn.style.cssText = btn._origStyle;
-                                }
-                            }, 2500);
-                        }
-                    });
-                });
+                this._shopFlash(container);
+                container.querySelectorAll('.auto-buy-btn').forEach(btn => btn.addEventListener('click', () => this._confirmTap(btn, 'Confirm?', () => {
+                    const brandKey = btn.dataset.brand, modelKey = btn.dataset.model, price = CAR_PRICES[brandKey]?.[modelKey] || 0;
+                    if (this.currency < price) { showMessage('INSUFFICIENT FUNDS.'); return; }
+                    this.currency -= price;
+                    const idx = this.garage.addCar(brandKey, modelKey);
+                    if (idx >= 0) {
+                        showMessage(`PURCHASED: ${this.garage.getDisplayName(idx).toUpperCase()}`);
+                        audioSys.sfx('ui');
+                        this.updateUI();
+                        this._shopJust = brandKey + ':' + modelKey;
+                        this.renderAutoShopTab();
+                    }
+                })));
             },
 
             // ── GARAGE TAB: View owned cars, switch active, sell ──
             _renderGarageTab(container) {
-                const self = this;
-                let html = '';
-
-                html += `<div style="font-size:0.65rem; color:#666; margin-bottom:10px;">OWNED: ${this.garage.count} VEHICLE${this.garage.count > 1 ? 'S' : ''}</div>`;
-
+                let html = `<div class="df-section"><span><span class="glint">◆</span>My Garage</span><span class="count">${this.garage.count} vehicle${this.garage.count === 1 ? '' : 's'}</span></div>`;
                 for (let i = 0; i < this.garage.count; i++) {
-                    const car = this.garage.get(i);
-                    const isActive = i === this.garage.activeIndex;
-                    const name = this.garage.getDisplayName(i);
-                    const brandData = VEHICLE_BRANDS[car.brand];
-                    const borderCol = isActive ? 'rgba(255,136,0,0.3)' : 'rgba(255,255,255,0.06)';
-                    const bgCol = isActive ? 'rgba(255,136,0,0.04)' : 'rgba(255,255,255,0.02)';
-
-                    html += `<div style="background:${bgCol}; border:1px solid ${borderCol}; border-radius:4px; padding:12px; margin-bottom:6px;">`;
-
-                    // Row 1: Name + Status
-                    html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">`;
-                    html += `<div style="display:flex; align-items:center; gap:8px;">`;
-                    html += `<div style="width:16px; height:10px; border-radius:2px; background:${car.paintColor}; border:1px solid rgba(255,255,255,0.15);"></div>`;
-                    html += `<span style="font-family:Orbitron,sans-serif; font-size:0.8rem; color:#ddd; letter-spacing:1px;">${name.toUpperCase()}</span>`;
-                    if (car.isDefault) html += `<span style="font-size:0.45rem; color:#d4af37; letter-spacing:1px; border:1px solid rgba(212,175,55,0.3); padding:1px 6px; border-radius:2px;">DEFAULT</span>`;
-                    html += `</div>`;
-                    html += `<span style="font-family:Orbitron,sans-serif; font-size:0.5rem; color:${isActive ? '#00ff88' : '#666'}; letter-spacing:1px;">${isActive ? '● ACTIVE' : '○'}</span>`;
-                    html += `</div>`;
-
-                    // Row 2: Color swatches
-                    html += `<div style="display:flex; gap:12px; align-items:center; margin-bottom:8px; font-size:0.55rem; color:#666;">`;
-                    html += `<span>PAINT <span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:${car.paintColor}; border:1px solid rgba(255,255,255,0.1); vertical-align:middle;"></span></span>`;
-                    if (car.underglowColor) html += `<span>GLOW <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${car.underglowColor}; box-shadow:0 0 4px ${car.underglowColor}; vertical-align:middle;"></span></span>`;
-                    html += `<span>LIGHTS <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${car.headlightColor}; box-shadow:0 0 4px ${car.headlightColor}; vertical-align:middle;"></span></span>`;
-                    html += `</div>`;
-
-                    // Row 3: Buttons
-                    html += `<div style="display:flex; gap:6px; flex-wrap:wrap;">`;
-                    if (!isActive) {
-                        html += `<button class="auto-activate-btn" data-index="${i}" style="font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:1px; padding:4px 12px; background:rgba(0,255,136,0.1); border:1px solid rgba(0,255,136,0.3); color:#00ff88; border-radius:3px; cursor:pointer;">SET ACTIVE</button>`;
-                    }
-                    html += `<button class="auto-reset-btn" data-index="${i}" style="font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:1px; padding:4px 12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; border-radius:3px; cursor:pointer;">RESET</button>`;
-                    if (!car.isDefault) {
-                        const sellPrice = Math.floor((CAR_PRICES[car.brand]?.[car.model] || 0) * 0.4);
-                        html += `<button class="auto-sell-btn" data-index="${i}" style="font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:1px; padding:4px 12px; background:rgba(255,68,68,0.08); border:1px solid rgba(255,68,68,0.2); color:#ff6644; border-radius:3px; cursor:pointer;">SELL (${sellPrice} PP)</button>`;
-                    }
-                    html += `</div>`;
-
-                    html += `</div>`;
+                    const car = this.garage.get(i), isActive = i === this.garage.activeIndex, name = this.garage.getDisplayName(i);
+                    html += `<div class="df-card${isActive ? ' lit' : ''}"><div class="df-head">`;
+                    html += `<div class="df-swatch sq" style="background:${car.paintColor}"></div>`;
+                    html += `<div class="grow"><div class="eyebrow">${car.brand} · ${car.model}</div><div class="title">${name}</div>`;
+                    html += `<div class="df-chips" style="margin-top:8px;">`;
+                    html += `<span class="df-chip">Paint <i class="df-swatch small sq" style="background:${car.paintColor}"></i></span>`;
+                    html += `<span class="df-chip">Glow <i class="df-swatch small" style="background:${car.underglowColor || 'transparent'};${car.underglowColor ? `box-shadow:0 0 5px ${car.underglowColor}` : ''}"></i></span>`;
+                    html += `<span class="df-chip">Lights <i class="df-swatch small" style="background:${car.headlightColor};box-shadow:0 0 5px ${car.headlightColor}"></i></span>`;
+                    html += `</div></div><div class="df-shop-side">${isActive ? '<span class="df-chip active">● Active</span>' : ''}${car.isDefault ? '<span class="df-chip gold">Default</span>' : ''}</div></div>`;
+                    html += `<div class="df-btn-row">`;
+                    if (!isActive) html += `<button class="df-btn small auto-activate-btn" data-index="${i}">Set active</button>`;
+                    html += `<button class="df-btn small ghost auto-reset-btn" data-index="${i}">Reset look</button>`;
+                    if (!car.isDefault) html += `<button class="df-btn small danger auto-sell-btn" data-index="${i}">Sell · ${Math.floor((CAR_PRICES[car.brand]?.[car.model] || 0) * 0.4).toLocaleString()} PP</button>`;
+                    html += `</div></div>`;
                 }
-
                 container.innerHTML = html;
-
-                // Wire activate
-                container.querySelectorAll('.auto-activate-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        self.switchGarageCar(parseInt(btn.dataset.index));
-                        self._renderGarageTab(container);
-                    });
-                });
-
-                // Wire reset (double-tap)
-                container.querySelectorAll('.auto-reset-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        if (btn.dataset.confirm === 'true') {
-                            self.resetGarageCarDefaults(parseInt(btn.dataset.index));
-                            self._renderGarageTab(container);
-                        } else {
-                            btn.dataset.confirm = 'true';
-                            btn._orig = btn.textContent;
-                            btn._origS = btn.style.cssText;
-                            btn.textContent = 'ARE YOU SURE?';
-                            btn.style.background = 'rgba(255,40,40,0.2)';
-                            btn.style.borderColor = 'rgba(255,40,40,0.6)';
-                            btn.style.color = '#ff4444';
-                            setTimeout(() => { btn.dataset.confirm = ''; btn.textContent = btn._orig; btn.style.cssText = btn._origS; }, 2500);
-                        }
-                    });
-                });
-
-                // Wire sell (double-tap)
-                container.querySelectorAll('.auto-sell-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const idx = parseInt(btn.dataset.index);
-                        const car = self.garage.get(idx);
-                        if (!car || car.isDefault) return;
-                        const sellPrice = Math.floor((CAR_PRICES[car.brand]?.[car.model] || 0) * 0.4);
-                        if (btn.dataset.confirm === 'true') {
-                            self.garage.removeCar(idx);
-                            self.currency += sellPrice;
-                            // If we sold the active car, rebuild ownedCar to the new active
-                            const newActive = self.garage.getActive();
-                            if (self.ownedCar.brand !== newActive.brand || self.ownedCar.model !== newActive.model) {
-                                self.switchGarageCar(self.garage.activeIndex);
-                            } else {
-                                self.garage.applyToVehicle(self.ownedCar);
-                            }
-                            document.getElementById('auto-shop-balance').textContent = `BALANCE: ${self.currency} PERSONICS`;
-                            self.updateUI();
-                            showMessage(`VEHICLE SOLD FOR ${sellPrice} PERSONICS.`);
-                            self._renderGarageTab(container);
-                        } else {
-                            btn.dataset.confirm = 'true';
-                            btn._orig = btn.textContent;
-                            btn._origS = btn.style.cssText;
-                            btn.textContent = 'SELL?';
-                            btn.style.background = 'rgba(255,40,40,0.2)';
-                            btn.style.borderColor = 'rgba(255,40,40,0.6)';
-                            btn.style.color = '#ff4444';
-                            setTimeout(() => { btn.dataset.confirm = ''; btn.textContent = btn._orig; btn.style.cssText = btn._origS; }, 2500);
-                        }
-                    });
-                });
+                container.querySelectorAll('.auto-activate-btn').forEach(btn => btn.addEventListener('click', () => {
+                    this.switchGarageCar(parseInt(btn.dataset.index)); audioSys.sfx('ui'); this.renderAutoShopTab();
+                }));
+                container.querySelectorAll('.auto-reset-btn').forEach(btn => btn.addEventListener('click', () => this._confirmTap(btn, 'Reset?', () => {
+                    this.resetGarageCarDefaults(parseInt(btn.dataset.index)); this.renderAutoShopTab();
+                })));
+                container.querySelectorAll('.auto-sell-btn').forEach(btn => btn.addEventListener('click', () => this._confirmTap(btn, 'Sell?', () => {
+                    const idx = parseInt(btn.dataset.index), car = this.garage.get(idx);
+                    if (!car || car.isDefault) return;
+                    const sellPrice = Math.floor((CAR_PRICES[car.brand]?.[car.model] || 0) * 0.4);
+                    this.garage.removeCar(idx);
+                    this.currency += sellPrice;
+                    // If we sold the active car, rebuild ownedCar to the new active
+                    const newActive = this.garage.getActive();
+                    if (this.ownedCar.brand !== newActive.brand || this.ownedCar.model !== newActive.model) this.switchGarageCar(this.garage.activeIndex);
+                    else this.garage.applyToVehicle(this.ownedCar);
+                    this.updateUI();
+                    showMessage(`VEHICLE SOLD FOR ${sellPrice} PERSONICS.`);
+                    this.renderAutoShopTab();
+                })));
             },
 
-            // ── CUSTOMIZE TAB: Paint, underglow, headlights ──
+            // ── CUSTOMIZE TAB: Paint, underglow, headlights (preview free, pay on apply) ──
             _renderCustomizeTab(container) {
-                const self = this;
-                const idx = this.garage.activeIndex;
-                const car = this.garage.getActive();
-                if (!car) { container.innerHTML = '<div style="color:#555;">No active vehicle.</div>'; return; }
-
-                const name = this.garage.getDisplayName(idx);
-                const brandData = VEHICLE_BRANDS[car.brand];
-
+                const idx = this.garage.activeIndex, car = this.garage.getActive();
+                if (!car) { container.innerHTML = '<div class="df-empty">No active vehicle.</div>'; return; }
+                const name = this.garage.getDisplayName(idx), brandData = VEHICLE_BRANDS[car.brand];
                 // Snapshot originals on first render (so we can revert)
                 if (!this._customizeOriginal || this._customizeOriginal._carId !== car.id) {
-                    this._customizeOriginal = {
-                        _carId: car.id,
-                        paintColor: car.paintColor,
-                        underglowColor: car.underglowColor,
-                        headlightColor: car.headlightColor
-                    };
-                    // Pending starts as current
-                    this._customizePending = {
-                        paintColor: car.paintColor,
-                        underglowColor: car.underglowColor,
-                        headlightColor: car.headlightColor
-                    };
+                    this._customizeOriginal = { _carId: car.id, paintColor: car.paintColor, underglowColor: car.underglowColor, headlightColor: car.headlightColor };
+                    this._customizePending = { paintColor: car.paintColor, underglowColor: car.underglowColor, headlightColor: car.headlightColor };
                 }
-                const pending = this._customizePending;
-                const orig = this._customizeOriginal;
-
-                // Color palette: brand colors + universal options + pink
+                const pending = this._customizePending, orig = this._customizeOriginal;
                 const universalColors = ['#1a1a1a', '#0a0a0a', '#ffffff', '#333333', '#8b0000', '#003366', '#2d5a27', '#4a0e4e', '#d4af37', '#ff4500', '#ff69b4', '#E6E6FA', '#CCCCFF'];
-                const brandColors = brandData?.colors || [];
-                const allPaintColors = [...new Set([...brandColors, ...universalColors])];
-
+                const allPaintColors = [...new Set([...(brandData?.colors || []), ...universalColors])];
                 const glowOptions = [null, '#ffffff', '#ff8800', '#00f3ff', '#ff00aa', '#00ff88', '#d4af37', '#ff2244', '#a469ff', '#ff4500', '#ff69b4', '#E6E6FA', '#CCCCFF'];
                 const headlightOptions = ['#ffffaa', '#ffffff', '#ccddff', '#ff8800', '#00f3ff', '#ff69b4', '#d4af37', '#ff2244', '#E6E6FA', '#CCCCFF'];
-
-                // Calculate pending cost
-                let totalCost = 0;
-                let changeCount = 0;
+                let totalCost = 0, changeCount = 0;
                 if (pending.paintColor !== orig.paintColor) { totalCost += CUSTOM_PRICES.paint; changeCount++; }
                 if (pending.underglowColor !== orig.underglowColor) { totalCost += CUSTOM_PRICES.underglow; changeCount++; }
                 if (pending.headlightColor !== orig.headlightColor) { totalCost += CUSTOM_PRICES.headlights; changeCount++; }
                 const canAfford = this.currency >= totalCost;
-
-                let html = '';
-                html += `<div style="font-family:Orbitron,sans-serif; font-size:0.75rem; color:#ff8800; letter-spacing:1px; margin-bottom:4px;">CUSTOMIZING: ${name.toUpperCase()}</div>`;
-                html += `<div style="font-size:0.55rem; color:#666; margin-bottom:12px;">Preview freely — you're only charged when you apply.</div>`;
-
-                // ── PAINT ──
-                html += `<div style="font-size:0.6rem; color:#888; letter-spacing:1px; margin:10px 0 6px;">PAINT COLOR <span style="font-size:0.5rem; color:#555;">(${CUSTOM_PRICES.paint} PP)</span></div>`;
-                html += `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">`;
-                for (const col of allPaintColors) {
-                    const isSelected = pending.paintColor === col;
-                    html += `<button class="auto-paint-btn" data-color="${col}" style="width:28px; height:28px; border-radius:4px; background:${col}; border:2px solid ${isSelected ? '#ff8800' : 'rgba(255,255,255,0.1)'}; cursor:pointer; ${isSelected ? 'box-shadow:0 0 8px rgba(255,136,0,0.5);' : ''}"></button>`;
-                }
-                html += `</div>`;
-
-                // ── UNDERGLOW ──
-                html += `<div style="font-size:0.6rem; color:#888; letter-spacing:1px; margin:10px 0 6px;">UNDERGLOW <span style="font-size:0.5rem; color:#555;">(${CUSTOM_PRICES.underglow} PP)</span></div>`;
-                html += `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">`;
-                for (const col of glowOptions) {
-                    const isSelected = pending.underglowColor === col;
-                    const display = col || 'transparent';
-                    const label = col === null ? '✕' : '';
-                    html += `<button class="auto-glow-btn" data-color="${col === null ? 'null' : col}" style="width:28px; height:28px; border-radius:50%; background:${display}; border:2px solid ${isSelected ? '#ff8800' : 'rgba(255,255,255,0.15)'}; cursor:pointer; color:#888; font-size:0.7rem; line-height:24px; text-align:center; ${col ? 'box-shadow:0 0 6px ' + col + ';' : ''} ${isSelected ? 'box-shadow:0 0 10px rgba(255,136,0,0.6);' : ''}">${label}</button>`;
-                }
-                html += `</div>`;
-
-                // ── HEADLIGHTS ──
-                html += `<div style="font-size:0.6rem; color:#888; letter-spacing:1px; margin:10px 0 6px;">HEADLIGHT COLOR <span style="font-size:0.5rem; color:#555;">(${CUSTOM_PRICES.headlights} PP)</span></div>`;
-                html += `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">`;
-                for (const col of headlightOptions) {
-                    const isSelected = pending.headlightColor === col;
-                    html += `<button class="auto-headlight-btn" data-color="${col}" style="width:28px; height:28px; border-radius:50%; background:${col}; border:2px solid ${isSelected ? '#ff8800' : 'rgba(255,255,255,0.15)'}; cursor:pointer; box-shadow:0 0 6px ${col}; ${isSelected ? 'box-shadow:0 0 10px rgba(255,136,0,0.6);' : ''}"></button>`;
-                }
-                html += `</div>`;
-
-                // ── LIVE PREVIEW ──
-                html += `<div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:4px; padding:12px; margin-top:10px;">`;
-                html += `<div style="font-size:0.55rem; color:#555; letter-spacing:1px; margin-bottom:8px;">PREVIEW</div>`;
-                html += `<div style="display:flex; align-items:center; gap:16px;">`;
-                html += `<div style="position:relative; width:80px; height:40px; background:${pending.paintColor}; border-radius:6px 6px 3px 3px; border:1px solid rgba(255,255,255,0.1);">`;
-                if (pending.underglowColor) html += `<div style="position:absolute; bottom:-4px; left:5px; right:5px; height:4px; background:${pending.underglowColor}; border-radius:2px; box-shadow:0 0 8px ${pending.underglowColor}, 0 2px 12px ${pending.underglowColor};"></div>`;
-                html += `<div style="position:absolute; top:8px; right:-2px; width:6px; height:6px; border-radius:50%; background:${pending.headlightColor}; box-shadow:0 0 8px ${pending.headlightColor};"></div>`;
-                html += `<div style="position:absolute; top:26px; right:-2px; width:6px; height:6px; border-radius:50%; background:${pending.headlightColor}; box-shadow:0 0 8px ${pending.headlightColor};"></div>`;
-                html += `</div>`;
-                html += `<div style="font-size:0.6rem; color:#999; line-height:1.6;">`;
-                html += `Paint: <span style="color:#ccc;">${pending.paintColor}</span>${pending.paintColor !== orig.paintColor ? ' <span style="color:#ff8800;">●</span>' : ''}<br>`;
-                html += `Glow: <span style="color:#ccc;">${pending.underglowColor || 'None'}</span>${pending.underglowColor !== orig.underglowColor ? ' <span style="color:#ff8800;">●</span>' : ''}<br>`;
-                html += `Lights: <span style="color:#ccc;">${pending.headlightColor}</span>${pending.headlightColor !== orig.headlightColor ? ' <span style="color:#ff8800;">●</span>' : ''}`;
-                html += `</div></div></div>`;
-
-                // ── ACTION BUTTONS ──
-                html += `<div style="display:flex; gap:8px; margin-top:14px;">`;
+                const picks = (cls, list, cur, sq, glow) => `<div class="df-swatches">${list.map(c => `<button class="df-swatch-pick${sq ? ' sq' : ''} ${cls}${c === cur ? ' on' : ''}" data-color="${c === null ? 'null' : c}" style="background:${c || 'transparent'};${glow && c ? `box-shadow:0 0 7px ${c};` : ''}">${c === null ? '✕' : ''}</button>`).join('')}</div>`;
+                const lamp = (top) => `<i class="lamp" style="top:${top}px;background:${pending.headlightColor};box-shadow:0 0 9px ${pending.headlightColor}"></i>`;
+                let html = `<div class="df-card"><div class="df-car-preview">`;
+                html += `<div class="df-car" style="background:${pending.paintColor}">${pending.underglowColor ? `<i class="glow" style="background:${pending.underglowColor};box-shadow:0 0 10px ${pending.underglowColor},0 3px 14px ${pending.underglowColor}"></i>` : ''}${lamp(9)}${lamp(33)}</div>`;
+                html += `<div class="grow"><div class="eyebrow">Customizing</div><div class="title">${name}</div><div class="desc">Preview freely — you're only charged when you apply.</div></div></div></div>`;
+                html += `<div class="df-section"><span>Paint</span><span class="count">${CUSTOM_PRICES.paint} PP${pending.paintColor !== orig.paintColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-paint-btn', allPaintColors, pending.paintColor, true)}`;
+                html += `<div class="df-section"><span>Underglow</span><span class="count">${CUSTOM_PRICES.underglow} PP${pending.underglowColor !== orig.underglowColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-glow-btn', glowOptions, pending.underglowColor, false, true)}`;
+                html += `<div class="df-section"><span>Headlights</span><span class="count">${CUSTOM_PRICES.headlights} PP${pending.headlightColor !== orig.headlightColor ? ' · <b style="color:var(--df-gold)">changed</b>' : ''}</span></div>${picks('auto-headlight-btn', headlightOptions, pending.headlightColor, false, true)}`;
+                html += `<div class="df-btn-row" style="justify-content:center;margin-top:14px;">`;
                 if (changeCount > 0) {
-                    html += `<button id="auto-custom-apply" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:1px; padding:8px 16px; flex:1; border-radius:3px; cursor:pointer; background:${canAfford ? 'rgba(255,136,0,0.15)' : 'rgba(255,255,255,0.03)'}; border:1px solid ${canAfford ? 'rgba(255,136,0,0.4)' : 'rgba(255,255,255,0.08)'}; color:${canAfford ? '#ff8800' : '#555'};">APPLY ${changeCount} CHANGE${changeCount > 1 ? 'S' : ''} — ${totalCost} PP</button>`;
-                    html += `<button id="auto-custom-revert" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:1px; padding:8px 16px; border-radius:3px; cursor:pointer; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888;">REVERT</button>`;
-                } else {
-                    html += `<div style="font-size:0.6rem; color:#555; font-style:italic; padding:8px 0;">No changes selected. Pick a color above to preview.</div>`;
-                }
+                    html += `<button class="df-btn" id="auto-custom-apply"${canAfford ? '' : ' disabled'}>Apply ${changeCount} change${changeCount > 1 ? 's' : ''} · ${totalCost} PP</button>`;
+                    html += `<button class="df-btn ghost" id="auto-custom-revert">Revert</button>`;
+                } else html += `<div class="df-hint">Pick a colour above to preview it.</div>`;
                 html += `</div>`;
-
                 container.innerHTML = html;
-
-                // ── Wire preview clicks (no charge, just update pending + re-render) ──
-                const updatePending = (prop, val) => {
-                    pending[prop] = val;
-                    self._renderCustomizeTab(container);
-                };
-
-                container.querySelectorAll('.auto-paint-btn').forEach(btn => {
-                    btn.addEventListener('click', () => updatePending('paintColor', btn.dataset.color));
-                });
-                container.querySelectorAll('.auto-glow-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const val = btn.dataset.color === 'null' ? null : btn.dataset.color;
-                        updatePending('underglowColor', val);
-                    });
-                });
-                container.querySelectorAll('.auto-headlight-btn').forEach(btn => {
-                    btn.addEventListener('click', () => updatePending('headlightColor', btn.dataset.color));
-                });
-
-                // ── Wire apply button (charges once for all changes) ──
+                const updatePending = (prop, val) => { pending[prop] = val; audioSys.sfx('ui'); this._renderCustomizeTab(container); };
+                container.querySelectorAll('.auto-paint-btn').forEach(b => b.addEventListener('click', () => updatePending('paintColor', b.dataset.color)));
+                container.querySelectorAll('.auto-glow-btn').forEach(b => b.addEventListener('click', () => updatePending('underglowColor', b.dataset.color === 'null' ? null : b.dataset.color)));
+                container.querySelectorAll('.auto-headlight-btn').forEach(b => b.addEventListener('click', () => updatePending('headlightColor', b.dataset.color)));
                 const applyBtn = document.getElementById('auto-custom-apply');
-                if (applyBtn) {
-                    applyBtn.addEventListener('click', () => {
-                        if (!canAfford) { showMessage(`INSUFFICIENT FUNDS (${totalCost} PERSONICS REQUIRED).`); return; }
-                        self.currency -= totalCost;
-                        self.customizeGarageCar(idx, {
-                            paintColor: pending.paintColor,
-                            underglowColor: pending.underglowColor,
-                            headlightColor: pending.headlightColor
-                        });
-                        document.getElementById('auto-shop-balance').textContent = `BALANCE: ${self.currency} PERSONICS`;
-                        self.updateUI();
-                        showMessage(`CUSTOMIZATION APPLIED — ${totalCost} PERSONICS`);
-                        // Reset originals to new state
-                        self._customizeOriginal = { _carId: car.id, paintColor: pending.paintColor, underglowColor: pending.underglowColor, headlightColor: pending.headlightColor };
-                        self._renderCustomizeTab(container);
-                    });
-                }
-
-                // ── Wire revert button ──
+                if (applyBtn) applyBtn.addEventListener('click', () => {
+                    if (!canAfford) { showMessage(`INSUFFICIENT FUNDS (${totalCost} PERSONICS REQUIRED).`); return; }
+                    this.currency -= totalCost;
+                    this.customizeGarageCar(idx, { paintColor: pending.paintColor, underglowColor: pending.underglowColor, headlightColor: pending.headlightColor });
+                    this._shopBalance('auto-shop-balance', this.currency);
+                    this.updateUI();
+                    showMessage(`CUSTOMIZATION APPLIED — ${totalCost} PERSONICS`);
+                    this._customizeOriginal = { _carId: car.id, paintColor: pending.paintColor, underglowColor: pending.underglowColor, headlightColor: pending.headlightColor };
+                    this._renderCustomizeTab(container);
+                });
                 const revertBtn = document.getElementById('auto-custom-revert');
-                if (revertBtn) {
-                    revertBtn.addEventListener('click', () => {
-                        pending.paintColor = orig.paintColor;
-                        pending.underglowColor = orig.underglowColor;
-                        pending.headlightColor = orig.headlightColor;
-                        self._renderCustomizeTab(container);
-                    });
-                }
+                if (revertBtn) revertBtn.addEventListener('click', () => {
+                    pending.paintColor = orig.paintColor; pending.underglowColor = orig.underglowColor; pending.headlightColor = orig.headlightColor;
+                    this._renderCustomizeTab(container);
+                });
             },
-            
+
             // =========================================================
             //  ZIB TAXI DESTINATION PICKER
             // =========================================================
             openZibMenu(zib) {
                 this.pauseSystem.acquire('zib_menu');
                 this._pendingZib = zib;
-                const menu = document.getElementById('zib-menu');
-                menu.style.display = 'block';
-                document.getElementById('zib-balance').textContent = `BALANCE: ${this.currency} PERSONICS`;
-
+                this._shopShow('zib-menu', true);
+                this._shopBalance('zib-balance', this.currency);
                 const container = document.getElementById('zib-destinations');
-                const self = this;
-                let html = '';
-
+                const DIST = { near: ['mint', 'Nearby'], mid: ['gold', 'Moderate'], far: ['crimson', 'Far'] };
+                const pin = typeof ACTION_ICONS !== 'undefined' && ACTION_ICONS.car ? `<span style="width:24px;height:24px;color:var(--df-gold);display:inline-flex">${ACTION_ICONS.car}</span>` : '🚕';
+                let html = `<div class="df-section"><span><span class="glint">◆</span>Select destination</span></div>`, n = 0;
                 for (const dest of ZIB_DESTINATIONS) {
-                    // Resolve position from landmark registry
                     const lm = this.landmarkRegistry[dest.landmark];
-                    if (!lm) continue; // Skip if landmark not found on current map
-                    const destX = lm.x;
-                    const destY = lm.y;
-
-                    const fare = this.zibSystem.calculateFare(zib.x, zib.y, destX, destY);
-                    const canAfford = this.currency >= fare;
-                    const dist = Math.hypot(destX - zib.x, destY - zib.y);
-                    const distLabel = dist < 500 ? 'NEARBY' : dist < 2000 ? 'MODERATE' : 'FAR';
-
-                    html += `<button class="zib-dest-btn" data-id="${dest.id}" data-landmark="${dest.landmark}" data-x="${destX}" data-y="${destY}" data-fare="${fare}" style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; margin-bottom:5px; background:${canAfford ? 'rgba(138,43,226,0.06)' : 'rgba(255,255,255,0.02)'}; border:1px solid ${canAfford ? 'rgba(138,43,226,0.2)' : 'rgba(255,255,255,0.05)'}; border-radius:4px; cursor:${canAfford ? 'pointer' : 'default'}; font-family:Montserrat,sans-serif; color:${canAfford ? '#ddd' : '#555'}; text-align:left;">`;
-                    html += `<div>`;
-                    html += `<div style="font-size:0.8rem; margin-bottom:2px;">${dest.label}</div>`;
-                    html += `<div style="font-size:0.5rem; color:#777; letter-spacing:1px;">${distLabel}</div>`;
-                    html += `</div>`;
-                    html += `<div style="font-family:Orbitron,sans-serif; font-size:0.6rem; color:${canAfford ? '#8a2be2' : '#555'}; letter-spacing:1px;">${fare} PP</div>`;
-                    html += `</button>`;
+                    if (!lm) continue;                                              // not on this map
+                    const fare = this.zibSystem.calculateFare(zib.x, zib.y, lm.x, lm.y), afford = this.currency >= fare;
+                    const dist = Math.hypot(lm.x - zib.x, lm.y - zib.y), [dc, dl] = DIST[dist < 500 ? 'near' : dist < 2000 ? 'mid' : 'far'];
+                    html += `<div class="df-card clickable zib-dest-btn${afford ? '' : ' unaffordable dim'}" data-landmark="${dest.landmark}" data-x="${lm.x}" data-y="${lm.y}" data-fare="${fare}"><div class="df-head">`;
+                    html += `<div class="note-ico">${pin}</div><div class="grow"><div class="title">${dest.label}</div><div class="df-chips" style="margin-top:6px;"><span class="df-chip ${dc}">${dl}</span></div></div>`;
+                    html += `<div class="df-shop-side">${this._priceHtml(fare, this.currency)}</div></div></div>`;
+                    n++;
                 }
-
+                if (!n) html += `<div class="df-empty">No destinations from here.</div>`;
                 container.innerHTML = html;
-
-                // Wire destination buttons
-                container.querySelectorAll('.zib-dest-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const fare = parseInt(btn.dataset.fare);
-                        if (self.currency < fare) { showMessage('INSUFFICIENT FUNDS.'); return; }
-                        const destX = parseFloat(btn.dataset.x);
-                        const destY = parseFloat(btn.dataset.y);
-                        const landmarkId = btn.dataset.landmark;
-                        const selectedZib = self._pendingZib;
-                        self.closeZibMenu();
-                        self.zibSystem.startRide(selectedZib, landmarkId, destX, destY, fare, self);
-                    });
-                });
-
-                // Wire close
+                container.querySelectorAll('.zib-dest-btn').forEach(card => card.addEventListener('click', () => {
+                    const fare = parseInt(card.dataset.fare);
+                    if (this.currency < fare) { showMessage('INSUFFICIENT FUNDS.'); audioSys.sfx('ui'); return; }
+                    const selectedZib = this._pendingZib;
+                    this.closeZibMenu();
+                    this.zibSystem.startRide(selectedZib, card.dataset.landmark, parseFloat(card.dataset.x), parseFloat(card.dataset.y), fare, this);
+                }));
                 document.getElementById('zib-close').onclick = () => this.closeZibMenu();
             },
 
@@ -51559,7 +51357,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
 
             closeZibMenu() {
-                document.getElementById('zib-menu').style.display = 'none';
+                this._shopShow('zib-menu', false);
                 this._pendingZib = null;
                 this.pauseSystem.release('zib_menu');
             },
@@ -52512,36 +52310,56 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
 
             // --- AUGMENT SHOP ---
+            /* ── SHOP FRAME (styles/shops.css): open/close an overlay, its balance capsule, double-tap buys ── */
+            _shopShow(id, on) {
+                const el = document.getElementById(id); if (!el) return;
+                el.classList.toggle('open', on);
+                if (on) el.onclick = (e) => { if (e.target === el) { const c = el.querySelector('.df-shop-close'); if (c) c.click(); } };   // a tap on the backdrop closes it
+            },
+            _shopBalance(id, n, unit = 'PP') {
+                const el = document.getElementById(id); if (!el) return;
+                el.classList.toggle('scrap', unit !== 'PP');
+                el.innerHTML = `<span class="gem">◆</span>${Math.floor(n).toLocaleString()}<span class="unit">${unit}</span>`;
+            },
+            /** First tap arms the button ("Confirm?"), a second within 2.5 s does it */
+            _confirmTap(btn, label, run) {
+                if (btn.dataset.armed) { btn.dataset.armed = ''; clearTimeout(btn._t); run(); return; }
+                btn.dataset.armed = '1'; btn._label = btn.innerHTML; btn.innerHTML = label; btn.classList.add('confirm');
+                audioSys.sfx('ui');
+                btn._t = setTimeout(() => { btn.dataset.armed = ''; btn.innerHTML = btn._label; btn.classList.remove('confirm'); }, 2500);
+            },
+            /** A card that was just bought glows gold once (after the re-render) */
+            _shopFlash(container) {
+                if (!this._shopJust) return;
+                const el = container.querySelector(`[data-key="${this._shopJust}"]`); this._shopJust = null;
+                if (el) { el.classList.add('bought'); el.scrollIntoView({ block: 'nearest' }); }
+            },
+            _priceHtml(price, have, unit = 'PP') {
+                return `<span class="df-price${have < price ? ' short' : ''}">${price.toLocaleString()}<span class="unit">${unit}</span></span>`;
+            },
+
             openAugmentShop() {
                 this.pauseSystem.acquire('augment_shop');
-                const shop = document.getElementById('augment-shop');
-                shop.classList.add('active');
-                document.getElementById('aug-shop-balance').textContent = `BALANCE: ${this.currency} PERSONICS`;
-                
-                const grid = document.getElementById('aug-shop-grid');
-                grid.innerHTML = '';
+                this._shopShow('augment-shop', true);
+                this._shopBalance('aug-shop-balance', this.currency);
+                const grid = document.getElementById('aug-shop-grid'), A = this.augments;
+                let html = `<div class="df-section"><span><span class="glint">◆</span>Cybernetic Augments</span><span class="count">${A.owned.length} / ${AUGMENT_CATALOG.length} installed</span></div>`;
                 for (const aug of AUGMENT_CATALOG) {
-                    const owned = this.augments.isOwned(aug.id);
-                    const card = document.createElement('div');
-                    card.className = 'aug-card' + (owned ? ' owned' : '');
-                    card.innerHTML = `
-                        <div class="aug-card-name">${aug.icon} ${aug.name}</div>
-                        <div class="aug-card-desc">${aug.desc}</div>
-                        ${owned ? '<div class="aug-card-owned">✓ OWNED</div>' : `<div class="aug-card-price">${aug.price} PP</div>`}
-                    `;
-                    if (!owned) {
-                        card.addEventListener('click', () => {
-                            if (this.augments.buy(aug.id, this)) {
-                                this.openAugmentShop(); // Refresh
-                            }
-                        });
-                    }
-                    grid.appendChild(card);
+                    const owned = A.isOwned(aug.id), afford = this.currency >= aug.price;
+                    html += `<div class="df-card${owned ? ' lit' : afford ? '' : ' unaffordable'}" data-key="${aug.id}"><div class="df-head">`;
+                    html += `<div class="note-ico">${aug.icon}</div><div class="grow"><div class="eyebrow">Slot · ${aug.slot}</div><div class="title">${aug.name}</div><div class="desc">${aug.desc}</div></div>`;
+                    html += `<div class="df-shop-side">${owned ? `<span class="df-chip active">✓ Installed</span>${A.isEquipped(aug.id) ? '<span class="df-chip">● Equipped</span>' : ''}`
+                        : `${this._priceHtml(aug.price, this.currency)}<button class="df-btn small" data-buy="${aug.id}"${afford ? '' : ' disabled'}>Buy</button>`}</div>`;
+                    html += `</div></div>`;
                 }
-
-                // Close handler
+                html += `<div class="df-hint" style="text-align:center;margin-top:8px;">Equip installed augments from the Augments screen.</div>`;
+                grid.innerHTML = html;
+                this._shopFlash(grid);
+                grid.querySelectorAll('button[data-buy]').forEach(b => b.addEventListener('click', () => this._confirmTap(b, 'Confirm?', () => {
+                    if (A.buy(b.dataset.buy, this)) { this._shopJust = b.dataset.buy; audioSys.sfx('ui'); this.openAugmentShop(); }
+                })));
                 document.getElementById('aug-shop-close').onclick = () => {
-                    shop.classList.remove('active');
+                    this._shopShow('augment-shop', false);
                     this.pauseSystem.release('augment_shop');
                 };
             },
@@ -52549,142 +52367,101 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // ── COSMETICS SHOP (Neural Systems) ──
             openCosmeticsShop() {
                 this.pauseSystem.acquire('cosmetics_shop');
+                this._shopShow('cosmetics-shop-overlay', true);
+                this._shopBalance('cosmetics-shop-balance', this.currency);
                 const overlay = document.getElementById('cosmetics-shop-overlay');
-                overlay.style.display = 'block';
-                document.getElementById('cosmetics-shop-balance').textContent = `BALANCE: ${this.currency} PERSONICS`;
-
-                // Tab state
-                let activeTab = 'wig';
                 const tabs = overlay.querySelectorAll('.cosmetics-tab');
                 const content = document.getElementById('cosmetics-shop-content');
+                const C = this.cosmetics;
+                const LABEL = { wig: 'W.I.G.s', skin: 'S.K.I.N.s', outfit: 'O.U.T.F.I.T.s', vocal: 'V.O.C.A.L.s', accessory: 'A.C.C.E.S.S.', hat: 'H.A.T.s', jewelry: 'J.E.W.E.L.s' };
+                let activeTab = this._cosmeticsTab || 'wig';
+
+                /** The item's look as a round swatch */
+                const swatchOf = (item, category) => {
+                    const d = item.data || {};
+                    if (category === 'wig') return `background:${d.color}`;
+                    if (category === 'skin') return `background:${d.skinColor}`;
+                    if (category === 'outfit') return `background:linear-gradient(135deg, ${d.top.color} 50%, ${d.bottom.color} 50%)`;
+                    if (category === 'hat' || category === 'jewelry') return `background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${d.color} 45%)`;
+                    if (category === 'vocal') return `background:${d.captionColor};opacity:0.8`;
+                    if (category === 'accessory' && d.held === 'umbrella') return `background:conic-gradient(${d.color} 0 12.5%, ${d.trim} 12.5% 14%, ${d.color} 14% 25%, ${d.trim} 25% 26.5%, ${d.color} 26.5% 100%)`;
+                    if (category === 'accessory') { const g = GLASS_DRINKS[C.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne; return `background:radial-gradient(circle at 35% 35%, #fff 0 12%, ${g.liquid} 30%, ${g.liquid2 || g.liquid} 100%)`; }
+                    return 'background:#333';
+                };
 
                 const renderTab = (category) => {
-                    activeTab = category;
-                    // Update tab styling
-                    tabs.forEach(t => {
-                        const isActive = t.dataset.tab === category;
-                        t.style.background = isActive ? 'rgba(0,136,255,0.15)' : 'rgba(255,255,255,0.03)';
-                        t.style.borderColor = isActive ? 'rgba(0,136,255,0.4)' : 'rgba(255,255,255,0.1)';
-                        t.style.color = isActive ? '#0088ff' : '#888';
-                    });
-
-                    // Get items for this category
+                    activeTab = this._cosmeticsTab = category;
+                    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === category));
                     const items = Object.values(COSMETICS_REGISTRY).filter(e => e.category === category);
                     const optional = category === 'accessory' || category === 'hat' || category === 'jewelry';   // these can be taken off
-
-                    let html = '';
+                    const ownedN = items.filter(it => C.isOwned(it.id)).length;
+                    let html = `<div class="df-section"><span><span class="glint">◆</span>${LABEL[category] || category}</span><span class="count">${ownedN} / ${items.length} owned</span></div>`;
                     for (const item of items) {
-                        const owned = this.cosmetics.isOwned(item.id);
-                        const equipped = this.cosmetics.isEquipped(item.id);
-                        const borderCol = equipped ? 'rgba(0,136,255,0.5)' : owned ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)';
-                        const bgCol = equipped ? 'rgba(0,136,255,0.08)' : 'rgba(255,255,255,0.03)';
-
-                        // Color swatch for visual categories
-                        let swatch = '';
-                        if (category === 'wig') {
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:${item.data.color};border:1px solid rgba(255,255,255,0.15);flex-shrink:0;"></div>`;
-                        } else if (category === 'skin') {
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:${item.data.skinColor};border:1px solid rgba(255,255,255,0.15);flex-shrink:0;"></div>`;
-                        } else if (category === 'outfit') {
-                            // Two-tone swatch: top color + bottom color
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg, ${item.data.top.color} 50%, ${item.data.bottom.color} 50%);border:1px solid rgba(255,255,255,0.15);flex-shrink:0;"></div>`;
-                        } else if (category === 'hat' || category === 'jewelry') {
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${item.data.color} 45%);border:1px solid rgba(255,255,255,0.2);flex-shrink:0;"></div>`;
-                        } else if (category === 'vocal') {
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:${item.data.captionColor};border:1px solid rgba(255,255,255,0.15);flex-shrink:0;opacity:0.7;"></div>`;
-                        } else if (category === 'accessory' && item.data.held === 'umbrella') {
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:conic-gradient(${item.data.color} 0 12.5%, ${item.data.trim} 12.5% 14%, ${item.data.color} 14% 25%, ${item.data.trim} 25% 26.5%, ${item.data.color} 26.5% 100%);border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"></div>`;
-                        } else if (category === 'accessory') {
-                            const d = GLASS_DRINKS[this.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne;
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #fff 0 12%, ${d.liquid} 30%, ${d.liquid2 || d.liquid} 100%);border:1px solid rgba(255,255,255,0.35);box-shadow:inset 0 0 3px rgba(255,255,255,0.6);flex-shrink:0;"></div>`;
-                        }
-
-                        html += `<div class="cosmetics-item" data-id="${item.id}" style="background:${bgCol}; border:1px solid ${borderCol}; border-radius:6px; padding:12px; margin-bottom:6px; display:flex; align-items:center; gap:10px; cursor:pointer; transition: border-color 0.2s;">`;
-                        html += swatch;
-                        html += `<div style="flex:1;">`;
-                        html += `<div style="font-family:Orbitron,sans-serif; font-size:0.7rem; color:${equipped ? '#0088ff' : '#ccc'}; letter-spacing:1px;">${item.name}`;
-                        if (equipped) html += ` <span style="color:#00ff66;font-size:0.55rem;margin-left:6px;">● ACTIVE</span>`;
-                        html += `</div>`;
-                        html += `<div style="font-size:0.6rem; color:#777; margin-top:2px;">${item.desc}</div>`;
-                        // Drink picker for the glass (owned only)
+                        const owned = C.isOwned(item.id), equipped = C.isEquipped(item.id), afford = this.currency >= item.price;
+                        html += `<div class="df-card clickable${equipped ? ' lit' : ''}${!owned && !afford ? ' unaffordable' : ''}" data-key="${item.id}" data-id="${item.id}"><div class="df-head">`;
+                        html += `<div class="df-swatch" style="${swatchOf(item, category)}"></div>`;
+                        html += `<div class="grow"><div class="title">${item.name}</div><div class="desc">${item.desc}</div></div>`;
+                        html += `<div class="df-shop-side">`;
+                        if (!owned) html += `${this._priceHtml(item.price, this.currency)}<button class="df-btn small" data-act="buy"${afford ? '' : ' disabled'}>Buy</button>`;
+                        else if (!equipped) html += `<span class="df-chip">Owned</span><button class="df-btn small ghost" data-act="equip">Equip</button>`;
+                        else html += `<span class="df-chip active">● Active</span>${optional ? '<button class="df-btn small danger" data-act="remove">Remove</button>' : ''}`;
+                        html += `</div></div>`;
+                        // The glass: pick the pour (owned only)
                         if (category === 'accessory' && owned && item.data.held === 'glass') {
-                            const cur = this.cosmetics.getAccessoryOption(item.id, 'drink');
-                            html += `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">`;
+                            const cur = C.getAccessoryOption(item.id, 'drink');
+                            html += `<div class="df-chips" style="margin-top:10px;">`;
                             for (const [key, d] of Object.entries(GLASS_DRINKS)) {
-                                const on = key === cur;
-                                html += `<div class="cosmetics-drink" data-acc="${item.id}" data-drink="${key}" style="display:flex; align-items:center; gap:4px; padding:3px 7px; border-radius:10px; border:1px solid ${on ? 'rgba(0,136,255,0.7)' : 'rgba(255,255,255,0.12)'}; background:${on ? 'rgba(0,136,255,0.15)' : 'rgba(255,255,255,0.03)'}; cursor:pointer;">`;
-                                html += `<div style="width:9px;height:9px;border-radius:50%;background:${d.liquid};${d.liquid2 ? `box-shadow:3px 0 0 -1px ${d.liquid2};` : ''}"></div>`;
-                                html += `<span style="font-size:0.5rem; color:${on ? '#fff' : '#999'}; letter-spacing:0.5px;">${d.name}</span></div>`;
+                                if (d.cafe) continue;                                   // (mugs are the cafe's)
+                                html += `<span class="df-chip pick cosmetics-drink${key === cur ? ' active' : ''}" data-acc="${item.id}" data-drink="${key}"><i class="dot" style="background:${d.liquid};${d.liquid2 ? `box-shadow:3px 0 0 -1px ${d.liquid2};` : ''}"></i>${d.name}</span>`;
                             }
                             html += `</div>`;
                         }
                         html += `</div>`;
-
-                        if (!owned) {
-                            html += `<div style="font-family:Orbitron,sans-serif; font-size:0.65rem; color:#ffd700; white-space:nowrap;">${item.price} PP</div>`;
-                        } else if (!equipped) {
-                            html += `<div style="font-size:0.55rem; color:#0088ff; letter-spacing:1px;">EQUIP</div>`;
-                        } else if (optional) {
-                            html += `<div style="font-size:0.55rem; color:#ff6688; letter-spacing:1px;">REMOVE</div>`;
-                        } else {
-                            html += `<div style="font-size:0.55rem; color:#555; letter-spacing:1px;">EQUIPPED</div>`;
-                        }
-                        html += `</div>`;
                     }
                     content.innerHTML = html;
+                    this._shopFlash(content);
 
-                    // Drink chips: pick the pour (and put the glass in hand)
-                    content.querySelectorAll('.cosmetics-drink').forEach(el => {
-                        el.addEventListener('click', (ev) => {
-                            ev.stopPropagation();
-                            this.cosmetics.setAccessoryOption(el.dataset.acc, 'drink', el.dataset.drink);
-                            this.cosmetics.equip(el.dataset.acc);
-                            audioSys.sfx('ui');
-                            renderTab(activeTab);
-                        });
-                    });
-
-                    // Bind click handlers
-                    content.querySelectorAll('.cosmetics-item').forEach(el => {
-                        el.addEventListener('click', () => {
-                            const id = el.dataset.id;
-                            const entry = COSMETICS_REGISTRY[id];
-                            if (entry && this.cosmetics.isEquipped(id) && ['accessory', 'hat', 'jewelry'].includes(entry.category)) {
-                                // optional pieces toggle off
-                                if (entry.category === 'accessory') this.cosmetics.unequipAccessory();
-                                else if (entry.category === 'hat') this.cosmetics.unequipHat();
-                                else this.cosmetics.unequipJewelry(id);
-                                audioSys.sfx('ui');
-                                renderTab(activeTab);
-                            } else if (this.cosmetics.isOwned(id)) {
-                                this.cosmetics.equip(id);
-                                audioSys.sfx('ui');
-                                renderTab(activeTab);
-                            } else {
-                                if (this.cosmetics.buy(id, this)) {
-                                    audioSys.sfx('ui'); // purchase blip
-                                    this.cosmetics.equip(id);
-                                    document.getElementById('cosmetics-shop-balance').textContent = `BALANCE: ${this.currency} PERSONICS`;
-                                    renderTab(activeTab);
-                                } else {
-                                    showMessage("INSUFFICIENT PERSONICS");
-                                }
+                    content.querySelectorAll('.cosmetics-drink').forEach(el => el.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        C.setAccessoryOption(el.dataset.acc, 'drink', el.dataset.drink);
+                        C.equip(el.dataset.acc);
+                        audioSys.sfx('ui');
+                        renderTab(activeTab);
+                    }));
+                    content.querySelectorAll('.df-card[data-id]').forEach(card => {
+                        const id = card.dataset.id, entry = COSMETICS_REGISTRY[id];
+                        const act = (kind, btn) => {
+                            if (kind === 'remove') {
+                                if (entry.category === 'accessory') C.unequipAccessory();
+                                else if (entry.category === 'hat') C.unequipHat();
+                                else C.unequipJewelry(id);
+                                audioSys.sfx('ui'); renderTab(activeTab);
+                            } else if (kind === 'equip') {
+                                C.equip(id); audioSys.sfx('ui'); renderTab(activeTab);
+                            } else if (kind === 'buy') {
+                                this._confirmTap(btn, 'Confirm?', () => {
+                                    if (C.buy(id, this)) {
+                                        audioSys.sfx('ui'); C.equip(id); this._shopJust = id;
+                                        this._shopBalance('cosmetics-shop-balance', this.currency);
+                                        renderTab(activeTab);
+                                    } else showMessage('INSUFFICIENT PERSONICS');
+                                });
                             }
+                        };
+                        card.querySelectorAll('button[data-act]').forEach(b => b.addEventListener('click', (ev) => { ev.stopPropagation(); act(b.dataset.act, b); }));
+                        // A tap on an owned card equips it (or takes an optional piece off)
+                        card.addEventListener('click', () => {
+                            if (!C.isOwned(id)) return;
+                            act(C.isEquipped(id) ? (['accessory', 'hat', 'jewelry'].includes(entry.category) ? 'remove' : null) : 'equip');
                         });
                     });
                 };
 
-                // Wire tabs
-                tabs.forEach(t => {
-                    t.onclick = () => renderTab(t.dataset.tab);
-                });
+                tabs.forEach(t => { t.onclick = () => { audioSys.sfx('ui'); renderTab(t.dataset.tab); }; });
+                renderTab(activeTab);
 
-                // Initial render
-                renderTab('wig');
-
-                // Close handler
                 document.getElementById('cosmetics-shop-close').onclick = () => {
-                    overlay.style.display = 'none';
+                    this._shopShow('cosmetics-shop-overlay', false);
                     this.pauseSystem.release('cosmetics_shop');
                 };
             },
@@ -53399,50 +53176,53 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // --- CRAFTING SYSTEM ---
             openCraftingTable() {
                 this.pauseSystem.acquire('crafting');
-                const shop = document.getElementById('augment-shop');
-                // Repurpose augment shop overlay for crafting
-                shop.classList.add('active');
-                shop.querySelector('.aug-shop-title').textContent = 'CRAFTING WORKBENCH';
-                shop.querySelector('.aug-shop-subtitle').textContent = 'APT 949 — MAIN ROOM';
-                document.getElementById('aug-shop-balance').textContent = `SCRAP: ${this.scrap}`;
-
-                const grid = document.getElementById('aug-shop-grid');
-                grid.innerHTML = '';
+                this._shopShow('craft-shop', true);
+                this._shopBalance('craft-shop-balance', this.scrap, 'Scrap');
+                const grid = document.getElementById('craft-shop-grid');
+                let html = `<div class="df-section"><span><span class="glint">◆</span>Schematics</span><span class="count">${SCHEMATICS.length}</span></div>`;
                 for (const sch of SCHEMATICS) {
-                    const owned = this.inventory.items.some(i => i.id === sch.id);
-                    const canAfford = this.scrap >= sch.scrapCost;
-                    const card = document.createElement('div');
-                    card.className = 'aug-card' + (owned ? ' owned' : '');
-                    card.innerHTML = `
-                        <div class="aug-card-name">${sch.icon || '⊕'} ${sch.name}</div>
-                        <div class="aug-card-desc">${sch.desc}</div>
-                        ${owned ? '<div class="aug-card-owned">✓ CRAFTED</div>' : `<div class="aug-card-price">${sch.scrapCost} SCRAP${!canAfford ? ' <span style="color:#ff5555;">(INSUFFICIENT)</span>' : ''}</div>`}
-                    `;
-                    if (!owned && canAfford) {
-                        card.addEventListener('click', () => {
-                            this.scrap -= sch.scrapCost;
-                            const craftedItem = createItemFromRegistry(sch.id, this);
-                            if (craftedItem) this.inventory.addItem(craftedItem);
-                            this.updateUI();
-                            showMessage(`CRAFTED: ${sch.name}`);
-                            audioSys.sfx('ui');
-                            this.openCraftingTable(); // Refresh
-                        });
+                    const owned = this.inventory.items.some(i => i.id === sch.id), canAfford = this.scrap >= sch.scrapCost;
+                    const reg = (typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[sch.id]) || {};
+                    // What it is: its registry stats, as label / value rows
+                    const stats = [], st = reg.stats || {};
+                    if (reg.type) stats.push(['Type', reg.type]);
+                    if (st.damage) stats.push(['Damage', st.damage]);
+                    if (st.fireRate) stats.push(['Fire delay', st.fireRate + '<span class="unit">ticks</span>']);
+                    if (st.recoil) stats.push(['Recoil', st.recoil]);
+                    if (st.dotDamage) stats.push(['Burn', `${st.dotDamage} × ${st.dotTicks || 1}`]);
+                    if (st.sticky) stats.push(['Orbs', 'Stick to targets']);
+                    if (st.effect === 'laser_sight') stats.push(['Effect', 'Targeting beam']);
+                    html += `<div class="df-card${owned ? ' lit' : ''}" data-key="${sch.id}"><div class="df-head">`;
+                    html += `<div class="note-ico">${sch.icon || '⊕'}</div><div class="grow"><div class="eyebrow">Schematic</div><div class="title">${sch.name}</div><div class="desc">${sch.desc}</div></div>`;
+                    html += `<div class="df-shop-side">${owned ? '<span class="df-chip active">✓ Crafted</span>' : `${this._priceHtml(sch.scrapCost, this.scrap, 'Scrap')}<button class="df-btn small" data-craft="${sch.id}"${canAfford ? '' : ' disabled'}>Craft</button>`}</div></div>`;
+                    if (stats.length) html += `<div class="df-rows" style="margin-top:8px;">${stats.map(([k, v]) => `<div class="df-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('')}</div>`;
+                    if (!owned) {
+                        const pct = Math.min(100, Math.round(this.scrap / sch.scrapCost * 100));
+                        html += `<div class="df-bar-label"><span>Scrap</span><span>${Math.min(this.scrap, sch.scrapCost)} / ${sch.scrapCost}</span></div><div class="df-bar ${canAfford ? 'gold' : ''}${pct ? '' : ' zero'}" style="--v:${pct}%"><i></i></div>`;
                     }
-                    grid.appendChild(card);
+                    html += `</div>`;
                 }
-
-                document.getElementById('aug-shop-close').onclick = () => {
-                    shop.classList.remove('active');
-                    // Restore titles for augment shop
-                    shop.querySelector('.aug-shop-title').textContent = 'CYBERNETIC AUGMENTS';
-                    shop.querySelector('.aug-shop-subtitle').textContent = "DR. YIN'S CLINIC";
+                grid.innerHTML = html;
+                this._shopFlash(grid);
+                grid.querySelectorAll('button[data-craft]').forEach(b => b.addEventListener('click', () => {
+                    const sch = SCHEMATICS.find(x => x.id === b.dataset.craft);
+                    if (!sch || this.scrap < sch.scrapCost) return;
+                    this.scrap -= sch.scrapCost;
+                    const craftedItem = createItemFromRegistry(sch.id, this);
+                    if (craftedItem) this.inventory.addItem(craftedItem);
+                    this.updateUI();
+                    showMessage(`CRAFTED: ${sch.name}`);
+                    audioSys.sfx('ui');
+                    this._shopJust = sch.id;
+                    this.openCraftingTable();
+                }));
+                document.getElementById('craft-shop-close').onclick = () => {
+                    this._shopShow('craft-shop', false);
                     this.pauseSystem.release('crafting');
                 };
             },
 
         });
-
         // GameEngine — Save schema, migrations, saveGame / loadGame.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 const AUTOSAVE_KEY = 'dfab_save_slot_auto';   // written when the app goes to the background (onPageHidden)
@@ -64798,6 +64578,7 @@ engineMixin({
                     ['cosmetics-shop-overlay', () => document.getElementById('cosmetics-shop-close').click()],
                     ['auto-shop-overlay', () => game.closeAutoShop()],
                     ['augment-shop', () => document.getElementById('aug-shop-close').click()],
+                    ['craft-shop', () => document.getElementById('craft-shop-close').click()],
                     ['zib-menu', () => game.closeZibMenu()],
                     ['gauntlet-menu', () => game.closeGauntletMenu()],
                     ['tuning-overlay', () => game.closeTuning()],

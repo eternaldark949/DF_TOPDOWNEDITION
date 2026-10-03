@@ -1161,62 +1161,7 @@
         }
         .save-slot-import-msg.show { opacity: 1; }
 
-        /* --- AUGMENT SHOP OVERLAY --- */
-        #augment-shop {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 10, 20, 0.95);
-            display: none; z-index: 500;
-            flex-direction: column; align-items: center; justify-content: center;
-            font-family: var(--font-ui);
-        }
-        #augment-shop.active { display: flex; }
-        .aug-shop-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.4rem; color: #00f3ff;
-            letter-spacing: 3px; margin-bottom: 5px;
-            text-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
-        }
-        .aug-shop-subtitle {
-            font-size: 0.75rem; color: #888;
-            letter-spacing: 2px; margin-bottom: 20px;
-        }
-        .aug-shop-balance {
-            font-size: 0.85rem; color: #ffd700;
-            margin-bottom: 15px;
-            text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-        }
-        .aug-shop-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 12px; max-width: 750px; width: 90%;
-            max-height: 50vh; overflow-y: auto;
-            padding: 5px;
-        }
-        .aug-card {
-            background: rgba(0, 243, 255, 0.05);
-            border: 1px solid rgba(0, 243, 255, 0.15);
-            border-radius: 8px; padding: 14px;
-            cursor: pointer; transition: all 0.2s;
-        }
-        .aug-card:hover {
-            background: rgba(0, 243, 255, 0.1);
-            border-color: rgba(0, 243, 255, 0.4);
-        }
-        .aug-card.owned { border-color: rgba(0, 255, 100, 0.3); }
-        .aug-card-name {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.8rem; color: #00f3ff;
-            margin-bottom: 5px;
-        }
-        .aug-card-desc { font-size: 0.75rem; color: #aaa; margin-bottom: 8px; line-height: 1.3; }
-        .aug-card-price { font-size: 0.8rem; color: #ffd700; }
-        .aug-card-owned { font-size: 0.75rem; color: #00ff66; }
-        .aug-shop-close {
-            margin-top: 20px; padding: 10px 30px;
-            background: transparent; border: 1px solid #555; color: #fff;
-            cursor: pointer; font-family: var(--font-ui); font-size: 0.85rem;
-            text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s;
-        }
-        .aug-shop-close:hover { border-color: #fff; background: rgba(255,255,255,0.05); }
+        /* (The augment shop and the other shops: styles/shops.css) */
 
 
 /* ── Resonance: Dr. Yin's tuning overlay (engine/tuning-ui.js) ── */

@@ -27,6 +27,7 @@ const STYLES = [
     'styles/cinematic.css',
     'styles/coach.css',
     'styles/dossier.css',
+    'styles/shops.css',
     'styles/landscape.css',
 ];
 
