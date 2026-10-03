@@ -883,6 +883,7 @@
                 this._updateValueEl('set-traffic', GameSettings.trafficDensity);
                 this._updateValueEl('set-pedestrians', GameSettings.pedestrianDensity);
                 this._updateValueEl('set-foliage', GameSettings.foliageDensity);
+                this._updateValueEl('set-crowd', GameSettings.crowdQuality || 'high');
                 this._updateValueEl('set-rain', GameSettings.rainDensity);
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
@@ -901,6 +902,7 @@
                 this._updateValueEl('set-audiobuffer', this._audioBufferLabel());
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
+                this._updateValueEl('set-countcalls', GameSettings.countCalls ? 'on' : 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
                 this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
                 this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
@@ -1029,6 +1031,11 @@
                     if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
                     this._updateValueEl(el.id, GameSettings.profilerMode);
 
+                } else if (key === 'countCalls') {
+                    GameSettings.countCalls = !GameSettings.countCalls;
+                    if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
+                    this._updateValueEl(el.id, GameSettings.countCalls ? 'on' : 'off');
+
                 } else if (key === 'debugView') {
                     game.debugMode = !game.debugMode;
                     if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
@@ -1084,6 +1091,8 @@
                     const current = GameSettings[key];
                     const idx = order.indexOf(current);
                     GameSettings[key] = order[(idx + 1) % 3];
+                    GameSettings.saveDensity();                                    // this device's, and applied now (trimToCap)
+                    if (key === 'crowdQuality' && typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
                     this._updateValueEl(el.id, GameSettings[key]);
                 }
                 

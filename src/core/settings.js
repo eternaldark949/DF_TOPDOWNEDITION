@@ -128,12 +128,20 @@
             label() { return this.supported() ? GameSettings.orientation : 'auto (phone)'; }
         };
 
+        /** Density and crowd detail are this device's, not a save's (a phone and a desktop want different ones) */
+        const _deviceDensity = (() => { try { return JSON.parse(localStorage.getItem('dfab_density') || '{}') || {}; } catch (e) { return {}; } })();
+        const _lvl = (v, d) => (v === 'low' || v === 'medium' || v === 'high') ? v : d;
+
         const GameSettings = {
-            // --- DENSITY ---
-            trafficDensity: 'high',         // 'low' | 'medium' | 'high'
-            pedestrianDensity: 'high',      // 'low' | 'medium' | 'high'
-            foliageDensity: 'high',         // 'low' | 'medium' | 'high'
-            rainDensity: 'high',            // 'low' | 'medium' | 'high'
+            // --- DENSITY --- (kept per device: dfab_density; saveDensity() after a change)
+            trafficDensity: _lvl(_deviceDensity.trafficDensity, 'high'),         // 'low' | 'medium' | 'high'
+            pedestrianDensity: _lvl(_deviceDensity.pedestrianDensity, 'high'),   // 'low' | 'medium' | 'high'
+            foliageDensity: _lvl(_deviceDensity.foliageDensity, 'high'),         // 'low' | 'medium' | 'high'
+            rainDensity: _lvl(_deviceDensity.rainDensity, 'high'),               // 'low' | 'medium' | 'high'
+            crowdQuality: _lvl(_deviceDensity.crowdQuality, 'high'),             // 'high' (live) | 'medium' (cheaper live) | 'low' (baked) — ui/crowd-impostors.js
+            saveDensity() {
+                try { localStorage.setItem('dfab_density', JSON.stringify({ trafficDensity: this.trafficDensity, pedestrianDensity: this.pedestrianDensity, foliageDensity: this.foliageDensity, rainDensity: this.rainDensity, crowdQuality: this.crowdQuality })); } catch (e) { /* private mode */ }
+            },
             
             // --- VISUAL ---
             lightingQuality: 'high',        // 'low' | 'medium' | 'high'
@@ -155,6 +163,7 @@
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
+            countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.

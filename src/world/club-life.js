@@ -281,7 +281,7 @@
                 list.sort(_byY);
                 for (const w of list) {
                     ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.globalAlpha = w.life;
-                    drawProceduralHumanoid(ctx, w, { stance: 'idle', ...w.look });
+                    drawCrowdHumanoid(ctx, w, { stance: 'idle', ...w.look });                // by Crowd Quality (ui/crowd-impostors.js)
                     ctx.restore();
                 }
             }

@@ -34,7 +34,7 @@
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
                     this._prof.classList.toggle('full', mode === 'full');
-                    if (mode !== 'full') this._countCalls(false);                 // the call counter only lives in Full
+                    if (mode !== 'full' || !GameSettings.countCalls) this._countCalls(false);   // the call counter: Full, and only when asked for
                     this._report = null;
                 }
                 if (game.debugMode) this._ensureDbg();
@@ -122,6 +122,8 @@
                     .sort((a, b) => b.time - a.time);
                 const max = Math.max(4, +rows[0]?.time || 0);
                 let html = `<div class="dp-total"><span>Frame work</span><b>${total ? total.time : '--'} ms</b></div>`;
+                // At the top, where a phone can see it: what was drawn, and the time spent outside the game's code
+                html += `<div class="dp-counts dp-render">${this._renderLine(game, total ? +total.time : 0)}</div>`;
                 rows.forEach((r, i) => {
                     const [grp, name] = r.label.includes(':') ? r.label.split(':') : ['', r.label];
                     html += `<div class="dp-row${i < 3 ? ' top' : ''}"><span class="dp-l"><i>${grp}</i>${name}</span><span class="dp-t">${r.time}</span>`
@@ -129,7 +131,6 @@
                 });
                 html += `<div class="dp-counts">${this._countLine(game)}</div>`;
                 html += `<div class="dp-counts dp-audio">${this._audioLine()}</div>`;
-                html += `<div class="dp-counts">${this._renderLine()}</div>`;
                 this._rowsEl.innerHTML = html;
             },
 
@@ -140,11 +141,26 @@
              * glitches (output underruns: the crackles and pops).
              */
             /** Bodies drawn / culled this frame, and canvas calls a frame (counted only while Full is open) */
-            _renderLine() {
-                this._countCalls(true);
+            _renderLine(game, workMs) {
+                const counting = !!GameSettings.countCalls;
+                this._countCalls(counting);
                 const n = this._callFrames ? Math.round(this._callTotal / this._callFrames) : 0;
                 this._callTotal = 0; this._callFrames = 0;
-                return `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span><span>canvas calls <b>${n.toLocaleString()}</b>/frame</span>`;
+                // frame time (last 30 frames) minus the game's own measured work: raster in the browser's GPU process, GC, the compositor
+                let sum = 0, k = 0;
+                for (let i = 0; i < 30; i++) { const v = this._times[(this._ti - 1 - i + this._times.length) % this._times.length]; if (v) { sum += v; k++; } }
+                const frameMs = k ? sum / k : 0, other = Math.max(0, frameMs - workMs);
+                const P = game.pedestrians, T = game.traffic;
+                const parts = [
+                    `<span>browser/GPU <b>${other.toFixed(1)}</b> ms</span>`,
+                    `<span>ticks/frame <b>${RenderStats.ticks}</b></span>`,
+                    `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span>`,
+                    `<span>cars <b>${T ? T.vehicles.length : 0}</b>/${GameSettings.getMaxTraffic()}</span>`,
+                    `<span>peds <b>${P ? P.pedestrians.length : 0}</b>/${GameSettings.getMaxPedestrians()}</span>`,
+                    `<span>crowd <b>${GameSettings.crowdQuality || 'high'}</b></span>`
+                ];
+                if (counting) parts.push(`<span>canvas calls <b>${n.toLocaleString()}</b>/frame</span>`);
+                return parts.join('');
             },
 
             /** A counting shim on the 2D context's methods (Full profiler only; removed when it closes) */

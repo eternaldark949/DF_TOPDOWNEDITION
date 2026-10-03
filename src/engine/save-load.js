@@ -740,10 +740,7 @@
 
                     // 12. Restore Settings
                     if (save.settings) {
-                        GameSettings.trafficDensity = save.settings.trafficDensity || 'high';
-                        GameSettings.pedestrianDensity = save.settings.pedestrianDensity || 'high';
-                        GameSettings.foliageDensity = save.settings.foliageDensity || 'high';
-                        GameSettings.rainDensity = save.settings.rainDensity || 'high';
+                        // (density and crowd detail stay this device's own — core/settings.js dfab_density — a save doesn't carry them over)
                         GameSettings.lightingQuality = save.settings.lightingQuality || 'high';
                         GameSettings.filmGrain = save.settings.filmGrain !== false;
                         GameSettings.softShadows = save.settings.softShadows ?? (GameSettings.lightingQuality === 'high');

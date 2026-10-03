@@ -138,6 +138,7 @@
             const order = ['low', 'medium', 'high'];
             const idx = order.indexOf(GameSettings[key]);
             GameSettings[key] = order[(idx + 1) % 3];
+            GameSettings.saveDensity();
             return GameSettings[key].toUpperCase();
         }
         

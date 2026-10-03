@@ -269,6 +269,7 @@
                 }
                 // Machine can't keep up — drop the backlog rather than spiral.
                 if (steps >= CONFIG.LOOP.MAX_STEPS) this._accumulator = 0;
+                RenderStats.ticks = steps;   // sim ticks this frame (the profiler: a slow frame runs several, and its update rows add them up)
                 
                 // Always draw for smooth visuals — blended between the last two ticks
                 if (interp) RenderInterp.apply(this, this._accumulator / stepMs);

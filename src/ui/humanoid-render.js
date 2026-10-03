@@ -49,7 +49,7 @@
             const layout = HAIR_LAYOUTS[hair.type];
             if (!layout) return { strands: [], jig: { x: 0, y: 0 } };
             const owner = dyn && dyn.owner, sway = (dyn && dyn.sway) || 0;
-            const T = owner ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js)
+            const T = owner && !_crowdLite ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js); a lighter crowd: at rest
             if (!T) return { strands: _hairRest(layout, headX, sway * 0.5), jig: { x: 0, y: 0 } };
             const { toW, toL, sc, ang: baseAngle } = T;
             const head = toW(headX, 0);
@@ -999,7 +999,7 @@
             const lod = typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0;
             const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
             const level = lod === 0 ? 2 : (lod === 1 && !ped ? 1 : 0);
-            if (!level || typeof sunNow !== 'function') return null;
+            if (!level || _crowdLite || typeof sunNow !== 'function') return null;    // (Crowd Quality medium/low: flat)
             if (_shadeFrame !== _frameTime) { _shadeFrame = _frameTime; _shadeRims = 0; _shadeCols = null; }
             const C = CONFIG.HUMAN_SHADE, sun = sunNow();
             const rot = _bodyRot, c = Math.cos(rot), s = Math.sin(rot);
@@ -1055,7 +1055,7 @@
          * frame here; a hovering android bobs over a soft glow.
          */
         /** What the entity pass drew this frame, for the profiler (reset by draw.js; ms only while it's on, Full) */
-        const RenderStats = { bodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0 };
+        const RenderStats = { bodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0, ticks: 1 };
 
         function drawProceduralHumanoid(ctx, entity, config = {}) {
             RenderStats.bodies++;

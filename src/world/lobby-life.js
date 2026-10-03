@@ -200,7 +200,7 @@
                         ctx.fillStyle = '#2b3a55'; ctx.fillRect(17, 1, 22, 9);
                         ctx.strokeStyle = '#e8c27a'; ctx.beginPath(); ctx.moveTo(14, -13); ctx.quadraticCurveTo(28, -22, 42, -13); ctx.stroke();
                     }
-                    drawProceduralHumanoid(ctx, w, { stance: 'idle', ...w.look });
+                    drawCrowdHumanoid(ctx, w, { stance: 'idle', ...w.look });                // by Crowd Quality (ui/crowd-impostors.js)
                     if (b && b.type !== 'roller') {                                   // carried: a case, a garment bag, a hat box
                         ctx.fillStyle = b.color;
                         if (b.type === 'case') { ctx.fillRect(-2, 9, 12, 5); ctx.fillStyle = '#e8c27a'; ctx.fillRect(3, 8, 3, 1); }

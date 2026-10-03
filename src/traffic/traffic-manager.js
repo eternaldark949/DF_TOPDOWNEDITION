@@ -176,6 +176,8 @@
                      }
                 }
         
+                // Over the cap (the setting was turned down): the farthest cars out of view fade away
+                if (_simTick % 60 === 0) this.trimToCap(player, playerCar, ownedCar);
                 // 2. SPAWN LOGIC
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
                     this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
@@ -219,6 +221,18 @@
                 }
             }
             
+            /** Down to GameSettings' cap: the farthest cars out of view fade out (theirs, the driven and the delivery stay) */
+            trimToCap(player, playerCar, ownedCar) {
+                const live = this.vehicles.filter(v => !v.fading && !v.dead);
+                const over = live.length - GameSettings.getMaxTraffic();
+                if (over <= 0 || !player) return;
+                const g = typeof game !== 'undefined' ? game : null, cb = g && g._cullBounds && g._cullBounds.cars;
+                const keep = v => v === playerCar || v === ownedCar || v.controlMode === 'PLAYER' || (g && v === g.deliveryVehicle);
+                live.filter(v => !keep(v) && (!cb || v.x < cb.left || v.x > cb.right || v.y < cb.top || v.y > cb.bottom))
+                    .sort((a, b) => Math.hypot(b.x - player.x, b.y - player.y) - Math.hypot(a.x - player.x, a.y - player.y))
+                    .slice(0, over).forEach(v => { v.fading = true; });
+            }
+
             // Optimized Collision Resolution with DEBRIS
             resolveCollisions(playerCar, player, weather, audioSys, ownedCar, decalSystem) {
                 if (this._crunchCd > 0) this._crunchCd--;

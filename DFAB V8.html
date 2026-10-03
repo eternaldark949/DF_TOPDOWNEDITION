@@ -4111,6 +4111,10 @@
                     <span class="settings-value val-high" id="set-foliage" data-key="foliageDensity">HIGH</span>
                 </div>
                 <div class="settings-row">
+                    <span class="settings-label">Crowd Quality</span>
+                    <span class="settings-value val-high" id="set-crowd" data-key="crowdQuality">HIGH</span>
+                </div>
+                <div class="settings-row">
                     <span class="settings-label">Rain</span>
                     <span class="settings-value val-high" id="set-rain" data-key="rainDensity">HIGH</span>
                 </div>
@@ -4239,6 +4243,10 @@
                 <div class="settings-row">
                     <span class="settings-label">Profiler</span>
                     <span class="settings-value" id="set-profiler" data-key="profiler">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Count Canvas Calls</span>
+                    <span class="settings-value" id="set-countcalls" data-key="countCalls">OFF</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Debug View</span>
@@ -7452,12 +7460,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             label() { return this.supported() ? GameSettings.orientation : 'auto (phone)'; }
         };
 
+        /** Density and crowd detail are this device's, not a save's (a phone and a desktop want different ones) */
+        const _deviceDensity = (() => { try { return JSON.parse(localStorage.getItem('dfab_density') || '{}') || {}; } catch (e) { return {}; } })();
+        const _lvl = (v, d) => (v === 'low' || v === 'medium' || v === 'high') ? v : d;
+
         const GameSettings = {
-            // --- DENSITY ---
-            trafficDensity: 'high',         // 'low' | 'medium' | 'high'
-            pedestrianDensity: 'high',      // 'low' | 'medium' | 'high'
-            foliageDensity: 'high',         // 'low' | 'medium' | 'high'
-            rainDensity: 'high',            // 'low' | 'medium' | 'high'
+            // --- DENSITY --- (kept per device: dfab_density; saveDensity() after a change)
+            trafficDensity: _lvl(_deviceDensity.trafficDensity, 'high'),         // 'low' | 'medium' | 'high'
+            pedestrianDensity: _lvl(_deviceDensity.pedestrianDensity, 'high'),   // 'low' | 'medium' | 'high'
+            foliageDensity: _lvl(_deviceDensity.foliageDensity, 'high'),         // 'low' | 'medium' | 'high'
+            rainDensity: _lvl(_deviceDensity.rainDensity, 'high'),               // 'low' | 'medium' | 'high'
+            crowdQuality: _lvl(_deviceDensity.crowdQuality, 'high'),             // 'high' (live) | 'medium' (cheaper live) | 'low' (baked) — ui/crowd-impostors.js
+            saveDensity() {
+                try { localStorage.setItem('dfab_density', JSON.stringify({ trafficDensity: this.trafficDensity, pedestrianDensity: this.pedestrianDensity, foliageDensity: this.foliageDensity, rainDensity: this.rainDensity, crowdQuality: this.crowdQuality })); } catch (e) { /* private mode */ }
+            },
             
             // --- VISUAL ---
             lightingQuality: 'high',        // 'low' | 'medium' | 'high'
@@ -7479,6 +7495,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
+            countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.
@@ -21271,7 +21288,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // --- RENDERER --- (every look lives in core/appearances.js)
                 if (this.role === 'teammate') this.drawTeammate(ctx, look);
-                else drawProceduralHumanoid(ctx, this, { stance: 'idle', ...look });
+                else drawCrowdHumanoid(ctx, this, { stance: 'idle', ...look });   // a standing NPC: by Crowd Quality (ui/crowd-impostors.js)
                 if (this.name === 'Prisma') this.drawPrismaShimmer(ctx);
 
                 ctx.restore();
@@ -22437,7 +22454,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Rain: open the umbrella, or pull the hoodie's hood up
                 if (this.look.umbrella) look = { ...look, held: { type: 'umbrella', color: this.look.umbrella, hand: 'right' } };
                 if (this._raining() && this.look.rainHood && !look.hat && look.top && look.top.type === 'hoodie') look = { ...look, hat: { type: 'hood_up', color: look.top.color } };
-                drawProceduralHumanoid(ctx, this, { ...look, stance: 'idle', lerpSpeed: 0.15 });
+                drawCrowdHumanoid(ctx, this, { ...look, stance: 'idle', lerpSpeed: 0.15 });   // by Crowd Quality (ui/crowd-impostors.js)
                 
                 // Waiting indicator (if at crosswalk) - above head at +X
                 if (this.state === 'waiting') {
@@ -22588,6 +22605,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 
+                // Over the cap (the setting was turned down): the farthest, out of view, go first
+                if (_simTick % 60 === 0) this.trimToCap();
                 // Spawn new pedestrians
                 this.spawnTimer--;
                 if (this.pedestrians.length < GameSettings.getMaxPedestrians() && this.spawnTimer <= 0) {
@@ -22596,6 +22615,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
+            /** Down to GameSettings' cap: the farthest pedestrians out of view leave (no one vanishes on screen) */
+            trimToCap() {
+                const over = this.pedestrians.length - GameSettings.getMaxPedestrians();
+                if (over <= 0 || typeof game === 'undefined') return;
+                const cb = game._cullBounds && game._cullBounds.bodies, p = game.player;
+                const out = this.pedestrians.filter(o => !o.quipText && (!cb || o.x < cb.left || o.x > cb.right || o.y < cb.top || o.y > cb.bottom))
+                    .sort((a, b) => Math.hypot(b.x - p.x, b.y - p.y) - Math.hypot(a.x - p.x, a.y - p.y)).slice(0, over);
+                for (const o of out) { if (!o.markedForDestroy) o.destroy(); const i = this.pedestrians.indexOf(o); if (i >= 0) this.pedestrians.splice(i, 1); }
+            }
+
             _trySpawn(player, map) {
                 // Try a few times to find a good spawn point
                 for (let attempt = 0; attempt < 5; attempt++) {
@@ -22866,7 +22895,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.fillStyle = '#2b3a55'; ctx.fillRect(17, 1, 22, 9);
                         ctx.strokeStyle = '#e8c27a'; ctx.beginPath(); ctx.moveTo(14, -13); ctx.quadraticCurveTo(28, -22, 42, -13); ctx.stroke();
                     }
-                    drawProceduralHumanoid(ctx, w, { stance: 'idle', ...w.look });
+                    drawCrowdHumanoid(ctx, w, { stance: 'idle', ...w.look });                // by Crowd Quality (ui/crowd-impostors.js)
                     if (b && b.type !== 'roller') {                                   // carried: a case, a garment bag, a hat box
                         ctx.fillStyle = b.color;
                         if (b.type === 'case') { ctx.fillRect(-2, 9, 12, 5); ctx.fillStyle = '#e8c27a'; ctx.fillRect(3, 8, 3, 1); }
@@ -23160,7 +23189,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 list.sort(_byY);
                 for (const w of list) {
                     ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.globalAlpha = w.life;
-                    drawProceduralHumanoid(ctx, w, { stance: 'idle', ...w.look });
+                    drawCrowdHumanoid(ctx, w, { stance: 'idle', ...w.look });                // by Crowd Quality (ui/crowd-impostors.js)
                     ctx.restore();
                 }
             }
@@ -36545,6 +36574,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                      }
                 }
         
+                // Over the cap (the setting was turned down): the farthest cars out of view fade away
+                if (_simTick % 60 === 0) this.trimToCap(player, playerCar, ownedCar);
                 // 2. SPAWN LOGIC
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
                     this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
@@ -36588,6 +36619,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
+            /** Down to GameSettings' cap: the farthest cars out of view fade out (theirs, the driven and the delivery stay) */
+            trimToCap(player, playerCar, ownedCar) {
+                const live = this.vehicles.filter(v => !v.fading && !v.dead);
+                const over = live.length - GameSettings.getMaxTraffic();
+                if (over <= 0 || !player) return;
+                const g = typeof game !== 'undefined' ? game : null, cb = g && g._cullBounds && g._cullBounds.cars;
+                const keep = v => v === playerCar || v === ownedCar || v.controlMode === 'PLAYER' || (g && v === g.deliveryVehicle);
+                live.filter(v => !keep(v) && (!cb || v.x < cb.left || v.x > cb.right || v.y < cb.top || v.y > cb.bottom))
+                    .sort((a, b) => Math.hypot(b.x - player.x, b.y - player.y) - Math.hypot(a.x - player.x, a.y - player.y))
+                    .slice(0, over).forEach(v => { v.fading = true; });
+            }
+
             // Optimized Collision Resolution with DEBRIS
             resolveCollisions(playerCar, player, weather, audioSys, ownedCar, decalSystem) {
                 if (this._crunchCd > 0) this._crunchCd--;
@@ -39636,7 +39679,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * current ctx frame: [[anchor, ..., hem], ...]. `key` names the panel on the owner.
          */
         function clothGeometry(ctx, owner, key, spec, dyn) {
-            const T = owner && (typeof _zoomLOD === 'undefined' || _zoomLOD < 2) ? _simTransform(ctx) : null;
+            const T = owner && !_crowdLite && (typeof _zoomLOD === 'undefined' || _zoomLOD < 2) ? _simTransform(ctx) : null;
             if (!T) return _clothRest(spec);
             const { toW, toL, sc, ang: baseAngle, M } = T;
             const n = spec.segs || 3, chains = spec.chains;
@@ -40637,7 +40680,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const layout = HAIR_LAYOUTS[hair.type];
             if (!layout) return { strands: [], jig: { x: 0, y: 0 } };
             const owner = dyn && dyn.owner, sway = (dyn && dyn.sway) || 0;
-            const T = owner ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js)
+            const T = owner && !_crowdLite ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js); a lighter crowd: at rest
             if (!T) return { strands: _hairRest(layout, headX, sway * 0.5), jig: { x: 0, y: 0 } };
             const { toW, toL, sc, ang: baseAngle } = T;
             const head = toW(headX, 0);
@@ -41587,7 +41630,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const lod = typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0;
             const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
             const level = lod === 0 ? 2 : (lod === 1 && !ped ? 1 : 0);
-            if (!level || typeof sunNow !== 'function') return null;
+            if (!level || _crowdLite || typeof sunNow !== 'function') return null;    // (Crowd Quality medium/low: flat)
             if (_shadeFrame !== _frameTime) { _shadeFrame = _frameTime; _shadeRims = 0; _shadeCols = null; }
             const C = CONFIG.HUMAN_SHADE, sun = sunNow();
             const rot = _bodyRot, c = Math.cos(rot), s = Math.sin(rot);
@@ -41643,7 +41686,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * frame here; a hovering android bobs over a soft glow.
          */
         /** What the entity pass drew this frame, for the profiler (reset by draw.js; ms only while it's on, Full) */
-        const RenderStats = { bodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0 };
+        const RenderStats = { bodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0, ticks: 1 };
 
         function drawProceduralHumanoid(ctx, entity, config = {}) {
             RenderStats.bodies++;
@@ -42647,6 +42690,106 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.restore();
         }
         
+        // ═══ CROWD QUALITY — how the crowd is drawn (Settings → Graphics → Crowd Quality) ═══
+        // The crowd: pedestrians, the lobby's and club's guests and staff, and a map's standing
+        // NPCs. Never Stella, the crew, enemies or the fallen (they're always drawn live).
+        //   high   — fully live (the default)
+        //   medium — live, but flat-shaded, with hair and cloth at rest (no physics), no lamp rim
+        //   low    — baked: each crowd member's look is drawn once into a strip of frames (an idle
+        //            frame and an 8-step walk cycle) and replayed: the contact shadow is drawn live,
+        //            then one drawImage. Bakes are lazy (one look a frame), kept for up to
+        //            CROWD_BAKE.MAX members (least recently seen go first); anyone not baked yet,
+        //            or in a pose that keeps moving (dancing), is drawn as on medium.
+        // drawCrowdHumanoid(ctx, entity, config) is the one entry point; the caller has already
+        // translated and rotated ctx to the body, as for drawProceduralHumanoid.
+
+        const CROWD_BAKE = { FRAMES: 8, R: 40, Q: 1.25, MAX: 64, PER_FRAME: 1 };
+
+        /** Medium detail for the body being drawn (read by humanShade, hairGeometry, clothGeometry) */
+        let _crowdLite = false;
+
+        const CrowdImpostors = {
+            cache: new Map(),          // entity → { sig, cv, used }
+            _bakedFrame: -1, _bakes: 0,
+
+            /** What a bake depends on: the look as drawn, the pose, the stride, rain on them */
+            _sig(e, c) {
+                const g = e._gait, sp = g ? Math.round(Math.min(3, g.speed) * 2) / 2 : 0;
+                const held = c.held ? c.held.type + (c.held.open ?? '') : '';
+                const hat = c.hat ? c.hat.type : '', hair = c.hair ? c.hair.type : '';
+                const W = typeof weatherAt === 'function' ? weatherAt(e) : null, wet = W && W.rain > 0.05 ? 'r' : '';
+                return (c.pose || '') + '|' + held + '|' + hat + '|' + hair + '|' + (sp > 0.3 ? Math.max(1, sp) : 0) + '|' + wet;
+            },
+
+            /** Bake the strip: frame 0 standing, 1..FRAMES the walk cycle, in the body's own frame (facing +x) */
+            _bake(e, c, sig) {
+                const F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R, Q = CROWD_BAKE.Q, cell = Math.ceil(R * 2 * Q);
+                const cv = document.createElement('canvas'); cv.width = cell * (F + 1); cv.height = cell;
+                const g = cv.getContext('2d'); if (!g) return null;
+                const sp = +sig.split('|')[4] || 0;
+                // a stand-in body: same look and place, its gait pinned (no ticks pass, so syncHumanoidGait keeps it)
+                const B = { x: e.x, y: e.y, angle: 0, look: e.look, walkPhase: 0 };
+                syncHumanoidGait(B);
+                const G = B._gait;
+                const cfg = Object.assign({}, c, { lerpSpeed: 1, noShadow: true, poseInstant: true });
+                const wm = _worldMatrix, wc = _worldCanvas, lite = _crowdLite;
+                _crowdLite = true;                                              // at rest, flat: the bake is lit the same whichever way they turn
+                try {
+                    for (let f = 0; f <= F; f++) {
+                        G.speed = f === 0 ? 0 : sp; G.dirX = 1; G.dirY = 0; G.tick = _simTick; G.prevX = B.x; G.prevY = B.y;
+                        B.walkPhase = f === 0 ? 0 : (f - 1) / F * Math.PI * 2; G.phasePrev = B.walkPhase;
+                        B._animState = null;
+                        g.setTransform(Q, 0, 0, Q, cell * f + R * Q, R * Q);
+                        drawProceduralHumanoid(g, B, cfg);
+                    }
+                } catch (err) { return null; }
+                finally { _crowdLite = lite; _worldMatrix = wm; _worldCanvas = wc; }
+                return { sig, cv, cell, used: _frameTime };
+            },
+
+            /** Draw from the bake if there is one (true), else false (the caller draws it live) */
+            draw(ctx, e, c) {
+                if (c.pose === 'dance' || c.pose === 'die') return false;          // poses that keep moving: live
+                syncHumanoidGait(e);                                                // the walk (and its footsteps) as the live draw would
+                const sig = this._sig(e, c);
+                let b = this.cache.get(e);
+                if (!b || b.sig !== sig) {
+                    if (this._bakedFrame !== _frameTime) { this._bakedFrame = _frameTime; this._bakes = 0; }
+                    if (this._bakes >= CROWD_BAKE.PER_FRAME) return false;          // one look a frame; live until then
+                    if (!b && this.cache.size >= CROWD_BAKE.MAX) {                   // full: make room from whoever was seen longest ago —
+                        let oldK = null, oldT = Infinity;                              // never someone on screen this frame (no thrash)
+                        for (const [k, v] of this.cache) if (v.used < oldT) { oldT = v.used; oldK = k; }
+                        if (oldK === null || oldT >= _frameTime) return false;
+                        this.cache.delete(oldK);
+                    }
+                    this._bakes++;
+                    b = this._bake(e, c, sig);
+                    if (!b) return false;
+                    this.cache.set(e, b);
+                }
+                b.used = _frameTime;
+                const g = e._gait, F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R;
+                const walking = g && g.speed > CONFIG.GAIT.STOP_SPEED && +b.sig.split('|')[4] > 0;
+                const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+                const f = walking ? 1 + (Math.round(ph / (Math.PI * 2) * F) % F) : 0;
+                // the contact shadow, live (it follows the sun and their facing)
+                if (!c.noShadow && !c.isDriving && _zoomLOD < 2) { const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a); drawHumanContactShadow(ctx); }
+                ctx.drawImage(b.cv, b.cell * f, 0, b.cell, b.cell, -R, -R, R * 2, R * 2);
+                RenderStats.bodies++;
+                return true;
+            },
+
+            clear() { this.cache.clear(); }
+        };
+
+        /** The crowd's draw: by Crowd Quality (high live, medium lighter, low baked) */
+        function drawCrowdHumanoid(ctx, entity, config) {
+            const q = GameSettings.crowdQuality || 'high';
+            if (q === 'high') return drawProceduralHumanoid(ctx, entity, config);
+            if (q === 'low' && CrowdImpostors.draw(ctx, entity, config)) return;
+            _crowdLite = true;
+            try { drawProceduralHumanoid(ctx, entity, config); } finally { _crowdLite = false; }
+        }
         // =============================================================================
         //  CITY LAYOUT SYSTEM v2.0
         //  Grid-based procedural city generator with block management
@@ -50033,7 +50176,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
                     this._prof.classList.toggle('full', mode === 'full');
-                    if (mode !== 'full') this._countCalls(false);                 // the call counter only lives in Full
+                    if (mode !== 'full' || !GameSettings.countCalls) this._countCalls(false);   // the call counter: Full, and only when asked for
                     this._report = null;
                 }
                 if (game.debugMode) this._ensureDbg();
@@ -50121,6 +50264,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     .sort((a, b) => b.time - a.time);
                 const max = Math.max(4, +rows[0]?.time || 0);
                 let html = `<div class="dp-total"><span>Frame work</span><b>${total ? total.time : '--'} ms</b></div>`;
+                // At the top, where a phone can see it: what was drawn, and the time spent outside the game's code
+                html += `<div class="dp-counts dp-render">${this._renderLine(game, total ? +total.time : 0)}</div>`;
                 rows.forEach((r, i) => {
                     const [grp, name] = r.label.includes(':') ? r.label.split(':') : ['', r.label];
                     html += `<div class="dp-row${i < 3 ? ' top' : ''}"><span class="dp-l"><i>${grp}</i>${name}</span><span class="dp-t">${r.time}</span>`
@@ -50128,7 +50273,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 });
                 html += `<div class="dp-counts">${this._countLine(game)}</div>`;
                 html += `<div class="dp-counts dp-audio">${this._audioLine()}</div>`;
-                html += `<div class="dp-counts">${this._renderLine()}</div>`;
                 this._rowsEl.innerHTML = html;
             },
 
@@ -50139,11 +50283,26 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * glitches (output underruns: the crackles and pops).
              */
             /** Bodies drawn / culled this frame, and canvas calls a frame (counted only while Full is open) */
-            _renderLine() {
-                this._countCalls(true);
+            _renderLine(game, workMs) {
+                const counting = !!GameSettings.countCalls;
+                this._countCalls(counting);
                 const n = this._callFrames ? Math.round(this._callTotal / this._callFrames) : 0;
                 this._callTotal = 0; this._callFrames = 0;
-                return `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span><span>canvas calls <b>${n.toLocaleString()}</b>/frame</span>`;
+                // frame time (last 30 frames) minus the game's own measured work: raster in the browser's GPU process, GC, the compositor
+                let sum = 0, k = 0;
+                for (let i = 0; i < 30; i++) { const v = this._times[(this._ti - 1 - i + this._times.length) % this._times.length]; if (v) { sum += v; k++; } }
+                const frameMs = k ? sum / k : 0, other = Math.max(0, frameMs - workMs);
+                const P = game.pedestrians, T = game.traffic;
+                const parts = [
+                    `<span>browser/GPU <b>${other.toFixed(1)}</b> ms</span>`,
+                    `<span>ticks/frame <b>${RenderStats.ticks}</b></span>`,
+                    `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span>`,
+                    `<span>cars <b>${T ? T.vehicles.length : 0}</b>/${GameSettings.getMaxTraffic()}</span>`,
+                    `<span>peds <b>${P ? P.pedestrians.length : 0}</b>/${GameSettings.getMaxPedestrians()}</span>`,
+                    `<span>crowd <b>${GameSettings.crowdQuality || 'high'}</b></span>`
+                ];
+                if (counting) parts.push(`<span>canvas calls <b>${n.toLocaleString()}</b>/frame</span>`);
+                return parts.join('');
             },
 
             /** A counting shim on the 2D context's methods (Full profiler only; removed when it closes) */
@@ -53834,10 +53993,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                     // 12. Restore Settings
                     if (save.settings) {
-                        GameSettings.trafficDensity = save.settings.trafficDensity || 'high';
-                        GameSettings.pedestrianDensity = save.settings.pedestrianDensity || 'high';
-                        GameSettings.foliageDensity = save.settings.foliageDensity || 'high';
-                        GameSettings.rainDensity = save.settings.rainDensity || 'high';
+                        // (density and crowd detail stay this device's own — core/settings.js dfab_density — a save doesn't carry them over)
                         GameSettings.lightingQuality = save.settings.lightingQuality || 'high';
                         GameSettings.filmGrain = save.settings.filmGrain !== false;
                         GameSettings.softShadows = save.settings.softShadows ?? (GameSettings.lightingQuality === 'high');
@@ -62758,6 +62914,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 // Machine can't keep up — drop the backlog rather than spiral.
                 if (steps >= CONFIG.LOOP.MAX_STEPS) this._accumulator = 0;
+                RenderStats.ticks = steps;   // sim ticks this frame (the profiler: a slow frame runs several, and its update rows add them up)
                 
                 // Always draw for smooth visuals — blended between the last two ticks
                 if (interp) RenderInterp.apply(this, this._accumulator / stepMs);
@@ -65615,6 +65772,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._updateValueEl('set-traffic', GameSettings.trafficDensity);
                 this._updateValueEl('set-pedestrians', GameSettings.pedestrianDensity);
                 this._updateValueEl('set-foliage', GameSettings.foliageDensity);
+                this._updateValueEl('set-crowd', GameSettings.crowdQuality || 'high');
                 this._updateValueEl('set-rain', GameSettings.rainDensity);
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
@@ -65633,6 +65791,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._updateValueEl('set-audiobuffer', this._audioBufferLabel());
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
+                this._updateValueEl('set-countcalls', GameSettings.countCalls ? 'on' : 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
                 this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
                 this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
@@ -65761,6 +65920,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
                     this._updateValueEl(el.id, GameSettings.profilerMode);
 
+                } else if (key === 'countCalls') {
+                    GameSettings.countCalls = !GameSettings.countCalls;
+                    if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
+                    this._updateValueEl(el.id, GameSettings.countCalls ? 'on' : 'off');
+
                 } else if (key === 'debugView') {
                     game.debugMode = !game.debugMode;
                     if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
@@ -65816,6 +65980,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const current = GameSettings[key];
                     const idx = order.indexOf(current);
                     GameSettings[key] = order[(idx + 1) % 3];
+                    GameSettings.saveDensity();                                    // this device's, and applied now (trimToCap)
+                    if (key === 'crowdQuality' && typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
                     this._updateValueEl(el.id, GameSettings[key]);
                 }
                 
@@ -65964,6 +66130,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const order = ['low', 'medium', 'high'];
             const idx = order.indexOf(GameSettings[key]);
             GameSettings[key] = order[(idx + 1) % 3];
+            GameSettings.saveDensity();
             return GameSettings[key].toUpperCase();
         }
         

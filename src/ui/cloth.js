@@ -60,7 +60,7 @@
          * current ctx frame: [[anchor, ..., hem], ...]. `key` names the panel on the owner.
          */
         function clothGeometry(ctx, owner, key, spec, dyn) {
-            const T = owner && (typeof _zoomLOD === 'undefined' || _zoomLOD < 2) ? _simTransform(ctx) : null;
+            const T = owner && !_crowdLite && (typeof _zoomLOD === 'undefined' || _zoomLOD < 2) ? _simTransform(ctx) : null;
             if (!T) return _clothRest(spec);
             const { toW, toL, sc, ang: baseAngle, M } = T;
             const n = spec.segs || 3, chains = spec.chains;

@@ -614,7 +614,7 @@
 
                 // --- RENDERER --- (every look lives in core/appearances.js)
                 if (this.role === 'teammate') this.drawTeammate(ctx, look);
-                else drawProceduralHumanoid(ctx, this, { stance: 'idle', ...look });
+                else drawCrowdHumanoid(ctx, this, { stance: 'idle', ...look });   // a standing NPC: by Crowd Quality (ui/crowd-impostors.js)
                 if (this.name === 'Prisma') this.drawPrismaShimmer(ctx);
 
                 ctx.restore();
