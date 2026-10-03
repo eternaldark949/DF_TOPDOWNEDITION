@@ -16,20 +16,20 @@
              glow     live lights [x, y, r, colour], breathing slowly in a wave down the gun
              run      a spark that glides down a light line [x0, x1, y, colour]
            ===================================================================== */
-        const GUN_MATERIALS = {             // base, edge (the dark facet), hi (the bright bevel) — jewel tones, pearl, tinted obsidian glass
-            abyss:      ['#1a1436', '#06030f', '#5c4fa0'],      // obsidian glass, violet in its depths
-            midnight:   ['#172a86', '#050a30', '#6f8cff'],
+        const GUN_MATERIALS = {             // base, edge (the dark facet: a deep shade of its own hue, never black), hi (the bright bevel)
+            abyss:      ['#1a1436', '#0e0926', '#5c4fa0'],      // obsidian glass, violet in its depths
+            midnight:   ['#172a86', '#0c1858', '#6f8cff'],
             lavender:   ['#a891ec', '#4a3790', '#f0e8ff'],
             periwinkle: ['#8392f7', '#2e3796', '#e2e6ff'],
             pearl:      ['#ece8fb', '#8f86b8', '#ffffff'],
-            crimson:    ['#c0143e', '#48031a', '#ff7a98'],
-            teal:       ['#12b8a4', '#034a42', '#9cfff2'],
-            bronze:     ['#a0602e', '#3a1606', '#f6b477'],       // rose bronze
-            molten:     ['#ff6418', '#7a1c00', '#ffd09a'],
-            gold:       ['#d2a038', '#5a3a06', '#fff0b0'],
+            crimson:    ['#c0143e', '#6a0828', '#ff7a98'],
+            teal:       ['#12b8a4', '#066a5e', '#9cfff2'],
+            bronze:     ['#a0602e', '#5a2a10', '#f6b477'],       // rose bronze
+            molten:     ['#ff6418', '#a03008', '#ffd09a'],
+            gold:       ['#d2a038', '#7a5414', '#fff0b0'],
             champagne:  ['#eddcb2', '#8e7446', '#fffaea'],
-            pink:       ['#e81c84', '#5e0430', '#ffa0d0'],
-            violet:     ['#4a24a0', '#14063a', '#b596ff']
+            pink:       ['#e81c84', '#8a0a4a', '#ffa0d0'],
+            violet:     ['#4a24a0', '#24105e', '#b596ff']
         };
 
         // Shapes (from the sketches): a rounded knob at the rear where the hand sits, a band that bulges out
@@ -238,22 +238,22 @@
                 if (p.emit) { c.save(); c.shadowColor = p.c; c.shadowBlur = 2.2 * WEAPON_BAKE; c.fill(path); c.fill(path); c.restore(); }
                 c.fill(path); return;
             }
-            const M = GUN_MATERIALS[p.m];
+            const M = GUN_MATERIALS[p.m], E = _gunMix(M[1], M[0], 0.4);                   // the edge: a deep shade of its own colour
             if (p.dot) {                                                                        // a faceted gem: lit half, shaded half, a glint
                 const [x, y, r] = p.dot, g = c.createLinearGradient(x - r, y - r, x + r, y + r);
                 g.addColorStop(0, M[2]); g.addColorStop(0.46, _gunMix(M[2], M[0], 0.55)); g.addColorStop(0.46, M[0]);
-                g.addColorStop(0.8, _gunMix(M[0], M[1], 0.5)); g.addColorStop(1, M[1]);
+                g.addColorStop(0.8, _gunMix(M[0], M[1], 0.5)); g.addColorStop(1, E);
                 c.fillStyle = g; c.fill(path);
                 c.fillStyle = 'rgba(255, 255, 255, 0.7)';
                 c.beginPath(); c.moveTo(x - r * 0.55, y - r * 0.2); c.lineTo(x - r * 0.2, y - r * 0.55); c.lineTo(x - r * 0.05, y - r * 0.4); c.lineTo(x - r * 0.4, y - r * 0.05); c.closePath(); c.fill();
                 return;
             }
             const g = c.createLinearGradient(0, y0, 0, y1);                                     // hard facets across the width
-            g.addColorStop(0, M[1]); g.addColorStop(0.08, M[1]);
+            g.addColorStop(0, E); g.addColorStop(0.08, E);
             g.addColorStop(0.08, M[2]); g.addColorStop(0.26, _gunMix(M[2], M[0], 0.5));
             g.addColorStop(0.26, M[0]); g.addColorStop(0.6, M[0]);
             g.addColorStop(0.6, _gunMix(M[0], M[1], 0.45)); g.addColorStop(0.9, _gunMix(M[0], M[1], 0.6));
-            g.addColorStop(0.9, M[1]); g.addColorStop(1, M[1]);
+            g.addColorStop(0.9, E); g.addColorStop(1, E);
             c.fillStyle = g; c.fill(path);
             if (x1 - x0 > 3 && y1 - y0 > 1.6) { c.save(); c.clip(path); _gunGlints(c, x0, y0, x1, y1, 0.2); c.restore(); }
         }
@@ -269,8 +269,8 @@
 
         /**
          * The baked sprite of a model (with an under-barrel laser when `laser`): drawn at 1/WEAPON_BAKE
-         * scale with its top-left at (x, y) in the gun's frame. An ink outline under every solid part
-         * keeps the silhouette readable at any zoom.
+         * scale with its top-left at (x, y) in the gun's frame. No ink outline: like the characters, a
+         * gun's edges are shades of its own colours, so it sits in the same vivid world.
          */
         function bakeWeapon(model, laser) {
             const key = model, cache = _weaponSprites.get(key) || {};
@@ -289,8 +289,6 @@
             cv.width = Math.ceil((bx1 - bx0) * K); cv.height = Math.ceil((by1 - by0) * K);
             const c = cv.getContext('2d');
             c.scale(K, K); c.translate(-bx0, -by0); c.lineJoin = 'round';
-            c.strokeStyle = 'rgba(8, 4, 18, 0.9)'; c.lineWidth = 0.7;                           // the ink outline, all solids at once
-            for (const p of parts) if (p.m) c.stroke(_gunPartPath(p));
             for (const p of parts) _paintGunPart(c, p);
             const out = { cv, x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 };
             cache[laser ? 1 : 0] = out; _weaponSprites.set(key, cache);
