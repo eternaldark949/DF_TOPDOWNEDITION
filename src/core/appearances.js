@@ -91,6 +91,10 @@
             'Barista Ren':      { skinColor: '#a0724a', gender: 'female', hair: { type: 'ponytail', color: '#2a1500' }, eyeColor: '#5a3a1a',
                                   top: { type: 'tshirt', color: '#654321' }, bottom: { type: 'apron', color: '#3a2a1a', under: '#222222' },
                                   shoes: { type: 'sneakers', color: '#eeeeee' }, pose: 'polish', faceRoom: true },
+            // The Cozy Cafe's cook, at the range in his whites
+            'Chef Koda':        { skinColor: '#7a5236', gender: 'male', build: 'broad', hair: { type: 'short', color: '#1a120c' }, eyeColor: '#3a2a1a',
+                                  top: { type: 'tshirt', color: '#f1ece2' }, bottom: { type: 'apron', color: '#e9e2d4', under: '#2a2a30' },
+                                  shoes: { type: 'sneakers', color: '#2a2a2a' }, pose: 'polish' },
 
             // The Empereal Lord's scientist and medic; she keeps Stella and 747 running
             'Dr. Yin': { skinColor: '#e8d0b8', gender: 'female', build: 'slim', hair: { type: 'short', color: '#222222' }, eyeColor: '#7a7394',
@@ -210,6 +214,29 @@
                     if (j.length) look.jewelry = j;
                 }
                 return look;
+            },
+            // The Cozy Cafe's guests (world/cafe-life.js): knitwear and coats in warm, muted tones —
+            // oat, cream, rust, mustard, sage, camel, cocoa, denim — beanies and berets, a scarf-red here and there
+            cafegoer(r) {
+                const pick = l => pickFrom(r, l), P = PALETTE;
+                const warm = ['#e8dcc4', '#d8c2a0', '#b5643e', '#c0903a', '#6d8a64', '#a07850', '#5a3a28', '#4a5a72', '#8e4632', '#efe4d0', '#3e4a3a', '#7a5a6a'];
+                const deep = ['#3a2a20', '#2e3440', '#4a3a2e', '#26303a', '#5a4632', '#1e1c1e'];
+                const gender = pick(['female', 'female', 'male', 'male', 'androgynous']);
+                const look = { gender, skinColor: pick(P.skins), build: pick([undefined, 'slim', 'athletic', 'curvy', 'broad']), height: 0.94 + r() * 0.12,
+                               hair: { type: pick(gender === 'male' ? ['short', 'curls', 'afro', 'braids', 'dreadlocks'] : ['long', 'ponytail', 'curls', 'braids', 'short', 'afro']), color: pick(P.hairs) } };
+                look.top = { type: pick(['turtleneck', 'turtleneck', 'hoodie', 'coat', 'jacket', 'tshirt', 'vest']), color: pick(warm), inner: pick(['#efe4d0', '#3a2a20', '#e8dcc4']) };
+                if (gender === 'female' && r() < 0.5) look.bottom = { type: pick(['long_skirt', 'pleated_skirt', 'skirt', 'leggings']), color: pick(deep.concat(['#8e4632', '#6d8a64', '#c0903a'])) };
+                else look.bottom = { type: 'pants', color: pick(deep) };
+                look.shoes = { type: pick(['boots', 'sneakers', 'loafers']), color: pick(['#3a2414', '#1e1c1e', '#efe4d0', '#6e4528']) };
+                if (r() < 0.35) look.hat = { type: pick(['beanie', 'beanie', 'beret', 'cap']), color: pick(warm) };
+                if (r() < 0.25) look.jewelry = [{ type: pick(['necklace', 'hoops', 'sunglasses']), color: pick(['#c9a24a', '#d8dcef', '#3a2a20']) }];
+                return look;
+            },
+            // The Cozy Cafe's other barista: a cream shirt and the house apron
+            cafe_staff(r) {
+                return { gender: pickFrom(r, ['female', 'male']), build: 'slim', skinColor: pickFrom(r, PALETTE.skins), hair: { type: pickFrom(r, ['ponytail', 'short', 'curls']), color: pickFrom(r, PALETTE.hairs) },
+                         top: { type: 'tshirt', color: '#efe4d0' }, bottom: { type: 'apron', color: '#4a2c1a', under: '#2a2a30' }, shoes: { type: 'sneakers', color: '#3a2414' },
+                         hat: r() < 0.5 ? { type: 'beanie', color: '#b5643e' } : undefined };
             },
             // Moon City's staff: a bouncer in black and gold, a barback in a vest, the powder-room attendant
             mc_staff(kind, r) {

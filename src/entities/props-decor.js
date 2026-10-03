@@ -1409,6 +1409,253 @@
             }
         }
 
+        /* =====================================================================
+           COZY CAFE (cc_*) — walnut, honey, brass and velvet. Flames, steam and
+           pendant glows are the glow pass's (engine/interiors.js drawCafeGlow).
+           Seated pieces take `face` (where the sitter looks); they're drawn
+           facing south and turned.
+           ===================================================================== */
+        const CC = {
+            walnut: '#4a2c1a', walnutDk: '#2e1b10', walnutLt: '#6e4529', honey: '#c98c4a', honeyLt: '#e2ae6c',
+            cream: '#f3e4c6', linen: '#e8dcc4', brass: '#c9a24a', copper: '#b8683a', steel: '#8d9098', steelDk: '#4a4d55',
+            brick: '#8a3b28', brickDk: '#5a2418', rust: '#8e4632', rustDk: '#5e2a1e', sage: '#6d8a64', sageDk: '#4a6244',
+            mustard: '#c0903a', leaf: '#4f7a3a', leafLt: '#79a656', pot: '#b5643e', chalk: '#1f2a24'
+        };
+        const CC_FACE = { S: 0, W: Math.PI / 2, N: Math.PI, E: -Math.PI / 2 };
+        function drawCafeDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000, d = p.decor || {}, C = CC;
+            const hsh = (k) => { const v = Math.sin((x * 12.9898 + y * 78.233 + k * 37.719)) * 43758.5453; return v - Math.floor(v); };   // a stable per-piece choice
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const shadow = (r = 4, X = x, Y = y, W = w, H = h) => rr(X + 3, Y + 4, W, H, r, 'rgba(0,0,0,0.32)');
+            const cup = (cx, cy, col = C.cream, coffee = '#6b4423') => { circ(cx + 1, cy + 1.5, 4.6, 'rgba(0,0,0,0.3)'); circ(cx, cy, 4.6, C.linen, 'rgba(120,90,60,0.6)', 0.6); circ(cx, cy, 3.4, col); circ(cx, cy, 2.6, coffee); circ(cx - 0.6, cy - 0.6, 1, 'rgba(240,220,190,0.75)'); ctx.fillStyle = C.linen; ctx.fillRect(cx + 4, cy - 1, 2.2, 2); };
+            const candleJar = (cx, cy) => { circ(cx, cy, 4.2, 'rgba(255,214,160,0.35)', 'rgba(255,230,190,0.6)', 0.7); circ(cx, cy, 2.2, '#f6ead6'); circ(cx, cy, 0.9, '#3a2410'); };
+            /** Draw facing south in a local frame (w × h as it stands when facing S), turned to `face` */
+            const turned = (face, fn) => {
+                const a = CC_FACE[face] || 0, side = Math.abs(Math.sin(a)) > 0.5, LW = side ? h : w, LH = side ? w : h;
+                ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(a); fn(-LW / 2, -LH / 2, LW, LH); ctx.restore();
+            };
+            switch (p.decorType) {
+                case 'cc_counter': {                                       // walnut bar, honey edge, slatted front, the register, a pastry case at the end
+                    shadow(4);
+                    if (d.vertical) {
+                        rr(x, y, w, h, 4, C.walnut, C.walnutDk, 1.2); rr(x + 3, y + 3, w - 6, h - 6, 3, C.walnutLt);
+                        ctx.fillStyle = 'rgba(0,0,0,0.18)'; for (let yy = y + 10; yy < y + h - 4; yy += 9) ctx.fillRect(x + w - 6, yy, 4, 5);   // the slats on the room side
+                        ctx.fillStyle = C.honey; ctx.fillRect(x + w - 3, y + 2, 2, h - 4);
+                        // A cake stand under a glass dome, a jar of biscotti
+                        circ(x + w / 2, y + 40, 10, 'rgba(230,240,255,0.18)', 'rgba(255,255,255,0.45)', 0.8); circ(x + w / 2, y + 40, 7, '#d9a36a'); circ(x + w / 2 - 2, y + 38, 2, '#f4dcc0');
+                        rr(x + w / 2 - 5, y + 74, 10, 14, 3, 'rgba(220,235,255,0.3)', 'rgba(255,255,255,0.5)', 0.7); ctx.fillStyle = '#c8935a'; ctx.fillRect(x + w / 2 - 3, y + 78, 6, 8);
+                        cup(x + w / 2, y + 112); cup(x + w / 2, y + 140, '#e9d2b4');
+                        break;
+                    }
+                    rr(x, y, w, h, 4, C.walnut, C.walnutDk, 1.2); rr(x + 3, y + 3, w - 6, h - 9, 3, C.walnutLt);
+                    ctx.fillStyle = C.honey; ctx.fillRect(x + 2, y + h - 4, w - 4, 2);                                  // the honey edge the guests lean on
+                    ctx.strokeStyle = 'rgba(255,220,170,0.08)'; ctx.lineWidth = 1; ctx.beginPath(); for (let xx = x + 12; xx < x + w; xx += 16) { ctx.moveTo(xx, y + 4); ctx.lineTo(xx + 6, y + h - 8); } ctx.stroke();
+                    // The register (brass), a tip jar, a cup of stirrers
+                    rr(x + 50, y + 5, 30, 16, 3, '#2a2026', C.brass, 1); rr(x + 54, y + 8, 14, 6, 1, 'rgba(170,255,200,0.65)'); ctx.fillStyle = C.brass; ctx.fillRect(x + 70, y + 8, 6, 9);
+                    circ(x + 98, y + 13, 6, 'rgba(220,235,255,0.25)', 'rgba(255,255,255,0.55)', 0.8); ctx.fillStyle = '#7fb06a'; ctx.fillRect(x + 95, y + 12, 6, 3); ctx.fillStyle = C.brass; circ(x + 99, y + 15, 1.4, C.brass);
+                    cup(x + 130, y + 13); cup(x + 150, y + 15, '#d8b48c');
+                    // The pastry case: glass, three shelves of something sweet
+                    const px = x + w - 104, pw = 98;
+                    rr(px, y + 2, pw, h - 7, 3, 'rgba(255,236,210,0.12)', 'rgba(255,240,220,0.55)', 1);
+                    const pastry = ['#d9a36a', '#f0c9a0', '#8a4b2e', '#e8b8c8', '#f4dcae', '#c27b4a'];
+                    for (let i = 0; i < 7; i++) for (let j = 0; j < 2; j++) {
+                        const cx = px + 9 + i * 13, cy = y + 9 + j * 10, col = pastry[(i * 3 + j * 5) % pastry.length];
+                        if ((i + j) % 3 === 2) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(cx - 5, cy + 3); ctx.quadraticCurveTo(cx, cy - 6, cx + 5, cy + 3); ctx.closePath(); ctx.fill(); }   // croissants
+                        else { circ(cx, cy, 4, col); circ(cx - 1, cy - 1, 1.4, 'rgba(255,255,255,0.4)'); }
+                    }
+                    ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(px + 4, y + 3, 3, h - 10);
+                    break;
+                }
+                case 'cc_espresso': {                                      // brass and steel: two group heads, cups warming on top, a pressure gauge
+                    shadow(5); rr(x, y, w, h, 6, C.steelDk, '#2a2c32', 1); rr(x + 3, y + 3, w - 6, h - 10, 5, C.steel);
+                    rr(x + 3, y + 3, w - 6, 5, 3, C.brass);
+                    for (const gx of [x + 18, x + w - 18]) { circ(gx, y + h - 9, 6, '#2a2c32', C.brass, 1.2); circ(gx, y + h - 9, 2.5, '#111'); }
+                    circ(x + w / 2, y + 18, 5, '#f4efe6', C.brass, 1); ctx.strokeStyle = '#a3241a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w / 2, y + 18); ctx.lineTo(x + w / 2 + 3 * Math.cos(t), y + 18 + 3 * Math.sin(t)); ctx.stroke();
+                    for (let i = 0; i < 4; i++) circ(x + 10 + i * 6, y + 12, 2.6, C.linen, 'rgba(0,0,0,0.25)', 0.5);
+                    break;
+                }
+                case 'cc_grinder': {
+                    shadow(3); rr(x + 3, y + 8, w - 6, h - 8, 3, '#2a2026', '#14100f', 1);
+                    ctx.fillStyle = 'rgba(120,80,50,0.85)'; ctx.beginPath(); ctx.moveTo(x + 2, y + 10); ctx.lineTo(x + w - 2, y + 10); ctx.lineTo(x + w - 6, y); ctx.lineTo(x + 6, y); ctx.closePath(); ctx.fill();
+                    for (let i = 0; i < 6; i++) circ(x + 7 + (i % 3) * 6, y + 3 + (i / 3 | 0) * 3, 1.3, '#3a2214');
+                    break;
+                }
+                case 'cc_mug_shelf': {                                     // a walnut shelf on the wall, mismatched mugs on hooks
+                    rr(x, y + h - 8, w, 8, 2, C.walnutLt, C.walnutDk, 1);
+                    const mugs = ['#e9dcc6', '#c98c4a', '#6d8a64', '#8e4632', '#f1e4cc', '#5d6f8a', '#d9b45a', '#b5643e'];
+                    for (let i = 0; i < 9; i++) { const mx = x + 8 + i * 13.5; rr(mx - 5, y + 2, 10, 11, 2, mugs[i % mugs.length], 'rgba(0,0,0,0.3)', 0.6); ctx.strokeStyle = mugs[i % mugs.length]; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(mx + 5, y + 7, 2.6, -1.2, 1.2); ctx.stroke(); }
+                    break;
+                }
+                case 'cc_plant': {                                         // a terracotta pot, leaves fanned out (variant 1: a big fern)
+                    const cx = x + w / 2, cy = y + h / 2, big = d.variant === 1, R = Math.min(w, h) / 2;
+                    circ(cx + 2, cy + 3, R * 0.62, 'rgba(0,0,0,0.3)'); circ(cx, cy, R * 0.58, C.pot, '#7a3e22', 1.2); circ(cx, cy, R * 0.44, '#3a2416');
+                    const n = big ? 13 : 9, sway = Math.sin(t * 0.8 + x) * 0.05;
+                    for (let i = 0; i < n; i++) {
+                        const a = i / n * Math.PI * 2 + sway + hsh(i) * 0.3, L = R * (big ? 1.25 : 0.95) * (0.75 + hsh(i + 9) * 0.35);
+                        ctx.fillStyle = i % 2 ? C.leaf : C.leafLt; ctx.beginPath();
+                        ctx.ellipse(cx + Math.cos(a) * L * 0.55, cy + Math.sin(a) * L * 0.55, L * 0.55, big ? 3.2 : 4.4, a, 0, Math.PI * 2); ctx.fill();
+                    }
+                    break;
+                }
+                case 'cc_fireplace': {                                     // brick surround on the west wall, a stone hearth, logs in the firebox
+                    shadow(3); rr(x, y, w, h, 3, C.brick, C.brickDk, 1.5);
+                    ctx.strokeStyle = 'rgba(40,12,8,0.55)'; ctx.lineWidth = 1; ctx.beginPath();
+                    for (let yy = y + 8, row = 0; yy < y + h; yy += 8, row++) { ctx.moveTo(x, yy); ctx.lineTo(x + w, yy); for (let xx = x + (row % 2 ? 6 : 12); xx < x + w; xx += 12) { ctx.moveTo(xx, yy - 8); ctx.lineTo(xx, yy); } }
+                    ctx.stroke();
+                    rr(x + w - 4, y - 8, 14, h + 16, 3, '#6a625a', '#3c3630', 1);                                        // the hearthstone
+                    rr(x + 8, y + 26, w - 14, h - 52, 4, '#140806', '#2a120a', 1.2);                                    // the firebox
+                    ctx.fillStyle = '#4a2c18'; ctx.save(); ctx.translate(x + w / 2 + 2, y + h / 2); ctx.rotate(0.4); ctx.fillRect(-4, -26, 8, 52); ctx.rotate(-0.8); ctx.fillRect(-4, -24, 8, 48); ctx.restore();   // crossed logs
+                    for (let i = 0; i < 7; i++) { const f = 0.5 + 0.5 * Math.sin(t * 5 + i * 1.7); circ(x + w / 2 + 2 + (hsh(i) - 0.5) * 12, y + 34 + i * ((h - 68) / 6), 2 + f * 1.5, `rgba(255,${90 + 80 * f | 0},30,${0.55 + 0.4 * f})`); }   // embers
+                    rr(x + 2, y + 6, 8, h - 12, 2, C.walnut);                                                            // the mantel's shadow line
+                    // On the mantel: two candlesticks and a small clock
+                    for (const cy of [y + 14, y + h - 14]) { circ(x + 6, cy, 3, C.brass); circ(x + 6, cy, 1.6, '#f6ead6'); }
+                    break;
+                }
+                case 'cc_armchair': case 'cc_loveseat': {                  // tufted velvet (rust or sage), deep arms, a cushion; a throw on some
+                    const sofa = p.decorType === 'cc_loveseat', col = sofa ? C.sage : (hsh(1) > 0.5 ? C.rust : C.mustard), dk = sofa ? C.sageDk : (col === C.rust ? C.rustDk : '#8a6424');
+                    turned(d.face || 'S', (X, Y, W, H) => {
+                        rr(X + 3, Y + 4, W, H, 10, 'rgba(0,0,0,0.32)');
+                        rr(X, Y, W, H, 10, dk); rr(X, Y, W, H * 0.34, 9, col, dk, 1);                                     // the back
+                        rr(X, Y + 4, W * 0.18, H - 6, 6, col, dk, 1); rr(X + W * 0.82, Y + 4, W * 0.18, H - 6, 6, col, dk, 1);   // arms
+                        const seats = sofa ? 2 : 1, sw = (W * 0.64) / seats;
+                        for (let i = 0; i < seats; i++) rr(X + W * 0.18 + i * sw + 1, Y + H * 0.32, sw - 2, H * 0.62, 6, col, 'rgba(0,0,0,0.25)', 0.8);
+                        ctx.fillStyle = 'rgba(0,0,0,0.22)'; for (let i = 1; i < 4; i++) for (const yy of [Y + H * 0.12, Y + H * 0.24]) { ctx.beginPath(); ctx.arc(X + W * i / 4, yy, 1.1, 0, Math.PI * 2); ctx.fill(); }   // tufting
+                        if (hsh(3) > 0.4) { ctx.fillStyle = 'rgba(232,220,196,0.85)'; ctx.beginPath(); ctx.moveTo(X + W * 0.62, Y + H * 0.3); ctx.lineTo(X + W * 0.84, Y + H * 0.3); ctx.lineTo(X + W * 0.8, Y + H * 0.95); ctx.lineTo(X + W * 0.56, Y + H * 0.9); ctx.closePath(); ctx.fill();   // a knitted throw
+                            ctx.strokeStyle = 'rgba(160,120,80,0.35)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let k = 0.4; k < 0.95; k += 0.1) { ctx.moveTo(X + W * 0.6, Y + H * k); ctx.lineTo(X + W * 0.82, Y + H * k); } ctx.stroke(); }
+                        if (sofa) rr(X + W * 0.24, Y + H * 0.3, W * 0.16, H * 0.2, 4, C.mustard, 'rgba(0,0,0,0.25)', 0.6);   // a cushion
+                    });
+                    break;
+                }
+                case 'cc_lowtable': {                                      // a low round table: a stack of books, two mugs, a candle
+                    const cx = x + w / 2, cy = y + h / 2, R = Math.min(w, h) / 2;
+                    circ(cx + 3, cy + 4, R, 'rgba(0,0,0,0.3)'); circ(cx, cy, R, C.walnut, C.walnutDk, 1.5); circ(cx, cy, R - 4, C.walnutLt);
+                    rr(cx - 16, cy - 10, 20, 14, 1, '#7a3b2e'); rr(cx - 15, cy - 13, 18, 4, 1, '#d9c8a6'); rr(cx - 14, cy - 17, 16, 4, 1, '#3e5a6e');
+                    cup(cx + 10, cy - 6); cup(cx + 6, cy + 10, '#e2c7a2'); candleJar(cx - 8, cy + 10);
+                    break;
+                }
+                case 'cc_bookshelf': {                                     // a walnut case of well-read spines
+                    shadow(2); rr(x, y, w, h, 2, C.walnutDk, '#1a0f08', 1);
+                    const cols = ['#7a3b2e', '#3e5a6e', '#c0903a', '#5f7a5a', '#d9c8a6', '#4a3a5e', '#9a5a3a', '#2e4a3a'];
+                    let bx = x + 3;
+                    while (bx < x + w - 4) { const bw = 3 + (hsh(bx) * 4 | 0), lean = hsh(bx + 1) > 0.88; ctx.fillStyle = cols[(bx * 7 | 0) % cols.length]; if (lean) { ctx.save(); ctx.translate(bx, y + h - 3); ctx.rotate(-0.25); ctx.fillRect(0, -(h - 7), bw, h - 7); ctx.restore(); } else ctx.fillRect(bx, y + 3, bw, h - 6); bx += bw + 0.6; }
+                    ctx.fillStyle = 'rgba(255,220,160,0.08)'; ctx.fillRect(x + 2, y + 2, w - 4, 2);
+                    break;
+                }
+                case 'cc_record': {                                        // a sideboard, a turntable turning, a stack of sleeves
+                    shadow(3); rr(x, y, w, h, 3, C.walnut, C.walnutDk, 1);
+                    rr(x + 3, y + 3, h - 6, h - 6, 2, '#2a2026'); const cx = x + 3 + (h - 6) / 2, cy = y + h / 2;
+                    circ(cx, cy, (h - 10) / 2, '#0e0c10'); circ(cx, cy, 3, '#c0903a');
+                    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(cx, cy, 7, t * 3.5, t * 3.5 + 1.2); ctx.stroke();
+                    ctx.strokeStyle = C.brass; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + h, y + 4); ctx.lineTo(cx + 4, cy - 2); ctx.stroke();
+                    for (let i = 0; i < 3; i++) rr(x + h + 4 + i * 2, y + 5, 14, h - 10, 1, ['#c98c4a', '#6d8a64', '#8e4632'][i], 'rgba(0,0,0,0.3)', 0.5);
+                    break;
+                }
+                case 'cc_round_table': {                                   // a walnut round, a candle jar, cups and saucers, a sprig in a bud vase
+                    const cx = x + w / 2, cy = y + h / 2, R = Math.min(w, h) / 2;
+                    circ(cx + 3, cy + 4, R, 'rgba(0,0,0,0.3)'); circ(cx, cy, R, C.walnut, C.walnutDk, 1.4); circ(cx, cy, R - 4, C.walnutLt);
+                    ctx.strokeStyle = 'rgba(255,220,170,0.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R - 10, 0, Math.PI * 2); ctx.stroke();
+                    candleJar(cx, cy);
+                    const k = hsh(5);
+                    if (k > 0.3) cup(cx - 13, cy + 4);
+                    if (k > 0.55) cup(cx + 13, cy - 4, '#e2c7a2');
+                    if (k < 0.5) { rr(cx + 6, cy + 6, 12, 8, 2, '#f1e4cc'); circ(cx + 12, cy + 10, 3, '#c27b4a'); }        // a plate, a pastry
+                    circ(cx - 6, cy - 12, 2.4, 'rgba(220,235,255,0.5)'); ctx.fillStyle = hsh(6) > 0.5 ? '#e8b8c8' : '#f4dcae'; circ(cx - 6, cy - 14, 2, ctx.fillStyle);
+                    break;
+                }
+                case 'cc_chair': {                                         // a bentwood chair: a round seat, a curved back
+                    turned(d.face || 'S', (X, Y, W, H) => {
+                        circ(X + W / 2 + 2, Y + H / 2 + 3, W / 2, 'rgba(0,0,0,0.28)');
+                        circ(X + W / 2, Y + H / 2 + 1, W / 2 - 1, C.walnutLt, C.walnutDk, 1.2);
+                        circ(X + W / 2, Y + H / 2 + 1, W / 2 - 5, hsh(2) > 0.5 ? C.rust : C.sage);
+                        ctx.strokeStyle = C.walnut; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X + W / 2, Y + H / 2 + 1, W / 2 - 1, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+                    });
+                    break;
+                }
+                case 'cc_booth': {                                         // a padded bench, its back to the wall
+                    turned(d.face || 'S', (X, Y, W, H) => {
+                        rr(X + 3, Y + 4, W, H, 8, 'rgba(0,0,0,0.3)');
+                        rr(X, Y, W, H, 8, C.walnutDk); rr(X + 2, Y + 1, W - 4, H * 0.38, 7, C.sage, C.sageDk, 1);
+                        for (let i = 0; i < 3; i++) rr(X + 3 + i * (W - 6) / 3, Y + H * 0.36, (W - 6) / 3 - 2, H * 0.56, 5, C.sage, 'rgba(0,0,0,0.25)', 0.8);
+                        ctx.fillStyle = 'rgba(0,0,0,0.2)'; for (let i = 1; i < 6; i++) { ctx.beginPath(); ctx.arc(X + W * i / 6, Y + H * 0.18, 1.1, 0, Math.PI * 2); ctx.fill(); }
+                    });
+                    break;
+                }
+                case 'cc_booth_table': case 'cc_side_table': {
+                    const side = p.decorType === 'cc_side_table';
+                    shadow(side ? 10 : 4); rr(x, y, w, h, side ? Math.min(w, h) / 2 : 4, C.walnut, C.walnutDk, 1.4); rr(x + 3, y + 3, w - 6, h - 6, side ? Math.min(w, h) / 2 - 3 : 3, C.walnutLt);
+                    if (side) { cup(x + w / 2 - 5, y + h / 2); circ(x + w / 2 + 8, y + h / 2 - 3, 2, 'rgba(220,235,255,0.5)'); break; }
+                    candleJar(x + w / 2, y + h / 2);
+                    cup(x + 14, y + 14); if (hsh(4) > 0.4) cup(x + w - 14, y + h - 14, '#e2c7a2');
+                    rr(x + w - 18, y + 6, 10, 12, 3, 'rgba(220,235,255,0.25)', 'rgba(255,255,255,0.5)', 0.6); ctx.fillStyle = '#f4ead6'; ctx.fillRect(x + w - 16, y + 11, 6, 6);   // sugar
+                    break;
+                }
+                case 'cc_bench': {                                         // a window bench: cushions in three colours, pillows, a folded blanket
+                    turned(d.face || 'S', (X, Y, W, H) => {
+                        rr(X + 3, Y + 4, W, H, 6, 'rgba(0,0,0,0.3)'); rr(X, Y, W, H, 6, C.walnutDk, '#1a0f08', 1);
+                        const cols = [C.rust, C.sage, C.mustard, C.linen];
+                        const n = Math.max(2, Math.round(W / 62));
+                        for (let i = 0; i < n; i++) rr(X + 3 + i * (W - 6) / n, Y + 3, (W - 6) / n - 3, H - 6, 6, cols[(i + (x | 0)) % cols.length], 'rgba(0,0,0,0.22)', 0.8);
+                        for (let i = 0; i < n; i += 2) rr(X + 8 + i * (W - 6) / n, Y + H - 14, 16, 10, 4, cols[(i + 1 + (x | 0)) % cols.length], 'rgba(0,0,0,0.25)', 0.6);   // pillows against the glass
+                    });
+                    break;
+                }
+                case 'cc_easel': {                                         // a chalkboard on legs: today's special
+                    shadow(2); rr(x, y, w, h, 2, C.walnutLt, C.walnutDk, 1); rr(x + 2, y + 2, w - 4, h - 4, 1, C.chalk);
+                    ctx.fillStyle = 'rgba(240,235,220,0.85)'; ctx.font = '600 5px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('honey', x + w / 2, y + h / 2 - 3); ctx.fillText('latte ♥', x + w / 2, y + h / 2 + 4);
+                    break;
+                }
+                case 'cc_stove': {                                         // the range: four burners, a pot simmering, a copper pan
+                    shadow(3); rr(x, y, w, h, 3, C.steelDk, '#202228', 1); rr(x + 3, y + 3, w - 6, h - 8, 2, '#2c2e34');
+                    for (let i = 0; i < 4; i++) { const bx = x + 18 + i * 32, by = y + h / 2 - 2; circ(bx, by, 10, '#16171b', '#55585f', 1); if (i === 1) circ(bx, by, 8, `rgba(80,140,255,${0.35 + 0.15 * Math.sin(t * 9)})`); }
+                    circ(x + 50, y + h / 2 - 2, 11, C.steel, '#3a3c42', 1); circ(x + 50, y + h / 2 - 2, 8, '#c27b4a');            // the soup
+                    circ(x + 114, y + h / 2 - 2, 10, C.copper, '#6e3a1a', 1); ctx.fillStyle = C.copper; ctx.fillRect(x + 123, y + h / 2 - 4, 10, 3);
+                    for (let i = 0; i < 4; i++) circ(x + 18 + i * 32, y + h - 3, 2, '#c9c9c9');
+                    break;
+                }
+                case 'cc_sink': { shadow(3); rr(x, y, w, h, 3, C.steel, C.steelDk, 1); rr(x + 6, y + 5, w / 2 - 9, h - 10, 4, '#5a5e66'); rr(x + w / 2 + 3, y + 5, w / 2 - 9, h - 10, 4, '#5a5e66'); circ(x + w / 2, y + 4, 2.5, '#d0d2d8'); break; }
+                case 'cc_prep': {                                          // a butcher-block table: a loaf, a board, a knife, a bowl of lemons
+                    shadow(3); rr(x, y, w, h, 3, '#b07a44', '#6e4628', 1.2);
+                    ctx.strokeStyle = 'rgba(80,50,25,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); for (let xx = x + 10; xx < x + w; xx += 10) { ctx.moveTo(xx, y + 2); ctx.lineTo(xx, y + h - 2); } ctx.stroke();
+                    ctx.fillStyle = '#c8894a'; ctx.beginPath(); ctx.ellipse(x + 30, y + h / 2, 18, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#8a5428'; ctx.beginPath(); for (let k = -10; k <= 10; k += 6) { ctx.moveTo(x + 30 + k - 2, y + h / 2 - 6); ctx.lineTo(x + 30 + k + 2, y + h / 2 + 6); } ctx.stroke();
+                    rr(x + 64, y + 10, 30, 22, 3, '#e3c38e'); ctx.fillStyle = '#cfd2d8'; ctx.fillRect(x + 70, y + 20, 18, 2);
+                    circ(x + 122, y + h / 2, 12, '#e8e2d4', '#b0a890', 1); for (let i = 0; i < 4; i++) circ(x + 118 + (i % 2) * 8, y + h / 2 - 3 + (i >> 1) * 6, 3.4, '#f2cf45');
+                    break;
+                }
+                case 'cc_fridge': { shadow(3); rr(x, y, w, h, 4, '#d6d8de', '#8a8d95', 1); ctx.fillStyle = '#9a9da5'; ctx.fillRect(x + 3, y + h * 0.42, w - 6, 1.5); rr(x + w - 9, y + 8, 3, 18, 1, '#6a6d75'); rr(x + w - 9, y + h * 0.5, 3, 22, 1, '#6a6d75');
+                    rr(x + 8, y + 10, 14, 10, 1, '#f5e9a8'); rr(x + 26, y + 30, 12, 12, 1, '#a8d8f5'); break; }       // notes and a drawing on the door
+                case 'cc_shelf': {                                         // shelves of jars and tins
+                    shadow(2); rr(x, y, w, h, 2, C.walnutDk, '#1a0f08', 1);
+                    const jars = ['#d9a36a', '#f4dcae', '#8a4b2e', '#6d8a64', '#c0903a', '#e8dcc4'];
+                    const along = d.vertical ? h : w, across = d.vertical ? w : h;
+                    for (let i = 0; i * 12 + 8 < along; i++) for (let j = 0; j < 2; j++) {
+                        const a = i * 12 + 7, b = across * (j ? 0.7 : 0.3);
+                        circ(d.vertical ? x + b : x + a, d.vertical ? y + a : y + b, 4, jars[(i * 2 + j) % jars.length], 'rgba(0,0,0,0.3)', 0.6);
+                    }
+                    break;
+                }
+                case 'cc_crate': {                                         // a crate of coffee beans, stencilled
+                    shadow(3); rr(x, y, w, h, 2, '#8a5a32', '#4a2c14', 1.2);
+                    ctx.strokeStyle = 'rgba(40,20,8,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.moveTo(x, y); ctx.lineTo(x + w, y + h); ctx.stroke();
+                    ctx.fillStyle = 'rgba(30,14,6,0.55)'; ctx.font = '700 7px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(d.variant ? 'COCOA' : 'BEANS', x + w / 2, y + h / 2);
+                    break;
+                }
+                case 'cc_sacks': {                                         // flour sacks slumped together
+                    for (let i = 0; i < 3; i++) { const sx = x + 4 + i * 24, sy = y + (i % 2) * 8; ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(sx + 16, sy + 24, 14, 18, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#e4d6b8'; ctx.beginPath(); ctx.ellipse(sx + 13, sy + 20, 13, 17, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#a89470'; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = '#b8574a'; ctx.fillRect(sx + 6, sy + 18, 14, 3); }
+                    break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
             if (p.decorType.startsWith('sc_')) return drawSanctumDecorProp(ctx, p);
@@ -1418,6 +1665,7 @@
             if (p.decorType.startsWith('dn_')) return drawLobbyDecorProp(ctx, p);
             if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
             if (p.decorType.startsWith('dp_')) return drawPalaceDecorProp(ctx, p);
+            if (p.decorType.startsWith('cc_')) return drawCafeDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);

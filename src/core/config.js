@@ -4,7 +4,7 @@
         (() => { let on = false; try { on = localStorage.getItem('dfab_debug') === '1'; } catch (e) { /* private mode */ } if (!on) console.log = () => {}; })();
 
         // Fireplaces: where the art draws the fire, and where the ambience hears it crackle
-        const HEARTHS = { apt_949: { x: 580, y: 432 }, keepers_parlor: { x: 450, y: 62 } };
+        const HEARTHS = { apt_949: { x: 580, y: 432 }, keepers_parlor: { x: 450, y: 62 }, cozy_cafe_interior: { x: 90, y: 535 } };
 
         // ╔════════════════════════════════════════════════════════════════════════════╗
         // ║     DIMENSIONS: FREELANCER - PERFORMANCE INFRASTRUCTURE                    ║

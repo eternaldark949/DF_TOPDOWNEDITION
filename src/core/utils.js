@@ -250,6 +250,7 @@
                 if (game.graveyardGhosts) out.push({ items: game.graveyardGhosts, pos: true, angles: ['angle'], scalars: ['life'] });
                 if (game.lobbyLife && game.lobbyLife.walkers.length) out.push({ items: game.lobbyLife.walkers, pos: true, angles: ['angle'], scalars: ['life'] });
                 if (game.clubLife && game.clubLife.walkers.length) out.push({ items: game.clubLife.walkers, pos: true, angles: ['angle'], scalars: ['life'] });
+                if (game.cafeLife && game.cafeLife.walkers.length) out.push({ items: game.cafeLife.walkers, pos: true, angles: ['angle'], scalars: ['life'] });
                 if (game.flitVFX) out.push({ items: game.flitVFX, scalars: ['ghostAlpha', 'trailLife', 'arrivalGlow'] });
                 if (game.lastKnownMarkers) out.push({ items: game.lastKnownMarkers, scalars: ['opacity'] });
                 if (m && m.ferrisWheel) out.push({ items: [m.ferrisWheel], angles: ['angle'] });

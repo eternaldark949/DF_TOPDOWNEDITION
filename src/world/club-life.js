@@ -40,7 +40,7 @@
         const CLUB_DRINKS = ['neon', 'neon', 'martini', 'champagne', 'rose', 'cream_soda', 'whiskey', 'red_wine', 'stellar_lemonade'];
 
         class ClubLife {
-            constructor() { this.walkers = []; this.map = null; this.taken = new Map(); }
+            constructor() { this.walkers = []; this.map = null; this.taken = new Map(); this.mapId = 'moon_city_nightclub'; }
 
             /** Fresh crowd for a (re)entered club. */
             reset(game) {
@@ -164,7 +164,7 @@
             }
 
             update(game) {
-                if (!game.activeMap || game.activeMap.id !== 'moon_city_nightclub') { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
+                if (!game.activeMap || game.activeMap.id !== this.mapId) { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
                 if (this.map !== game.activeMap) this.reset(game);
                 let guests = 0; for (const w of this.walkers) if (w.kind === 'guest') guests++;
                 const target = this._target(game);
@@ -193,7 +193,7 @@
                     if (!step) continue;
                     if (!step.go && !step.exit) { w.steps.shift(); continue; }
                     const [gx, gy] = step.go, d = Math.hypot(gx - w.x, gy - w.y);
-                    if (d > 6 && !step._arrived) {
+                    if (d > (step.exit ? 26 : 6) && !step._arrived) {                       // (the door: near enough, someone may be standing in it)
                         let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
                         for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
                             const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
@@ -230,8 +230,10 @@
                     if (step.face) w.angle = Math.atan2(step.face[1] - w.y, step.face[0] - w.x);
                     else if (step.seatFace !== undefined) w.angle = step.seatFace;
                     w.look.pose = step.hide ? undefined : step.pose;
-                    // A drink, fetched at the bar (the bartender's had it poured)
+                    // A drink, fetched at the bar (the bartender's had it poured); or something handed over here (`give`)
                     if (step.drink && !w.look.held && step.wait < 200) w.look.held = { type: 'glass', drink: pickFrom(Math.random, CLUB_DRINKS), hand: 'right' };
+                    if (step.give && !w.look.held && step.wait < (step.giveAt || 200)) w.look.held = step.give;
+                    if (step.take && w.look.held && step.wait < (step.takeAt || 30)) w.look.held = null;   // (and set down here)
                     if (--step.wait <= 0) {
                         if (step._back) {                                              // get up / come out
                             const b = step._back; step._back = null;
@@ -241,8 +243,8 @@
                             continue;
                         }
                         w.steps.shift(); this._releaseStep(w, step);
-                        // Glasses get finished; some go back for another
-                        if (w.look.held && Math.random() < 0.25) w.look.held = null;
+                        // Glasses get finished; some go back for another (`keep`: not this one, it was just handed over)
+                        if (w.look.held && !step.keep && Math.random() < 0.25) w.look.held = null;
                     }
                 }
             }

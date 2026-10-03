@@ -4364,7 +4364,7 @@
         (() => { let on = false; try { on = localStorage.getItem('dfab_debug') === '1'; } catch (e) { /* private mode */ } if (!on) console.log = () => {}; })();
 
         // Fireplaces: where the art draws the fire, and where the ambience hears it crackle
-        const HEARTHS = { apt_949: { x: 580, y: 432 }, keepers_parlor: { x: 450, y: 62 } };
+        const HEARTHS = { apt_949: { x: 580, y: 432 }, keepers_parlor: { x: 450, y: 62 }, cozy_cafe_interior: { x: 90, y: 535 } };
 
         // ╔════════════════════════════════════════════════════════════════════════════╗
         // ║     DIMENSIONS: FREELANCER - PERFORMANCE INFRASTRUCTURE                    ║
@@ -5050,7 +5050,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             whiskey:    { name: 'Whiskey',       glass: 'tumbler', rim: 4.0, liquid: '#b5641a', ice: true },
             neon:       { name: 'Neon Cocktail', glass: 'coupe',   rim: 4.6, liquid: '#17dcff', liquid2: '#ff2bd6', glow: true, garnish: 'citrus' },
             cream_soda: { name: 'Ms. Jean Cream Soda', glass: 'soda', rim: 3.8, liquid: '#f4b0c4', bubbles: true, foam: true, straw: '#d4447c' },
-            stellar_lemonade: { name: 'Stellar Lemonade', glass: 'tumbler', rim: 4.0, liquid: '#f3dc6a', ice: true, garnish: 'citrus' }   // JJ's
+            stellar_lemonade: { name: 'Stellar Lemonade', glass: 'tumbler', rim: 4.0, liquid: '#f3dc6a', ice: true, garnish: 'citrus' },   // JJ's
+            // The Cozy Cafe's mugs (its guests, world/cafe-life.js; `cafe`: not one of the Crystal Glass's pours)
+            latte:      { name: 'Honey Latte',   glass: 'mug', rim: 4.4, liquid: '#a9784e', cup: '#efe4d0', art: true, cafe: true },
+            tea:        { name: 'Chai',          glass: 'mug', rim: 4.2, liquid: '#b07a3c', cup: '#6d8a64', cafe: true },
+            cocoa:      { name: 'Cocoa',         glass: 'mug', rim: 4.4, liquid: '#5a3424', cup: '#c0903a', foam: true, cafe: true },
+            espresso:   { name: 'Espresso',      glass: 'mug', rim: 3.2, liquid: '#3a2214', cup: '#f3ead8', crema: true, cafe: true }
         };
 
         const COSMETICS_REGISTRY = {
@@ -5885,6 +5890,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (game.graveyardGhosts) out.push({ items: game.graveyardGhosts, pos: true, angles: ['angle'], scalars: ['life'] });
                 if (game.lobbyLife && game.lobbyLife.walkers.length) out.push({ items: game.lobbyLife.walkers, pos: true, angles: ['angle'], scalars: ['life'] });
                 if (game.clubLife && game.clubLife.walkers.length) out.push({ items: game.clubLife.walkers, pos: true, angles: ['angle'], scalars: ['life'] });
+                if (game.cafeLife && game.cafeLife.walkers.length) out.push({ items: game.cafeLife.walkers, pos: true, angles: ['angle'], scalars: ['life'] });
                 if (game.flitVFX) out.push({ items: game.flitVFX, scalars: ['ghostAlpha', 'trailLife', 'arrivalGlow'] });
                 if (game.lastKnownMarkers) out.push({ items: game.lastKnownMarkers, scalars: ['opacity'] });
                 if (m && m.ferrisWheel) out.push({ items: [m.ferrisWheel], angles: ['angle'] });
@@ -7078,6 +7084,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'Barista Ren':      { skinColor: '#a0724a', gender: 'female', hair: { type: 'ponytail', color: '#2a1500' }, eyeColor: '#5a3a1a',
                                   top: { type: 'tshirt', color: '#654321' }, bottom: { type: 'apron', color: '#3a2a1a', under: '#222222' },
                                   shoes: { type: 'sneakers', color: '#eeeeee' }, pose: 'polish', faceRoom: true },
+            // The Cozy Cafe's cook, at the range in his whites
+            'Chef Koda':        { skinColor: '#7a5236', gender: 'male', build: 'broad', hair: { type: 'short', color: '#1a120c' }, eyeColor: '#3a2a1a',
+                                  top: { type: 'tshirt', color: '#f1ece2' }, bottom: { type: 'apron', color: '#e9e2d4', under: '#2a2a30' },
+                                  shoes: { type: 'sneakers', color: '#2a2a2a' }, pose: 'polish' },
 
             // The Empereal Lord's scientist and medic; she keeps Stella and 747 running
             'Dr. Yin': { skinColor: '#e8d0b8', gender: 'female', build: 'slim', hair: { type: 'short', color: '#222222' }, eyeColor: '#7a7394',
@@ -7197,6 +7207,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (j.length) look.jewelry = j;
                 }
                 return look;
+            },
+            // The Cozy Cafe's guests (world/cafe-life.js): knitwear and coats in warm, muted tones —
+            // oat, cream, rust, mustard, sage, camel, cocoa, denim — beanies and berets, a scarf-red here and there
+            cafegoer(r) {
+                const pick = l => pickFrom(r, l), P = PALETTE;
+                const warm = ['#e8dcc4', '#d8c2a0', '#b5643e', '#c0903a', '#6d8a64', '#a07850', '#5a3a28', '#4a5a72', '#8e4632', '#efe4d0', '#3e4a3a', '#7a5a6a'];
+                const deep = ['#3a2a20', '#2e3440', '#4a3a2e', '#26303a', '#5a4632', '#1e1c1e'];
+                const gender = pick(['female', 'female', 'male', 'male', 'androgynous']);
+                const look = { gender, skinColor: pick(P.skins), build: pick([undefined, 'slim', 'athletic', 'curvy', 'broad']), height: 0.94 + r() * 0.12,
+                               hair: { type: pick(gender === 'male' ? ['short', 'curls', 'afro', 'braids', 'dreadlocks'] : ['long', 'ponytail', 'curls', 'braids', 'short', 'afro']), color: pick(P.hairs) } };
+                look.top = { type: pick(['turtleneck', 'turtleneck', 'hoodie', 'coat', 'jacket', 'tshirt', 'vest']), color: pick(warm), inner: pick(['#efe4d0', '#3a2a20', '#e8dcc4']) };
+                if (gender === 'female' && r() < 0.5) look.bottom = { type: pick(['long_skirt', 'pleated_skirt', 'skirt', 'leggings']), color: pick(deep.concat(['#8e4632', '#6d8a64', '#c0903a'])) };
+                else look.bottom = { type: 'pants', color: pick(deep) };
+                look.shoes = { type: pick(['boots', 'sneakers', 'loafers']), color: pick(['#3a2414', '#1e1c1e', '#efe4d0', '#6e4528']) };
+                if (r() < 0.35) look.hat = { type: pick(['beanie', 'beanie', 'beret', 'cap']), color: pick(warm) };
+                if (r() < 0.25) look.jewelry = [{ type: pick(['necklace', 'hoops', 'sunglasses']), color: pick(['#c9a24a', '#d8dcef', '#3a2a20']) }];
+                return look;
+            },
+            // The Cozy Cafe's other barista: a cream shirt and the house apron
+            cafe_staff(r) {
+                return { gender: pickFrom(r, ['female', 'male']), build: 'slim', skinColor: pickFrom(r, PALETTE.skins), hair: { type: pickFrom(r, ['ponytail', 'short', 'curls']), color: pickFrom(r, PALETTE.hairs) },
+                         top: { type: 'tshirt', color: '#efe4d0' }, bottom: { type: 'apron', color: '#4a2c1a', under: '#2a2a30' }, shoes: { type: 'sneakers', color: '#3a2414' },
+                         hat: r() < 0.5 ? { type: 'beanie', color: '#b5643e' } : undefined };
             },
             // Moon City's staff: a bouncer in black and gold, a barback in a vest, the powder-room attendant
             mc_staff(kind, r) {
@@ -12726,28 +12759,28 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ]
             },
             'cozy_cafe_interior': {
+                // The Cozy Cafe: honey herringbone under pendant lamps, a brick hearth with armchairs, round
+                // candlelit tables, booths along the east wall, window benches either side of the door.
+                // Floor in drawCafeInterior, furniture in drawCafeDecorProp (cc_*), glow in drawCafeGlow.
                 id: 'cozy_cafe_interior', width: 1200, height: 1000, type: 'indoor',
-                label: 'Cozy Cafe', floorColor: '#1a1008',
+                label: 'Cozy Cafe', floorColor: '#2a1a0e',
+                ambientDarkness: 0.5,                               // warm and lamp-lit, never dark
+                navProps: 'all',                                    // the guests walk round the furniture (world/cafe-life.js)
+                wallStyle: { fill: '#2b1a12', stroke: 'rgba(240,190,120,0.35)' },   // dark walnut panelling, honey trim
                 spawn: { x: 600, y: 900 },
-                zones: [
-                    { x: 60, y: 60, w: 1080, h: 600, color: '#2a1a0e', texture: 'wood' },
-                    { x: 60, y: 60, w: 350, h: 200, color: '#1e1208' },
-                    { x: 700, y: 60, w: 440, h: 250, color: '#1a1410' },
-                    { x: 450, y: 800, w: 300, h: 140, color: '#3e2723', texture: 'carpet' },
-                ],
+                zones: [],
                 walls: [
                     { x: 0, y: 0, w: 1200, h: 50 }, { x: 0, y: 950, w: 500, h: 50 },
                     { x: 700, y: 950, w: 500, h: 50 }, { x: 0, y: 0, w: 50, h: 1000 },
                     { x: 1150, y: 0, w: 50, h: 1000 }, { x: 700, y: 300, w: 450, h: 15 },
-                    { x: 690, y: 60, w: 15, h: 240 }, { x: 120, y: 250, w: 300, h: 20 },
-                    { x: 400, y: 100, w: 20, h: 170 }, { x: 950, y: 700, w: 200, h: 15 },
+                    { x: 690, y: 60, w: 15, h: 240 }, { x: 950, y: 700, w: 200, h: 15 },
                     { x: 940, y: 700, w: 15, h: 250 },
                 ],
                 transitions: [ { x: 500, y: 920, w: 200, h: 80, target: 'hub_949', label: 'Exit to City' } ],
                 landmarks: [
                     { id: 'cafe_exit', x: 600, y: 960 }, { id: 'cafe_counter', x: 250, y: 200 },
-                    { id: 'cafe_dining', x: 500, y: 550 }, { id: 'cafe_booths', x: 850, y: 550 },
-                    { id: 'cafe_kitchen', x: 900, y: 150 }
+                    { id: 'cafe_dining', x: 560, y: 550 }, { id: 'cafe_booths', x: 1040, y: 500 },
+                    { id: 'cafe_hearth', x: 190, y: 535 }, { id: 'cafe_kitchen', x: 900, y: 150 }
                 ]
             },
             'auto_shop': {
@@ -12990,6 +13023,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             { name: 'Anavia',  x: 550,  y: 1650, role: 'vip' },
         ];
         const HUB_NPC_CLEARANCE = 90; // px half-extent kept building-free per anchor
+
+        // The Cozy Cafe's round tables (centres) and booth rows (centre y): the props, the lamps and
+        // the guests' seats (world/cafe-life.js) all come from these
+        const CAFE_TABLES = [[505, 385], [628, 470], [505, 560], [628, 650], [505, 740]];
+        const CAFE_BOOTHS = [385, 500, 615];
 
         // ============================================================================
         /* Map-building shorthands (each map's case aliases them as F, S, A, L) */
@@ -13388,33 +13426,62 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ];
                     break;
 
-                case 'cozy_cafe_interior':
+                case 'cozy_cafe_interior': {
+                    // Cozy Cafe: the furniture art in drawCafeDecorProp (cc_*), the floor in drawCafeInterior,
+                    // the hearth, candles, pendants and steam in drawCafeGlow. Guests: world/cafe-life.js (CAFE).
+                    const F = decorPropsIn('#3a2418');
                     e.props = [
-                        new PropEntity({ x: 150, y: 100, width: 50, height: 40, color: '#444' }), new PropEntity({ x: 260, y: 100, width: 80, height: 40, color: '#3a2a1a' }),
-                        new PropEntity({ x: 350, y: 120, width: 30, height: 25, color: '#2a2a2a' }),
-                        new PropEntity({ x: 150, y: 280, width: 25, height: 25, color: '#4e342e' }), new PropEntity({ x: 220, y: 280, width: 25, height: 25, color: '#4e342e' }),
-                        new PropEntity({ x: 290, y: 280, width: 25, height: 25, color: '#4e342e' }), new PropEntity({ x: 360, y: 280, width: 25, height: 25, color: '#4e342e' }),
-                        new PropEntity({ x: 100, y: 380, width: 70, height: 50, color: '#3e2723' }), new PropEntity({ x: 100, y: 500, width: 70, height: 50, color: '#3e2723' }), new PropEntity({ x: 100, y: 620, width: 70, height: 50, color: '#3e2723' }),
-                        new PropEntity({ x: 350, y: 400, width: 80, height: 60, color: '#3e2723' }), new PropEntity({ x: 350, y: 550, width: 80, height: 60, color: '#3e2723' }), new PropEntity({ x: 350, y: 700, width: 80, height: 60, color: '#3e2723' }),
-                        new PropEntity({ x: 550, y: 400, width: 80, height: 60, color: '#3e2723' }), new PropEntity({ x: 550, y: 550, width: 80, height: 60, color: '#3e2723' }), new PropEntity({ x: 550, y: 700, width: 80, height: 60, color: '#3e2723' }),
-                        new PropEntity({ x: 780, y: 400, width: 120, height: 50, color: '#4a2a18' }), new PropEntity({ x: 780, y: 520, width: 120, height: 50, color: '#4a2a18' }), new PropEntity({ x: 780, y: 640, width: 120, height: 50, color: '#4a2a18' }),
-                        new PropEntity({ x: 910, y: 390, width: 15, height: 70, color: '#5d3a1a' }), new PropEntity({ x: 910, y: 510, width: 15, height: 70, color: '#5d3a1a' }), new PropEntity({ x: 910, y: 630, width: 15, height: 70, color: '#5d3a1a' }),
-                        new PropEntity({ x: 750, y: 100, width: 150, height: 40, color: '#555' }), new PropEntity({ x: 950, y: 80, width: 80, height: 60, color: '#333' }), new PropEntity({ x: 1070, y: 80, width: 50, height: 70, color: '#4a4a4a' }),
-                        new PropEntity({ x: 1000, y: 750, width: 60, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 1080, y: 750, width: 60, height: 40, color: '#2a2a2a' }),
-                        new PropEntity({ x: 480, y: 860, width: 25, height: 25, color: '#2d5a27' }), new PropEntity({ x: 710, y: 860, width: 25, height: 25, color: '#2d5a27' }),
-                        new PropEntity({ x: 930, y: 880, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        // The counter: a long walnut bar with the pastry case at its end, the espresso machine,
+                        // grinder and the mug shelf behind (the gap at the west end lets the staff out)
+                        F(120, 245, 300, 30, 'cc_counter'), F(394, 92, 30, 183, 'cc_counter', { vertical: true }),
+                        F(140, 54, 66, 36, 'cc_espresso'), F(214, 58, 26, 28, 'cc_grinder'), F(252, 52, 130, 24, 'cc_mug_shelf'),
+                        F(60, 300, 36, 36, 'cc_plant', { variant: 1 }),
+                        // The hearth: a brick fireplace on the west wall, two armchairs, a loveseat, a low table
+                        F(52, 470, 46, 130, 'cc_fireplace'),
+                        F(142, 410, 50, 46, 'cc_armchair', { face: 'S' }), F(142, 618, 50, 46, 'cc_armchair', { face: 'N' }),
+                        F(286, 488, 46, 104, 'cc_loveseat', { face: 'W' }), F(176, 508, 62, 54, 'cc_lowtable'),
+                        // Books and records along the north wall
+                        F(440, 52, 170, 26, 'cc_bookshelf'), F(620, 54, 58, 28, 'cc_record'),
+                        // Round tables, a candle and two chairs each
+                        ...CAFE_TABLES.flatMap(([cx, cy]) => [F(cx - 26, cy - 26, 52, 52, 'cc_round_table', { candles: true }),
+                            F(cx - 59, cy - 11, 22, 22, 'cc_chair', { face: 'E' }), F(cx + 37, cy - 11, 22, 22, 'cc_chair', { face: 'W' })]),
+                        // Booths along the east wall: a bench either side of a table
+                        ...CAFE_BOOTHS.flatMap(cy => [F(1104, cy - 40, 42, 80, 'cc_booth', { face: 'W' }), F(1030, cy - 28, 62, 56, 'cc_booth_table', { candles: true }),
+                            F(966, cy - 40, 42, 80, 'cc_booth', { face: 'E' })]),
+                        // Window benches either side of the door, plants, the chalkboard
+                        F(66, 908, 360, 36, 'cc_bench', { face: 'N' }), F(752, 908, 180, 36, 'cc_bench', { face: 'N' }),
+                        F(150, 862, 36, 30, 'cc_side_table'), F(320, 862, 36, 30, 'cc_side_table'), F(822, 862, 36, 30, 'cc_side_table'),
+                        F(440, 906, 32, 32, 'cc_plant'), F(712, 906, 32, 32, 'cc_plant'),
+                        F(452, 836, 34, 18, 'cc_easel'),
+                        F(885, 718, 40, 56, null, { color: '#00f3ff', interactionType: 'vending_machine' }),
+                        // Kitchen: the range, the sink, the prep table, the fridge, a shelf of jars
+                        F(720, 54, 130, 46, 'cc_stove'), F(900, 54, 90, 34, 'cc_sink'), F(880, 160, 150, 44, 'cc_prep'),
+                        F(1090, 56, 54, 76, 'cc_fridge'), F(1104, 184, 40, 104, 'cc_shelf', { vertical: true }),
+                        // Storeroom: crates of beans, flour sacks, shelving
+                        F(990, 756, 56, 40, 'cc_crate'), F(1060, 756, 56, 40, 'cc_crate', { variant: 1 }), F(1056, 856, 76, 52, 'cc_sacks'),
+                        F(962, 880, 36, 60, 'cc_shelf', { vertical: true }),
                     ];
-                    e.npcs = [ new NPC(200, 150, "Barista Ren", 'bartender'), new NPC(850, 200, "Chef Koda") ];
+                    e.npcs = [ new NPC(250, 170, "Barista Ren", 'bartender'), new NPC(785, 128, "Chef Koda") ];
+                    e.npcs[0].angle = Math.PI / 2; e.npcs[1].angle = -Math.PI / 2;           // Ren faces the counter, Koda the range
+                    const L = hiddenLamp;
+                    const flame = (x, y, color, r) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius: r, candle: true }), { candle: true, visible: false });
                     e.lamps = [
-                        new LampEntity({ x: 200, y: 180, lampType: 3, color: '#ffaa00', lightRadius: 250 }), new LampEntity({ x: 350, y: 180, lampType: 3, color: '#ffaa00', lightRadius: 250 }),
-                        new LampEntity({ x: 200, y: 450, lampType: 4, color: '#ff9933', lightRadius: 280 }), new LampEntity({ x: 200, y: 620, lampType: 4, color: '#ff9933', lightRadius: 280 }),
-                        new LampEntity({ x: 450, y: 470, lampType: 4, color: '#ffaa00', lightRadius: 300 }), new LampEntity({ x: 450, y: 650, lampType: 4, color: '#ffaa00', lightRadius: 300 }),
-                        new LampEntity({ x: 650, y: 470, lampType: 4, color: '#ffaa00', lightRadius: 300 }), new LampEntity({ x: 650, y: 650, lampType: 4, color: '#ffaa00', lightRadius: 300 }),
-                        new LampEntity({ x: 850, y: 450, lampType: 3, color: '#ff8800', lightRadius: 200 }), new LampEntity({ x: 850, y: 580, lampType: 3, color: '#ff8800', lightRadius: 200 }), new LampEntity({ x: 850, y: 700, lampType: 3, color: '#ff8800', lightRadius: 200 }),
-                        new LampEntity({ x: 850, y: 150, lampType: 3, color: '#ffd080', lightRadius: 300 }), new LampEntity({ x: 1050, y: 150, lampType: 3, color: '#ffd080', lightRadius: 250 }),
-                        new LampEntity({ x: 500, y: 900, lampType: 3, color: '#ffaa00', lightRadius: 200 }), new LampEntity({ x: 700, y: 900, lampType: 3, color: '#ffaa00', lightRadius: 200 }),
+                        L(190, 262, '#ffcf8a', 260), L(330, 262, '#ffcf8a', 260),                   // the counter's two pendants
+                        ...CAFE_TABLES.map(([x, y]) => L(x, y, '#ffc27a', 200)),                   // the pendants over the tables
+                        ...CAFE_BOOTHS.map(y => L(1035, y, '#ffb870', 180)),
+                        flame(104, 535, '#ff8a3a', 340),                                            // the fire (it breathes)
+                        L(250, 880, '#ffd9a0', 240), L(840, 880, '#ffd9a0', 200),                  // the window benches
+                        L(920, 170, '#ffe6bd', 320), L(1050, 820, '#e0c8a8', 220),                 // kitchen, storeroom
+                    ];
+                    const S = softLight, A = areaLight;
+                    e.softLights = [
+                        A(380, 500, 640, 880, '#ffb06a', 0.2), A(1040, 500, 220, 360, '#ffb070', 0.18),   // the room's warm wash
+                        A(200, 535, 300, 300, '#ff8c40', 0.18),                                             // firelight over the rug
+                        ...CAFE_TABLES.map(([x, y]) => S(x, y, 56, '#ffb46a', 0.55, 2)),                     // candles
+                        ...CAFE_BOOTHS.map(y => S(1061, y, 46, '#ffb46a', 0.5, 2)),
                     ];
                     break;
+                }
 
                 case 'auto_shop':
                     e.props = [
@@ -14810,7 +14877,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (game.clubLife && game.clubLife.walkers.length) doorActors = doorActors.concat(game.clubLife.doorActors());   // the club's crowd pushes the restroom doors
                     if (game.enemies && game.enemies.length) {
                         const seen = new Set(actors);
-                        doorActors = actors.concat(game.enemies.filter(e => e && !e.dead && e.active !== false && !seen.has(e)));
+                        doorActors = doorActors.concat(game.enemies.filter(e => e && !e.dead && e.active !== false && !seen.has(e)));   // (onto the crowd too, not over it)
                     }
                     game.roomSystem.stepDoorPhysics(doorActors);
                 }
@@ -16778,6 +16845,253 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        /* =====================================================================
+           COZY CAFE (cc_*) — walnut, honey, brass and velvet. Flames, steam and
+           pendant glows are the glow pass's (engine/interiors.js drawCafeGlow).
+           Seated pieces take `face` (where the sitter looks); they're drawn
+           facing south and turned.
+           ===================================================================== */
+        const CC = {
+            walnut: '#4a2c1a', walnutDk: '#2e1b10', walnutLt: '#6e4529', honey: '#c98c4a', honeyLt: '#e2ae6c',
+            cream: '#f3e4c6', linen: '#e8dcc4', brass: '#c9a24a', copper: '#b8683a', steel: '#8d9098', steelDk: '#4a4d55',
+            brick: '#8a3b28', brickDk: '#5a2418', rust: '#8e4632', rustDk: '#5e2a1e', sage: '#6d8a64', sageDk: '#4a6244',
+            mustard: '#c0903a', leaf: '#4f7a3a', leafLt: '#79a656', pot: '#b5643e', chalk: '#1f2a24'
+        };
+        const CC_FACE = { S: 0, W: Math.PI / 2, N: Math.PI, E: -Math.PI / 2 };
+        function drawCafeDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000, d = p.decor || {}, C = CC;
+            const hsh = (k) => { const v = Math.sin((x * 12.9898 + y * 78.233 + k * 37.719)) * 43758.5453; return v - Math.floor(v); };   // a stable per-piece choice
+            const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const circ = (cx, cy, r, fill, stroke, lw = 1) => {
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+            };
+            const shadow = (r = 4, X = x, Y = y, W = w, H = h) => rr(X + 3, Y + 4, W, H, r, 'rgba(0,0,0,0.32)');
+            const cup = (cx, cy, col = C.cream, coffee = '#6b4423') => { circ(cx + 1, cy + 1.5, 4.6, 'rgba(0,0,0,0.3)'); circ(cx, cy, 4.6, C.linen, 'rgba(120,90,60,0.6)', 0.6); circ(cx, cy, 3.4, col); circ(cx, cy, 2.6, coffee); circ(cx - 0.6, cy - 0.6, 1, 'rgba(240,220,190,0.75)'); ctx.fillStyle = C.linen; ctx.fillRect(cx + 4, cy - 1, 2.2, 2); };
+            const candleJar = (cx, cy) => { circ(cx, cy, 4.2, 'rgba(255,214,160,0.35)', 'rgba(255,230,190,0.6)', 0.7); circ(cx, cy, 2.2, '#f6ead6'); circ(cx, cy, 0.9, '#3a2410'); };
+            /** Draw facing south in a local frame (w × h as it stands when facing S), turned to `face` */
+            const turned = (face, fn) => {
+                const a = CC_FACE[face] || 0, side = Math.abs(Math.sin(a)) > 0.5, LW = side ? h : w, LH = side ? w : h;
+                ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(a); fn(-LW / 2, -LH / 2, LW, LH); ctx.restore();
+            };
+            switch (p.decorType) {
+                case 'cc_counter': {                                       // walnut bar, honey edge, slatted front, the register, a pastry case at the end
+                    shadow(4);
+                    if (d.vertical) {
+                        rr(x, y, w, h, 4, C.walnut, C.walnutDk, 1.2); rr(x + 3, y + 3, w - 6, h - 6, 3, C.walnutLt);
+                        ctx.fillStyle = 'rgba(0,0,0,0.18)'; for (let yy = y + 10; yy < y + h - 4; yy += 9) ctx.fillRect(x + w - 6, yy, 4, 5);   // the slats on the room side
+                        ctx.fillStyle = C.honey; ctx.fillRect(x + w - 3, y + 2, 2, h - 4);
+                        // A cake stand under a glass dome, a jar of biscotti
+                        circ(x + w / 2, y + 40, 10, 'rgba(230,240,255,0.18)', 'rgba(255,255,255,0.45)', 0.8); circ(x + w / 2, y + 40, 7, '#d9a36a'); circ(x + w / 2 - 2, y + 38, 2, '#f4dcc0');
+                        rr(x + w / 2 - 5, y + 74, 10, 14, 3, 'rgba(220,235,255,0.3)', 'rgba(255,255,255,0.5)', 0.7); ctx.fillStyle = '#c8935a'; ctx.fillRect(x + w / 2 - 3, y + 78, 6, 8);
+                        cup(x + w / 2, y + 112); cup(x + w / 2, y + 140, '#e9d2b4');
+                        break;
+                    }
+                    rr(x, y, w, h, 4, C.walnut, C.walnutDk, 1.2); rr(x + 3, y + 3, w - 6, h - 9, 3, C.walnutLt);
+                    ctx.fillStyle = C.honey; ctx.fillRect(x + 2, y + h - 4, w - 4, 2);                                  // the honey edge the guests lean on
+                    ctx.strokeStyle = 'rgba(255,220,170,0.08)'; ctx.lineWidth = 1; ctx.beginPath(); for (let xx = x + 12; xx < x + w; xx += 16) { ctx.moveTo(xx, y + 4); ctx.lineTo(xx + 6, y + h - 8); } ctx.stroke();
+                    // The register (brass), a tip jar, a cup of stirrers
+                    rr(x + 50, y + 5, 30, 16, 3, '#2a2026', C.brass, 1); rr(x + 54, y + 8, 14, 6, 1, 'rgba(170,255,200,0.65)'); ctx.fillStyle = C.brass; ctx.fillRect(x + 70, y + 8, 6, 9);
+                    circ(x + 98, y + 13, 6, 'rgba(220,235,255,0.25)', 'rgba(255,255,255,0.55)', 0.8); ctx.fillStyle = '#7fb06a'; ctx.fillRect(x + 95, y + 12, 6, 3); ctx.fillStyle = C.brass; circ(x + 99, y + 15, 1.4, C.brass);
+                    cup(x + 130, y + 13); cup(x + 150, y + 15, '#d8b48c');
+                    // The pastry case: glass, three shelves of something sweet
+                    const px = x + w - 104, pw = 98;
+                    rr(px, y + 2, pw, h - 7, 3, 'rgba(255,236,210,0.12)', 'rgba(255,240,220,0.55)', 1);
+                    const pastry = ['#d9a36a', '#f0c9a0', '#8a4b2e', '#e8b8c8', '#f4dcae', '#c27b4a'];
+                    for (let i = 0; i < 7; i++) for (let j = 0; j < 2; j++) {
+                        const cx = px + 9 + i * 13, cy = y + 9 + j * 10, col = pastry[(i * 3 + j * 5) % pastry.length];
+                        if ((i + j) % 3 === 2) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(cx - 5, cy + 3); ctx.quadraticCurveTo(cx, cy - 6, cx + 5, cy + 3); ctx.closePath(); ctx.fill(); }   // croissants
+                        else { circ(cx, cy, 4, col); circ(cx - 1, cy - 1, 1.4, 'rgba(255,255,255,0.4)'); }
+                    }
+                    ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(px + 4, y + 3, 3, h - 10);
+                    break;
+                }
+                case 'cc_espresso': {                                      // brass and steel: two group heads, cups warming on top, a pressure gauge
+                    shadow(5); rr(x, y, w, h, 6, C.steelDk, '#2a2c32', 1); rr(x + 3, y + 3, w - 6, h - 10, 5, C.steel);
+                    rr(x + 3, y + 3, w - 6, 5, 3, C.brass);
+                    for (const gx of [x + 18, x + w - 18]) { circ(gx, y + h - 9, 6, '#2a2c32', C.brass, 1.2); circ(gx, y + h - 9, 2.5, '#111'); }
+                    circ(x + w / 2, y + 18, 5, '#f4efe6', C.brass, 1); ctx.strokeStyle = '#a3241a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w / 2, y + 18); ctx.lineTo(x + w / 2 + 3 * Math.cos(t), y + 18 + 3 * Math.sin(t)); ctx.stroke();
+                    for (let i = 0; i < 4; i++) circ(x + 10 + i * 6, y + 12, 2.6, C.linen, 'rgba(0,0,0,0.25)', 0.5);
+                    break;
+                }
+                case 'cc_grinder': {
+                    shadow(3); rr(x + 3, y + 8, w - 6, h - 8, 3, '#2a2026', '#14100f', 1);
+                    ctx.fillStyle = 'rgba(120,80,50,0.85)'; ctx.beginPath(); ctx.moveTo(x + 2, y + 10); ctx.lineTo(x + w - 2, y + 10); ctx.lineTo(x + w - 6, y); ctx.lineTo(x + 6, y); ctx.closePath(); ctx.fill();
+                    for (let i = 0; i < 6; i++) circ(x + 7 + (i % 3) * 6, y + 3 + (i / 3 | 0) * 3, 1.3, '#3a2214');
+                    break;
+                }
+                case 'cc_mug_shelf': {                                     // a walnut shelf on the wall, mismatched mugs on hooks
+                    rr(x, y + h - 8, w, 8, 2, C.walnutLt, C.walnutDk, 1);
+                    const mugs = ['#e9dcc6', '#c98c4a', '#6d8a64', '#8e4632', '#f1e4cc', '#5d6f8a', '#d9b45a', '#b5643e'];
+                    for (let i = 0; i < 9; i++) { const mx = x + 8 + i * 13.5; rr(mx - 5, y + 2, 10, 11, 2, mugs[i % mugs.length], 'rgba(0,0,0,0.3)', 0.6); ctx.strokeStyle = mugs[i % mugs.length]; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(mx + 5, y + 7, 2.6, -1.2, 1.2); ctx.stroke(); }
+                    break;
+                }
+                case 'cc_plant': {                                         // a terracotta pot, leaves fanned out (variant 1: a big fern)
+                    const cx = x + w / 2, cy = y + h / 2, big = d.variant === 1, R = Math.min(w, h) / 2;
+                    circ(cx + 2, cy + 3, R * 0.62, 'rgba(0,0,0,0.3)'); circ(cx, cy, R * 0.58, C.pot, '#7a3e22', 1.2); circ(cx, cy, R * 0.44, '#3a2416');
+                    const n = big ? 13 : 9, sway = Math.sin(t * 0.8 + x) * 0.05;
+                    for (let i = 0; i < n; i++) {
+                        const a = i / n * Math.PI * 2 + sway + hsh(i) * 0.3, L = R * (big ? 1.25 : 0.95) * (0.75 + hsh(i + 9) * 0.35);
+                        ctx.fillStyle = i % 2 ? C.leaf : C.leafLt; ctx.beginPath();
+                        ctx.ellipse(cx + Math.cos(a) * L * 0.55, cy + Math.sin(a) * L * 0.55, L * 0.55, big ? 3.2 : 4.4, a, 0, Math.PI * 2); ctx.fill();
+                    }
+                    break;
+                }
+                case 'cc_fireplace': {                                     // brick surround on the west wall, a stone hearth, logs in the firebox
+                    shadow(3); rr(x, y, w, h, 3, C.brick, C.brickDk, 1.5);
+                    ctx.strokeStyle = 'rgba(40,12,8,0.55)'; ctx.lineWidth = 1; ctx.beginPath();
+                    for (let yy = y + 8, row = 0; yy < y + h; yy += 8, row++) { ctx.moveTo(x, yy); ctx.lineTo(x + w, yy); for (let xx = x + (row % 2 ? 6 : 12); xx < x + w; xx += 12) { ctx.moveTo(xx, yy - 8); ctx.lineTo(xx, yy); } }
+                    ctx.stroke();
+                    rr(x + w - 4, y - 8, 14, h + 16, 3, '#6a625a', '#3c3630', 1);                                        // the hearthstone
+                    rr(x + 8, y + 26, w - 14, h - 52, 4, '#140806', '#2a120a', 1.2);                                    // the firebox
+                    ctx.fillStyle = '#4a2c18'; ctx.save(); ctx.translate(x + w / 2 + 2, y + h / 2); ctx.rotate(0.4); ctx.fillRect(-4, -26, 8, 52); ctx.rotate(-0.8); ctx.fillRect(-4, -24, 8, 48); ctx.restore();   // crossed logs
+                    for (let i = 0; i < 7; i++) { const f = 0.5 + 0.5 * Math.sin(t * 5 + i * 1.7); circ(x + w / 2 + 2 + (hsh(i) - 0.5) * 12, y + 34 + i * ((h - 68) / 6), 2 + f * 1.5, `rgba(255,${90 + 80 * f | 0},30,${0.55 + 0.4 * f})`); }   // embers
+                    rr(x + 2, y + 6, 8, h - 12, 2, C.walnut);                                                            // the mantel's shadow line
+                    // On the mantel: two candlesticks and a small clock
+                    for (const cy of [y + 14, y + h - 14]) { circ(x + 6, cy, 3, C.brass); circ(x + 6, cy, 1.6, '#f6ead6'); }
+                    break;
+                }
+                case 'cc_armchair': case 'cc_loveseat': {                  // tufted velvet (rust or sage), deep arms, a cushion; a throw on some
+                    const sofa = p.decorType === 'cc_loveseat', col = sofa ? C.sage : (hsh(1) > 0.5 ? C.rust : C.mustard), dk = sofa ? C.sageDk : (col === C.rust ? C.rustDk : '#8a6424');
+                    turned(d.face || 'S', (X, Y, W, H) => {
+                        rr(X + 3, Y + 4, W, H, 10, 'rgba(0,0,0,0.32)');
+                        rr(X, Y, W, H, 10, dk); rr(X, Y, W, H * 0.34, 9, col, dk, 1);                                     // the back
+                        rr(X, Y + 4, W * 0.18, H - 6, 6, col, dk, 1); rr(X + W * 0.82, Y + 4, W * 0.18, H - 6, 6, col, dk, 1);   // arms
+                        const seats = sofa ? 2 : 1, sw = (W * 0.64) / seats;
+                        for (let i = 0; i < seats; i++) rr(X + W * 0.18 + i * sw + 1, Y + H * 0.32, sw - 2, H * 0.62, 6, col, 'rgba(0,0,0,0.25)', 0.8);
+                        ctx.fillStyle = 'rgba(0,0,0,0.22)'; for (let i = 1; i < 4; i++) for (const yy of [Y + H * 0.12, Y + H * 0.24]) { ctx.beginPath(); ctx.arc(X + W * i / 4, yy, 1.1, 0, Math.PI * 2); ctx.fill(); }   // tufting
+                        if (hsh(3) > 0.4) { ctx.fillStyle = 'rgba(232,220,196,0.85)'; ctx.beginPath(); ctx.moveTo(X + W * 0.62, Y + H * 0.3); ctx.lineTo(X + W * 0.84, Y + H * 0.3); ctx.lineTo(X + W * 0.8, Y + H * 0.95); ctx.lineTo(X + W * 0.56, Y + H * 0.9); ctx.closePath(); ctx.fill();   // a knitted throw
+                            ctx.strokeStyle = 'rgba(160,120,80,0.35)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let k = 0.4; k < 0.95; k += 0.1) { ctx.moveTo(X + W * 0.6, Y + H * k); ctx.lineTo(X + W * 0.82, Y + H * k); } ctx.stroke(); }
+                        if (sofa) rr(X + W * 0.24, Y + H * 0.3, W * 0.16, H * 0.2, 4, C.mustard, 'rgba(0,0,0,0.25)', 0.6);   // a cushion
+                    });
+                    break;
+                }
+                case 'cc_lowtable': {                                      // a low round table: a stack of books, two mugs, a candle
+                    const cx = x + w / 2, cy = y + h / 2, R = Math.min(w, h) / 2;
+                    circ(cx + 3, cy + 4, R, 'rgba(0,0,0,0.3)'); circ(cx, cy, R, C.walnut, C.walnutDk, 1.5); circ(cx, cy, R - 4, C.walnutLt);
+                    rr(cx - 16, cy - 10, 20, 14, 1, '#7a3b2e'); rr(cx - 15, cy - 13, 18, 4, 1, '#d9c8a6'); rr(cx - 14, cy - 17, 16, 4, 1, '#3e5a6e');
+                    cup(cx + 10, cy - 6); cup(cx + 6, cy + 10, '#e2c7a2'); candleJar(cx - 8, cy + 10);
+                    break;
+                }
+                case 'cc_bookshelf': {                                     // a walnut case of well-read spines
+                    shadow(2); rr(x, y, w, h, 2, C.walnutDk, '#1a0f08', 1);
+                    const cols = ['#7a3b2e', '#3e5a6e', '#c0903a', '#5f7a5a', '#d9c8a6', '#4a3a5e', '#9a5a3a', '#2e4a3a'];
+                    let bx = x + 3;
+                    while (bx < x + w - 4) { const bw = 3 + (hsh(bx) * 4 | 0), lean = hsh(bx + 1) > 0.88; ctx.fillStyle = cols[(bx * 7 | 0) % cols.length]; if (lean) { ctx.save(); ctx.translate(bx, y + h - 3); ctx.rotate(-0.25); ctx.fillRect(0, -(h - 7), bw, h - 7); ctx.restore(); } else ctx.fillRect(bx, y + 3, bw, h - 6); bx += bw + 0.6; }
+                    ctx.fillStyle = 'rgba(255,220,160,0.08)'; ctx.fillRect(x + 2, y + 2, w - 4, 2);
+                    break;
+                }
+                case 'cc_record': {                                        // a sideboard, a turntable turning, a stack of sleeves
+                    shadow(3); rr(x, y, w, h, 3, C.walnut, C.walnutDk, 1);
+                    rr(x + 3, y + 3, h - 6, h - 6, 2, '#2a2026'); const cx = x + 3 + (h - 6) / 2, cy = y + h / 2;
+                    circ(cx, cy, (h - 10) / 2, '#0e0c10'); circ(cx, cy, 3, '#c0903a');
+                    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(cx, cy, 7, t * 3.5, t * 3.5 + 1.2); ctx.stroke();
+                    ctx.strokeStyle = C.brass; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + h, y + 4); ctx.lineTo(cx + 4, cy - 2); ctx.stroke();
+                    for (let i = 0; i < 3; i++) rr(x + h + 4 + i * 2, y + 5, 14, h - 10, 1, ['#c98c4a', '#6d8a64', '#8e4632'][i], 'rgba(0,0,0,0.3)', 0.5);
+                    break;
+                }
+                case 'cc_round_table': {                                   // a walnut round, a candle jar, cups and saucers, a sprig in a bud vase
+                    const cx = x + w / 2, cy = y + h / 2, R = Math.min(w, h) / 2;
+                    circ(cx + 3, cy + 4, R, 'rgba(0,0,0,0.3)'); circ(cx, cy, R, C.walnut, C.walnutDk, 1.4); circ(cx, cy, R - 4, C.walnutLt);
+                    ctx.strokeStyle = 'rgba(255,220,170,0.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R - 10, 0, Math.PI * 2); ctx.stroke();
+                    candleJar(cx, cy);
+                    const k = hsh(5);
+                    if (k > 0.3) cup(cx - 13, cy + 4);
+                    if (k > 0.55) cup(cx + 13, cy - 4, '#e2c7a2');
+                    if (k < 0.5) { rr(cx + 6, cy + 6, 12, 8, 2, '#f1e4cc'); circ(cx + 12, cy + 10, 3, '#c27b4a'); }        // a plate, a pastry
+                    circ(cx - 6, cy - 12, 2.4, 'rgba(220,235,255,0.5)'); ctx.fillStyle = hsh(6) > 0.5 ? '#e8b8c8' : '#f4dcae'; circ(cx - 6, cy - 14, 2, ctx.fillStyle);
+                    break;
+                }
+                case 'cc_chair': {                                         // a bentwood chair: a round seat, a curved back
+                    turned(d.face || 'S', (X, Y, W, H) => {
+                        circ(X + W / 2 + 2, Y + H / 2 + 3, W / 2, 'rgba(0,0,0,0.28)');
+                        circ(X + W / 2, Y + H / 2 + 1, W / 2 - 1, C.walnutLt, C.walnutDk, 1.2);
+                        circ(X + W / 2, Y + H / 2 + 1, W / 2 - 5, hsh(2) > 0.5 ? C.rust : C.sage);
+                        ctx.strokeStyle = C.walnut; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X + W / 2, Y + H / 2 + 1, W / 2 - 1, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+                    });
+                    break;
+                }
+                case 'cc_booth': {                                         // a padded bench, its back to the wall
+                    turned(d.face || 'S', (X, Y, W, H) => {
+                        rr(X + 3, Y + 4, W, H, 8, 'rgba(0,0,0,0.3)');
+                        rr(X, Y, W, H, 8, C.walnutDk); rr(X + 2, Y + 1, W - 4, H * 0.38, 7, C.sage, C.sageDk, 1);
+                        for (let i = 0; i < 3; i++) rr(X + 3 + i * (W - 6) / 3, Y + H * 0.36, (W - 6) / 3 - 2, H * 0.56, 5, C.sage, 'rgba(0,0,0,0.25)', 0.8);
+                        ctx.fillStyle = 'rgba(0,0,0,0.2)'; for (let i = 1; i < 6; i++) { ctx.beginPath(); ctx.arc(X + W * i / 6, Y + H * 0.18, 1.1, 0, Math.PI * 2); ctx.fill(); }
+                    });
+                    break;
+                }
+                case 'cc_booth_table': case 'cc_side_table': {
+                    const side = p.decorType === 'cc_side_table';
+                    shadow(side ? 10 : 4); rr(x, y, w, h, side ? Math.min(w, h) / 2 : 4, C.walnut, C.walnutDk, 1.4); rr(x + 3, y + 3, w - 6, h - 6, side ? Math.min(w, h) / 2 - 3 : 3, C.walnutLt);
+                    if (side) { cup(x + w / 2 - 5, y + h / 2); circ(x + w / 2 + 8, y + h / 2 - 3, 2, 'rgba(220,235,255,0.5)'); break; }
+                    candleJar(x + w / 2, y + h / 2);
+                    cup(x + 14, y + 14); if (hsh(4) > 0.4) cup(x + w - 14, y + h - 14, '#e2c7a2');
+                    rr(x + w - 18, y + 6, 10, 12, 3, 'rgba(220,235,255,0.25)', 'rgba(255,255,255,0.5)', 0.6); ctx.fillStyle = '#f4ead6'; ctx.fillRect(x + w - 16, y + 11, 6, 6);   // sugar
+                    break;
+                }
+                case 'cc_bench': {                                         // a window bench: cushions in three colours, pillows, a folded blanket
+                    turned(d.face || 'S', (X, Y, W, H) => {
+                        rr(X + 3, Y + 4, W, H, 6, 'rgba(0,0,0,0.3)'); rr(X, Y, W, H, 6, C.walnutDk, '#1a0f08', 1);
+                        const cols = [C.rust, C.sage, C.mustard, C.linen];
+                        const n = Math.max(2, Math.round(W / 62));
+                        for (let i = 0; i < n; i++) rr(X + 3 + i * (W - 6) / n, Y + 3, (W - 6) / n - 3, H - 6, 6, cols[(i + (x | 0)) % cols.length], 'rgba(0,0,0,0.22)', 0.8);
+                        for (let i = 0; i < n; i += 2) rr(X + 8 + i * (W - 6) / n, Y + H - 14, 16, 10, 4, cols[(i + 1 + (x | 0)) % cols.length], 'rgba(0,0,0,0.25)', 0.6);   // pillows against the glass
+                    });
+                    break;
+                }
+                case 'cc_easel': {                                         // a chalkboard on legs: today's special
+                    shadow(2); rr(x, y, w, h, 2, C.walnutLt, C.walnutDk, 1); rr(x + 2, y + 2, w - 4, h - 4, 1, C.chalk);
+                    ctx.fillStyle = 'rgba(240,235,220,0.85)'; ctx.font = '600 5px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('honey', x + w / 2, y + h / 2 - 3); ctx.fillText('latte ♥', x + w / 2, y + h / 2 + 4);
+                    break;
+                }
+                case 'cc_stove': {                                         // the range: four burners, a pot simmering, a copper pan
+                    shadow(3); rr(x, y, w, h, 3, C.steelDk, '#202228', 1); rr(x + 3, y + 3, w - 6, h - 8, 2, '#2c2e34');
+                    for (let i = 0; i < 4; i++) { const bx = x + 18 + i * 32, by = y + h / 2 - 2; circ(bx, by, 10, '#16171b', '#55585f', 1); if (i === 1) circ(bx, by, 8, `rgba(80,140,255,${0.35 + 0.15 * Math.sin(t * 9)})`); }
+                    circ(x + 50, y + h / 2 - 2, 11, C.steel, '#3a3c42', 1); circ(x + 50, y + h / 2 - 2, 8, '#c27b4a');            // the soup
+                    circ(x + 114, y + h / 2 - 2, 10, C.copper, '#6e3a1a', 1); ctx.fillStyle = C.copper; ctx.fillRect(x + 123, y + h / 2 - 4, 10, 3);
+                    for (let i = 0; i < 4; i++) circ(x + 18 + i * 32, y + h - 3, 2, '#c9c9c9');
+                    break;
+                }
+                case 'cc_sink': { shadow(3); rr(x, y, w, h, 3, C.steel, C.steelDk, 1); rr(x + 6, y + 5, w / 2 - 9, h - 10, 4, '#5a5e66'); rr(x + w / 2 + 3, y + 5, w / 2 - 9, h - 10, 4, '#5a5e66'); circ(x + w / 2, y + 4, 2.5, '#d0d2d8'); break; }
+                case 'cc_prep': {                                          // a butcher-block table: a loaf, a board, a knife, a bowl of lemons
+                    shadow(3); rr(x, y, w, h, 3, '#b07a44', '#6e4628', 1.2);
+                    ctx.strokeStyle = 'rgba(80,50,25,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); for (let xx = x + 10; xx < x + w; xx += 10) { ctx.moveTo(xx, y + 2); ctx.lineTo(xx, y + h - 2); } ctx.stroke();
+                    ctx.fillStyle = '#c8894a'; ctx.beginPath(); ctx.ellipse(x + 30, y + h / 2, 18, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#8a5428'; ctx.beginPath(); for (let k = -10; k <= 10; k += 6) { ctx.moveTo(x + 30 + k - 2, y + h / 2 - 6); ctx.lineTo(x + 30 + k + 2, y + h / 2 + 6); } ctx.stroke();
+                    rr(x + 64, y + 10, 30, 22, 3, '#e3c38e'); ctx.fillStyle = '#cfd2d8'; ctx.fillRect(x + 70, y + 20, 18, 2);
+                    circ(x + 122, y + h / 2, 12, '#e8e2d4', '#b0a890', 1); for (let i = 0; i < 4; i++) circ(x + 118 + (i % 2) * 8, y + h / 2 - 3 + (i >> 1) * 6, 3.4, '#f2cf45');
+                    break;
+                }
+                case 'cc_fridge': { shadow(3); rr(x, y, w, h, 4, '#d6d8de', '#8a8d95', 1); ctx.fillStyle = '#9a9da5'; ctx.fillRect(x + 3, y + h * 0.42, w - 6, 1.5); rr(x + w - 9, y + 8, 3, 18, 1, '#6a6d75'); rr(x + w - 9, y + h * 0.5, 3, 22, 1, '#6a6d75');
+                    rr(x + 8, y + 10, 14, 10, 1, '#f5e9a8'); rr(x + 26, y + 30, 12, 12, 1, '#a8d8f5'); break; }       // notes and a drawing on the door
+                case 'cc_shelf': {                                         // shelves of jars and tins
+                    shadow(2); rr(x, y, w, h, 2, C.walnutDk, '#1a0f08', 1);
+                    const jars = ['#d9a36a', '#f4dcae', '#8a4b2e', '#6d8a64', '#c0903a', '#e8dcc4'];
+                    const along = d.vertical ? h : w, across = d.vertical ? w : h;
+                    for (let i = 0; i * 12 + 8 < along; i++) for (let j = 0; j < 2; j++) {
+                        const a = i * 12 + 7, b = across * (j ? 0.7 : 0.3);
+                        circ(d.vertical ? x + b : x + a, d.vertical ? y + a : y + b, 4, jars[(i * 2 + j) % jars.length], 'rgba(0,0,0,0.3)', 0.6);
+                    }
+                    break;
+                }
+                case 'cc_crate': {                                         // a crate of coffee beans, stencilled
+                    shadow(3); rr(x, y, w, h, 2, '#8a5a32', '#4a2c14', 1.2);
+                    ctx.strokeStyle = 'rgba(40,20,8,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.moveTo(x, y); ctx.lineTo(x + w, y + h); ctx.stroke();
+                    ctx.fillStyle = 'rgba(30,14,6,0.55)'; ctx.font = '700 7px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(d.variant ? 'COCOA' : 'BEANS', x + w / 2, y + h / 2);
+                    break;
+                }
+                case 'cc_sacks': {                                         // flour sacks slumped together
+                    for (let i = 0; i < 3; i++) { const sx = x + 4 + i * 24, sy = y + (i % 2) * 8; ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(sx + 16, sy + 24, 14, 18, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#e4d6b8'; ctx.beginPath(); ctx.ellipse(sx + 13, sy + 20, 13, 17, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#a89470'; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = '#b8574a'; ctx.fillRect(sx + 6, sy + 18, 14, 3); }
+                    break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
             if (p.decorType.startsWith('sc_')) return drawSanctumDecorProp(ctx, p);
@@ -16787,6 +17101,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (p.decorType.startsWith('dn_')) return drawLobbyDecorProp(ctx, p);
             if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
             if (p.decorType.startsWith('dp_')) return drawPalaceDecorProp(ctx, p);
+            if (p.decorType.startsWith('cc_')) return drawCafeDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
@@ -23037,7 +23352,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const CLUB_DRINKS = ['neon', 'neon', 'martini', 'champagne', 'rose', 'cream_soda', 'whiskey', 'red_wine', 'stellar_lemonade'];
 
         class ClubLife {
-            constructor() { this.walkers = []; this.map = null; this.taken = new Map(); }
+            constructor() { this.walkers = []; this.map = null; this.taken = new Map(); this.mapId = 'moon_city_nightclub'; }
 
             /** Fresh crowd for a (re)entered club. */
             reset(game) {
@@ -23161,7 +23476,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             update(game) {
-                if (!game.activeMap || game.activeMap.id !== 'moon_city_nightclub') { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
+                if (!game.activeMap || game.activeMap.id !== this.mapId) { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
                 if (this.map !== game.activeMap) this.reset(game);
                 let guests = 0; for (const w of this.walkers) if (w.kind === 'guest') guests++;
                 const target = this._target(game);
@@ -23190,7 +23505,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (!step) continue;
                     if (!step.go && !step.exit) { w.steps.shift(); continue; }
                     const [gx, gy] = step.go, d = Math.hypot(gx - w.x, gy - w.y);
-                    if (d > 6 && !step._arrived) {
+                    if (d > (step.exit ? 26 : 6) && !step._arrived) {                       // (the door: near enough, someone may be standing in it)
                         let s = actorSteer(w, gx, gy, w.speed, M), vx = s.x, vy = s.y;
                         for (const mw of game._makeWay || [pl]) {                          // make way for 949 and her crew
                             const px = w.x - mw.x, py = w.y - mw.y, pd = Math.hypot(px, py);
@@ -23227,8 +23542,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (step.face) w.angle = Math.atan2(step.face[1] - w.y, step.face[0] - w.x);
                     else if (step.seatFace !== undefined) w.angle = step.seatFace;
                     w.look.pose = step.hide ? undefined : step.pose;
-                    // A drink, fetched at the bar (the bartender's had it poured)
+                    // A drink, fetched at the bar (the bartender's had it poured); or something handed over here (`give`)
                     if (step.drink && !w.look.held && step.wait < 200) w.look.held = { type: 'glass', drink: pickFrom(Math.random, CLUB_DRINKS), hand: 'right' };
+                    if (step.give && !w.look.held && step.wait < (step.giveAt || 200)) w.look.held = step.give;
+                    if (step.take && w.look.held && step.wait < (step.takeAt || 30)) w.look.held = null;   // (and set down here)
                     if (--step.wait <= 0) {
                         if (step._back) {                                              // get up / come out
                             const b = step._back; step._back = null;
@@ -23238,8 +23555,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             continue;
                         }
                         w.steps.shift(); this._releaseStep(w, step);
-                        // Glasses get finished; some go back for another
-                        if (w.look.held && Math.random() < 0.25) w.look.held = null;
+                        // Glasses get finished; some go back for another (`keep`: not this one, it was just handed over)
+                        if (w.look.held && !step.keep && Math.random() < 0.25) w.look.held = null;
                     }
                 }
             }
@@ -23281,6 +23598,142 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     drawCrowdHumanoid(ctx, w, { stance: 'idle', ...w.look });                // by Crowd Quality (ui/crowd-impostors.js)
                     ctx.restore();
                 }
+            }
+        }
+        // ============================================================================
+        //  CAFE LIFE — the Cozy Cafe's guests (cozy_cafe_interior only)
+        //  They come in from the street, queue at the counter, order, wait for their cup
+        //  at the pick-up end, and settle in for a while: a round table by a candle, an
+        //  armchair by the fire, a booth, the window bench. Some browse the books or the
+        //  pastry case first; friends come in pairs and share a table. Visits are long and
+        //  calm (a minute or two seated), the walk unhurried. A second barista carries
+        //  cups out to the tables and polishes. Busy in the morning and late afternoon,
+        //  a few night owls after dark. Built on ClubLife's walker loop (world/club-life.js):
+        //  ambient walkers, not NPCs — no dialogue, no prompts. Updated from update.js,
+        //  drawn with the characters (draw.js), by Crowd Quality.
+        // ============================================================================
+        const CAFE_GATE = [600, 896];
+        const CAFE_SPOTS = {
+            queue: [[300, 304], [300, 332], [300, 360], [300, 388]], orderAt: [300, 250],
+            pickup: [[170, 304], [212, 304]], pickupAt: [190, 250],
+            pastry: [[366, 306], [396, 306]], books: [[480, 104], [530, 104], [580, 104]], record: [650, 106],
+            staffHome: [150, 206], staffGap: [86, 262]
+        };
+        const CAFE_DRINKS = ['latte', 'latte', 'tea', 'cocoa', 'espresso', 'latte', 'tea'];
+        const CAFE_CROWD = { low: 6, medium: 10, high: 14 };
+        // Seats: where you sit, where you step up to it from, which way you face. (Chairs come in
+        // pairs, a table's two: chair 2k and 2k+1, so friends can take a table together.)
+        const CAFE_SEATS = {
+            chair: CAFE_TABLES.flatMap(([cx, cy]) => [
+                { at: [cx - 48, cy], from: [cx - 48, cy + 34], face: 0 },
+                { at: [cx + 48, cy], from: [cx + 48, cy + 34], face: Math.PI }]),
+            hearth: [
+                { at: [167, 433], from: [167, 476], face: Math.PI / 2 }, { at: [167, 641], from: [167, 600], face: -Math.PI / 2 },
+                { at: [309, 515], from: [262, 515], face: Math.PI }, { at: [309, 565], from: [262, 565], face: Math.PI }],
+            booth: CAFE_BOOTHS.flatMap(cy => [
+                { at: [987, cy - 17], from: [944, cy - 17], face: 0 }, { at: [987, cy + 17], from: [944, cy + 17], face: 0 },
+                { at: [1125, cy - 17], from: [1068, cy + 58], face: Math.PI }, { at: [1125, cy + 17], from: [1068, cy + 58], face: Math.PI }]),
+            bench: [[105, 926], [222, 926], [288, 926], [398, 926], [792, 926], [892, 926]].map(([x, y]) => ({ at: [x, y], from: [x, 878], face: -Math.PI / 2 }))
+        };
+
+        class CafeLife extends ClubLife {
+            constructor() { super(); this.mapId = 'cozy_cafe_interior'; }
+
+            /** A fresh café: the barista on shift, and the day's regulars already settled in. */
+            reset(game) {
+                this.walkers = []; this.map = game.activeMap; this._spawnTimer = 0; this.taken = new Map();
+                const nav = NavGrid.for(this.map);
+                this._snap = ([x, y]) => { const f = nav && nav.nearestFree(x, y, 4); return f !== null && f !== undefined ? [nav.cx(f), nav.cy(f)] : [x, y]; };
+                const staff = this._make('runner', CAFE_SPOTS.staffHome[0], CAFE_SPOTS.staffHome[1], ROLE_LOOKS.cafe_staff(seededRandom('cafe_staff')));
+                staff.life = 1; staff.speed = 1.2;
+                this.walkers.push(staff);
+                const n = this._target(game);
+                for (let i = 0; i < Math.round(n * 0.75); i++) this._spawnGuest(true);
+            }
+
+            /** How full: the density setting, scaled by the hour (mornings and late afternoons are busy). */
+            _target(game) {
+                const base = CAFE_CROWD[GameSettings.pedestrianDensity] || CAFE_CROWD.medium;
+                const h = (((game.worldMinutes || 0) / 60) % 24 + 24) % 24;
+                const k = h >= 7 && h < 10 ? 1 : h >= 10 && h < 14 ? 0.7 : h >= 14 && h < 18 ? 0.9 : h >= 18 && h < 22 ? 0.55 : h >= 22 || h < 2 ? 0.3 : 0.12;
+                return Math.max(1, Math.round(base * k));
+            }
+
+            /** A guest (or two friends) walks in; when the café is entered, some are already seated, cup in hand. */
+            _spawnGuest(midVisit) {
+                const r = Math.random;
+                const pair = !midVisit && r() < 0.3;
+                const party = [];
+                for (let k = 0; k < (pair ? 2 : 1); k++) {
+                    const look = ROLE_LOOKS.cafegoer(seededRandom('cafe' + r()));
+                    const p = midVisit ? CAFE_GATE : [CAFE_GATE[0] + (k ? 22 : 0), CAFE_GATE[1] + (k ? 10 : 0)];
+                    const g = this._make('guest', p[0], p[1], look);
+                    g.speed = 0.85 + r() * 0.35; g.fade = midVisit ? 0 : 0.04; g.life = midVisit ? 1 : 0;
+                    party.push(g);
+                }
+                const mug = () => ({ type: 'glass', drink: pickFrom(r, CAFE_DRINKS), hand: 'right' });
+                // Friends: one table, a chair each
+                let pairChairs = null;
+                if (pair) {
+                    const set = this.taken.get('chair') || (this.taken.set('chair', new Map()), this.taken.get('chair'));
+                    const free = []; for (let t = 0; t < CAFE_SEATS.chair.length / 2; t++) if (!set.has(2 * t) && !set.has(2 * t + 1)) free.push(t);
+                    if (free.length) { const t = free[r() * free.length | 0]; set.set(2 * t, party[0]); set.set(2 * t + 1, party[1]); pairChairs = [2 * t, 2 * t + 1]; }
+                }
+                party.forEach((g, k) => {
+                    const stay = 1800 + r() * 2700 | 0;                                 // a minute or two and a half, seated
+                    if (midVisit) {
+                        g.look.held = mug();
+                        g.steps.push({ seat: pickFrom(r, ['chair', 'chair', 'hearth', 'booth', 'booth', 'bench']), wait: (stay * (0.2 + r() * 0.8)) | 0, pose: pickFrom(r, ['sit', 'sit', 'sit_lean', 'sit_phone', 'sit_work']) });
+                    } else {
+                        if (k === 0 || !pairChairs) g.steps.push({ order: true });     // (a friend lets the other order for both)
+                        else g.steps.push({ go: CAFE_SPOTS.pastry[1], face: [396, 250], wait: 120 + r() * 120 | 0, pose: 'idle' });
+                        g.steps.push({ go: CAFE_SPOTS.pickup[k], face: CAFE_SPOTS.pickupAt, wait: 80 + r() * 60 | 0, pose: 'idle', give: mug(), giveAt: 50, keep: true });
+                        if (!pairChairs && r() < 0.3) g.steps.push(r() < 0.6 ? { browse: 'books' } : { browse: 'pastry' });
+                        g.steps.push(pairChairs ? { seatIdx: pairChairs[k], pool: 'chair', wait: stay, pose: pickFrom(r, ['sit', 'sit_lean', 'sit']) }
+                                                : { seat: pickFrom(r, ['chair', 'chair', 'chair', 'hearth', 'booth', 'booth', 'bench', 'bench']), wait: stay, pose: pickFrom(r, ['sit', 'sit', 'sit_lean', 'sit_phone', 'sit_work']) });
+                    }
+                    if (!pairChairs && r() < 0.2) g.steps.push({ browse: 'record' });
+                    g.steps.push({ exit: true, go: CAFE_GATE });
+                    this.walkers.push(g);
+                });
+            }
+
+            /** Turn a planned activity into concrete stops (claiming what it needs). */
+            _expand(w, step) {
+                const r = Math.random, S = CAFE_SPOTS;
+                if (step.order) {
+                    const i = this._claim('queue', S.queue.length, w);
+                    if (i < 0) return [{ go: this._snap([340, 430]), face: S.orderAt, wait: 120, pose: 'phone' }, { order: true }];   // a wait by the tables, then try again
+                    return [{ go: S.queue[i], face: S.orderAt, wait: 120 + r() * 140 | 0, pose: pickFrom(r, ['idle', 'phone', 'idle']), pool: 'queue' }];
+                }
+                if (step.browse) {
+                    if (step.browse === 'books') { const p = pickFrom(r, S.books); return [{ go: this._snap(p), face: [p[0], 50], wait: 200 + r() * 300 | 0, pose: 'idle' }]; }
+                    if (step.browse === 'record') return [{ go: this._snap(S.record), face: [650, 50], wait: 150 + r() * 150 | 0, pose: 'idle' }];
+                    return [{ go: S.pastry[0], face: [366, 250], wait: 150 + r() * 150 | 0, pose: 'idle' }];
+                }
+                if (step.seat || step.seatIdx !== undefined) {
+                    let pool = step.seat || step.pool, i = step.seatIdx;
+                    if (i === undefined) {
+                        i = this._claim(pool, CAFE_SEATS[pool].length, w);
+                        for (const alt of ['chair', 'booth', 'bench', 'hearth']) { if (i >= 0) break; pool = alt; i = this._claim(alt, CAFE_SEATS[alt].length, w); }
+                        if (i < 0) return [{ go: this._snap(pickFrom(r, S.books)), face: [500, 50], wait: 300, pose: 'phone' }];   // full: a look at the books, then home
+                    }
+                    const s = CAFE_SEATS[pool][i];
+                    return [{ go: this._snap(s.from), seatAt: s.at, seatFace: s.face, wait: step.wait, pose: step.pose, pool }];
+                }
+                return [step];
+            }
+
+            /** The other barista: polishes behind the counter, carries a cup out to a table now and then. */
+            _staffThink(w) {
+                if (w.steps.length) return;
+                const r = Math.random, S = CAFE_SPOTS;
+                if (r() < 0.45) {
+                    const [cx, cy] = pickFrom(r, CAFE_TABLES);
+                    w.look.held = { type: 'glass', drink: pickFrom(r, CAFE_DRINKS), hand: 'right' };
+                    w.steps.push({ go: S.staffGap, wait: 1 }, { go: this._snap([cx, cy + 36]), face: [cx, cy], wait: 70 + r() * 40 | 0, pose: 'idle', take: true, keep: true },   // the cup set down
+                                 { go: S.staffGap, wait: 1 }, { go: S.staffHome, face: [150, 260], wait: 300 + r() * 300 | 0, pose: 'polish' });
+                } else w.steps.push({ go: this._snap([120 + r() * 220, 200 + r() * 20]), face: [200, 260], wait: 240 + r() * 360 | 0, pose: 'polish' });
             }
         }
         // ============================================================================
@@ -42711,6 +43164,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const TAU = Math.PI * 2, R = D.rim;
             const side = hand === 'left' ? -1 : 1;
             const gx = hX + 1.5, gy = hY + side * 3.5;          // just past the fingers
+            if (D.glass === 'mug') {                            // a ceramic mug (the cafe's): the cup, its handle, the drink, a heart in the foam
+                ctx.save(); ctx.translate(gx, gy);
+                ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.arc(0.9, 1.1, R * 1.05, 0, TAU); ctx.fill();
+                ctx.strokeStyle = D.cup; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(R * 1.05, side * 0.4, R * 0.45, -1.3, 1.3); ctx.stroke();
+                ctx.fillStyle = D.cup; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+                ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.4; ctx.stroke();
+                ctx.fillStyle = D.liquid; ctx.beginPath(); ctx.arc(0, 0, R * 0.76, 0, TAU); ctx.fill();
+                if (D.art) { ctx.fillStyle = 'rgba(250,238,222,0.9)'; ctx.beginPath(); ctx.arc(-0.7, -0.4, R * 0.24, 0, TAU); ctx.arc(0.7, -0.4, R * 0.24, 0, TAU); ctx.fill();
+                             ctx.beginPath(); ctx.moveTo(-1.6, 0); ctx.lineTo(0, 1.9); ctx.lineTo(1.6, 0); ctx.closePath(); ctx.fill(); }
+                if (D.foam) { ctx.fillStyle = 'rgba(250,240,230,0.85)'; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(Math.cos(i * 1.7) * R * 0.32, Math.sin(i * 1.7) * R * 0.32, R * 0.2, 0, TAU); ctx.fill(); } }
+                if (D.crema) { ctx.fillStyle = 'rgba(200,140,70,0.75)'; ctx.beginPath(); ctx.arc(0, 0, R * 0.5, 0, TAU); ctx.fill(); }
+                ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(-R * 0.45, -R * 0.45, R * 0.18, 0, TAU); ctx.fill();
+                ctx.restore();
+                return;
+            }
             const T = ctx.getTransform();
             const light = -Math.PI * 0.75 - Math.atan2(T.b, T.a);  // toward screen upper-left, in local space
             const lx = Math.cos(light), ly = Math.sin(light);
@@ -47436,6 +47904,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.graveyardGhosts = []; // Procedural humanoid ghosts in the cemetery
                 this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (world/lobby-life.js)
                 this.clubLife = new ClubLife();   // Moon City's crowd (world/club-life.js)
+                this.cafeLife = new CafeLife();   // the Cozy Cafe's guests (world/cafe-life.js)
                 this.furniture = new FurnitureSystem(this);   // grab and move the apartment's furniture (engine/furniture.js)
                 
                 // Time slow system for dramatic moments (boss kills, etc.)
@@ -54039,7 +54508,7 @@ engineMixin({
         const MAP_BAKES = {
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
-            apt_949: ['_backdropStatic'], van_interior: ['_vanCabin'],
+            apt_949: ['_backdropStatic'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };
 
@@ -56587,6 +57056,7 @@ engineMixin({
                 // The Double Nights lobby: guests and staff come and go; searched cases refill daily
                 this.lobbyLife.update(this);
                 this.clubLife.update(this);
+                this.cafeLife.update(this);
                 Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
                 this.updateNpcPosts();             // shoved off their post: back they go (engine/npc-posts.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
@@ -56812,6 +57282,7 @@ engineMixin({
                     for (const o of this.npcs || []) if (!this.teammates.includes(o)) nudge(o, 26, 0);
                     if (this.lobbyLife) for (const o of this.lobbyLife.walkers) nudge(o, 22, 0.8);
                     if (this.clubLife) for (const o of this.clubLife.walkers) nudge(o, 22, 0.8);
+                    if (this.cafeLife) for (const o of this.cafeLife.walkers) if (!o.seated) nudge(o, 22, 0.8);
                     if (!navT || navT.walkable(tm.x + sepX, tm.y + sepY)) { tm.x += sepX; tm.y += sepY; }
 
                     // ── EYELINE TACTICS: a firing spot overrides the formation slot ──
@@ -58639,6 +59110,7 @@ engineMixin({
                     this.pedestrians.draw(this.ctx, cbB); // Roaming civilians
                     this.lobbyLife.draw(this.ctx, cbB);    // Double Nights guests and staff
                     this.clubLife.draw(this.ctx, cbB);     // Moon City's crowd
+                    this.cafeLife.draw(this.ctx, cbB);     // the Cozy Cafe's guests
                     if (this.furniture) this.furniture.draw(this.ctx);   // the hand's outline and side handles (engine/furniture.js)
                     if (!(this.scenes && this.scenes.crewOffstage)) for (const tm of this.teammates) {
                         if (tm.x < cbB.left || tm.x > cbB.right || tm.y < cbB.top || tm.y > cbB.bottom) { if (tm.tickHidden) tm.tickHidden(); continue; }
@@ -59341,6 +59813,7 @@ engineMixin({
             van_interior:        { floor: (g, c) => g.drawVanInterior(c),     glow: (g, c) => g.drawVanGlow(c) },     // chapter 1's ride (engine/van-art.js)
             hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) },
             ethereal_plane:      { glow: (g, c) => g.drawEtherealGlow(c) },
+            cozy_cafe_interior:  { floor: (g, c) => g.drawCafeInterior(c),    glow: (g, c) => g.drawCafeGlow(c) },     // the hearth, candles, pendants, steam
             demoness_palace:     { floor: (g, c) => g.drawPalaceInterior(c), glow: (g, c) => g.drawPalaceGlow(c) }   // engine/palace-art.js      // engine/reflections.js: its mirror floor gives this back
         };
 
@@ -60035,6 +60508,127 @@ engineMixin({
             },
 
             /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
+            /* =====================================================================
+               COZY CAFE — the floor, painted once (released when she leaves: MAP_BAKES),
+               and the glow: the fire, pendant lamps, candles, string lights, steam,
+               and the windows by the benches (sky by day, the city's lights by night,
+               rain running down them when it rains outside)
+               ===================================================================== */
+            drawCafeInterior(ctx) {
+                if (!this._cafeFloor) this._cafeFloor = this._paintCafeFloor();
+                ctx.drawImage(this._cafeFloor, 0, 0);
+            },
+
+            _paintCafeFloor() {
+                const W = 1200, H = 1000, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+                const c = cv.getContext('2d'), r = seededRandom(5150);
+                c.fillStyle = '#1c120a'; c.fillRect(0, 0, W, H);
+                // Honey chevron parquet over the whole café floor, each plank its own shade, a little worn
+                c.save(); c.beginPath(); c.rect(50, 50, 1100, 900); c.clip();
+                const cw = 26, rh = 11, sl = 13;
+                for (let y0 = 30; y0 < H; y0 += rh) for (let x0 = 40, col = 0; x0 < W; x0 += cw, col++) {
+                    const up = col % 2 === 0, v = r();
+                    c.fillStyle = `rgb(${132 + v * 40 | 0},${84 + v * 26 | 0},${44 + v * 16 | 0})`;
+                    c.beginPath();
+                    c.moveTo(x0, y0 + (up ? sl : 0)); c.lineTo(x0 + cw, y0 + (up ? 0 : sl));
+                    c.lineTo(x0 + cw, y0 + (up ? 0 : sl) + rh); c.lineTo(x0, y0 + (up ? sl : 0) + rh); c.closePath(); c.fill();
+                    c.strokeStyle = 'rgba(40,20,8,0.45)'; c.lineWidth = 0.8; c.stroke();
+                }
+                // Worn paths: door → counter, door → the tables (lighter, where the varnish has gone)
+                for (const [x1, y1, x2, y2] of [[600, 940, 280, 320], [600, 940, 600, 560], [600, 940, 960, 500]]) {
+                    for (let k = 0; k <= 1; k += 0.05) {
+                        const x = x1 + (x2 - x1) * k, y = y1 + (y2 - y1) * k, g = c.createRadialGradient(x, y, 0, x, y, 60);
+                        g.addColorStop(0, 'rgba(255,220,160,0.035)'); g.addColorStop(1, 'rgba(255,220,160,0)'); c.fillStyle = g; c.fillRect(x - 60, y - 60, 120, 120);
+                    }
+                }
+                c.restore();
+                // Behind the counter: terracotta squares
+                for (let y = 50; y < 245; y += 22) for (let x = 50; x < 395; x += 22) { const v = r(); c.fillStyle = `rgb(${150 + v * 30 | 0},${72 + v * 18 | 0},${48 + v * 10 | 0})`; c.fillRect(x + 1, y + 1, 20, 20); }
+                // The kitchen: black and cream checkers
+                for (let y = 50, j = 0; y < 300; y += 25, j++) for (let x = 705, i = 0; x < 1150; x += 25, i++) { c.fillStyle = (i + j) % 2 ? '#e9dfc8' : '#1e1c1e'; c.fillRect(x, y, 25, 25); }
+                c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(705, 50, 445, 250);
+                // The storeroom: worn concrete
+                c.fillStyle = '#4a443e'; c.fillRect(955, 715, 195, 235);
+                for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(${r() > 0.5 ? '20,16,12' : '120,110,96'},${0.06 + r() * 0.08})`; c.beginPath(); c.arc(955 + r() * 195, 715 + r() * 235, 4 + r() * 18, 0, Math.PI * 2); c.fill(); }
+                // The hearth rug: a deep red and saffron oval with a patterned border
+                const rug = (cx, cy, rx, ry) => {
+                    c.save(); c.translate(cx, cy);
+                    c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.ellipse(3, 4, rx, ry, 0, 0, Math.PI * 2); c.fill();
+                    const rings = [[1, '#5e1e1a'], [0.93, '#c0903a'], [0.88, '#7a2a22'], [0.62, '#8e3a2a'], [0.56, '#d9a35a'], [0.5, '#6e2420'], [0.2, '#c0903a']];
+                    for (const [k, col] of rings) { c.fillStyle = col; c.beginPath(); c.ellipse(0, 0, rx * k, ry * k, 0, 0, Math.PI * 2); c.fill(); }
+                    c.fillStyle = '#e8c88a';
+                    for (let i = 0; i < 36; i++) { const a = i / 36 * Math.PI * 2; c.beginPath(); c.arc(Math.cos(a) * rx * 0.755, Math.sin(a) * ry * 0.755, 2.4, 0, Math.PI * 2); c.fill(); }
+                    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; c.save(); c.rotate(a); c.fillStyle = '#d9a35a'; c.beginPath(); c.moveTo(rx * 0.22, 0); c.lineTo(rx * 0.4, -6); c.lineTo(rx * 0.48, 0); c.lineTo(rx * 0.4, 6); c.closePath(); c.fill(); c.restore(); }
+                    c.strokeStyle = 'rgba(232,200,138,0.6)'; c.lineWidth = 1; c.setLineDash([2, 3]); c.beginPath(); c.ellipse(0, 0, rx * 0.97, ry * 0.97, 0, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+                    c.restore();
+                };
+                rug(205, 536, 150, 132);
+                // Under the booths: a long runner in sage and cream
+                c.fillStyle = '#4a6244'; c.fillRect(952, 336, 196, 330); c.fillStyle = '#e8dcc4'; c.fillRect(956, 340, 188, 3); c.fillRect(956, 659, 188, 3);
+                c.fillStyle = 'rgba(232,220,196,0.25)'; for (let y = 352; y < 656; y += 14) for (let x = 964; x < 1140; x += 14) { c.beginPath(); c.arc(x, y, 1.4, 0, Math.PI * 2); c.fill(); }
+                // The doormat
+                c.fillStyle = '#7a5a34'; c.fillRect(520, 842, 160, 62); c.strokeStyle = '#4a3420'; c.lineWidth = 3; c.strokeRect(524, 846, 152, 54);
+                c.fillStyle = 'rgba(40,24,10,0.75)'; c.font = 'bold 15px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('come in, get cozy', 600, 873);
+                // At the counter: "order here", in brass inlay
+                c.fillStyle = 'rgba(201,162,74,0.55)'; c.font = 'italic 13px Georgia, serif'; c.fillText('✦  order here  ✦', 272, 296);
+                return cv;
+            },
+
+            drawCafeGlow(ctx) {
+                const t = _frameTime / 1000, dc = this.dayCycle(), night = dc.darkness > 0.3, rain = (this.weather && this.weather.intensity || 0) > 0.08;
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
+                const fl = (k) => 0.82 + 0.1 * Math.sin(t * 7.3 + k) + 0.08 * Math.sin(t * 12.1 + k * 2.3);   // a flame's breath
+                ctx.save();
+                // The windows by the benches, on the south wall: the sky by day, the city's lights by night, rain on the glass
+                for (const [x0, x1] of [[80, 420], [760, 925]]) {
+                    for (let wx = x0; wx < x1 - 20; wx += 58) {
+                        const ww = Math.min(52, x1 - wx);
+                        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+                        ctx.fillStyle = '#3a2416'; ctx.fillRect(wx - 3, 952, ww + 6, 30);
+                        const g = ctx.createLinearGradient(0, 955, 0, 978);
+                        if (night) { g.addColorStop(0, '#1a1438'); g.addColorStop(1, '#2c1e4a'); } else { g.addColorStop(0, '#9fc2e6'); g.addColorStop(1, '#d9e6f2'); }
+                        ctx.fillStyle = g; ctx.fillRect(wx, 955, ww, 24);
+                        if (night) for (let i = 0; i < 4; i++) { const lx = wx + 5 + ((i * 13 + wx) % (ww - 8)); ctx.fillStyle = ['#ffcf8a', '#ff8ec4', '#a6c8ff', '#ffd9a0'][i]; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 0.7 + i + wx); ctx.fillRect(lx, 964 + (i % 2) * 6, 2, 2); }
+                        ctx.globalAlpha = 1;
+                        if (rain) { ctx.strokeStyle = 'rgba(220,235,255,0.35)'; ctx.lineWidth = 0.8; ctx.beginPath(); for (let i = 0; i < 5; i++) { const sx = wx + 4 + ((i * 11 + (t * 30 | 0) * (i + 1)) % (ww - 6)), sy = 955 + ((t * 18 + i * 7) % 18); ctx.moveTo(sx, sy); ctx.lineTo(sx - 0.5, sy + 5); } ctx.stroke(); }
+                        ctx.fillStyle = '#5a3a24'; ctx.fillRect(wx + ww / 2 - 1, 955, 2, 24); ctx.fillRect(wx, 966, ww, 2);
+                    }
+                }
+                ctx.globalCompositeOperation = 'lighter';
+                // Daylight through the windows across the benches and well into the room; at night a faint cool spill
+                const day = Math.max(0, Math.min(1, dc.daylight != null ? dc.daylight : (night ? 0 : 1)));
+                for (const [cx, w] of [[250, 340], [842, 170]]) glow(cx, 920, w * 0.7, night ? '150, 160, 255' : '255, 240, 210', night ? 0.05 : 0.18);
+                if (day > 0.05) { glow(250, 860, 420, '255, 236, 200', 0.12 * day); glow(842, 860, 260, '255, 236, 200', 0.1 * day); glow(600, 600, 700, '255, 226, 180', 0.06 * day); }
+                // The fire: a deep wash, the flames, sparks
+                const f0 = fl(0);
+                glow(120, 535, 260, '255, 120, 40', 0.2 * f0); glow(92, 535, 90, '255, 170, 70', 0.45 * f0);
+                for (let i = 0; i < 6; i++) { const fy = 505 + i * 12, f = fl(i * 1.7); glow(86 + 4 * Math.sin(t * 9 + i), fy, 12 + 6 * f, '255, 150, 50', 0.55 * f); glow(84, fy, 6, '255, 230, 150', 0.6 * f); }
+                for (let i = 0; i < 5; i++) { const ph = (t * 0.6 + i * 0.21) % 1; glow(92 + ph * 40 + Math.sin(t * 3 + i) * 5, 535 + Math.sin(i * 2.3) * 30 - ph * 10, 2.5, '255, 190, 90', 0.7 * (1 - ph)); }
+                // Pendant lamps over the tables and the counter: a warm cone below a brass shade
+                const pendants = [[190, 262], [330, 262], ...CAFE_TABLES];   // two over the counter (clear of Ren), one over each round table
+                for (const [px, py] of pendants) glow(px, py, 120, '255, 196, 120', 0.12);
+                // Candles on the tables, the booths, the low table and the mantel
+                const candles = [...CAFE_TABLES.map(([x, y]) => [x, y]), ...CAFE_BOOTHS.map(y => [1061, y]), [199, 545], [58, 484], [58, 586]];
+                candles.forEach(([x, y], i) => { const f = fl(i * 2.1); glow(x, y, 34, '255, 170, 80', 0.32 * f); glow(x, y, 7, '255, 235, 180', 0.75 * f); });
+                // String lights: along the bookshelf wall, over the booths, above the window benches
+                const bulbs = [];
+                for (let x = 438; x <= 686; x += 18) bulbs.push([x, 84 + 4 * Math.sin((x - 438) / 248 * Math.PI)]);
+                for (let y = 330; y <= 690; y += 20) bulbs.push([1142, y]);
+                for (let x = 70; x <= 930; x += 20) if (x < 470 || x > 740) bulbs.push([x, 946]);
+                bulbs.forEach(([x, y], i) => { const tw = 0.6 + 0.4 * Math.sin(t * 1.3 + i * 1.7); glow(x, y, 9, i % 3 ? '255, 214, 150' : '255, 180, 200', 0.5 * tw); });
+                // Steam: from the espresso machine, and a curl over each cup on the round tables
+                const curl = (x, y, k, s = 1) => { for (let j = 0; j < 3; j++) { const ph = (t * 0.35 + j / 3 + k) % 1; glow(x + Math.sin(t * 1.4 + j + k) * 4 * ph, y - ph * 22 * s, (4 + ph * 7) * s, '255, 245, 235', 0.1 * (1 - ph)); } };
+                curl(158, 60, 0, 1.4); curl(188, 60, 0.4, 1.4);
+                CAFE_TABLES.forEach(([x, y], i) => curl(x - 13, y + 4, i * 0.37));
+                ctx.restore();
+                // The pendant shades themselves (seen from above), drawn solid
+                ctx.lineWidth = 1.5; ctx.strokeStyle = '#c9a24a';
+                for (const [px, py] of pendants) {
+                    ctx.fillStyle = '#3a2416'; ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#fff1d0'; ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2); ctx.fill();
+                }
+            },
+
             drawApartmentGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these

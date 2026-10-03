@@ -66,6 +66,7 @@ const SCRIPTS = [
     'entities/pedestrians.js',
     'world/lobby-life.js',
     'world/club-life.js',
+    'world/cafe-life.js',
     'engine/furniture.js',
     'entities/enemies.js',
     'entities/hunters.js',

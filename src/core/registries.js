@@ -125,7 +125,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             whiskey:    { name: 'Whiskey',       glass: 'tumbler', rim: 4.0, liquid: '#b5641a', ice: true },
             neon:       { name: 'Neon Cocktail', glass: 'coupe',   rim: 4.6, liquid: '#17dcff', liquid2: '#ff2bd6', glow: true, garnish: 'citrus' },
             cream_soda: { name: 'Ms. Jean Cream Soda', glass: 'soda', rim: 3.8, liquid: '#f4b0c4', bubbles: true, foam: true, straw: '#d4447c' },
-            stellar_lemonade: { name: 'Stellar Lemonade', glass: 'tumbler', rim: 4.0, liquid: '#f3dc6a', ice: true, garnish: 'citrus' }   // JJ's
+            stellar_lemonade: { name: 'Stellar Lemonade', glass: 'tumbler', rim: 4.0, liquid: '#f3dc6a', ice: true, garnish: 'citrus' },   // JJ's
+            // The Cozy Cafe's mugs (its guests, world/cafe-life.js; `cafe`: not one of the Crystal Glass's pours)
+            latte:      { name: 'Honey Latte',   glass: 'mug', rim: 4.4, liquid: '#a9784e', cup: '#efe4d0', art: true, cafe: true },
+            tea:        { name: 'Chai',          glass: 'mug', rim: 4.2, liquid: '#b07a3c', cup: '#6d8a64', cafe: true },
+            cocoa:      { name: 'Cocoa',         glass: 'mug', rim: 4.4, liquid: '#5a3424', cup: '#c0903a', foam: true, cafe: true },
+            espresso:   { name: 'Espresso',      glass: 'mug', rim: 3.2, liquid: '#3a2214', cup: '#f3ead8', crema: true, cafe: true }
         };
 
         const COSMETICS_REGISTRY = {

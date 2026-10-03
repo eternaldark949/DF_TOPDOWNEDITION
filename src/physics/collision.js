@@ -338,7 +338,7 @@
                     if (game.clubLife && game.clubLife.walkers.length) doorActors = doorActors.concat(game.clubLife.doorActors());   // the club's crowd pushes the restroom doors
                     if (game.enemies && game.enemies.length) {
                         const seen = new Set(actors);
-                        doorActors = actors.concat(game.enemies.filter(e => e && !e.dead && e.active !== false && !seen.has(e)));
+                        doorActors = doorActors.concat(game.enemies.filter(e => e && !e.dead && e.active !== false && !seen.has(e)));   // (onto the crowd too, not over it)
                     }
                     game.roomSystem.stepDoorPhysics(doorActors);
                 }

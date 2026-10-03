@@ -6,7 +6,7 @@
         const MAP_BAKES = {
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
-            apt_949: ['_backdropStatic'], van_interior: ['_vanCabin'],
+            apt_949: ['_backdropStatic'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };
 

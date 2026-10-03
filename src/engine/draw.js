@@ -722,6 +722,7 @@
                     this.pedestrians.draw(this.ctx, cbB); // Roaming civilians
                     this.lobbyLife.draw(this.ctx, cbB);    // Double Nights guests and staff
                     this.clubLife.draw(this.ctx, cbB);     // Moon City's crowd
+                    this.cafeLife.draw(this.ctx, cbB);     // the Cozy Cafe's guests
                     if (this.furniture) this.furniture.draw(this.ctx);   // the hand's outline and side handles (engine/furniture.js)
                     if (!(this.scenes && this.scenes.crewOffstage)) for (const tm of this.teammates) {
                         if (tm.x < cbB.left || tm.x > cbB.right || tm.y < cbB.top || tm.y > cbB.bottom) { if (tm.tickHidden) tm.tickHidden(); continue; }

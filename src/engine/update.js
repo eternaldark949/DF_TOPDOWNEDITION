@@ -286,6 +286,7 @@
                 // The Double Nights lobby: guests and staff come and go; searched cases refill daily
                 this.lobbyLife.update(this);
                 this.clubLife.update(this);
+                this.cafeLife.update(this);
                 Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
                 this.updateNpcPosts();             // shoved off their post: back they go (engine/npc-posts.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
@@ -511,6 +512,7 @@
                     for (const o of this.npcs || []) if (!this.teammates.includes(o)) nudge(o, 26, 0);
                     if (this.lobbyLife) for (const o of this.lobbyLife.walkers) nudge(o, 22, 0.8);
                     if (this.clubLife) for (const o of this.clubLife.walkers) nudge(o, 22, 0.8);
+                    if (this.cafeLife) for (const o of this.cafeLife.walkers) if (!o.seated) nudge(o, 22, 0.8);
                     if (!navT || navT.walkable(tm.x + sepX, tm.y + sepY)) { tm.x += sepX; tm.y += sepY; }
 
                     // ── EYELINE TACTICS: a firing spot overrides the formation slot ──
