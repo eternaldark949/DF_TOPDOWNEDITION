@@ -94,7 +94,15 @@
         function drawCrowdHumanoid(ctx, entity, config) {
             const q = GameSettings.crowdQuality || 'high';
             if (q === 'high') return drawProceduralHumanoid(ctx, entity, config);
-            if (q === 'low' && CrowdImpostors.draw(ctx, entity, config)) return;
+            if (q === 'low') {
+                if (!RenderStats.timed) { if (CrowdImpostors.draw(ctx, entity, config)) return; }
+                else {                                                              // a baked body is still a body: Entities: People
+                    const t0 = performance.now(), pm = RenderStats.peopleMs;
+                    const ok = CrowdImpostors.draw(ctx, entity, config);
+                    RenderStats.peopleMs = pm + (performance.now() - t0);
+                    if (ok) return;
+                }
+            }
             _crowdLite = true;
             try { drawProceduralHumanoid(ctx, entity, config); } finally { _crowdLite = false; }
         }

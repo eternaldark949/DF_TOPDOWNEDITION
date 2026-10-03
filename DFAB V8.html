@@ -4249,6 +4249,10 @@
                     <span class="settings-value" id="set-countcalls" data-key="countCalls">OFF</span>
                 </div>
                 <div class="settings-row">
+                    <span class="settings-label">Baseline: Skip World</span>
+                    <span class="settings-value" id="set-baseline" data-key="baseline">OFF</span>
+                </div>
+                <div class="settings-row">
                     <span class="settings-label">Debug View</span>
                     <span class="settings-value" id="set-debug" data-key="debugView">OFF</span>
                 </div>
@@ -7495,6 +7499,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
+            baseline: false,                // the ground and Stella only: the most this device can give the game (not kept)
             countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
             
             // --- AUDIO ---
@@ -42786,7 +42791,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function drawCrowdHumanoid(ctx, entity, config) {
             const q = GameSettings.crowdQuality || 'high';
             if (q === 'high') return drawProceduralHumanoid(ctx, entity, config);
-            if (q === 'low' && CrowdImpostors.draw(ctx, entity, config)) return;
+            if (q === 'low') {
+                if (!RenderStats.timed) { if (CrowdImpostors.draw(ctx, entity, config)) return; }
+                else {                                                              // a baked body is still a body: Entities: People
+                    const t0 = performance.now(), pm = RenderStats.peopleMs;
+                    const ok = CrowdImpostors.draw(ctx, entity, config);
+                    RenderStats.peopleMs = pm + (performance.now() - t0);
+                    if (ok) return;
+                }
+            }
             _crowdLite = true;
             try { drawProceduralHumanoid(ctx, entity, config); } finally { _crowdLite = false; }
         }
@@ -57959,6 +57972,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return v;
             },
 
+            /** Profiler (Full mode): bill the time since the last lap to `label`, less the bodies drawn
+                meanwhile (those are Entities: People). Laps run end to end through Render:Entities. */
+            _entLap(label) {
+                const now = performance.now(), pm = RenderStats.peopleMs;
+                this.profiler.add(label, (now - this._lapT) - (pm - this._lapP), true);
+                this._lapT = now; this._lapP = pm;
+            },
+
             /** A point on the canvas (backing-store px) -> the world, through this frame's view. */
             viewToWorld(sx, sy) {
                 const v = this.view || { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom };
@@ -58167,6 +58188,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
                 this.profiler.stop('Render:World');
                 
+                // Baseline (Settings → Developer): the ground and Stella only, to see the most this device
+                // can give the game. Everything from the buildings to the world's top layers is skipped.
+                const _baseline = !!GameSettings.baseline;
+                if (!_baseline) {   // ── to the end of Render:Entities
                 // Buildings - BASE LAYER (shadows, ground floor) - drawn before entities
                 this.profiler.start('Render:Buildings');
                 // PERFORMANCE: AABB viewport culling
@@ -58300,6 +58325,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Entrance Markers (Holo-Zones) - Periwinkle/Lavender Glow
                 this.profiler.start('Render:Entities');
+                if (RenderStats.timed) { this._lapT = performance.now(); this._lapP = RenderStats.peopleMs; }   // the laps below split Entities into rows
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.transitions) {
                     const cbW = cullBounds.world;
@@ -58498,6 +58524,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.ctx.restore();
                 }
             
+                if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Grid (Faint) - WITH VIEWPORT CULLING (not in the city: its ground is painted)
                 if (!bakedGround) {
                 this.ctx.strokeStyle = 'rgba(164, 105, 255, 0.1)'; 
@@ -58542,6 +58569,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.roomSystem.drawDoors(this.ctx);
                 }
             
+                if (RenderStats.timed) this._entLap('Entities: Ground');
                 // 3. DYNAMIC ENTITIES & CARS
                 // PERFORMANCE: AABB viewport culling for props
                 {
@@ -58554,6 +58582,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     });
                 }
                 
+                if (RenderStats.timed) this._entLap('Entities: Props');
                 // Draw Traffic Cars
                 // PERFORMANCE: AABB viewport culling + distance LOD
                 {
@@ -58621,12 +58650,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
             
+                if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
                 this.drawNoiseRipples(this.ctx);
                 this.drawCorpses(this.ctx, cullBounds.bodies);           // the fallen, under the living (engine/finisher.js)
                 this.drawHunterDashes(this.ctx);                         // crimson flits (engine/palace-art.js)
                 this.drawExecuteCue(this.ctx);                           // a gold reticle under an unaware back (engine/executions.js)
                 
+                if (RenderStats.timed) this._entLap('Entities: Effects');
                 // PERFORMANCE: AABB viewport culling for entities
                 {
                     const cbE = cullBounds.entities;
@@ -58691,6 +58722,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 
+                if (RenderStats.timed) this._entLap('Entities: People extras');
                 // Active Car (The one player is driving)
                 if (this.car.visible) this.car.draw(this.ctx);
                 
@@ -58699,6 +58731,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.bumperMinigame.draw(this.ctx, this.camera);
                 }
                 
+                if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 // Rooms she isn't in sit in a soft violet shadow (RoomSystem.drawVeil). On a dark map
                 // the light layer carries the veil (lighting.js); in bright light it goes on the scene.
                 if (this.roomSystem.active && this.getAmbientDarkness() < 0.5) {
@@ -58708,6 +58741,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Flit VFX (ghost afterimage, lightning trails — drawn behind player)
                 if (this.flitVFX.length > 0) this.drawFlitVFX(this.ctx);
 
+                if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Player
                 if (this.player.visible) { 
                     if (this.flitState.active) this.ctx.globalAlpha = 0.5; 
@@ -58716,6 +58750,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.drawPlayerEmote();
                 }
                 
+                if (RenderStats.timed) this._entLap('Entities: People extras');
                 // ── UNIFIED BUBBLE PASS ──
                 // Speech bubbles (NPC + pedestrian) draw AFTER all character
                 // bodies so they're never covered by the player, teammates,
@@ -58773,6 +58808,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.drawShotFx(this.ctx, cullBounds.world);                 // barrel smoke, embers, golden wisps (engine/combat-effects.js)
                 this.drawSlashes(this.ctx);                                  // a blade's gold arc (engine/status-effects.js)
 
+                if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Passenger lean-out rendering — draw in-car companions at their seat positions
                 // Uses drawProceduralHumanoid with isDriving flag for unified lean-out animation
                 // Drawn BEFORE the car overlay so the car body partially covers them
@@ -58844,7 +58880,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 
-                const _topsT0 = RenderStats.timed ? performance.now() : 0;   // the world's top layers (profiler: Entities: World tops)
+                if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 // Ferris Wheel BASE (legs/shadow — under building roofs)
                 if (this.activeMap.ferrisWheel) {
                     this.activeMap.ferrisWheel.drawBase(this.ctx);
@@ -58945,10 +58981,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     l.draw(this.ctx, this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight);
                 }); 
             
-                if (RenderStats.timed) {
-                    this.profiler.add('Entities: World tops', performance.now() - _topsT0, true);   // roofs, signs, foliage, lamps
-                    this.profiler.add('Entities: People', RenderStats.peopleMs, true);           // every body drawn
-                }
+                if (RenderStats.timed) this._entLap('Entities: World tops');   // roofs, signs, foliage, lamps
                 // 3. Draw projectiles and weather effects
                 this.projectiles.forEach(p => p.draw(this.ctx));
                 
@@ -59021,15 +59054,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 
+                if (RenderStats.timed) this._entLap('Entities: Effects');
                 this.weather.draw(this.ctx);
+                if (RenderStats.timed) this._entLap('Entities: Weather');
                 
                 // Graveyard humanoid ghosts
                 if (this.graveyardGhosts.length > 0) this.drawGraveyardGhosts(this.ctx);
                 
+                if (RenderStats.timed) {
+                    this._entLap('Entities: Effects');
+                    this.profiler.add('Entities: People', RenderStats.peopleMs, true);           // every body drawn
+                }
                 this.profiler.stop('Render:Entities');
+                } else if (this.player.visible) this.drawPlayer();   // (baseline: her alone)
                 
                 // 4. LIGHTING SYSTEM & DEBUG
                 this.profiler.start('Render:Lighting');
+                if (!_baseline) {   // ── to the debug view
                 this.drawLightingSystem(this.ctx);
                 // By day, the sun's warmth over the frame (engine/daylight.js)
                 this.drawDaylight(this.ctx);
@@ -59047,6 +59088,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (this.dbg('lights')) this.drawDebugLighting(this.ctx);
                     this.drawDebugLayers(this.ctx);
                 }
+                }   // (baseline)
             
                 this.ctx.restore();
                 
@@ -65792,6 +65834,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
                 this._updateValueEl('set-countcalls', GameSettings.countCalls ? 'on' : 'off');
+                this._updateValueEl('set-baseline', GameSettings.baseline ? 'on' : 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
                 this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
                 this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
@@ -65924,6 +65967,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     GameSettings.countCalls = !GameSettings.countCalls;
                     if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
                     this._updateValueEl(el.id, GameSettings.countCalls ? 'on' : 'off');
+
+                } else if (key === 'baseline') {
+                    GameSettings.baseline = !GameSettings.baseline;
+                    this._updateValueEl(el.id, GameSettings.baseline ? 'on' : 'off');
 
                 } else if (key === 'debugView') {
                     game.debugMode = !game.debugMode;

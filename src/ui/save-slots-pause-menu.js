@@ -903,6 +903,7 @@
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
                 this._updateValueEl('set-countcalls', GameSettings.countCalls ? 'on' : 'off');
+                this._updateValueEl('set-baseline', GameSettings.baseline ? 'on' : 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
                 this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
                 this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
@@ -1035,6 +1036,10 @@
                     GameSettings.countCalls = !GameSettings.countCalls;
                     if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
                     this._updateValueEl(el.id, GameSettings.countCalls ? 'on' : 'off');
+
+                } else if (key === 'baseline') {
+                    GameSettings.baseline = !GameSettings.baseline;
+                    this._updateValueEl(el.id, GameSettings.baseline ? 'on' : 'off');
 
                 } else if (key === 'debugView') {
                     game.debugMode = !game.debugMode;

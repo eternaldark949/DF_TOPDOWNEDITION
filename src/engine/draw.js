@@ -13,6 +13,14 @@
                 return v;
             },
 
+            /** Profiler (Full mode): bill the time since the last lap to `label`, less the bodies drawn
+                meanwhile (those are Entities: People). Laps run end to end through Render:Entities. */
+            _entLap(label) {
+                const now = performance.now(), pm = RenderStats.peopleMs;
+                this.profiler.add(label, (now - this._lapT) - (pm - this._lapP), true);
+                this._lapT = now; this._lapP = pm;
+            },
+
             /** A point on the canvas (backing-store px) -> the world, through this frame's view. */
             viewToWorld(sx, sy) {
                 const v = this.view || { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom };
@@ -221,6 +229,10 @@
             
                 this.profiler.stop('Render:World');
                 
+                // Baseline (Settings → Developer): the ground and Stella only, to see the most this device
+                // can give the game. Everything from the buildings to the world's top layers is skipped.
+                const _baseline = !!GameSettings.baseline;
+                if (!_baseline) {   // ── to the end of Render:Entities
                 // Buildings - BASE LAYER (shadows, ground floor) - drawn before entities
                 this.profiler.start('Render:Buildings');
                 // PERFORMANCE: AABB viewport culling
@@ -354,6 +366,7 @@
                 
                 // Entrance Markers (Holo-Zones) - Periwinkle/Lavender Glow
                 this.profiler.start('Render:Entities');
+                if (RenderStats.timed) { this._lapT = performance.now(); this._lapP = RenderStats.peopleMs; }   // the laps below split Entities into rows
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.transitions) {
                     const cbW = cullBounds.world;
@@ -552,6 +565,7 @@
                     this.ctx.restore();
                 }
             
+                if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Grid (Faint) - WITH VIEWPORT CULLING (not in the city: its ground is painted)
                 if (!bakedGround) {
                 this.ctx.strokeStyle = 'rgba(164, 105, 255, 0.1)'; 
@@ -596,6 +610,7 @@
                     this.roomSystem.drawDoors(this.ctx);
                 }
             
+                if (RenderStats.timed) this._entLap('Entities: Ground');
                 // 3. DYNAMIC ENTITIES & CARS
                 // PERFORMANCE: AABB viewport culling for props
                 {
@@ -608,6 +623,7 @@
                     });
                 }
                 
+                if (RenderStats.timed) this._entLap('Entities: Props');
                 // Draw Traffic Cars
                 // PERFORMANCE: AABB viewport culling + distance LOD
                 {
@@ -675,12 +691,14 @@
                     }
                 }
             
+                if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
                 this.drawNoiseRipples(this.ctx);
                 this.drawCorpses(this.ctx, cullBounds.bodies);           // the fallen, under the living (engine/finisher.js)
                 this.drawHunterDashes(this.ctx);                         // crimson flits (engine/palace-art.js)
                 this.drawExecuteCue(this.ctx);                           // a gold reticle under an unaware back (engine/executions.js)
                 
+                if (RenderStats.timed) this._entLap('Entities: Effects');
                 // PERFORMANCE: AABB viewport culling for entities
                 {
                     const cbE = cullBounds.entities;
@@ -745,6 +763,7 @@
                     }
                 }
                 
+                if (RenderStats.timed) this._entLap('Entities: People extras');
                 // Active Car (The one player is driving)
                 if (this.car.visible) this.car.draw(this.ctx);
                 
@@ -753,6 +772,7 @@
                     this.bumperMinigame.draw(this.ctx, this.camera);
                 }
                 
+                if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 // Rooms she isn't in sit in a soft violet shadow (RoomSystem.drawVeil). On a dark map
                 // the light layer carries the veil (lighting.js); in bright light it goes on the scene.
                 if (this.roomSystem.active && this.getAmbientDarkness() < 0.5) {
@@ -762,6 +782,7 @@
                 // Flit VFX (ghost afterimage, lightning trails — drawn behind player)
                 if (this.flitVFX.length > 0) this.drawFlitVFX(this.ctx);
 
+                if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Player
                 if (this.player.visible) { 
                     if (this.flitState.active) this.ctx.globalAlpha = 0.5; 
@@ -770,6 +791,7 @@
                     this.drawPlayerEmote();
                 }
                 
+                if (RenderStats.timed) this._entLap('Entities: People extras');
                 // ── UNIFIED BUBBLE PASS ──
                 // Speech bubbles (NPC + pedestrian) draw AFTER all character
                 // bodies so they're never covered by the player, teammates,
@@ -827,6 +849,7 @@
                 this.drawShotFx(this.ctx, cullBounds.world);                 // barrel smoke, embers, golden wisps (engine/combat-effects.js)
                 this.drawSlashes(this.ctx);                                  // a blade's gold arc (engine/status-effects.js)
 
+                if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Passenger lean-out rendering — draw in-car companions at their seat positions
                 // Uses drawProceduralHumanoid with isDriving flag for unified lean-out animation
                 // Drawn BEFORE the car overlay so the car body partially covers them
@@ -898,7 +921,7 @@
                     }
                 }
                 
-                const _topsT0 = RenderStats.timed ? performance.now() : 0;   // the world's top layers (profiler: Entities: World tops)
+                if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 // Ferris Wheel BASE (legs/shadow — under building roofs)
                 if (this.activeMap.ferrisWheel) {
                     this.activeMap.ferrisWheel.drawBase(this.ctx);
@@ -999,10 +1022,7 @@
                     l.draw(this.ctx, this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight);
                 }); 
             
-                if (RenderStats.timed) {
-                    this.profiler.add('Entities: World tops', performance.now() - _topsT0, true);   // roofs, signs, foliage, lamps
-                    this.profiler.add('Entities: People', RenderStats.peopleMs, true);           // every body drawn
-                }
+                if (RenderStats.timed) this._entLap('Entities: World tops');   // roofs, signs, foliage, lamps
                 // 3. Draw projectiles and weather effects
                 this.projectiles.forEach(p => p.draw(this.ctx));
                 
@@ -1075,15 +1095,23 @@
                     }
                 }
                 
+                if (RenderStats.timed) this._entLap('Entities: Effects');
                 this.weather.draw(this.ctx);
+                if (RenderStats.timed) this._entLap('Entities: Weather');
                 
                 // Graveyard humanoid ghosts
                 if (this.graveyardGhosts.length > 0) this.drawGraveyardGhosts(this.ctx);
                 
+                if (RenderStats.timed) {
+                    this._entLap('Entities: Effects');
+                    this.profiler.add('Entities: People', RenderStats.peopleMs, true);           // every body drawn
+                }
                 this.profiler.stop('Render:Entities');
+                } else if (this.player.visible) this.drawPlayer();   // (baseline: her alone)
                 
                 // 4. LIGHTING SYSTEM & DEBUG
                 this.profiler.start('Render:Lighting');
+                if (!_baseline) {   // ── to the debug view
                 this.drawLightingSystem(this.ctx);
                 // By day, the sun's warmth over the frame (engine/daylight.js)
                 this.drawDaylight(this.ctx);
@@ -1101,6 +1129,7 @@
                     if (this.dbg('lights')) this.drawDebugLighting(this.ctx);
                     this.drawDebugLayers(this.ctx);
                 }
+                }   // (baseline)
             
                 this.ctx.restore();
                 
