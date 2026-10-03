@@ -121,6 +121,7 @@ const SCRIPTS = [
     'engine/combat-fx.js',
     'engine/boss-intro.js',
     'engine/noise.js',
+    'world/map-edge.js',
     'engine/finisher.js',
     'engine/reflections.js',
     'engine/footsteps.js',

@@ -39,6 +39,7 @@
             resetGameState() {
                 if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
                 if (this.scenes) this.scenes.abort();                       // a scene left playing doesn't run on into the next game
+                if (this._rideState && this._rideState.on) { this._rideEl.classList.remove('show'); this._rideState.on = false; }   // the ride tag goes with the run
                 // The big canvases go with the run: painted floors, the city's ground tiles, the baked crowd
                 if (this._releaseMapBakes) this._releaseMapBakes(null);
                 if (this.groundBaker) { this.groundBaker.invalidate(); this.groundBaker.mapId = null; }

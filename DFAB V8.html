@@ -276,6 +276,22 @@
         #ui-wave .w-bar i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, var(--df-lavender), #fff); box-shadow: 0 0 6px rgba(241, 232, 254, 0.8); transition: transform 0.35s ease; }
         #ui-wave.between .w-bar { opacity: 0; }
         body.wave-hud #ui-stealth-indicator { top: calc(12% + 52px); }
+        /* The ride tag (GameEngine._rideHud, engine/draw.js): what she's driving, bottom left, in the wave readout's capsule */
+        #ui-ride { position: absolute; left: 14px; bottom: 26%; z-index: 20; pointer-events: none; opacity: 0; transform: translateY(6px); transition: opacity 0.4s ease, transform 0.4s ease;
+            display: flex; flex-direction: column; gap: 4px; padding: 6px 14px 7px 10px; border-radius: 16px; max-width: calc(100vw - 28px);
+            background: linear-gradient(100deg, rgba(4, 1, 6, 0.62), rgba(22, 6, 46, 0.58)); border: 1px solid rgba(202, 176, 250, 0.32); }
+        #ui-ride.show { opacity: 1; transform: translateY(0); }
+        #ui-ride .r-line { display: flex; align-items: center; gap: 8px; white-space: nowrap; font: 600 0.62rem var(--font-ui); letter-spacing: 3px; text-transform: uppercase; }
+        #ui-ride .r-ico { width: 16px; height: 16px; display: inline-flex; color: var(--df-gold); filter: drop-shadow(0 0 4px rgba(255, 194, 72, 0.6)); }
+        #ui-ride .r-ico svg { width: 100%; height: 100%; }
+        #ui-ride .r-name { color: var(--df-cream); text-shadow: 0 0 8px rgba(255, 236, 200, 0.35); overflow: hidden; text-overflow: ellipsis; }
+        #ui-ride .r-chip { font-size: 0.48rem; letter-spacing: 2px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(208, 16, 28, 0.75); color: #ff8a92; }
+        #ui-ride .r-chip.own { border-color: rgba(255, 194, 72, 0.75); color: var(--df-gold); }
+        #ui-ride .r-chip.zib { border-color: rgba(202, 176, 250, 0.7); color: var(--df-lavender-pale); }
+        #ui-ride .r-sub { display: none; align-items: center; gap: 7px; padding-left: 24px; font: 500 0.54rem var(--font-ui); letter-spacing: 2.5px; text-transform: uppercase; color: var(--df-lavender-pale); }
+        #ui-ride.away .r-sub { display: flex; }
+        @media (orientation: portrait) { body:not(.landscape) #ui-ride { bottom: auto; top: 128px; } }   /* a tall phone: under the menu badge, clear of the controls */
+        #ui-ride .r-arrow { display: inline-block; color: var(--df-gold); font-size: 0.6rem; text-shadow: 0 0 6px rgba(255, 194, 72, 0.8); transition: transform 0.25s ease; }
         
         /* HUD Bars */
         #ui-health { 
@@ -3574,6 +3590,8 @@
             
             <div id="ui-stealth-indicator">HIDDEN (100%)</div>
             <div id="ui-wave" aria-live="polite"></div>
+            <div id="ui-ride"><div class="r-line"><span class="r-ico"></span><span class="r-name"></span><span class="r-chip"></span></div>
+                <div class="r-sub"><span class="r-arrow">➤</span><span class="r-dist"></span></div></div>
 
             <div id="ui-health">
                 <div id="health-bar" style="width: 100%;"></div>
@@ -34472,10 +34490,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fill();
                     ctx.shadowBlur = 0;
                     
-                    ctx.font = `bold ${12 * scale}px Courier New`;
-                    ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+                    // the label in the HUD's champagne caps (Montserrat, spaced), with a gold glow
+                    ctx.font = `600 ${10 * scale}px Montserrat, sans-serif`;
+                    if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+                    ctx.shadowColor = `rgba(255, 194, 72, ${0.8 * alpha})`; ctx.shadowBlur = 6;
+                    ctx.fillStyle = `rgba(255, 240, 214, ${alpha})`;
                     ctx.textAlign = 'center';
                     ctx.fillText('YOUR CAR', 0, -this.width/2 - (20 * scale));
+                    ctx.shadowBlur = 0;
+                    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
                 }
                 
                 // Delivery Vehicle Marker (pulsing violet)
@@ -49628,7 +49651,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.save(); ctx.lineWidth = 1.2;
                 for (const r of R) {
                     const t = this._ringT(r), e = 1 - Math.pow(1 - t, 2);   // ease out
-                    ctx.globalAlpha = 0.26 * (1 - t);
+                    ctx.globalAlpha = 0.18 * (1 - t) * (1 - t);              // fades early: mostly gone by half its life
                     ctx.strokeStyle = r.enemy ? '#ff8a5c' : '#d8c6ff';
                     ctx.beginPath(); ctx.arc(r.x, r.y, 12 + (r.reach - 12) * e, 0, Math.PI * 2); ctx.stroke();
                 }
@@ -49665,7 +49688,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // off screen: wholly outside it, or grown past its farthest corner
                     if (rad - th > Math.hypot(Math.max(cx, W - cx), Math.max(cy, H - cy))) continue;
                     if (rad + th < 0 || cx + rad + th < 0 || cx - rad - th > W || cy + rad + th < 0 || cy - rad - th > H) continue;
-                    const bend = bends < 4 && t < 0.8; if (bend) bends++;
+                    const bend = bends < 4 && t < 0.6; if (bend) bends++;
                     if (bend && !copied) { this._mirageCtx.drawImage(this.canvas, 0, 0, sw, sh); copied = true; }
                     const seed = r.seed ?? (r.seed = Math.random() * 100), ph = _gameTimeSec;
                     const amp = th * 0.7;
@@ -49685,33 +49708,222 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     band.moveTo(inner[0], inner[1]);
                     for (let i = 2; i < inner.length; i += 2) band.lineTo(inner[i], inner[i + 1]);
                     band.closePath();
-                    const k = 1 - t;
+                    const k = (1 - t) * (1 - t);                                  // a soft presence that fades early, at full width
                     if (bend) {
                         // the bend: the scene under the band, pushed outward from the sound and nudged along it.
                         // Only the band's box is copied back (clamped to the screen), not the whole frame.
                         const pad = rad + th + amp, x0 = Math.max(0, cx - pad), y0 = Math.max(0, cy - pad);
                         const x1 = Math.min(W, cx + pad), y1 = Math.min(H, cy + pad);
                         if (x1 > x0 && y1 > y0) {
-                            const sc = 1 + (0.045 + 6 / Math.max(40, rad)) * k;
+                            const sc = 1 + (0.034 + 4.5 / Math.max(40, rad)) * k;
                             // the source box that lands on [x0,x1]×[y0,y1] once scaled about (cx, cy)
                             const u0 = cx + (x0 - cx) / sc, v0 = cy + (y0 - cy) / sc, u1 = cx + (x1 - cx) / sc, v1 = cy + (y1 - cy) / sc;
                             ctx.save();
                             ctx.clip(band, 'evenodd');
-                            ctx.globalAlpha = Math.min(1, 0.35 + k);
+                            ctx.globalAlpha = 0.75 * k;
                             ctx.drawImage(cv, u0 / 4, v0 / 4, (u1 - u0) / 4, (v1 - v0) / 4, x0 + 1.2 * k, y0, x1 - x0, y1 - y0);
                             ctx.restore();
                         }
                     }
                     // a whisper of light on the outer edge, brighter where the ripple crests
-                    ctx.globalAlpha = (r.enemy ? 0.45 : 0.2) * k;
+                    ctx.globalAlpha = (r.enemy ? 0.32 : 0.14) * k;
                     ctx.strokeStyle = r.enemy ? '#ff7a4a' : '#d8c6ff'; ctx.lineWidth = r.enemy ? 1.4 : 1;
                     ctx.stroke(outer);
-                    ctx.globalAlpha = 0.07 * k;
+                    ctx.globalAlpha = 0.04 * k;
                     ctx.fillStyle = r.enemy ? '#ffb08a' : '#efe4ff'; ctx.fill(band, 'evenodd');
                     ctx.globalAlpha = 1;
                 }
                 ctx.restore();
             },
+        });
+        /* =====================================================================
+           THE VEIL — the edge of an outdoor map. The city doesn't stop in black: past
+           its last stretch the dimension thins out into a deep indigo void of drifting
+           stars and nebula, behind a curtain of light along the seam. Near her the seam
+           brightens and a row of ◆ diamonds (the HUD's motif) shimmers up; pressing into
+           it sends a ripple of light running along the seam both ways.
+           Drawn in world space after the emissive pass (above the darkness layer), and
+           skipped whenever no edge is near the screen, which is nearly always.
+           Maps: type 'outdoor', unless the map says edge: false.
+           Each edge is drawn in its own frame: x runs along the seam, -y points out into
+           the void, +y in over the city — so one set of gradients serves all four.
+           ===================================================================== */
+        const MAP_EDGE = {
+            HAZE: 150,          // the violet haze reaching in over the city
+            GLOW: 120,          // the curtain of light falling out into the void
+            NEAR: 240,          // she's this close: the seam wakes up around her
+            BAND: 64,           // spacing of the aurora streaks along the seam
+            PARALLAX: 0.35,     // the void drifts at this share of the camera's motion: it's far away
+            TILE: 512,          // the void's starfield tile
+            DIAMOND: 28,        // spacing of the ◆ row
+            RIPPLE_LIFE: 1.2, RIPPLE_SPEED: 300, RIPPLE_EVERY: 0.9
+        };
+
+        let _edgeTile = null, _edgeStreak = null;
+
+        /** The void: one seeded 512 px tile of nebula and stars, wrapped so it repeats seamlessly. */
+        function _edgeVoidTile() {
+            if (_edgeTile) return _edgeTile;
+            const S = MAP_EDGE.TILE, cv = document.createElement('canvas'); cv.width = cv.height = S;
+            const c = cv.getContext('2d'), rng = seededRandom('the veil'), TAU = Math.PI * 2;
+            c.fillStyle = '#080320'; c.fillRect(0, 0, S, S);
+            const cols = ['92, 40, 170', '168, 44, 150', '48, 60, 180', '124, 84, 224'];
+            for (let i = 0; i < 16; i++) {
+                const x = rng() * S, y = rng() * S, r = 60 + rng() * 190, col = cols[i % cols.length], a = 0.1 + rng() * 0.12;
+                for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+                    const X = x + ox, Y = y + oy;
+                    if (X + r < 0 || X - r > S || Y + r < 0 || Y - r > S) continue;
+                    const g = c.createRadialGradient(X, Y, 0, X, Y, r);
+                    g.addColorStop(0, `rgba(${col}, ${a})`); g.addColorStop(1, `rgba(${col}, 0)`);
+                    c.fillStyle = g; c.fillRect(X - r, Y - r, r * 2, r * 2);
+                }
+            }
+            for (let i = 0; i < 180; i++) {
+                const x = 4 + rng() * (S - 8), y = 4 + rng() * (S - 8), big = rng() < 0.07, r = big ? 1.3 + rng() : 0.4 + rng() * 0.7, tint = rng();
+                c.fillStyle = tint < 0.6 ? '#ffffff' : tint < 0.85 ? '#d8c6ff' : '#ffc2e6';
+                c.globalAlpha = 0.3 + rng() * 0.6;
+                c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+                if (big) { c.globalAlpha *= 0.45; c.fillRect(x - r * 3, y - 0.3, r * 6, 0.6); c.fillRect(x - 0.3, y - r * 3, 0.6, r * 6); }
+            }
+            c.globalAlpha = 1;
+            return _edgeTile = cv;
+        }
+
+        /** An aurora streak: a soft upright blade of light, brightest at its foot (the seam). */
+        function _edgeStreakSprite() {
+            if (_edgeStreak) return _edgeStreak;
+            const cv = document.createElement('canvas'); cv.width = 32; cv.height = 128;
+            const c = cv.getContext('2d');
+            const h = c.createLinearGradient(0, 0, 32, 0);
+            h.addColorStop(0, 'rgba(214, 196, 255, 0)'); h.addColorStop(0.5, 'rgba(214, 196, 255, 1)'); h.addColorStop(1, 'rgba(214, 196, 255, 0)');
+            c.fillStyle = h; c.fillRect(0, 0, 32, 128);
+            const v = c.createLinearGradient(0, 128, 0, 0);
+            v.addColorStop(0, 'rgba(0, 0, 0, 1)'); v.addColorStop(0.35, 'rgba(0, 0, 0, 0.5)'); v.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            c.globalCompositeOperation = 'destination-in'; c.fillStyle = v; c.fillRect(0, 0, 32, 128);
+            return _edgeStreak = cv;
+        }
+
+        engineMixin({
+            /** The veil along every outdoor map edge on screen (world space, ctx in the camera's transform). */
+            drawMapEdge(ctx) {
+                const m = this.activeMap, CB = this._cullBounds;
+                if (!m || m.type !== 'outdoor' || m.edge === false || !CB || !CB.view) return;
+                const E = MAP_EDGE, V = CB.view, W = m.width, H = m.height;
+                // nothing near the screen: the usual case, and free
+                if (V.left > E.HAZE && V.top > E.HAZE && V.right < W - E.HAZE && V.bottom < H - E.HAZE) return;
+                const t = _gameTimeSec;
+                ctx.save();
+                // 1. The void beyond the map, a starfield drifting slowly behind the parallax
+                const pat = this._edgePat || (this._edgePat = ctx.createPattern(_edgeVoidTile(), 'repeat'));
+                if (pat.setTransform) {
+                    const M = this._edgeMat || (this._edgeMat = new DOMMatrix());
+                    // far away: it drifts with a share of the camera, and shrinks less than the city when zoomed out
+                    const sc = Math.pow(Math.max(0.2, this.view.zoom), -0.6);
+                    M.a = M.d = sc; M.e = this.view.x * E.PARALLAX + t * 5; M.f = this.view.y * E.PARALLAX + t * 2;
+                    pat.setTransform(M);
+                }
+                ctx.fillStyle = pat;
+                const x0 = V.left - 2, x1 = V.right + 2, y0 = V.top - 2, y1 = V.bottom + 2;
+                if (x0 < 0) ctx.fillRect(x0, y0, -x0, y1 - y0);
+                if (x1 > W) ctx.fillRect(W, y0, x1 - W, y1 - y0);
+                const cx0 = Math.max(0, x0), cx1 = Math.min(W, x1);
+                if (cx1 > cx0) {
+                    if (y0 < 0) ctx.fillRect(cx0, y0, cx1 - cx0, -y0);
+                    if (y1 > H) ctx.fillRect(cx0, H, cx1 - cx0, y1 - H);
+                }
+                // 2. Each edge on screen, in its own frame (x along the seam, -y out into the void)
+                const F = this.isDriving && this.car ? this.car : this.player;
+                const fx = F ? F.x : -1e9, fy = F ? F.y : -1e9;
+                const G = this._edgeGrads || (this._edgeGrads = this._edgeGradients(ctx));
+                if (V.top < E.HAZE && V.bottom > -E.GLOW)     this._drawEdge(ctx, G, 'n', 0, 0, 0, W, V.left, V.right, fx, fy, t);
+                if (V.bottom > H - E.HAZE && V.top < H + E.GLOW) this._drawEdge(ctx, G, 's', W, H, Math.PI, W, W - V.right, W - V.left, W - fx, H - fy, t);
+                if (V.left < E.HAZE && V.right > -E.GLOW)     this._drawEdge(ctx, G, 'w', 0, H, -Math.PI / 2, H, H - V.bottom, H - V.top, H - fy, fx, t);
+                if (V.right > W - E.HAZE && V.left < W + E.GLOW) this._drawEdge(ctx, G, 'e', W, 0, Math.PI / 2, H, V.top, V.bottom, fy, W - fx, t);
+                // the corners: the curtain's light rounds them, clipped to the void's quarter
+                ctx.globalCompositeOperation = 'lighter';
+                for (const [cx, cy, sx, sy] of [[0, 0, -1, -1], [W, 0, 1, -1], [0, H, -1, 1], [W, H, 1, 1]]) {
+                    if (cx + E.GLOW < V.left || cx - E.GLOW > V.right || cy + E.GLOW < V.top || cy - E.GLOW > V.bottom) continue;
+                    ctx.save(); ctx.translate(cx, cy);
+                    ctx.fillStyle = G.corner; ctx.fillRect(sx < 0 ? -E.GLOW : 0, sy < 0 ? -E.GLOW : 0, E.GLOW, E.GLOW);
+                    ctx.restore();
+                }
+                ctx.restore();
+            },
+
+            /** The veil's gradients, in an edge's own frame (shared by all four edges). */
+            _edgeGradients(ctx) {
+                const E = MAP_EDGE;
+                const haze = ctx.createLinearGradient(0, 0, 0, E.HAZE);                      // in over the city
+                haze.addColorStop(0, 'rgba(84, 46, 176, 0.55)'); haze.addColorStop(0.35, 'rgba(62, 28, 132, 0.24)'); haze.addColorStop(1, 'rgba(40, 14, 90, 0)');
+                const glow = ctx.createLinearGradient(0, 0, 0, -E.GLOW);                     // out into the void
+                glow.addColorStop(0, 'rgba(206, 180, 255, 0.34)'); glow.addColorStop(0.3, 'rgba(140, 96, 230, 0.12)'); glow.addColorStop(1, 'rgba(90, 50, 190, 0)');
+                const corner = ctx.createRadialGradient(0, 0, 0, 0, 0, E.GLOW);            // the same curtain, rounding a corner
+                corner.addColorStop(0, 'rgba(206, 180, 255, 0.34)'); corner.addColorStop(0.3, 'rgba(140, 96, 230, 0.12)'); corner.addColorStop(1, 'rgba(90, 50, 190, 0)');
+                return { haze, glow, corner };
+            },
+
+            /**
+             * One edge: translate/rotate puts its frame at (ox, oy) turned by `rot`; it is `len`
+             * long and [u0, u1] of it is on screen. (fu, fn): her place along it and how far in.
+             */
+            _drawEdge(ctx, G, id, ox, oy, rot, len, u0, u1, fu, fn, t) {
+                const E = MAP_EDGE;
+                u0 = Math.max(0, u0 - 4); u1 = Math.min(len, u1 + 4);
+                if (u1 <= u0) return;
+                ctx.save();
+                ctx.translate(ox, oy); if (rot) ctx.rotate(rot);
+                const L = u1 - u0;
+                // the haze in over the city, and the curtain of light out over the void
+                ctx.fillStyle = G.haze; ctx.fillRect(u0, 0, L, E.HAZE);
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = G.glow; ctx.fillRect(u0, -E.GLOW, L, E.GLOW);
+                // aurora streaks: anchored to the world, each breathing on its own beat, drifting a little
+                const sp = _edgeStreakSprite(), B = E.BAND;
+                for (let i = Math.floor(u0 / B) - 1, n = Math.ceil(u1 / B) + 1; i <= n; i++) {
+                    const u = i * B + Math.sin(t * 0.3 + i * 1.9) * 14;
+                    if (u < 10 || u > len - 10) continue;                                   // not past the corners
+                    const a = 0.08 + 0.16 * (0.5 + 0.5 * Math.sin(t * 0.7 + i * 2.3));
+                    const h = E.GLOW * (0.7 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.45 + i * 1.3)));
+                    ctx.globalAlpha = a; ctx.drawImage(sp, u - 13, -h, 26, h);
+                }
+                // the seam: a thread of light with a soft halo, shimmering slowly
+                const sh = 0.85 + 0.15 * Math.sin(t * 1.3);
+                ctx.globalAlpha = 0.2 * sh; ctx.fillStyle = '#c8b2ff'; ctx.fillRect(u0, -4, L, 8);
+                ctx.globalAlpha = 0.7 * sh; ctx.fillStyle = '#f1e8fe'; ctx.fillRect(u0, -0.8, L, 1.6);
+                // near her: the seam brightens and the ◆ row shimmers up
+                if (fn < E.NEAR && fn > -E.NEAR && fu > -E.NEAR && fu < len + E.NEAR) {
+                    const k = Math.pow(1 - Math.max(0, fn) / E.NEAR, 1.5);
+                    ctx.globalAlpha = 0.28 * k; drawGlow(ctx, fu, 0, 40 + 100 * k, '214, 196, 255', 0);
+                    const D = E.DIAMOND, reach = 170;
+                    ctx.fillStyle = '#f1e8fe';
+                    for (let j = Math.floor((fu - reach) / D), n = Math.ceil((fu + reach) / D); j <= n; j++) {
+                        const u = j * D; if (u < 0 || u > len) continue;
+                        const fall = 1 - Math.abs(u - fu) / reach; if (fall <= 0) continue;
+                        const a = k * fall * (0.55 + 0.45 * Math.sin(t * 3 + j * 0.9));
+                        if (a < 0.02) continue;
+                        const y = -12 - 4 * Math.sin(t * 2 + j * 0.7), s = 2.6 + 1.6 * k;
+                        ctx.globalAlpha = a;
+                        ctx.beginPath(); ctx.moveTo(u, y - s); ctx.lineTo(u + s * 0.7, y); ctx.lineTo(u, y + s); ctx.lineTo(u - s * 0.7, y); ctx.closePath(); ctx.fill();
+                    }
+                    // pressing into it (moving, right at the edge): a ripple sets off along the seam
+                    const st = this._edgeTouch || (this._edgeTouch = {});
+                    const last = st[id], moved = last && Math.hypot(fu - last.u, fn - last.n) > 0.2;
+                    st[id] = { u: fu, n: fn };
+                    const R = this._edgeRipples || (this._edgeRipples = []);
+                    if (fn < 26 && moved && t - (st[id + 'T'] || -9) > E.RIPPLE_EVERY && R.length < 6) { R.push({ id, u: fu, t0: t }); st[id + 'T'] = t; }
+                }
+                const R = this._edgeRipples;
+                if (R && R.length) for (let i = R.length - 1; i >= 0; i--) {
+                    const r = R[i], age = t - r.t0;
+                    if (age > E.RIPPLE_LIFE || age < 0) { R.splice(i, 1); continue; }
+                    if (r.id !== id) continue;
+                    const k = 1 - age / E.RIPPLE_LIFE, d = 20 + age * E.RIPPLE_SPEED;
+                    ctx.globalAlpha = 0.55 * k * k; drawGlow(ctx, r.u, 0, 40 + 40 * (1 - k), '214, 196, 255', 0);
+                    ctx.globalAlpha = 0.85 * k;
+                    drawGlow(ctx, r.u - d, 0, 22, '241, 232, 254', 0.3); drawGlow(ctx, r.u + d, 0, 22, '241, 232, 254', 0.3);
+                }
+                ctx.restore();
+            }
         });
         // GameEngine — Deaths and the finisher. Methods are added to GameEngine.prototype
         // (see engineMixin in game-engine.js).
@@ -54598,6 +54810,7 @@ engineMixin({
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
                 this.casings = []; this.shotFx = []; this.muzzleFlashes = []; this.flitVFX = [];
                 this.noiseRipples = []; this.lastKnownMarkers = [];
+                this._edgeRipples = null; this._edgeTouch = null;                       // the veil's ripples (world/map-edge.js)
                 if (typeof Walker !== 'undefined') {                                   // walks are across the old floor
                     for (const w of Walker.walks.slice()) Walker._end(w, 'cancelled');
                     if (this.player && this.player._walk) Walker._end(this.player._walk, 'cancelled');
@@ -59506,6 +59719,8 @@ engineMixin({
                 this.drawDaylight(this.ctx);
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
                 this.drawEmissivePass(this.ctx);
+                // The veil at the edge of an outdoor map (world/map-edge.js), above the darkness
+                this.drawMapEdge(this.ctx);
                 // Looking down a sniper's sight: the world narrows to her line
                 this.drawScopeView(this.ctx);
                 // Health bars and damage numbers, above the darkness so they read at night
@@ -59573,40 +59788,8 @@ engineMixin({
                     this.ctx.restore();
                 }
                 
-                // Vehicle HUD Info (bottom-left)
-                if (this.isDriving && this.car && !(this.bumperMinigame && this.bumperMinigame.active)) {
-                    this.ctx.save();
-                    this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset to screen space
-                    
-                    const isOwnedCar = this.car === this.ownedCar;
-                    const isZibRide = this.zibSystem && this.zibSystem.isPassenger;
-                    const vhudY = this.canvas.height - 40;
-                    this.ctx.font = 'bold 7px Courier New';
-                    this.ctx.fillStyle = isZibRide ? '#8a2be2' : isOwnedCar ? '#FFD700' : '#ffaa00';
-                    this.ctx.shadowColor = isZibRide ? '#8a2be2' : isOwnedCar ? '#FFD700' : '#ffaa00';
-                    this.ctx.shadowBlur = 4;
-                    this.ctx.textAlign = 'left';
-                    
-                    const vehicleText = isZibRide ?
-                        '► ZIB AUTONOMOUS TAXI (PASSENGER)' :
-                        isOwnedCar ? 
-                        `► ${this.garage.getDisplayName(this.garage.activeIndex).toUpperCase()} (YOUR CAR)` : 
-                        `► ${this.car.brand.toUpperCase()} ${this.car.modelName.toUpperCase()} (HIJACKED)`;
-                    this.ctx.fillText(vehicleText, 20, vhudY);
-                    
-                    if (!isOwnedCar && this.ownedCar.visible) {
-                        const dx = this.ownedCar.x - this.player.x;
-                        const dy = this.ownedCar.y - this.player.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        this.ctx.font = '6px Courier New';
-                        this.ctx.fillStyle = '#FFD700';
-                        this.ctx.shadowColor = '#FFD700';
-                        this.ctx.shadowBlur = 3;
-                        this.ctx.fillText(`YOUR CAR: ${Math.round(distance)}m away`, 20, vhudY + 9);
-                    }
-                    this.ctx.shadowBlur = 0;
-                    this.ctx.restore();
-                }
+                // The ride tag (bottom left, #ui-ride): what she's driving, and where her own car is
+                this._rideHud();
                 
                 // 6. CSS FILTERS (Night Vision / Grayscale / Color Grade)
                 const targetNV = this.nightVision ? 1.0 : 0.0;
@@ -59787,6 +59970,41 @@ engineMixin({
                 PerfBench.draw(this.ctx, 20, this.canvas.height - 110);
                 this.profiler.tick(); 
                 DevOverlay.frame(this);                   // the profiler pill and debug counts (DOM)
+            },
+
+            /**
+             * The ride tag (#ui-ride, bottom left): the car's name with a chip (HIJACKED, YOURS,
+             * ZIB · PASSENGER) and, in someone else's car, how far off her own car is with a gold
+             * arrow pointing to it. Touches the DOM only when something it shows changes.
+             */
+            _rideHud() {
+                const el = this._rideEl || (this._rideEl = document.getElementById('ui-ride'));
+                if (!el) return;
+                const on = !!(this.isDriving && this.car && !(this.bumperMinigame && this.bumperMinigame.active) && !(this.cutscene && this.cutscene.active));
+                const R = this._rideState || (this._rideState = { on: false, name: '', chip: '', dist: '', rot: null });
+                if (on !== R.on) { el.classList.toggle('show', on); R.on = on; }
+                if (!on) return;
+                if (!R.parts) R.parts = { ico: el.querySelector('.r-ico'), name: el.querySelector('.r-name'), chip: el.querySelector('.r-chip'),
+                                          dist: el.querySelector('.r-dist'), arrow: el.querySelector('.r-arrow') };
+                const P = R.parts, own = this.car === this.ownedCar, zib = !!(this.zibSystem && this.zibSystem.isPassenger);
+                const name = zib ? 'Zib autonomous taxi' : own ? this.garage.getDisplayName(this.garage.activeIndex) : `${this.car.brand} ${this.car.modelName}`;
+                const chip = zib ? 'zib' : own ? 'own' : 'hijacked';
+                if (name !== R.name) { P.name.textContent = name; R.name = name; }
+                if (chip !== R.chip) {
+                    P.chip.textContent = zib ? 'Zib · passenger' : own ? 'Yours' : 'Hijacked';
+                    P.chip.className = 'r-chip' + (zib ? ' zib' : own ? ' own' : '');
+                    if (!P.ico.firstChild && typeof ACTION_ICONS !== 'undefined') P.ico.innerHTML = ACTION_ICONS.car;
+                    R.chip = chip;
+                }
+                const away = !own && !zib && this.ownedCar && this.ownedCar.visible;
+                if (!!away !== R.away) { el.classList.toggle('away', !!away); R.away = !!away; }
+                if (away) {
+                    const dx = this.ownedCar.x - this.player.x, dy = this.ownedCar.y - this.player.y;
+                    const dist = 'Your car · ' + Math.round(Math.hypot(dx, dy) / 10) * 10 + 'm';
+                    if (dist !== R.dist) { P.dist.textContent = dist; R.dist = dist; }
+                    const rot = Math.round(Math.atan2(dy, dx) * 180 / Math.PI / 10) * 10;   // 10° steps
+                    if (rot !== R.rot) { P.arrow.style.transform = `rotate(${rot}deg)`; R.rot = rot; }
+                }
             },
 
         });
@@ -63278,6 +63496,7 @@ engineMixin({
             resetGameState() {
                 if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
                 if (this.scenes) this.scenes.abort();                       // a scene left playing doesn't run on into the next game
+                if (this._rideState && this._rideState.on) { this._rideEl.classList.remove('show'); this._rideState.on = false; }   // the ride tag goes with the run
                 // The big canvases go with the run: painted floors, the city's ground tiles, the baked crowd
                 if (this._releaseMapBakes) this._releaseMapBakes(null);
                 if (this.groundBaker) { this.groundBaker.invalidate(); this.groundBaker.mapId = null; }

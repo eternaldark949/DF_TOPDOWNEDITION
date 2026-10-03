@@ -237,10 +237,15 @@
                     ctx.fill();
                     ctx.shadowBlur = 0;
                     
-                    ctx.font = `bold ${12 * scale}px Courier New`;
-                    ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+                    // the label in the HUD's champagne caps (Montserrat, spaced), with a gold glow
+                    ctx.font = `600 ${10 * scale}px Montserrat, sans-serif`;
+                    if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+                    ctx.shadowColor = `rgba(255, 194, 72, ${0.8 * alpha})`; ctx.shadowBlur = 6;
+                    ctx.fillStyle = `rgba(255, 240, 214, ${alpha})`;
                     ctx.textAlign = 'center';
                     ctx.fillText('YOUR CAR', 0, -this.width/2 - (20 * scale));
+                    ctx.shadowBlur = 0;
+                    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
                 }
                 
                 // Delivery Vehicle Marker (pulsing violet)

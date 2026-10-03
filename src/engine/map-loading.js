@@ -98,6 +98,7 @@ engineMixin({
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
                 this.casings = []; this.shotFx = []; this.muzzleFlashes = []; this.flitVFX = [];
                 this.noiseRipples = []; this.lastKnownMarkers = [];
+                this._edgeRipples = null; this._edgeTouch = null;                       // the veil's ripples (world/map-edge.js)
                 if (typeof Walker !== 'undefined') {                                   // walks are across the old floor
                     for (const w of Walker.walks.slice()) Walker._end(w, 'cancelled');
                     if (this.player && this.player._walk) Walker._end(this.player._walk, 'cancelled');

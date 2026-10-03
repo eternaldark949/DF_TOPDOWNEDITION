@@ -1120,6 +1120,8 @@
                 this.drawDaylight(this.ctx);
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
                 this.drawEmissivePass(this.ctx);
+                // The veil at the edge of an outdoor map (world/map-edge.js), above the darkness
+                this.drawMapEdge(this.ctx);
                 // Looking down a sniper's sight: the world narrows to her line
                 this.drawScopeView(this.ctx);
                 // Health bars and damage numbers, above the darkness so they read at night
@@ -1187,40 +1189,8 @@
                     this.ctx.restore();
                 }
                 
-                // Vehicle HUD Info (bottom-left)
-                if (this.isDriving && this.car && !(this.bumperMinigame && this.bumperMinigame.active)) {
-                    this.ctx.save();
-                    this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset to screen space
-                    
-                    const isOwnedCar = this.car === this.ownedCar;
-                    const isZibRide = this.zibSystem && this.zibSystem.isPassenger;
-                    const vhudY = this.canvas.height - 40;
-                    this.ctx.font = 'bold 7px Courier New';
-                    this.ctx.fillStyle = isZibRide ? '#8a2be2' : isOwnedCar ? '#FFD700' : '#ffaa00';
-                    this.ctx.shadowColor = isZibRide ? '#8a2be2' : isOwnedCar ? '#FFD700' : '#ffaa00';
-                    this.ctx.shadowBlur = 4;
-                    this.ctx.textAlign = 'left';
-                    
-                    const vehicleText = isZibRide ?
-                        '► ZIB AUTONOMOUS TAXI (PASSENGER)' :
-                        isOwnedCar ? 
-                        `► ${this.garage.getDisplayName(this.garage.activeIndex).toUpperCase()} (YOUR CAR)` : 
-                        `► ${this.car.brand.toUpperCase()} ${this.car.modelName.toUpperCase()} (HIJACKED)`;
-                    this.ctx.fillText(vehicleText, 20, vhudY);
-                    
-                    if (!isOwnedCar && this.ownedCar.visible) {
-                        const dx = this.ownedCar.x - this.player.x;
-                        const dy = this.ownedCar.y - this.player.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        this.ctx.font = '6px Courier New';
-                        this.ctx.fillStyle = '#FFD700';
-                        this.ctx.shadowColor = '#FFD700';
-                        this.ctx.shadowBlur = 3;
-                        this.ctx.fillText(`YOUR CAR: ${Math.round(distance)}m away`, 20, vhudY + 9);
-                    }
-                    this.ctx.shadowBlur = 0;
-                    this.ctx.restore();
-                }
+                // The ride tag (bottom left, #ui-ride): what she's driving, and where her own car is
+                this._rideHud();
                 
                 // 6. CSS FILTERS (Night Vision / Grayscale / Color Grade)
                 const targetNV = this.nightVision ? 1.0 : 0.0;
@@ -1401,6 +1371,41 @@
                 PerfBench.draw(this.ctx, 20, this.canvas.height - 110);
                 this.profiler.tick(); 
                 DevOverlay.frame(this);                   // the profiler pill and debug counts (DOM)
+            },
+
+            /**
+             * The ride tag (#ui-ride, bottom left): the car's name with a chip (HIJACKED, YOURS,
+             * ZIB · PASSENGER) and, in someone else's car, how far off her own car is with a gold
+             * arrow pointing to it. Touches the DOM only when something it shows changes.
+             */
+            _rideHud() {
+                const el = this._rideEl || (this._rideEl = document.getElementById('ui-ride'));
+                if (!el) return;
+                const on = !!(this.isDriving && this.car && !(this.bumperMinigame && this.bumperMinigame.active) && !(this.cutscene && this.cutscene.active));
+                const R = this._rideState || (this._rideState = { on: false, name: '', chip: '', dist: '', rot: null });
+                if (on !== R.on) { el.classList.toggle('show', on); R.on = on; }
+                if (!on) return;
+                if (!R.parts) R.parts = { ico: el.querySelector('.r-ico'), name: el.querySelector('.r-name'), chip: el.querySelector('.r-chip'),
+                                          dist: el.querySelector('.r-dist'), arrow: el.querySelector('.r-arrow') };
+                const P = R.parts, own = this.car === this.ownedCar, zib = !!(this.zibSystem && this.zibSystem.isPassenger);
+                const name = zib ? 'Zib autonomous taxi' : own ? this.garage.getDisplayName(this.garage.activeIndex) : `${this.car.brand} ${this.car.modelName}`;
+                const chip = zib ? 'zib' : own ? 'own' : 'hijacked';
+                if (name !== R.name) { P.name.textContent = name; R.name = name; }
+                if (chip !== R.chip) {
+                    P.chip.textContent = zib ? 'Zib · passenger' : own ? 'Yours' : 'Hijacked';
+                    P.chip.className = 'r-chip' + (zib ? ' zib' : own ? ' own' : '');
+                    if (!P.ico.firstChild && typeof ACTION_ICONS !== 'undefined') P.ico.innerHTML = ACTION_ICONS.car;
+                    R.chip = chip;
+                }
+                const away = !own && !zib && this.ownedCar && this.ownedCar.visible;
+                if (!!away !== R.away) { el.classList.toggle('away', !!away); R.away = !!away; }
+                if (away) {
+                    const dx = this.ownedCar.x - this.player.x, dy = this.ownedCar.y - this.player.y;
+                    const dist = 'Your car · ' + Math.round(Math.hypot(dx, dy) / 10) * 10 + 'm';
+                    if (dist !== R.dist) { P.dist.textContent = dist; R.dist = dist; }
+                    const rot = Math.round(Math.atan2(dy, dx) * 180 / Math.PI / 10) * 10;   // 10° steps
+                    if (rot !== R.rot) { P.arrow.style.transform = `rotate(${rot}deg)`; R.rot = rot; }
+                }
             },
 
         });
