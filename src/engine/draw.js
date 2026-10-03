@@ -39,7 +39,7 @@
             
                 // --- PROFILER START ---
                 this.profiler.beginFrame();
-                RenderStats.bodies = 0; RenderStats.culled = 0; RenderStats.peopleMs = 0;
+                RenderStats.bodies = 0; RenderStats.culled = 0; RenderStats.peopleMs = 0; RenderStats.bldBase = 0; RenderStats.bldTops = 0;
                 RenderStats.timed = !!(this.showProfiler && GameSettings.profilerMode === 'full');
                 this.profiler.start('Render:Total');
                 this.profiler.markWrapper('Render:Total');
@@ -116,6 +116,7 @@
                     const vw = (this.canvas.width / 2) / viewZoom + Math.abs(this.camera.shakeX || 0), vh = (this.canvas.height / 2) / viewZoom + Math.abs(this.camera.shakeY || 0);
                     const B = CONFIG.CULLING.BODIES, C = CONFIG.CULLING.CARS;
                     cullBounds.bodies = { left: camX - vw - B, right: camX + vw + B, top: camY - vh - B, bottom: camY + vh + B };
+                    cullBounds.view = { left: camX - vw, right: camX + vw, top: camY - vh, bottom: camY + vh };   // the screen itself (BuildingV2.inView adds its own reach)
                     cullBounds.cars = { left: camX - vw - C, right: camX + vw + C, top: camY - vh - C, bottom: camY + vh + C };
                 }
                 this._cullBounds = cullBounds;
@@ -237,12 +238,17 @@
                 this.profiler.start('Render:Buildings');
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.buildings) {
-                    const cb = cullBounds.buildings;
+                    const cb = cullBounds.buildings, V = cullBounds.view, cam = this.camera;
                     this.activeMap.buildings.forEach(b => {
-                        // AABB check - building bounds vs viewport bounds
-                        const bRight = b.x + (b.w || 200);
-                        const bBottom = b.y + (b.h || 200);
-                        if (bRight < cb.left || b.x > cb.right || bBottom < cb.top || b.y > cb.bottom) return;
+                        // Leaning buildings: anything of them that could reach the screen (BuildingV2.inView);
+                        // the rest by the wide rect
+                        if (b.isV2 && b.inView) { if (!b.inView(V, cam)) return; }
+                        else {
+                            const bRight = b.x + (b.w || 200);
+                            const bBottom = b.y + (b.h || 200);
+                            if (bRight < cb.left || b.x > cb.right || bBottom < cb.top || b.y > cb.bottom) return;
+                        }
+                        RenderStats.bldBase++;
                         
                         if (b.drawBase) {
                             b.drawBase(this.ctx);
@@ -930,13 +936,11 @@
                 // Buildings - TOP LAYER (roofs, upper floors) - drawn OVER player for occlusion
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.buildings) {
-                    const cb = cullBounds.buildingTops;
+                    const V = cullBounds.view, cam = this.camera;
                     this.activeMap.buildings.forEach(b => {
                         if (b.isV2 && b.drawTop) {
-                            const bRight = b.x + (b.w || 200);
-                            const bBottom = b.y + (b.h || 200);
-                            if (bRight < cb.left || b.x > cb.right || bBottom < cb.top || b.y > cb.bottom) return;
-                            
+                            if (!b.inView(V, cam)) return;
+                            RenderStats.bldTops++;
                             b.drawTop(this.ctx, this.worldMinutes);
                         }
                     });
@@ -957,12 +961,10 @@
                 // Buildings - SIGN LAYER (neon signs above entrance) - drawn OVER building tops
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.buildings) {
-                    const cb = cullBounds.buildingTops;
+                    const V = cullBounds.view, cam = this.camera;
                     this.activeMap.buildings.forEach(b => {
                         if (b.isV2 && b.drawSign) {
-                            const bRight = b.x + (b.w || 200);
-                            const bBottom = b.y + (b.h || 200);
-                            if (bRight < cb.left || b.x > cb.right || bBottom < cb.top || b.y > cb.bottom) return;
+                            if (!b.inView(V, cam)) return;
                             
                             b.drawSign(this.ctx);
                         }

@@ -760,6 +760,20 @@
                 return p;
             },
 
+            /** Could any of it be on screen? Its footprint, its leaned walls and roof (reckoned a few floors
+                higher, for crowns, spires and signs) and its reach (beams, plazas), against the real view rect V. */
+            inView(V, cam) {
+                const C = CONFIG.CULLING, r = (this.emissiveReach || 0) + C.BUILDINGS_VIEW;
+                const x0 = this.x, y0 = this.y, x1 = this.x + (this.w || 200), y1 = this.y + (this.h || 200);
+                let L = x0, R = x1, T = y0, Bt = y1;
+                if (CONFIG.BUILDINGS.LEAN) {
+                    const k = 1 + this._leanScale(C.LEAN_EXTRA);                // roof = cam + (p - cam) * k
+                    const rx0 = cam.x + (x0 - cam.x) * k, rx1 = cam.x + (x1 - cam.x) * k, ry0 = cam.y + (y0 - cam.y) * k, ry1 = cam.y + (y1 - cam.y) * k;
+                    L = Math.min(L, rx0, rx1); R = Math.max(R, rx0, rx1); T = Math.min(T, ry0, ry1); Bt = Math.max(Bt, ry0, ry1);
+                }
+                return !(R + r < V.left || L - r > V.right || Bt + r < V.top || T - r > V.bottom);
+            },
+
             _leanScale(extraFloors = 0) {
                 const B = CONFIG.BUILDINGS;
                 const h = (Math.min(this.floors, B.MAX_FLOORS) + extraFloors) * B.FLOOR_HEIGHT;

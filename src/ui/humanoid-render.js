@@ -1060,7 +1060,7 @@
          * frame here; a hovering android bobs over a soft glow.
          */
         /** What the entity pass drew this frame, for the profiler (reset by draw.js; ms only while it's on, Full) */
-        const RenderStats = { bodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0, ticks: 1 };
+        const RenderStats = { bodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0, ticks: 1, bldBase: 0, bldTops: 0 };
 
         function drawProceduralHumanoid(ctx, entity, config = {}) {
             RenderStats.bodies++;

@@ -151,7 +151,8 @@
             // Tuning: Lower both toward 0.35 for wider cull (safer, more entities drawn).
             //         Raise both toward 1.0 for tighter cull (better perf, risk of edge pop-in at low zoom).
             // The city's baked ground tiles (world/ground-baker.js)
-            GROUND_BAKE: { HALF_RES_BELOW: 0.55, FULL_RES_ABOVE: 0.65, MIN_PER_FRAME: 2, MAX_PER_FRAME: 6, FRAME_MS: 3, AHEAD_TICKS: 45 },
+            GROUND_BAKE: { HALF_RES_BELOW: 0.55, FULL_RES_ABOVE: 0.65, MIN_PER_FRAME: 2, MAX_PER_FRAME: 6, FRAME_MS: 3, AHEAD_TICKS: 45,
+                           MIN_TILES: 12, MAX_TILES: 40 },   // tiles kept: twice what the view touches + 4, within these (≈1 MB each)
 
             // Zoom detail steps (engine/draw.js _zoomLOD): below `in` drop a step, above `out` come back
             LOD_ZOOM: [{ in: 0.68, out: 0.74 }, { in: 0.48, out: 0.54 }],
@@ -177,6 +178,10 @@
                 // the screen of them. Margins cover a body's shadow, held gun and bubble; a car's length.
                 BODIES: 70,
                 CARS: 160,
+                // Leaning buildings (BuildingV2.inView): drawn when their footprint, walls or leaned roof — reckoned
+                // LEAN_EXTRA floors above the roof, for crowns, spires and signs — come within this of the view
+                BUILDINGS_VIEW: 60,
+                LEAN_EXTRA: 6,
                 WORLD: 200,                     // Pavements, crosswalks, transitions, walls, floor zones
                 
                 // Entity Spawning (radial - unchanged)

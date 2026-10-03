@@ -160,7 +160,30 @@
                     `<span>crowd <b>${GameSettings.crowdQuality || 'high'}</b></span>`
                 ];
                 if (counting) parts.push(`<span>canvas calls <b>${n.toLocaleString()}</b>/frame</span>`);
+                // The world: buildings drawn of the map's, the ground tiles held, and the big image caches' memory
+                const M = game.activeMap, nb = M && M.buildings ? M.buildings.length : 0;
+                if (nb) parts.push(`<span>buildings <b>${RenderStats.bldBase}</b>/${RenderStats.bldTops} of ${nb}</span>`);
+                const mem = this._canvasMB(game);
+                if (mem.groundN) parts.push(`<span>ground <b>${mem.groundN}</b> tiles (${mem.ground.toFixed(0)} MB)</span>`);
+                parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB</span>`);
                 return parts.join('');
+            },
+
+            /** Pixel memory held by the game's big canvas caches (4 bytes a pixel): ground tiles, painted floors,
+                car sprites, the baked crowd. Recounted every half second. */
+            _canvasMB(game) {
+                const now = performance.now();
+                if (this._memAt && now - this._memAt < 500) return this._mem;
+                const px = (cv) => cv ? cv.width * cv.height : 0, MB = 4 / 1048576;
+                let ground = 0, groundN = 0, floors = 0, cars = 0, crowd = 0;
+                const gb = game.groundBaker;
+                if (gb) for (const cv of gb.cache.values()) { ground += px(cv); groundN++; }
+                if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
+                if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
+                if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv);
+                this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, total: (ground + floors + cars + crowd) * MB };
+                this._memAt = now;
+                return this._mem;
             },
 
             /** A counting shim on the 2D context's methods (Full profiler only; removed when it closes) */
