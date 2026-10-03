@@ -3,6 +3,8 @@
         engineMixin({
             /** From the menu into the world: hide the menu layer, show the canvas, start the loop. */
             enterWorld() {
+                if (this.running) return;                                      // a second tap during the fade: one loop only
+                if (typeof audioSys !== 'undefined') audioSys.wake();
                 const ttb = document.getElementById('tap-to-begin'); if (ttb) ttb.remove();
                 document.getElementById('ui-layer').style.display = 'none';
                 document.getElementById('game-container').style.display = 'block';
@@ -12,6 +14,11 @@
             stop() {
                 this.running = false;
                 ambience.silence();
+                // Nothing of the run keeps going behind the menu: a ringing call, the car's hum, the radio, an open dialogue
+                if (typeof phoneSystem !== 'undefined' && phoneSystem.endCall) phoneSystem.endCall();
+                if (typeof audioSys !== 'undefined') { audioSys.engine({ on: false }); audioSys.tyres(0); audioSys.idle(); }
+                if (this.musicWidget && this.musicWidget.isPlaying) this.musicWidget.togglePlay(false);
+                if (this.dialogueBox && this.dialogueBox.style.display !== 'none') this.endDialogue();
                 this.pauseSystem.clear();
                 document.getElementById('game-container').style.display = 'none'; 
                 document.getElementById('ui-layer').style.display = 'flex'; 
@@ -31,6 +38,11 @@
              */
             resetGameState() {
                 if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
+                if (this.scenes) this.scenes.abort();                       // a scene left playing doesn't run on into the next game
+                // The big canvases go with the run: painted floors, the city's ground tiles, the baked crowd
+                if (this._releaseMapBakes) this._releaseMapBakes(null);
+                if (this.groundBaker) { this.groundBaker.invalidate(); this.groundBaker.mapId = null; }
+                if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
                 if (this.coach) { this.coach.dismiss(); this.coach.deserialize([]); }   // a story New Game then calls hud.startFresh()
                 if (this.hud) this.hud.revealAll();
                 // --- PLAYER STATE ---
@@ -163,6 +175,10 @@
                 this.stickyOrbs = [];
                 this.muzzleFlashes = []; this.casings = []; this.shotFx = [];
                 this.loot = [];
+                this.npcs = []; this.props = []; this.lamps = []; this.enemies = []; this.corpses = [];   // the last map's (loading a map sets them)
+                this.lastKnownMarkers = []; this.noiseRipples = []; this.flitVFX = [];
+                if (this.traffic) this.traffic.reset();                         // the last run's street, too (the hub doesn't reset it on load)
+                if (this.pedestrians) this.pedestrians.reset();
                 this.activeInteraction = null;
                 
                 // --- PHONE ---

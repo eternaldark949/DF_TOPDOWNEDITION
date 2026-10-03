@@ -23,16 +23,19 @@
         /** Normalize an angle difference to [-PI, PI]. */
         function normalizeAngle(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
         
-        /** Darken a hex color by an absolute RGB amount (0-255). Cached: bodies ask for the same few every frame. */
-        const _darkenCache = new Map();
-        function darkenHex(hex, amount) {
-            const key = hex + '|' + amount, hit = _darkenCache.get(key);
-            if (hit !== undefined) return hit;
-            const out = _darkenHexRaw(hex, amount);
-            if (_darkenCache.size > 4096) _darkenCache.clear();
-            _darkenCache.set(key, out);
-            return out;
+        /** A two-level cache (colour → amount → result): a hit builds no key string. Cleared past 4096 entries. */
+        function _hexCache(raw) {
+            const top = new Map(); let n = 0;
+            return (hex, amount) => {
+                let m = top.get(hex);
+                if (m === undefined) { if (n > 4096) { top.clear(); n = 0; } m = new Map(); top.set(hex, m); }
+                let out = m.get(amount);
+                if (out === undefined) { out = raw(hex, amount); m.set(amount, out); n++; }
+                return out;
+            };
         }
+        /** Darken a hex color by an absolute RGB amount (0-255). Cached: bodies ask for the same few every frame. */
+        const darkenHex = _hexCache((hex, amount) => _darkenHexRaw(hex, amount));
         function _darkenHexRaw(hex, amount) {
             hex = hex.replace('#', '');
             if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];   // '#222' → '222222'
@@ -42,8 +45,9 @@
             return `rgb(${r},${g},${b})`;
         }
         
-        /** Lighten a hex color by an absolute RGB amount (0-255). */
-        function lightenHex(hex, amount) {
+        /** Lighten a hex color by an absolute RGB amount (0-255). Cached like darkenHex. */
+        const lightenHex = _hexCache((hex, amount) => _lightenHexRaw(hex, amount));
+        function _lightenHexRaw(hex, amount) {
             hex = hex.replace('#', '');
             if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
             const r = clamp(parseInt(hex.substr(0, 2), 16) + amount, 0, 255);
@@ -64,20 +68,15 @@
 
         /** Check if a line segment is blocked by any rect in the obstacle arrays. */
         function isLineBlocked(x1, y1, x2, y2, walls, buildings) {
-            if (walls) { for (const w of walls) { if (getLineRectIntersections(x1, y1, x2, y2, w.x, w.y, w.w, w.h).length > 0) return true; } }
-            if (buildings) { for (const b of buildings) { if (getLineRectIntersections(x1, y1, x2, y2, b.x, b.y, b.w, b.h).length > 0) return true; } }
+            if (walls) { for (let i = 0; i < walls.length; i++) { const w = walls[i]; if (segCrossesRect(x1, y1, x2, y2, w.x, w.y, w.w, w.h)) return true; } }
+            if (buildings) { for (let i = 0; i < buildings.length; i++) { const b = buildings[i]; if (segCrossesRect(x1, y1, x2, y2, b.x, b.y, b.w, b.h)) return true; } }
             return false;
         }
         
         /** Raycast: find nearest hit distance along a line through obstacle rects. Returns maxDist if no hit. */
         function raycastNearest(x1, y1, x2, y2, obstacles, maxDist) {
             let nearest = maxDist;
-            for (const o of obstacles) {
-                for (const hit of getLineRectIntersections(x1, y1, x2, y2, o.x, o.y, o.w, o.h)) {
-                    const d = Math.hypot(hit.x - x1, hit.y - y1);
-                    if (d < nearest) nearest = d;
-                }
-            }
+            for (let i = 0; i < obstacles.length; i++) { const o = obstacles[i]; nearest = segRectNearest(x1, y1, x2, y2, o.x, o.y, o.w, o.h, nearest, -Infinity); }
             return nearest;
         }
         
@@ -105,35 +104,36 @@
          *   opts.minDist      ignore walls nearer than this (a beam cast from behind the bumper)
          * Rays go to every nearby obstacle corner (±0.0001 rad) and stop at the first wall they hit.
          */
+        const _visRel = [], _visAng = [];                                     // scratch, reused by every call
         function computeVisibilityPoly(ox, oy, range, obstacles, opts = {}) {
-            const relevant = obstacles.filter(o => Math.hypot(o.x + o.w / 2 - ox, o.y + o.h / 2 - oy) < range + Math.max(o.w, o.h));
+            const relevant = _visRel; relevant.length = 0;
+            for (let i = 0; i < obstacles.length; i++) { const o = obstacles[i]; if (Math.hypot(o.x + o.w / 2 - ox, o.y + o.h / 2 - oy) < range + Math.max(o.w, o.h)) relevant.push(o); }
             const minDist = opts.minDist || 0;                                // ignore hits nearer than this
             const windowed = opts.aMin !== undefined;
             const TAU = Math.PI * 2, span = windowed ? (((opts.aMax - opts.aMin) % TAU + TAU) % TAU || TAU) : 0;
             const rel = a => ((a - opts.aMin) % TAU + TAU) % TAU;
-            const angles = [], points = [];
-            for (const o of relevant) points.push({ x: o.x, y: o.y }, { x: o.x + o.w, y: o.y }, { x: o.x + o.w, y: o.y + o.h }, { x: o.x, y: o.y + o.h });
-            if (opts.extraPoints) points.push(...opts.extraPoints);
-            for (const p of points) {
-                const angle = Math.atan2(p.y - oy, p.x - ox);
-                for (const off of [-0.0001, 0, 0.0001]) {
+            const angles = _visAng; angles.length = 0;
+            // Rays at every corner (and just either side of it), in the order the corners were always listed
+            const aim = (px, py) => {
+                const angle = Math.atan2(py - oy, px - ox);
+                for (let k = -1; k <= 1; k++) {
+                    const off = k === 0 ? 0 : k * 0.0001;
                     if (windowed && rel(angle + off) > span) continue;
                     angles.push(angle + off);
                 }
-            }
+            };
+            for (let i = 0; i < relevant.length; i++) { const o = relevant[i]; aim(o.x, o.y); aim(o.x + o.w, o.y); aim(o.x + o.w, o.y + o.h); aim(o.x, o.y + o.h); }
+            if (opts.extraPoints) for (const p of opts.extraPoints) aim(p.x, p.y);
             if (windowed) {
                 const step = opts.arcStep || 0.12, n = Math.max(1, Math.ceil(span / step));
                 for (let i = 0; i <= n; i++) angles.push(opts.aMin + span * i / n);
             }
-            const out = [];
-            for (const a of angles) {
-                const dx = Math.cos(a), dy = Math.sin(a);
+            const out = new Array(angles.length);
+            for (let j = 0; j < angles.length; j++) {
+                const a = angles[j], dx = Math.cos(a), dy = Math.sin(a), ex = ox + dx * range, ey = oy + dy * range;
                 let closest = range;
-                for (const o of relevant) {
-                    const hits = getLineRectIntersections(ox, oy, ox + dx * range, oy + dy * range, o.x, o.y, o.w, o.h);
-                    for (const h of hits) { const d = Math.hypot(h.x - ox, h.y - oy); if (d < closest && d >= minDist) closest = d; }
-                }
-                out.push({ angle: a, x: ox + dx * closest, y: oy + dy * closest });
+                for (let i = 0; i < relevant.length; i++) { const o = relevant[i]; closest = segRectNearest(ox, oy, ex, ey, o.x, o.y, o.w, o.h, closest, minDist); }
+                out[j] = { angle: a, x: ox + dx * closest, y: oy + dy * closest };
             }
             if (windowed) out.sort((p, q) => rel(p.angle) - rel(q.angle));
             else out.sort((p, q) => p.angle - q.angle);
@@ -230,8 +230,9 @@
         const _glowSprites = new Map();
         /** A 64×64 glow for `color` ('#rrggbb' or 'r, g, b'); `core` 0…1 is how solid the centre is (0 = linear falloff). */
         function glowSprite(color, core = 0.35) {
-            const key = color + '|' + core;
-            let cv = _glowSprites.get(key);
+            let byCore = _glowSprites.get(color);                              // colour → core → sprite (a hit builds no key string)
+            if (!byCore) _glowSprites.set(color, byCore = new Map());
+            let cv = byCore.get(core);
             if (cv) return cv;
             const rgb = color[0] === '#' ? hexToRgb(color) : color;
             cv = document.createElement('canvas'); cv.width = cv.height = 64;
@@ -240,7 +241,7 @@
             if (core > 0) g.addColorStop(core, `rgba(${rgb}, 0.45)`);        // core 0: a plain linear falloff
             g.addColorStop(1, `rgba(${rgb}, 0)`);
             c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            _glowSprites.set(key, cv);
+            byCore.set(core, cv);
             return cv;
         }
         /** Stamp a glow of radius r at x, y (alpha from the context's globalAlpha). */

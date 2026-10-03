@@ -17,7 +17,6 @@
                 
                 this.MAP_NAMES = {
                     'hub_949': 'Moon City',
-                    'road_test': 'Outskirts',
                     'ethereal_plane': 'Ethereal Plane',
                     'apt_949': '949\'s Apartment',
                     'hotel_lobby': 'Double Nights Hotel',
@@ -91,6 +90,7 @@
             loadFromSlot(index) {
                 const data = this.getSlotData(index);
                 if (!data) return false;
+                if (index === 'auto') return game.loadGame(this._slotKey('auto'));   // the autosave: your own slot stays the active one
                 this.setActiveSlot(index);
                 return game.loadGame();
             }
@@ -115,6 +115,7 @@
                 this.mode = mode;
                 this.onComplete = onComplete || null;
                 this._confirmTarget = null;
+                clearTimeout(this._closeT);                                     // reopened mid-close: stay open
                 this._render();
                 this.overlay.classList.add('active');
                 requestAnimationFrame(() => { this.overlay.style.opacity = '1'; });
@@ -122,7 +123,8 @@
 
             close() {
                 this.overlay.style.opacity = '0';
-                setTimeout(() => { this.overlay.classList.remove('active'); }, 300);
+                clearTimeout(this._closeT);
+                this._closeT = setTimeout(() => { this.overlay.classList.remove('active'); }, 300);
             }
 
             _formatDate(ts) {
@@ -189,6 +191,17 @@
                     html += `</div>`;
                 }
 
+                // The autosave (made when the app went to the background): load only
+                const auto = this.mode === 'load' ? this.getSlotSummary('auto') : null;
+                if (auto) html += `<div class="save-slot-card" data-slot="auto">
+                        <div class="save-slot-header"><span class="save-slot-label">Autosave</span></div>
+                        <div class="save-slot-meta">
+                            <span class="meta-map">⧫ ${auto.mapName}</span>
+                            <span class="meta-currency">¤ ${auto.currency.toLocaleString()}</span>
+                            <span class="meta-story">Ch. ${auto.storyStep}</span>
+                            <span class="meta-date">${this._formatDate(auto.timestamp)}</span>
+                        </div></div>`;
+
                 const hasAny = this.hasAnySave();
                 html += `<div class="save-slot-footer">
                     <div class="save-slot-footer-actions">
@@ -208,16 +221,17 @@
             _bindEvents() {
                 // Close
                 this.overlay.querySelector('#save-slot-close').addEventListener('click', () => this.close());
-                this.overlay.addEventListener('click', (e) => {
-                    if (e.target === this.overlay) this.close();
-                });
+                if (!this._backdropBound) {                                     // the overlay outlives each render: bind it once
+                    this._backdropBound = true;
+                    this.overlay.addEventListener('click', (e) => { if (e.target === this.overlay) this.close(); });
+                }
 
                 // Slot cards
                 this.overlay.querySelectorAll('.save-slot-card').forEach(card => {
                     card.addEventListener('click', (e) => {
                         // Don't trigger if clicking delete or confirm buttons
                         if (e.target.closest('.save-slot-delete') || e.target.closest('.save-slot-confirm')) return;
-                        const slot = parseInt(card.dataset.slot);
+                        const slot = card.dataset.slot === 'auto' ? 'auto' : parseInt(card.dataset.slot);
                         this._onSlotClick(slot);
                     });
                 });
@@ -321,7 +335,7 @@
                 for (let i = 0; i < this.maxSlots; i++) {
                     if (this.getSlotData(i)) return true;
                 }
-                return false;
+                return !!this.getSlotData('auto');
             }
 
             // --- EXPORT ALL SLOTS ---

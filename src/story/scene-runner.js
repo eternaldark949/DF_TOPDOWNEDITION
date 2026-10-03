@@ -153,6 +153,14 @@
                 this._finish(true);
             }
 
+            /** Quit or a load: drop the scene with nothing after it (no flag, no onSkip, its promise never resolves) */
+            abort() {
+                const A = this.active;
+                if (!A) return;
+                A.resolve = () => {}; A.meta = Object.assign({}, A.meta, { flag: null });
+                this._finish(true);
+            }
+
             _finish(skipped) {
                 const A = this.active;
                 if (!A) return;

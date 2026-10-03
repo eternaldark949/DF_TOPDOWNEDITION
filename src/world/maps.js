@@ -19,15 +19,6 @@
                 ],
                 zones: [], buildings: [], walls: [], transitions: []
             },
-            'road_test': {
-                id: 'road_test', width: 4000, height: 4000, type: 'outdoor',
-                label: 'Road Test Zone (Expanded)', floorColor: '#0b1a0b',
-                climate: 'outskirt',   // Milder than the city — driving out feels different
-                spawn: { x: 2000, y: 2000 },
-                pavements: [], crosswalks: [], lamps: [],
-                walls: [ { x: 0, y: 0, w: 4000, h: 50 }, { x: 0, y: 3950, w: 4000, h: 50 }, { x: 0, y: 0, w: 50, h: 4000 }, { x: 3950, y: 0, w: 50, h: 4000 } ],
-                transitions: [ { x: 1960, y: 3900, w: 80, h: 50, target: 'hub_949', label: 'Return to City' } ]
-            },
             'ethereal_plane': {
                 id: 'ethereal_plane', width: 1200, height: 1200, type: 'indoor',
                 label: 'The Ethereal Plane', floorColor: '#0a001a',

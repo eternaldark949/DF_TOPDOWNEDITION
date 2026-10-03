@@ -171,22 +171,27 @@
                 // ╔══════════════════════════════════════════════════════════════════╗
         // ║                    SPATIAL HASH GRID                              ║
         // ╚══════════════════════════════════════════════════════════════════╝
+        /* Broad-phase grid for collisions. Cells keyed by number, their arrays kept and emptied each clear;
+           queries drop repeats with a per-query stamp instead of a Set (results in the same order). */
         class SpatialHashGrid {
             constructor(cellSize = 200) {
                 this.cellSize = cellSize;
-                this.cells = new Map();
+                this.cells = new Map();     // key → entities (arrays kept between frames)
+                this._used = [];            // the arrays filled since the last clear
+                this._stamp = 0;
             }
             
+            // Cell key (a number) for cell (cx, cy)
+            _ckey(cx, cy) { return (cx + 32768) * 65536 + (cy + 32768); }
             // Get cell key from world position
             _key(x, y) {
-                const cx = Math.floor(x / this.cellSize);
-                const cy = Math.floor(y / this.cellSize);
-                return `${cx},${cy}`;
+                return this._ckey(Math.floor(x / this.cellSize), Math.floor(y / this.cellSize));
             }
             
             // Clear all cells (call at start of each frame)
             clear() {
-                this.cells.clear();
+                for (let i = 0; i < this._used.length; i++) this._used[i].length = 0;
+                this._used.length = 0;
             }
             
             // Insert entity into appropriate cell(s)
@@ -201,11 +206,11 @@
                 
                 for (let cx = minCX; cx <= maxCX; cx++) {
                     for (let cy = minCY; cy <= maxCY; cy++) {
-                        const key = `${cx},${cy}`;
-                        if (!this.cells.has(key)) {
-                            this.cells.set(key, []);
-                        }
-                        this.cells.get(key).push(entity);
+                        const key = this._ckey(cx, cy);
+                        let cell = this.cells.get(key);
+                        if (!cell) { cell = []; this.cells.set(key, cell); }
+                        if (!cell.length) this._used.push(cell);
+                        cell.push(entity);
                     }
                 }
             }
@@ -213,7 +218,7 @@
             // Get potential collision candidates for an entity
             getNearby(entity) {
                 const bb = entity.getBoundingBox();
-                const candidates = new Set();
+                const stamp = ++this._stamp, candidates = [];
                 
                 const minCX = Math.floor(bb.x / this.cellSize);
                 const maxCX = Math.floor((bb.x + bb.w) / this.cellSize);
@@ -222,24 +227,21 @@
                 
                 for (let cx = minCX; cx <= maxCX; cx++) {
                     for (let cy = minCY; cy <= maxCY; cy++) {
-                        const key = `${cx},${cy}`;
-                        const cell = this.cells.get(key);
-                        if (cell) {
-                            for (let other of cell) {
-                                if (other !== entity) {
-                                    candidates.add(other);
-                                }
-                            }
+                        const cell = this.cells.get(this._ckey(cx, cy));
+                        if (!cell) continue;
+                        for (let i = 0; i < cell.length; i++) {
+                            const other = cell[i];
+                            if (other !== entity && other._hashStamp !== stamp) { other._hashStamp = stamp; candidates.push(other); }
                         }
                     }
                 }
                 
-                return Array.from(candidates);
+                return candidates;
             }
             
             // Get all entities in a radius (for explosions, etc.)
             getInRadius(x, y, radius) {
-                const results = new Set();
+                const stamp = ++this._stamp, results = [];
                 
                 const minCX = Math.floor((x - radius) / this.cellSize);
                 const maxCX = Math.floor((x + radius) / this.cellSize);
@@ -248,20 +250,18 @@
                 
                 for (let cx = minCX; cx <= maxCX; cx++) {
                     for (let cy = minCY; cy <= maxCY; cy++) {
-                        const key = `${cx},${cy}`;
-                        const cell = this.cells.get(key);
-                        if (cell) {
-                            for (let e of cell) {
-                                const dist = Math.hypot(e.x - x, e.y - y);
-                                if (dist <= radius + e.radius) {
-                                    results.add(e);
-                                }
-                            }
+                        const cell = this.cells.get(this._ckey(cx, cy));
+                        if (!cell) continue;
+                        for (let i = 0; i < cell.length; i++) {
+                            const e = cell[i];
+                            if (e._hashStamp === stamp) continue;
+                            const dist = Math.hypot(e.x - x, e.y - y);
+                            if (dist <= radius + e.radius) { e._hashStamp = stamp; results.push(e); }
                         }
                     }
                 }
                 
-                return Array.from(results);
+                return results;
             }
         }
 

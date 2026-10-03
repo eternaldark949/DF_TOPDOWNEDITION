@@ -721,12 +721,17 @@
                 
                 // Their own look (Pedestrian.makeLook) — hats, hair and all. Zoomed out (more of
                 // the crowd on screen, too small to read details) they get simple hair, no jewelry.
-                const far = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 1;
-                let look = far && this.look.hair ? { ...this.look, hair: { type: 'short', color: this.look.hair.color }, jewelry: null } : this.look;
-                // Rain: open the umbrella, or pull the hoodie's hood up
-                if (this.look.umbrella) look = { ...look, held: { type: 'umbrella', color: this.look.umbrella, hand: 'right' } };
-                if (this._raining() && this.look.rainHood && !look.hat && look.top && look.top.type === 'hoodie') look = { ...look, hat: { type: 'hood_up', color: look.top.color } };
-                drawCrowdHumanoid(ctx, this, { ...look, stance: 'idle', lerpSpeed: 0.15 });   // by Crowd Quality (ui/crowd-impostors.js)
+                // (Composed once and kept until zoom detail, rain or the look changes — not rebuilt every frame.)
+                const far = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 1, raining = this._raining();
+                if (!this._drawCfg || this._drawCfgFar !== far || this._drawCfgRain !== raining || this._drawCfgLook !== this.look) {
+                    let look = far && this.look.hair ? { ...this.look, hair: { type: 'short', color: this.look.hair.color }, jewelry: null } : this.look;
+                    // Rain: open the umbrella, or pull the hoodie's hood up
+                    if (this.look.umbrella) look = { ...look, held: { type: 'umbrella', color: this.look.umbrella, hand: 'right' } };
+                    if (raining && this.look.rainHood && !look.hat && look.top && look.top.type === 'hoodie') look = { ...look, hat: { type: 'hood_up', color: look.top.color } };
+                    this._drawCfg = { ...look, stance: 'idle', lerpSpeed: 0.15 };
+                    this._drawCfgFar = far; this._drawCfgRain = raining; this._drawCfgLook = this.look;
+                }
+                drawCrowdHumanoid(ctx, this, this._drawCfg);   // by Crowd Quality (ui/crowd-impostors.js)
                 
                 // Waiting indicator (if at crosswalk) - above head at +X
                 if (this.state === 'waiting') {

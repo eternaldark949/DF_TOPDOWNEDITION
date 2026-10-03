@@ -194,7 +194,7 @@
                     const rz = this.restrictedZone;
                     const wb = cullBounds.world;
                     // Only draw if zone is visible in viewport
-                    if (rz.x + rz.w > wb.x && rz.x < wb.x + wb.w && rz.y + rz.h > wb.y && rz.y < wb.y + wb.h) {
+                    if (rz.x + rz.w > wb.left && rz.x < wb.right && rz.y + rz.h > wb.top && rz.y < wb.bottom) {
                         this.ctx.save();
                         // Pulsing crimson dashed border
                         const t = _frameTime / 500;

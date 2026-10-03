@@ -1,4 +1,6 @@
-        /* --- OPTIMIZATION: SPATIAL GRID --- */
+        /* --- OPTIMIZATION: SPATIAL GRID ---
+           Cells are keyed by number (no strings) and their arrays are kept and emptied, not rebuilt;
+           getNearby drops repeats with a per-query stamp instead of a Set (same order as before). */
         class SpatialGrid {
             constructor(width, height, cellSize) {
                 this.width = width;
@@ -6,15 +8,18 @@
                 this.cellSize = cellSize;
                 this.cols = Math.ceil(width / cellSize);
                 this.rows = Math.ceil(height / cellSize);
-                this.cells = new Map();
+                this.cells = new Map();     // key → clients (arrays kept between rebuilds)
+                this._used = [];            // the arrays filled since the last clear
+                this._stamp = 0;
             }
         
             clear() {
-                this.cells.clear();
+                for (let i = 0; i < this._used.length; i++) this._used[i].length = 0;
+                this._used.length = 0;
             }
         
             getKey(col, row) {
-                return `${col},${row}`;
+                return (col + 32768) * 65536 + (row + 32768);
             }
         
             add(client) {
@@ -28,10 +33,10 @@
                 for (let c = minCol; c <= maxCol; c++) {
                     for (let r = minRow; r <= maxRow; r++) {
                         const key = this.getKey(c, r);
-                        if (!this.cells.has(key)) {
-                            this.cells.set(key, []);
-                        }
-                        this.cells.get(key).push(client);
+                        let cell = this.cells.get(key);
+                        if (!cell) { cell = []; this.cells.set(key, cell); }
+                        if (!cell.length) this._used.push(cell);
+                        cell.push(client);
                     }
                 }
             }
@@ -43,19 +48,18 @@
                 const minRow = Math.floor((client.y - r) / this.cellSize);
                 const maxRow = Math.floor((client.y + r) / this.cellSize);
         
-                const nearby = new Set();
+                const stamp = ++this._stamp, nearby = [];
                 for (let c = minCol; c <= maxCol; c++) {
                     for (let r = minRow; r <= maxRow; r++) {
-                        const key = this.getKey(c, r);
-                        if (this.cells.has(key)) {
-                            const contents = this.cells.get(key);
-                            for (let other of contents) {
-                                if (other !== client) nearby.add(other);
-                            }
+                        const contents = this.cells.get(this.getKey(c, r));
+                        if (!contents) continue;
+                        for (let i = 0; i < contents.length; i++) {
+                            const other = contents[i];
+                            if (other !== client && other._gridStamp !== stamp) { other._gridStamp = stamp; nearby.push(other); }
                         }
                     }
                 }
-                return Array.from(nearby);
+                return nearby;
             }
         }
 
@@ -242,8 +246,6 @@
                 for (const v of allVehicles) this.grid.add(v);
                 if (playerCar && playerCar.visible && !allVehicles.includes(playerCar)) this.grid.add(playerCar);
                 if (ownedCar && ownedCar.visible && ownedCar !== playerCar && !allVehicles.includes(ownedCar)) this.grid.add(ownedCar);
-                const seen = new Set();
-                
                 if (playerCar && playerCar.visible && !allVehicles.includes(playerCar)) {
                     allVehicles.push(playerCar);
                 }
@@ -251,16 +253,18 @@
                 if (ownedCar && ownedCar.visible && ownedCar !== playerCar && !allVehicles.includes(ownedCar)) {
                     allVehicles.push(ownedCar);
                 }
+                // Each pair once, at the turn of whichever comes first in the list (as the old pair-key Set did:
+                // neighbours are mutual, so the first to meet the other is the earlier one)
+                for (let i = 0; i < allVehicles.length; i++) allVehicles[i]._colIdx = i;
             
                 // 2. BROAD PHASE: SPATIAL GRID
-                for (let v1 of allVehicles) {
+                for (let n1 = 0; n1 < allVehicles.length; n1++) {
+                    const v1 = allVehicles[n1];
                     const neighbors = this.grid.getNearby(v1);
                     
                     for (let v2 of neighbors) {
                         if (v1 === v2) continue; 
-                        const key = v1.id < v2.id ? v1.id + ':' + v2.id : v2.id + ':' + v1.id;   // each pair once
-                        if (seen.has(key)) continue;
-                        seen.add(key);
+                        if (v2._colIdx === undefined || allVehicles[v2._colIdx] !== v2 || v2._colIdx < n1) continue;   // met already (or not in the list)
                         
                         // 3. NARROW PHASE: SAT RESOLUTION
                         const collided = PhysicsSystem.resolveOBBCollision(v1, v2);

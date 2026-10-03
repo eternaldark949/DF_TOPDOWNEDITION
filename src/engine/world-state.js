@@ -154,7 +154,6 @@
                         'hotel_lobby': "DOUBLE NIGHTS HOTEL",
                         'hotel_suite': "PENTHOUSE SUITE",
                         'church_boss': "THE SANCTUM",
-                        'road_test': "ROAD TEST ZONE",
                         'hub_949': "CITY SECTOR 9",
                         'auto_shop': "TORQUE AUTO",
                         'neural_sys_interior': "NEURAL SYSTEMS",

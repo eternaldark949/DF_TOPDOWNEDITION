@@ -596,13 +596,16 @@
                 }
             
                 // Enemies (Gangers, Bosses)
+                let trafficCars = null;                                         // the cars they dodge: one list a tick, shared (read only)
                 for(let i=this.enemies.length-1; i>=0; i--) {
                     let enemy = this.enemies[i];
                     let result = null;
                     
                     if (enemy instanceof Ganger) {
-                        const trafficCars = this.traffic ? [...this.traffic.vehicles] : [];
-                        if (this.isDriving && this.car) trafficCars.push(this.car);
+                        if (!trafficCars) {
+                            trafficCars = this.traffic ? [...this.traffic.vehicles] : [];
+                            if (this.isDriving && this.car) trafficCars.push(this.car);
+                        }
                         result = enemy.update(this.player, this.activeMap.walls, getColliders(this.activeMap), this.lastKnownMarkers, trafficCars, this.activeMap, this.enemies);
                     } else if (enemy instanceof GatlingGunner) {
                         result = enemy.update(this.player.x, this.player.y, this.enemies, this.activeMap.walls);

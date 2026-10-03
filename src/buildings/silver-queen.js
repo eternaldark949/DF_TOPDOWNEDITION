@@ -24,6 +24,8 @@
             pilasters: [-143, -80, 80, 143]
         };
 
+        const _SQ_BANDS = [[], [], [], [], [], [], [], []];   // _sqRoofEdgeLights: the bulb cores by brightness band, reused
+
         Object.assign(BuildingV2.prototype, {
             _sqH() { const B = CONFIG.BUILDINGS; return Math.min(this.floors, B.MAX_FLOORS) * B.FLOOR_HEIGHT; },
 
@@ -125,7 +127,8 @@
                 if (depth < 4) return;
                 const ex = bx - ax, ey = by - ay, tx = cx - dx, ty = cy - dy, ux = dx - ax, uy = dy - ay;
                 const at = (u, v) => [ax + ex * u + (ux + tx * u - ex * u) * v, ay + ey * u + (uy + ty * u - ey * u) * v];
-                const sub = (p, u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); p.moveTo(a[0], a[1]); p.lineTo(b[0], b[1]); p.lineTo(c[0], c[1]); p.lineTo(d[0], d[1]); p.closePath(); };
+                const atX = (u, v) => ax + ex * u + (ux + tx * u - ex * u) * v, atY = (u, v) => ay + ey * u + (uy + ty * u - ey * u) * v;   // at(), without the array
+                const sub = (p, u0, u1, v0, v1) => { p.moveTo(atX(u0, v0), atY(u0, v0)); p.lineTo(atX(u1, v0), atY(u1, v0)); p.lineTo(atX(u1, v1), atY(u1, v1)); p.lineTo(atX(u0, v1), atY(u0, v1)); p.closePath(); };
                 const corner = f.side === 'C', pil = corner ? { us: [], w: 0, len: Math.hypot(f.x2 - f.x1, f.y2 - f.y1) } : this._sqPilasters(f), H = this._sqH(), lod = _zoomLOD, K = LandmarkKit, T = SQ_THEME;
                 const vBelt = SQ_PORTICO.floors * CONFIG.BUILDINGS.FLOOR_HEIGHT / H;
                 const nx = f.nx, ny = f.ny;
@@ -931,19 +934,23 @@
                 } else {
                     ctx.globalCompositeOperation = 'lighter';
                     // Each bulb shimmers on its own; the cores go out in a few brightness bands (8 fills, not one per bulb)
-                    const bands = [[], [], [], [], [], [], [], []], a0 = ctx.globalAlpha;
-                    this._sqBulbs.forEach(([x, y], i) => {
+                    const bands = _SQ_BANDS, a0 = ctx.globalAlpha, B = this._sqBulbs;
+                    for (let b = 0; b < 8; b++) bands[b].length = 0;
+                    for (let i = 0; i < B.length; i++) {
+                        const x = B[i][0], y = B[i][1];
                         const h = _bldHash(5151, i), on = 0.55 + 0.45 * Math.pow(Math.max(0, Math.sin(t * (1.1 + h) + h * 20)), 4);
                         const warm = i % 2 === 0;
                         if (lod === 0) { ctx.globalAlpha = a0 * 0.45 * on; drawGlow(ctx, x, y, 7, warm ? '255, 217, 160' : '217, 194, 255', 0); }
                         bands[(warm ? 0 : 4) + Math.min(3, Math.floor((on - 0.55) / 0.45 * 4))].push(x, y);
-                    });
-                    bands.forEach((pts, bi) => {
-                        if (!pts.length) return;
-                        const on = 0.55 + 0.45 * ((bi % 4) + 0.5) / 4, p = new Path2D();
-                        for (let j = 0; j < pts.length; j += 2) { p.moveTo(pts[j] + 1.5, pts[j + 1]); p.arc(pts[j], pts[j + 1], 1.5, 0, Math.PI * 2); }
-                        ctx.globalAlpha = a0 * on; ctx.fillStyle = bi < 4 ? 'rgb(255,236,205)' : 'rgb(236,224,255)'; ctx.fill(p);
-                    });
+                    }
+                    for (let bi = 0; bi < 8; bi++) {
+                        const pts = bands[bi];
+                        if (!pts.length) continue;
+                        const on = 0.55 + 0.45 * ((bi % 4) + 0.5) / 4;
+                        ctx.beginPath();
+                        for (let j = 0; j < pts.length; j += 2) { ctx.moveTo(pts[j] + 1.5, pts[j + 1]); ctx.arc(pts[j], pts[j + 1], 1.5, 0, Math.PI * 2); }
+                        ctx.globalAlpha = a0 * on; ctx.fillStyle = bi < 4 ? 'rgb(255,236,205)' : 'rgb(236,224,255)'; ctx.fill();
+                    }
                     ctx.globalAlpha = a0;
                 }
                 ctx.restore();

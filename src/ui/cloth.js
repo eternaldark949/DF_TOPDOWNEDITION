@@ -21,19 +21,39 @@
            ===================================================================== */
 
         const CLOTH_SIM = { STEP: 1 / 120, MAX_STEPS: 12, SNAP: 80 };
+        const _CL_ROOT = { x: 0, y: 0 }, _CL_HEM = { x: 0, y: 0 };   // clothGeometry's per-slice points, reused
 
+        /* The frame → world transform for a simulation drawn in the current ctx frame. One shared object
+           (its helpers read _stM), filled by each _simTransform call: a caller uses it before the next call.
+           The world matrix's inverse is worked out once a frame, not once per hair and cloth panel. */
+        let _stM = null, _stDet = 1, _stInv = null, _stInvSrc = null;
+        const _simT = {
+            M: null, sc: 1, ang: 0,
+            toW: (x, y) => ({ x: _stM.a * x + _stM.c * y + _stM.e, y: _stM.b * x + _stM.d * y + _stM.f }),
+            toL: (x, y) => { const M = _stM, dx = x - M.e, dy = y - M.f; return { x: (M.d * dx - M.c * dy) / _stDet, y: (-M.b * dx + M.a * dy) / _stDet }; },
+            /** toL into an existing point (no new object) */
+            toLInto: (o, x, y) => { const M = _stM, dx = x - M.e, dy = y - M.f; o.x = (M.d * dx - M.c * dy) / _stDet; o.y = (-M.b * dx + M.a * dy) / _stDet; return o; }
+        };
         /** Frame → world helpers for simulations drawn in the current ctx frame, or null off the world canvas. */
         function _simTransform(ctx) {
             if (!_worldMatrix || ctx.canvas !== _worldCanvas) return null;
-            const M = _worldMatrix.inverse().multiply(ctx.getTransform());   // camera and shake cancel out
-            const det = M.a * M.d - M.b * M.c;
-            return {
-                M,
-                toW: (x, y) => ({ x: M.a * x + M.c * y + M.e, y: M.b * x + M.d * y + M.f }),
-                toL: (x, y) => { const dx = x - M.e, dy = y - M.f; return { x: (M.d * dx - M.c * dy) / det, y: (-M.b * dx + M.a * dy) / det }; },
-                sc: Math.hypot(M.a, M.b) || 1,
-                ang: Math.atan2(M.b, M.a)                                     // the frame's +x in world
-            };
+            if (_stInvSrc !== _worldMatrix) { _stInv = _worldMatrix.inverse(); _stInvSrc = _worldMatrix; }   // (a new matrix each frame)
+            const M = _stInv.multiply(ctx.getTransform());                   // camera and shake cancel out
+            _stM = M; _stDet = M.a * M.d - M.b * M.c;
+            _simT.M = M; _simT.sc = Math.hypot(M.a, M.b) || 1; _simT.ang = Math.atan2(M.b, M.a);   // the frame's +x in world
+            return _simT;
+        }
+
+        /** The sim's points in the ctx frame, written into arrays kept on the sim (the draw reads them at once) */
+        function _simOut(sim, chains, toLInto) {
+            const out = sim._out || (sim._out = []);
+            out.length = chains.length;
+            for (let i = 0; i < chains.length; i++) {
+                const pts = chains[i], o = out[i] || (out[i] = []);
+                if (o.length !== pts.length) { o.length = 0; for (let j = 0; j < pts.length; j++) o.push({ x: 0, y: 0 }); }
+                for (let j = 0; j < pts.length; j++) toLInto(o[j], pts[j].x, pts[j].y);
+            }
+            return out;
         }
 
         /** How many fixed slices of game time a simulation should run this frame. */
@@ -62,13 +82,13 @@
         function clothGeometry(ctx, owner, key, spec, dyn) {
             const T = owner && !_crowdLite && (typeof _zoomLOD === 'undefined' || _zoomLOD < 2) ? _simTransform(ctx) : null;
             if (!T) return _clothRest(spec);
-            const { toW, toL, sc, ang: baseAngle, M } = T;
+            const { toW, toLInto, sc, ang: baseAngle, M } = T;
             const n = spec.segs || 3, chains = spec.chains;
             const store = owner._cloth || (owner._cloth = {});
             let sim = store[key];
-            const origin = { x: M.e, y: M.f };
-            if (!sim || sim.count !== chains.length * (n + 1) || Math.hypot(sim.ox - origin.x, sim.oy - origin.y) > CLOTH_SIM.SNAP * sc) {
-                sim = store[key] = { t: _gameTimeSec, acc: 0, ox: origin.x, oy: origin.y, ang: baseAngle, count: chains.length * (n + 1),
+            const originX = M.e, originY = M.f;
+            if (!sim || sim.count !== chains.length * (n + 1) || Math.hypot(sim.ox - originX, sim.oy - originY) > CLOTH_SIM.SNAP * sc) {
+                sim = store[key] = { t: _gameTimeSec, acc: 0, ox: originX, oy: originY, ang: baseAngle, count: chains.length * (n + 1),
                                      chains: _clothRest(spec).map(pts => pts.map(p => { const w = toW(p.x, p.y); return { x: w.x, y: w.y, px: w.x, py: w.y }; })) };
             }
 
@@ -90,15 +110,16 @@
                 const f = k / steps;
                 // Body pose for this slice, interpolated from last frame's
                 const ang = a0 + dA * f, c = Math.cos(ang), s = Math.sin(ang);
-                const fx = ox0 + (origin.x - ox0) * f, fy = oy0 + (origin.y - oy0) * f;
-                const sliceW = (lx, ly) => ({ x: fx + (c * lx - s * ly) * sc, y: fy + (s * lx + c * ly) * sc });
+                const fx = ox0 + (originX - ox0) * f, fy = oy0 + (originY - oy0) * f;
                 const time = sim.t + (k - steps) * CLOTH_SIM.STEP;
 
                 for (let ci = 0; ci < chains.length; ci++) {
                     const ch = chains[ci], pts = sim.chains[ci];
-                    const root = sliceW(ch.a.x, ch.a.y);
+                    // the seam and hem points for this slice, in the world (as sliceW(lx, ly) was, without its objects)
+                    const root = _CL_ROOT, hem = _CL_HEM;
+                    root.x = fx + (c * ch.a.x - s * ch.a.y) * sc; root.y = fy + (s * ch.a.x + c * ch.a.y) * sc;
                     pts[0].px = pts[0].x; pts[0].py = pts[0].y; pts[0].x = root.x; pts[0].y = root.y;
-                    const hem = sliceW(ch.t.x, ch.t.y);
+                    hem.x = fx + (c * ch.t.x - s * ch.t.y) * sc; hem.y = fy + (s * ch.t.x + c * ch.t.y) * sc;
                     const L = Math.hypot(ch.t.x - ch.a.x, ch.t.y - ch.a.y) / n * sc;
                     for (let i = 1; i <= n; i++) {
                         const p = pts[i], u = i / n;
@@ -146,8 +167,8 @@
                     }
                 }
             }
-            sim.ox = origin.x; sim.oy = origin.y; sim.ang = baseAngle;
-            return sim.chains.map(pts => pts.map(p => toL(p.x, p.y)));
+            sim.ox = originX; sim.oy = originY; sim.ang = baseAngle;
+            return _simOut(sim, sim.chains, toLInto);
         }
 
         /**

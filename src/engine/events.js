@@ -91,8 +91,20 @@
                 return !!h;
             },
 
+            /** The app went to the background (another app, the lock screen, the tab hidden or closed): save quietly
+                to the Autosave slot, stop the radio, and open the pause menu so she isn't ambushed on return. */
+            onPageHidden() {
+                if (!this.running) return;
+                try { this.saveGame({ auto: true }); } catch (e) { console.warn('autosave', e); }
+                if (this.musicWidget && this.musicWidget.isPlaying) this.musicWidget.togglePlay(false);
+                const pm = typeof pauseMenuController !== 'undefined' ? pauseMenuController : null;
+                if (pm && !pm.isOpen && !this.paused && !(this.scenes && this.scenes.running)) pm.open();
+            },
+
             initEvents() {
                 window.addEventListener('resize', () => { this.resize(); });
+                document.addEventListener('visibilitychange', () => { if (document.hidden) this.onPageHidden(); });
+                window.addEventListener('pagehide', () => this.onPageHidden());
                 window.addEventListener('keydown', (e) => { 
                     this.keys[e.key] = true; 
                     if (e.key === 'h' || e.key === 'H') this.useBooster();

@@ -98,10 +98,18 @@
         
             // Must be called after user interaction to unlock audio (browser policy)
             init() {
-                if (this.ctx.state === 'suspended') {
-                    this.ctx.resume();
-                }
+                if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume();
             }
+
+            /** Back at the menu: once the fades have played out, stop the audio thread (an sfx or enterWorld wakes it) */
+            idle(ms = 1200) {
+                clearTimeout(this._idleT);
+                this._idleT = setTimeout(() => {
+                    if (typeof game !== 'undefined' && (game.running || (game.musicWidget && game.musicWidget.isPlaying))) return;
+                    this.ctx.suspend();
+                }, ms);
+            }
+            wake() { clearTimeout(this._idleT); if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume(); }
             
             // Centralized audio toggle. Used by Settings UI and save-load restore.
             // Pass true/false; reads GameSettings.audioEnabled when called with no arg.
@@ -124,8 +132,8 @@
                5. Start and stop at precise times
                --------------------------------------------------------------- */
             sfx(type, opts = {}) {
-                // Ensure audio context is active
-                if (this.ctx.state === 'suspended') this.ctx.resume();
+                // Ensure audio context is active (not from a timer while the app is in the background)
+                if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume();
                 // Rapid fire: a few shots ringing at once is plenty; more only stacks into clipping
                 const dur = SFX_DUR[type] || 0.3, V = this._sfxV || (this._sfxV = {});
                 if ((V[type] || 0) >= (SFX_CAP[type] || 6)) return;

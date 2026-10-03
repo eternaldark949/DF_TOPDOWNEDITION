@@ -54,7 +54,10 @@
         })();
 
         document.getElementById('btn-new-game').addEventListener('click', () => { FullscreenManager.requestIfEnabled(); mainMenuList.classList.add('hidden'); storyModeList.classList.remove('hidden'); });
+        let _starting = false;   // a second tap during the half-second fade would start a second prologue and loop
         document.getElementById('btn-story-949').addEventListener('click', () => { 
+            if (_starting || game.running) return;
+            _starting = true;
             // 1. Initialize Audio Context (Browser requirement)
             audioSys.init(); 
             audioSys.sfx('ui'); 
@@ -69,6 +72,8 @@
             // 4. Wait for fade (500ms), then Swap Layers & Start
             setTimeout(() => { 
                 // The prologue (story/scenes/prologue.js), then chapter 1
+ 
+                _starting = false;
                 game.scenes.play('prologue').then(() => game.story.startPrologue());
                 game.enterWorld();
             }, 500); 

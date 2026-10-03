@@ -41,6 +41,7 @@
             });
         }
 
+        const _HAIR_ROOT = { x: 0, y: 0 };   // hairGeometry's per-slice root, reused
         /**
          * Current hair geometry in the head frame: { strands: [[{x,y}...]...], jig: {x,y} }.
          * Steps the owner's physics when drawn on the main canvas; otherwise the rest pose.
@@ -51,7 +52,7 @@
             const owner = dyn && dyn.owner, sway = (dyn && dyn.sway) || 0;
             const T = owner && !_crowdLite ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js); a lighter crowd: at rest
             if (!T) return { strands: _hairRest(layout, headX, sway * 0.5), jig: { x: 0, y: 0 } };
-            const { toW, toL, sc, ang: baseAngle } = T;
+            const { toW, toL, toLInto, sc, ang: baseAngle } = T;
             const head = toW(headX, 0);
 
             let sim = owner._hairSim;
@@ -86,12 +87,13 @@
                 const ang = a0 + dA * f;
                 const c = Math.cos(ang), s = Math.sin(ang);
                 const hx = hx0 + (head.x - hx0) * f, hy = hy0 + (head.y - hy0) * f;
-                const sliceW = (lx, ly) => ({ x: hx + (c * (lx - headX) - s * ly) * sc, y: hy + (s * (lx - headX) + c * ly) * sc });
                 const time = sim.t + (k - steps) * HAIR_SIM.STEP;
 
                 for (let si = 0; si < sim.strands.length; si++) {
                     const spec = specs[si], pts = sim.strands[si];
-                    const root = sliceW(headX + spec.root.x, spec.root.y);
+                    // the strand's root for this slice, in the world (as sliceW(lx, ly) was, without its object)
+                    const root = _HAIR_ROOT, lx = headX + spec.root.x, ly = spec.root.y;
+                    root.x = hx + (c * (lx - headX) - s * ly) * sc; root.y = hy + (s * (lx - headX) + c * ly) * sc;
                     pts[0].px = pts[0].x; pts[0].py = pts[0].y; pts[0].x = root.x; pts[0].y = root.y;
                     const restA = ang + spec.dir - sway * 0.5;          // rest direction swings with the shoulders
                     const rc = Math.cos(restA), rs = Math.sin(restA);
@@ -136,7 +138,7 @@
             }
             sim.headX = head.x; sim.headY = head.y; sim.ang = baseAngle;
 
-            const strands = sim.strands.map(pts => pts.map(p => toL(p.x, p.y)));
+            const strands = _simOut(sim, sim.strands, toLInto);
             let jig = { x: 0, y: 0 };
             if (layout.jiggle) {
                 const l0 = toL(head.x, head.y), l1 = toL(sim.jig.x, sim.jig.y);
@@ -970,6 +972,9 @@
         function _glossy(piece, item) { return !!item && (item.finish ? item.finish === 'gloss' : !!(piece && piece.finish === 'gloss')); }
         let _shadeFrame = -1, _shadeRims = 0, _lampGrid = null, _shadeCols = null, _bodyRot = 0;
         const _SHADOW_RGB = '12, 6, 28';
+
+        /** A new map: drop the old map's lamp buckets (map-loading.js) */
+        function humanShadeReset() { _lampGrid = null; }
 
         /** Street lamps bucketed in 200px cells, rebuilt when the map's lamp list changes. */
         function _lampNear(x, y, R) {
