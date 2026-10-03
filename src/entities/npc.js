@@ -541,6 +541,15 @@
              * Draw the NPC with role-specific rendering.
              * Preserves all original visual styles exactly.
              */
+            /** Out of view (engine/draw.js culls it): what draw would have ticked — quips, the gait (footsteps) */
+            tickHidden() {
+                if (this.inCar || this.dead) return;
+                RenderStats.culled++;
+                if (this.quipText && ++this.quipAge >= this.quipDuration) { this.quipText = null; this.quipAge = 0; }
+                if (this.quipCooldown > 0) this.quipCooldown--;
+                syncHumanoidGait(this);
+            }
+
             draw(ctx, player) {
                 
                 if (this.inCar || this.dead) return;

@@ -663,6 +663,15 @@
                 }
             }
             
+            /** Out of view (PedestrianManager.draw culls it): what draw would have ticked — gait (footsteps), facing */
+            tickHidden() {
+                if (this.dead) return;
+                RenderStats.culled++;
+                syncHumanoidGait(this);
+                this.lastX = this.x; this.lastY = this.y;
+                this.angle = this.facingAngle;
+            }
+
             draw(ctx) {
                 if (this.dead) return;
                 
@@ -924,7 +933,7 @@
              */
             draw(ctx, cb) {
                 for (let ped of this.pedestrians) {
-                    if (cb && (ped.x < cb.left || ped.x > cb.right || ped.y < cb.top || ped.y > cb.bottom)) continue;
+                    if (cb && (ped.x < cb.left || ped.x > cb.right || ped.y < cb.top || ped.y > cb.bottom)) { ped.tickHidden(); continue; }
                     ped.draw(ctx);
                 }
             }

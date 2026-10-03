@@ -31,6 +31,8 @@
             
                 // --- PROFILER START ---
                 this.profiler.beginFrame();
+                RenderStats.bodies = 0; RenderStats.culled = 0; RenderStats.peopleMs = 0;
+                RenderStats.timed = !!(this.showProfiler && GameSettings.profilerMode === 'full');
                 this.profiler.start('Render:Total');
                 this.profiler.markWrapper('Render:Total');
                 /* Render:Setup — the full-screen clear, camera transform, cull
@@ -101,6 +103,14 @@
                     entities:     { left: camX - cullHalfW - CONFIG.CULLING.ENTITIES,      right: camX + cullHalfW + CONFIG.CULLING.ENTITIES,      top: camY - cullHalfH - CONFIG.CULLING.ENTITIES,      bottom: camY + cullHalfH + CONFIG.CULLING.ENTITIES },
                     world:        { left: camX - cullHalfW - CONFIG.CULLING.WORLD,         right: camX + cullHalfW + CONFIG.CULLING.WORLD,         top: camY - cullHalfH - CONFIG.CULLING.WORLD,         bottom: camY + cullHalfH + CONFIG.CULLING.WORLD }
                 };
+                // People and car bodies: the view itself (its real zoom, the finisher's push-in, the shake), not the 0.45 rect
+                {
+                    const vw = (this.canvas.width / 2) / viewZoom + Math.abs(this.camera.shakeX || 0), vh = (this.canvas.height / 2) / viewZoom + Math.abs(this.camera.shakeY || 0);
+                    const B = CONFIG.CULLING.BODIES, C = CONFIG.CULLING.CARS;
+                    cullBounds.bodies = { left: camX - vw - B, right: camX + vw + B, top: camY - vh - B, bottom: camY + vh + B };
+                    cullBounds.cars = { left: camX - vw - C, right: camX + vw + C, top: camY - vh - C, bottom: camY + vh + C };
+                }
+                this._cullBounds = cullBounds;
             
                 // --- DYNAMIC LOD (Zoom-Aware) ---
                 // Progressive quality reduction as camera zooms out.
@@ -601,7 +611,7 @@
                 // Draw Traffic Cars
                 // PERFORMANCE: AABB viewport culling + distance LOD
                 {
-                    const cbV = cullBounds.vehicles;
+                    const cbV = cullBounds.cars;
                     this.traffic.vehicles.forEach(v => {
                         if (!v.visible) return;
                         if (v.x < cbV.left || v.x > cbV.right || v.y < cbV.top || v.y > cbV.bottom) return;
@@ -667,7 +677,7 @@
             
                 this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
                 this.drawNoiseRipples(this.ctx);
-                this.drawCorpses(this.ctx, cullBounds.entities);         // the fallen, under the living (engine/finisher.js)
+                this.drawCorpses(this.ctx, cullBounds.bodies);           // the fallen, under the living (engine/finisher.js)
                 this.drawHunterDashes(this.ctx);                         // crimson flits (engine/palace-art.js)
                 this.drawExecuteCue(this.ctx);                           // a gold reticle under an unaware back (engine/executions.js)
                 
@@ -678,19 +688,21 @@
                         if (l.x < cbE.left || l.x > cbE.right || l.y < cbE.top || l.y > cbE.bottom) return;
                         l.draw(this.ctx);
                     });
-                    this.npcs.forEach(n => {
-                        if (n.x < cbE.left || n.x > cbE.right || n.y < cbE.top || n.y > cbE.bottom) return;
+                    // People: only those in view are drawn; the rest still tick what their draw did (gait, quips)
+                    const cbB = cullBounds.bodies;
+                    for (const n of this.npcs) {
+                        if (n.x < cbB.left || n.x > cbB.right || n.y < cbB.top || n.y > cbB.bottom) { if (n.tickHidden) n.tickHidden(); continue; }
                         n.draw(this.ctx);
-                    });
+                    }
                     if (this.scenes && this.scenes.actors.length) this.scenes.drawActors(this.ctx);   // a scene's cast
-                    this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
-                    this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
-                    this.clubLife.draw(this.ctx, cbE);     // Moon City's crowd
+                    this.pedestrians.draw(this.ctx, cbB); // Roaming civilians
+                    this.lobbyLife.draw(this.ctx, cbB);    // Double Nights guests and staff
+                    this.clubLife.draw(this.ctx, cbB);     // Moon City's crowd
                     if (this.furniture) this.furniture.draw(this.ctx);   // the hand's outline and side handles (engine/furniture.js)
-                    if (!(this.scenes && this.scenes.crewOffstage)) this.teammates.forEach(tm => {
-                        if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) return;
+                    if (!(this.scenes && this.scenes.crewOffstage)) for (const tm of this.teammates) {
+                        if (tm.x < cbB.left || tm.x > cbB.right || tm.y < cbB.top || tm.y > cbB.bottom) { if (tm.tickHidden) tm.tickHidden(); continue; }
                         tm.draw(this.ctx, this.player);
-                    });
+                    }
                     // Velvet Cat
                     if (this.velvetCat && this.velvetCat.visible && !this.velvetCat.inCar) {
                         this.velvetCat.draw(this.ctx);
@@ -886,6 +898,7 @@
                     }
                 }
                 
+                const _topsT0 = RenderStats.timed ? performance.now() : 0;   // the world's top layers (profiler: Entities: World tops)
                 // Ferris Wheel BASE (legs/shadow — under building roofs)
                 if (this.activeMap.ferrisWheel) {
                     this.activeMap.ferrisWheel.drawBase(this.ctx);
@@ -986,6 +999,10 @@
                     l.draw(this.ctx, this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight);
                 }); 
             
+                if (RenderStats.timed) {
+                    this.profiler.add('Entities: World tops', performance.now() - _topsT0, true);   // roofs, signs, foliage, lamps
+                    this.profiler.add('Entities: People', RenderStats.peopleMs, true);           // every body drawn
+                }
                 // 3. Draw projectiles and weather effects
                 this.projectiles.forEach(p => p.draw(this.ctx));
                 

@@ -4470,6 +4470,11 @@
                 HEADLIGHTS: 250,                // Vehicle headlight cones
                 VEHICLES: 300,                  // Traffic vehicles
                 ENTITIES: 200,                  // NPCs, enemies, pedestrians, loot
+                // Tight bounds from the real view (draw.js `bodies` / `cars`): people and car bodies are
+                // the costliest things drawn, and the wide rect above (sized for zoom 0.45) drew 2–3×
+                // the screen of them. Margins cover a body's shadow, held gun and bubble; a car's length.
+                BODIES: 70,
+                CARS: 160,
                 WORLD: 200,                     // Pavements, crosswalks, transitions, walls, floor zones
                 
                 // Entity Spawning (radial - unchanged)
@@ -5607,6 +5612,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         /** Stand-in for throwaway render proxies with no position (VFX silhouettes). */
         const _STATIC_GAIT = Object.freeze({ speed: 0, dirX: 1, dirY: 0 });
+        /** Depth order for a crowd's draw list (one shared comparator: no closure per frame) */
+        const _byY = (a, b) => a.y - b.y;
 
         function _ensureGait(entity) {
             let g = entity._gait;
@@ -6597,8 +6604,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         /** Normalize an angle difference to [-PI, PI]. */
         function normalizeAngle(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
         
-        /** Darken a hex color by an absolute RGB amount (0-255). */
+        /** Darken a hex color by an absolute RGB amount (0-255). Cached: bodies ask for the same few every frame. */
+        const _darkenCache = new Map();
         function darkenHex(hex, amount) {
+            const key = hex + '|' + amount, hit = _darkenCache.get(key);
+            if (hit !== undefined) return hit;
+            const out = _darkenHexRaw(hex, amount);
+            if (_darkenCache.size > 4096) _darkenCache.clear();
+            _darkenCache.set(key, out);
+            return out;
+        }
+        function _darkenHexRaw(hex, amount) {
             hex = hex.replace('#', '');
             if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];   // '#222' → '222222'
             const r = clamp(parseInt(hex.substr(0, 2), 16) - amount, 0, 255);
@@ -10571,6 +10587,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         /** Draw an umbrella seen from above: a ribbed canopy (open 0…1) or a furled stick in the hand. */
+        const _sheens = new Map();
+        function _umbrellaSheen(R) {
+            const k = Math.round(R * 4) / 4; let g = _sheens.get(k);
+            if (!g) {
+                const c = (_sheens._c || (_sheens._c = document.createElement('canvas').getContext('2d')));
+                g = c.createRadialGradient(-k * 0.35, -k * 0.35, 0, 0, 0, k);
+                g.addColorStop(0, 'rgba(255,255,255,0.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+                _sheens.set(k, g);
+            }
+            return g;
+        }
         function drawUmbrella(ctx, cx, cy, handX, handY, open, u) {
             const color = u.color || '#1a1a1a', trim = u.trim || darkenHex(color, 40);
             if (open < 0.15) {                                                   // furled: a slim stick along the forearm
@@ -10591,9 +10618,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             ctx.fill();
             // Sheen on the upper panels, ribs, the tip
-            const sh = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, 0, cx, cy, R);
-            sh.addColorStop(0, 'rgba(255,255,255,0.22)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = sh; ctx.fill();
+            // (one gradient per canopy size, made once: shifted into place, the path stays where it was built)
+            const sh = _umbrellaSheen(R);
+            ctx.save(); ctx.translate(cx, cy); ctx.fillStyle = sh; ctx.fill(); ctx.restore();
             ctx.strokeStyle = trim; ctx.lineWidth = 0.7; ctx.beginPath();
             for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2; ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); }
             ctx.stroke();
@@ -21171,6 +21198,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * Draw the NPC with role-specific rendering.
              * Preserves all original visual styles exactly.
              */
+            /** Out of view (engine/draw.js culls it): what draw would have ticked — quips, the gait (footsteps) */
+            tickHidden() {
+                if (this.inCar || this.dead) return;
+                RenderStats.culled++;
+                if (this.quipText && ++this.quipAge >= this.quipDuration) { this.quipText = null; this.quipAge = 0; }
+                if (this.quipCooldown > 0) this.quipCooldown--;
+                syncHumanoidGait(this);
+            }
+
             draw(ctx, player) {
                 
                 if (this.inCar || this.dead) return;
@@ -22338,6 +22374,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
+            /** Out of view (PedestrianManager.draw culls it): what draw would have ticked — gait (footsteps), facing */
+            tickHidden() {
+                if (this.dead) return;
+                RenderStats.culled++;
+                syncHumanoidGait(this);
+                this.lastX = this.x; this.lastY = this.y;
+                this.angle = this.facingAngle;
+            }
+
             draw(ctx) {
                 if (this.dead) return;
                 
@@ -22599,7 +22644,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             draw(ctx, cb) {
                 for (let ped of this.pedestrians) {
-                    if (cb && (ped.x < cb.left || ped.x > cb.right || ped.y < cb.top || ped.y > cb.bottom)) continue;
+                    if (cb && (ped.x < cb.left || ped.x > cb.right || ped.y < cb.top || ped.y > cb.bottom)) { ped.tickHidden(); continue; }
                     ped.draw(ctx);
                 }
             }
@@ -22790,7 +22835,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             draw(ctx, cb) {
                 if (!this.walkers.length) return;
                 const t = _frameTime / 1000;
-                const list = this.walkers.filter(w => !cb || (w.x > cb.left && w.x < cb.right && w.y > cb.top && w.y < cb.bottom)).sort((a, b) => a.y - b.y);
+                // In view only (one reused list, sorted by depth); the rest keep their gait (footsteps) ticking
+                const list = this._drawList || (this._drawList = []); list.length = 0;
+                for (const w of this.walkers) { if (!cb || (w.x > cb.left && w.x < cb.right && w.y > cb.top && w.y < cb.bottom)) list.push(w); else { syncHumanoidGait(w); RenderStats.culled++; } }
+                list.sort(_byY);
                 for (const w of list) {
                     // Portal arrivals and departures: a violet-gold bloom that fades as they solidify
                     if (w.life < 1 && (w.from === 'portal' || w.exitKind === 'portal')) {
@@ -23106,7 +23154,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             draw(ctx, cb) {
                 if (!this.walkers.length) return;
-                const list = this.walkers.filter(w => w.life > 0.01 && (!cb || (w.x > cb.left && w.x < cb.right && w.y > cb.top && w.y < cb.bottom))).sort((a, b) => a.y - b.y);
+                // In view only (one reused list, sorted by depth); the rest keep their gait (footsteps) ticking
+                const list = this._drawList || (this._drawList = []); list.length = 0;
+                for (const w of this.walkers) { if (w.life <= 0.01) continue; if (!cb || (w.x > cb.left && w.x < cb.right && w.y > cb.top && w.y < cb.bottom)) list.push(w); else { syncHumanoidGait(w); RenderStats.culled++; } }
+                list.sort(_byY);
                 for (const w of list) {
                     ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle); ctx.globalAlpha = w.life;
                     drawProceduralHumanoid(ctx, w, { stance: 'idle', ...w.look });
@@ -40172,9 +40223,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.beginPath(); ctx.arc(hx, 0, 8.3, -1.25, 1.25); ctx.arc(hx + 1.2, 0, 5.2, 1.1, -1.1, true); ctx.closePath(); ctx.fill();
                     ctx.strokeStyle = c.tint || '#5a2a8a'; ctx.globalAlpha = 0.55; ctx.lineWidth = 0.7;
                     ctx.beginPath(); ctx.arc(hx, 0, 8.1, -1.1, 1.1); ctx.stroke(); ctx.globalAlpha = 1;
-                    ctx.fillStyle = c.eyes || '#e8c27a'; ctx.shadowColor = c.eyes || '#e8c27a'; ctx.shadowBlur = 3;
+                    // the slits' glow: a cached glow sprite under each (no shadowBlur: it ran every frame on her)
+                    const eye = c.eyes || '#e8c27a', a0 = ctx.globalAlpha;
+                    ctx.globalAlpha = a0 * 0.75;
+                    for (const s of [-1, 1]) drawGlow(ctx, hx + 6.2, s * 2.6, 3.4, eye, 0.3);
+                    ctx.globalAlpha = a0; ctx.fillStyle = eye;
                     for (const s of [-1, 1]) { ctx.save(); ctx.translate(hx + 6.2, s * 2.6); ctx.rotate(s * 0.35); ctx.fillRect(-0.45, -1.3, 0.9, 2.6); ctx.restore(); }
-                    ctx.shadowBlur = 0;
                 },
                     portrait(ctx, P, c) {
                         const { cx, cy, fw, fh, eyeY, eyeSpacing } = P, eyes = c.eyes || '#e8c27a';
@@ -41588,7 +41642,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
          * Draw a procedural character. Builds and height (ui/bodies.js) scale the body
          * frame here; a hovering android bobs over a soft glow.
          */
+        /** What the entity pass drew this frame, for the profiler (reset by draw.js; ms only while it's on, Full) */
+        const RenderStats = { bodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0 };
+
         function drawProceduralHumanoid(ctx, entity, config = {}) {
+            RenderStats.bodies++;
+            if (!RenderStats.timed) return _drawProceduralHumanoid(ctx, entity, config);
+            const t0 = performance.now();
+            try { return _drawProceduralHumanoid(ctx, entity, config); } finally { RenderStats.peopleMs += performance.now() - t0; }
+        }
+
+        function _drawProceduralHumanoid(ctx, entity, config = {}) {
             const S = bodyScale(config), A = androidLook(config.body);
             const hover = A && A.hover && !config.isDriving;
             if (!config.isDriving && _zoomLOD < 2) {
@@ -42369,10 +42433,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.stroke(); ctx.restore();
             }
             if (hitK > 0.05) {                                              // the flash of the hit
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                const fl = ctx.createRadialGradient(headX * 0.5, 0, 0, headX * 0.5, 0, 15);
-                fl.addColorStop(0, `rgba(255, 235, 235, ${0.45 * hitK})`); fl.addColorStop(1, 'rgba(255, 235, 235, 0)');
-                ctx.fillStyle = fl; ctx.beginPath(); ctx.arc(headX * 0.5, 0, 15, 0, Math.PI * 2); ctx.fill();
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';       // a cached glow (lightning flashes every body outdoors at once)
+                ctx.globalAlpha *= 0.45 * hitK; drawGlow(ctx, headX * 0.5, 0, 15, '255, 235, 235', 0);
                 ctx.restore();
             }
         
@@ -48844,6 +48906,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             T_STELLA: 1100,        // ms on Stella, twirling
             ZOOM_BODY: 1.6, ZOOM_STELLA: 1.8,
             CORPSES: 24, LIE: 12, FADE: 1.5,
+            SNAP_AFTER: 0.75, SNAP_R: 64, SNAP_Q: 3,   // a settled body becomes a still (radius in world px, supersampled ×Q)
             RAMP_IN: 150, RAMP_OUT: 600,   // ms: a hard brake on the kill, then time builds back on an S-curve
             CUT_OUT: 250                   // ms: back to speed when she acts (fires, flits) mid-finisher
         };
@@ -48858,6 +48921,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 C.push({ e, t0: _gameTimeSec, dir, kind: melee ? 'punch' : heavy ? 'heavy' : 'shot', weapon: e.equippedWeaponId || null,
                          spin: (Math.random() - 0.5) * (melee ? 1.2 : 0.4), seed: Math.random() * 10 });
                 while (C.length > FINISHER.CORPSES) C.shift();
+            },
+
+            /** A settled body, drawn once into its own small canvas (centred, unrotated: drawCorpses turns and stretches it) */
+            _snapCorpse(e, bx, by, facing, sx, sy) {
+                const R = FINISHER.SNAP_R, Q = FINISHER.SNAP_Q, cv = document.createElement('canvas');
+                cv.width = cv.height = R * 2 * Q;
+                const g = cv.getContext('2d'); if (!g) return null;
+                // Drawn exactly as on the street: this canvas stands in for the world (so its light, sun
+                // shadow, hair and cloth read their world position), turned and stretched the same way
+                g.setTransform(Q, 0, 0, Q, R * Q - bx * Q, R * Q - by * Q);
+                const wm = _worldMatrix, wc = _worldCanvas;
+                _worldMatrix = g.getTransform(); _worldCanvas = cv;
+                try {
+                    g.translate(bx, by); g.rotate(facing); g.scale(sx, sy);
+                    drawProceduralHumanoid(g, e, { ...e.look, stance: 'idle', pose: 'die', poseWhileMoving: true, poseInstant: true, weapon: null });
+                } catch (err) { return null; }
+                finally { _worldMatrix = wm; _worldCanvas = wc; }
+                return cv;
             },
 
             updateCorpses() {
@@ -48889,10 +48970,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             ctx.save(); ctx.translate(gx, gy); ctx.rotate(facing + 2.2 + c.seed);
                             drawWeapon(ctx, c.weapon, 0, 0, 0, 0.9, false); ctx.restore();
                         }
+                        e._corpseK = ease;
+                        const sx = 1 + 0.32 * ease, sy = 1 - 0.06 * ease;
+                        if (age > FINISHER.SNAP_AFTER) {
+                            // Settled: from here it's a still image — drawn once, in place, then stamped (one drawImage, not ~300 calls)
+                            const S = c.snap || (c.snap = this._snapCorpse(e, bx, by, facing, sx, sy));
+                            if (S) { const R = FINISHER.SNAP_R; ctx.drawImage(S, bx - R, by - R, R * 2, R * 2); ctx.restore(); continue; }
+                        }
                         ctx.translate(bx, by); ctx.rotate(facing);
                         // from above, a body lying back reads longer along its length and a touch narrower
-                        ctx.scale(1 + 0.32 * ease, 1 - 0.06 * ease);
-                        e._corpseK = ease;
+                        ctx.scale(sx, sy);
                         drawProceduralHumanoid(ctx, e, { ...e.look, stance: 'idle', pose: 'die', poseWhileMoving: true, poseInstant: true, weapon: null });
                     } else {
                         // generic: tip toward the fall, sink, and go
@@ -49946,6 +50033,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
                     this._prof.classList.toggle('full', mode === 'full');
+                    if (mode !== 'full') this._countCalls(false);                 // the call counter only lives in Full
                     this._report = null;
                 }
                 if (game.debugMode) this._ensureDbg();
@@ -49992,6 +50080,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._last = now;
                 if (!game.showProfiler && !game.debugMode) return;
                 this._times[this._ti] = dt; this._ti = (this._ti + 1) % this._times.length;
+                if (this._calls) { this._callTotal += RenderStats.calls; this._callFrames++; RenderStats.calls = 0; }
                 this._n++;
                 if (game.showProfiler && this._prof) {
                     if (this._n % 3 === 0) this._sparkStep(dt);
@@ -50039,6 +50128,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 });
                 html += `<div class="dp-counts">${this._countLine(game)}</div>`;
                 html += `<div class="dp-counts dp-audio">${this._audioLine()}</div>`;
+                html += `<div class="dp-counts">${this._renderLine()}</div>`;
                 this._rowsEl.innerHTML = html;
             },
 
@@ -50048,6 +50138,31 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * second, main-thread ms a second spent starting them, and, where Chrome reports it,
              * glitches (output underruns: the crackles and pops).
              */
+            /** Bodies drawn / culled this frame, and canvas calls a frame (counted only while Full is open) */
+            _renderLine() {
+                this._countCalls(true);
+                const n = this._callFrames ? Math.round(this._callTotal / this._callFrames) : 0;
+                this._callTotal = 0; this._callFrames = 0;
+                return `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span><span>canvas calls <b>${n.toLocaleString()}</b>/frame</span>`;
+            },
+
+            /** A counting shim on the 2D context's methods (Full profiler only; removed when it closes) */
+            _countCalls(on) {
+                const P = CanvasRenderingContext2D.prototype;
+                if (on && !this._calls) {
+                    this._calls = {}; this._callTotal = 0; this._callFrames = 0;
+                    for (const k of Object.getOwnPropertyNames(P)) {
+                        const d = Object.getOwnPropertyDescriptor(P, k);
+                        if (!d || typeof d.value !== 'function' || k === 'constructor') continue;
+                        const f = d.value; this._calls[k] = f;
+                        P[k] = function () { RenderStats.calls++; return f.apply(this, arguments); };
+                    }
+                } else if (!on && this._calls) {
+                    for (const k in this._calls) Object.getOwnPropertyDescriptor(P, k) && (P[k] = this._calls[k]);
+                    this._calls = null;
+                }
+            },
+
             _audioLine() {
                 if (typeof audioSys === 'undefined' || !audioSys.stats) return '';
                 const c = audioSys.ctx, S = audioSys.stats;
@@ -57706,6 +57821,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
                 // --- PROFILER START ---
                 this.profiler.beginFrame();
+                RenderStats.bodies = 0; RenderStats.culled = 0; RenderStats.peopleMs = 0;
+                RenderStats.timed = !!(this.showProfiler && GameSettings.profilerMode === 'full');
                 this.profiler.start('Render:Total');
                 this.profiler.markWrapper('Render:Total');
                 /* Render:Setup — the full-screen clear, camera transform, cull
@@ -57776,6 +57893,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     entities:     { left: camX - cullHalfW - CONFIG.CULLING.ENTITIES,      right: camX + cullHalfW + CONFIG.CULLING.ENTITIES,      top: camY - cullHalfH - CONFIG.CULLING.ENTITIES,      bottom: camY + cullHalfH + CONFIG.CULLING.ENTITIES },
                     world:        { left: camX - cullHalfW - CONFIG.CULLING.WORLD,         right: camX + cullHalfW + CONFIG.CULLING.WORLD,         top: camY - cullHalfH - CONFIG.CULLING.WORLD,         bottom: camY + cullHalfH + CONFIG.CULLING.WORLD }
                 };
+                // People and car bodies: the view itself (its real zoom, the finisher's push-in, the shake), not the 0.45 rect
+                {
+                    const vw = (this.canvas.width / 2) / viewZoom + Math.abs(this.camera.shakeX || 0), vh = (this.canvas.height / 2) / viewZoom + Math.abs(this.camera.shakeY || 0);
+                    const B = CONFIG.CULLING.BODIES, C = CONFIG.CULLING.CARS;
+                    cullBounds.bodies = { left: camX - vw - B, right: camX + vw + B, top: camY - vh - B, bottom: camY + vh + B };
+                    cullBounds.cars = { left: camX - vw - C, right: camX + vw + C, top: camY - vh - C, bottom: camY + vh + C };
+                }
+                this._cullBounds = cullBounds;
             
                 // --- DYNAMIC LOD (Zoom-Aware) ---
                 // Progressive quality reduction as camera zooms out.
@@ -58276,7 +58401,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Draw Traffic Cars
                 // PERFORMANCE: AABB viewport culling + distance LOD
                 {
-                    const cbV = cullBounds.vehicles;
+                    const cbV = cullBounds.cars;
                     this.traffic.vehicles.forEach(v => {
                         if (!v.visible) return;
                         if (v.x < cbV.left || v.x > cbV.right || v.y < cbV.top || v.y > cbV.bottom) return;
@@ -58342,7 +58467,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
                 this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
                 this.drawNoiseRipples(this.ctx);
-                this.drawCorpses(this.ctx, cullBounds.entities);         // the fallen, under the living (engine/finisher.js)
+                this.drawCorpses(this.ctx, cullBounds.bodies);           // the fallen, under the living (engine/finisher.js)
                 this.drawHunterDashes(this.ctx);                         // crimson flits (engine/palace-art.js)
                 this.drawExecuteCue(this.ctx);                           // a gold reticle under an unaware back (engine/executions.js)
                 
@@ -58353,19 +58478,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         if (l.x < cbE.left || l.x > cbE.right || l.y < cbE.top || l.y > cbE.bottom) return;
                         l.draw(this.ctx);
                     });
-                    this.npcs.forEach(n => {
-                        if (n.x < cbE.left || n.x > cbE.right || n.y < cbE.top || n.y > cbE.bottom) return;
+                    // People: only those in view are drawn; the rest still tick what their draw did (gait, quips)
+                    const cbB = cullBounds.bodies;
+                    for (const n of this.npcs) {
+                        if (n.x < cbB.left || n.x > cbB.right || n.y < cbB.top || n.y > cbB.bottom) { if (n.tickHidden) n.tickHidden(); continue; }
                         n.draw(this.ctx);
-                    });
+                    }
                     if (this.scenes && this.scenes.actors.length) this.scenes.drawActors(this.ctx);   // a scene's cast
-                    this.pedestrians.draw(this.ctx, cbE); // Roaming civilians
-                    this.lobbyLife.draw(this.ctx, cbE);    // Double Nights guests and staff
-                    this.clubLife.draw(this.ctx, cbE);     // Moon City's crowd
+                    this.pedestrians.draw(this.ctx, cbB); // Roaming civilians
+                    this.lobbyLife.draw(this.ctx, cbB);    // Double Nights guests and staff
+                    this.clubLife.draw(this.ctx, cbB);     // Moon City's crowd
                     if (this.furniture) this.furniture.draw(this.ctx);   // the hand's outline and side handles (engine/furniture.js)
-                    if (!(this.scenes && this.scenes.crewOffstage)) this.teammates.forEach(tm => {
-                        if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) return;
+                    if (!(this.scenes && this.scenes.crewOffstage)) for (const tm of this.teammates) {
+                        if (tm.x < cbB.left || tm.x > cbB.right || tm.y < cbB.top || tm.y > cbB.bottom) { if (tm.tickHidden) tm.tickHidden(); continue; }
                         tm.draw(this.ctx, this.player);
-                    });
+                    }
                     // Velvet Cat
                     if (this.velvetCat && this.velvetCat.visible && !this.velvetCat.inCar) {
                         this.velvetCat.draw(this.ctx);
@@ -58561,6 +58688,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 
+                const _topsT0 = RenderStats.timed ? performance.now() : 0;   // the world's top layers (profiler: Entities: World tops)
                 // Ferris Wheel BASE (legs/shadow — under building roofs)
                 if (this.activeMap.ferrisWheel) {
                     this.activeMap.ferrisWheel.drawBase(this.ctx);
@@ -58661,6 +58789,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     l.draw(this.ctx, this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight);
                 }); 
             
+                if (RenderStats.timed) {
+                    this.profiler.add('Entities: World tops', performance.now() - _topsT0, true);   // roofs, signs, foliage, lamps
+                    this.profiler.add('Entities: People', RenderStats.peopleMs, true);           // every body drawn
+                }
                 // 3. Draw projectiles and weather effects
                 this.projectiles.forEach(p => p.draw(this.ctx));
                 

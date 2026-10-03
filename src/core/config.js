@@ -172,6 +172,11 @@
                 HEADLIGHTS: 250,                // Vehicle headlight cones
                 VEHICLES: 300,                  // Traffic vehicles
                 ENTITIES: 200,                  // NPCs, enemies, pedestrians, loot
+                // Tight bounds from the real view (draw.js `bodies` / `cars`): people and car bodies are
+                // the costliest things drawn, and the wide rect above (sized for zoom 0.45) drew 2–3×
+                // the screen of them. Margins cover a body's shadow, held gun and bubble; a car's length.
+                BODIES: 70,
+                CARS: 160,
                 WORLD: 200,                     // Pavements, crosswalks, transitions, walls, floor zones
                 
                 // Entity Spawning (radial - unchanged)

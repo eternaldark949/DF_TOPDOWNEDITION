@@ -1054,7 +1054,17 @@
          * Draw a procedural character. Builds and height (ui/bodies.js) scale the body
          * frame here; a hovering android bobs over a soft glow.
          */
+        /** What the entity pass drew this frame, for the profiler (reset by draw.js; ms only while it's on, Full) */
+        const RenderStats = { bodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0 };
+
         function drawProceduralHumanoid(ctx, entity, config = {}) {
+            RenderStats.bodies++;
+            if (!RenderStats.timed) return _drawProceduralHumanoid(ctx, entity, config);
+            const t0 = performance.now();
+            try { return _drawProceduralHumanoid(ctx, entity, config); } finally { RenderStats.peopleMs += performance.now() - t0; }
+        }
+
+        function _drawProceduralHumanoid(ctx, entity, config = {}) {
             const S = bodyScale(config), A = androidLook(config.body);
             const hover = A && A.hover && !config.isDriving;
             if (!config.isDriving && _zoomLOD < 2) {
@@ -1835,10 +1845,8 @@
                 ctx.stroke(); ctx.restore();
             }
             if (hitK > 0.05) {                                              // the flash of the hit
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                const fl = ctx.createRadialGradient(headX * 0.5, 0, 0, headX * 0.5, 0, 15);
-                fl.addColorStop(0, `rgba(255, 235, 235, ${0.45 * hitK})`); fl.addColorStop(1, 'rgba(255, 235, 235, 0)');
-                ctx.fillStyle = fl; ctx.beginPath(); ctx.arc(headX * 0.5, 0, 15, 0, Math.PI * 2); ctx.fill();
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';       // a cached glow (lightning flashes every body outdoors at once)
+                ctx.globalAlpha *= 0.45 * hitK; drawGlow(ctx, headX * 0.5, 0, 15, '255, 235, 235', 0);
                 ctx.restore();
             }
         

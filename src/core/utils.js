@@ -44,6 +44,8 @@
 
         /** Stand-in for throwaway render proxies with no position (VFX silhouettes). */
         const _STATIC_GAIT = Object.freeze({ speed: 0, dirX: 1, dirY: 0 });
+        /** Depth order for a crowd's draw list (one shared comparator: no closure per frame) */
+        const _byY = (a, b) => a.y - b.y;
 
         function _ensureGait(entity) {
             let g = entity._gait;

@@ -468,9 +468,12 @@
                     ctx.beginPath(); ctx.arc(hx, 0, 8.3, -1.25, 1.25); ctx.arc(hx + 1.2, 0, 5.2, 1.1, -1.1, true); ctx.closePath(); ctx.fill();
                     ctx.strokeStyle = c.tint || '#5a2a8a'; ctx.globalAlpha = 0.55; ctx.lineWidth = 0.7;
                     ctx.beginPath(); ctx.arc(hx, 0, 8.1, -1.1, 1.1); ctx.stroke(); ctx.globalAlpha = 1;
-                    ctx.fillStyle = c.eyes || '#e8c27a'; ctx.shadowColor = c.eyes || '#e8c27a'; ctx.shadowBlur = 3;
+                    // the slits' glow: a cached glow sprite under each (no shadowBlur: it ran every frame on her)
+                    const eye = c.eyes || '#e8c27a', a0 = ctx.globalAlpha;
+                    ctx.globalAlpha = a0 * 0.75;
+                    for (const s of [-1, 1]) drawGlow(ctx, hx + 6.2, s * 2.6, 3.4, eye, 0.3);
+                    ctx.globalAlpha = a0; ctx.fillStyle = eye;
                     for (const s of [-1, 1]) { ctx.save(); ctx.translate(hx + 6.2, s * 2.6); ctx.rotate(s * 0.35); ctx.fillRect(-0.45, -1.3, 0.9, 2.6); ctx.restore(); }
-                    ctx.shadowBlur = 0;
                 },
                     portrait(ctx, P, c) {
                         const { cx, cy, fw, fh, eyeY, eyeSpacing } = P, eyes = c.eyes || '#e8c27a';

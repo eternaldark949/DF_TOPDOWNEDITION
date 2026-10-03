@@ -34,6 +34,7 @@
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
                     this._prof.classList.toggle('full', mode === 'full');
+                    if (mode !== 'full') this._countCalls(false);                 // the call counter only lives in Full
                     this._report = null;
                 }
                 if (game.debugMode) this._ensureDbg();
@@ -80,6 +81,7 @@
                 this._last = now;
                 if (!game.showProfiler && !game.debugMode) return;
                 this._times[this._ti] = dt; this._ti = (this._ti + 1) % this._times.length;
+                if (this._calls) { this._callTotal += RenderStats.calls; this._callFrames++; RenderStats.calls = 0; }
                 this._n++;
                 if (game.showProfiler && this._prof) {
                     if (this._n % 3 === 0) this._sparkStep(dt);
@@ -127,6 +129,7 @@
                 });
                 html += `<div class="dp-counts">${this._countLine(game)}</div>`;
                 html += `<div class="dp-counts dp-audio">${this._audioLine()}</div>`;
+                html += `<div class="dp-counts">${this._renderLine()}</div>`;
                 this._rowsEl.innerHTML = html;
             },
 
@@ -136,6 +139,31 @@
              * second, main-thread ms a second spent starting them, and, where Chrome reports it,
              * glitches (output underruns: the crackles and pops).
              */
+            /** Bodies drawn / culled this frame, and canvas calls a frame (counted only while Full is open) */
+            _renderLine() {
+                this._countCalls(true);
+                const n = this._callFrames ? Math.round(this._callTotal / this._callFrames) : 0;
+                this._callTotal = 0; this._callFrames = 0;
+                return `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span><span>canvas calls <b>${n.toLocaleString()}</b>/frame</span>`;
+            },
+
+            /** A counting shim on the 2D context's methods (Full profiler only; removed when it closes) */
+            _countCalls(on) {
+                const P = CanvasRenderingContext2D.prototype;
+                if (on && !this._calls) {
+                    this._calls = {}; this._callTotal = 0; this._callFrames = 0;
+                    for (const k of Object.getOwnPropertyNames(P)) {
+                        const d = Object.getOwnPropertyDescriptor(P, k);
+                        if (!d || typeof d.value !== 'function' || k === 'constructor') continue;
+                        const f = d.value; this._calls[k] = f;
+                        P[k] = function () { RenderStats.calls++; return f.apply(this, arguments); };
+                    }
+                } else if (!on && this._calls) {
+                    for (const k in this._calls) Object.getOwnPropertyDescriptor(P, k) && (P[k] = this._calls[k]);
+                    this._calls = null;
+                }
+            },
+
             _audioLine() {
                 if (typeof audioSys === 'undefined' || !audioSys.stats) return '';
                 const c = audioSys.ctx, S = audioSys.stats;

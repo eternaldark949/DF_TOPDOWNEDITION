@@ -20,6 +20,7 @@
             T_STELLA: 1100,        // ms on Stella, twirling
             ZOOM_BODY: 1.6, ZOOM_STELLA: 1.8,
             CORPSES: 24, LIE: 12, FADE: 1.5,
+            SNAP_AFTER: 0.75, SNAP_R: 64, SNAP_Q: 3,   // a settled body becomes a still (radius in world px, supersampled ×Q)
             RAMP_IN: 150, RAMP_OUT: 600,   // ms: a hard brake on the kill, then time builds back on an S-curve
             CUT_OUT: 250                   // ms: back to speed when she acts (fires, flits) mid-finisher
         };
@@ -34,6 +35,24 @@
                 C.push({ e, t0: _gameTimeSec, dir, kind: melee ? 'punch' : heavy ? 'heavy' : 'shot', weapon: e.equippedWeaponId || null,
                          spin: (Math.random() - 0.5) * (melee ? 1.2 : 0.4), seed: Math.random() * 10 });
                 while (C.length > FINISHER.CORPSES) C.shift();
+            },
+
+            /** A settled body, drawn once into its own small canvas (centred, unrotated: drawCorpses turns and stretches it) */
+            _snapCorpse(e, bx, by, facing, sx, sy) {
+                const R = FINISHER.SNAP_R, Q = FINISHER.SNAP_Q, cv = document.createElement('canvas');
+                cv.width = cv.height = R * 2 * Q;
+                const g = cv.getContext('2d'); if (!g) return null;
+                // Drawn exactly as on the street: this canvas stands in for the world (so its light, sun
+                // shadow, hair and cloth read their world position), turned and stretched the same way
+                g.setTransform(Q, 0, 0, Q, R * Q - bx * Q, R * Q - by * Q);
+                const wm = _worldMatrix, wc = _worldCanvas;
+                _worldMatrix = g.getTransform(); _worldCanvas = cv;
+                try {
+                    g.translate(bx, by); g.rotate(facing); g.scale(sx, sy);
+                    drawProceduralHumanoid(g, e, { ...e.look, stance: 'idle', pose: 'die', poseWhileMoving: true, poseInstant: true, weapon: null });
+                } catch (err) { return null; }
+                finally { _worldMatrix = wm; _worldCanvas = wc; }
+                return cv;
             },
 
             updateCorpses() {
@@ -65,10 +84,16 @@
                             ctx.save(); ctx.translate(gx, gy); ctx.rotate(facing + 2.2 + c.seed);
                             drawWeapon(ctx, c.weapon, 0, 0, 0, 0.9, false); ctx.restore();
                         }
+                        e._corpseK = ease;
+                        const sx = 1 + 0.32 * ease, sy = 1 - 0.06 * ease;
+                        if (age > FINISHER.SNAP_AFTER) {
+                            // Settled: from here it's a still image — drawn once, in place, then stamped (one drawImage, not ~300 calls)
+                            const S = c.snap || (c.snap = this._snapCorpse(e, bx, by, facing, sx, sy));
+                            if (S) { const R = FINISHER.SNAP_R; ctx.drawImage(S, bx - R, by - R, R * 2, R * 2); ctx.restore(); continue; }
+                        }
                         ctx.translate(bx, by); ctx.rotate(facing);
                         // from above, a body lying back reads longer along its length and a touch narrower
-                        ctx.scale(1 + 0.32 * ease, 1 - 0.06 * ease);
-                        e._corpseK = ease;
+                        ctx.scale(sx, sy);
                         drawProceduralHumanoid(ctx, e, { ...e.look, stance: 'idle', pose: 'die', poseWhileMoving: true, poseInstant: true, weapon: null });
                     } else {
                         // generic: tip toward the fall, sink, and go

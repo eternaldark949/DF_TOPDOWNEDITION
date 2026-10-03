@@ -23,8 +23,17 @@
         /** Normalize an angle difference to [-PI, PI]. */
         function normalizeAngle(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
         
-        /** Darken a hex color by an absolute RGB amount (0-255). */
+        /** Darken a hex color by an absolute RGB amount (0-255). Cached: bodies ask for the same few every frame. */
+        const _darkenCache = new Map();
         function darkenHex(hex, amount) {
+            const key = hex + '|' + amount, hit = _darkenCache.get(key);
+            if (hit !== undefined) return hit;
+            const out = _darkenHexRaw(hex, amount);
+            if (_darkenCache.size > 4096) _darkenCache.clear();
+            _darkenCache.set(key, out);
+            return out;
+        }
+        function _darkenHexRaw(hex, amount) {
             hex = hex.replace('#', '');
             if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];   // '#222' → '222222'
             const r = clamp(parseInt(hex.substr(0, 2), 16) - amount, 0, 255);
