@@ -306,6 +306,7 @@
                             let topSpeed = this.speed;  // cruise (TEAMMATE_SPEED, 3.5)
                             if (dist > C.CATCHUP_DISTANCE) topSpeed = C.CATCHUP_SPEED;
                             else if (dist > C.MATCH_DISTANCE) topSpeed = C.MATCH_SPEED;
+                            if (game && game.crewSneaking && game.crewSneaking()) topSpeed *= SNEAK.SPEED;   // creeping with her
                             // Proportional approach: step shrinks as we near the target,
                             // capped by the chosen speed. This is what kills the wiggle.
                             // Straight when clear, otherwise along a nav-grid path; soft arrival either way
@@ -388,6 +389,7 @@
                 let minDist = range;
                 for (let e of enemies) {
                     if (e.dead) continue;
+                    if (game && game.crewMayEngage && !game.crewMayEngage(e)) continue;   // sneaking with her: hold fire on the unaware
                     const d = Math.hypot(this.x - e.x, this.y - e.y);
                     if (d < minDist && (!needsEyeline || hasShotLine(this.x, this.y, e.x, e.y, game.activeMap))) { minDist = d; nearest = e; }
                 }
@@ -727,6 +729,8 @@
                 // Determine stance from combat state (only active when recruited)
                 const inCombat = this.recruited && (this.cooldown > 0 || (this.shotsLeftInBurst < this.burstSize));
                 const weaponId = this.recruited ? this.equippedWeaponId : null;
+                const g = typeof game !== 'undefined' ? game : null;
+                const crouch = !!(this.recruited && !this.inCar && g && g.crewSneaking && g.crewSneaking() && g.activeMap && g.activeMap.id !== 'apt_949');
                 
                 drawProceduralHumanoid(ctx, this, {
                     ...app,
@@ -735,7 +739,8 @@
                     // Stance fits the weapon (rifles/snipers two-handed); ability users cast
                     // with an extended hand. Recoil is a real kick from the last shot.
                     stance: inCombat ? stanceForWeapon(weaponId) : 'idle',
-                    pose: this._idlePose || app.pose || undefined,   // e.g. Yenna's crossed arms at the apartment
+                    pose: this._idlePose || app.pose || (crouch ? 'sneak' : undefined),   // e.g. Yenna's crossed arms at the apartment; low when sneaking with her
+                    poseWhileMoving: crouch && !this._idlePose && !app.pose,
                     kick: inCombat ? shotKick(this) : 0,
                     weapon: weaponId ? { id: weaponId, ready: inCombat } : null,
                     top:    app.top    || { type: 'suit', color: '#2a0a3a' },

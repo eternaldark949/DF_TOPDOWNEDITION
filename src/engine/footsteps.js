@@ -81,7 +81,7 @@
                 const pace = Math.min(1, speed / 3);
                 if (typeof ambience !== 'undefined' && ambience.footstep) {
                     const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z;
-                    ambience.footstep(shoe, mat, { gain: isHer ? (this.sneaking ? 0.2 : 0.4 + 0.6 * pace) : 0.3 + 0.4 * pace, wet, near: isHer ? 1 : Math.max(0, 1 - d / 520) * 0.75, pan: isHer ? 0 : (e.x - pl.x) / Math.max(200, hw) });
+                    ambience.footstep(shoe, mat, { gain: isHer ? (this.sneaking ? 0.2 : 0.4 + 0.6 * pace) : (0.3 + 0.4 * pace) * (this.sneaking && this.teammates && this.teammates.includes(e) ? 0.4 : 1), wet, near: isHer ? 1 : Math.max(0, 1 - d / 520) * 0.75, pan: isHer ? 0 : (e.x - pl.x) / Math.max(200, hw) });
                 }
                 if (isHer) {
                     // her steps carry: shoe × floor × pace; a puddle gives her away (with a small ring)

@@ -469,6 +469,7 @@
                 // Gunfire carries: gangers in earshot come to look (engine/noise.js)
                 { const N = CONFIG.NOISE, id = (this.currentWeapon && this.currentWeapon.id) || '';
                   this.emitNoise(this.player.x, this.player.y, isSniperVisual || id.includes('sniper') ? N.sniper : id.includes('rifle') ? N.rifle : N.pistol, 'shot'); }
+                this._loudUntil = _gameTimeSec + 10;                     // she's fired: the crew is weapons free (engine/sneak.js)
 
                 // 5. Spawn Muzzle Flash
                 this.muzzleFlashes.push({ 

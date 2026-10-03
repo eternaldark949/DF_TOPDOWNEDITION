@@ -6319,7 +6319,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const range = companionRange(tm);
             let target = null, best = range + N.ENGAGE_RANGE_BONUS;
             for (const e of game.enemies) {
-                if (e.dead) continue;
+                if (e.dead || (game.crewMayEngage && !game.crewMayEngage(e))) continue;   // sneaking: no flanking the unaware
                 const d = Math.hypot(e.x - tm.x, e.y - tm.y);
                 if (d < best) { best = d; target = e; }
             }
@@ -20936,6 +20936,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             let topSpeed = this.speed;  // cruise (TEAMMATE_SPEED, 3.5)
                             if (dist > C.CATCHUP_DISTANCE) topSpeed = C.CATCHUP_SPEED;
                             else if (dist > C.MATCH_DISTANCE) topSpeed = C.MATCH_SPEED;
+                            if (game && game.crewSneaking && game.crewSneaking()) topSpeed *= SNEAK.SPEED;   // creeping with her
                             // Proportional approach: step shrinks as we near the target,
                             // capped by the chosen speed. This is what kills the wiggle.
                             // Straight when clear, otherwise along a nav-grid path; soft arrival either way
@@ -21018,6 +21019,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let minDist = range;
                 for (let e of enemies) {
                     if (e.dead) continue;
+                    if (game && game.crewMayEngage && !game.crewMayEngage(e)) continue;   // sneaking with her: hold fire on the unaware
                     const d = Math.hypot(this.x - e.x, this.y - e.y);
                     if (d < minDist && (!needsEyeline || hasShotLine(this.x, this.y, e.x, e.y, game.activeMap))) { minDist = d; nearest = e; }
                 }
@@ -21357,6 +21359,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Determine stance from combat state (only active when recruited)
                 const inCombat = this.recruited && (this.cooldown > 0 || (this.shotsLeftInBurst < this.burstSize));
                 const weaponId = this.recruited ? this.equippedWeaponId : null;
+                const g = typeof game !== 'undefined' ? game : null;
+                const crouch = !!(this.recruited && !this.inCar && g && g.crewSneaking && g.crewSneaking() && g.activeMap && g.activeMap.id !== 'apt_949');
                 
                 drawProceduralHumanoid(ctx, this, {
                     ...app,
@@ -21365,7 +21369,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Stance fits the weapon (rifles/snipers two-handed); ability users cast
                     // with an extended hand. Recoil is a real kick from the last shot.
                     stance: inCombat ? stanceForWeapon(weaponId) : 'idle',
-                    pose: this._idlePose || app.pose || undefined,   // e.g. Yenna's crossed arms at the apartment
+                    pose: this._idlePose || app.pose || (crouch ? 'sneak' : undefined),   // e.g. Yenna's crossed arms at the apartment; low when sneaking with her
+                    poseWhileMoving: crouch && !this._idlePose && !app.pose,
                     kick: inCombat ? shotKick(this) : 0,
                     weapon: weaponId ? { id: weaponId, ready: inCombat } : null,
                     top:    app.top    || { type: 'suit', color: '#2a0a3a' },
@@ -48206,6 +48211,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Gunfire carries: gangers in earshot come to look (engine/noise.js)
                 { const N = CONFIG.NOISE, id = (this.currentWeapon && this.currentWeapon.id) || '';
                   this.emitNoise(this.player.x, this.player.y, isSniperVisual || id.includes('sniper') ? N.sniper : id.includes('rifle') ? N.rifle : N.pistol, 'shot'); }
+                this._loudUntil = _gameTimeSec + 10;                     // she's fired: the crew is weapons free (engine/sneak.js)
 
                 // 5. Spawn Muzzle Flash
                 this.muzzleFlashes.push({ 
@@ -49576,7 +49582,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const pace = Math.min(1, speed / 3);
                 if (typeof ambience !== 'undefined' && ambience.footstep) {
                     const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z;
-                    ambience.footstep(shoe, mat, { gain: isHer ? (this.sneaking ? 0.2 : 0.4 + 0.6 * pace) : 0.3 + 0.4 * pace, wet, near: isHer ? 1 : Math.max(0, 1 - d / 520) * 0.75, pan: isHer ? 0 : (e.x - pl.x) / Math.max(200, hw) });
+                    ambience.footstep(shoe, mat, { gain: isHer ? (this.sneaking ? 0.2 : 0.4 + 0.6 * pace) : (0.3 + 0.4 * pace) * (this.sneaking && this.teammates && this.teammates.includes(e) ? 0.4 : 1), wet, near: isHer ? 1 : Math.max(0, 1 - d / 520) * 0.75, pan: isHer ? 0 : (e.x - pl.x) / Math.max(200, hw) });
                 }
                 if (isHer) {
                     // her steps carry: shoe × floor × pace; a puddle gives her away (with a small ring)
@@ -49823,6 +49829,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // moves at 55%. Her steps carry a third as far (a puddle still splashes, a little), she's
         // a quarter harder to make out, and an unaware back is hers to take (engine/executions.js).
         // Driving, a scene or the furniture ends it.
+        //
+        // The crew sneaks with her: they crouch, keep her pace, close up behind her, and hold
+        // fire on anyone who hasn't noticed them (crewMayEngage) — until it goes loud: a guard
+        // turns ALERT (they fire on the aware ones), or she fires (weapons free for 10 s).
 
         const SNEAK = { SPEED: 0.55, STEP_NOISE: 0.35, PUDDLE_NOISE: 0.6, VISIBILITY: 0.75 };
 
@@ -49836,6 +49846,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 document.body.classList.toggle('sneaking', on);
             },
             toggleSneak() { this.setSneak(!this.sneaking); },
+
+            /** The crew's half of it: sneaking with her (pace, crouch, quiet steps)? */
+            crewSneaking() { return !!this.sneaking && !this.isDriving; },
+
+            /** May the crew shoot at (or move to a firing spot on) this enemy? Quiet: only the aware ones. */
+            crewMayEngage(e) {
+                if (!this.sneaking || _gameTimeSec < (this._loudUntil || 0)) return true;
+                return e.state === undefined || e.state === 'ALERT' || e.state === 'SUPPRESSING';
+            },
 
             /** Once per tick: what ends a sneak, and the speed it allows */
             updateSneak() {
@@ -56475,7 +56494,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     t => t.recruited && !t.downed && !t.inCar
                 );
                 const formationN = activeFormation.length;
-                const formationRadius = CONFIG.COMPANION.FORMATION_RADIUS;
+                // sneaking: they close up behind her (eased, so the slots don't jump)
+                this._formR = (this._formR ?? CONFIG.COMPANION.FORMATION_RADIUS) + ((this.crewSneaking() ? 48 : CONFIG.COMPANION.FORMATION_RADIUS) - (this._formR ?? CONFIG.COMPANION.FORMATION_RADIUS)) * 0.08;
+                const formationRadius = this._formR;
                 const baseAngle = CONFIG.COMPANION.FORMATION_FOLLOW_FACING
                     ? (this.player.angle + Math.PI)  // +π = behind player
                     : 0;
@@ -56581,7 +56602,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             // Repositioning for a clear shot — nav-grid path to the spot
                             const C = CONFIG.COMPANION;
                             const dSpot = Math.hypot(eyelineSpot.x - tm.x, eyelineSpot.y - tm.y);
-                            const topSpeed = dSpot > C.CATCHUP_DISTANCE ? C.CATCHUP_SPEED : (dSpot > C.MATCH_DISTANCE ? C.MATCH_SPEED : C.CONTRACT_SPEED);
+                            const topSpeed = (dSpot > C.CATCHUP_DISTANCE ? C.CATCHUP_SPEED : (dSpot > C.MATCH_DISTANCE ? C.MATCH_SPEED : C.CONTRACT_SPEED)) * (this.crewSneaking() ? SNEAK.SPEED : 1);
                             companionNavStep(tm, eyelineSpot.x, eyelineSpot.y, topSpeed, this);
                         } else if (tm._formationSlot) {
                             // Soft arrival on slot via smartMove (which still does
@@ -56595,6 +56616,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             let topSpeed = C.CONTRACT_SPEED;  // cruise
                             if (distSlot > C.CATCHUP_DISTANCE) topSpeed = C.CATCHUP_SPEED;
                             else if (distSlot > C.MATCH_DISTANCE) topSpeed = C.MATCH_SPEED;
+                            if (this.crewSneaking()) topSpeed *= SNEAK.SPEED;                   // creeping with her
                             if (distSlot > C.FORMATION_DEADZONE) {
                                 // smartMove uses its own internal stop-at-60 check, so
                                 // for short approaches we step directly. This avoids

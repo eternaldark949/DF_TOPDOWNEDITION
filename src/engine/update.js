@@ -432,7 +432,9 @@
                     t => t.recruited && !t.downed && !t.inCar
                 );
                 const formationN = activeFormation.length;
-                const formationRadius = CONFIG.COMPANION.FORMATION_RADIUS;
+                // sneaking: they close up behind her (eased, so the slots don't jump)
+                this._formR = (this._formR ?? CONFIG.COMPANION.FORMATION_RADIUS) + ((this.crewSneaking() ? 48 : CONFIG.COMPANION.FORMATION_RADIUS) - (this._formR ?? CONFIG.COMPANION.FORMATION_RADIUS)) * 0.08;
+                const formationRadius = this._formR;
                 const baseAngle = CONFIG.COMPANION.FORMATION_FOLLOW_FACING
                     ? (this.player.angle + Math.PI)  // +π = behind player
                     : 0;
@@ -538,7 +540,7 @@
                             // Repositioning for a clear shot — nav-grid path to the spot
                             const C = CONFIG.COMPANION;
                             const dSpot = Math.hypot(eyelineSpot.x - tm.x, eyelineSpot.y - tm.y);
-                            const topSpeed = dSpot > C.CATCHUP_DISTANCE ? C.CATCHUP_SPEED : (dSpot > C.MATCH_DISTANCE ? C.MATCH_SPEED : C.CONTRACT_SPEED);
+                            const topSpeed = (dSpot > C.CATCHUP_DISTANCE ? C.CATCHUP_SPEED : (dSpot > C.MATCH_DISTANCE ? C.MATCH_SPEED : C.CONTRACT_SPEED)) * (this.crewSneaking() ? SNEAK.SPEED : 1);
                             companionNavStep(tm, eyelineSpot.x, eyelineSpot.y, topSpeed, this);
                         } else if (tm._formationSlot) {
                             // Soft arrival on slot via smartMove (which still does
@@ -552,6 +554,7 @@
                             let topSpeed = C.CONTRACT_SPEED;  // cruise
                             if (distSlot > C.CATCHUP_DISTANCE) topSpeed = C.CATCHUP_SPEED;
                             else if (distSlot > C.MATCH_DISTANCE) topSpeed = C.MATCH_SPEED;
+                            if (this.crewSneaking()) topSpeed *= SNEAK.SPEED;                   // creeping with her
                             if (distSlot > C.FORMATION_DEADZONE) {
                                 // smartMove uses its own internal stop-at-60 check, so
                                 // for short approaches we step directly. This avoids

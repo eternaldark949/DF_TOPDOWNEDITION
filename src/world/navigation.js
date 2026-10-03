@@ -339,7 +339,7 @@
             const range = companionRange(tm);
             let target = null, best = range + N.ENGAGE_RANGE_BONUS;
             for (const e of game.enemies) {
-                if (e.dead) continue;
+                if (e.dead || (game.crewMayEngage && !game.crewMayEngage(e))) continue;   // sneaking: no flanking the unaware
                 const d = Math.hypot(e.x - tm.x, e.y - tm.y);
                 if (d < best) { best = d; target = e; }
             }
