@@ -1,0 +1,117 @@
+        /* =====================================================================
+           SHOPS — Dr. Yin's augments, the workbench, Torque, Neural Systems and
+           Zib.ME share one frame in the dossier scheme (--df-*, dossier.css cards,
+           chips, tabs and buttons). Markup: index.html (.df-shop); renderers:
+           engine/screens-ui.js, engine/shops-menus.js.
+           ===================================================================== */
+        .df-shop {
+            position: fixed; inset: 0; z-index: 300; display: none;
+            align-items: center; justify-content: center; padding: 18px; box-sizing: border-box;
+            background:
+                radial-gradient(ellipse 55% 45% at 50% 0%, var(--df-wine), transparent 70%),
+                radial-gradient(ellipse 50% 60% at 45% 100%, rgba(40, 4, 30, 0.6), transparent 70%),
+                rgba(5, 1, 3, 0.93);
+            font-family: var(--font-ui); color: #e6dff0;
+            animation: df-shop-in 0.22s ease-out;
+        }
+        .df-shop.open { display: flex; }
+        @keyframes df-shop-in { from { opacity: 0; } to { opacity: 1; } }
+        .df-shop-panel {
+            position: relative; width: min(760px, 100%); max-height: 100%; display: flex; flex-direction: column;
+            border-radius: 28px; border: 2px dotted rgba(202, 176, 250, 0.35);
+            background: linear-gradient(170deg, rgba(14, 4, 12, 0.96) 0%, rgba(10, 3, 22, 0.94) 60%, rgba(24, 6, 52, 0.9) 100%);
+            box-shadow: 0 0 40px rgba(93, 20, 226, 0.25), inset 0 0 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+        .df-shop.narrow .df-shop-panel { width: min(540px, 100%); }
+
+        /* Header: script title, small caps line, the balance capsule */
+        .df-shop-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; padding: 16px 24px 10px; flex-shrink: 0;
+            border-bottom: 1px solid transparent;
+            border-image: linear-gradient(90deg, transparent, rgba(216, 198, 162, 0.45) 12%, rgba(255, 255, 255, 0.4) 50%, rgba(216, 198, 162, 0.45) 88%, transparent) 1; }
+        .df-shop-titles { min-width: 0; }
+        .df-shop-title { font: 400 2.3rem var(--font-script); line-height: 1; color: var(--df-lavender-pale);
+            text-shadow: 0 0 14px rgba(202, 176, 250, 0.55), 0 0 2px rgba(255, 255, 255, 0.6); white-space: nowrap; }
+        .df-shop-sub { font: 600 0.56rem var(--font-ui); letter-spacing: 3.5px; text-transform: uppercase; color: var(--df-champagne); margin-top: 6px; }
+        .df-shop-balance { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px;
+            border: 1px solid rgba(255, 194, 72, 0.55); background: rgba(40, 24, 8, 0.55);
+            font: 700 0.78rem var(--font-ui); letter-spacing: 1px; color: var(--df-gold); text-shadow: 0 0 8px rgba(255, 194, 72, 0.35); }
+        .df-shop-balance .gem { font-size: 0.55rem; text-shadow: 0 0 6px rgba(255, 194, 72, 0.9); }
+        .df-shop-balance .unit { font-size: 0.56rem; letter-spacing: 2px; color: var(--df-champagne); }
+        .df-shop-balance.scrap { border-color: rgba(185, 174, 196, 0.6); background: rgba(20, 16, 28, 0.6); color: var(--df-lavender-pale); text-shadow: none; }
+        .df-shop-balance.scrap .gem { color: var(--df-lilac-grey); text-shadow: none; }
+
+        .df-shop .df-tabs { margin: 10px 14px 0; flex-shrink: 0; }
+        .df-shop-tabs-scroll { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; justify-content: flex-start; padding-bottom: 2px; }
+        .df-shop-tabs-scroll::-webkit-scrollbar { display: none; }
+        .df-shop-tabs-scroll .df-tab { flex-shrink: 0; }
+
+        .df-shop-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 22px 14px; scrollbar-width: thin; scrollbar-color: rgba(202, 176, 250, 0.35) transparent; }
+        .df-shop-body::-webkit-scrollbar { width: 6px; }
+        .df-shop-body::-webkit-scrollbar-thumb { background: rgba(202, 176, 250, 0.3); border-radius: 3px; }
+        .df-shop-foot { flex-shrink: 0; display: flex; justify-content: center; padding: 10px 16px 16px; }
+        .df-shop-foot .screen-back-btn { min-width: 160px; }
+
+        /* Cards in a shop: the price / action column on the right */
+        .df-shop .df-card { margin-bottom: 9px; }
+        .df-shop .df-card .df-head { align-items: center; }
+        .df-shop-side { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; flex-shrink: 0; }
+        .df-price { font: 700 0.8rem var(--font-ui); letter-spacing: 1px; color: var(--df-gold); white-space: nowrap; }
+        .df-price .unit { font-size: 0.55rem; letter-spacing: 2px; color: var(--df-champagne); margin-left: 3px; }
+        .df-price.short { color: #ff8a92; }
+        .df-price.short .unit { color: #ff8a92; opacity: 0.8; }
+        .df-card.lit .df-price { color: #7a4d06; } .df-card.lit .df-price .unit { color: #7d5bbd; }
+        .df-shop .df-card.bought { animation: df-bought 0.75s ease-out; }
+        @keyframes df-bought { 0% { box-shadow: 0 0 0 rgba(255, 194, 72, 0); } 30% { box-shadow: 0 0 34px rgba(255, 194, 72, 0.75); border-color: var(--df-gold); } 100% { box-shadow: 0 0 0 rgba(255, 194, 72, 0); } }
+        .df-shop .df-card.unaffordable .title { opacity: 0.75; }
+        .df-shop .df-btn[disabled] { opacity: 0.4; cursor: default; box-shadow: none; }
+        .df-shop .df-btn.small { padding: 5px 13px; font-size: 0.55rem; letter-spacing: 2px; }
+        .df-btn-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+
+        /* Swatches (Neural Systems, Torque) */
+        .df-swatch { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; border: 2px solid rgba(255, 255, 255, 0.25); box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.35); }
+        .df-swatch.sq { border-radius: 9px; }
+        .df-swatch.small { width: 12px; height: 12px; border-width: 1px; vertical-align: middle; display: inline-block; }
+        .df-swatches { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 6px; }
+        .df-swatch-pick { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px dotted rgba(255, 255, 255, 0.35); padding: 0;
+            font: 700 0.7rem var(--font-ui); color: var(--df-lilac-grey); transition: transform 0.15s, box-shadow 0.2s; }
+        .df-swatch-pick:hover { transform: scale(1.08); }
+        .df-swatch-pick.on { border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(202, 176, 250, 0.55), 0 0 14px rgba(202, 176, 250, 0.6); }
+        .df-swatch-pick.sq { border-radius: 10px; }
+        .df-chip.pick { cursor: pointer; }
+        .df-chip .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+        /* Torque's car preview */
+        .df-car-preview { display: flex; align-items: center; gap: 22px; }
+        .df-car { position: relative; width: 104px; height: 50px; border-radius: 14px 18px 10px 10px; border: 1px solid rgba(255, 255, 255, 0.2); flex-shrink: 0;
+            box-shadow: inset 0 -8px 14px rgba(0, 0, 0, 0.35), inset 0 6px 10px rgba(255, 255, 255, 0.12); }
+        .df-car::before { content: ''; position: absolute; left: 30%; right: 22%; top: 9px; bottom: 9px; border-radius: 8px; background: rgba(20, 16, 40, 0.75); box-shadow: inset 0 0 6px rgba(160, 180, 255, 0.35); }
+        .df-car .glow { position: absolute; bottom: -6px; left: 8px; right: 8px; height: 5px; border-radius: 3px; }
+        .df-car .lamp { position: absolute; right: -3px; width: 7px; height: 7px; border-radius: 50%; }
+
+        @media (max-width: 700px) {
+            .df-shop { padding: 8px; }
+            .df-shop-panel { border-radius: 22px; }
+            .df-shop-head { padding: 12px 16px 8px; flex-wrap: wrap; }
+            .df-shop-title { font-size: 1.9rem; }
+            .df-shop-body { padding: 6px 10px 12px; }
+            .df-shop .df-card { padding: 11px 13px; }
+            .df-shop .df-card .df-head { flex-wrap: nowrap; }
+            .df-shop .df-card .df-head > .grow { min-width: 0; }
+            .df-shop .note-ico { width: 38px; height: 38px; font-size: 1.2rem; }
+            .df-shop .df-tab { padding: 7px 14px; letter-spacing: 2.5px; }
+        }
+        /* Landscape phones: a shorter header, the back pill beside the title */
+        body.landscape .df-shop { padding: 6px 10px; }
+        body.landscape .df-shop-head { padding: 8px 18px 6px; }
+        body.landscape .df-shop-title { font-size: 1.6rem; }
+        body.landscape .df-shop-sub { margin-top: 3px; }
+        body.landscape .df-shop .df-tabs { margin-top: 6px; margin-bottom: 8px; }
+        body.landscape .df-shop-head { padding-right: 150px; align-items: center; }                     /* room for the back pill, up here */
+        body.landscape .df-shop-foot { position: absolute; top: 12px; right: 16px; padding: 0; z-index: 2; }
+        body.landscape .df-shop-foot .screen-back-btn { height: 32px; min-width: 118px; padding: 0 16px; font-size: 0.62rem; letter-spacing: 2px; }
+        body.landscape .df-shop-body { padding-bottom: 10px; }
+        body.landscape .df-shop .df-card { padding: 10px 16px; }
+        body.landscape .df-shop .df-section { margin: 12px 0 8px; }
+        body.landscape .df-shop .df-section:first-child { margin-top: 4px; }
+        body.landscape .df-shop-panel { width: min(860px, 100%); }

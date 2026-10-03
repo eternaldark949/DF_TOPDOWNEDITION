@@ -14,35 +14,38 @@
 </head>
 <body>
 
-    <!-- AUGMENT SHOP (Dr. Yin's) -->
-    <div id="augment-shop">
-        <div class="aug-shop-title">CYBERNETIC AUGMENTS</div>
-        <div class="aug-shop-subtitle">DR. YIN'S CLINIC</div>
-        <div class="aug-shop-balance" id="aug-shop-balance">BALANCE: 0 PP</div>
-        <div class="aug-shop-grid" id="aug-shop-grid"></div>
-        <button class="aug-shop-close" id="aug-shop-close">CLOSE</button>
+    <!-- AUGMENT SHOP (Dr. Yin's) and the WORKBENCH — styles/shops.css -->
+    <div id="augment-shop" class="df-shop">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Augments</div><div class="df-shop-sub">Dr. Yin's Clinic · Empereal Medbay</div></div>
+                <div class="df-shop-balance" id="aug-shop-balance"></div>
+            </div>
+            <div class="df-shop-body" id="aug-shop-grid"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="aug-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
+        </div>
+    </div>
+    <div id="craft-shop" class="df-shop narrow">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Workbench</div><div class="df-shop-sub">Apt 949 · Main Room</div></div>
+                <div class="df-shop-balance" id="craft-shop-balance"></div>
+            </div>
+            <div class="df-shop-body" id="craft-shop-grid"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="craft-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
+        </div>
     </div>
 
     <!-- AUTO SHOP (Torque's) -->
-    <div id="auto-shop-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
-        <div style="max-width:700px; margin:30px auto; padding:20px;">
-            <!-- Header -->
-            <div style="font-family:Orbitron,sans-serif; font-size:1.2rem; letter-spacing:4px; color:#ff8800; text-shadow:0 0 10px rgba(255,136,0,0.4); margin-bottom:2px;">TORQUE AUTO</div>
-            <div style="font-size:0.6rem; color:#666; letter-spacing:2px; margin-bottom:8px;">SERVICE BAY — SOUTHERN DIMENSIONS CITY</div>
-            <div id="auto-shop-balance" style="font-family:Orbitron,sans-serif; font-size:0.7rem; color:#ffd700; letter-spacing:1px; margin-bottom:16px;">BALANCE: 0 PP</div>
-            
-            <!-- Tabs -->
-            <div id="auto-shop-tabs" style="display:flex; gap:4px; margin-bottom:16px;">
-                <button class="auto-tab" data-tab="browse" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:8px 16px; background:rgba(255,136,0,0.15); border:1px solid rgba(255,136,0,0.4); color:#ff8800; cursor:pointer; flex:1;">BROWSE</button>
-                <button class="auto-tab" data-tab="garage" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:8px 16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">MY GARAGE</button>
-                <button class="auto-tab" data-tab="customize" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:8px 16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">CUSTOMIZE</button>
+    <div id="auto-shop-overlay" class="df-shop">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Torque Auto</div><div class="df-shop-sub">Service Bay · Southern Dimensions City</div></div>
+                <div class="df-shop-balance" id="auto-shop-balance"></div>
             </div>
-            
-            <!-- Content -->
-            <div id="auto-shop-content"></div>
-            
-            <!-- Close -->
-            <button id="auto-shop-close" style="font-family:Orbitron,sans-serif; font-size:0.65rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.15); color:#888; cursor:pointer; width:100%; margin-top:16px;">CLOSE</button>
+            <div class="df-tabs" id="auto-shop-tabs"><span class="df-tab auto-tab" data-tab="browse">Browse</span><span class="df-tab auto-tab" data-tab="garage">Garage</span><span class="df-tab auto-tab" data-tab="customize">Customize</span></div>
+            <div class="df-shop-body" id="auto-shop-content"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="auto-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
         </div>
     </div>
 
@@ -56,41 +59,27 @@
             <div class="tun-close" onclick="game.closeTuning()">CLOSE</div>
         </div>
     </div>
-    <div id="cosmetics-shop-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(5,5,20,0.95); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
-        <div style="max-width:700px; margin:30px auto; padding:20px;">
-            <!-- Header -->
-            <div style="font-family:Orbitron,sans-serif; font-size:1.2rem; letter-spacing:4px; color:#0088ff; text-shadow:0 0 12px rgba(0,136,255,0.4); margin-bottom:2px;">NEURAL SYSTEMS</div>
-            <div style="font-size:0.6rem; color:#666; letter-spacing:2px; margin-bottom:4px;">IDENTITY SEQUENCING LAB — SOUTHERN DIMENSIONS CITY</div>
-            <div id="cosmetics-shop-balance" style="font-family:Orbitron,sans-serif; font-size:0.7rem; color:#ffd700; letter-spacing:1px; margin-bottom:16px;">BALANCE: 0 PP</div>
-            
-            <!-- Tabs -->
-            <div id="cosmetics-shop-tabs" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:16px;">
-                <button class="cosmetics-tab" data-tab="wig" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(0,136,255,0.15); border:1px solid rgba(0,136,255,0.4); color:#0088ff; cursor:pointer; flex:1;">W.I.G.s</button>
-                <button class="cosmetics-tab" data-tab="skin" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">S.K.I.N.s</button>
-                <button class="cosmetics-tab" data-tab="outfit" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">O.U.T.F.I.T.s</button>
-                <button class="cosmetics-tab" data-tab="vocal" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">V.O.C.A.L.s</button>
-                <button class="cosmetics-tab" data-tab="accessory" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">A.C.C.E.S.S.</button>
-                <button class="cosmetics-tab" data-tab="hat" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">H.A.T.s</button>
-                <button class="cosmetics-tab" data-tab="jewelry" style="font-family:Orbitron,sans-serif; font-size:0.55rem; letter-spacing:1px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:#888; cursor:pointer; flex:1;">J.E.W.E.L.s</button>
+    <div id="cosmetics-shop-overlay" class="df-shop">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Neural Systems</div><div class="df-shop-sub">Identity Sequencing Lab · Southern Dimensions City</div></div>
+                <div class="df-shop-balance" id="cosmetics-shop-balance"></div>
             </div>
-            
-            <!-- Content -->
-            <div id="cosmetics-shop-content"></div>
-            
-            <!-- Close -->
-            <button id="cosmetics-shop-close" style="font-family:Orbitron,sans-serif; font-size:0.65rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.15); color:#888; cursor:pointer; width:100%; margin-top:16px;">CLOSE</button>
+            <div class="df-tabs df-shop-tabs-scroll" id="cosmetics-shop-tabs"><span class="df-tab small cosmetics-tab" data-tab="wig">Wigs</span><span class="df-tab small cosmetics-tab" data-tab="skin">Skins</span><span class="df-tab small cosmetics-tab" data-tab="outfit">Outfits</span><span class="df-tab small cosmetics-tab" data-tab="vocal">Vocals</span><span class="df-tab small cosmetics-tab" data-tab="accessory">Carry</span><span class="df-tab small cosmetics-tab" data-tab="hat">Hats</span><span class="df-tab small cosmetics-tab" data-tab="jewelry">Jewels</span></div>
+            <div class="df-shop-body" id="cosmetics-shop-content"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="cosmetics-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
         </div>
     </div>
 
     <!-- ZIB TAXI DESTINATION PICKER -->
-    <div id="zib-menu" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(10,5,30,0.94); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
-        <div style="max-width:500px; margin:40px auto; padding:20px;">
-            <div style="font-family:Orbitron,sans-serif; font-size:1.1rem; letter-spacing:4px; color:#8a2be2; text-shadow:0 0 12px rgba(138,43,226,0.5); margin-bottom:2px;">ZIB</div>
-            <div style="font-size:0.55rem; color:#666; letter-spacing:2px; margin-bottom:4px;">AUTONOMOUS TRANSIT — SOUTHERN DIMENSIONS CITY</div>
-            <div id="zib-balance" style="font-family:Orbitron,sans-serif; font-size:0.65rem; color:#ffd700; letter-spacing:1px; margin-bottom:16px;">BALANCE: 0 PP</div>
-            <div style="font-size:0.6rem; color:#888; letter-spacing:1px; margin-bottom:10px; border-bottom:1px solid rgba(138,43,226,0.15); padding-bottom:6px;">SELECT DESTINATION</div>
-            <div id="zib-destinations"></div>
-            <button id="zib-close" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.12); color:#888; cursor:pointer; width:100%; margin-top:14px;">CANCEL</button>
+    <div id="zib-menu" class="df-shop narrow">
+        <div class="df-shop-panel">
+            <div class="df-shop-head">
+                <div class="df-shop-titles"><div class="df-shop-title">Zib.ME</div><div class="df-shop-sub">Autonomous Transit · Where to?</div></div>
+                <div class="df-shop-balance" id="zib-balance"></div>
+            </div>
+            <div class="df-shop-body" id="zib-destinations"></div>
+            <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="zib-close"><span class="btn-arrow">◀</span> Cancel</button></div>
         </div>
     </div>
 
@@ -250,6 +239,11 @@
                         <div class="row-center"><div class="menu-btn" id="lbl-scopeview">Scope View: ON</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
+                    <div class="menu-item-row" id="btn-toggle-scopeslow">
+                        <div class="row-left"><div class="desc-box">Snipers: time slows while you hold the scope, for a few breaths.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-scopeslow">Scope Slow-Mo: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
                     <div class="menu-item-row" id="btn-toggle-audio">
                         <div class="row-left"><div class="desc-box">Mute all SFX and music.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-audio">Master Audio: ON</div></div>
@@ -340,6 +334,8 @@
             
             <div id="ui-stealth-indicator">HIDDEN (100%)</div>
             <div id="ui-wave" aria-live="polite"></div>
+            <div id="ui-ride"><div class="r-line"><span class="r-ico"></span><span class="r-name"></span><span class="r-chip"></span></div>
+                <div class="r-sub"><span class="r-arrow">➤</span><span class="r-dist"></span></div></div>
 
             <div id="ui-health">
                 <div id="health-bar" style="width: 100%;"></div>
@@ -927,6 +923,10 @@
                     <span class="settings-value val-high" id="set-foliage" data-key="foliageDensity">HIGH</span>
                 </div>
                 <div class="settings-row">
+                    <span class="settings-label">Crowd Quality</span>
+                    <span class="settings-value val-high" id="set-crowd" data-key="crowdQuality">HIGH</span>
+                </div>
+                <div class="settings-row">
                     <span class="settings-label">Rain</span>
                     <span class="settings-value val-high" id="set-rain" data-key="rainDensity">HIGH</span>
                 </div>
@@ -963,6 +963,10 @@
                 <div class="settings-row">
                     <span class="settings-label">Scope View</span>
                     <span class="settings-value val-on" id="set-scopeview" data-key="scopeView">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Scope Slow-Mo</span>
+                    <span class="settings-value val-on" id="set-scopeslow" data-key="scopeSlow">ON</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Film Grain</span>
@@ -1025,6 +1029,10 @@
                     <span class="settings-value val-on" id="set-audio" data-key="audioEnabled">ON</span>
                 </div>
                 <div class="settings-row">
+                    <span class="settings-label">Audio Buffer</span>
+                    <span class="settings-value" id="set-audiobuffer" data-key="audioBuffer">BALANCED</span>
+                </div>
+                <div class="settings-row">
                     <span class="settings-label">Footsteps</span>
                     <span class="settings-value val-on" id="set-footsteps" data-key="footsteps">ON</span>
                 </div>
@@ -1047,6 +1055,14 @@
                 <div class="settings-row">
                     <span class="settings-label">Profiler</span>
                     <span class="settings-value" id="set-profiler" data-key="profiler">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Count Canvas Calls</span>
+                    <span class="settings-value" id="set-countcalls" data-key="countCalls">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Baseline: Skip World</span>
+                    <span class="settings-value" id="set-baseline" data-key="baseline">OFF</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Debug View</span>

@@ -663,6 +663,15 @@
                 }
             }
             
+            /** Out of view (PedestrianManager.draw culls it): what draw would have ticked — gait (footsteps), facing */
+            tickHidden() {
+                if (this.dead) return;
+                RenderStats.culled++;
+                syncHumanoidGait(this);
+                this.lastX = this.x; this.lastY = this.y;
+                this.angle = this.facingAngle;
+            }
+
             draw(ctx) {
                 if (this.dead) return;
                 
@@ -712,12 +721,17 @@
                 
                 // Their own look (Pedestrian.makeLook) — hats, hair and all. Zoomed out (more of
                 // the crowd on screen, too small to read details) they get simple hair, no jewelry.
-                const far = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 1;
-                let look = far && this.look.hair ? { ...this.look, hair: { type: 'short', color: this.look.hair.color }, jewelry: null } : this.look;
-                // Rain: open the umbrella, or pull the hoodie's hood up
-                if (this.look.umbrella) look = { ...look, held: { type: 'umbrella', color: this.look.umbrella, hand: 'right' } };
-                if (this._raining() && this.look.rainHood && !look.hat && look.top && look.top.type === 'hoodie') look = { ...look, hat: { type: 'hood_up', color: look.top.color } };
-                drawProceduralHumanoid(ctx, this, { ...look, stance: 'idle', lerpSpeed: 0.15 });
+                // (Composed once and kept until zoom detail, rain or the look changes — not rebuilt every frame.)
+                const far = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 1, raining = this._raining();
+                if (!this._drawCfg || this._drawCfgFar !== far || this._drawCfgRain !== raining || this._drawCfgLook !== this.look) {
+                    let look = far && this.look.hair ? { ...this.look, hair: { type: 'short', color: this.look.hair.color }, jewelry: null } : this.look;
+                    // Rain: open the umbrella, or pull the hoodie's hood up
+                    if (this.look.umbrella) look = { ...look, held: { type: 'umbrella', color: this.look.umbrella, hand: 'right' } };
+                    if (raining && this.look.rainHood && !look.hat && look.top && look.top.type === 'hoodie') look = { ...look, hat: { type: 'hood_up', color: look.top.color } };
+                    this._drawCfg = { ...look, stance: 'idle', lerpSpeed: 0.15 };
+                    this._drawCfgFar = far; this._drawCfgRain = raining; this._drawCfgLook = this.look;
+                }
+                drawCrowdHumanoid(ctx, this, this._drawCfg);   // by Crowd Quality (ui/crowd-impostors.js)
                 
                 // Waiting indicator (if at crosswalk) - above head at +X
                 if (this.state === 'waiting') {
@@ -868,6 +882,8 @@
                     }
                 }
                 
+                // Over the cap (the setting was turned down): the farthest, out of view, go first
+                if (_simTick % 60 === 0) this.trimToCap();
                 // Spawn new pedestrians
                 this.spawnTimer--;
                 if (this.pedestrians.length < GameSettings.getMaxPedestrians() && this.spawnTimer <= 0) {
@@ -876,6 +892,16 @@
                 }
             }
             
+            /** Down to GameSettings' cap: the farthest pedestrians out of view leave (no one vanishes on screen) */
+            trimToCap() {
+                const over = this.pedestrians.length - GameSettings.getMaxPedestrians();
+                if (over <= 0 || typeof game === 'undefined') return;
+                const cb = game._cullBounds && game._cullBounds.bodies, p = game.player;
+                const out = this.pedestrians.filter(o => !o.quipText && (!cb || o.x < cb.left || o.x > cb.right || o.y < cb.top || o.y > cb.bottom))
+                    .sort((a, b) => Math.hypot(b.x - p.x, b.y - p.y) - Math.hypot(a.x - p.x, a.y - p.y)).slice(0, over);
+                for (const o of out) { if (!o.markedForDestroy) o.destroy(); const i = this.pedestrians.indexOf(o); if (i >= 0) this.pedestrians.splice(i, 1); }
+            }
+
             _trySpawn(player, map) {
                 // Try a few times to find a good spawn point
                 for (let attempt = 0; attempt < 5; attempt++) {
@@ -924,7 +950,7 @@
              */
             draw(ctx, cb) {
                 for (let ped of this.pedestrians) {
-                    if (cb && (ped.x < cb.left || ped.x > cb.right || ped.y < cb.top || ped.y > cb.bottom)) continue;
+                    if (cb && (ped.x < cb.left || ped.x > cb.right || ped.y < cb.top || ped.y > cb.bottom)) { ped.tickHidden(); continue; }
                     ped.draw(ctx);
                 }
             }

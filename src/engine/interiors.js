@@ -18,6 +18,7 @@
             van_interior:        { floor: (g, c) => g.drawVanInterior(c),     glow: (g, c) => g.drawVanGlow(c) },     // chapter 1's ride (engine/van-art.js)
             hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) },
             ethereal_plane:      { glow: (g, c) => g.drawEtherealGlow(c) },
+            cozy_cafe_interior:  { floor: (g, c) => g.drawCafeInterior(c),    glow: (g, c) => g.drawCafeGlow(c) },     // the hearth, candles, pendants, steam
             demoness_palace:     { floor: (g, c) => g.drawPalaceInterior(c), glow: (g, c) => g.drawPalaceGlow(c) }   // engine/palace-art.js      // engine/reflections.js: its mirror floor gives this back
         };
 
@@ -712,6 +713,127 @@
             },
 
             /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
+            /* =====================================================================
+               COZY CAFE — the floor, painted once (released when she leaves: MAP_BAKES),
+               and the glow: the fire, pendant lamps, candles, string lights, steam,
+               and the windows by the benches (sky by day, the city's lights by night,
+               rain running down them when it rains outside)
+               ===================================================================== */
+            drawCafeInterior(ctx) {
+                if (!this._cafeFloor) this._cafeFloor = this._paintCafeFloor();
+                ctx.drawImage(this._cafeFloor, 0, 0);
+            },
+
+            _paintCafeFloor() {
+                const W = 1200, H = 1000, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+                const c = cv.getContext('2d'), r = seededRandom(5150);
+                c.fillStyle = '#1c120a'; c.fillRect(0, 0, W, H);
+                // Honey chevron parquet over the whole café floor, each plank its own shade, a little worn
+                c.save(); c.beginPath(); c.rect(50, 50, 1100, 900); c.clip();
+                const cw = 26, rh = 11, sl = 13;
+                for (let y0 = 30; y0 < H; y0 += rh) for (let x0 = 40, col = 0; x0 < W; x0 += cw, col++) {
+                    const up = col % 2 === 0, v = r();
+                    c.fillStyle = `rgb(${132 + v * 40 | 0},${84 + v * 26 | 0},${44 + v * 16 | 0})`;
+                    c.beginPath();
+                    c.moveTo(x0, y0 + (up ? sl : 0)); c.lineTo(x0 + cw, y0 + (up ? 0 : sl));
+                    c.lineTo(x0 + cw, y0 + (up ? 0 : sl) + rh); c.lineTo(x0, y0 + (up ? sl : 0) + rh); c.closePath(); c.fill();
+                    c.strokeStyle = 'rgba(40,20,8,0.45)'; c.lineWidth = 0.8; c.stroke();
+                }
+                // Worn paths: door → counter, door → the tables (lighter, where the varnish has gone)
+                for (const [x1, y1, x2, y2] of [[600, 940, 280, 320], [600, 940, 600, 560], [600, 940, 960, 500]]) {
+                    for (let k = 0; k <= 1; k += 0.05) {
+                        const x = x1 + (x2 - x1) * k, y = y1 + (y2 - y1) * k, g = c.createRadialGradient(x, y, 0, x, y, 60);
+                        g.addColorStop(0, 'rgba(255,220,160,0.035)'); g.addColorStop(1, 'rgba(255,220,160,0)'); c.fillStyle = g; c.fillRect(x - 60, y - 60, 120, 120);
+                    }
+                }
+                c.restore();
+                // Behind the counter: terracotta squares
+                for (let y = 50; y < 245; y += 22) for (let x = 50; x < 395; x += 22) { const v = r(); c.fillStyle = `rgb(${150 + v * 30 | 0},${72 + v * 18 | 0},${48 + v * 10 | 0})`; c.fillRect(x + 1, y + 1, 20, 20); }
+                // The kitchen: black and cream checkers
+                for (let y = 50, j = 0; y < 300; y += 25, j++) for (let x = 705, i = 0; x < 1150; x += 25, i++) { c.fillStyle = (i + j) % 2 ? '#e9dfc8' : '#1e1c1e'; c.fillRect(x, y, 25, 25); }
+                c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(705, 50, 445, 250);
+                // The storeroom: worn concrete
+                c.fillStyle = '#4a443e'; c.fillRect(955, 715, 195, 235);
+                for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(${r() > 0.5 ? '20,16,12' : '120,110,96'},${0.06 + r() * 0.08})`; c.beginPath(); c.arc(955 + r() * 195, 715 + r() * 235, 4 + r() * 18, 0, Math.PI * 2); c.fill(); }
+                // The hearth rug: a deep red and saffron oval with a patterned border
+                const rug = (cx, cy, rx, ry) => {
+                    c.save(); c.translate(cx, cy);
+                    c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.ellipse(3, 4, rx, ry, 0, 0, Math.PI * 2); c.fill();
+                    const rings = [[1, '#5e1e1a'], [0.93, '#c0903a'], [0.88, '#7a2a22'], [0.62, '#8e3a2a'], [0.56, '#d9a35a'], [0.5, '#6e2420'], [0.2, '#c0903a']];
+                    for (const [k, col] of rings) { c.fillStyle = col; c.beginPath(); c.ellipse(0, 0, rx * k, ry * k, 0, 0, Math.PI * 2); c.fill(); }
+                    c.fillStyle = '#e8c88a';
+                    for (let i = 0; i < 36; i++) { const a = i / 36 * Math.PI * 2; c.beginPath(); c.arc(Math.cos(a) * rx * 0.755, Math.sin(a) * ry * 0.755, 2.4, 0, Math.PI * 2); c.fill(); }
+                    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; c.save(); c.rotate(a); c.fillStyle = '#d9a35a'; c.beginPath(); c.moveTo(rx * 0.22, 0); c.lineTo(rx * 0.4, -6); c.lineTo(rx * 0.48, 0); c.lineTo(rx * 0.4, 6); c.closePath(); c.fill(); c.restore(); }
+                    c.strokeStyle = 'rgba(232,200,138,0.6)'; c.lineWidth = 1; c.setLineDash([2, 3]); c.beginPath(); c.ellipse(0, 0, rx * 0.97, ry * 0.97, 0, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+                    c.restore();
+                };
+                rug(205, 536, 150, 132);
+                // Under the booths: a long runner in sage and cream
+                c.fillStyle = '#4a6244'; c.fillRect(952, 336, 196, 330); c.fillStyle = '#e8dcc4'; c.fillRect(956, 340, 188, 3); c.fillRect(956, 659, 188, 3);
+                c.fillStyle = 'rgba(232,220,196,0.25)'; for (let y = 352; y < 656; y += 14) for (let x = 964; x < 1140; x += 14) { c.beginPath(); c.arc(x, y, 1.4, 0, Math.PI * 2); c.fill(); }
+                // The doormat
+                c.fillStyle = '#7a5a34'; c.fillRect(520, 842, 160, 62); c.strokeStyle = '#4a3420'; c.lineWidth = 3; c.strokeRect(524, 846, 152, 54);
+                c.fillStyle = 'rgba(40,24,10,0.75)'; c.font = 'bold 15px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('come in, get cozy', 600, 873);
+                // At the counter: "order here", in brass inlay
+                c.fillStyle = 'rgba(201,162,74,0.55)'; c.font = 'italic 13px Georgia, serif'; c.fillText('✦  order here  ✦', 272, 296);
+                return cv;
+            },
+
+            drawCafeGlow(ctx) {
+                const t = _frameTime / 1000, dc = this.dayCycle(), night = dc.darkness > 0.3, rain = (this.weather && this.weather.intensity || 0) > 0.08;
+                const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
+                const fl = (k) => 0.82 + 0.1 * Math.sin(t * 7.3 + k) + 0.08 * Math.sin(t * 12.1 + k * 2.3);   // a flame's breath
+                ctx.save();
+                // The windows by the benches, on the south wall: the sky by day, the city's lights by night, rain on the glass
+                for (const [x0, x1] of [[80, 420], [760, 925]]) {
+                    for (let wx = x0; wx < x1 - 20; wx += 58) {
+                        const ww = Math.min(52, x1 - wx);
+                        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+                        ctx.fillStyle = '#3a2416'; ctx.fillRect(wx - 3, 952, ww + 6, 30);
+                        const g = ctx.createLinearGradient(0, 955, 0, 978);
+                        if (night) { g.addColorStop(0, '#1a1438'); g.addColorStop(1, '#2c1e4a'); } else { g.addColorStop(0, '#9fc2e6'); g.addColorStop(1, '#d9e6f2'); }
+                        ctx.fillStyle = g; ctx.fillRect(wx, 955, ww, 24);
+                        if (night) for (let i = 0; i < 4; i++) { const lx = wx + 5 + ((i * 13 + wx) % (ww - 8)); ctx.fillStyle = ['#ffcf8a', '#ff8ec4', '#a6c8ff', '#ffd9a0'][i]; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 0.7 + i + wx); ctx.fillRect(lx, 964 + (i % 2) * 6, 2, 2); }
+                        ctx.globalAlpha = 1;
+                        if (rain) { ctx.strokeStyle = 'rgba(220,235,255,0.35)'; ctx.lineWidth = 0.8; ctx.beginPath(); for (let i = 0; i < 5; i++) { const sx = wx + 4 + ((i * 11 + (t * 30 | 0) * (i + 1)) % (ww - 6)), sy = 955 + ((t * 18 + i * 7) % 18); ctx.moveTo(sx, sy); ctx.lineTo(sx - 0.5, sy + 5); } ctx.stroke(); }
+                        ctx.fillStyle = '#5a3a24'; ctx.fillRect(wx + ww / 2 - 1, 955, 2, 24); ctx.fillRect(wx, 966, ww, 2);
+                    }
+                }
+                ctx.globalCompositeOperation = 'lighter';
+                // Daylight through the windows across the benches and well into the room; at night a faint cool spill
+                const day = Math.max(0, Math.min(1, dc.daylight != null ? dc.daylight : (night ? 0 : 1)));
+                for (const [cx, w] of [[250, 340], [842, 170]]) glow(cx, 920, w * 0.7, night ? '150, 160, 255' : '255, 240, 210', night ? 0.05 : 0.18);
+                if (day > 0.05) { glow(250, 860, 420, '255, 236, 200', 0.12 * day); glow(842, 860, 260, '255, 236, 200', 0.1 * day); glow(600, 600, 700, '255, 226, 180', 0.06 * day); }
+                // The fire: a deep wash, the flames, sparks
+                const f0 = fl(0);
+                glow(120, 535, 260, '255, 120, 40', 0.2 * f0); glow(92, 535, 90, '255, 170, 70', 0.45 * f0);
+                for (let i = 0; i < 6; i++) { const fy = 505 + i * 12, f = fl(i * 1.7); glow(86 + 4 * Math.sin(t * 9 + i), fy, 12 + 6 * f, '255, 150, 50', 0.55 * f); glow(84, fy, 6, '255, 230, 150', 0.6 * f); }
+                for (let i = 0; i < 5; i++) { const ph = (t * 0.6 + i * 0.21) % 1; glow(92 + ph * 40 + Math.sin(t * 3 + i) * 5, 535 + Math.sin(i * 2.3) * 30 - ph * 10, 2.5, '255, 190, 90', 0.7 * (1 - ph)); }
+                // Pendant lamps over the tables and the counter: a warm cone below a brass shade
+                const pendants = [[190, 262], [330, 262], ...CAFE_TABLES];   // two over the counter (clear of Ren), one over each round table
+                for (const [px, py] of pendants) glow(px, py, 120, '255, 196, 120', 0.12);
+                // Candles on the tables, the booths, the low table and the mantel
+                const candles = [...CAFE_TABLES.map(([x, y]) => [x, y]), ...CAFE_BOOTHS.map(y => [1061, y]), [199, 545], [58, 484], [58, 586]];
+                candles.forEach(([x, y], i) => { const f = fl(i * 2.1); glow(x, y, 34, '255, 170, 80', 0.32 * f); glow(x, y, 7, '255, 235, 180', 0.75 * f); });
+                // String lights: along the bookshelf wall, over the booths, above the window benches
+                const bulbs = [];
+                for (let x = 438; x <= 686; x += 18) bulbs.push([x, 84 + 4 * Math.sin((x - 438) / 248 * Math.PI)]);
+                for (let y = 330; y <= 690; y += 20) bulbs.push([1142, y]);
+                for (let x = 70; x <= 930; x += 20) if (x < 470 || x > 740) bulbs.push([x, 946]);
+                bulbs.forEach(([x, y], i) => { const tw = 0.6 + 0.4 * Math.sin(t * 1.3 + i * 1.7); glow(x, y, 9, i % 3 ? '255, 214, 150' : '255, 180, 200', 0.5 * tw); });
+                // Steam: from the espresso machine, and a curl over each cup on the round tables
+                const curl = (x, y, k, s = 1) => { for (let j = 0; j < 3; j++) { const ph = (t * 0.35 + j / 3 + k) % 1; glow(x + Math.sin(t * 1.4 + j + k) * 4 * ph, y - ph * 22 * s, (4 + ph * 7) * s, '255, 245, 235', 0.1 * (1 - ph)); } };
+                curl(158, 60, 0, 1.4); curl(188, 60, 0.4, 1.4);
+                CAFE_TABLES.forEach(([x, y], i) => curl(x - 13, y + 4, i * 0.37));
+                ctx.restore();
+                // The pendant shades themselves (seen from above), drawn solid
+                ctx.lineWidth = 1.5; ctx.strokeStyle = '#c9a24a';
+                for (const [px, py] of pendants) {
+                    ctx.fillStyle = '#3a2416'; ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#fff1d0'; ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2); ctx.fill();
+                }
+            },
+
             drawApartmentGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these

@@ -1,6 +1,16 @@
         // GameEngine — loadMap / _doLoadMap (building every map), baked lighting.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
-        engineMixin({
+                /* Each interior's painted floor (or backdrop) is a big canvas — 2–11 MB apiece. They're painted from
+           fixed seeds, so they're let go when she leaves the map and painted again (under the door fade) on
+           the next visit. The Keeper's two places travel together (the prologue walks between them). */
+        const MAP_BAKES = {
+            house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
+            hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
+            apt_949: ['_backdropStatic'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
+            keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
+        };
+
+engineMixin({
             loadMap(mapId, spawnAt) {
                 // 1. Initial Load (No Fade)
                 if (!this.activeMap) {
@@ -17,9 +27,14 @@
                 
                 // Pause game
                 this.pauseSystem.acquire('map_load');
+                const seq = this._loadSeq = (this._loadSeq || 0) + 1;
                 
                 // 3. Wait for Screen to go Black (400ms)
                 setTimeout(() => {
+                    if (seq !== this._loadSeq) return;                          // a newer load took over: it switches and fades in
+                    if (!this.activeMap) {                                       // the game was quit mid-fade: nothing to load into
+                        fadeOverlay.classList.remove('active'); this.pauseSystem.release('map_load'); return;
+                    }
                     // A. Switch the Map Data
                     this._doLoadMap(mapId, spawnAt);
                     
@@ -29,6 +44,7 @@
                     
                     // C. Fade Back In
                     setTimeout(() => {
+                        if (seq !== this._loadSeq) return;
                         fadeOverlay.classList.remove('active');
                         this.pauseSystem.release('map_load');
                     }, 100);
@@ -68,6 +84,34 @@
                 return true;
             },
 
+            /** Let go of the painted floors of every map but `keepId` (null: all of them) */
+            _releaseMapBakes(keepId) {
+                const keep = MAP_BAKES[keepId] || [];
+                for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (this[k] && !keep.includes(k)) this[k] = null;
+            },
+
+            /** What belongs to the map being left: effects at its coordinates, walks across its floor,
+                a finisher or slow-mo in progress, and caches that would hold the old map alive. */
+            _clearMapResidue() {
+                if (this.finisher) this.endFinisher(true);
+                this.finCam = null;
+                this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
+                this.casings = []; this.shotFx = []; this.muzzleFlashes = []; this.flitVFX = [];
+                this.noiseRipples = []; this.lastKnownMarkers = [];
+                this._edgeRipples = null; this._edgeTouch = null;                       // the veil's ripples (world/map-edge.js)
+                if (typeof Walker !== 'undefined') {                                   // walks are across the old floor
+                    for (const w of Walker.walks.slice()) Walker._end(w, 'cancelled');
+                    if (this.player && this.player._walk) Walker._end(this.player._walk, 'cancelled');
+                }
+                if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
+                // caches keyed by the old map (each rebuilds on its next use)
+                this.skyLayer = null;
+                if (typeof ambience !== 'undefined') { ambience._areaMap = null; ambience._areas = {}; }
+                if (typeof NavGrid !== 'undefined') NavGrid._cache = null;
+                if (typeof humanShadeReset === 'function') humanShadeReset();
+                for (const c of [this.car, this.ownedCar, this.deliveryVehicle]) if (c) c._beamCache = null;
+            },
+
             _doLoadMap(mapId, spawnAt) {
                 // =========================================================
                 //  PHASE 1: CLEANUP
@@ -98,6 +142,8 @@
                 }
                 this.projectiles = [];
                 this.stickyOrbs = [];
+                this._clearMapResidue();
+                this._releaseMapBakes(mapId);
                 
                 GameEntity.queueEnabled = true;
                 GameEntity.clearQueue();
@@ -105,11 +151,11 @@
                 
                 this.neonSigns = [];
                 
-                if (this.activeMap && (this.activeMap.id === 'hub_949' || this.activeMap.id === 'road_test')) { 
+                if (this.activeMap && this.activeMap.id === 'hub_949') { 
                     this.hubState.carX = this.car.x; this.hubState.carY = this.car.y; this.hubState.carAngle = this.car.angle; 
                 }
                 
-                if (mapId !== 'hub_949' && mapId !== 'road_test') {
+                if (mapId !== 'hub_949') {
                     this.traffic.reset();
                     this.pedestrians.reset();
                 }
@@ -810,65 +856,6 @@
                     } // end of else (!this._hubCache) — first-time generation
                 }
                 
-                // --- ROAD TEST (AUTOMATED) ---
-                if (mapId === 'road_test') {
-                    // Initialize road network
-                    resetRoadNetworkIds();
-                    this.traffic.network = new RoadNetwork();
-                    const net = this.traffic.network;
-                    const mapData = maps['road_test'];
-                    
-                    const gridLines = [600, 1300, 2000, 2700, 3400];
-                    const extension = 250; 
-                    const startCoord = gridLines[0] - extension; 
-                    const endCoord = gridLines[gridLines.length-1] + extension;
-                    const roadLength = endCoord - startCoord;
-                    const lampColors = ['#ff007f', '#ccccff', '#ffd700', '#8a2be2']; 
-
-                    const addLampsToSegment = (x, y1, y2, orientation) => {
-                        const mid = (y1 + y2) / 2;
-                        const segmentLen = Math.abs(y2 - y1);
-                        const count = segmentLen > 600 ? 2 : 1;
-                        const offset = segmentLen > 600 ? 150 : 0; 
-                        const positions = (count === 1) ? [mid] : [mid - offset, mid + offset];
-                        positions.forEach(pos => {
-                            const color = lampColors[Math.floor(Math.random() * lampColors.length)];
-                            if (orientation === 'V') mapData.lamps.push(new LampEntity({ x: x, y: pos, lampType: 2, color: color }));
-                            else mapData.lamps.push(new LampEntity({ x: pos, y: x, lampType: 2, color: color }));
-                        });
-                    };
-
-                    gridLines.forEach(x => {
-                        const lanes = Math.floor(Math.random() * 3) + 1; 
-                        const width = (lanes * 2) * 60;
-                        const road = createRoad(x - width/2, startCoord, width, roadLength, 'V', '', lanes, true, true);
-                        net.addRoad(road);
-                        const lxL = road.x - 37.5; const lxR = road.x + road.w + 37.5;
-                        addLampsToSegment(lxL, startCoord, gridLines[0], 'V'); addLampsToSegment(lxR, startCoord, gridLines[0], 'V');
-                        for(let i=0; i<gridLines.length-1; i++) { addLampsToSegment(lxL, gridLines[i], gridLines[i+1], 'V'); addLampsToSegment(lxR, gridLines[i], gridLines[i+1], 'V'); }
-                        addLampsToSegment(lxL, gridLines[gridLines.length-1], endCoord, 'V'); addLampsToSegment(lxR, gridLines[gridLines.length-1], endCoord, 'V');
-                    });
-
-                    gridLines.forEach(y => {
-                        const lanes = Math.floor(Math.random() * 3) + 1;
-                        const width = (lanes * 2) * 60;
-                        const road = createRoad(startCoord, y - width/2, roadLength, width, 'H', '', lanes, true, true);
-                        net.addRoad(road);
-                        const lyT = road.y - 37.5; const lyB = road.y + road.h + 37.5;
-                        addLampsToSegment(lyT, startCoord, gridLines[0], 'H'); addLampsToSegment(lyB, startCoord, gridLines[0], 'H');
-                        for(let i=0; i<gridLines.length-1; i++) { addLampsToSegment(lyT, gridLines[i], gridLines[i+1], 'H'); addLampsToSegment(lyB, gridLines[i], gridLines[i+1], 'H'); }
-                        addLampsToSegment(lyT, gridLines[gridLines.length-1], endCoord, 'H'); addLampsToSegment(lyB, gridLines[gridLines.length-1], endCoord, 'H');
-                    });
-
-                    net.buildGraph();
-                    net.roads.forEach(road => { mapData.pavements.push(...road.getPavements()); });
-                    const autoCrosswalks = net.generateCrosswalks(mapData.pavements);
-                    mapData.crosswalks.push(...autoCrosswalks);
-                    this.traffic.vehicles = []; 
-                    
-                    console.log(`[ROAD TEST] Road network initialized`);
-                }
-
                 // =========================================================
                 //  PHASE 4: LOAD MAP DATA
                 // =========================================================
@@ -927,14 +914,8 @@
                         this.activeMap.cityLayout.applyBlockLampColors(this.activeMap.lamps);
                     }
                     
-                    // Add Road Test Map transition (at bottom center of hub)
+                    // The Ollo test zone's door (bottom centre of the hub)
                     if (this.activeMap.id === 'hub_949') {
-                        this.activeMap.transitions.push({
-                            x: 1960, y: 8400, w: 80, h: 60,
-                            target: 'road_test',
-                            label: 'Enter Road Test Zone',
-                            _fromBuilding: true
-                        });
                         this.activeMap.transitions.push({
                             x: 1960, y: 8500, w: 80, h: 60,
                             target: 'ollo_test',
@@ -1042,7 +1023,7 @@
                 } 
                 
                 this.decals.clear(); 
-                this.corpses = []; this.finisher = null; this.finCam = null;
+                this.corpses = [];
                 
                 // Deactivate current map entities (non-target maps have empty arrays from lazy creation)
                 const targetMapData = maps[mapId];
@@ -1054,6 +1035,8 @@
                 // Re-register persistents
                 if (this.player) { this.player.active = true; this.player.markedForDestroy = false; this.player.reregister(); }
                 if (this.ownedCar && this.ownedCar instanceof VehicleEntity) { this.ownedCar.active = true; this.ownedCar.markedForDestroy = false; this.ownedCar.dead = false; this.ownedCar.reregister(); }
+                // A taken car (hijacked off the street) is hers like the owned one: back in the registry, or it's a ghost with no collision
+                if (this.car && this.car !== this.ownedCar && this.car instanceof GameEntity) { this.car.markedForDestroy = false; this.car.dead = false; this.car.reregister(); }
                 for (let tm of this.teammates) { if (tm instanceof ActorEntity) { tm.active = true; tm.markedForDestroy = false; tm.reregister(); } }
                 
                 // Activate current map entities
@@ -1188,7 +1171,7 @@
                 }
                 
                 // Setup Car for Hub
-                if (this.activeMap.id === 'hub_949' || this.activeMap.id === 'road_test') {
+                if (this.activeMap.id === 'hub_949') {
                     this.car.x = this.hubState.carX; 
                     this.car.y = this.hubState.carY; 
                     this.car.angle = this.hubState.carAngle;

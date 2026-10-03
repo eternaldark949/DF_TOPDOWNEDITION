@@ -41,6 +41,7 @@
             });
         }
 
+        const _HAIR_ROOT = { x: 0, y: 0 };   // hairGeometry's per-slice root, reused
         /**
          * Current hair geometry in the head frame: { strands: [[{x,y}...]...], jig: {x,y} }.
          * Steps the owner's physics when drawn on the main canvas; otherwise the rest pose.
@@ -49,9 +50,9 @@
             const layout = HAIR_LAYOUTS[hair.type];
             if (!layout) return { strands: [], jig: { x: 0, y: 0 } };
             const owner = dyn && dyn.owner, sway = (dyn && dyn.sway) || 0;
-            const T = owner ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js)
+            const T = owner && !_crowdLite ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js); a lighter crowd: at rest
             if (!T) return { strands: _hairRest(layout, headX, sway * 0.5), jig: { x: 0, y: 0 } };
-            const { toW, toL, sc, ang: baseAngle } = T;
+            const { toW, toL, toLInto, sc, ang: baseAngle } = T;
             const head = toW(headX, 0);
 
             let sim = owner._hairSim;
@@ -86,12 +87,13 @@
                 const ang = a0 + dA * f;
                 const c = Math.cos(ang), s = Math.sin(ang);
                 const hx = hx0 + (head.x - hx0) * f, hy = hy0 + (head.y - hy0) * f;
-                const sliceW = (lx, ly) => ({ x: hx + (c * (lx - headX) - s * ly) * sc, y: hy + (s * (lx - headX) + c * ly) * sc });
                 const time = sim.t + (k - steps) * HAIR_SIM.STEP;
 
                 for (let si = 0; si < sim.strands.length; si++) {
                     const spec = specs[si], pts = sim.strands[si];
-                    const root = sliceW(headX + spec.root.x, spec.root.y);
+                    // the strand's root for this slice, in the world (as sliceW(lx, ly) was, without its object)
+                    const root = _HAIR_ROOT, lx = headX + spec.root.x, ly = spec.root.y;
+                    root.x = hx + (c * (lx - headX) - s * ly) * sc; root.y = hy + (s * (lx - headX) + c * ly) * sc;
                     pts[0].px = pts[0].x; pts[0].py = pts[0].y; pts[0].x = root.x; pts[0].y = root.y;
                     const restA = ang + spec.dir - sway * 0.5;          // rest direction swings with the shoulders
                     const rc = Math.cos(restA), rs = Math.sin(restA);
@@ -136,7 +138,7 @@
             }
             sim.headX = head.x; sim.headY = head.y; sim.ang = baseAngle;
 
-            const strands = sim.strands.map(pts => pts.map(p => toL(p.x, p.y)));
+            const strands = _simOut(sim, sim.strands, toLInto);
             let jig = { x: 0, y: 0 };
             if (layout.jiggle) {
                 const l0 = toL(head.x, head.y), l1 = toL(sim.jig.x, sim.jig.y);
@@ -971,6 +973,9 @@
         let _shadeFrame = -1, _shadeRims = 0, _lampGrid = null, _shadeCols = null, _bodyRot = 0;
         const _SHADOW_RGB = '12, 6, 28';
 
+        /** A new map: drop the old map's lamp buckets (map-loading.js) */
+        function humanShadeReset() { _lampGrid = null; }
+
         /** Street lamps bucketed in 200px cells, rebuilt when the map's lamp list changes. */
         function _lampNear(x, y, R) {
             const L = typeof game !== 'undefined' ? game.lamps : null;
@@ -999,7 +1004,7 @@
             const lod = typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0;
             const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
             const level = lod === 0 ? 2 : (lod === 1 && !ped ? 1 : 0);
-            if (!level || typeof sunNow !== 'function') return null;
+            if (!level || _crowdLite || typeof sunNow !== 'function') return null;    // (Crowd Quality medium/low: flat)
             if (_shadeFrame !== _frameTime) { _shadeFrame = _frameTime; _shadeRims = 0; _shadeCols = null; }
             const C = CONFIG.HUMAN_SHADE, sun = sunNow();
             const rot = _bodyRot, c = Math.cos(rot), s = Math.sin(rot);
@@ -1054,7 +1059,17 @@
          * Draw a procedural character. Builds and height (ui/bodies.js) scale the body
          * frame here; a hovering android bobs over a soft glow.
          */
+        /** What the entity pass drew this frame, for the profiler (reset by draw.js; ms only while it's on, Full) */
+        const RenderStats = { bodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0, ticks: 1, bldBase: 0, bldTops: 0 };
+
         function drawProceduralHumanoid(ctx, entity, config = {}) {
+            RenderStats.bodies++;
+            if (!RenderStats.timed) return _drawProceduralHumanoid(ctx, entity, config);
+            const t0 = performance.now();
+            try { return _drawProceduralHumanoid(ctx, entity, config); } finally { RenderStats.peopleMs += performance.now() - t0; }
+        }
+
+        function _drawProceduralHumanoid(ctx, entity, config = {}) {
             const S = bodyScale(config), A = androidLook(config.body);
             const hover = A && A.hover && !config.isDriving;
             if (!config.isDriving && _zoomLOD < 2) {
@@ -1835,10 +1850,8 @@
                 ctx.stroke(); ctx.restore();
             }
             if (hitK > 0.05) {                                              // the flash of the hit
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                const fl = ctx.createRadialGradient(headX * 0.5, 0, 0, headX * 0.5, 0, 15);
-                fl.addColorStop(0, `rgba(255, 235, 235, ${0.45 * hitK})`); fl.addColorStop(1, 'rgba(255, 235, 235, 0)');
-                ctx.fillStyle = fl; ctx.beginPath(); ctx.arc(headX * 0.5, 0, 15, 0, Math.PI * 2); ctx.fill();
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';       // a cached glow (lightning flashes every body outdoors at once)
+                ctx.globalAlpha *= 0.45 * hitK; drawGlow(ctx, headX * 0.5, 0, 15, '255, 235, 235', 0);
                 ctx.restore();
             }
         
@@ -1881,6 +1894,21 @@
             const TAU = Math.PI * 2, R = D.rim;
             const side = hand === 'left' ? -1 : 1;
             const gx = hX + 1.5, gy = hY + side * 3.5;          // just past the fingers
+            if (D.glass === 'mug') {                            // a ceramic mug (the cafe's): the cup, its handle, the drink, a heart in the foam
+                ctx.save(); ctx.translate(gx, gy);
+                ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.arc(0.9, 1.1, R * 1.05, 0, TAU); ctx.fill();
+                ctx.strokeStyle = D.cup; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(R * 1.05, side * 0.4, R * 0.45, -1.3, 1.3); ctx.stroke();
+                ctx.fillStyle = D.cup; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+                ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.4; ctx.stroke();
+                ctx.fillStyle = D.liquid; ctx.beginPath(); ctx.arc(0, 0, R * 0.76, 0, TAU); ctx.fill();
+                if (D.art) { ctx.fillStyle = 'rgba(250,238,222,0.9)'; ctx.beginPath(); ctx.arc(-0.7, -0.4, R * 0.24, 0, TAU); ctx.arc(0.7, -0.4, R * 0.24, 0, TAU); ctx.fill();
+                             ctx.beginPath(); ctx.moveTo(-1.6, 0); ctx.lineTo(0, 1.9); ctx.lineTo(1.6, 0); ctx.closePath(); ctx.fill(); }
+                if (D.foam) { ctx.fillStyle = 'rgba(250,240,230,0.85)'; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(Math.cos(i * 1.7) * R * 0.32, Math.sin(i * 1.7) * R * 0.32, R * 0.2, 0, TAU); ctx.fill(); } }
+                if (D.crema) { ctx.fillStyle = 'rgba(200,140,70,0.75)'; ctx.beginPath(); ctx.arc(0, 0, R * 0.5, 0, TAU); ctx.fill(); }
+                ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(-R * 0.45, -R * 0.45, R * 0.18, 0, TAU); ctx.fill();
+                ctx.restore();
+                return;
+            }
             const T = ctx.getTransform();
             const light = -Math.PI * 0.75 - Math.atan2(T.b, T.a);  // toward screen upper-left, in local space
             const lx = Math.cos(light), ly = Math.sin(light);

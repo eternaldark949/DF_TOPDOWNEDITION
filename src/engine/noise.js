@@ -60,7 +60,7 @@
                 ctx.save(); ctx.lineWidth = 1.2;
                 for (const r of R) {
                     const t = this._ringT(r), e = 1 - Math.pow(1 - t, 2);   // ease out
-                    ctx.globalAlpha = 0.26 * (1 - t);
+                    ctx.globalAlpha = 0.18 * (1 - t) * (1 - t);              // fades early: mostly gone by half its life
                     ctx.strokeStyle = r.enemy ? '#ff8a5c' : '#d8c6ff';
                     ctx.beginPath(); ctx.arc(r.x, r.y, 12 + (r.reach - 12) * e, 0, Math.PI * 2); ctx.stroke();
                 }
@@ -97,7 +97,7 @@
                     // off screen: wholly outside it, or grown past its farthest corner
                     if (rad - th > Math.hypot(Math.max(cx, W - cx), Math.max(cy, H - cy))) continue;
                     if (rad + th < 0 || cx + rad + th < 0 || cx - rad - th > W || cy + rad + th < 0 || cy - rad - th > H) continue;
-                    const bend = bends < 4 && t < 0.8; if (bend) bends++;
+                    const bend = bends < 4 && t < 0.6; if (bend) bends++;
                     if (bend && !copied) { this._mirageCtx.drawImage(this.canvas, 0, 0, sw, sh); copied = true; }
                     const seed = r.seed ?? (r.seed = Math.random() * 100), ph = _gameTimeSec;
                     const amp = th * 0.7;
@@ -117,28 +117,28 @@
                     band.moveTo(inner[0], inner[1]);
                     for (let i = 2; i < inner.length; i += 2) band.lineTo(inner[i], inner[i + 1]);
                     band.closePath();
-                    const k = 1 - t;
+                    const k = (1 - t) * (1 - t);                                  // a soft presence that fades early, at full width
                     if (bend) {
                         // the bend: the scene under the band, pushed outward from the sound and nudged along it.
                         // Only the band's box is copied back (clamped to the screen), not the whole frame.
                         const pad = rad + th + amp, x0 = Math.max(0, cx - pad), y0 = Math.max(0, cy - pad);
                         const x1 = Math.min(W, cx + pad), y1 = Math.min(H, cy + pad);
                         if (x1 > x0 && y1 > y0) {
-                            const sc = 1 + (0.045 + 6 / Math.max(40, rad)) * k;
+                            const sc = 1 + (0.034 + 4.5 / Math.max(40, rad)) * k;
                             // the source box that lands on [x0,x1]×[y0,y1] once scaled about (cx, cy)
                             const u0 = cx + (x0 - cx) / sc, v0 = cy + (y0 - cy) / sc, u1 = cx + (x1 - cx) / sc, v1 = cy + (y1 - cy) / sc;
                             ctx.save();
                             ctx.clip(band, 'evenodd');
-                            ctx.globalAlpha = Math.min(1, 0.35 + k);
+                            ctx.globalAlpha = 0.75 * k;
                             ctx.drawImage(cv, u0 / 4, v0 / 4, (u1 - u0) / 4, (v1 - v0) / 4, x0 + 1.2 * k, y0, x1 - x0, y1 - y0);
                             ctx.restore();
                         }
                     }
                     // a whisper of light on the outer edge, brighter where the ripple crests
-                    ctx.globalAlpha = (r.enemy ? 0.45 : 0.2) * k;
+                    ctx.globalAlpha = (r.enemy ? 0.32 : 0.14) * k;
                     ctx.strokeStyle = r.enemy ? '#ff7a4a' : '#d8c6ff'; ctx.lineWidth = r.enemy ? 1.4 : 1;
                     ctx.stroke(outer);
-                    ctx.globalAlpha = 0.07 * k;
+                    ctx.globalAlpha = 0.04 * k;
                     ctx.fillStyle = r.enemy ? '#ffb08a' : '#efe4ff'; ctx.fill(band, 'evenodd');
                     ctx.globalAlpha = 1;
                 }

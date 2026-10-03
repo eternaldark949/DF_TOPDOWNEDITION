@@ -34,6 +34,7 @@
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
                     this._prof.classList.toggle('full', mode === 'full');
+                    if (mode !== 'full' || !GameSettings.countCalls) this._countCalls(false);   // the call counter: Full, and only when asked for
                     this._report = null;
                 }
                 if (game.debugMode) this._ensureDbg();
@@ -80,6 +81,7 @@
                 this._last = now;
                 if (!game.showProfiler && !game.debugMode) return;
                 this._times[this._ti] = dt; this._ti = (this._ti + 1) % this._times.length;
+                if (this._calls) { this._callTotal += RenderStats.calls; this._callFrames++; RenderStats.calls = 0; }
                 this._n++;
                 if (game.showProfiler && this._prof) {
                     if (this._n % 3 === 0) this._sparkStep(dt);
@@ -120,13 +122,99 @@
                     .sort((a, b) => b.time - a.time);
                 const max = Math.max(4, +rows[0]?.time || 0);
                 let html = `<div class="dp-total"><span>Frame work</span><b>${total ? total.time : '--'} ms</b></div>`;
+                // At the top, where a phone can see it: what was drawn, and the time spent outside the game's code
+                html += `<div class="dp-counts dp-render">${this._renderLine(game, total ? +total.time : 0)}</div>`;
                 rows.forEach((r, i) => {
                     const [grp, name] = r.label.includes(':') ? r.label.split(':') : ['', r.label];
                     html += `<div class="dp-row${i < 3 ? ' top' : ''}"><span class="dp-l"><i>${grp}</i>${name}</span><span class="dp-t">${r.time}</span>`
                          + `<span class="dp-bar"><i style="transform:scaleX(${Math.min(1, r.time / max).toFixed(3)})"></i></span></div>`;
                 });
                 html += `<div class="dp-counts">${this._countLine(game)}</div>`;
+                html += `<div class="dp-counts dp-audio">${this._audioLine()}</div>`;
                 this._rowsEl.innerHTML = html;
+            },
+
+            /**
+             * The audio thread, as far as the page can see it: the context's state, buffer mode and
+             * latency, voices playing now (and the peak over the last second), sounds started a
+             * second, main-thread ms a second spent starting them, and, where Chrome reports it,
+             * glitches (output underruns: the crackles and pops).
+             */
+            /** Bodies drawn / culled this frame, and canvas calls a frame (counted only while Full is open) */
+            _renderLine(game, workMs) {
+                const counting = !!GameSettings.countCalls;
+                this._countCalls(counting);
+                const n = this._callFrames ? Math.round(this._callTotal / this._callFrames) : 0;
+                this._callTotal = 0; this._callFrames = 0;
+                // frame time (last 30 frames) minus the game's own measured work: raster in the browser's GPU process, GC, the compositor
+                let sum = 0, k = 0;
+                for (let i = 0; i < 30; i++) { const v = this._times[(this._ti - 1 - i + this._times.length) % this._times.length]; if (v) { sum += v; k++; } }
+                const frameMs = k ? sum / k : 0, other = Math.max(0, frameMs - workMs);
+                const P = game.pedestrians, T = game.traffic;
+                const parts = [
+                    `<span>browser/GPU <b>${other.toFixed(1)}</b> ms</span>`,
+                    `<span>ticks/frame <b>${RenderStats.ticks}</b></span>`,
+                    `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span>`,
+                    `<span>cars <b>${T ? T.vehicles.length : 0}</b>/${GameSettings.getMaxTraffic()}</span>`,
+                    `<span>peds <b>${P ? P.pedestrians.length : 0}</b>/${GameSettings.getMaxPedestrians()}</span>`,
+                    `<span>crowd <b>${GameSettings.crowdQuality || 'high'}</b></span>`
+                ];
+                if (counting) parts.push(`<span>canvas calls <b>${n.toLocaleString()}</b>/frame</span>`);
+                // The world: buildings drawn of the map's, the ground tiles held, and the big image caches' memory
+                const M = game.activeMap, nb = M && M.buildings ? M.buildings.length : 0;
+                if (nb) parts.push(`<span>buildings <b>${RenderStats.bldBase}</b>/${RenderStats.bldTops} of ${nb}</span>`);
+                const mem = this._canvasMB(game);
+                if (mem.groundN) parts.push(`<span>ground <b>${mem.groundN}</b> tiles (${mem.ground.toFixed(0)} MB)</span>`);
+                parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB</span>`);
+                return parts.join('');
+            },
+
+            /** Pixel memory held by the game's big canvas caches (4 bytes a pixel): ground tiles, painted floors,
+                car sprites, the baked crowd. Recounted every half second. */
+            _canvasMB(game) {
+                const now = performance.now();
+                if (this._memAt && now - this._memAt < 500) return this._mem;
+                const px = (cv) => cv ? cv.width * cv.height : 0, MB = 4 / 1048576;
+                let ground = 0, groundN = 0, floors = 0, cars = 0, crowd = 0;
+                const gb = game.groundBaker;
+                if (gb) for (const cv of gb.cache.values()) { ground += px(cv); groundN++; }
+                if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
+                if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
+                if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv);
+                this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, total: (ground + floors + cars + crowd) * MB };
+                this._memAt = now;
+                return this._mem;
+            },
+
+            /** A counting shim on the 2D context's methods (Full profiler only; removed when it closes) */
+            _countCalls(on) {
+                const P = CanvasRenderingContext2D.prototype;
+                if (on && !this._calls) {
+                    this._calls = {}; this._callTotal = 0; this._callFrames = 0;
+                    for (const k of Object.getOwnPropertyNames(P)) {
+                        const d = Object.getOwnPropertyDescriptor(P, k);
+                        if (!d || typeof d.value !== 'function' || k === 'constructor') continue;
+                        const f = d.value; this._calls[k] = f;
+                        P[k] = function () { RenderStats.calls++; return f.apply(this, arguments); };
+                    }
+                } else if (!on && this._calls) {
+                    for (const k in this._calls) Object.getOwnPropertyDescriptor(P, k) && (P[k] = this._calls[k]);
+                    this._calls = null;
+                }
+            },
+
+            _audioLine() {
+                if (typeof audioSys === 'undefined' || !audioSys.stats) return '';
+                const c = audioSys.ctx, S = audioSys.stats;
+                const lat = Math.round(((c.baseLatency || 0) + (c.outputLatency || 0)) * 1000);
+                const parts = [['audio', c.state === 'running' ? audioSys.bufferMode : c.state], ['latency', lat + ' ms'],
+                               ['voices', `${S.live} / ${S.peakSec ?? S.peak}`], ['new/s', S.perSec], ['start ms/s', S.ms.toFixed(1)]];
+                const st = c.playbackStats || c.playoutStats;                // the playback-stats API, where the browser has it
+                if (st) {
+                    const ev = st.underrunEvents ?? st.fallbackFramesEvents, dur = st.underrunDuration ?? st.fallbackDuration;
+                    if (ev !== undefined) parts.push(['glitches', ev + (dur ? ` (${Math.round(dur * 1000)} ms)` : '')]);
+                } else parts.push(['glitches', 'n/a']);
+                return parts.map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('');
             },
 
             _countLine(game) {

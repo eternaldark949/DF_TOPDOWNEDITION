@@ -1,6 +1,8 @@
         // GameEngine — Save schema, migrations, saveGame / loadGame.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
-        engineMixin({
+                const AUTOSAVE_KEY = 'dfab_save_slot_auto';   // written when the app goes to the background (onPageHidden)
+
+engineMixin({
             // ========================================
             // MODULAR SAVE/LOAD SYSTEM
             // ========================================
@@ -134,7 +136,7 @@
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
                         flitTwoFinger: GameSettings.flitTwoFinger, flitButton: GameSettings.flitButton,
-                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, scopeView: GameSettings.scopeView,
+                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, scopeView: GameSettings.scopeView, scopeSlow: GameSettings.scopeSlow,
                         ambienceVolume: GameSettings.ambienceVolume,
                         musicVolume: GameSettings.musicVolume,
                         fullscreen: GameSettings.fullscreen,
@@ -395,8 +397,11 @@
                 return save;
             },
 
-            saveGame() {
-                if (this.scenes && this.scenes.running) { showMessage("Can't save during a scene"); return; }
+            /** `auto`: the quiet save made when the app goes to the background — its own slot (the Load
+                screen's Autosave card), never the player's, no message or sound. */
+            saveGame(opts = {}) {
+                const auto = !!opts.auto;
+                if (this.scenes && this.scenes.running) { if (!auto) showMessage("Can't save during a scene"); return; }
                 // Build save data from schema (captures current game state)
                 const saveData = this.getSaveSchema();
                 
@@ -418,6 +423,7 @@
                     role: t.role || 'civilian'
                 }));
         
+                if (auto) { try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(saveData)); } catch (e) { /* storage full: skip */ } return; }
                 localStorage.setItem(
                     (typeof saveSlotManager !== 'undefined') ? saveSlotManager.getActiveKey() : 'dfab_save_slot_0',
                     JSON.stringify(saveData)
@@ -432,11 +438,12 @@
                 }
             },
         
-            loadGame() {
-                const slotKey = (typeof saveSlotManager !== 'undefined') ? saveSlotManager.getActiveKey() : 'dfab_save_slot_0';
+            loadGame(key) {
+                const slotKey = key || ((typeof saveSlotManager !== 'undefined') ? saveSlotManager.getActiveKey() : 'dfab_save_slot_0');
                 let json = localStorage.getItem(slotKey);
                 // (A pre-slots save was moved into slot 1 once, by saveSlotManager._migrateV1Save; an empty slot stays empty.)
                 if (json && this.pausableTimers) this.pausableTimers.length = 0;   // the loaded world starts with nothing pending
+                if (json && this.scenes) this.scenes.abort();                       // nor with a scene from before it
                 if (!json) {
                     showMessage("NO SAVE FILE FOUND.");
                     audioSys.sfx('ui');
@@ -492,6 +499,7 @@
                     const playerY = playerData.y ?? rawSave.player?.y ?? defaults.player.y;
                     // Saved in Grum's old arena: it's the House of Death now — start at its door
                     if (mapId === 'grum_arena') { mapId = 'house_of_death'; this.loadMap(mapId); }
+                    else if (mapId === 'road_test') { mapId = 'hub_949'; this.loadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
                     else this.loadMap(mapId, { x: playerX, y: playerY });
         
                     // 4. Restore Teammates (unified — permanent + contract)
@@ -584,7 +592,10 @@
                     this.ownedCar.y = carData.y ?? defaults.car.y;
                     this.ownedCar.angle = carData.angle ?? defaults.car.angle;
                     
-                    const carMapId = carData.mapId ?? rawSave.car?.mapId ?? defaults.car.mapId;
+                    let carMapId = carData.mapId ?? rawSave.car?.mapId ?? defaults.car.mapId;
+                    if (carMapId === 'road_test') {                                       // left in the old road test zone: parked back in the city
+                        carMapId = 'hub_949'; this.ownedCar.x = defaults.car.x; this.ownedCar.y = defaults.car.y; this.ownedCar.angle = defaults.car.angle;
+                    }
                     if (carMapId === this.activeMap.id && this.activeMap.type !== 'indoor') {
                         this.ownedCar.visible = true;
                     } else {
@@ -740,10 +751,7 @@
 
                     // 12. Restore Settings
                     if (save.settings) {
-                        GameSettings.trafficDensity = save.settings.trafficDensity || 'high';
-                        GameSettings.pedestrianDensity = save.settings.pedestrianDensity || 'high';
-                        GameSettings.foliageDensity = save.settings.foliageDensity || 'high';
-                        GameSettings.rainDensity = save.settings.rainDensity || 'high';
+                        // (density and crowd detail stay this device's own — core/settings.js dfab_density — a save doesn't carry them over)
                         GameSettings.lightingQuality = save.settings.lightingQuality || 'high';
                         GameSettings.filmGrain = save.settings.filmGrain !== false;
                         GameSettings.softShadows = save.settings.softShadows ?? (GameSettings.lightingQuality === 'high');
@@ -769,6 +777,7 @@
                         GameSettings.aimBeforeFire = save.settings.aimBeforeFire !== false;
                         GameSettings.sniperRelease = save.settings.sniperRelease !== false;
                         GameSettings.scopeView = save.settings.scopeView !== false;
+                        GameSettings.scopeSlow = save.settings.scopeSlow !== false;
                         GameSettings.applyControls();
                         if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
                         if (typeof save.settings.musicVolume === 'number') audioSys.setMusicVolume(save.settings.musicVolume);

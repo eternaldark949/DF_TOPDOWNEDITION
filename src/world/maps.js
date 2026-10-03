@@ -19,15 +19,6 @@
                 ],
                 zones: [], buildings: [], walls: [], transitions: []
             },
-            'road_test': {
-                id: 'road_test', width: 4000, height: 4000, type: 'outdoor',
-                label: 'Road Test Zone (Expanded)', floorColor: '#0b1a0b',
-                climate: 'outskirt',   // Milder than the city — driving out feels different
-                spawn: { x: 2000, y: 2000 },
-                pavements: [], crosswalks: [], lamps: [],
-                walls: [ { x: 0, y: 0, w: 4000, h: 50 }, { x: 0, y: 3950, w: 4000, h: 50 }, { x: 0, y: 0, w: 50, h: 4000 }, { x: 3950, y: 0, w: 50, h: 4000 } ],
-                transitions: [ { x: 1960, y: 3900, w: 80, h: 50, target: 'hub_949', label: 'Return to City' } ]
-            },
             'ethereal_plane': {
                 id: 'ethereal_plane', width: 1200, height: 1200, type: 'indoor',
                 label: 'The Ethereal Plane', floorColor: '#0a001a',
@@ -215,28 +206,28 @@
                 ]
             },
             'cozy_cafe_interior': {
+                // The Cozy Cafe: honey herringbone under pendant lamps, a brick hearth with armchairs, round
+                // candlelit tables, booths along the east wall, window benches either side of the door.
+                // Floor in drawCafeInterior, furniture in drawCafeDecorProp (cc_*), glow in drawCafeGlow.
                 id: 'cozy_cafe_interior', width: 1200, height: 1000, type: 'indoor',
-                label: 'Cozy Cafe', floorColor: '#1a1008',
+                label: 'Cozy Cafe', floorColor: '#2a1a0e',
+                ambientDarkness: 0.5,                               // warm and lamp-lit, never dark
+                navProps: 'all',                                    // the guests walk round the furniture (world/cafe-life.js)
+                wallStyle: { fill: '#2b1a12', stroke: 'rgba(240,190,120,0.35)' },   // dark walnut panelling, honey trim
                 spawn: { x: 600, y: 900 },
-                zones: [
-                    { x: 60, y: 60, w: 1080, h: 600, color: '#2a1a0e', texture: 'wood' },
-                    { x: 60, y: 60, w: 350, h: 200, color: '#1e1208' },
-                    { x: 700, y: 60, w: 440, h: 250, color: '#1a1410' },
-                    { x: 450, y: 800, w: 300, h: 140, color: '#3e2723', texture: 'carpet' },
-                ],
+                zones: [],
                 walls: [
                     { x: 0, y: 0, w: 1200, h: 50 }, { x: 0, y: 950, w: 500, h: 50 },
                     { x: 700, y: 950, w: 500, h: 50 }, { x: 0, y: 0, w: 50, h: 1000 },
                     { x: 1150, y: 0, w: 50, h: 1000 }, { x: 700, y: 300, w: 450, h: 15 },
-                    { x: 690, y: 60, w: 15, h: 240 }, { x: 120, y: 250, w: 300, h: 20 },
-                    { x: 400, y: 100, w: 20, h: 170 }, { x: 950, y: 700, w: 200, h: 15 },
+                    { x: 690, y: 60, w: 15, h: 240 }, { x: 950, y: 700, w: 200, h: 15 },
                     { x: 940, y: 700, w: 15, h: 250 },
                 ],
                 transitions: [ { x: 500, y: 920, w: 200, h: 80, target: 'hub_949', label: 'Exit to City' } ],
                 landmarks: [
                     { id: 'cafe_exit', x: 600, y: 960 }, { id: 'cafe_counter', x: 250, y: 200 },
-                    { id: 'cafe_dining', x: 500, y: 550 }, { id: 'cafe_booths', x: 850, y: 550 },
-                    { id: 'cafe_kitchen', x: 900, y: 150 }
+                    { id: 'cafe_dining', x: 560, y: 550 }, { id: 'cafe_booths', x: 1040, y: 500 },
+                    { id: 'cafe_hearth', x: 190, y: 535 }, { id: 'cafe_kitchen', x: 900, y: 150 }
                 ]
             },
             'auto_shop': {

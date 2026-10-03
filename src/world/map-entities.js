@@ -10,10 +10,15 @@
         //  Single source of truth: createMapEntities reads these too.
         // ============================================================================
         const HUB_NPC_ANCHORS = [
-            { name: 'Mirabel', x: 2000, y: 1850 },
+            // Mirabel: off the hub for now — she's in her lounge at Moon City (moon_city_nightclub)
             { name: 'Anavia',  x: 550,  y: 1650, role: 'vip' },
         ];
         const HUB_NPC_CLEARANCE = 90; // px half-extent kept building-free per anchor
+
+        // The Cozy Cafe's round tables (centres) and booth rows (centre y): the props, the lamps and
+        // the guests' seats (world/cafe-life.js) all come from these
+        const CAFE_TABLES = [[505, 385], [628, 470], [505, 560], [628, 650], [505, 740]];
+        const CAFE_BOOTHS = [385, 500, 615];
 
         // ============================================================================
         /* Map-building shorthands (each map's case aliases them as F, S, A, L) */
@@ -412,33 +417,62 @@
                     ];
                     break;
 
-                case 'cozy_cafe_interior':
+                case 'cozy_cafe_interior': {
+                    // Cozy Cafe: the furniture art in drawCafeDecorProp (cc_*), the floor in drawCafeInterior,
+                    // the hearth, candles, pendants and steam in drawCafeGlow. Guests: world/cafe-life.js (CAFE).
+                    const F = decorPropsIn('#3a2418');
                     e.props = [
-                        new PropEntity({ x: 150, y: 100, width: 50, height: 40, color: '#444' }), new PropEntity({ x: 260, y: 100, width: 80, height: 40, color: '#3a2a1a' }),
-                        new PropEntity({ x: 350, y: 120, width: 30, height: 25, color: '#2a2a2a' }),
-                        new PropEntity({ x: 150, y: 280, width: 25, height: 25, color: '#4e342e' }), new PropEntity({ x: 220, y: 280, width: 25, height: 25, color: '#4e342e' }),
-                        new PropEntity({ x: 290, y: 280, width: 25, height: 25, color: '#4e342e' }), new PropEntity({ x: 360, y: 280, width: 25, height: 25, color: '#4e342e' }),
-                        new PropEntity({ x: 100, y: 380, width: 70, height: 50, color: '#3e2723' }), new PropEntity({ x: 100, y: 500, width: 70, height: 50, color: '#3e2723' }), new PropEntity({ x: 100, y: 620, width: 70, height: 50, color: '#3e2723' }),
-                        new PropEntity({ x: 350, y: 400, width: 80, height: 60, color: '#3e2723' }), new PropEntity({ x: 350, y: 550, width: 80, height: 60, color: '#3e2723' }), new PropEntity({ x: 350, y: 700, width: 80, height: 60, color: '#3e2723' }),
-                        new PropEntity({ x: 550, y: 400, width: 80, height: 60, color: '#3e2723' }), new PropEntity({ x: 550, y: 550, width: 80, height: 60, color: '#3e2723' }), new PropEntity({ x: 550, y: 700, width: 80, height: 60, color: '#3e2723' }),
-                        new PropEntity({ x: 780, y: 400, width: 120, height: 50, color: '#4a2a18' }), new PropEntity({ x: 780, y: 520, width: 120, height: 50, color: '#4a2a18' }), new PropEntity({ x: 780, y: 640, width: 120, height: 50, color: '#4a2a18' }),
-                        new PropEntity({ x: 910, y: 390, width: 15, height: 70, color: '#5d3a1a' }), new PropEntity({ x: 910, y: 510, width: 15, height: 70, color: '#5d3a1a' }), new PropEntity({ x: 910, y: 630, width: 15, height: 70, color: '#5d3a1a' }),
-                        new PropEntity({ x: 750, y: 100, width: 150, height: 40, color: '#555' }), new PropEntity({ x: 950, y: 80, width: 80, height: 60, color: '#333' }), new PropEntity({ x: 1070, y: 80, width: 50, height: 70, color: '#4a4a4a' }),
-                        new PropEntity({ x: 1000, y: 750, width: 60, height: 40, color: '#2a2a2a' }), new PropEntity({ x: 1080, y: 750, width: 60, height: 40, color: '#2a2a2a' }),
-                        new PropEntity({ x: 480, y: 860, width: 25, height: 25, color: '#2d5a27' }), new PropEntity({ x: 710, y: 860, width: 25, height: 25, color: '#2d5a27' }),
-                        new PropEntity({ x: 930, y: 880, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        // The counter: a long walnut bar with the pastry case at its end, the espresso machine,
+                        // grinder and the mug shelf behind (the gap at the west end lets the staff out)
+                        F(120, 245, 300, 30, 'cc_counter'), F(394, 92, 30, 183, 'cc_counter', { vertical: true }),
+                        F(140, 54, 66, 36, 'cc_espresso'), F(214, 58, 26, 28, 'cc_grinder'), F(252, 52, 130, 24, 'cc_mug_shelf'),
+                        F(60, 300, 36, 36, 'cc_plant', { variant: 1 }),
+                        // The hearth: a brick fireplace on the west wall, two armchairs, a loveseat, a low table
+                        F(52, 470, 46, 130, 'cc_fireplace'),
+                        F(142, 410, 50, 46, 'cc_armchair', { face: 'S' }), F(142, 618, 50, 46, 'cc_armchair', { face: 'N' }),
+                        F(286, 488, 46, 104, 'cc_loveseat', { face: 'W' }), F(176, 508, 62, 54, 'cc_lowtable'),
+                        // Books and records along the north wall
+                        F(440, 52, 170, 26, 'cc_bookshelf'), F(620, 54, 58, 28, 'cc_record'),
+                        // Round tables, a candle and two chairs each
+                        ...CAFE_TABLES.flatMap(([cx, cy]) => [F(cx - 26, cy - 26, 52, 52, 'cc_round_table', { candles: true }),
+                            F(cx - 59, cy - 11, 22, 22, 'cc_chair', { face: 'E' }), F(cx + 37, cy - 11, 22, 22, 'cc_chair', { face: 'W' })]),
+                        // Booths along the east wall: a bench either side of a table
+                        ...CAFE_BOOTHS.flatMap(cy => [F(1104, cy - 40, 42, 80, 'cc_booth', { face: 'W' }), F(1030, cy - 28, 62, 56, 'cc_booth_table', { candles: true }),
+                            F(966, cy - 40, 42, 80, 'cc_booth', { face: 'E' })]),
+                        // Window benches either side of the door, plants, the chalkboard
+                        F(66, 908, 360, 36, 'cc_bench', { face: 'N' }), F(752, 908, 180, 36, 'cc_bench', { face: 'N' }),
+                        F(150, 862, 36, 30, 'cc_side_table'), F(320, 862, 36, 30, 'cc_side_table'), F(822, 862, 36, 30, 'cc_side_table'),
+                        F(440, 906, 32, 32, 'cc_plant'), F(712, 906, 32, 32, 'cc_plant'),
+                        F(452, 836, 34, 18, 'cc_easel'),
+                        F(885, 718, 40, 56, null, { color: '#00f3ff', interactionType: 'vending_machine' }),
+                        // Kitchen: the range, the sink, the prep table, the fridge, a shelf of jars
+                        F(720, 54, 130, 46, 'cc_stove'), F(900, 54, 90, 34, 'cc_sink'), F(880, 160, 150, 44, 'cc_prep'),
+                        F(1090, 56, 54, 76, 'cc_fridge'), F(1104, 184, 40, 104, 'cc_shelf', { vertical: true }),
+                        // Storeroom: crates of beans, flour sacks, shelving
+                        F(990, 756, 56, 40, 'cc_crate'), F(1060, 756, 56, 40, 'cc_crate', { variant: 1 }), F(1056, 856, 76, 52, 'cc_sacks'),
+                        F(962, 880, 36, 60, 'cc_shelf', { vertical: true }),
                     ];
-                    e.npcs = [ new NPC(200, 150, "Barista Ren", 'bartender'), new NPC(850, 200, "Chef Koda") ];
+                    e.npcs = [ new NPC(250, 170, "Barista Ren", 'bartender'), new NPC(785, 128, "Chef Koda") ];
+                    e.npcs[0].angle = Math.PI / 2; e.npcs[1].angle = -Math.PI / 2;           // Ren faces the counter, Koda the range
+                    const L = hiddenLamp;
+                    const flame = (x, y, color, r) => Object.assign(new LampEntity({ x, y, lampType: 4, color, lightRadius: r, candle: true }), { candle: true, visible: false });
                     e.lamps = [
-                        new LampEntity({ x: 200, y: 180, lampType: 3, color: '#ffaa00', lightRadius: 250 }), new LampEntity({ x: 350, y: 180, lampType: 3, color: '#ffaa00', lightRadius: 250 }),
-                        new LampEntity({ x: 200, y: 450, lampType: 4, color: '#ff9933', lightRadius: 280 }), new LampEntity({ x: 200, y: 620, lampType: 4, color: '#ff9933', lightRadius: 280 }),
-                        new LampEntity({ x: 450, y: 470, lampType: 4, color: '#ffaa00', lightRadius: 300 }), new LampEntity({ x: 450, y: 650, lampType: 4, color: '#ffaa00', lightRadius: 300 }),
-                        new LampEntity({ x: 650, y: 470, lampType: 4, color: '#ffaa00', lightRadius: 300 }), new LampEntity({ x: 650, y: 650, lampType: 4, color: '#ffaa00', lightRadius: 300 }),
-                        new LampEntity({ x: 850, y: 450, lampType: 3, color: '#ff8800', lightRadius: 200 }), new LampEntity({ x: 850, y: 580, lampType: 3, color: '#ff8800', lightRadius: 200 }), new LampEntity({ x: 850, y: 700, lampType: 3, color: '#ff8800', lightRadius: 200 }),
-                        new LampEntity({ x: 850, y: 150, lampType: 3, color: '#ffd080', lightRadius: 300 }), new LampEntity({ x: 1050, y: 150, lampType: 3, color: '#ffd080', lightRadius: 250 }),
-                        new LampEntity({ x: 500, y: 900, lampType: 3, color: '#ffaa00', lightRadius: 200 }), new LampEntity({ x: 700, y: 900, lampType: 3, color: '#ffaa00', lightRadius: 200 }),
+                        L(190, 262, '#ffcf8a', 260), L(330, 262, '#ffcf8a', 260),                   // the counter's two pendants
+                        ...CAFE_TABLES.map(([x, y]) => L(x, y, '#ffc27a', 200)),                   // the pendants over the tables
+                        ...CAFE_BOOTHS.map(y => L(1035, y, '#ffb870', 180)),
+                        flame(104, 535, '#ff8a3a', 340),                                            // the fire (it breathes)
+                        L(250, 880, '#ffd9a0', 240), L(840, 880, '#ffd9a0', 200),                  // the window benches
+                        L(920, 170, '#ffe6bd', 320), L(1050, 820, '#e0c8a8', 220),                 // kitchen, storeroom
+                    ];
+                    const S = softLight, A = areaLight;
+                    e.softLights = [
+                        A(380, 500, 640, 880, '#ffb06a', 0.2), A(1040, 500, 220, 360, '#ffb070', 0.18),   // the room's warm wash
+                        A(200, 535, 300, 300, '#ff8c40', 0.18),                                             // firelight over the rug
+                        ...CAFE_TABLES.map(([x, y]) => S(x, y, 56, '#ffb46a', 0.55, 2)),                     // candles
+                        ...CAFE_BOOTHS.map(y => S(1061, y, 46, '#ffb46a', 0.5, 2)),
                     ];
                     break;
+                }
 
                 case 'auto_shop':
                     e.props = [

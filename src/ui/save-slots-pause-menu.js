@@ -17,7 +17,6 @@
                 
                 this.MAP_NAMES = {
                     'hub_949': 'Moon City',
-                    'road_test': 'Outskirts',
                     'ethereal_plane': 'Ethereal Plane',
                     'apt_949': '949\'s Apartment',
                     'hotel_lobby': 'Double Nights Hotel',
@@ -91,6 +90,7 @@
             loadFromSlot(index) {
                 const data = this.getSlotData(index);
                 if (!data) return false;
+                if (index === 'auto') return game.loadGame(this._slotKey('auto'));   // the autosave: your own slot stays the active one
                 this.setActiveSlot(index);
                 return game.loadGame();
             }
@@ -115,6 +115,7 @@
                 this.mode = mode;
                 this.onComplete = onComplete || null;
                 this._confirmTarget = null;
+                clearTimeout(this._closeT);                                     // reopened mid-close: stay open
                 this._render();
                 this.overlay.classList.add('active');
                 requestAnimationFrame(() => { this.overlay.style.opacity = '1'; });
@@ -122,7 +123,8 @@
 
             close() {
                 this.overlay.style.opacity = '0';
-                setTimeout(() => { this.overlay.classList.remove('active'); }, 300);
+                clearTimeout(this._closeT);
+                this._closeT = setTimeout(() => { this.overlay.classList.remove('active'); }, 300);
             }
 
             _formatDate(ts) {
@@ -189,6 +191,17 @@
                     html += `</div>`;
                 }
 
+                // The autosave (made when the app went to the background): load only
+                const auto = this.mode === 'load' ? this.getSlotSummary('auto') : null;
+                if (auto) html += `<div class="save-slot-card" data-slot="auto">
+                        <div class="save-slot-header"><span class="save-slot-label">Autosave</span></div>
+                        <div class="save-slot-meta">
+                            <span class="meta-map">⧫ ${auto.mapName}</span>
+                            <span class="meta-currency">¤ ${auto.currency.toLocaleString()}</span>
+                            <span class="meta-story">Ch. ${auto.storyStep}</span>
+                            <span class="meta-date">${this._formatDate(auto.timestamp)}</span>
+                        </div></div>`;
+
                 const hasAny = this.hasAnySave();
                 html += `<div class="save-slot-footer">
                     <div class="save-slot-footer-actions">
@@ -208,16 +221,17 @@
             _bindEvents() {
                 // Close
                 this.overlay.querySelector('#save-slot-close').addEventListener('click', () => this.close());
-                this.overlay.addEventListener('click', (e) => {
-                    if (e.target === this.overlay) this.close();
-                });
+                if (!this._backdropBound) {                                     // the overlay outlives each render: bind it once
+                    this._backdropBound = true;
+                    this.overlay.addEventListener('click', (e) => { if (e.target === this.overlay) this.close(); });
+                }
 
                 // Slot cards
                 this.overlay.querySelectorAll('.save-slot-card').forEach(card => {
                     card.addEventListener('click', (e) => {
                         // Don't trigger if clicking delete or confirm buttons
                         if (e.target.closest('.save-slot-delete') || e.target.closest('.save-slot-confirm')) return;
-                        const slot = parseInt(card.dataset.slot);
+                        const slot = card.dataset.slot === 'auto' ? 'auto' : parseInt(card.dataset.slot);
                         this._onSlotClick(slot);
                     });
                 });
@@ -321,7 +335,7 @@
                 for (let i = 0; i < this.maxSlots; i++) {
                     if (this.getSlotData(i)) return true;
                 }
-                return false;
+                return !!this.getSlotData('auto');
             }
 
             // --- EXPORT ALL SLOTS ---
@@ -883,10 +897,11 @@
                 this._updateValueEl('set-traffic', GameSettings.trafficDensity);
                 this._updateValueEl('set-pedestrians', GameSettings.pedestrianDensity);
                 this._updateValueEl('set-foliage', GameSettings.foliageDensity);
+                this._updateValueEl('set-crowd', GameSettings.crowdQuality || 'high');
                 this._updateValueEl('set-rain', GameSettings.rainDensity);
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
-                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease'], ['set-scopeview', 'scopeView']])
+                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease'], ['set-scopeview', 'scopeView'], ['set-scopeslow', 'scopeSlow']])
                     this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
@@ -898,8 +913,11 @@
                 this._updateValueEl('set-finisher', GameSettings.finisher || 'full');
                 this._updateValueEl('set-enemyrings', GameSettings.enemyRings !== false ? 'on' : 'off');
                 this._updateValueEl('set-footsteps', GameSettings.footsteps !== false ? 'on' : 'off');
+                this._updateValueEl('set-audiobuffer', this._audioBufferLabel());
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
+                this._updateValueEl('set-countcalls', GameSettings.countCalls ? 'on' : 'off');
+                this._updateValueEl('set-baseline', GameSettings.baseline ? 'on' : 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
                 this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
                 this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
@@ -911,6 +929,12 @@
                 this._updateValueEl('set-fps', GameSettings.fpsLimit === 0 ? 'none' : String(GameSettings.fpsLimit));
             }
             
+            /** The Audio Buffer setting, with a note while it waits for a restart */
+            _audioBufferLabel() {
+                const want = GameSettings.audioBuffer || 'balanced';
+                return typeof audioSys !== 'undefined' && audioSys.bufferMode !== want ? want + ' · restart' : want;
+            }
+
             _updateValueEl(id, value) {
                 const el = document.getElementById(id);
                 if (!el) return;
@@ -929,7 +953,7 @@
             _cycleSetting(el) {
                 const key = el.dataset.key;
                 
-                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'aimBeforeFire' || key === 'sniperRelease' || key === 'scopeView') {
+                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'aimBeforeFire' || key === 'sniperRelease' || key === 'scopeView' || key === 'scopeSlow') {
                     GameSettings[key] = !GameSettings[key];
                     GameSettings.applyControls();
                     this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
@@ -989,6 +1013,14 @@
                     this.closeSettings();
                     this.enterCinematic({ grade: true, back: 'settings' });
 
+                } else if (key === 'audioBuffer') {
+                    // Low latency → Balanced → Smooth (bigger buffer, fewer crackles); the audio
+                    // context only takes it at launch, so it says so until then
+                    const order = ['low', 'balanced', 'smooth'];
+                    GameSettings.audioBuffer = order[(order.indexOf(GameSettings.audioBuffer || 'balanced') + 1) % order.length];
+                    try { localStorage.setItem('dfab_audio_buffer', GameSettings.audioBuffer); } catch (e) { /* private mode */ }
+                    this._updateValueEl(el.id, this._audioBufferLabel());
+
                 } else if (key === 'enemyRings' || key === 'footsteps') {
                     GameSettings[key] = GameSettings[key] === false;
                     this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
@@ -1013,6 +1045,15 @@
                     game.showProfiler = GameSettings.profilerMode !== 'off';
                     if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
                     this._updateValueEl(el.id, GameSettings.profilerMode);
+
+                } else if (key === 'countCalls') {
+                    GameSettings.countCalls = !GameSettings.countCalls;
+                    if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);
+                    this._updateValueEl(el.id, GameSettings.countCalls ? 'on' : 'off');
+
+                } else if (key === 'baseline') {
+                    GameSettings.baseline = !GameSettings.baseline;
+                    this._updateValueEl(el.id, GameSettings.baseline ? 'on' : 'off');
 
                 } else if (key === 'debugView') {
                     game.debugMode = !game.debugMode;
@@ -1069,6 +1110,8 @@
                     const current = GameSettings[key];
                     const idx = order.indexOf(current);
                     GameSettings[key] = order[(idx + 1) % 3];
+                    GameSettings.saveDensity();                                    // this device's, and applied now (trimToCap)
+                    if (key === 'crowdQuality' && typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
                     this._updateValueEl(el.id, GameSettings[key]);
                 }
                 

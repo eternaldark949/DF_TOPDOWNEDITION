@@ -11,6 +11,42 @@
         
 
         
+        /* --- ALLOCATION-FREE LINE-RECT TESTS (sight lines, rays, vision cones: thousands a frame) ---
+           The same arithmetic as getLineRectIntersections, edge by edge, so every answer matches it;
+           nothing is allocated, and a segment whose box misses the rect's is rejected first. */
+
+        /** Where segment 1→2 crosses edge e1→e2, as uA along the segment (0..1), or -1 when it doesn't */
+        function _segEdgeT(x1, y1, x2, y2, ex1, ey1, ex2, ey2) {
+            const denom = (ey2 - ey1) * (x2 - x1) - (ex2 - ex1) * (y2 - y1);
+            if (denom === 0) return -1;
+            const uA = ((ex2 - ex1) * (y1 - ey1) - (ey2 - ey1) * (x1 - ex1)) / denom;
+            const uB = ((x2 - x1) * (y1 - ey1) - (y2 - y1) * (x1 - ex1)) / denom;
+            return (uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1) ? uA : -1;
+        }
+
+        /** True when the segment crosses any edge of the rect (getLineRectIntersections(...).length > 0) */
+        function segCrossesRect(x1, y1, x2, y2, rx, ry, rw, rh) {
+            if ((x1 > x2 ? x1 : x2) < rx || (x1 < x2 ? x1 : x2) > rx + rw || (y1 > y2 ? y1 : y2) < ry || (y1 < y2 ? y1 : y2) > ry + rh) return false;
+            return _segEdgeT(x1, y1, x2, y2, rx, ry, rx + rw, ry) >= 0 || _segEdgeT(x1, y1, x2, y2, rx, ry + rh, rx + rw, ry + rh) >= 0
+                || _segEdgeT(x1, y1, x2, y2, rx, ry, rx, ry + rh) >= 0 || _segEdgeT(x1, y1, x2, y2, rx + rw, ry, rx + rw, ry + rh) >= 0;
+        }
+
+        /** The nearest crossing's distance from (x1, y1) that's at least minD, if under `best`; else `best`.
+            (Distances are worked out exactly as from getLineRectIntersections' points.) */
+        function segRectNearest(x1, y1, x2, y2, rx, ry, rw, rh, best, minD) {
+            if ((x1 > x2 ? x1 : x2) < rx || (x1 < x2 ? x1 : x2) > rx + rw || (y1 > y2 ? y1 : y2) < ry || (y1 < y2 ? y1 : y2) > ry + rh) return best;
+            for (let e = 0; e < 4; e++) {
+                const t = e === 0 ? _segEdgeT(x1, y1, x2, y2, rx, ry, rx + rw, ry)
+                        : e === 1 ? _segEdgeT(x1, y1, x2, y2, rx, ry + rh, rx + rw, ry + rh)
+                        : e === 2 ? _segEdgeT(x1, y1, x2, y2, rx, ry, rx, ry + rh)
+                        : _segEdgeT(x1, y1, x2, y2, rx + rw, ry, rx + rw, ry + rh);
+                if (t < 0) continue;
+                const d = Math.hypot(x1 + t * (x2 - x1) - x1, y1 + t * (y2 - y1) - y1);
+                if (d < best && d >= minD) best = d;
+            }
+            return best;
+        }
+
         /* --- HELPER: LINE-RECT INTERSECTION --- */
         function getLineRectIntersections(x1, y1, x2, y2, rx, ry, rw, rh) {
             const points = [];

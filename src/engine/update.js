@@ -286,7 +286,9 @@
                 // The Double Nights lobby: guests and staff come and go; searched cases refill daily
                 this.lobbyLife.update(this);
                 this.clubLife.update(this);
+                this.cafeLife.update(this);
                 Walker.update(this);               // everyone else on a goTo walk (world/walker.js)
+                this.updateNpcPosts();             // shoved off their post: back they go (engine/npc-posts.js)
                 if (_simTick % 60 === 0) {                                // lost things (lobby, club) refill daily
                     if (this._lostMap !== this.activeMap) { this._lostMap = this.activeMap; this._hasLost = this.props.some(p => p.interactionType === 'lost_luggage'); }
                     if (this._hasLost) this.refreshLostLuggage();
@@ -431,7 +433,9 @@
                     t => t.recruited && !t.downed && !t.inCar
                 );
                 const formationN = activeFormation.length;
-                const formationRadius = CONFIG.COMPANION.FORMATION_RADIUS;
+                // sneaking: they close up behind her (eased, so the slots don't jump)
+                this._formR = (this._formR ?? CONFIG.COMPANION.FORMATION_RADIUS) + ((this.crewSneaking() ? 48 : CONFIG.COMPANION.FORMATION_RADIUS) - (this._formR ?? CONFIG.COMPANION.FORMATION_RADIUS)) * 0.08;
+                const formationRadius = this._formR;
                 const baseAngle = CONFIG.COMPANION.FORMATION_FOLLOW_FACING
                     ? (this.player.angle + Math.PI)  // +π = behind player
                     : 0;
@@ -508,6 +512,7 @@
                     for (const o of this.npcs || []) if (!this.teammates.includes(o)) nudge(o, 26, 0);
                     if (this.lobbyLife) for (const o of this.lobbyLife.walkers) nudge(o, 22, 0.8);
                     if (this.clubLife) for (const o of this.clubLife.walkers) nudge(o, 22, 0.8);
+                    if (this.cafeLife) for (const o of this.cafeLife.walkers) if (!o.seated) nudge(o, 22, 0.8);
                     if (!navT || navT.walkable(tm.x + sepX, tm.y + sepY)) { tm.x += sepX; tm.y += sepY; }
 
                     // ── EYELINE TACTICS: a firing spot overrides the formation slot ──
@@ -537,7 +542,7 @@
                             // Repositioning for a clear shot — nav-grid path to the spot
                             const C = CONFIG.COMPANION;
                             const dSpot = Math.hypot(eyelineSpot.x - tm.x, eyelineSpot.y - tm.y);
-                            const topSpeed = dSpot > C.CATCHUP_DISTANCE ? C.CATCHUP_SPEED : (dSpot > C.MATCH_DISTANCE ? C.MATCH_SPEED : C.CONTRACT_SPEED);
+                            const topSpeed = (dSpot > C.CATCHUP_DISTANCE ? C.CATCHUP_SPEED : (dSpot > C.MATCH_DISTANCE ? C.MATCH_SPEED : C.CONTRACT_SPEED)) * (this.crewSneaking() ? SNEAK.SPEED : 1);
                             companionNavStep(tm, eyelineSpot.x, eyelineSpot.y, topSpeed, this);
                         } else if (tm._formationSlot) {
                             // Soft arrival on slot via smartMove (which still does
@@ -551,6 +556,7 @@
                             let topSpeed = C.CONTRACT_SPEED;  // cruise
                             if (distSlot > C.CATCHUP_DISTANCE) topSpeed = C.CATCHUP_SPEED;
                             else if (distSlot > C.MATCH_DISTANCE) topSpeed = C.MATCH_SPEED;
+                            if (this.crewSneaking()) topSpeed *= SNEAK.SPEED;                   // creeping with her
                             if (distSlot > C.FORMATION_DEADZONE) {
                                 // smartMove uses its own internal stop-at-60 check, so
                                 // for short approaches we step directly. This avoids
@@ -592,13 +598,16 @@
                 }
             
                 // Enemies (Gangers, Bosses)
+                let trafficCars = null;                                         // the cars they dodge: one list a tick, shared (read only)
                 for(let i=this.enemies.length-1; i>=0; i--) {
                     let enemy = this.enemies[i];
                     let result = null;
                     
                     if (enemy instanceof Ganger) {
-                        const trafficCars = this.traffic ? [...this.traffic.vehicles] : [];
-                        if (this.isDriving && this.car) trafficCars.push(this.car);
+                        if (!trafficCars) {
+                            trafficCars = this.traffic ? [...this.traffic.vehicles] : [];
+                            if (this.isDriving && this.car) trafficCars.push(this.car);
+                        }
                         result = enemy.update(this.player, this.activeMap.walls, getColliders(this.activeMap), this.lastKnownMarkers, trafficCars, this.activeMap, this.enemies);
                     } else if (enemy instanceof GatlingGunner) {
                         result = enemy.update(this.player.x, this.player.y, this.enemies, this.activeMap.walls);

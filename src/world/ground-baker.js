@@ -29,7 +29,7 @@
             constructor(game) {
                 this.game = game;
                 this.S = 512;                 // tile size (world px, painted 1:1)
-                this.max = 40;                // full-size tiles' worth kept (≈ 40 MB at most; a half-res tile counts ¼)
+                this.max = 40;                // full-size tiles' worth kept (a half-res tile counts ¼): set each frame from the view (draw)
                 this.lod = 0;
                 this.weight = 0;
                 this.cache = new Map();
@@ -58,6 +58,11 @@
                 const range = (v) => [Math.max(0, Math.floor(v.left / S)), Math.max(0, Math.floor(v.top / S)),
                                       Math.min(cols, Math.floor(v.right / S)), Math.min(rows, Math.floor(v.bottom / S))];
                 const [i0, j0, i1, j1] = range(view);
+                // What to keep: twice the tiles a view this size can touch, plus a few for the road ahead
+                // (a phone at walking zoom: ~16 tiles, ~16 MB), never past the old flat 40
+                const need = (Math.ceil((view.right - view.left) / S) + 1) * (Math.ceil((view.bottom - view.top) / S) + 1) * (this.lod ? 0.25 : 1);
+                this.max = Math.max(G.MIN_TILES, Math.min(G.MAX_TILES, Math.ceil(need * 2 + 4)));
+                this._trim();
                 this.t0 = performance.now(); this.baked = 0;
                 this.stats = { flat: 0, stand: 0, baked: 0 };
                 for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
@@ -96,11 +101,16 @@
                 const cv = this._bake(i, j, lod);
                 cv._w = lod ? 0.25 : 1;                                          // memory, in full-size tiles
                 this.cache.set(key, cv); this.weight = (this.weight || 0) + cv._w;
-                while (this.weight > this.max && this.cache.size > 1) {         // the oldest go first
+                this._trim();
+                return cv;
+            }
+
+            /** Over budget: the least recently seen tiles go first (the ones in view were just touched) */
+            _trim() {
+                while (this.weight > this.max && this.cache.size > 1) {
                     const k0 = this.cache.keys().next().value;
                     this.weight -= this.cache.get(k0)._w || 1; this.cache.delete(k0);
                 }
-                return cv;
             }
 
             _bake(i, j, lod = 0) {

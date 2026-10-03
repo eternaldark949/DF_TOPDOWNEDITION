@@ -20,11 +20,29 @@
            - tyres(l)  : Looped tyre squeal for the driven car, level 0..1
            - engine(s) : The driven car's electric hum (ENGINE_HUM per brand)
            ===================================================================== */
+        /** The Audio Buffer setting → the context's latencyHint (read once, at launch) */
+        const AUDIO_BUFFERS = { low: 'interactive', balanced: 'balanced', smooth: 'playback' };
+        /** sfx(): how long each one rings (s) and how many may ring at once */
+        const SFX_DUR = { shoot: 0.16, explode: 0.31, thunder: 2.8, knock: 0.14, bump: 0.32, crunch: 0.3, ui: 0.06, flit: 0.21 };
+        const SFX_CAP = { shoot: 4, explode: 3, thunder: 2, ui: 3, crunch: 3 };
+
+        /** Bring a gain in over a few ms instead of jumping to it — a jump is a click */
+        function softStart(param, t, amp, ramp = 0.003) {
+            param.setValueAtTime(0.0001, t);
+            param.exponentialRampToValueAtTime(Math.max(0.0002, amp), t + ramp);
+        }
+
         class AudioSystem {
             constructor() {
                 // Shared Web Audio API context - used by SFX and MusicWidgetSystem
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                this.ctx = new AudioContext();
+                // The output buffer (Settings → Audio Buffer): 'balanced' by default. The smallest
+                // ('interactive') underruns on mid-range phones while the game is busy — the crackles
+                // and pops — so it trades ~10–20 ms of latency for a steady stream. Read at launch.
+                this.bufferMode = AUDIO_BUFFERS[GameSettings.audioBuffer] ? GameSettings.audioBuffer : 'balanced';
+                try { this.ctx = new AudioContext({ latencyHint: AUDIO_BUFFERS[this.bufferMode] }); }
+                catch (e) { this.ctx = new AudioContext(); }
+                this._countVoices();
                 
                 // MASTER GAIN BUS — single point of mute for ALL audio (SFX + music).
                 // Both sfx() oscillators and MusicWidgetSystem.trackSource route through
@@ -32,13 +50,44 @@
                 // masterGain.gain silences the entire game in one place.
                 this.masterGain = this.ctx.createGain();
                 this.masterGain.gain.value = GameSettings.audioEnabled ? 1.0 : 0.0;
-                this.masterGain.connect(this.ctx.destination);
+                // A brick-wall limiter on the way out: a stack of shots over the music and rain
+                // would otherwise sum past full scale and clip (a harsh crackle)
+                this.limiter = this.ctx.createDynamicsCompressor();
+                const L = this.limiter;
+                L.threshold.value = -1; L.knee.value = 0; L.ratio.value = 20; L.attack.value = 0.001; L.release.value = 0.1;   // near-transparent below full scale
+                this.masterGain.connect(L); L.connect(this.ctx.destination);
 
                 // MUSIC BUS — all music (the apartment's track, the phone radio) goes through
                 // here into the master, so the Music slider sets it apart from sound effects.
                 this.musicGain = this.ctx.createGain();
                 this.musicGain.gain.value = GameSettings.musicVolume ?? 0.7;
                 this.musicGain.connect(this.masterGain);
+            }
+
+            /**
+             * Live voices for the profiler: every oscillator and buffer source counts while it plays
+             * (loops included). `stats` also counts sounds started per second and the peak.
+             */
+            _countVoices() {
+                const c = this.ctx, S = this.stats = { live: 0, peak: 0, started: 0, perSec: 0, _t: 0, _n: 0, ms: 0, _ms: 0 };
+                for (const name of ['createOscillator', 'createBufferSource']) {
+                    const make = c[name].bind(c);
+                    c[name] = () => {
+                        const n = make(), start = n.start.bind(n);
+                        n.start = (...a) => {
+                            S.live++; S.started++; if (S.live > S.peak) S.peak = S.live;
+                            n.addEventListener('ended', () => { S.live--; }, { once: true });
+                            return start(...a);
+                        };
+                        return n;
+                    };
+                }
+            }
+
+            /** Once a frame (ambience.update): roll the per-second counters */
+            _tickStats() {
+                const S = this.stats, now = performance.now();
+                if (now - S._t >= 1000) { S.perSec = S.started - S._n; S._n = S.started; S.ms = S._ms; S._ms = 0; S._t = now; S.peakSec = S.peak; S.peak = S.live; }
             }
 
             /** Music slider (0..1). */
@@ -49,16 +98,24 @@
         
             // Must be called after user interaction to unlock audio (browser policy)
             init() {
-                if (this.ctx.state === 'suspended') {
-                    this.ctx.resume();
-                }
+                if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume();
             }
+
+            /** Back at the menu: once the fades have played out, stop the audio thread (an sfx or enterWorld wakes it) */
+            idle(ms = 1200) {
+                clearTimeout(this._idleT);
+                this._idleT = setTimeout(() => {
+                    if (typeof game !== 'undefined' && (game.running || (game.musicWidget && game.musicWidget.isPlaying))) return;
+                    this.ctx.suspend();
+                }, ms);
+            }
+            wake() { clearTimeout(this._idleT); if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume(); }
             
             // Centralized audio toggle. Used by Settings UI and save-load restore.
             // Pass true/false; reads GameSettings.audioEnabled when called with no arg.
             setEnabled(on) {
                 if (typeof on === 'boolean') GameSettings.audioEnabled = on;
-                this.masterGain.gain.value = GameSettings.audioEnabled ? 1.0 : 0.0;
+                this.masterGain.gain.setTargetAtTime(GameSettings.audioEnabled ? 1.0 : 0.0, this.ctx.currentTime, 0.02);   // a fade, not a click
             }
         
             /* ---------------------------------------------------------------
@@ -75,8 +132,12 @@
                5. Start and stop at precise times
                --------------------------------------------------------------- */
             sfx(type, opts = {}) {
-                // Ensure audio context is active
-                if (this.ctx.state === 'suspended') this.ctx.resume();
+                // Ensure audio context is active (not from a timer while the app is in the background)
+                if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume();
+                // Rapid fire: a few shots ringing at once is plenty; more only stacks into clipping
+                const dur = SFX_DUR[type] || 0.3, V = this._sfxV || (this._sfxV = {});
+                if ((V[type] || 0) >= (SFX_CAP[type] || 6)) return;
+                V[type] = (V[type] || 0) + 1; setTimeout(() => { V[type]--; }, dur * 1000 + 30);
 
                 // Muffled = heard through walls: a lowpass in front of the master bus
                 let out = this.masterGain;
@@ -99,20 +160,20 @@
                     osc.type = 'square';
                     osc.frequency.setValueAtTime(800, now);
                     osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
-                    gain.gain.setValueAtTime(0.1, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    softStart(gain.gain, now, 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
                     osc.start(now);
-                    osc.stop(now + 0.15);
+                    osc.stop(now + 0.16);
                 } 
                 else if (type === 'explode') {
                     // EXPLOSION: Harsh sawtooth rumbling down
                     osc.type = 'sawtooth';
                     osc.frequency.setValueAtTime(100, now);
                     osc.frequency.exponentialRampToValueAtTime(10, now + 0.3);
-                    gain.gain.setValueAtTime(0.2, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    softStart(gain.gain, now, 0.2);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
                     osc.start(now);
-                    osc.stop(now + 0.3);
+                    osc.stop(now + 0.31);
                 }
                 else if (type === 'thunder') {
                     // THUNDER: low sawtooth rumble with a slow decay. Two detuned
@@ -199,20 +260,20 @@
                     // UI BLIP: Clean sine tone, short and high
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(1200, now);
-                    gain.gain.setValueAtTime(0.05, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                    softStart(gain.gain, now, 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
                     osc.start(now);
-                    osc.stop(now + 0.05);
+                    osc.stop(now + 0.06);
                 }
                 else if (type === 'flit') {
                     // TELEPORT: Smooth triangle wave rising in pitch
                     osc.type = 'triangle';
                     osc.frequency.setValueAtTime(200, now);
                     osc.frequency.linearRampToValueAtTime(600, now + 0.2);
-                    gain.gain.setValueAtTime(0.1, now);
-                    gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                    softStart(gain.gain, now, 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
                     osc.start(now);
-                    osc.stop(now + 0.2);
+                    osc.stop(now + 0.21);
                 }
             }
 
@@ -243,6 +304,10 @@
                 }
                 const E = this._eng, now = this.ctx.currentTime, H = ENGINE_HUM[st && st.brand] || ENGINE_HUM.Gelfash;
                 const v = Math.max(0, Math.min(1, (st && st.speed01) || 0)), thr = Math.max(0, Math.min(1, (st && st.throttle) || 0));
+                // Only when something moved: parked (or on foot) it would otherwise reschedule eight glides a frame
+                const sig = (on ? 1 : 0) + '|' + H.root + '|' + Math.round(v * 200) + '|' + Math.round(thr * 50);
+                if (sig === this._engSig) return;
+                this._engSig = sig;
                 const f = H.root * (1 + 1.1 * v);                                  // one smooth glide, idle to top speed
                 const glide = (p, x) => p.setTargetAtTime(x, now, 0.12);
                 glide(E.body1.o.frequency, f); glide(E.body2.o.frequency, f * 2);
@@ -281,6 +346,7 @@
                     src.start();
                     this._tyre = { g, bp };
                 }
+                if (Math.abs(L - (this._tyreL ?? -1)) < 0.01 && (L > 0 || this._tyreL === 0)) return;                 // unchanged: nothing to schedule
                 const now = this.ctx.currentTime;
                 this._tyre.g.gain.setTargetAtTime(L * 0.5, now, L > this._tyreL ? 0.03 : 0.09);
                 this._tyre.bp.frequency.setTargetAtTime(1300 + 500 * L, now, 0.1);
@@ -367,6 +433,7 @@
             /** Called every frame from GameEngine.loop (also while paused). */
             update(game) {
                 const a = this.audio;
+                if (a.stats) a._tickStats();
                 if (!this.ready) { if (a.ctx.state !== 'running') return; this._build(); }
                 const map = game.activeMap; if (!map) return;
                 const now = a.ctx.currentTime, w = game.weather, rs = game.roomSystem;
@@ -387,7 +454,8 @@
                 a.engine({ on: inCar, brand: car && car.brand, speed01: car ? Math.abs(car.speed || 0) / (car.maxSpeed || 10) : 0,
                            throttle: car ? Math.abs(car.controlMode === 'PLAYER' ? (car.pedal || 0) : (car.manualGas || 0)) : 0 });   // her motor (auto-drive too)
 
-                this.bus.gain.setTargetAtTime(vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0)), now, 0.4);   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
+                const busV = vol * 1.9 * (paused ? 0.25 : 1) * (1 - 0.45 * (game.scopeK || 0));
+                if (Math.abs(busV - (this._busV ?? -1)) > 0.004) { this._busV = busV; this.bus.gain.setTargetAtTime(busV, now, 0.4); }   // only on change: a new automation event every frame keeps the audio thread busy   // scoped: the world goes quiet   // layer levels are set low; 1.9 brings the bed to about -22 dBFS
                 const van = map.id === 'van_interior', rolling = van && game.vanMoving !== false;   // the crew's van: rain drums on the roof, the road hums underneath
                 this._set(this.L.rain, outside && !realm ? 0.3 * rain : 0, 0.8);
                 this._set(this.L.rainIn, van ? 0.2 : outside ? 0 : 0.22 * rain, 0.8);
@@ -523,7 +591,7 @@
                 if (!this._voice(null, 0.05)) return;
                 const ctx = this.audio.ctx, f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2000 + Math.random() * 3000; f.Q.value = 1.5;
                 const d = 0.005 + Math.random() * 0.035;
-                this._burst(this.pink, d, f, v * (0.4 + Math.random() * 0.6), (g, t, a) => { g.setValueAtTime(a, t); g.exponentialRampToValueAtTime(0.0001, t + d); });
+                this._burst(this.pink, d, f, v * (0.4 + Math.random() * 0.6), (g, t, a) => { softStart(g, t, a, 0.002); g.exponentialRampToValueAtTime(0.0001, t + d); });
             }
 
             _carPass(v) {
@@ -558,7 +626,7 @@
                 const ctx = this.audio.ctx, now = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
                 o.type = 'sine'; o.frequency.setValueAtTime(1800 + Math.random() * 900, now); o.frequency.exponentialRampToValueAtTime(900, now + 0.05);
                 o.connect(g); g.connect(this.bus);
-                g.gain.setValueAtTime(v, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+                softStart(g.gain, now, v); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
                 o.start(now); o.stop(now + 0.07);
             }
 
@@ -590,7 +658,7 @@
                     const os = ctx.createOscillator(), g = ctx.createGain(); os.type = type;
                     os.frequency.setValueAtTime(f0, now); os.frequency.exponentialRampToValueAtTime(f1, now + dur);
                     os.connect(g); g.connect(out);
-                    g.gain.setValueAtTime(Math.max(0.0002, amp), now); g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+                    softStart(g.gain, now, amp); g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
                     os.start(now); os.stop(now + dur + 0.02);
                 };
                 const soft = mat === 'carpet' ? 0.35 : mat === 'grass' ? 0.5 : 1, j = 0.9 + _sndRand() * 0.2;
@@ -639,7 +707,7 @@
                     s2.start(now + 0.05, _sndRand() * 2.5, 0.15);
                     const o = ctx.createOscillator(), g3 = ctx.createGain(); o.type = 'sine';
                     o.frequency.setValueAtTime(3400, now + 0.05); o.frequency.exponentialRampToValueAtTime(3100, now + 0.4);
-                    o.connect(g3); g3.connect(this.foley); g3.gain.setValueAtTime(0.025, now + 0.05); g3.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+                    o.connect(g3); g3.connect(this.foley); softStart(g3.gain, now + 0.05, 0.025); g3.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
                     o.start(now + 0.05); o.stop(now + 0.42);
                 }
             }
@@ -681,27 +749,27 @@
                 } else if (kind === 'latch') {
                     if (!this._voice(null, 0.1)) return;
                     const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 3200; f.Q.value = 3;
-                    this._burst(this.pink, 0.025, f, 0.18 * near, (gg, t, amp) => { gg.setValueAtTime(amp, t); gg.exponentialRampToValueAtTime(0.0001, t + 0.025); });
+                    this._burst(this.pink, 0.025, f, 0.18 * near, (gg, t, amp) => { softStart(gg, t, amp, 0.002); gg.exponentialRampToValueAtTime(0.0001, t + 0.025); });
                     const o = ctx.createOscillator(), g = ctx.createGain();
                     o.frequency.setValueAtTime(140, now); o.frequency.exponentialRampToValueAtTime(70, now + 0.07);
-                    o.connect(g); g.connect(this.bus); g.gain.setValueAtTime(0.09 * near, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+                    o.connect(g); g.connect(this.bus); softStart(g.gain, now, 0.09 * near); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
                     o.start(now); o.stop(now + 0.09);
                 } else if (kind === 'thud') {                                 // a round into a wooden leaf
                     if (!this._voice(null, 0.12)) return;
                     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520;
-                    this._burst(this.pink, 0.06, f, 0.22 * near, (gg, t, amp) => { gg.setValueAtTime(amp, t); gg.exponentialRampToValueAtTime(0.0001, t + 0.06); });
+                    this._burst(this.pink, 0.06, f, 0.22 * near, (gg, t, amp) => { softStart(gg, t, amp, 0.002); gg.exponentialRampToValueAtTime(0.0001, t + 0.06); });
                     const o = ctx.createOscillator(), g = ctx.createGain();
                     o.frequency.setValueAtTime(120, now); o.frequency.exponentialRampToValueAtTime(60, now + 0.1);
-                    o.connect(g); g.connect(this.bus); g.gain.setValueAtTime(0.12 * near, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+                    o.connect(g); g.connect(this.bus); softStart(g.gain, now, 0.12 * near); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
                     o.start(now); o.stop(now + 0.12);
                 } else if (kind === 'tink') {                                 // a round glancing off glass
                     if (!this._voice(null, 0.3)) return;
                     const o = ctx.createOscillator(), g = ctx.createGain();
                     o.type = 'sine'; o.frequency.setValueAtTime(2600 + Math.random() * 500, now);
-                    o.connect(g); g.connect(this.bus); g.gain.setValueAtTime(0.06 * near, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+                    o.connect(g); g.connect(this.bus); softStart(g.gain, now, 0.06 * near); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
                     o.start(now); o.stop(now + 0.3);
                     const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 4000;
-                    this._burst(this.pink, 0.03, f, 0.12 * near, (gg, t, amp) => { gg.setValueAtTime(amp, t); gg.exponentialRampToValueAtTime(0.0001, t + 0.03); });
+                    this._burst(this.pink, 0.03, f, 0.12 * near, (gg, t, amp) => { softStart(gg, t, amp, 0.002); gg.exponentialRampToValueAtTime(0.0001, t + 0.03); });
                 } else if (kind === 'whoosh') {
                     if (!this._voice(null, 0.4)) return;
                     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 0.8;
@@ -751,6 +819,25 @@
         }
 
         const ambience = new AmbienceSystem(audioSys);
+
+        // Audio:Sounds in the profiler: the main-thread cost of starting each sound (building its
+        // nodes and envelopes). They're started from inside other sections (AI, physics, logic),
+        // so the row is shown but not added to the frame total. The mixing itself runs on the
+        // browser's audio thread; the Audio line under the rows reports on that.
+        for (const [obj, names] of [[audioSys, ['sfx']], [ambience, ['footstep', 'slash', 'splash', 'doorEvent']]]) {
+            for (const name of names) {
+                const fn = obj[name];
+                obj[name] = function (...args) {
+                    const t0 = performance.now();
+                    try { return fn.apply(this, args); }
+                    finally {
+                        const ms = performance.now() - t0;
+                        audioSys.stats._ms += ms;
+                        if (typeof game !== 'undefined' && game && game.profiler) game.profiler.add('Audio:Sounds', ms, true);
+                    }
+                };
+            }
+        }
 
         // Nothing plays in a background tab
         document.addEventListener('visibilitychange', () => {

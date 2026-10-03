@@ -2,6 +2,11 @@
         // lane about her width stays lit along her line of fire, out to where the shot would
         // land. Eases in and out; the lane sways a little, then steadies (the cue to take the
         // shot). The camera leans down the line. Setting: GameSettings.scopeView.
+        // Scope slow-mo (GameSettings.scopeSlow): while she holds the scope, time eases down to
+        // SCOPE.SLOW with it — for a few breaths. Her focus (SCOPE.FOCUS real seconds) drains while
+        // she's slowed and refills once she lifts the scope; as it runs out, time eases back.
+        // A thin arc round her shows what's left. The loop takes the slower of this and any
+        // other time slow (a finisher, a boss's fall).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         const SCOPE = {
             IN: 7, OUT: 9,                // easing rates (per second) — about 0.25 s in, 0.2 s out
@@ -10,7 +15,11 @@
             WIDTH: 30,                    // the lane's width (world px) — about her own
             RANGE: 950,                   // how far she can look (world px), clipped at walls
             LEAN: 0.3,                    // camera lean down the line, as a share of the half-view
-            SWAY: 0.014, STEADY: 0.6      // radians of breathing sway; seconds to settle
+            SWAY: 0.014, STEADY: 0.6,     // radians of breathing sway; seconds to settle
+            SLOW: 0.35,                   // time scale at full scope
+            FOCUS: 3,                     // real seconds of slow-mo in a full breath
+            RECHARGE: 0.6,                // focus back per real second with the scope down
+            FADE: 0.6                     // the last of the focus eases time back to full speed
         };
 
         engineMixin({
@@ -23,7 +32,7 @@
 
             /** Ease the scope in or out; track how long she's held it (for the sway to settle). */
             updateScope() {
-                const on = this.isScoping(), dt = 1 / 60;
+                const on = this.isScoping(), dt = 1 / 60 / Math.max(0.05, this._loopScale || 1);   // real time, so it eases the same in slow-mo
                 const k = this.scopeK || 0, target = on ? 1 : 0;
                 this.scopeK = k + (target - k) * (1 - Math.exp(-(on ? SCOPE.IN : SCOPE.OUT) * dt));
                 if (this.scopeK < 0.002) this.scopeK = 0;
@@ -32,6 +41,34 @@
                 const a = this.player.angle, half = Math.min(this.canvas.width, this.canvas.height) / 2 / (this.camera.zoom || 1);
                 this.scopeLeanX = Math.cos(a) * half * SCOPE.LEAN * this.scopeK;
                 this.scopeLeanY = Math.sin(a) * half * SCOPE.LEAN * this.scopeK;
+            },
+
+            /**
+             * Once a rendered frame (real ms, loop.js): the time scale the scope asks for (1 = none).
+             * Drains her focus while she's slowed; refills it while the scope is down.
+             */
+            scopeTimeScale(elapsedMs) {
+                if (this._focus === undefined) this._focus = SCOPE.FOCUS;
+                if (this.paused) return this._scopeScale || 1;
+                const dt = elapsedMs / 1000, k = this.scopeK || 0, scoping = this.isScoping();
+                const allowed = GameSettings.scopeSlow !== false && !this.finisher && !(this.scenes && this.scenes.running);
+                if (allowed && scoping) this._focus = Math.max(0, this._focus - dt * k);
+                else if (!scoping) this._focus = Math.min(SCOPE.FOCUS, this._focus + dt * SCOPE.RECHARGE);
+                const fk = Math.min(1, this._focus / SCOPE.FADE);
+                return (this._scopeScale = allowed ? 1 - (1 - SCOPE.SLOW) * k * fk : 1);
+            },
+
+            /** The focus arc round her while she's scoped (world space): lavender, draining clockwise */
+            _drawFocusArc(ctx, k) {
+                if (GameSettings.scopeSlow === false || this._focus === undefined) return;
+                const f = this._focus / SCOPE.FOCUS, p = this.player;
+                if (f >= 0.999 && (this._scopeScale ?? 1) >= 0.999) return;
+                ctx.save(); ctx.lineCap = 'round';
+                ctx.strokeStyle = `rgba(202, 176, 250, ${0.16 * k})`; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 27, 0, Math.PI * 2); ctx.stroke();
+                ctx.strokeStyle = f < 0.25 ? `rgba(255, 138, 146, ${0.85 * k})` : `rgba(241, 232, 254, ${0.75 * k})`;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 27, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); ctx.stroke();
+                ctx.restore();
             },
 
             /** A soft lane sprite: bright along its middle, feathered at the sides, fading at the far end. */
@@ -93,5 +130,6 @@
                 ctx.globalAlpha = (0.35 + 0.35 * steady) * k; ctx.strokeStyle = steady >= 1 ? '#ffd9a0' : '#ff6a7a'; ctx.lineWidth = 0.8;
                 ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(far, 0); ctx.stroke();
                 ctx.restore();
+                this._drawFocusArc(ctx, k);                                  // over the veil, so it reads
             },
         });

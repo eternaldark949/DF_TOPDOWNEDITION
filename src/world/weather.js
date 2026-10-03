@@ -130,6 +130,32 @@
            - Flit teleport afterimages
            - Atmospheric ghost effects in graveyard
            ===================================================================== */
+        // drawRainOverlay's per-frame tables, made once
+        const _RAIN_SCRATCH = { bandPaths: new Array(4), corePaths: new Array(4), bandAlpha: new Float32Array(4), bandWidth: new Float32Array(4),
+                                coreAlpha: new Float32Array(4), coreWidth: new Float32Array(4), bandCount: new Int32Array(4), lamps: [], lit: [] };
+        /* A particle's colour, parsed once: { fill, mode } — mode 1: an rgba(…, 1) whose alpha follows life;
+           0.5: an rgba(…, 0.5) whose alpha is half its life; 0: anything else (drawn as is, faded by life).
+           null: a colour the old string edit mangled, kept on the old path. */
+        const _particleStyles = new Map();
+        function _particleStyle(color) {
+            let st = _particleStyles.get(color);
+            if (st !== undefined) return st;
+            const m = /^rgba\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/.exec(color);
+            if (m && (m[4] === '1' || m[4] === '0.5')) st = { fill: `rgb(${m[1]}, ${m[2]}, ${m[3]})`, mode: m[4] === '1' ? 1 : 0.5 };
+            else st = color.includes('1)') || color.includes('0.5)') ? null : { fill: color, mode: 0 };
+            if (_particleStyles.size > 256) _particleStyles.clear();
+            _particleStyles.set(color, st);
+            return st;
+        }
+        const _rainLitStyles = new Map();   // rgb → alpha (thousandths) → 'rgba(…)'
+        function _rainLitStyle(r, g, b, a) {
+            const rgb = (r << 16) | (g << 8) | b; let m = _rainLitStyles.get(rgb);
+            if (!m) { if (_rainLitStyles.size > 64) _rainLitStyles.clear(); _rainLitStyles.set(rgb, m = new Map()); }
+            const k = Math.round(a * 1000); let st = m.get(k);
+            if (st === undefined) m.set(k, st = `rgba(${r},${g},${b},${a.toFixed(3)})`);
+            return st;
+        }
+
         class WeatherSystem {
             constructor(width, height) {
                 this.isRaining = true;       // Toggle for rain effect
@@ -937,7 +963,11 @@
                                 ctx.lineTo(p.x - p.vx * 2, p.y - p.vy * 2); // Trail effect
                                 ctx.stroke();
                     } else {
-                        ctx.fillStyle = p.color.replace('1)', `${p.life})`).replace('0.5)', `${p.life * 0.5})`); ctx.globalAlpha = p.life; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+                        // Its colour's alpha follows its life (as the old per-frame string edit did), folded into globalAlpha
+                        const st = _particleStyle(p.color), L = Math.min(1, p.life);
+                        if (st) { ctx.fillStyle = st.fill; ctx.globalAlpha = L * (st.mode === 1 ? L : st.mode === 0.5 ? Math.min(1, p.life * 0.5) : 1); }
+                        else { ctx.fillStyle = p.color.replace('1)', `${p.life})`).replace('0.5)', `${p.life * 0.5})`); ctx.globalAlpha = p.life; }
+                        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
                     }
                     ctx.restore();
                 });
@@ -994,14 +1024,10 @@
                 // 4 bands × 2 passes (main + core) = max 8 stroke calls instead of 2000+
                 ctx.lineCap = 'round';
                 
-                const BANDS = 4;
-                const bandPaths = new Array(BANDS);
-                const corePaths = new Array(BANDS);
-                const bandAlpha = new Float32Array(BANDS);
-                const bandWidth = new Float32Array(BANDS);
-                const coreAlpha = new Float32Array(BANDS);
-                const coreWidth = new Float32Array(BANDS);
-                const bandCount = new Int32Array(BANDS);
+                const BANDS = 4, S = _RAIN_SCRATCH;                   // the per-band tables, reused frame to frame
+                const bandPaths = S.bandPaths, corePaths = S.corePaths, bandAlpha = S.bandAlpha, bandWidth = S.bandWidth;
+                const coreAlpha = S.coreAlpha, coreWidth = S.coreWidth, bandCount = S.bandCount;
+                for (let b = 0; b < BANDS; b++) { bandPaths[b] = undefined; corePaths[b] = undefined; bandCount[b] = 0; }
                 
                 // Visual weight of the current condition. Uses the RAW intensity
                 // (not the budget-capped one) so a storm reads heavier on screen
@@ -1020,36 +1046,39 @@
                 }
                 
                 // Pre-calculate visible lamp screen positions for light interaction
-                let screenLamps = null;
+                let screenLamps = null, nLamps = 0;
                 if (lamps && lamps.length > 0) {
-                    screenLamps = [];
+                    screenLamps = S.lamps;
                     for (const l of lamps) {
                         const lsx = (l.x - camX) * zoom + hw;
                         const lsy = (l.y - camY) * zoom + hh;
                         const lsr = (l.radius || 200) * zoom * 0.6;
                         // Skip lamps far off screen
                         if (lsx < -lsr || lsx > this.width + lsr || lsy < -lsr || lsy > this.height + lsr) continue;
-                        const hex = (l.color || '#ffeebb').replace('#', '');
-                        // Parse each channel; preserve 0x00 bytes (the `|| 255` fallback
-                        // pattern would have corrupted any channel that was 00 — common
-                        // in crimson #ff0055, amber #ffaa00, cyan #00ddff lamps — turning
-                        // them yellow-white at runtime).
-                        const pr = parseInt(hex.substr(0, 2), 16);
-                        const pg = parseInt(hex.substr(2, 2), 16);
-                        const pb = parseInt(hex.substr(4, 2), 16);
-                        screenLamps.push({
-                            sx: lsx, sy: lsy, sr: lsr, srSq: lsr * lsr,
-                            r: Number.isNaN(pr) ? 255 : pr,
-                            g: Number.isNaN(pg) ? 238 : pg,
-                            b: Number.isNaN(pb) ? 187 : pb,
-                            intensity: l.intensity || 0.8
-                        });
+                        const col = l.color || '#ffeebb';
+                        if (l._rainCol !== col) {                                    // parsed once per lamp colour, not every frame
+                            const hex = col.replace('#', '');
+                            // Parse each channel; preserve 0x00 bytes (the `|| 255` fallback
+                            // pattern would have corrupted any channel that was 00 — common
+                            // in crimson #ff0055, amber #ffaa00, cyan #00ddff lamps — turning
+                            // them yellow-white at runtime).
+                            const pr = parseInt(hex.substr(0, 2), 16);
+                            const pg = parseInt(hex.substr(2, 2), 16);
+                            const pb = parseInt(hex.substr(4, 2), 16);
+                            l._rainCol = col;
+                            l._rainR = Number.isNaN(pr) ? 255 : pr; l._rainG = Number.isNaN(pg) ? 238 : pg; l._rainB = Number.isNaN(pb) ? 187 : pb;
+                        }
+                        const sl = screenLamps[nLamps] || (screenLamps[nLamps] = {});
+                        sl.sx = lsx; sl.sy = lsy; sl.sr = lsr; sl.srSq = lsr * lsr;
+                        sl.r = l._rainR; sl.g = l._rainG; sl.b = l._rainB; sl.intensity = l.intensity || 0.8;
+                        nLamps++;
                     }
-                    if (screenLamps.length === 0) screenLamps = null;
+                    if (nLamps === 0) screenLamps = null;
                 }
                 
-                // Collect lit drop data for the colored pass
-                const litDrops = screenLamps ? [] : null;
+                // Collect lit drop data for the colored pass: 9 numbers a drop (tail, head, rgb, alpha, width)
+                const litDrops = screenLamps ? S.lit : null;
+                if (litDrops) litDrops.length = 0;
                 
                 // Sort drops into bands and build paths
                 // Render interpolation: step each drop back by the frame's lag (drops fall
@@ -1098,17 +1127,14 @@
                     
                     // Check lamp proximity for light interaction
                     if (screenLamps) {
-                        for (const sl of screenLamps) {
+                        for (let k = 0; k < nLamps; k++) {
+                            const sl = screenLamps[k];
                             const ddx = ax - sl.sx, ddy = ay - sl.sy;
                             const distSq = ddx * ddx + ddy * ddy;
                             if (distSq < sl.srSq) {
                                 const falloff = 1 - Math.sqrt(distSq) / sl.sr;
-                                litDrops.push({
-                                    tx: tailX, ty: tailY, ax, ay,
-                                    cr: sl.r, cg: sl.g, cb: sl.b,
-                                    a: Math.min(0.5, 0.12 + falloff * 0.38) * sl.intensity,
-                                    w: bandWidth[band] * (1 + falloff * 0.6)
-                                });
+                                litDrops.push(tailX, tailY, ax, ay, sl.r, sl.g, sl.b,
+                                    Math.min(0.5, 0.12 + falloff * 0.38) * sl.intensity, bandWidth[band] * (1 + falloff * 0.6));
                                 break; // One lamp per drop
                             }
                         }
@@ -1133,15 +1159,13 @@
                 
                 // --- LIT RAIN PASS (colored drops near lamps) ---
                 if (litDrops && litDrops.length > 0) {
-                    // Batch by color (group drops lit by the same lamp)
-                    // For simplicity: draw individually since each may have unique alpha/width
-                    // Performance: these are a small fraction of total drops
-                    for (const ld of litDrops) {
-                        ctx.strokeStyle = `rgba(${ld.cr},${ld.cg},${ld.cb},${ld.a.toFixed(3)})`;
-                        ctx.lineWidth = ld.w;
+                    // Drawn one by one (each has its own alpha and width); the colour strings come from a cache
+                    for (let i = 0; i < litDrops.length; i += 9) {
+                        ctx.strokeStyle = _rainLitStyle(litDrops[i + 4], litDrops[i + 5], litDrops[i + 6], litDrops[i + 7]);
+                        ctx.lineWidth = litDrops[i + 8];
                         ctx.beginPath();
-                        ctx.moveTo(ld.tx, ld.ty);
-                        ctx.lineTo(ld.ax, ld.ay);
+                        ctx.moveTo(litDrops[i], litDrops[i + 1]);
+                        ctx.lineTo(litDrops[i + 2], litDrops[i + 3]);
                         ctx.stroke();
                     }
                 }

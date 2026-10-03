@@ -359,6 +359,16 @@
                 console.warn(`[Profiler] ${label}: ${msg}`);
             }
 
+            /**
+             * Add time measured elsewhere (ms). `nested`: it already sits inside another
+             * section (sounds started from the AI, say), so it's shown but not added to the total.
+             */
+            add(label, ms, nested) {
+                const m = this.metrics[label] || (this.metrics[label] = { current: 0, avg: 0, open: false, wrapper: false });
+                if (nested) m.nested = true;
+                m.current += ms;
+            }
+
             /** Mark a label as wrapping other sections so totals don't double-count. */
             markWrapper(label) {
                 if (!this.metrics[label]) {
@@ -380,7 +390,7 @@
                         // contain their children. Adding them to the sum counted
                         // the whole render and update passes twice, so TOTAL_MS
                         // read close to double the real frame time.
-                        if (!m.wrapper) totalFrameTime += m.avg;
+                        if (!m.wrapper && !m.nested) totalFrameTime += m.avg;
                         
                         this.report.push({ 
                             label: label, 

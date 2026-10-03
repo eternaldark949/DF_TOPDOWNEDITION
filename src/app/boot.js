@@ -138,6 +138,7 @@
             const order = ['low', 'medium', 'high'];
             const idx = order.indexOf(GameSettings[key]);
             GameSettings[key] = order[(idx + 1) % 3];
+            GameSettings.saveDensity();
             return GameSettings[key].toUpperCase();
         }
         
@@ -168,6 +169,7 @@
             lbl('lbl-aimfire', `Aim Before Firing: ${onOff('aimBeforeFire')}`, onCol('aimBeforeFire'));
             lbl('lbl-sniperrelease', `Sniper Fire on Release: ${onOff('sniperRelease')}`, onCol('sniperRelease'));
             lbl('lbl-scopeview', `Scope View: ${onOff('scopeView')}`, onCol('scopeView'));
+            lbl('lbl-scopeslow', `Scope Slow-Mo: ${onOff('scopeSlow')}`, onCol('scopeSlow'));
             lbl('lbl-audio', `Master Audio: ${GameSettings.audioEnabled ? 'ON' : 'OFF'}`,
                 GameSettings.audioEnabled ? '' : '#666');
             lbl('lbl-fps', `FPS Limit: ${GameSettings.fpsLimit === 0 ? 'NONE' : GameSettings.fpsLimit}`,
@@ -260,7 +262,7 @@
         });
         
         // Flit controls (touch): ring, flick, two-finger tap, the ⚡ button
-        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton'], ['btn-toggle-aimfire', 'aimBeforeFire'], ['btn-toggle-sniperrelease', 'sniperRelease'], ['btn-toggle-scopeview', 'scopeView']]) {
+        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton'], ['btn-toggle-aimfire', 'aimBeforeFire'], ['btn-toggle-sniperrelease', 'sniperRelease'], ['btn-toggle-scopeview', 'scopeView'], ['btn-toggle-scopeslow', 'scopeSlow']]) {
             document.getElementById(id).addEventListener('click', () => {
                 GameSettings[key] = !GameSettings[key];
                 GameSettings.applyControls();

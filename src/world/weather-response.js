@@ -48,6 +48,17 @@
         }
 
         /** Draw an umbrella seen from above: a ribbed canopy (open 0…1) or a furled stick in the hand. */
+        const _sheens = new Map();
+        function _umbrellaSheen(R) {
+            const k = Math.round(R * 4) / 4; let g = _sheens.get(k);
+            if (!g) {
+                const c = (_sheens._c || (_sheens._c = document.createElement('canvas').getContext('2d')));
+                g = c.createRadialGradient(-k * 0.35, -k * 0.35, 0, 0, 0, k);
+                g.addColorStop(0, 'rgba(255,255,255,0.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+                _sheens.set(k, g);
+            }
+            return g;
+        }
         function drawUmbrella(ctx, cx, cy, handX, handY, open, u) {
             const color = u.color || '#1a1a1a', trim = u.trim || darkenHex(color, 40);
             if (open < 0.15) {                                                   // furled: a slim stick along the forearm
@@ -68,9 +79,9 @@
             }
             ctx.fill();
             // Sheen on the upper panels, ribs, the tip
-            const sh = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, 0, cx, cy, R);
-            sh.addColorStop(0, 'rgba(255,255,255,0.22)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = sh; ctx.fill();
+            // (one gradient per canopy size, made once: shifted into place, the path stays where it was built)
+            const sh = _umbrellaSheen(R);
+            ctx.save(); ctx.translate(cx, cy); ctx.fillStyle = sh; ctx.fill(); ctx.restore();
             ctx.strokeStyle = trim; ctx.lineWidth = 0.7; ctx.beginPath();
             for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2; ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); }
             ctx.stroke();

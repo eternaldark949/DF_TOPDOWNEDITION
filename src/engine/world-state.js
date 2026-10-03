@@ -34,12 +34,16 @@
                 const art = INTERIOR_ART[this.activeMap.id];
                 if (art && art.glow) art.glow(this, ctx);
                 if (CONFIG.BUILDINGS.LEAN && this.activeMap.buildings) {
+                    const V = this._cullBounds && this._cullBounds.view;
                     const z = this.camera.zoom || 1;
                     const hw = this.canvas.width / 2 / z + 200, hh = this.canvas.height / 2 / z + 200;
                     for (const b of this.activeMap.buildings) {
                         if (!b.isV2 || !b.drawEmissive) continue;
-                        const m = b.emissiveReach || 0;
-                        if (b.x + b.w < this.camera.x - hw - m || b.x > this.camera.x + hw + m || b.y + b.h < this.camera.y - hh - m || b.y > this.camera.y + hh + m) continue;
+                        if (V) { if (!b.inView(V, this.camera)) continue; }               // what could reach the screen (BuildingV2.inView)
+                        else {
+                            const m = b.emissiveReach || 0;
+                            if (b.x + b.w < this.camera.x - hw - m || b.x > this.camera.x + hw + m || b.y + b.h < this.camera.y - hh - m || b.y > this.camera.y + hh + m) continue;
+                        }
                         b.drawEmissive(ctx, dark);
                     }
                 }
@@ -154,7 +158,6 @@
                         'hotel_lobby': "DOUBLE NIGHTS HOTEL",
                         'hotel_suite': "PENTHOUSE SUITE",
                         'church_boss': "THE SANCTUM",
-                        'road_test': "ROAD TEST ZONE",
                         'hub_949': "CITY SECTOR 9",
                         'auto_shop': "TORQUE AUTO",
                         'neural_sys_interior': "NEURAL SYSTEMS",

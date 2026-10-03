@@ -169,7 +169,10 @@
             draw(ctx, cb) {
                 if (!this.walkers.length) return;
                 const t = _frameTime / 1000;
-                const list = this.walkers.filter(w => !cb || (w.x > cb.left && w.x < cb.right && w.y > cb.top && w.y < cb.bottom)).sort((a, b) => a.y - b.y);
+                // In view only (one reused list, sorted by depth); the rest keep their gait (footsteps) ticking
+                const list = this._drawList || (this._drawList = []); list.length = 0;
+                for (const w of this.walkers) { if (!cb || (w.x > cb.left && w.x < cb.right && w.y > cb.top && w.y < cb.bottom)) list.push(w); else { syncHumanoidGait(w); RenderStats.culled++; } }
+                list.sort(_byY);
                 for (const w of list) {
                     // Portal arrivals and departures: a violet-gold bloom that fades as they solidify
                     if (w.life < 1 && (w.from === 'portal' || w.exitKind === 'portal')) {
@@ -197,7 +200,7 @@
                         ctx.fillStyle = '#2b3a55'; ctx.fillRect(17, 1, 22, 9);
                         ctx.strokeStyle = '#e8c27a'; ctx.beginPath(); ctx.moveTo(14, -13); ctx.quadraticCurveTo(28, -22, 42, -13); ctx.stroke();
                     }
-                    drawProceduralHumanoid(ctx, w, { stance: 'idle', ...w.look });
+                    drawCrowdHumanoid(ctx, w, { stance: 'idle', ...w.look });                // by Crowd Quality (ui/crowd-impostors.js)
                     if (b && b.type !== 'roller') {                                   // carried: a case, a garment bag, a hat box
                         ctx.fillStyle = b.color;
                         if (b.type === 'case') { ctx.fillRect(-2, 9, 12, 5); ctx.fillStyle = '#e8c27a'; ctx.fillRect(3, 8, 3, 1); }

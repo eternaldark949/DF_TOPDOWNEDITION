@@ -438,36 +438,56 @@
             },
 
             // --- AUGMENT SHOP ---
+            /* ── SHOP FRAME (styles/shops.css): open/close an overlay, its balance capsule, double-tap buys ── */
+            _shopShow(id, on) {
+                const el = document.getElementById(id); if (!el) return;
+                el.classList.toggle('open', on);
+                if (on) el.onclick = (e) => { if (e.target === el) { const c = el.querySelector('.df-shop-close'); if (c) c.click(); } };   // a tap on the backdrop closes it
+            },
+            _shopBalance(id, n, unit = 'PP') {
+                const el = document.getElementById(id); if (!el) return;
+                el.classList.toggle('scrap', unit !== 'PP');
+                el.innerHTML = `<span class="gem">◆</span>${Math.floor(n).toLocaleString()}<span class="unit">${unit}</span>`;
+            },
+            /** First tap arms the button ("Confirm?"), a second within 2.5 s does it */
+            _confirmTap(btn, label, run) {
+                if (btn.dataset.armed) { btn.dataset.armed = ''; clearTimeout(btn._t); run(); return; }
+                btn.dataset.armed = '1'; btn._label = btn.innerHTML; btn.innerHTML = label; btn.classList.add('confirm');
+                audioSys.sfx('ui');
+                btn._t = setTimeout(() => { btn.dataset.armed = ''; btn.innerHTML = btn._label; btn.classList.remove('confirm'); }, 2500);
+            },
+            /** A card that was just bought glows gold once (after the re-render) */
+            _shopFlash(container) {
+                if (!this._shopJust) return;
+                const el = container.querySelector(`[data-key="${this._shopJust}"]`); this._shopJust = null;
+                if (el) { el.classList.add('bought'); el.scrollIntoView({ block: 'nearest' }); }
+            },
+            _priceHtml(price, have, unit = 'PP') {
+                return `<span class="df-price${have < price ? ' short' : ''}">${price.toLocaleString()}<span class="unit">${unit}</span></span>`;
+            },
+
             openAugmentShop() {
                 this.pauseSystem.acquire('augment_shop');
-                const shop = document.getElementById('augment-shop');
-                shop.classList.add('active');
-                document.getElementById('aug-shop-balance').textContent = `BALANCE: ${this.currency} PERSONICS`;
-                
-                const grid = document.getElementById('aug-shop-grid');
-                grid.innerHTML = '';
+                this._shopShow('augment-shop', true);
+                this._shopBalance('aug-shop-balance', this.currency);
+                const grid = document.getElementById('aug-shop-grid'), A = this.augments;
+                let html = `<div class="df-section"><span><span class="glint">◆</span>Cybernetic Augments</span><span class="count">${A.owned.length} / ${AUGMENT_CATALOG.length} installed</span></div>`;
                 for (const aug of AUGMENT_CATALOG) {
-                    const owned = this.augments.isOwned(aug.id);
-                    const card = document.createElement('div');
-                    card.className = 'aug-card' + (owned ? ' owned' : '');
-                    card.innerHTML = `
-                        <div class="aug-card-name">${aug.icon} ${aug.name}</div>
-                        <div class="aug-card-desc">${aug.desc}</div>
-                        ${owned ? '<div class="aug-card-owned">✓ OWNED</div>' : `<div class="aug-card-price">${aug.price} PP</div>`}
-                    `;
-                    if (!owned) {
-                        card.addEventListener('click', () => {
-                            if (this.augments.buy(aug.id, this)) {
-                                this.openAugmentShop(); // Refresh
-                            }
-                        });
-                    }
-                    grid.appendChild(card);
+                    const owned = A.isOwned(aug.id), afford = this.currency >= aug.price;
+                    html += `<div class="df-card${owned ? ' lit' : afford ? '' : ' unaffordable'}" data-key="${aug.id}"><div class="df-head">`;
+                    html += `<div class="note-ico">${aug.icon}</div><div class="grow"><div class="eyebrow">Slot · ${aug.slot}</div><div class="title">${aug.name}</div><div class="desc">${aug.desc}</div></div>`;
+                    html += `<div class="df-shop-side">${owned ? `<span class="df-chip active">✓ Installed</span>${A.isEquipped(aug.id) ? '<span class="df-chip">● Equipped</span>' : ''}`
+                        : `${this._priceHtml(aug.price, this.currency)}<button class="df-btn small" data-buy="${aug.id}"${afford ? '' : ' disabled'}>Buy</button>`}</div>`;
+                    html += `</div></div>`;
                 }
-
-                // Close handler
+                html += `<div class="df-hint" style="text-align:center;margin-top:8px;">Equip installed augments from the Augments screen.</div>`;
+                grid.innerHTML = html;
+                this._shopFlash(grid);
+                grid.querySelectorAll('button[data-buy]').forEach(b => b.addEventListener('click', () => this._confirmTap(b, 'Confirm?', () => {
+                    if (A.buy(b.dataset.buy, this)) { this._shopJust = b.dataset.buy; audioSys.sfx('ui'); this.openAugmentShop(); }
+                })));
                 document.getElementById('aug-shop-close').onclick = () => {
-                    shop.classList.remove('active');
+                    this._shopShow('augment-shop', false);
                     this.pauseSystem.release('augment_shop');
                 };
             },
@@ -475,142 +495,101 @@
             // ── COSMETICS SHOP (Neural Systems) ──
             openCosmeticsShop() {
                 this.pauseSystem.acquire('cosmetics_shop');
+                this._shopShow('cosmetics-shop-overlay', true);
+                this._shopBalance('cosmetics-shop-balance', this.currency);
                 const overlay = document.getElementById('cosmetics-shop-overlay');
-                overlay.style.display = 'block';
-                document.getElementById('cosmetics-shop-balance').textContent = `BALANCE: ${this.currency} PERSONICS`;
-
-                // Tab state
-                let activeTab = 'wig';
                 const tabs = overlay.querySelectorAll('.cosmetics-tab');
                 const content = document.getElementById('cosmetics-shop-content');
+                const C = this.cosmetics;
+                const LABEL = { wig: 'W.I.G.s', skin: 'S.K.I.N.s', outfit: 'O.U.T.F.I.T.s', vocal: 'V.O.C.A.L.s', accessory: 'A.C.C.E.S.S.', hat: 'H.A.T.s', jewelry: 'J.E.W.E.L.s' };
+                let activeTab = this._cosmeticsTab || 'wig';
+
+                /** The item's look as a round swatch */
+                const swatchOf = (item, category) => {
+                    const d = item.data || {};
+                    if (category === 'wig') return `background:${d.color}`;
+                    if (category === 'skin') return `background:${d.skinColor}`;
+                    if (category === 'outfit') return `background:linear-gradient(135deg, ${d.top.color} 50%, ${d.bottom.color} 50%)`;
+                    if (category === 'hat' || category === 'jewelry') return `background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${d.color} 45%)`;
+                    if (category === 'vocal') return `background:${d.captionColor};opacity:0.8`;
+                    if (category === 'accessory' && d.held === 'umbrella') return `background:conic-gradient(${d.color} 0 12.5%, ${d.trim} 12.5% 14%, ${d.color} 14% 25%, ${d.trim} 25% 26.5%, ${d.color} 26.5% 100%)`;
+                    if (category === 'accessory') { const g = GLASS_DRINKS[C.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne; return `background:radial-gradient(circle at 35% 35%, #fff 0 12%, ${g.liquid} 30%, ${g.liquid2 || g.liquid} 100%)`; }
+                    return 'background:#333';
+                };
 
                 const renderTab = (category) => {
-                    activeTab = category;
-                    // Update tab styling
-                    tabs.forEach(t => {
-                        const isActive = t.dataset.tab === category;
-                        t.style.background = isActive ? 'rgba(0,136,255,0.15)' : 'rgba(255,255,255,0.03)';
-                        t.style.borderColor = isActive ? 'rgba(0,136,255,0.4)' : 'rgba(255,255,255,0.1)';
-                        t.style.color = isActive ? '#0088ff' : '#888';
-                    });
-
-                    // Get items for this category
+                    activeTab = this._cosmeticsTab = category;
+                    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === category));
                     const items = Object.values(COSMETICS_REGISTRY).filter(e => e.category === category);
                     const optional = category === 'accessory' || category === 'hat' || category === 'jewelry';   // these can be taken off
-
-                    let html = '';
+                    const ownedN = items.filter(it => C.isOwned(it.id)).length;
+                    let html = `<div class="df-section"><span><span class="glint">◆</span>${LABEL[category] || category}</span><span class="count">${ownedN} / ${items.length} owned</span></div>`;
                     for (const item of items) {
-                        const owned = this.cosmetics.isOwned(item.id);
-                        const equipped = this.cosmetics.isEquipped(item.id);
-                        const borderCol = equipped ? 'rgba(0,136,255,0.5)' : owned ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)';
-                        const bgCol = equipped ? 'rgba(0,136,255,0.08)' : 'rgba(255,255,255,0.03)';
-
-                        // Color swatch for visual categories
-                        let swatch = '';
-                        if (category === 'wig') {
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:${item.data.color};border:1px solid rgba(255,255,255,0.15);flex-shrink:0;"></div>`;
-                        } else if (category === 'skin') {
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:${item.data.skinColor};border:1px solid rgba(255,255,255,0.15);flex-shrink:0;"></div>`;
-                        } else if (category === 'outfit') {
-                            // Two-tone swatch: top color + bottom color
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg, ${item.data.top.color} 50%, ${item.data.bottom.color} 50%);border:1px solid rgba(255,255,255,0.15);flex-shrink:0;"></div>`;
-                        } else if (category === 'hat' || category === 'jewelry') {
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${item.data.color} 45%);border:1px solid rgba(255,255,255,0.2);flex-shrink:0;"></div>`;
-                        } else if (category === 'vocal') {
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:${item.data.captionColor};border:1px solid rgba(255,255,255,0.15);flex-shrink:0;opacity:0.7;"></div>`;
-                        } else if (category === 'accessory' && item.data.held === 'umbrella') {
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:conic-gradient(${item.data.color} 0 12.5%, ${item.data.trim} 12.5% 14%, ${item.data.color} 14% 25%, ${item.data.trim} 25% 26.5%, ${item.data.color} 26.5% 100%);border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"></div>`;
-                        } else if (category === 'accessory') {
-                            const d = GLASS_DRINKS[this.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne;
-                            swatch = `<div style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #fff 0 12%, ${d.liquid} 30%, ${d.liquid2 || d.liquid} 100%);border:1px solid rgba(255,255,255,0.35);box-shadow:inset 0 0 3px rgba(255,255,255,0.6);flex-shrink:0;"></div>`;
-                        }
-
-                        html += `<div class="cosmetics-item" data-id="${item.id}" style="background:${bgCol}; border:1px solid ${borderCol}; border-radius:6px; padding:12px; margin-bottom:6px; display:flex; align-items:center; gap:10px; cursor:pointer; transition: border-color 0.2s;">`;
-                        html += swatch;
-                        html += `<div style="flex:1;">`;
-                        html += `<div style="font-family:Orbitron,sans-serif; font-size:0.7rem; color:${equipped ? '#0088ff' : '#ccc'}; letter-spacing:1px;">${item.name}`;
-                        if (equipped) html += ` <span style="color:#00ff66;font-size:0.55rem;margin-left:6px;">● ACTIVE</span>`;
-                        html += `</div>`;
-                        html += `<div style="font-size:0.6rem; color:#777; margin-top:2px;">${item.desc}</div>`;
-                        // Drink picker for the glass (owned only)
+                        const owned = C.isOwned(item.id), equipped = C.isEquipped(item.id), afford = this.currency >= item.price;
+                        html += `<div class="df-card clickable${equipped ? ' lit' : ''}${!owned && !afford ? ' unaffordable' : ''}" data-key="${item.id}" data-id="${item.id}"><div class="df-head">`;
+                        html += `<div class="df-swatch" style="${swatchOf(item, category)}"></div>`;
+                        html += `<div class="grow"><div class="title">${item.name}</div><div class="desc">${item.desc}</div></div>`;
+                        html += `<div class="df-shop-side">`;
+                        if (!owned) html += `${this._priceHtml(item.price, this.currency)}<button class="df-btn small" data-act="buy"${afford ? '' : ' disabled'}>Buy</button>`;
+                        else if (!equipped) html += `<span class="df-chip">Owned</span><button class="df-btn small ghost" data-act="equip">Equip</button>`;
+                        else html += `<span class="df-chip active">● Active</span>${optional ? '<button class="df-btn small danger" data-act="remove">Remove</button>' : ''}`;
+                        html += `</div></div>`;
+                        // The glass: pick the pour (owned only)
                         if (category === 'accessory' && owned && item.data.held === 'glass') {
-                            const cur = this.cosmetics.getAccessoryOption(item.id, 'drink');
-                            html += `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">`;
+                            const cur = C.getAccessoryOption(item.id, 'drink');
+                            html += `<div class="df-chips" style="margin-top:10px;">`;
                             for (const [key, d] of Object.entries(GLASS_DRINKS)) {
-                                const on = key === cur;
-                                html += `<div class="cosmetics-drink" data-acc="${item.id}" data-drink="${key}" style="display:flex; align-items:center; gap:4px; padding:3px 7px; border-radius:10px; border:1px solid ${on ? 'rgba(0,136,255,0.7)' : 'rgba(255,255,255,0.12)'}; background:${on ? 'rgba(0,136,255,0.15)' : 'rgba(255,255,255,0.03)'}; cursor:pointer;">`;
-                                html += `<div style="width:9px;height:9px;border-radius:50%;background:${d.liquid};${d.liquid2 ? `box-shadow:3px 0 0 -1px ${d.liquid2};` : ''}"></div>`;
-                                html += `<span style="font-size:0.5rem; color:${on ? '#fff' : '#999'}; letter-spacing:0.5px;">${d.name}</span></div>`;
+                                if (d.cafe) continue;                                   // (mugs are the cafe's)
+                                html += `<span class="df-chip pick cosmetics-drink${key === cur ? ' active' : ''}" data-acc="${item.id}" data-drink="${key}"><i class="dot" style="background:${d.liquid};${d.liquid2 ? `box-shadow:3px 0 0 -1px ${d.liquid2};` : ''}"></i>${d.name}</span>`;
                             }
                             html += `</div>`;
                         }
                         html += `</div>`;
-
-                        if (!owned) {
-                            html += `<div style="font-family:Orbitron,sans-serif; font-size:0.65rem; color:#ffd700; white-space:nowrap;">${item.price} PP</div>`;
-                        } else if (!equipped) {
-                            html += `<div style="font-size:0.55rem; color:#0088ff; letter-spacing:1px;">EQUIP</div>`;
-                        } else if (optional) {
-                            html += `<div style="font-size:0.55rem; color:#ff6688; letter-spacing:1px;">REMOVE</div>`;
-                        } else {
-                            html += `<div style="font-size:0.55rem; color:#555; letter-spacing:1px;">EQUIPPED</div>`;
-                        }
-                        html += `</div>`;
                     }
                     content.innerHTML = html;
+                    this._shopFlash(content);
 
-                    // Drink chips: pick the pour (and put the glass in hand)
-                    content.querySelectorAll('.cosmetics-drink').forEach(el => {
-                        el.addEventListener('click', (ev) => {
-                            ev.stopPropagation();
-                            this.cosmetics.setAccessoryOption(el.dataset.acc, 'drink', el.dataset.drink);
-                            this.cosmetics.equip(el.dataset.acc);
-                            audioSys.sfx('ui');
-                            renderTab(activeTab);
-                        });
-                    });
-
-                    // Bind click handlers
-                    content.querySelectorAll('.cosmetics-item').forEach(el => {
-                        el.addEventListener('click', () => {
-                            const id = el.dataset.id;
-                            const entry = COSMETICS_REGISTRY[id];
-                            if (entry && this.cosmetics.isEquipped(id) && ['accessory', 'hat', 'jewelry'].includes(entry.category)) {
-                                // optional pieces toggle off
-                                if (entry.category === 'accessory') this.cosmetics.unequipAccessory();
-                                else if (entry.category === 'hat') this.cosmetics.unequipHat();
-                                else this.cosmetics.unequipJewelry(id);
-                                audioSys.sfx('ui');
-                                renderTab(activeTab);
-                            } else if (this.cosmetics.isOwned(id)) {
-                                this.cosmetics.equip(id);
-                                audioSys.sfx('ui');
-                                renderTab(activeTab);
-                            } else {
-                                if (this.cosmetics.buy(id, this)) {
-                                    audioSys.sfx('ui'); // purchase blip
-                                    this.cosmetics.equip(id);
-                                    document.getElementById('cosmetics-shop-balance').textContent = `BALANCE: ${this.currency} PERSONICS`;
-                                    renderTab(activeTab);
-                                } else {
-                                    showMessage("INSUFFICIENT PERSONICS");
-                                }
+                    content.querySelectorAll('.cosmetics-drink').forEach(el => el.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        C.setAccessoryOption(el.dataset.acc, 'drink', el.dataset.drink);
+                        C.equip(el.dataset.acc);
+                        audioSys.sfx('ui');
+                        renderTab(activeTab);
+                    }));
+                    content.querySelectorAll('.df-card[data-id]').forEach(card => {
+                        const id = card.dataset.id, entry = COSMETICS_REGISTRY[id];
+                        const act = (kind, btn) => {
+                            if (kind === 'remove') {
+                                if (entry.category === 'accessory') C.unequipAccessory();
+                                else if (entry.category === 'hat') C.unequipHat();
+                                else C.unequipJewelry(id);
+                                audioSys.sfx('ui'); renderTab(activeTab);
+                            } else if (kind === 'equip') {
+                                C.equip(id); audioSys.sfx('ui'); renderTab(activeTab);
+                            } else if (kind === 'buy') {
+                                this._confirmTap(btn, 'Confirm?', () => {
+                                    if (C.buy(id, this)) {
+                                        audioSys.sfx('ui'); C.equip(id); this._shopJust = id;
+                                        this._shopBalance('cosmetics-shop-balance', this.currency);
+                                        renderTab(activeTab);
+                                    } else showMessage('INSUFFICIENT PERSONICS');
+                                });
                             }
+                        };
+                        card.querySelectorAll('button[data-act]').forEach(b => b.addEventListener('click', (ev) => { ev.stopPropagation(); act(b.dataset.act, b); }));
+                        // A tap on an owned card equips it (or takes an optional piece off)
+                        card.addEventListener('click', () => {
+                            if (!C.isOwned(id)) return;
+                            act(C.isEquipped(id) ? (['accessory', 'hat', 'jewelry'].includes(entry.category) ? 'remove' : null) : 'equip');
                         });
                     });
                 };
 
-                // Wire tabs
-                tabs.forEach(t => {
-                    t.onclick = () => renderTab(t.dataset.tab);
-                });
+                tabs.forEach(t => { t.onclick = () => { audioSys.sfx('ui'); renderTab(t.dataset.tab); }; });
+                renderTab(activeTab);
 
-                // Initial render
-                renderTab('wig');
-
-                // Close handler
                 document.getElementById('cosmetics-shop-close').onclick = () => {
-                    overlay.style.display = 'none';
+                    this._shopShow('cosmetics-shop-overlay', false);
                     this.pauseSystem.release('cosmetics_shop');
                 };
             },
@@ -1325,47 +1304,50 @@
             // --- CRAFTING SYSTEM ---
             openCraftingTable() {
                 this.pauseSystem.acquire('crafting');
-                const shop = document.getElementById('augment-shop');
-                // Repurpose augment shop overlay for crafting
-                shop.classList.add('active');
-                shop.querySelector('.aug-shop-title').textContent = 'CRAFTING WORKBENCH';
-                shop.querySelector('.aug-shop-subtitle').textContent = 'APT 949 — MAIN ROOM';
-                document.getElementById('aug-shop-balance').textContent = `SCRAP: ${this.scrap}`;
-
-                const grid = document.getElementById('aug-shop-grid');
-                grid.innerHTML = '';
+                this._shopShow('craft-shop', true);
+                this._shopBalance('craft-shop-balance', this.scrap, 'Scrap');
+                const grid = document.getElementById('craft-shop-grid');
+                let html = `<div class="df-section"><span><span class="glint">◆</span>Schematics</span><span class="count">${SCHEMATICS.length}</span></div>`;
                 for (const sch of SCHEMATICS) {
-                    const owned = this.inventory.items.some(i => i.id === sch.id);
-                    const canAfford = this.scrap >= sch.scrapCost;
-                    const card = document.createElement('div');
-                    card.className = 'aug-card' + (owned ? ' owned' : '');
-                    card.innerHTML = `
-                        <div class="aug-card-name">${sch.icon || '⊕'} ${sch.name}</div>
-                        <div class="aug-card-desc">${sch.desc}</div>
-                        ${owned ? '<div class="aug-card-owned">✓ CRAFTED</div>' : `<div class="aug-card-price">${sch.scrapCost} SCRAP${!canAfford ? ' <span style="color:#ff5555;">(INSUFFICIENT)</span>' : ''}</div>`}
-                    `;
-                    if (!owned && canAfford) {
-                        card.addEventListener('click', () => {
-                            this.scrap -= sch.scrapCost;
-                            const craftedItem = createItemFromRegistry(sch.id, this);
-                            if (craftedItem) this.inventory.addItem(craftedItem);
-                            this.updateUI();
-                            showMessage(`CRAFTED: ${sch.name}`);
-                            audioSys.sfx('ui');
-                            this.openCraftingTable(); // Refresh
-                        });
+                    const owned = this.inventory.items.some(i => i.id === sch.id), canAfford = this.scrap >= sch.scrapCost;
+                    const reg = (typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[sch.id]) || {};
+                    // What it is: its registry stats, as label / value rows
+                    const stats = [], st = reg.stats || {};
+                    if (reg.type) stats.push(['Type', reg.type]);
+                    if (st.damage) stats.push(['Damage', st.damage]);
+                    if (st.fireRate) stats.push(['Fire delay', st.fireRate + '<span class="unit">ticks</span>']);
+                    if (st.recoil) stats.push(['Recoil', st.recoil]);
+                    if (st.dotDamage) stats.push(['Burn', `${st.dotDamage} × ${st.dotTicks || 1}`]);
+                    if (st.sticky) stats.push(['Orbs', 'Stick to targets']);
+                    if (st.effect === 'laser_sight') stats.push(['Effect', 'Targeting beam']);
+                    html += `<div class="df-card${owned ? ' lit' : ''}" data-key="${sch.id}"><div class="df-head">`;
+                    html += `<div class="note-ico">${sch.icon || '⊕'}</div><div class="grow"><div class="eyebrow">Schematic</div><div class="title">${sch.name}</div><div class="desc">${sch.desc}</div></div>`;
+                    html += `<div class="df-shop-side">${owned ? '<span class="df-chip active">✓ Crafted</span>' : `${this._priceHtml(sch.scrapCost, this.scrap, 'Scrap')}<button class="df-btn small" data-craft="${sch.id}"${canAfford ? '' : ' disabled'}>Craft</button>`}</div></div>`;
+                    if (stats.length) html += `<div class="df-rows" style="margin-top:8px;">${stats.map(([k, v]) => `<div class="df-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('')}</div>`;
+                    if (!owned) {
+                        const pct = Math.min(100, Math.round(this.scrap / sch.scrapCost * 100));
+                        html += `<div class="df-bar-label"><span>Scrap</span><span>${Math.min(this.scrap, sch.scrapCost)} / ${sch.scrapCost}</span></div><div class="df-bar ${canAfford ? 'gold' : ''}${pct ? '' : ' zero'}" style="--v:${pct}%"><i></i></div>`;
                     }
-                    grid.appendChild(card);
+                    html += `</div>`;
                 }
-
-                document.getElementById('aug-shop-close').onclick = () => {
-                    shop.classList.remove('active');
-                    // Restore titles for augment shop
-                    shop.querySelector('.aug-shop-title').textContent = 'CYBERNETIC AUGMENTS';
-                    shop.querySelector('.aug-shop-subtitle').textContent = "DR. YIN'S CLINIC";
+                grid.innerHTML = html;
+                this._shopFlash(grid);
+                grid.querySelectorAll('button[data-craft]').forEach(b => b.addEventListener('click', () => {
+                    const sch = SCHEMATICS.find(x => x.id === b.dataset.craft);
+                    if (!sch || this.scrap < sch.scrapCost) return;
+                    this.scrap -= sch.scrapCost;
+                    const craftedItem = createItemFromRegistry(sch.id, this);
+                    if (craftedItem) this.inventory.addItem(craftedItem);
+                    this.updateUI();
+                    showMessage(`CRAFTED: ${sch.name}`);
+                    audioSys.sfx('ui');
+                    this._shopJust = sch.id;
+                    this.openCraftingTable();
+                }));
+                document.getElementById('craft-shop-close').onclick = () => {
+                    this._shopShow('craft-shop', false);
                     this.pauseSystem.release('crafting');
                 };
             },
 
         });
-

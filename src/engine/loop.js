@@ -3,6 +3,8 @@
         engineMixin({
             /** From the menu into the world: hide the menu layer, show the canvas, start the loop. */
             enterWorld() {
+                if (this.running) return;                                      // a second tap during the fade: one loop only
+                if (typeof audioSys !== 'undefined') audioSys.wake();
                 const ttb = document.getElementById('tap-to-begin'); if (ttb) ttb.remove();
                 document.getElementById('ui-layer').style.display = 'none';
                 document.getElementById('game-container').style.display = 'block';
@@ -12,6 +14,11 @@
             stop() {
                 this.running = false;
                 ambience.silence();
+                // Nothing of the run keeps going behind the menu: a ringing call, the car's hum, the radio, an open dialogue
+                if (typeof phoneSystem !== 'undefined' && phoneSystem.endCall) phoneSystem.endCall();
+                if (typeof audioSys !== 'undefined') { audioSys.engine({ on: false }); audioSys.tyres(0); audioSys.idle(); }
+                if (this.musicWidget && this.musicWidget.isPlaying) this.musicWidget.togglePlay(false);
+                if (this.dialogueBox && this.dialogueBox.style.display !== 'none') this.endDialogue();
                 this.pauseSystem.clear();
                 document.getElementById('game-container').style.display = 'none'; 
                 document.getElementById('ui-layer').style.display = 'flex'; 
@@ -31,6 +38,12 @@
              */
             resetGameState() {
                 if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
+                if (this.scenes) this.scenes.abort();                       // a scene left playing doesn't run on into the next game
+                if (this._rideState && this._rideState.on) { this._rideEl.classList.remove('show'); this._rideState.on = false; }   // the ride tag goes with the run
+                // The big canvases go with the run: painted floors, the city's ground tiles, the baked crowd
+                if (this._releaseMapBakes) this._releaseMapBakes(null);
+                if (this.groundBaker) { this.groundBaker.invalidate(); this.groundBaker.mapId = null; }
+                if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
                 if (this.coach) { this.coach.dismiss(); this.coach.deserialize([]); }   // a story New Game then calls hud.startFresh()
                 if (this.hud) this.hud.revealAll();
                 // --- PLAYER STATE ---
@@ -163,6 +176,10 @@
                 this.stickyOrbs = [];
                 this.muzzleFlashes = []; this.casings = []; this.shotFx = [];
                 this.loot = [];
+                this.npcs = []; this.props = []; this.lamps = []; this.enemies = []; this.corpses = [];   // the last map's (loading a map sets them)
+                this.lastKnownMarkers = []; this.noiseRipples = []; this.flitVFX = [];
+                if (this.traffic) this.traffic.reset();                         // the last run's street, too (the hub doesn't reset it on load)
+                if (this.pedestrians) this.pedestrians.reset();
                 this.activeInteraction = null;
                 
                 // --- PHONE ---
@@ -195,7 +212,9 @@
             },
             loop() {
                 if (!this.running) return;
-                ambience.update(this);
+                const _a0 = performance.now();
+                ambience.update(this);                                   // the beds, the music, the motor (Audio:Ambience in the profiler)
+                if (this.profiler) this.profiler.add('Audio:Ambience', performance.now() - _a0);
                 
                 /* FPS LIMITER — skip frame if too soon.
                    Scheduled against a running due-time rather than the last
@@ -254,7 +273,7 @@
                 // Real-time length of one tick. GAME_SPEED 0.5 → 33.3ms → 30 ticks/sec.
                 // A time slow (triggerTimeSlow) stretches it the same way: evenly spaced, interpolated ticks.
                 if (this.finisher || this.finCam) this.updateFinisher(elapsed);   // the finisher's beats run on real time (engine/finisher.js)
-                const slow = this.updateTimeSlow(elapsed);
+                const slow = this._loopScale = Math.min(this.updateTimeSlow(elapsed), this.scopeTimeScale(elapsed));   // a finisher's slow, or the scope's (engine/scope.js)
                 const stepMs = CONFIG.LOOP.STEP_MS / Math.max(0.05, (CONFIG.LOOP.GAME_SPEED || 1) * slow);
                 const interp = CONFIG.LOOP.INTERPOLATE;
 
@@ -267,6 +286,7 @@
                 }
                 // Machine can't keep up — drop the backlog rather than spiral.
                 if (steps >= CONFIG.LOOP.MAX_STEPS) this._accumulator = 0;
+                RenderStats.ticks = steps;   // sim ticks this frame (the profiler: a slow frame runs several, and its update rows add them up)
                 
                 // Always draw for smooth visuals — blended between the last two ticks
                 if (interp) RenderInterp.apply(this, this._accumulator / stepMs);

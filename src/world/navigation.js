@@ -107,7 +107,7 @@
                 while (k > 0) {
                     const p = (k - 1) >> 1;
                     if (F[p] <= F[k]) break;
-                    [H[p], H[k]] = [H[k], H[p]]; [F[p], F[k]] = [F[k], F[p]]; k = p;
+                    const th = H[p]; H[p] = H[k]; H[k] = th; const tf = F[p]; F[p] = F[k]; F[k] = tf; k = p;   // (swaps without a temporary array)
                 }
             }
             _pop() {
@@ -121,7 +121,7 @@
                         if (l < H.length && F[l] < F[m]) m = l;
                         if (r < H.length && F[r] < F[m]) m = r;
                         if (m === k) break;
-                        [H[m], H[k]] = [H[k], H[m]]; [F[m], F[k]] = [F[k], F[m]]; k = m;
+                        const th = H[m]; H[m] = H[k]; H[k] = th; const tf = F[m]; F[m] = F[k]; F[k] = tf; k = m;
                     }
                 }
                 return top;
@@ -339,7 +339,7 @@
             const range = companionRange(tm);
             let target = null, best = range + N.ENGAGE_RANGE_BONUS;
             for (const e of game.enemies) {
-                if (e.dead) continue;
+                if (e.dead || (game.crewMayEngage && !game.crewMayEngage(e))) continue;   // sneaking: no flanking the unaware
                 const d = Math.hypot(e.x - tm.x, e.y - tm.y);
                 if (d < best) { best = d; target = e; }
             }

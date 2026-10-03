@@ -7,6 +7,7 @@
            - Detailed facades with windows, balconies, architectural details
            - Procedural window lighting based on time of day
            ===================================================================== */
+        const _FW_SHEEN = [];   // _drawFaceWindows: the sun sheen's windows, reused every face
         class BuildingV2 {
             constructor(config) {
                 this.isV2 = true;
@@ -759,6 +760,20 @@
                 return p;
             },
 
+            /** Could any of it be on screen? Its footprint, its leaned walls and roof (reckoned a few floors
+                higher, for crowns, spires and signs) and its reach (beams, plazas), against the real view rect V. */
+            inView(V, cam) {
+                const C = CONFIG.CULLING, r = (this.emissiveReach || 0) + C.BUILDINGS_VIEW;
+                const x0 = this.x, y0 = this.y, x1 = this.x + (this.w || 200), y1 = this.y + (this.h || 200);
+                let L = x0, R = x1, T = y0, Bt = y1;
+                if (CONFIG.BUILDINGS.LEAN) {
+                    const k = 1 + this._leanScale(C.LEAN_EXTRA);                // roof = cam + (p - cam) * k
+                    const rx0 = cam.x + (x0 - cam.x) * k, rx1 = cam.x + (x1 - cam.x) * k, ry0 = cam.y + (y0 - cam.y) * k, ry1 = cam.y + (y1 - cam.y) * k;
+                    L = Math.min(L, rx0, rx1); R = Math.max(R, rx0, rx1); T = Math.min(T, ry0, ry1); Bt = Math.max(Bt, ry0, ry1);
+                }
+                return !(R + r < V.left || L - r > V.right || Bt + r < V.top || T - r > V.bottom);
+            },
+
             _leanScale(extraFloors = 0) {
                 const B = CONFIG.BUILDINGS;
                 const h = (Math.min(this.floors, B.MAX_FLOORS) + extraFloors) * B.FLOOR_HEIGHT;
@@ -914,8 +929,15 @@
                 const rim = sills && emissive ? LandmarkKit.rim(this, this._sqDark != null ? this._sqDark : 0.6) : null;
                 const nxo = f.side === 'E' ? 1 : f.side === 'W' ? -1 : 0, nyo = f.side === 'S' ? 1 : f.side === 'N' ? -1 : 0;
                 const glass = new Path2D(), litP = new Path2D(), lavP = new Path2D(), tvA = new Path2D(), tvB = new Path2D();
-                const lipP = sills ? new Path2D() : null, shP = sills && !emissive ? new Path2D() : null, sheen = [];
+                const lipP = sills ? new Path2D() : null, shP = sills && !emissive ? new Path2D() : null, sheen = _FW_SHEEN;
+                sheen.length = 0;                                   // [u0, u1, v0, v1, a] × n, reused
                 const sOut = 1.6, sLo = 0.2 / floors, sSh = 0.5 / floors;
+                // a sill's line at height vv from w0 to w1, and a window corner at (u, v): made once a face, not per window
+                const sill = (P2, w0, w1, vv) => {
+                    P2.moveTo(ax + ex * w0 + (ux + tx * w0 - ex * w0) * vv + nxo * sOut, ay + ey * w0 + (uy + ty * w0 - ey * w0) * vv + nyo * sOut);
+                    P2.lineTo(ax + ex * w1 + (ux + tx * w1 - ex * w1) * vv + nxo * sOut, ay + ey * w1 + (uy + ty * w1 - ey * w1) * vv + nyo * sOut);
+                };
+                const q = (path, u, v) => path.lineTo(ax + ex * u + (ux + tx * u - ex * u) * v, ay + ey * u + (uy + ty * u - ey * u) * v);
                 for (let fl = 0; fl < floors; fl++) {
                     const v0 = (fl + 0.28) / floors, v1 = (fl + 0.78) / floors;
                     for (let c = 0; c < cols; c++) {
@@ -925,22 +947,18 @@
                         const isLit = h < (this.style ? 0.5 : 0.3);
                         if (sills && (!emissive || rim.a > 0.01)) {                 // the sill: a lip just under the glass, a shadow under it
                             const w0 = u0 - 0.06 / cols, w1 = u1 + 0.06 / cols;
-                            for (const [P2, vv] of emissive ? [[lipP, v0 - sLo]] : [[lipP, v0 - sLo], [shP, v0 - sSh]]) {
-                                const x0 = ax + ex * w0 + (ux + tx * w0 - ex * w0) * vv + nxo * sOut, y0 = ay + ey * w0 + (uy + ty * w0 - ey * w0) * vv + nyo * sOut;
-                                const x1 = ax + ex * w1 + (ux + tx * w1 - ex * w1) * vv + nxo * sOut, y1 = ay + ey * w1 + (uy + ty * w1 - ey * w1) * vv + nyo * sOut;
-                                P2.moveTo(x0, y0); P2.lineTo(x1, y1);
-                            }
+                            sill(lipP, w0, w1, v0 - sLo);
+                            if (!emissive) sill(shP, w0, w1, v0 - sSh);
                         }
                         if (emissive && !isLit) continue;
                         const path = !emissive ? glass : h < 0.06 ? (Math.sin(_gameTimeSec * 9 + c) > 0 ? tvA : tvB)
                                    : (this.facadeFeature === 'silver_queen' && h > 0.36) ? lavP : litP;   // someone's watching TV; some rooms lit lavender
                         // the four corners: at(u0,v0), at(u1,v0), at(u1,v1), at(u0,v1)
-                        const q = (u, v) => path.lineTo(ax + ex * u + (ux + tx * u - ex * u) * v, ay + ey * u + (uy + ty * u - ey * u) * v);
                         path.moveTo(ax + ex * u0 + (ux + tx * u0 - ex * u0) * v0, ay + ey * u0 + (uy + ty * u0 - ey * u0) * v0);
-                        q(u1, v0); q(u1, v1); q(u0, v1); path.closePath();
+                        q(path, u1, v0); q(path, u1, v1); q(path, u0, v1); path.closePath();
                         if (!emissive && skyA > 0) {
                             const du = Math.abs((u0 + u1) / 2 - uc), sh = sheenA * Math.max(0, 1 - du / 0.16) * (0.7 + 0.3 * (fl % 2));
-                            if (sh > 0.01) sheen.push([u0, u1, v0, v1, sh]);
+                            if (sh > 0.01) sheen.push(u0, u1, v0, v1, sh);
                         }
                     }
                 }
@@ -959,10 +977,11 @@
                 ctx.fillStyle = sq ? 'rgba(23,0,92,0.9)' : 'rgba(20,28,48,0.9)'; ctx.fill(glass);
                 if (skyA > 0) {
                     ctx.fillStyle = `rgba(${glassRGB}, ${skyA})`; ctx.fill(glass);
-                    for (const [u0, u1, v0, v1, sh] of sheen) {
-                        const pt = (u, v) => [ax + ex * u + (ux + tx * u - ex * u) * v, ay + ey * u + (uy + ty * u - ey * u) * v];
-                        const a = pt(u0, v0), b = pt(u1, v0), c2 = pt(u1, v1), d = pt(u0, v1);
-                        ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c2[0], c2[1]); ctx.lineTo(d[0], d[1]); ctx.closePath();
+                    for (let i = 0; i < sheen.length; i += 5) {
+                        const u0 = sheen[i], u1 = sheen[i + 1], v0 = sheen[i + 2], v1 = sheen[i + 3], sh = sheen[i + 4];
+                        ctx.beginPath();
+                        ctx.moveTo(ax + ex * u0 + (ux + tx * u0 - ex * u0) * v0, ay + ey * u0 + (uy + ty * u0 - ey * u0) * v0);
+                        q(ctx, u1, v0); q(ctx, u1, v1); q(ctx, u0, v1); ctx.closePath();
                         ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; ctx.fill();
                     }
                 }

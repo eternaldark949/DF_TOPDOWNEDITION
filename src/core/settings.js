@@ -128,12 +128,20 @@
             label() { return this.supported() ? GameSettings.orientation : 'auto (phone)'; }
         };
 
+        /** Density and crowd detail are this device's, not a save's (a phone and a desktop want different ones) */
+        const _deviceDensity = (() => { try { return JSON.parse(localStorage.getItem('dfab_density') || '{}') || {}; } catch (e) { return {}; } })();
+        const _lvl = (v, d) => (v === 'low' || v === 'medium' || v === 'high') ? v : d;
+
         const GameSettings = {
-            // --- DENSITY ---
-            trafficDensity: 'high',         // 'low' | 'medium' | 'high'
-            pedestrianDensity: 'high',      // 'low' | 'medium' | 'high'
-            foliageDensity: 'high',         // 'low' | 'medium' | 'high'
-            rainDensity: 'high',            // 'low' | 'medium' | 'high'
+            // --- DENSITY --- (kept per device: dfab_density; saveDensity() after a change)
+            trafficDensity: _lvl(_deviceDensity.trafficDensity, 'high'),         // 'low' | 'medium' | 'high'
+            pedestrianDensity: _lvl(_deviceDensity.pedestrianDensity, 'high'),   // 'low' | 'medium' | 'high'
+            foliageDensity: _lvl(_deviceDensity.foliageDensity, 'high'),         // 'low' | 'medium' | 'high'
+            rainDensity: _lvl(_deviceDensity.rainDensity, 'high'),               // 'low' | 'medium' | 'high'
+            crowdQuality: _lvl(_deviceDensity.crowdQuality, 'high'),             // 'high' (live) | 'medium' (cheaper live) | 'low' (baked) — ui/crowd-impostors.js
+            saveDensity() {
+                try { localStorage.setItem('dfab_density', JSON.stringify({ trafficDensity: this.trafficDensity, pedestrianDensity: this.pedestrianDensity, foliageDensity: this.foliageDensity, rainDensity: this.rainDensity, crowdQuality: this.crowdQuality })); } catch (e) { /* private mode */ }
+            },
             
             // --- VISUAL ---
             lightingQuality: 'high',        // 'low' | 'medium' | 'high'
@@ -155,9 +163,15 @@
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
+            baseline: false,                // the ground and Stella only: the most this device can give the game (not kept)
+            countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.
+            audioBuffer: (() => {           // 'low' | 'balanced' | 'smooth': the output buffer (audio/audio.js); read at launch, kept per device
+                try { const v = localStorage.getItem('dfab_audio_buffer'); if (v === 'low' || v === 'balanced' || v === 'smooth') return v; } catch (e) { /* private mode */ }
+                return 'balanced';
+            })(),
             ambienceVolume: (() => {        // Rain, wind, city, room tone, fireplace (0..1); kept outside saves too
                 try {
                     const v = parseFloat(localStorage.getItem('dfab_ambience_volume'));
@@ -185,7 +199,7 @@
             // --- CONTROLS (touch) — flitting without letting go of the trigger ---
             // Kept in localStorage (dfab_controls) and in saves. See initJoystick.
             ...(() => {
-                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, scopeView: true };
+                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, scopeView: true, scopeSlow: true };
                 try { Object.assign(d, JSON.parse(localStorage.getItem('dfab_controls') || '{}')); } catch (e) { /* private mode */ }
                 return d;
             })(),
@@ -264,7 +278,7 @@
             // Apply film grain visibility
             /** Store the control toggles and show or hide the ⚡ button. */
             applyControls() {
-                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, scopeView: this.scopeView })); } catch (e) { /* private mode */ }
+                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, scopeView: this.scopeView, scopeSlow: this.scopeSlow })); } catch (e) { /* private mode */ }
                 const b = document.getElementById('btn-flit');
                 if (b) b.classList.toggle('hidden-by-setting', !this.flitButton);
                 const r = document.getElementById('joystick-ring');
