@@ -287,88 +287,90 @@
 
                     // === 2. GHOST AFTERIMAGE at start point ===
                     if (vfx.ghostAlpha > 0) {
-                        ctx.save();
-                        ctx.translate(vfx.startX, vfx.startY);
-                        ctx.rotate(vfx.startAngle);
+                        const ghostLook = { ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
+                            { skin: '#c8a0ff', hair: '#d8c0ff', top: '#b88aee', bottom: '#9a70d4', shoes: '#8060b8' }), stance: vfx.stance, isDriving: false };
+                        const originVisible = decorativeBodyInView(vfx.startX, vfx.startY, ghostLook, 1.04, 40);
+                        if (originVisible) {
+                            ctx.save();
+                            ctx.translate(vfx.startX, vfx.startY);
+                            ctx.rotate(vfx.startAngle);
 
-                        // Pulsing violet-white glow behind the ghost
-                        const glowPulse = 0.7 + Math.sin(Date.now() * 0.008) * 0.3;
-                        const glowRadius = 25 + vfx.ghostAlpha * 15;
-                        ctx.save();
-                        ctx.globalAlpha = vfx.ghostAlpha * 0.4 * glowPulse;
-                        const ghostGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
-                        ghostGlow.addColorStop(0, 'rgba(200, 170, 255, 0.8)');
-                        ghostGlow.addColorStop(0.5, 'rgba(164, 105, 255, 0.3)');
-                        ghostGlow.addColorStop(1, 'rgba(164, 105, 255, 0)');
-                        ctx.fillStyle = ghostGlow;
-                        ctx.beginPath();
-                        ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.restore();
+                            // Pulsing violet-white glow behind the ghost
+                            const glowPulse = 0.7 + Math.sin(Date.now() * 0.008) * 0.3;
+                            const glowRadius = 25 + vfx.ghostAlpha * 15;
+                            ctx.save();
+                            ctx.globalAlpha = vfx.ghostAlpha * 0.4 * glowPulse;
+                            const ghostGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
+                            ghostGlow.addColorStop(0, 'rgba(200, 170, 255, 0.8)');
+                            ghostGlow.addColorStop(0.5, 'rgba(164, 105, 255, 0.3)');
+                            ghostGlow.addColorStop(1, 'rgba(164, 105, 255, 0)');
+                            ctx.fillStyle = ghostGlow;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.restore();
 
-                        // Draw the player silhouette with violet-white tint
-                        ctx.globalAlpha = vfx.ghostAlpha * 0.75;
-                        // Vertical flicker/distortion — slight scale wobble
-                        const flicker = 1.0 + (Math.random() - 0.5) * 0.04 * vfx.ghostAlpha;
-                        ctx.scale(flicker, 1.0 + (1.0 - flicker) * 0.5);
+                            // Draw the player silhouette with violet-white tint
+                            ctx.globalAlpha = vfx.ghostAlpha * 0.75;
+                            // Vertical flicker/distortion — slight scale wobble
+                            const flicker = 1.0 + (Math.random() - 0.5) * 0.04 * vfx.ghostAlpha;
+                            ctx.scale(flicker, 1.0 + (1.0 - flicker) * 0.5);
 
-                        drawProceduralHumanoid(ctx, {
-                            walkPhase: 0, animState: 'idle',
-                            velocityX: 0, velocityY: 0, speed: 0
-                        }, {
-                            // Her own cut, in violet light
-                            ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
-                                { skin: '#c8a0ff', hair: '#d8c0ff', top: '#b88aee', bottom: '#9a70d4', shoes: '#8060b8' }),
-                            stance: vfx.stance,
-                            isDriving: false
-                        });
+                            drawProceduralHumanoid(ctx, {
+                                walkPhase: 0, animState: 'idle',
+                                velocityX: 0, velocityY: 0, speed: 0
+                            }, ghostLook);
 
-                        ctx.restore();
+                            ctx.restore();
+                        } else {
+                            Math.random(); // original ghost flicker, before body pose/blink/glass seeds
+                            tickHiddenDecorativeBody({ walkPhase: 0, animState: 'idle', velocityX: 0, velocityY: 0, speed: 0 }, ghostLook);
+                        }
                     }
 
                     // === 3. ARRIVAL GLOW + AFTERIMAGE at destination ===
                     if (vfx.arrivalGlow > 0) {
                         const ag = vfx.arrivalGlow;
+                        const arrivalLook = { ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
+                            { skin: '#e0d0ff', hair: '#f0e8ff', top: '#d4c0f8', bottom: '#c0aaee', shoes: '#b098e0' }), stance: vfx.stance, isDriving: false };
+                        if (decorativeBodyInView(vfx.endX, vfx.endY, arrivalLook, 1.08, 55)) {
 
-                        // Radial bloom
-                        ctx.save();
-                        const expandRadius = 30 + (1.0 - ag) * 25;
-                        ctx.globalAlpha = ag * 0.6;
-                        ctx.translate(vfx.endX, vfx.endY);
-                        const arrGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, expandRadius);
-                        arrGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-                        arrGrad.addColorStop(0.3, 'rgba(200, 170, 255, 0.6)');
-                        arrGrad.addColorStop(0.7, 'rgba(164, 105, 255, 0.2)');
-                        arrGrad.addColorStop(1, 'rgba(164, 105, 255, 0)');
-                        ctx.fillStyle = arrGrad;
-                        ctx.shadowColor = '#c8a0ff';
-                        ctx.shadowBlur = 20 * ag;
-                        ctx.beginPath();
-                        ctx.arc(0, 0, expandRadius, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.restore();
+                            // Radial bloom
+                            ctx.save();
+                            const expandRadius = 30 + (1.0 - ag) * 25;
+                            ctx.globalAlpha = ag * 0.6;
+                            ctx.translate(vfx.endX, vfx.endY);
+                            const arrGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, expandRadius);
+                            arrGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+                            arrGrad.addColorStop(0.3, 'rgba(200, 170, 255, 0.6)');
+                            arrGrad.addColorStop(0.7, 'rgba(164, 105, 255, 0.2)');
+                            arrGrad.addColorStop(1, 'rgba(164, 105, 255, 0)');
+                            ctx.fillStyle = arrGrad;
+                            ctx.shadowColor = '#c8a0ff';
+                            ctx.shadowBlur = 20 * ag;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, expandRadius, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.restore();
 
-                        // Arrival afterimage — bright white-violet silhouette that
-                        // rapidly fades as the real player "solidifies" in place
-                        ctx.save();
-                        ctx.translate(vfx.endX, vfx.endY);
-                        ctx.rotate(vfx.startAngle);
-                        ctx.globalAlpha = ag * 0.6;
-                        // Slight vertical stretch that settles — materializing effect
-                        const settle = 1.0 + ag * 0.08;
-                        ctx.scale(1.0, settle);
+                            // Arrival afterimage — bright white-violet silhouette that
+                            // rapidly fades as the real player "solidifies" in place
+                            ctx.save();
+                            ctx.translate(vfx.endX, vfx.endY);
+                            ctx.rotate(vfx.startAngle);
+                            ctx.globalAlpha = ag * 0.6;
+                            // Slight vertical stretch that settles — materializing effect
+                            const settle = 1.0 + ag * 0.08;
+                            ctx.scale(1.0, settle);
 
-                        drawProceduralHumanoid(ctx, {
-                            walkPhase: 0, animState: 'idle',
-                            velocityX: 0, velocityY: 0, speed: 0
-                        }, {
-                            // Her own cut, in violet light
-                            ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
-                                { skin: '#e0d0ff', hair: '#f0e8ff', top: '#d4c0f8', bottom: '#c0aaee', shoes: '#b098e0' }),
-                            stance: vfx.stance,
-                            isDriving: false
-                        });
-                        ctx.restore();
+                            drawProceduralHumanoid(ctx, {
+                                walkPhase: 0, animState: 'idle',
+                                velocityX: 0, velocityY: 0, speed: 0
+                            }, arrivalLook);
+                            ctx.restore();
+                        } else {
+                            tickHiddenDecorativeBody({ walkPhase: 0, animState: 'idle', velocityX: 0, velocityY: 0, speed: 0 }, arrivalLook);
+                        }
                     }
 
                     // === 4. ORIGIN BURST — small particles at start ===
@@ -388,6 +390,13 @@
             drawGraveyardGhosts(ctx) {
                 for (const g of this.graveyardGhosts) {
                     if (g.life <= 0) continue;
+                    const look = { ...g.look, stance: 'idle' };
+                    // Include the maximum flicker stretch and life-scaled halo. Ghosts
+                    // keep wandering/fading in update.js while their hidden paint pauses.
+                    if (g.life <= 1 && !decorativeBodyInView(g.x, g.y, look, 1.02, 28 + g.life * 12)) {
+                        tickHiddenDecorativeBody(g, look);
+                        continue;
+                    }
                     ctx.save();
                     ctx.translate(g.x, g.y);
 
@@ -416,7 +425,7 @@
 
                     // Pass the ghost itself so the shared gait controller can track it
                     // (the old throwaway object used velocityX/Y, which the renderer never read)
-                    drawProceduralHumanoid(ctx, g, { ...g.look, stance: 'idle' });
+                    drawProceduralHumanoid(ctx, g, look);
 
                     ctx.restore();
                     ctx.restore();

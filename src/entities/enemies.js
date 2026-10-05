@@ -590,6 +590,25 @@
                 return this._sight;
             }
 
+            /** The source-order roster must still match: deaths, inserts and ID changes can happen mid-tick. */
+            static _squadFor(allEnemies) {
+                const caches = GatlingGunner._squadCaches || (GatlingGunner._squadCaches = new WeakMap());
+                const cache = caches.get(allEnemies);
+                if (cache) {
+                    let i = 0, same = true;
+                    for (const enemy of allEnemies) {
+                        if (!(enemy instanceof GatlingGunner) || enemy.dead) continue;
+                        if (cache.input[i] !== enemy || cache.ids[i] !== enemy.id) { same = false; break; }
+                        i++;
+                    }
+                    if (same && i === cache.input.length) return cache.sorted;
+                }
+                const input = allEnemies.filter(e => e instanceof GatlingGunner && !e.dead);
+                const sorted = input.slice().sort((a, b) => a.id - b.id);
+                caches.set(allEnemies, { input, ids: input.map(e => e.id), sorted });
+                return sorted;
+            }
+
             /**
              * Override ActorEntity update for squad AI and gatling mechanics.
              */
@@ -630,8 +649,7 @@
                 this._prevPlayerY = playerY;
                 
                 // --- SQUAD FORMATION LOGIC ---
-                const squad = allEnemies.filter(e => e instanceof GatlingGunner && !e.dead);
-                squad.sort((a, b) => a.id - b.id);
+                const squad = GatlingGunner._squadFor(allEnemies);
                 
                 const myIndex = squad.indexOf(this);
                 const squadSize = squad.length;

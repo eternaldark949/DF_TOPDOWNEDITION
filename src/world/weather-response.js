@@ -14,6 +14,16 @@
            ===================================================================== */
         const WEATHER_RESPONSE = { CLOTH_WIND: 0.085, HAIR_WIND: 0.05, STRONG_FROM: 0.55, STRONG_SPAN: 0.4 };
 
+        // Every outdoor character shares the same wind direction. Cache by the actual
+        // components, including signed zero, so edits and map changes are immediate.
+        let _weatherDirX, _weatherDirY, _weatherDirAngle = 0;
+        function _weatherWindAngle(x, y) {
+            if (!Object.is(x, _weatherDirX) || !Object.is(y, _weatherDirY)) {
+                _weatherDirX = x; _weatherDirY = y; _weatherDirAngle = Math.atan2(y, x);
+            }
+            return _weatherDirAngle;
+        }
+
         function weatherAt(entity) {
             if (typeof game === 'undefined' || !game || !game.weather || !game.activeMap || !entity) return null;
             const map = game.activeMap, w = game.weather;
@@ -35,7 +45,7 @@
                 hairWind: { x: v.x * k.HAIR_WIND * gust, y: v.y * k.HAIR_WIND * gust },
                 rain: w.isRaining ? Math.min(1, w.intensity || 0) * reach : 0,
                 strong: Math.max(0, Math.min(1, ((w.wind || 0) - k.STRONG_FROM) / k.STRONG_SPAN)) * reach,
-                dir: Math.atan2(wv.y, wv.x)
+                dir: _weatherWindAngle(wv.x, wv.y)
             };
             // Lightning ripple: a flinch per strike, staggered per character
             const strike = w.strikeCount || 0;

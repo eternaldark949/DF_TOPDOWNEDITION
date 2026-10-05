@@ -177,7 +177,9 @@
                 if (enemies && enemies.length > 0) {
                     for (let e of enemies) {
                         if (e.dead) continue;
-                        const ed = Math.hypot(e.x - this.x, e.y - this.y);
+                        const dx = e.x - this.x, dy = e.y - this.y;
+                        if (Math.abs(dx) >= QUIP_DANGER_RANGE || Math.abs(dy) >= QUIP_DANGER_RANGE) continue;
+                        const ed = Math.hypot(dx, dy);
                         if (ed < QUIP_DANGER_RANGE) {
                             // Higher trigger chance — combat is loud, panic spreads
                             if (Math.random() < 0.025) {
@@ -190,8 +192,9 @@
                 
                 // 2. SEES WEAPON — player nearby with weapon out
                 if (weaponOut && player) {
-                    const pd = Math.hypot(player.x - this.x, player.y - this.y);
-                    if (pd < QUIP_WEAPON_RANGE) {
+                    const dx = player.x - this.x, dy = player.y - this.y;
+                    if (Math.abs(dx) < QUIP_WEAPON_RANGE && Math.abs(dy) < QUIP_WEAPON_RANGE
+                        && Math.hypot(dx, dy) < QUIP_WEAPON_RANGE) {
                         if (Math.random() < 0.012) {
                             this._setQuip(this._pickQuip('seesWeapon'));
                         }
@@ -335,6 +338,7 @@
                     
                     const dx = car.x - this.x;
                     const dy = car.y - this.y;
+                    if (Math.abs(dx) > REACT_RADIUS || Math.abs(dy) > REACT_RADIUS) continue;
                     const dist = Math.hypot(dx, dy);
                     if (dist > REACT_RADIUS) continue;
                     
@@ -456,7 +460,9 @@
                 if (trafficVehicles) {
                     for (const car of trafficVehicles) {
                         if (!car || car.dead) continue;
-                        const d = Math.hypot(car.x - this.x, car.y - this.y);
+                        const dx = car.x - this.x, dy = car.y - this.y;
+                        if (Math.abs(dx) >= 18 || Math.abs(dy) >= 18) continue;
+                        const d = Math.hypot(dx, dy);
                         if (d < 18 && Math.abs(car.speed) > 1.5) {
                             this._handleVehicleImpact(car);
                             return;
@@ -520,14 +526,18 @@
                     
                     // Make way for 949 and her crew (engine/update.js _makeWay)
                     for (const p of (typeof game !== 'undefined' && game._makeWay) || [player]) {
-                        const pd = Math.hypot(p.x - this.x, p.y - this.y);
+                        const pdx = p.x - this.x, pdy = p.y - this.y;
+                        if (Math.abs(pdx) >= 60 || Math.abs(pdy) >= 60) continue;
+                        const pd = Math.hypot(pdx, pdy);
                         if (pd < 60 && pd > 0.1) { moveX += (this.x - p.x) / pd * 1.5; moveY += (this.y - p.y) / pd * 1.5; }
                     }
                     
                     // Avoid other pedestrians
                     for (let other of otherPedestrians) {
                         if (other === this || other.dead) continue;
-                        const otherDist = Math.hypot(other.x - this.x, other.y - this.y);
+                        const odx = other.x - this.x, ody = other.y - this.y;
+                        if (Math.abs(odx) >= 30 || Math.abs(ody) >= 30) continue;
+                        const otherDist = Math.hypot(odx, ody);
                         if (otherDist < 30) {
                             const avoidX = (this.x - other.x) / (otherDist + 0.1);
                             const avoidY = (this.y - other.y) / (otherDist + 0.1);
@@ -627,7 +637,9 @@
                 for (let vehicle of trafficVehicles) {
                     if (!vehicle || vehicle.dead) continue;
                     
-                    const vDist = Math.hypot(vehicle.x - cwCenterX, vehicle.y - cwCenterY);
+                    const dx = vehicle.x - cwCenterX, dy = vehicle.y - cwCenterY;
+                    if (Math.abs(dx) >= checkDist || Math.abs(dy) >= checkDist) continue;
+                    const vDist = Math.hypot(dx, dy);
                     if (vDist < checkDist) {
                         // Check if vehicle is heading toward crosswalk
                         const towardX = cwCenterX - vehicle.x;
@@ -917,7 +929,9 @@
                     // Check not too close to other pedestrians
                     let tooClose = false;
                     for (let ped of this.pedestrians) {
-                        if (Math.hypot(ped.x - node.x, ped.y - node.y) < 60) {
+                        const dx = ped.x - node.x, dy = ped.y - node.y;
+                        if (Math.abs(dx) >= 60 || Math.abs(dy) >= 60) continue;
+                        if (Math.hypot(dx, dy) < 60) {
                             tooClose = true;
                             break;
                         }

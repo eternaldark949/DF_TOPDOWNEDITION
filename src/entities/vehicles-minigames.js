@@ -541,6 +541,67 @@
         //  FERRIS WHEEL — Animated top-down ferris wheel for Biggs Amusement Park
         //  Renders as a foreshortened ellipse with rotating gondolas.
         // ════════════════════════════════════════════════════════════════════════
+        // Paint-only culling: never changes emitters, collision, animation updates or reflection queries.
+        // Two backing-canvas pixels cover antialiasing; invalid/custom geometry stays live.
+        function worldPaintBoxInView(ctx, view, zoom, x, y, left, top, right, bottom, angle = 0) {
+            if (!view || !Number.isFinite(zoom) || zoom <= 0 ||
+                !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(angle) ||
+                !Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(right) || !Number.isFinite(bottom) ||
+                right < left || bottom < top || !Number.isFinite(view.left) || !Number.isFinite(view.right) ||
+                !Number.isFinite(view.top) || !Number.isFinite(view.bottom) || view.right < view.left || view.bottom < view.top ||
+                (ctx.filter && ctx.filter !== 'none') || ctx.shadowBlur > 0 || ctx.shadowOffsetX || ctx.shadowOffsetY ||
+                (ctx.globalCompositeOperation && ctx.globalCompositeOperation !== 'source-over')) return true;
+            const c = Math.cos(angle), s = Math.sin(angle), mx = (left + right) / 2, my = (top + bottom) / 2;
+            const cx = x + c * mx - s * my, cy = y + s * mx + c * my;
+            const hw = Math.abs(c) * (right - left) / 2 + Math.abs(s) * (bottom - top) / 2;
+            const hh = Math.abs(s) * (right - left) / 2 + Math.abs(c) * (bottom - top) / 2;
+            const pad = 2 / zoom + 1e-7 * Math.max(1, Math.abs(cx), Math.abs(cy), hw, hh);
+            if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(hw) || !Number.isFinite(hh) || !Number.isFinite(pad)) return true;
+            return cx + hw + pad >= view.left && cx - hw - pad <= view.right &&
+                   cy + hh + pad >= view.top && cy - hh - pad <= view.bottom;
+        }
+
+        function ferrisPaintInView(wheel, ctx, view, zoom, top) {
+            if (!wheel || wheel[top ? 'drawTop' : 'drawBase'] !== FerrisWheel.prototype[top ? 'drawTop' : 'drawBase']) return true;
+            if (view && wheel.x >= view.left && wheel.x <= view.right && wheel.y >= view.top && wheel.y <= view.bottom) return true;
+            const R = wheel.wheelRadius, hg = wheel.rimGap / 2, sf = R / 140;
+            if (!Number.isFinite(R) || R <= 0 || !Number.isFinite(hg) || hg < 0 ||
+                !Number.isFinite(wheel.axleHeight) || !Number.isFinite(wheel.angle) ||
+                !Number.isFinite(wheel.gondolaCount) || wheel.gondolaCount < 0 || wheel.gondolaCount > 256) return true;
+            let left, right, low, high;
+            if (top) {
+                // Rims/spokes, lit gondola halos, hubs, arms and height-dependent ground shadows.
+                const minSO = (wheel.axleHeight - R) * 0.12, maxSO = (wheel.axleHeight + R) * 0.12;
+                left = Math.min(-R - 2, -R - 23.76 * sf, -8 * sf - 1, -R + minSO + 3 * sf - 21.78 * sf);
+                right = Math.max(R + 2, R + 23.76 * sf, 8 * sf + 1, R + maxSO + 3 * sf + 21.78 * sf);
+                low = Math.min(-hg - 9 * sf - 1, -29.76 * sf, minSO - 4.05 * sf);
+                high = Math.max(hg + 9 * sf + 1, 35.86 * sf, maxSO + 14.05 * sf);
+            } else {
+                const support = Math.max(hg, R * 0.25) + 3 * sf;
+                left = Math.min(-R * 0.2 - 3 * sf, 5 * sf - R - 10);
+                right = Math.max(R * 0.2 + 3 * sf, 5 * sf + R + 10);
+                low = Math.min(-support, 7 * sf - hg - 18);
+                high = Math.max(support, 7 * sf + hg + 18);
+            }
+            return worldPaintBoxInView(ctx, view, zoom, wheel.x, wheel.y, left, low, right, high, wheel.facing);
+        }
+
+        const _ferrisGondolaBuffers = new WeakMap();
+        function ferrisGondolaBuffer(wheel) {
+            const n = wheel.gondolaCount;
+            // Preserve legacy/custom count behavior without retaining an unbounded allocation.
+            if (!Number.isInteger(n) || n < 0 || n > 256) return null;
+            let b = _ferrisGondolaBuffers.get(wheel);
+            if (!b) { b = { records: [], order: [] }; _ferrisGondolaBuffers.set(wheel, b); }
+            b.records.length = b.order.length = n;
+            for (let i = 0; i < n; i++) {
+                const g = b.records[i] || (b.records[i] = { x: 0, height: 0, nh: 0, ci: i });
+                // Restore original index order before sorting, including equal-height ties.
+                b.order[i] = g;
+            }
+            return b;
+        }
+
         class FerrisWheel {
             constructor(x, y, config = {}) {
                 this.x = x; this.y = y;
@@ -637,13 +698,16 @@
                 ctx.globalAlpha = 1.0;
 
                 // ─── GONDOLAS ───
-                const gondolas = [];
+                const gondolaBuffer = ferrisGondolaBuffer(this);
+                const gondolas = gondolaBuffer ? gondolaBuffer.order : [];
                 for (let i = 0; i < this.gondolaCount; i++) {
                     const ga = this.angle + (i/this.gondolaCount)*Math.PI*2;
                     const rimX = Math.cos(ga)*R;
                     const height = Math.sin(ga)*R + axleH;
                     const nh = (height-(axleH-R))/(R*2);
-                    gondolas.push({ x: rimX, height, nh, ci: i });
+                    if (gondolaBuffer) {
+                        const g = gondolas[i]; g.x = rimX; g.height = height; g.nh = nh;
+                    } else gondolas.push({ x: rimX, height, nh, ci: i });
                 }
                 gondolas.sort((a, b) => a.height - b.height);
 

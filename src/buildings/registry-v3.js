@@ -36,43 +36,98 @@
                 }
             }
             
+            /** Parsed editor data keeps its draw ordering until membership/level assignments change. */
+            _prepareDrawLists() {
+                let cached = this._drawLists;
+                let changed = !cached || cached.footprint !== this.footprint || cached.details !== this.details || cached.levels !== this.levels ||
+                    cached.groundLevel !== this._groundLevel || cached.fpSlots.length !== this.footprint.length ||
+                    cached.detailSlots.length !== this.details.length || cached.levelIds.length !== this.levels.length;
+                if (!changed) {
+                    for (let i = 0; i < this.footprint.length; i++) if (cached.fpSlots[i][0] !== this.footprint[i] || cached.fpSlots[i][1] !== this.footprint[i].level) { changed = true; break; }
+                    if (!changed) for (let i = 0; i < this.details.length; i++) if (cached.detailSlots[i][0] !== this.details[i] || cached.detailSlots[i][1] !== this.details[i].level) { changed = true; break; }
+                    if (!changed) for (let i = 0; i < this.levels.length; i++) if (cached.levelIds[i] !== this.levels[i].id) { changed = true; break; }
+                }
+                if (changed) {
+                    const order = {};
+                    this.levels.forEach((level, i) => order[level.id] = i);
+                    cached = this._drawLists = { footprint: this.footprint, details: this.details, levels: this.levels, groundLevel: this._groundLevel,
+                        fpSlots: this.footprint.map(shape => [shape, shape.level]), detailSlots: this.details.map(shape => [shape, shape.level]),
+                        levelIds: this.levels.map(level => level.id), groundFP: [], groundDetails: [], upperFP: [], upperDetails: [] };
+                    for (const shape of this.footprint) (shape.level === this._groundLevel ? cached.groundFP : cached.upperFP).push(shape);
+                    for (const shape of this.details) (shape.level === this._groundLevel ? cached.groundDetails : cached.upperDetails).push(shape);
+                    cached.upperFP.sort((a, b) => (order[a.level] || 0) - (order[b.level] || 0));
+                    cached.upperDetails.sort((a, b) => (order[a.level] || 0) - (order[b.level] || 0));
+                }
+                return cached;
+            }
+
+            /** Unknown text/glow detail extents retain the full draw; known geometric exports can be culled. */
+            _paintBounds(footprints, details, ctx) {
+                if (!Number.isFinite(this.x) || !Number.isFinite(this.y)) return null;
+                let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+                const add = (shape, bounds, radial) => {
+                    const cx = radial ? shape.x : shape.x + (shape.w || 0) / 2, cy = radial ? shape.y : shape.y + (shape.h || 0) / 2;
+                    const sx = shape.scaleX || 1, sy = shape.scaleY || 1, angle = shape.rotation || 0;
+                    if (![cx, cy, sx, sy, angle, bounds.left, bounds.right, bounds.top, bounds.bottom].every(Number.isFinite)) return false;
+                    const ca = Math.cos(angle), sa = Math.sin(angle);
+                    for (const x of [bounds.left, bounds.right]) for (const y of [bounds.top, bounds.bottom]) {
+                        const ax = (x - cx) * sx, ay = (y - cy) * sy;
+                        const px = this.x + cx + ax * ca - ay * sa, py = this.y + cy + ax * sa + ay * ca;
+                        left = Math.min(left, px); right = Math.max(right, px); top = Math.min(top, py); bottom = Math.max(bottom, py);
+                    }
+                    return true;
+                };
+                for (const shape of footprints) {
+                    if (![shape.x, shape.y, shape.w, shape.h].every(Number.isFinite)) return null;
+                    const sw = shape.stroke ? (shape.strokeWidth || 1) : 0;
+                    if (sw < 0 || !Number.isFinite(sw)) return null;
+                    const pad = Math.max(1, sw * Math.max(1, ctx.miterLimit || 10));
+                    if (!add(shape, { left: Math.min(shape.x, shape.x + shape.w) - pad, right: Math.max(shape.x, shape.x + shape.w) + pad,
+                        top: Math.min(shape.y, shape.y + shape.h) - pad, bottom: Math.max(shape.y, shape.y + shape.h) + pad }, false)) return null;
+                }
+                for (const shape of details) {
+                    let bounds;
+                    if (shape.type === 'skylight') {
+                        const w = shape.w || 40, h = shape.h || 30;
+                        bounds = { left: Math.min(shape.x, shape.x + w) - 20, right: Math.max(shape.x, shape.x + w) + 20,
+                            top: Math.min(shape.y, shape.y + h) - 20, bottom: Math.max(shape.y, shape.y + h) + 20 };
+                    } else if (shape.type === 'skylight_corner') {
+                        const w = shape.w || 30, h = shape.h || 30, cx = shape.x + (shape.curveX !== undefined ? shape.curveX : 0), cy = shape.y + (shape.curveY !== undefined ? shape.curveY : h);
+                        bounds = { left: Math.min(shape.x, shape.x + w, cx) - 20, right: Math.max(shape.x, shape.x + w, cx) + 20,
+                            top: Math.min(shape.y, shape.y + h, cy) - 20, bottom: Math.max(shape.y, shape.y + h, cy) + 20 };
+                    } else if (shape.type === 'interior_wall') {
+                        const x2 = shape.x2 !== undefined ? shape.x2 : shape.x, y2 = shape.y2 !== undefined ? shape.y2 : shape.y + 40;
+                        bounds = { left: Math.min(shape.x, x2) - 4, right: Math.max(shape.x, x2) + 4,
+                            top: Math.min(shape.y, y2) - 4, bottom: Math.max(shape.y, y2) + 4 };
+                    } else if (shape.type === 'lamp' || shape.type === 'interior_lamp') {
+                        continue; // emitters are rendered separately, and this detail paints no pixels
+                    } else return null;
+                    if (!add(shape, bounds, false)) return null;
+                }
+                return { left, right, top, bottom };
+            }
+
             // Ground-level shapes — drawn BENEATH the player (crimson facade, sidewalk)
             drawGround(ctx, time) {
+                const lists = this._prepareDrawLists(), view = paintViewBounds(ctx);
+                if (view && !paintBoundsIntersect(view, this._paintBounds(lists.groundFP, lists.groundDetails, ctx))) return;
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 const t = (time || 0) / 1000;
-                // Only draw ground-level footprints and details
-                this.footprint.forEach(s => {
-                    if (s.level === this._groundLevel) this._drawFootprint(ctx, s);
-                });
-                this.details.forEach(s => {
-                    if (s.level === this._groundLevel) this._drawDetail(ctx, s, t);
-                });
+                for (const shape of lists.groundFP) this._drawFootprint(ctx, shape);
+                for (const shape of lists.groundDetails) this._drawDetail(ctx, shape, t);
                 ctx.restore();
             }
             
             // Everything above ground — drawn OVER the player (building body, roof, signs, lamps)
             draw(ctx, time) {
+                const lists = this._prepareDrawLists(), view = paintViewBounds(ctx);
+                if (view && !paintBoundsIntersect(view, this._paintBounds(lists.upperFP, lists.upperDetails, ctx))) return;
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 const t = (time || 0) / 1000;
-                
-                // Level ordering
-                const levelOrder = {};
-                this.levels.forEach((lv, i) => levelOrder[lv.id] = i);
-                
-                // Draw footprint shapes (sorted by level, skip ground level)
-                const sortedFP = [...this.footprint]
-                    .filter(s => s.level !== this._groundLevel)
-                    .sort((a, b) => (levelOrder[a.level] || 0) - (levelOrder[b.level] || 0));
-                sortedFP.forEach(s => this._drawFootprint(ctx, s));
-                
-                // Draw details (sorted by level, skip ground level)
-                const sortedDetails = [...this.details]
-                    .filter(s => s.level !== this._groundLevel)
-                    .sort((a, b) => (levelOrder[a.level] || 0) - (levelOrder[b.level] || 0));
-                sortedDetails.forEach(s => this._drawDetail(ctx, s, t));
-                
+                for (const shape of lists.upperFP) this._drawFootprint(ctx, shape);
+                for (const shape of lists.upperDetails) this._drawDetail(ctx, shape, t);
                 ctx.restore();
             }
             

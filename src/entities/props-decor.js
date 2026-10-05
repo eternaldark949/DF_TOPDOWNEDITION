@@ -1860,6 +1860,18 @@
                     this.x = g.x; this.y = g.y; this.angle = g.angle; this.vx = this.vy = this.angularVel = 0;
                 }
                 if (this.fixedRotation) this.angularVel = 0;
+                // Settled furniture still wakes on any assigned velocity/rotation or
+                // edited pose. Keep all externally visible sleeping bookkeeping.
+                if (this.vx === 0 && this.vy === 0 && this.angularVel === 0 && Number.isFinite(this.friction) && Number.isFinite(this.angularFriction)) {
+                    // Retain even signed-zero arithmetic and the original zero normalization.
+                    this.x += this.vx; this.y += this.vy; this.angle += this.angularVel;
+                    this.vx = this.vy = this.angularVel = 0;
+                    this._still = (this._still || 0) + 1;
+                    if (!this._good) this._good = {};
+                    this._good.x = this.x; this._good.y = this.y; this._good.angle = this.angle;
+                    this.w = this.width; this.h = this.height;
+                    return;
+                }
                 // Speed cap: no faster than about half its own thickness a tick (walls can't be skipped)
                 const sp = Math.hypot(this.vx, this.vy), cap = Math.max(4, Math.min(14, Math.min(this.width, this.height) * 0.9));
                 if (sp > cap) { this.vx *= cap / sp; this.vy *= cap / sp; }

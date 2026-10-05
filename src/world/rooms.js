@@ -36,6 +36,38 @@
             VIS_RATE: 5, LIGHT_RATE: 9, OUTDOOR_RATE: 4   // easing, per second
         };
         
+        // Draw culling uses the current canvas transform, including shake, zoom and
+        // reduced light-layer resolution. Nonlocal compositing/filters retain the full draw.
+        const _paintViewBoundsCache = new WeakMap();
+        function paintViewBounds(ctx, padding = 16) {
+            if (!ctx.canvas || !ctx.getTransform || (ctx.filter && ctx.filter !== 'none') ||
+                (ctx.shadowBlur || 0) !== 0 || (ctx.shadowOffsetX || 0) !== 0 || (ctx.shadowOffsetY || 0) !== 0 ||
+                !['source-over', 'destination-out', 'lighter', 'multiply', 'screen', 'soft-light'].includes(ctx.globalCompositeOperation)) return null;
+            const m = ctx.getTransform(), W = ctx.canvas.width, H = ctx.canvas.height;
+            const det = m.a * m.d - m.b * m.c;
+            if (![m.a, m.b, m.c, m.d, m.e, m.f, W, H, padding, det].every(Number.isFinite) || det === 0 || W < 0 || H < 0) return null;
+            let c = _paintViewBoundsCache.get(ctx);
+            if (c && c.a === m.a && c.b === m.b && c.c === m.c && c.d === m.d && c.e === m.e && c.f === m.f &&
+                c.W === W && c.H === H && c.padding === padding) return c.bounds;
+            const xs = [], ys = [];
+            for (const px of [-padding, W + padding]) for (const py of [-padding, H + padding]) {
+                xs.push((m.d * (px - m.e) - m.c * (py - m.f)) / det);
+                ys.push((-m.b * (px - m.e) + m.a * (py - m.f)) / det);
+            }
+            const bounds = { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) };
+            if (![bounds.left, bounds.right, bounds.top, bounds.bottom].every(Number.isFinite)) return null;
+            // Outward rounding makes exact viewport/cell boundaries conservative.
+            const guard = 64 * Number.EPSILON * Math.max(1, ...xs.map(Math.abs), ...ys.map(Math.abs));
+            bounds.left -= guard; bounds.right += guard; bounds.top -= guard; bounds.bottom += guard;
+            c = { a: m.a, b: m.b, c: m.c, d: m.d, e: m.e, f: m.f, W, H, padding, bounds };
+            _paintViewBoundsCache.set(ctx, c);
+            return bounds;
+        }
+        function paintBoundsIntersect(view, bounds) {
+            if (!view || !bounds || ![bounds.left, bounds.right, bounds.top, bounds.bottom].every(Number.isFinite)) return true;
+            return !(bounds.right < view.left || bounds.left > view.right || bounds.bottom < view.top || bounds.top > view.bottom);
+        }
+
         /**
          * IndoorWindow — Projects daylight/exterior glow through walls.
          * Facing direction determines which way light enters.
@@ -56,6 +88,83 @@
                 this._shardOffsets = [];
             }
             
+            /** Enclose glass/shards, the daylight cone, or its separate radial colour pool. */
+            _paintBounds(pass, daylight) {
+                const x = this.x, y = this.y, w = this.w, h = this.h;
+                if (![x, y, w, h, daylight, this.projectionLength].every(Number.isFinite)) return null;
+                let left = Math.min(x, x + w), right = Math.max(x, x + w), top = Math.min(y, y + h), bottom = Math.max(y, y + h);
+                if (pass === 'glass') {
+                    if (!this.shattered) {
+                        right = Math.max(right, x + (this.facing === 'N' || this.facing === 'S' ? w : 2));
+                        bottom = Math.max(bottom, y + (this.facing === 'N' || this.facing === 'S' ? 2 : h));
+                    }
+                    if (this.shattered) for (const shard of this._shardOffsets) {
+                        const r = Math.hypot(shard.size / 2, 1), cx = x + w / 2 + shard.x, cy = y + h / 2 + shard.y;
+                        left = Math.min(left, cx - r); right = Math.max(right, cx + r);
+                        top = Math.min(top, cy - r); bottom = Math.max(bottom, cy + r);
+                    }
+                    return { left: left - 1, right: right + 1, top: top - 1, bottom: bottom + 1 };
+                }
+                if (pass === 'color') {
+                    const r = this.projectionLength * daylight * 0.7;
+                    if (!(r > 0)) return null; // invalid radii retain the original error/empty behavior
+                    const cx = this.facing === 'E' ? x + w + r * 0.4 : this.facing === 'W' ? x - r * 0.4 : x + w / 2;
+                    const cy = this.facing === 'S' ? y + h + r * 0.5 : this.facing === 'N' ? y - r * 0.5 :
+                        this.facing === 'E' || this.facing === 'W' ? y + h / 2 : y + r * 0.5;
+                    return { left: cx - r, right: cx + r, top: cy - r, bottom: cy + r };
+                }
+                const length = this.projectionLength * daylight, spread = Math.abs(w * 0.4);
+                if (this.facing === 'N' || this.facing === 'S') {
+                    left -= spread; right += spread;
+                    const tip = this.facing === 'S' ? y + h + length : y - length;
+                    top = Math.min(top, tip); bottom = Math.max(bottom, tip);
+                } else if (this.facing === 'E' || this.facing === 'W') {
+                    top -= spread; bottom += spread;
+                    const tip = this.facing === 'E' ? x + w + length : x - length;
+                    left = Math.min(left, tip); right = Math.max(right, tip);
+                } else return null;
+                return { left, right, top, bottom };
+            }
+
+            _colorProjectionGradient(ctx, daylight, radius, cx, cy) {
+                const m = ctx.getTransform ? ctx.getTransform() : null;
+                let cached = this._colorProjectionCache;
+                if (m && cached && cached.ctx === ctx && cached.radius === radius && cached.cx === cx && cached.cy === cy &&
+                    cached.daylight === daylight && cached.tint === this.tint && cached.a === m.a && cached.b === m.b &&
+                    cached.c === m.c && cached.d === m.d && cached.e === m.e && cached.f === m.f) return cached.gradient;
+                const g = ctx.createRadialGradient(cx, cy, 5, cx, cy, radius);
+                g.addColorStop(0, `rgba(${this.tint}, ${daylight * 0.15})`);
+                g.addColorStop(1, 'rgba(0,0,0,0)');
+                if (m) this._colorProjectionCache = { ctx, radius, cx, cy, daylight, tint: this.tint,
+                    a: m.a, b: m.b, c: m.c, d: m.d, e: m.e, f: m.f, gradient: g };
+                return g;
+            }
+
+            /** Skipping pixels must retain the paint state that later objects inherit. */
+            _finishPaintState(ctx, pass, daylight) {
+                if (pass === 'glass') {
+                    if (this.shattered) {
+                        ctx.fillStyle = 'rgba(10, 15, 25, 0.6)';
+                        ctx.strokeStyle = 'rgba(150, 180, 200, 0.3)'; ctx.lineWidth = 1;
+                        const age = Math.min(1, (_frameTime - this.shatterTime) / 2000);
+                        ctx.fillStyle = 'rgba(180, 200, 220, ' + Math.max(0.1, 0.6 - age * 0.5) + ')';
+                    } else {
+                        // Set both values so invalid user-supplied tint strings behave as before.
+                        ctx.fillStyle = daylight > 0.1 ? 'rgba(200, 220, 255, ' + (0.15 + daylight * 0.5) + ')' : 'rgba(30, 30, 50, 0.8)';
+                        ctx.fillStyle = 'rgba(' + this.tint + ', ' + (0.1 + daylight * 0.4) + ')';
+                    }
+                    return;
+                }
+                if (daylight < 0.05) return;
+                if (pass === 'hole') { ctx.fillStyle = `rgba(255, 255, 255, ${daylight * 0.7})`; return; }
+                const radius = this.projectionLength * daylight * 0.7;
+                const cx = this.facing === 'E' ? this.x + this.w + radius * 0.4 : this.facing === 'W' ? this.x - radius * 0.4 : this.x + this.w / 2;
+                const cy = this.facing === 'S' ? this.y + this.h + radius * 0.5 : this.facing === 'N' ? this.y - radius * 0.5 :
+                    this.facing === 'E' || this.facing === 'W' ? this.y + this.h / 2 : this.y + radius * 0.5;
+                ctx.fillStyle = this._colorProjectionGradient(ctx, daylight, radius, cx, cy);
+                ctx.globalAlpha = 1.0;
+            }
+
             /**
              * Check if a point (projectile/explosion) hits this window.
              * Returns true if shattered by this hit.
@@ -179,14 +288,8 @@
                     default: cy = this.y + pLen * 0.5;
                 }
                 
-                const grad = lightCtx.createRadialGradient(
-                    this.facing === 'E' ? this.x + this.w + pLen * 0.4 : this.facing === 'W' ? this.x - pLen * 0.4 : cx,
-                    cy, 5,
-                    this.facing === 'E' ? this.x + this.w + pLen * 0.4 : this.facing === 'W' ? this.x - pLen * 0.4 : cx,
-                    cy, pLen
-                );
-                grad.addColorStop(0, `rgba(${this.tint}, ${daylight * 0.15})`);
-                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                const grad = this._colorProjectionGradient(lightCtx, daylight, pLen,
+                    this.facing === 'E' ? this.x + this.w + pLen * 0.4 : this.facing === 'W' ? this.x - pLen * 0.4 : cx, cy);
                 
                 lightCtx.globalAlpha = daylight * 0.3;
                 lightCtx.fillStyle = grad;
@@ -444,6 +547,27 @@
                 }
             }
             
+            /** All possible cloth control points and the end-point glow at this wind. */
+            _paintBounds(wind, windDir) {
+                if (![this.x, this.y, this.length, this.width, wind, windDir].every(Number.isFinite) || !this._offsets.length ||
+                    this.length <= 0 || this.width <= 0 || !Number.isInteger(this.segments) || this.segments <= 0) return null;
+                let amplitude = 0;
+                for (const off of this._offsets) {
+                    if (!Number.isFinite(off.amp)) return null;
+                    amplitude = Math.max(amplitude, Math.abs(wind) * (Math.abs(this.width * off.amp) + 5) * Math.abs(windDir));
+                }
+                const L = this.length, r = Math.abs(L) * 0.5, stroke = Math.abs(this.width) / 4 + Math.abs(this.width) / 6;
+                let left, right, top, bottom;
+                if (this.anchor === 'top') {
+                    left = -amplitude - stroke; right = amplitude + stroke; top = Math.min(0, L) - stroke; bottom = Math.max(0, L) + stroke;
+                } else {
+                    const end = this.anchor === 'left' ? L : -L;
+                    left = Math.min(0, end) - stroke; right = Math.max(0, end) + stroke; top = -amplitude - stroke; bottom = amplitude + stroke;
+                }
+                // The radial pool is centred on the final point, which is also within these bounds.
+                return { left: this.x + left - r, right: this.x + right + r, top: this.y + top - r, bottom: this.y + bottom + r };
+            }
+
             draw(ctx, wind = 0.3, windDir = 1, time = 0) {
                 const t = time + this.phaseOffset;
                 
@@ -948,14 +1072,17 @@
             }
             
             drawWindows(ctx, daylight) {
+                const view = paintViewBounds(ctx);
                 for (const win of this.windows) {
-                    win.draw(ctx, daylight);
+                    if (paintBoundsIntersect(view, win._paintBounds ? win._paintBounds('glass', daylight) : null) || !win._finishPaintState) win.draw(ctx, daylight);
+                    else win._finishPaintState(ctx, 'glass', daylight);
                 }
             }
             
             drawLinens(ctx, wind, windDir, time) {
+                const view = paintViewBounds(ctx);
                 for (const linen of this.linens) {
-                    linen.draw(ctx, wind, windDir, time);
+                    if (paintBoundsIntersect(view, linen._paintBounds ? linen._paintBounds(wind, windDir) : null)) linen.draw(ctx, wind, windDir, time);
                 }
             }
             
@@ -964,8 +1091,10 @@
              * Called during destination-out pass (cuts light holes).
              */
             drawWindowLightProjections(lightCtx, daylight) {
+                const view = paintViewBounds(lightCtx);
                 for (const win of this.windows) {
-                    win.drawLightProjection(lightCtx, daylight);
+                    if (paintBoundsIntersect(view, win._paintBounds ? win._paintBounds('hole', daylight) : null) || !win._finishPaintState) win.drawLightProjection(lightCtx, daylight);
+                    else win._finishPaintState(lightCtx, 'hole', daylight);
                 }
             }
             
@@ -974,8 +1103,10 @@
              * Called during lighter blend pass.
              */
             drawWindowColorPass(lightCtx, daylight) {
+                const view = paintViewBounds(lightCtx);
                 for (const win of this.windows) {
-                    win.drawColorProjection(lightCtx, daylight);
+                    if (paintBoundsIntersect(view, win._paintBounds ? win._paintBounds('color', daylight) : null) || !win._finishPaintState) win.drawColorProjection(lightCtx, daylight);
+                    else win._finishPaintState(lightCtx, 'color', daylight);
                 }
             }
         }

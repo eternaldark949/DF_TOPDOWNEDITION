@@ -205,6 +205,27 @@
             return spr;
         }
 
+        function foliagePaintInView(f, ctx, view, zoom, wind, windDirection, frameTimeSec) {
+            if (!f || f.draw !== Foliage.prototype.draw || !Object.prototype.hasOwnProperty.call(FLORA_KINDS, f.type) ||
+                !Number.isFinite(f.size) || f.size <= 0 || !Number.isFinite(f.phaseOffset) ||
+                !Number.isFinite(f.swayMultiplier) || !Number.isFinite(wind) || !Number.isFinite(windDirection)) return true;
+            if (view && f.x >= view.left && f.x <= view.right && f.y >= view.top && f.y <= view.bottom) return true;
+            const time = frameTimeSec || _frameTimeSec;
+            if (!Number.isFinite(time)) return true;
+            const sway = Math.sin(time * 2 + f.phaseOffset) * wind * 8 * f.swayMultiplier * windDirection;
+            const s = f.size, palm = f.type === 'palm', bush = f.type === 'bush';
+            const cx = f.x + sway * (bush ? 0.6 : palm ? 0.3 : 1), cy = foliageCanopyY(f);
+            // Exact sprite bucket and canvas rounding, rather than the requested size alone.
+            const sz = Math.round(s * 5) / 5, R = (palm ? 24 : bush ? 13 : 21) * sz;
+            const half = Math.ceil(R * 2.6 + 6) / 2;
+            if (worldPaintBoxInView(ctx, view, zoom, cx, cy, -half, -half, half, half, palm ? sway * 0.012 : 0)) return true;
+            if (!_sunShadow.on) {
+                const r = (bush ? 13 : palm ? 16 : 19) * s;
+                return worldPaintBoxInView(ctx, view, zoom, cx + 3 * s, cy + 4 * s, -r, -r * 0.82, r, r * 0.82);
+            }
+            return false;
+        }
+
         class Foliage {
             constructor(x, y, type = 'tree', size = 1.0) {
                 this.x = x;

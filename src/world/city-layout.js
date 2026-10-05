@@ -1,3 +1,171 @@
+
+        /** Full-profiler-only stage hooks. Restored entirely when Full mode is off. */
+        const PeopleProfiler = {
+            active: false, hooks: null,
+            keys: ['Hair physics', 'Hair drawing', 'Cloth physics', 'Cloth drawing', 'Shading', 'Held items', 'Crowd sprites', 'Crowd baking'],
+
+            _wrap(part, original, entry, opaque) {
+                return function() {
+                    const S = RenderStats;
+                    if (!S.peopleScope || S.peopleOpaque || (!entry && !S.peopleDepth)) return original.apply(this, arguments);
+                    const parent = S.peoplePart, wasOpaque = S.peopleOpaque;
+                    const t = performance.now();
+                    if (parent !== null) S.peopleParts[parent] += t - S.peoplePartT;
+                    S.peoplePart = part; S.peoplePartT = t;
+                    if (entry) S.peopleDepth++;
+                    if (opaque) S.peopleOpaque = true;
+                    try { return original.apply(this, arguments); }
+                    finally {
+                        const end = performance.now();
+                        S.peopleParts[part] += end - S.peoplePartT;
+                        S.peoplePart = parent; S.peoplePartT = end; S.peopleOpaque = wasOpaque;
+                        if (entry) S.peopleDepth--;
+                    }
+                };
+            },
+
+            sync(on) {
+                on = !!on;
+                if (on === this.active) return;
+                if (!this.hooks) {
+                    const hooks = this.hooks = [];
+                    const bind = (part, get, set, entry = false, opaque = false) => {
+                        const original = get();
+                        hooks.push({ original, wrapped: this._wrap(part, original, entry, opaque), set });
+                    };
+                    bind('Hair physics', () => hairGeometry, fn => { hairGeometry = fn; });
+                    bind('Cloth physics', () => clothGeometry, fn => { clothGeometry = fn; });
+                    bind('Cloth drawing', () => drawClothPanel, fn => { drawClothPanel = fn; });
+                    bind('Shading', () => humanShade, fn => { humanShade = fn; });
+                    bind('Shading', () => drawHumanContactShadow, fn => { drawHumanContactShadow = fn; });
+                    bind('Shading', () => _softSpot, fn => { _softSpot = fn; });
+                    bind('Held items', () => drawHeldGlass, fn => { drawHeldGlass = fn; });
+                    bind('Held items', () => drawWeapon, fn => { drawWeapon = fn; });
+                    bind('Held items', () => drawUmbrella, fn => { drawUmbrella = fn; });
+                    bind('Crowd sprites', () => CrowdImpostors.draw, fn => { CrowdImpostors.draw = fn; }, true);
+                    bind('Crowd baking', () => CrowdImpostors._bake, fn => { CrowdImpostors._bake = fn; }, false, true);
+                    for (const type of Object.keys(HAIR_RENDERERS)) {
+                        bind('Hair drawing', () => HAIR_RENDERERS[type], fn => { HAIR_RENDERERS[type] = fn; });
+                    }
+                }
+                for (const h of this.hooks) h.set(on ? h.wrapped : h.original);
+                this.active = on;
+            },
+
+            beginEntities() {
+                const S = RenderStats;
+                S.peopleScope = true; S.peoplePart = null; S.peopleOpaque = false;
+                for (const key of this.keys) S.peopleParts[key] = 0;
+            },
+
+            endEntities(profiler, ms) {
+                const S = RenderStats;
+                S.peopleScope = false;
+                profiler.add('Entities: People', ms, true);
+                let known = 0;
+                for (const key of this.keys) {
+                    const value = S.peopleParts[key]; known += value;
+                    profiler.add('People: ' + key, value, true);
+                }
+                // Uninstrumented body, limbs, outfits and pose setup, plus hook overhead.
+                profiler.add('People: Body and limbs', Math.max(0, ms - known), true);
+            }
+        };
+        /** Buildings/World tops detail hooks exist only while the Full profiler is shown.
+            Stage rows are exclusive; body drawing stays in its existing People rows. */
+        const WorldRenderProfiler = {
+            active: false, hooks: null, scope: null, part: null, partT: 0, partP: 0,
+            parts: Object.create(null),
+            keys: {
+                Buildings: ['Base', 'Forecourts', 'Reflection prep', 'Wet ground', 'Reflections', 'Sun shadows', 'Cloud shadows', 'Indoor floors', 'Windows', 'Signs'],
+                'World tops': ['Roofs and facades', 'Windows', 'Signs', 'Ferris wheel', 'Foliage', 'Leaves', 'Lamp bodies', 'Linens']
+            },
+
+            _wrap(tag, original) {
+                const stage = this;
+                return function() {
+                    if (!stage.scope) return original.apply(this, arguments);
+                    const part = tag === 'geometry' ? (stage.scope === 'Buildings' ? 'Base' : 'Roofs and facades') : tag;
+                    // Hooks shared with lighting/interior passes only charge their own draw scope.
+                    if (!Object.prototype.hasOwnProperty.call(stage.parts, part)) return original.apply(this, arguments);
+                    const parent = stage.part, t = performance.now(), p = RenderStats.peopleMs;
+                    if (parent !== null) stage.parts[parent] += (t - stage.partT) - (p - stage.partP);
+                    stage.part = part; stage.partT = t; stage.partP = p;
+                    try { return original.apply(this, arguments); }
+                    finally {
+                        const end = performance.now(), ep = RenderStats.peopleMs;
+                        stage.parts[part] += (end - stage.partT) - (ep - stage.partP);
+                        stage.part = parent; stage.partT = end; stage.partP = ep;
+                    }
+                };
+            },
+
+            sync(on) {
+                on = !!on;
+                if (on === this.active) return;
+                if (!this.hooks) {
+                    const hooks = this.hooks = [];
+                    // Capture the finished rendering implementation, including optimizations.
+                    const bind = (tag, owner, key) => {
+                        const original = owner[key];
+                        if (typeof original !== 'function') return;
+                        hooks.push({ owner, key, original, wrapped: this._wrap(tag, original) });
+                    };
+                    const E = GameEngine.prototype, B = BuildingV2.prototype;
+                    bind('geometry', E, '_prepareRenderBuildingLists');
+                    for (const C of [Building, BuildingV2]) {
+                        bind('geometry', C.prototype, 'drawBase');
+                        bind('geometry', C.prototype, 'drawTop');
+                    }
+                    bind('geometry', BuildingV3.prototype, 'drawGround');
+                    bind('geometry', BuildingV3.prototype, 'draw');
+                    bind('geometry', Billboard.prototype, 'drawTop');
+                    for (const key of ['_sqDrawGround', '_dnDrawGround', '_mcDrawGround']) bind('Forecourts', B, key);
+                    bind('Reflection prep', E, 'prepareReflections');
+                    bind('Wet ground', E, 'drawPuddles');
+                    bind('Reflections', E, 'drawReflections');
+                    bind('Sun shadows', E, 'drawCastShadows');
+                    bind('Cloud shadows', E, '_drawCloudShadows');
+                    bind('Indoor floors', RoomSystem.prototype, 'drawFloors');
+                    bind('Windows', RoomSystem.prototype, 'drawWindows');
+                    bind('Windows', B, '_drawFaceWindows');
+                    bind('Signs', NeonSign.prototype, 'draw');
+                    for (const key of ['drawSign', '_paintSign', '_dnDrawSign', '_mcDrawSign']) bind('Signs', B, key);
+                    bind('Ferris wheel', FerrisWheel.prototype, 'drawBase');
+                    bind('Ferris wheel', FerrisWheel.prototype, 'drawTop');
+                    bind('Foliage', Foliage.prototype, 'draw');
+                    bind('Leaves', LeafParticleSystem.prototype, 'draw');
+                    bind('Lamp bodies', LampEntity.prototype, 'draw');
+                    bind('Linens', RoomSystem.prototype, 'drawLinens');
+                }
+                for (const h of this.hooks) h.owner[h.key] = on ? h.wrapped : h.original;
+                this.active = on; this.scope = null; this.part = null;
+            },
+
+            begin(scope, profiler, parentLabel) {
+                this.scope = scope; this.part = null;
+                this.parentLabel = parentLabel;
+                this.parentBase = profiler.metrics[parentLabel]?.current || 0;
+                this.peopleBase = RenderStats.peopleMs;
+                for (const key of Object.keys(this.parts)) delete this.parts[key];
+                for (const key of this.keys[scope]) this.parts[key] = 0;
+            },
+
+            end(profiler) {
+                const scope = this.scope;
+                if (!scope) return;
+                this.scope = null; this.part = null;
+                const ms = (profiler.metrics[this.parentLabel]?.current || 0) - this.parentBase;
+                let known = 0;
+                for (const key of this.keys[scope]) {
+                    const value = this.parts[key]; known += value;
+                    profiler.add(scope + ': ' + key, value, true);
+                }
+                // Buildings includes its decorative bodies; World tops' lap already excludes People.
+                const people = scope === 'Buildings' ? RenderStats.peopleMs - this.peopleBase : 0;
+                profiler.add(scope + ': Other', Math.max(0, ms - known - people), true);
+            }
+        };
         // =============================================================================
         //  CITY LAYOUT SYSTEM v2.0
         //  Grid-based procedural city generator with block management

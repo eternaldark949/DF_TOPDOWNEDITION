@@ -159,11 +159,28 @@
                 const i0 = Math.floor((cull.left - drift.x) / cell) - 1, i1 = Math.floor((cull.right - drift.x) / cell) + 1;
                 const j0 = Math.floor((cull.top - drift.y) / cell) - 1, j1 = Math.floor((cull.bottom - drift.y) / cell) + 1;
                 const a = (0.1 + 0.08 * S.overcast) * strength;
+                // Test the painted ellipse in backing-store pixels, not the deliberately wide
+                // world candidate rectangle. Reflection/custom affine contexts work too.
+                const m = ctx.getTransform(), cv = ctx.canvas;
+                const cc = Math.cos(0.3), ss = Math.sin(0.3);
+                const ex = Math.hypot(1.4 * (m.a * cc + m.c * ss), -m.a * ss + m.c * cc);
+                const ey = Math.hypot(1.4 * (m.b * cc + m.d * ss), -m.b * ss + m.d * cc);
+                const sx = Math.abs(ctx.shadowOffsetX || 0), sy = Math.abs(ctx.shadowOffsetY || 0);
+                const canCull = (!ctx.filter || ctx.filter === 'none') && !(ctx.shadowBlur > 0) &&
+                    [m.a, m.b, m.c, m.d, m.e, m.f, ex, ey, sx, sy, cv.width, cv.height].every(Number.isFinite) &&
+                    cv.width > 0 && cv.height > 0;
                 ctx.save(); ctx.globalCompositeOperation = 'multiply';
                 for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
                     const h = _bldHash(i * 13.1 + j * 7.7, 5);
                     if (h > 0.55 + 0.4 * S.overcast) continue;
                     const cx = i * cell + drift.x + _bldHash(i, j + 3) * cell, cy = j * cell + drift.y + _bldHash(j, i + 9) * cell, r = 280 + _bldHash(i + j, 2) * 320;
+                    if (canCull) {
+                        const px = m.a * cx + m.c * cy + m.e, py = m.b * cx + m.d * cy + m.f;
+                        const guard = 2 + 32 * Number.EPSILON * Math.max(1, Math.abs(px), Math.abs(py), r * ex, r * ey);
+                        const rx = r * ex + sx + guard, ry = r * ey + sy + guard;
+                        if (Number.isFinite(px) && Number.isFinite(py) && Number.isFinite(rx) && Number.isFinite(ry) &&
+                            (px + rx < 0 || px - rx > cv.width || py + ry < 0 || py - ry > cv.height)) continue;
+                    }
                     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
                     g.addColorStop(0, `rgba(96, 84, 150, ${a})`); g.addColorStop(1, 'rgba(96, 84, 150, 0)');
                     ctx.fillStyle = g; ctx.globalAlpha = 1; ctx.beginPath(); ctx.ellipse(cx, cy, r * 1.4, r, 0.3, 0, Math.PI * 2);

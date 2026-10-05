@@ -20,9 +20,11 @@
                 if (!el || !this.resonance) return;
                 const R = this.resonance;
                 const de = this.darkElement > 0 ? ` <span style="color:#b98cff">◆ ${this.darkElement}</span>` : '';
-                el.innerHTML = `<span style="color:#c9a6ff">◈ Lv ${R.level}</span>${R.unsettled > 0 ? ` · ${R.unsettled} unsettled` : ''}${de}`;
+                const html = `<span style="color:#c9a6ff">◈ Lv ${R.level}</span>${R.unsettled > 0 ? ` · ${R.unsettled} unsettled` : ''}${de}`;
+                if (el._resHudHTML !== html) { el._resHudHTML = html; el.innerHTML = html; }
                 const glow = Math.min(1, R.unsettled / Math.max(1, R.toNext() === Infinity ? 500 : R.toNext()));
-                el.style.textShadow = `0 0 ${4 + glow * 10}px rgba(185, 140, 255, ${0.3 + glow * 0.6})`;
+                const shadow = `0 0 ${4 + glow * 10}px rgba(185, 140, 255, ${0.3 + glow * 0.6})`;
+                if (el._resHudShadow !== shadow) { el._resHudShadow = shadow; el.style.textShadow = shadow; }
             },
 
             /** Dr. Yin offers a choice: tune Resonance or browse augments. */

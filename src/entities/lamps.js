@@ -102,6 +102,30 @@
             return cv;
         }
 
+        function lampPaintInView(lamp, ctx, view, zoom, daylight) {
+            if (!lamp || lamp.draw !== LampEntity.prototype.draw || lamp._glow !== LampEntity.prototype._glow ||
+                !Number.isFinite(daylight) || !Number.isFinite(lamp._lightK ?? 1)) return true;
+            if (view && lamp.x >= view.left && lamp.x <= view.right && lamp.y >= view.top && lamp.y <= view.bottom) return true;
+            const style = LAMP_TYPE_STYLE[lamp.lampType], on = daylight < 0.2 && !lamp._forcedOff;
+            let left, top, right, bottom;
+            if (style === 'antique_crook' || style === 'antique_twin') {
+                const spec = LAMP_STYLES[style], box = spec.box;
+                if (!box || box.length !== 4 || !box.every(Number.isFinite) || box[2] <= 0 || box[3] <= 0 || !Array.isArray(spec.bulbs)) return true;
+                left = box[0]; top = box[1]; right = left + box[2]; bottom = top + box[3];
+                if (on) for (const b of spec.bulbs) {
+                    if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) return true;
+                    // The 24-unit glow also contains every 18-unit orbit plus its 1.2-unit mote.
+                    left = Math.min(left, b.x - 24); right = Math.max(right, b.x + 24);
+                    top = Math.min(top, b.y - 24); bottom = Math.max(bottom, b.y + 24);
+                }
+            } else if (lamp.lampType === 3 || lamp.lampType === 4 || lamp.lampType === 5) {
+                const r = on ? (lamp.lampType === 4 ? 34 : 24) : lamp.lampType === 4 ? 12 : 8;
+                left = -r; right = r; top = lamp.lampType === 5 ? Math.min(-12, -r) : -r;
+                bottom = lamp.lampType === 5 ? Math.max(12, r) : r;
+            } else return true;
+            return worldPaintBoxInView(ctx, view, zoom, lamp.x, lamp.y, left, top, right, bottom, lamp.angle);
+        }
+
         class LampEntity extends GameEntity {
             constructor(config) {
                 super({

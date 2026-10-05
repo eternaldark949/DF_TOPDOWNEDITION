@@ -598,6 +598,7 @@
             ctx.closePath();
         }
         /** Crescent of radius R with its horns pointing along rot; thick = body width as a fraction of R. */
+        const _FW_DEFAULT_WINDOW_MASK = BuildingV2.prototype._sqWindowMask; // captured before runtime overrides
         function sqCrescent(ctx, cx, cy, R, rot, thick = 0.5, a = 0.9) {
             const m = R * (1 - thick), d = (R * R - m * m) / (2 * (m + R * Math.cos(a))), r2 = d + m;
             const h = Math.atan2(R * Math.sin(a), R * Math.cos(a) - d);

@@ -30,30 +30,52 @@
             short: { jiggle: 0.4 }
         };
 
-        /** Rest pose in the head frame (also the fallback when there's no physics). */
+        // Rest geometry is transient, like _simOut: a draw consumes it before another hair call.
+        // Cache each immutable layout's points instead of allocating the same nested arrays per body.
+        const _hairRestCache = new WeakMap(), _hairMetrics = new WeakMap();
         function _hairRest(layout, headX, sway = 0) {
-            return (layout.strands || []).map(s => {
-                const pts = [], a = s.dir - sway;
-                let x = headX + s.root.x, y = s.root.y;
-                pts.push({ x, y });
-                for (let i = 1; i <= s.segs; i++) { x += Math.cos(a) * s.len; y += Math.sin(a) * s.len; pts.push({ x, y }); }
-                return pts;
-            });
+            let cache = _hairRestCache.get(layout);
+            if (!cache) {
+                cache = { headX: NaN, sway: NaN, strands: (layout.strands || []).map(s =>
+                    Array.from({ length: s.segs + 1 }, () => ({ x: 0, y: 0 }))), jig: { x: 0, y: 0 }, lod: 0 };
+                _hairRestCache.set(layout, cache);
+            }
+            if (cache.headX !== headX || cache.sway !== sway) {
+                const specs = layout.strands || [];
+                for (let si = 0; si < specs.length; si++) {
+                    const s = specs[si], pts = cache.strands[si], a = s.dir - sway;
+                    const dx = Math.cos(a) * s.len, dy = Math.sin(a) * s.len;
+                    let x = headX + s.root.x, y = s.root.y;
+                    pts[0].x = x; pts[0].y = y;
+                    for (let i = 1; i <= s.segs; i++) { x += dx; y += dy; pts[i].x = x; pts[i].y = y; }
+                }
+                cache.headX = headX; cache.sway = sway;
+            }
+            return cache.strands;
+        }
+        function _hairDrawLOD(ctx) {
+            // Portraits and sprite bakes must never inherit the live camera's distant detail.
+            return _worldMatrix && ctx.canvas === _worldCanvas && typeof _zoomLOD !== 'undefined' ? _zoomLOD : 0;
         }
 
-        const _HAIR_ROOT = { x: 0, y: 0 };   // hairGeometry's per-slice root, reused
+        const _HAIR_ROOT = { x: 0, y: 0 }, _HAIR_HEAD = { x: 0, y: 0 };   // transient world points, reused
         /**
          * Current hair geometry in the head frame: { strands: [[{x,y}...]...], jig: {x,y} }.
          * Steps the owner's physics when drawn on the main canvas; otherwise the rest pose.
          */
         function hairGeometry(ctx, headX, hair, dyn) {
             const layout = HAIR_LAYOUTS[hair.type];
-            if (!layout) return { strands: [], jig: { x: 0, y: 0 } };
+            if (!layout) return { strands: [], jig: { x: 0, y: 0 }, lod: 0 };
             const owner = dyn && dyn.owner, sway = (dyn && dyn.sway) || 0;
             const T = owner && !_crowdLite ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js); a lighter crowd: at rest
-            if (!T) return { strands: _hairRest(layout, headX, sway * 0.5), jig: { x: 0, y: 0 } };
-            const { toW, toL, toLInto, sc, ang: baseAngle } = T;
-            const head = toW(headX, 0);
+            if (!T) {
+                _hairRest(layout, headX, sway * 0.5);
+                const rest = _hairRestCache.get(layout); rest.lod = _hairDrawLOD(ctx);
+                return rest;
+            }
+            const { toW, toLInto, sc, ang: baseAngle, M } = T;
+            const head = _HAIR_HEAD;
+            head.x = M.a * headX + M.c * 0 + M.e; head.y = M.b * headX + M.d * 0 + M.f;
 
             let sim = owner._hairSim;
             const reset = !sim || sim.type !== hair.type || Math.hypot(sim.headX - head.x, sim.headY - head.y) > HAIR_SIM.SNAP * sc;
@@ -68,6 +90,15 @@
             const steps = _simSteps(sim, HAIR_SIM.STEP, HAIR_SIM.MAX_STEPS);
 
             const specs = layout.strands || [];
+            let metrics = _hairMetrics.get(layout);
+            if (!metrics) {
+                metrics = specs.map(spec => {
+                    const u = [], spring = [];
+                    for (let i = 1; i <= spec.segs; i++) { u[i] = i / spec.segs; spring[i] = layout.stiffness * (1 - 0.6 * u[i]); }
+                    return { u, spring };
+                });
+                _hairMetrics.set(layout, metrics);
+            }
             const hx0 = sim.headX, hy0 = sim.headY, a0 = sim.ang;
             let dA = baseAngle - a0; while (dA > Math.PI) dA -= Math.PI * 2; while (dA < -Math.PI) dA += Math.PI * 2;
 
@@ -75,7 +106,8 @@
                 // Between slices: carry the hair rigidly with the head so it stays attached
                 const dx = head.x - hx0, dy = head.y - hy0;
                 for (let si = 0; si < sim.strands.length; si++) {
-                    const pts = sim.strands[si], root = toW(headX + specs[si].root.x, specs[si].root.y);
+                    const pts = sim.strands[si], root = _HAIR_ROOT, lx = headX + specs[si].root.x, ly = specs[si].root.y;
+                    root.x = M.a * lx + M.c * ly + M.e; root.y = M.b * lx + M.d * ly + M.f;
                     const rx = root.x - pts[0].x, ry = root.y - pts[0].y;
                     for (const p of pts) { p.x += rx; p.y += ry; p.px += rx; p.py += ry; }
                 }
@@ -90,7 +122,7 @@
                 const time = sim.t + (k - steps) * HAIR_SIM.STEP;
 
                 for (let si = 0; si < sim.strands.length; si++) {
-                    const spec = specs[si], pts = sim.strands[si];
+                    const spec = specs[si], pts = sim.strands[si], metric = metrics[si];
                     // the strand's root for this slice, in the world (as sliceW(lx, ly) was, without its object)
                     const root = _HAIR_ROOT, lx = headX + spec.root.x, ly = spec.root.y;
                     root.x = hx + (c * (lx - headX) - s * ly) * sc; root.y = hy + (s * (lx - headX) + c * ly) * sc;
@@ -102,11 +134,11 @@
                         const p = pts[i];
                         const vx = (p.x - p.px) * layout.damping, vy = (p.y - p.py) * layout.damping;
                         // Spring toward the rest pose — stiff near the scalp, loose at the tips
-                        const k0 = layout.stiffness * (1 - 0.6 * (i / n));
+                        const k0 = metric.spring[i];
                         let ax = (root.x + rc * L * i - p.x) * k0, ay = (root.y + rs * L * i - p.y) * k0;
-                        if (dyn && dyn.wind) { ax += dyn.wind.x * sc * (i / n); ay += dyn.wind.y * sc * (i / n); }   // the weather's wind
+                        if (dyn && dyn.wind) { ax += dyn.wind.x * sc * metric.u[i]; ay += dyn.wind.y * sc * metric.u[i]; }   // the weather's wind
                         if (layout.wiggle) {                           // restless tendrils
-                            const w = Math.sin(time * 5 + i * 0.9 + si * 1.7) * layout.wiggle * sc * (i / n);
+                            const w = Math.sin(time * 5 + i * 0.9 + si * 1.7) * layout.wiggle * sc * metric.u[i];
                             ax += -rs * w; ay += rc * w;
                         }
                         p.px = p.x; p.py = p.y;
@@ -120,8 +152,11 @@
                     for (let i = 1; i <= n; i++) {
                         const a = pts[i - 1], p = pts[i];
                         const bx = p.x, by = p.y;
-                        const hdx = p.x - hx, hdy = p.y - hy, hd = Math.hypot(hdx, hdy);
-                        if (hd < R && hd > 0.001) { p.x = hx + hdx / hd * R; p.y = hy + hdy / hd * R; }
+                        const hdx = p.x - hx, hdy = p.y - hy;
+                        if (Math.abs(hdx) < R && Math.abs(hdy) < R) {
+                            const hd = Math.hypot(hdx, hdy);
+                            if (hd < R && hd > 0.001) { p.x = hx + hdx / hd * R; p.y = hy + hdy / hd * R; }
+                        }
                         const dx = p.x - a.x, dy = p.y - a.y, d = Math.hypot(dx, dy) || 1;
                         p.x = a.x + dx / d * L; p.y = a.y + dy / d * L;
                         corrX[i] = p.x - bx; corrY[i] = p.y - by;
@@ -139,26 +174,54 @@
             sim.headX = head.x; sim.headY = head.y; sim.ang = baseAngle;
 
             const strands = _simOut(sim, sim.strands, toLInto);
-            let jig = { x: 0, y: 0 };
+            const geo = sim._hairGeo || (sim._hairGeo = { strands, jig: { x: 0, y: 0 }, lod: 0 });
+            const jig = geo.jig; jig.x = 0; jig.y = 0;
             if (layout.jiggle) {
-                const l0 = toL(head.x, head.y), l1 = toL(sim.jig.x, sim.jig.y);
+                const l0 = toLInto(sim._hairL0 || (sim._hairL0 = { x: 0, y: 0 }), head.x, head.y);
+                const l1 = toLInto(sim._hairL1 || (sim._hairL1 = { x: 0, y: 0 }), sim.jig.x, sim.jig.y);
                 let jx = (l1.x - l0.x) * layout.jiggle, jy = (l1.y - l0.y) * layout.jiggle;
                 const jm = Math.hypot(jx, jy), cap = 3;
                 if (jm > cap) { jx *= cap / jm; jy *= cap / jm; }
-                jig = { x: jx, y: jy };
+                jig.x = jx; jig.y = jy;
             }
-            return { strands, jig };
+            geo.strands = strands; geo.lod = _hairDrawLOD(ctx);
+            return geo;
         }
 
         /** Stroke a strand with a width that tapers from w0 (root) to w1 (tip). */
-        function _taperedStrand(ctx, pts, w0, w1) {
+        function _taperedStrand(ctx, pts, w0, w1, lod = 0) {
             ctx.lineCap = 'round';
-            for (let i = 1; i < pts.length; i++) {
-                ctx.lineWidth = w0 + (w1 - w0) * ((i - 1) / Math.max(1, pts.length - 2));
-                ctx.beginPath(); ctx.moveTo(pts[i - 1].x, pts[i - 1].y); ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke();
+            const n = pts.length - 1;
+            if (!lod) {
+                const d = Math.max(1, pts.length - 2);
+                for (let i = 1; i < pts.length; i++) {
+                    ctx.lineWidth = w0 + (w1 - w0) * ((i - 1) / d);
+                    ctx.beginPath(); ctx.moveTo(pts[i - 1].x, pts[i - 1].y); ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke();
+                }
+            } else {
+                // Keep every curve point and both ends; fewer width bands at distant zoom.
+                // Physics topology never changes, so returning to full detail needs no reset.
+                const group = lod >= 2 ? 3 : 2, bands = Math.ceil(n / group), join = ctx.lineJoin;
+                ctx.lineJoin = 'round';
+                for (let i = 0, band = 0; i < n; i += group, band++) {
+                    const end = Math.min(n, i + group);
+                    ctx.lineWidth = w0 + (w1 - w0) * (band / Math.max(1, bands - 1));
+                    ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y);
+                    for (let j = i + 1; j <= end; j++) ctx.lineTo(pts[j].x, pts[j].y);
+                    ctx.stroke();
+                }
+                ctx.lineJoin = join;
             }
             ctx.lineCap = 'butt';
         }
+
+        // Fixed curl positions and bounce weights; exactly the original crown and highlight math.
+        const _HAIR_CURL_RING = Array.from({ length: 10 }, (_, i) => {
+            const th = (i / 10) * Math.PI * 2 + 0.3;
+            const back = Math.cos(th) < 0 ? 1 : 0.6;
+            return { x: Math.cos(th) * 8.5 * back, y: Math.sin(th) * 8.5, r: 4 + (i % 2) * 0.8, bounce: 1 + (i % 2) * 0.5 };
+        });
+        const _HAIR_CURL_HIGHLIGHTS = Array.from({ length: 5 }, (_, i) => ({ x: Math.cos(i * 1.3) * 4, y: Math.sin(i * 1.3) * 4 }));
 
         // Hair renderers: (ctx, color, headX, dyn, geo) where geo = hairGeometry(...)
         const HAIR_RENDERERS = {
@@ -175,10 +238,10 @@
                     for (let i = R.length - 1; i >= 0; i--) ctx.lineTo(R[i].x, R[i].y);
                     ctx.closePath(); ctx.fill();
                     // Soft rounded ends and strand texture
-                    for (const st of S) _taperedStrand(ctx, st, 4, 3);
+                    for (const st of S) _taperedStrand(ctx, st, 4, 3, geo.lod);
                     const a0 = ctx.globalAlpha;
                     ctx.strokeStyle = _hairShade(color, 0.25); ctx.globalAlpha = a0 * 0.35;
-                    for (let s = 1; s < S.length - 1; s++) _taperedStrand(ctx, S[s], 1, 0.6);
+                    for (let s = 1; s < S.length - 1; s++) _taperedStrand(ctx, S[s], 1, 0.6, geo.lod);
                     ctx.globalAlpha = a0;
                 }
                 // Crown
@@ -198,19 +261,19 @@
                 ctx.fillStyle = color;
                 ctx.beginPath(); ctx.arc(cx + j.x * 0.5, j.y * 0.5, 9.5, 0, Math.PI * 2); ctx.fill();
                 // An even ring of curls around the crown; outer curls bounce more
-                const curlsN = 10;
-                for (let i = 0; i < curlsN; i++) {
-                    const th = (i / curlsN) * Math.PI * 2 + 0.3;
-                    const back = Math.cos(th) < 0 ? 1 : 0.6;          // fuller toward the back
-                    const r = 4 + (i % 2) * 0.8;
+                for (const curl of _HAIR_CURL_RING) {
                     ctx.beginPath();
-                    ctx.arc(cx + Math.cos(th) * 8.5 * back + j.x * (1 + (i % 2) * 0.5), Math.sin(th) * 8.5 + j.y * (1 + (i % 2) * 0.5), r, 0, Math.PI * 2);
+                    ctx.arc(cx + curl.x + j.x * curl.bounce, curl.y + j.y * curl.bounce, curl.r, 0, Math.PI * 2);
                     ctx.fill();
                 }
-                // Tight texture highlights
+                // Tiny texture marks can be farther apart at distant zoom; outer curls stay complete.
                 const a0 = ctx.globalAlpha;
                 ctx.fillStyle = _hairShade(color, -0.15); ctx.globalAlpha = a0 * 0.35;
-                for (let i = 0; i < 5; i++) { const th = i * 1.3; ctx.beginPath(); ctx.arc(cx + Math.cos(th) * 4 + j.x * 0.5, Math.sin(th) * 4 + j.y * 0.5, 1.6, 0, Math.PI * 2); ctx.fill(); }
+                const stride = geo.lod >= 2 ? 3 : (geo.lod ? 2 : 1);
+                for (let i = 0; i < _HAIR_CURL_HIGHLIGHTS.length; i += stride) {
+                    const mark = _HAIR_CURL_HIGHLIGHTS[i];
+                    ctx.beginPath(); ctx.arc(cx + mark.x + j.x * 0.5, mark.y + j.y * 0.5, 1.6, 0, Math.PI * 2); ctx.fill();
+                }
                 ctx.globalAlpha = a0;
             },
             demon_dancer(ctx, color, headX, dyn, geo) {
@@ -218,10 +281,11 @@
                 ctx.strokeStyle = hairColor; ctx.fillStyle = hairColor;
                 // 4–5 separate tendrils of varied weight; the thin ones are translucent
                 const a0 = ctx.globalAlpha;
-                geo.strands.forEach((st, i) => {
+                for (let i = 0; i < geo.strands.length; i++) {
+                    const st = geo.strands[i];
                     ctx.globalAlpha = a0 * (i % 2 ? 0.65 : 1);
-                    _taperedStrand(ctx, st, i % 2 ? 2.6 : 4.4, 0.8);
-                });
+                    _taperedStrand(ctx, st, i % 2 ? 2.6 : 4.4, 0.8, geo.lod);
+                }
                 ctx.globalAlpha = a0;
                 ctx.beginPath(); ctx.ellipse(headX - 1, 0, 9.5, 8.5, 0, 0, Math.PI * 2); ctx.fill();
             },
@@ -240,12 +304,14 @@
                 ctx.fillStyle = color; ctx.strokeStyle = color;
                 const dark = _hairShade(color, 0.3);
                 for (const st of geo.strands) {
-                    _taperedStrand(ctx, st, 3.6, 2.8);
+                    _taperedStrand(ctx, st, 3.6, 2.8, geo.lod);
                     // Woven look: alternating plaits along the braid
-                    for (let i = 1; i < st.length; i++) {
+                    const stride = geo.lod >= 2 ? 3 : (geo.lod ? 2 : 1);
+                    for (let i = 1; i < st.length; i += stride) {
+                        const plait = Math.ceil(i / stride);
                         const a = st[i - 1], b = st[i], ang = Math.atan2(b.y - a.y, b.x - a.x);
-                        ctx.save(); ctx.translate((a.x + b.x) / 2, (a.y + b.y) / 2); ctx.rotate(ang + (i % 2 ? 0.5 : -0.5));
-                        ctx.fillStyle = i % 2 ? color : dark;
+                        ctx.save(); ctx.translate((a.x + b.x) / 2, (a.y + b.y) / 2); ctx.rotate(ang + (plait % 2 ? 0.5 : -0.5));
+                        ctx.fillStyle = plait % 2 ? color : dark;
                         ctx.beginPath(); ctx.ellipse(0, 0, 2.2, 1.6, 0, 0, Math.PI * 2); ctx.fill();
                         ctx.restore();
                     }
@@ -262,14 +328,14 @@
             },
             dreadlocks(ctx, color, headX, dyn, geo) {
                 ctx.strokeStyle = color; ctx.fillStyle = color;
-                for (const st of geo.strands) _taperedStrand(ctx, st, 4, 3.2);
+                for (const st of geo.strands) _taperedStrand(ctx, st, 4, 3.2, geo.lod);
                 ctx.beginPath(); ctx.ellipse(headX, 0, 10, 9, 0, 0, Math.PI * 2); ctx.fill();
                 ctx.beginPath(); ctx.arc(headX - 7, -3, 4, 0, Math.PI * 2); ctx.fill();
                 ctx.beginPath(); ctx.arc(headX - 7, 3, 4, 0, Math.PI * 2); ctx.fill();
             },
             ponytail(ctx, color, headX, dyn, geo) {
                 ctx.fillStyle = color; ctx.strokeStyle = color;
-                for (const st of geo.strands) _taperedStrand(ctx, st, 5, 3);
+                for (const st of geo.strands) _taperedStrand(ctx, st, 5, 3, geo.lod);
                 // Sleek base pulled tight over the head, tight side volume, and the tie
                 ctx.beginPath(); ctx.ellipse(headX, 0, 10, 9, 0, 0, Math.PI * 2); ctx.fill();
                 ctx.beginPath(); ctx.arc(headX - 7, -3, 3.5, 0, Math.PI * 2); ctx.fill();
@@ -1040,6 +1106,13 @@
         }
 
         /** A soft shadow under the feet: cast along the sun by day, a round pool at night and indoors. */
+        let _contactShadowX, _contactShadowY, _contactShadowAngle = 0;
+        function _contactShadowDirection(x, y) {
+            if (!Object.is(x, _contactShadowX) || !Object.is(y, _contactShadowY)) {
+                _contactShadowX = x; _contactShadowY = y; _contactShadowAngle = Math.atan2(y, x);
+            }
+            return _contactShadowAngle;
+        }
         function drawHumanContactShadow(ctx) {
             if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
             const C = CONFIG.HUMAN_SHADE, sp = glowSprite(_SHADOW_RGB, 0.45), a0 = ctx.globalAlpha;
@@ -1047,7 +1120,7 @@
             ctx.translate(-4, 0);
             if (typeof _sunShadow !== 'undefined' && _sunShadow.on) {
                 const L = Math.min(1.6, _sunShadow.len) * _sunShadow.k;
-                ctx.rotate(Math.atan2(_sunShadow.dy, _sunShadow.dx) - _bodyRot);
+                ctx.rotate(_contactShadowDirection(_sunShadow.dx, _sunShadow.dy) - _bodyRot);
                 ctx.translate(2 + 5 * L, 0); ctx.scale((11 + 9 * L) / 32, 9 / 32);
                 ctx.globalAlpha = a0 * (C.SHADOW_NIGHT + (C.SHADOW_DAY - C.SHADOW_NIGHT) * _sunShadow.k);
             } else { ctx.scale(12 / 32, 10 / 32); ctx.globalAlpha = a0 * C.SHADOW_NIGHT; }
@@ -1060,14 +1133,64 @@
          * frame here; a hovering android bobs over a soft glow.
          */
         /** What the entity pass drew this frame, for the profiler (reset by draw.js; ms only while it's on, Full) */
-        const RenderStats = { bodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0, ticks: 1, bldBase: 0, bldTops: 0 };
+        const RenderStats = { bodies: 0, liveBodies: 0, cachedBodies: 0, bakedBodies: 0, culled: 0, peopleMs: 0, timed: false, calls: 0, ticks: 1, bldBase: 0, bldTops: 0, peopleScope: false, peopleDepth: 0, peopleParts: Object.create(null), peoplePart: null, peoplePartT: 0, peopleOpaque: false };
 
         function drawProceduralHumanoid(ctx, entity, config = {}) {
-            RenderStats.bodies++;
+            if (config._crowdBake) RenderStats.bakedBodies++;
+            else { RenderStats.bodies++; RenderStats.liveBodies++; }
             if (!RenderStats.timed) return _drawProceduralHumanoid(ctx, entity, config);
             const t0 = performance.now();
-            try { return _drawProceduralHumanoid(ctx, entity, config); } finally { RenderStats.peopleMs += performance.now() - t0; }
+            RenderStats.peopleDepth++;
+            try { return _drawProceduralHumanoid(ctx, entity, config); }
+            finally { RenderStats.peopleDepth--; RenderStats.peopleMs += performance.now() - t0; }
         }
+
+        // Retain body-drawing buffers and helpers per owner. Values are rewritten every
+        // draw so outfit edits, weather and pose changes do not require invalidation.
+        const _humanoidDrawBuffers = new WeakMap();
+        function _humanoidDrawBuffer(entity) {
+            let h = _humanoidDrawBuffers.get(entity);
+            if (h) return h;
+            h = { entity, clothes: {}, shadeConfig: { _wet: 0 }, scaleFrame: { x: 1, y: 1, k: 1 },
+                clothDyn: { wind: null },
+                driveDyn: { owner: entity, sway: 0, drag: 0, bounce: 0, wiggle: 0, android: null },
+                walkDyn: { owner: entity, sway: 0, drag: 0, bounce: 0, wiggle: 0, wind: null, android: null } };
+            h.darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * (hex === h.skin ? frac : frac + h.wet))) : '#000';
+            h.withHead = (hx, draw) => {
+                const ctx = h.ctx, S = h.scale;
+                if (!S) return draw(hx);
+                ctx.save(); ctx.scale(S.k / S.x, S.k / S.y); draw(hx * S.x / S.k); ctx.restore();
+            };
+            h.pf = (key, i) => (h.pose && h.pose[key] ? h.pose[key][i] * h.poseW : 0);
+            h.drawLimb = (x1, y1, x2, y2, width, color, gloss) => {
+                const ctx = h.ctx, SH = h.shade;
+                const len = Math.hypot(x2-x1, y2-y1)/2 + 2;
+                const ang = Math.atan2(y2-y1, x2-x1);
+                if (!SH) {
+                    // ellipse's own rotation gives the same shape without changing the
+                    // Canvas frame. Only fillStyle changes, so restore that explicitly.
+                    const fill = ctx.fillStyle;
+                    ctx.fillStyle = color;
+                    ctx.beginPath(); ctx.ellipse((x1+x2)/2, (y1+y2)/2, len, width, ang, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = fill;
+                    return;
+                }
+                ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.ellipse(0, 0, len, width, 0, 0, Math.PI*2); ctx.fill();
+                const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;
+                if (gloss) {
+                    ctx.fillStyle = SH.hl2;
+                    ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.36, 0, 0, Math.PI*2); ctx.fill();
+                } else if (SH.lx || SH.ly) {
+                    _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.3);
+                }
+                ctx.restore();
+            };
+            _humanoidDrawBuffers.set(entity, h);
+            return h;
+        }
+        function _humanoidLerp(current, target, speed) { return current + (target - current) * speed; }
 
         function _drawProceduralHumanoid(ctx, entity, config = {}) {
             const S = bodyScale(config), A = androidLook(config.body);
@@ -1086,7 +1209,9 @@
             const sx = (S ? S.x : 1) * bob, sy = (S ? S.y : 1) * bob;
             const muzzle = entity._muzzleLocal;
             ctx.save(); ctx.scale(sx, sy);
-            try { _drawHumanoidBody(ctx, entity, config, { x: sx, y: sy, k: (S ? S.k : 1) * bob }, A); }
+            const scale = _humanoidDrawBuffer(entity).scaleFrame;
+            scale.x = sx; scale.y = sy; scale.k = (S ? S.k : 1) * bob;
+            try { _drawHumanoidBody(ctx, entity, config, scale, A); }
             finally { ctx.restore(); }
             // Shots leave from the drawn muzzle, so carry the scale into it
             if (entity._muzzleLocal && entity._muzzleLocal !== muzzle) entity._muzzleLocal = { x: entity._muzzleLocal.x * sx, y: entity._muzzleLocal.y * sy };
@@ -1110,20 +1235,18 @@
             const umbrellaOpen = umbrella ? (umbrella.open !== undefined ? umbrella.open : (W && W.rain > 0.05 ? 1 : 0)) : 0;
             const glassHand = (held && !isDrivingCfg(config) && (held.type === 'glass' || held.type === 'champagne_glass' || umbrella)) ? (held.hand || 'right') : null;
         
-            const clothes = {
-                hair:   config.hair   || null,
-                hat:    config.hat    || null,
-                top:    config.top    || null, 
-                bottom: config.bottom || null,
-                shoes:  config.shoes  || null,
-                train:  config.train  || null,
-                jewelry: config.jewelry || null
-            };
+            const h = _humanoidDrawBuffer(entity), clothes = h.clothes;
+            h.ctx = ctx; h.scale = S; h.skin = skinColor;
+            clothes.hair = config.hair || null; clothes.hat = config.hat || null;
+            clothes.top = config.top || null; clothes.bottom = config.bottom || null;
+            clothes.shoes = config.shoes || null; clothes.train = config.train || null;
+            clothes.jewelry = config.jewelry || null;
         
             // Rain darkens clothes a touch (not skin)
             const wet = W ? W.rain * 0.08 : 0;
-            const SH = isDriving ? null : humanShade(ctx, entity, { _wet: W ? W.rain : 0 });
-            const darken = (hex, frac) => hex ? darkenHex(hex, Math.floor(255 * (hex === skinColor ? frac : frac + wet))) : '#000';
+            h.wet = wet; h.shadeConfig._wet = W ? W.rain : 0;
+            const SH = h.shade = isDriving ? null : humanShade(ctx, entity, h.shadeConfig);
+            const darken = h.darken;
         
             // --- 2. PROPORTIONS ---
             let shoulderSpread = 9; let hipWidth = 8; let hipXOff = -5; let torsoWidth = 10; let torsoXOff = -3;
@@ -1136,10 +1259,7 @@
             if (build && build.hip) { hipXOff -= hipWidth * (build.hip - 1) / 2; hipWidth *= build.hip; }
             if (build && build.shoulder) shoulderSpread *= build.shoulder;
             // Head keeps its shape under a build's scale: draw it through this
-            const withHead = (hx, draw) => {
-                if (!S) return draw(hx);
-                ctx.save(); ctx.scale(S.k / S.x, S.k / S.y); draw(hx * S.x / S.k); ctx.restore();
-            };
+            const withHead = h.withHead;
         
             // --- 3. GAIT (shared controller — see CONFIG.GAIT / syncHumanoidGait) ---
             const gait = syncHumanoidGait(entity);
@@ -1166,8 +1286,9 @@
             // Walk oscillations. Like the arm swing, these are applied AFTER the pose
             // smoothing in step 6 — the per-render lerp there would mute and delay
             // them — so the pose targets below are built without them.
-            const walkBounce = (isDriving || hovering) ? 0 : Math.abs(Math.sin(walkCycle)) * (gaitSpeed * 0.2); // Bounce scales with speed
-            const walkSway = Math.sin(walkCycle) * 0.3 * sway;  // sway is 0 when driving or stopped
+            const walkSin = Math.sin(walkCycle), walkOppSin = isDriving ? 0 : Math.sin(walkCycle + Math.PI);
+            const walkBounce = (isDriving || hovering) ? 0 : Math.abs(walkSin) * (gaitSpeed * 0.2); // Bounce scales with speed
+            const walkSway = walkSin * 0.3 * sway;  // sway is 0 when driving or stopped
             let bounce = 0;         // pose-target bounce; walk bounce is added after smoothing
         
             // Punch strike 0..1 (null unless the caller passes punchTicks). Applied after
@@ -1183,7 +1304,7 @@
             const shoulderPoseX = hipAnchorX - walkBounce + (punchStrike !== null ? bodyRecoil : 0);
             let hipRotation = 0;    // pose targets; walk sway is added after smoothing
             let torsoRotation = 0;
-            const armSwing = isDriving ? 0 : Math.sin(walkCycle + Math.PI) * gaitSpeed;        
+            const armSwing = isDriving ? 0 : walkOppSin * gaitSpeed;        
 
             // --- 3b. POSE (ui/poses.js): what the body does while standing still ---
             // Fades in after a moment standing, out the moment the character walks.
@@ -1202,26 +1323,9 @@
                 if (config.poseInstant) ps.w = target;                     // a fall can't wait for the pose to fade in
                 if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender, beat: name === 'dance' ? mapBeatN() : null }); poseW = ps.w; }
             }
-            const pf = (key, i) => (pose && pose[key] ? pose[key][i] * poseW : 0);
+            h.pose = pose; h.poseW = poseW;
+            const pf = h.pf;
 
-            // --- 4. CALCULATE POSITIONS ---
-            const lBaseY = -hipWidth / 2 - 1;
-            const rBaseY = hipWidth / 2 + 1;
-        
-            const lWalkX = Math.sin(walkCycle) * strideLen * fwdAmt;
-            const rWalkX = Math.sin(walkCycle + Math.PI) * strideLen * fwdAmt;
-            const lWalkY = Math.sin(walkCycle) * strafeLen * sideAmt;
-            const rWalkY = Math.sin(walkCycle + Math.PI) * strafeLen * sideAmt;
-        
-            const lFootX = -3 + lWalkX + pf('lf', 0);
-            const rFootX = -3 + rWalkX + pf('rf', 0);
-            const lFootY = lBaseY + lWalkY + pf('lf', 1);
-            const rFootY = rBaseY + rWalkY + pf('rf', 1);
-        
-            const lKneeX = (hipAnchorX + lFootX) / 2;
-            const lKneeY = (lBaseY + lFootY) / 2;
-            const rKneeX = (hipAnchorX + rFootX) / 2;
-            const rKneeY = (rBaseY + rFootY) / 2;        
             // --- 5. HAND POSITIONS ---
             let lFistX, rFistX, lFistY, rFistY;
         
@@ -1335,8 +1439,11 @@
             }
             
             // Guard-pose targets, kept so the punch can blend onto them (see step 6)
-            const punchGuard = punchStrike !== null
-                ? [lFistX, lFistY, rFistX, rFistY, lElbowX, lElbowY, rElbowX, rElbowY] : null;
+            const punchGuard = punchStrike !== null ? (h.punchGuard || (h.punchGuard = new Array(8))) : null;
+            if (punchGuard) {
+                punchGuard[0] = lFistX; punchGuard[1] = lFistY; punchGuard[2] = rFistX; punchGuard[3] = rFistY;
+                punchGuard[4] = lElbowX; punchGuard[5] = lElbowY; punchGuard[6] = rElbowX; punchGuard[7] = rElbowY;
+            }
 
             // --- 6. ANIMATION INTERPOLATION ---
             // Smoothly interpolate limb positions to avoid snappy transitions
@@ -1358,7 +1465,7 @@
             const anim = entity._animState;
             
             // Lerp function
-            const lerp = (current, target, speed) => current + (target - current) * speed;
+            const lerp = _humanoidLerp;
             
             // Interpolate hand positions (key for stance transitions)
             anim.lFistX = lerp(anim.lFistX, lFistX, lerpSpeed);
@@ -1395,7 +1502,7 @@
             if (anim.armSwingW === undefined) anim.armSwingW = walkArms ? 1 : 0;
             anim.armSwingW = lerp(anim.armSwingW, walkArms ? 1 : 0, lerpSpeed);
             if (anim.armSwingW > 0.001 && strideLen > 0) {
-                const handSwing = Math.sin(walkCycle + Math.PI) * strideLen * CONFIG.GAIT.ARM_SWING_RATIO * anim.armSwingW;
+                const handSwing = walkOppSin * strideLen * CONFIG.GAIT.ARM_SWING_RATIO * anim.armSwingW;
                 const ls = glassHand === 'left' ? 0.25 : 1, rs = glassHand === 'right' ? 0.25 : 1;   // keep the drink steady
                 lFistX += handSwing * ls;
                 rFistX -= handSwing * rs;
@@ -1474,23 +1581,7 @@
                 }
             }
             
-            const drawLimb = (x1, y1, x2, y2, width, color, gloss) => {
-                const len = Math.hypot(x2-x1, y2-y1)/2 + 2;
-                const ang = Math.atan2(y2-y1, x2-x1);
-                ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
-                ctx.fillStyle = color;
-                ctx.beginPath(); ctx.ellipse(0, 0, len, width, 0, 0, Math.PI*2); ctx.fill();
-                if (SH) {                                                   // light across the limb, toward the sun
-                    const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;
-                    if (gloss) {                                            // glossy fabric: a crisp sheen
-                        ctx.fillStyle = SH.hl2;
-                        ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.36, 0, 0, Math.PI*2); ctx.fill();
-                    } else {                                                // matte: a smooth gradient, lit side to shaded side
-                        if (SH.lx || SH.ly) _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.3);
-                    }
-                }
-                ctx.restore();
-            };
+            const drawLimb = h.drawLimb;
             
             // --- DRAW WEAPON (Behind hands) ---
             // Only draw if player and has a weapon, and NOT driving (driving has its own weapon logic)
@@ -1571,27 +1662,9 @@
             // Wardrobe pieces for this outfit (see ui/wardrobe.js); unknown types draw as plain colour
             const WD = typeof WARDROBE !== 'undefined' ? WARDROBE : null;
             const topP = WD && clothes.top ? WD.tops[clothes.top.type] : null;
-            const botP = WD && clothes.bottom ? WD.bottoms[clothes.bottom.type] : null;
-            const shoeP = WD && clothes.shoes ? WD.shoes[clothes.shoes.type] : null;
             const sleeve = clothes.top ? (topP ? topP.sleeve : 'long') : 'none';
             // Sleeves can come from the shirt under a vest; legs from trousers under an apron
             const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : clothes.top.color) : null;
-            const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
-            const topGloss = _glossy(topP, clothes.top), botGloss = _glossy(botP, clothes.bottom);
-            const jewelryAt = (where) => (clothes.jewelry || []).filter(j => WD && WD.jewelry[j.type] && WD.jewelry[j.type].at === where);
-            const headX0 = bounce - bodyRecoil;
-            const clothDyn = { wind: W ? W.wind : null };                 // the weather blows on hems and trains
-            const g = {
-                darken, skin: skinColor, gender, walkCycle, android: A,
-                torso: { x: torsoXOff, w: torsoWidth }, hip: { x: hipXOff, w: hipWidth },
-                headX: headX0, headInTorso: headX0 - hipAnchorX,
-                feet: [[lFootX, lFootY], [rFootX, rFootY]], knees: [[lKneeX, lKneeY], [rKneeX, rKneeY]],
-                hipPt: [[hipAnchorX, lBaseY], [hipAnchorX, rBaseY]],
-                fists: [[lFistX, lFistY], [rFistX, rFistY]], elbows: [[lElbowX, lElbowY], [rElbowX, rElbowY]],
-                // Cloth simulated in whatever frame the piece draws in; seated drivers get the rest shape
-                cloth: (key, spec) => clothGeometry(ctx, isDriving ? null : entity, key, spec, clothDyn)
-            };
-
             if (isDriving) {
                 // Driving mode rendering - different poses for shooting vs not shooting
                 ctx.save();
@@ -1665,7 +1738,7 @@
                 
                 // --- HEAD & HAIR ---
                 const headX = 0 + headForward;
-                const driveDyn = { owner: entity, sway: 0, drag: 0, bounce: 0, wiggle: 0 };
+                const driveDyn = h.driveDyn;
                 driveDyn.android = A;
                 withHead(headX, hx => drawHeadAndHair(ctx, hx, skinColor, config.faceDark || '#3e2723', config.faceLight || '#5d4037', clothes.hair, driveDyn, clothes.hat, clothes.jewelry));
                 
@@ -1674,7 +1747,47 @@
             }
         
             // --- WALKING MODE ---
+
+            // --- 4. CALCULATE POSITIONS ---
+            const lBaseY = -hipWidth / 2 - 1;
+            const rBaseY = hipWidth / 2 + 1;
         
+            const lWalkX = walkSin * strideLen * fwdAmt;
+            const rWalkX = walkOppSin * strideLen * fwdAmt;
+            const lWalkY = walkSin * strafeLen * sideAmt;
+            const rWalkY = walkOppSin * strafeLen * sideAmt;
+        
+            const lFootX = -3 + lWalkX + pf('lf', 0);
+            const rFootX = -3 + rWalkX + pf('rf', 0);
+            const lFootY = lBaseY + lWalkY + pf('lf', 1);
+            const rFootY = rBaseY + rWalkY + pf('rf', 1);
+        
+            const lKneeX = (hipAnchorX + lFootX) / 2;
+            const lKneeY = (lBaseY + lFootY) / 2;
+            const rKneeX = (hipAnchorX + rFootX) / 2;
+            const rKneeY = (rBaseY + rFootY) / 2;        
+            const botP = WD && clothes.bottom ? WD.bottoms[clothes.bottom.type] : null;
+            const shoeP = WD && clothes.shoes ? WD.shoes[clothes.shoes.type] : null;
+            const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
+            const topGloss = _glossy(topP, clothes.top), botGloss = _glossy(botP, clothes.bottom);
+            const headX0 = bounce - bodyRecoil;
+            h.clothDyn.wind = W ? W.wind : null;
+            let g = h.geometry;
+            if (!g) {
+                const pair = () => [[0, 0], [0, 0]];
+                g = h.geometry = { darken, torso: { x: 0, w: 0 }, hip: { x: 0, w: 0 },
+                    feet: pair(), knees: pair(), hipPt: pair(), fists: pair(), elbows: pair(),
+                    cloth: (key, spec) => clothGeometry(h.ctx, entity, key, spec, h.clothDyn) };
+            }
+            g.skin = skinColor; g.gender = gender; g.walkCycle = walkCycle; g.android = A;
+            g.torso.x = torsoXOff; g.torso.w = torsoWidth; g.hip.x = hipXOff; g.hip.w = hipWidth;
+            g.headX = headX0; g.headInTorso = headX0 - hipAnchorX;
+            g.feet[0][0] = lFootX; g.feet[0][1] = lFootY; g.feet[1][0] = rFootX; g.feet[1][1] = rFootY;
+            g.knees[0][0] = lKneeX; g.knees[0][1] = lKneeY; g.knees[1][0] = rKneeX; g.knees[1][1] = rKneeY;
+            g.hipPt[0][0] = hipAnchorX; g.hipPt[0][1] = lBaseY; g.hipPt[1][0] = hipAnchorX; g.hipPt[1][1] = rBaseY;
+            g.fists[0][0] = lFistX; g.fists[0][1] = lFistY; g.fists[1][0] = rFistX; g.fists[1][1] = rFistY;
+            g.elbows[0][0] = lElbowX; g.elbows[0][1] = lElbowY; g.elbows[1][0] = rElbowX; g.elbows[1][1] = rElbowY;
+
             // 1. Feet
             if (shoeP) {
                 shoeP.draw(ctx, g, clothes.shoes);
@@ -1766,7 +1879,9 @@
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
             drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor, sleeve === 'long' && topGloss);
             drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor, sleeve === 'long' && topGloss);
-            for (const j of jewelryAt('wrists')) WD.jewelry[j.type].draw(ctx, g, j);
+            if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
+                const p = WD.jewelry[j.type]; if (p && p.at === 'wrists') p.draw(ctx, g, j);
+            }
         
             // 8. Upper Arms (fabric under short or long sleeves)
             const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
@@ -1800,7 +1915,9 @@
                 else { ctx.fillStyle = darken(clothes.top.color, 0.1); ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill(); }
                 if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
             }
-            for (const j of jewelryAt('neck')) WD.jewelry[j.type].draw(ctx, g, j);
+            if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
+                const p = WD.jewelry[j.type]; if (p && p.at === 'neck') p.draw(ctx, g, j);
+            }
             if (SH && SH.body) {                                            // the torso's form: soft shade on the side away from the sun
                 const cx = torsoXOff + torsoWidth * 0.5;
                 if (SH.lx || SH.ly) _softSpot(ctx, cx - SH.lx * 2.5, -SH.ly * 7, torsoWidth * 1.5, 16, _SHADOW_RGB, SH.shA * 1.3);
@@ -1829,8 +1946,8 @@
             const hairMove = gaitSpeed / 5.2;
             // Hair motion comes from the strand physics (hairGeometry): the owner's head
             // position in the world, plus the shoulder sway the strands swing with.
-            const walkDyn = { owner: entity, sway: torsoRotation, drag: 0, bounce: 0, wiggle: 0, wind: W ? W.hairWind : null };
-            walkDyn.android = A;
+            const walkDyn = h.walkDyn;
+            walkDyn.sway = torsoRotation; walkDyn.wind = W ? W.hairWind : null; walkDyn.android = A;
             const turning = headY !== 0 || headTurn !== 0;
             withHead(headX, hx => {
                 if (turning) { ctx.save(); ctx.translate(hx, headY); ctx.rotate(headTurn); ctx.translate(-hx, 0); }

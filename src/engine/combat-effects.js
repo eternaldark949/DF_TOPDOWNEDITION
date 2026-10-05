@@ -72,8 +72,11 @@
                     const r = (l.radius || 200) * 0.6, d = Math.hypot(l.x - k.x, l.y - k.y);
                     if (d < r) { const s = 1 - d / r; if (s > bk) { bk = s; best = l; } }
                 };
-                for (const l of this.lamps || []) consider(l);
-                for (const l of (this.activeMap && this.activeMap._interiorLights) || []) consider(l);
+                for (const entry of this._queryLampCandidates({ left: k.x, right: k.x, top: k.y, bottom: k.y }, 'lampCasings')) consider(entry.item);
+                if (this.activeMap && this.activeMap._interiorLights) {
+                    for (const entry of this._queryEffectCandidates('interiorLamps', this.activeMap._interiorLights,
+                        { left: k.x, right: k.x, top: k.y, bottom: k.y }, 'interiorLampCasings')) consider(entry.item);
+                }
                 if (best && /^#[0-9a-f]{6}$/i.test(best.color || '')) { k.lc = best.color; k.lk = bk; }
             },
             /**
@@ -333,9 +336,13 @@
                 // Apply Fidelity Scale — lightingScale composes with the render
                 // scale rather than multiplying against it, so 'low' lighting at
                 // 0.5 render scale doesn't end up at quarter resolution.
-                // (drawLightingSystem also halves it for soft shadows, and keeps it in step)
-                this.lightCanvas.width = Math.max(1, Math.round(bufW * this.lightingScale)); 
-                this.lightCanvas.height = Math.max(1, Math.round(bufH * this.lightingScale));
+                // Match the final draw size so resize does not allocate a larger buffer first.
+                const lightScale = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1);
+                const lightW = Math.max(1, Math.round(bufW * lightScale));
+                const lightH = Math.max(1, Math.round(bufH * lightScale));
+                if (this.lightCanvas.width !== lightW || this.lightCanvas.height !== lightH) {
+                    this.lightCanvas.width = lightW; this.lightCanvas.height = lightH;
+                }
                 
                 // Weather spawns and its full-screen overlay work in backing-store
                 // pixels, not CSS pixels — pass the buffer size or rain lands in

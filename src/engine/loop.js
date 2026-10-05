@@ -37,7 +37,12 @@
              * Resets: inventory, quest progress, health, currency, driving, entities.
              */
             resetGameState() {
+                this._cancelMapTextureWarmup(true);
                 this._clearRenderSpatial();
+                this._releaseReflectionScratch();
+                this._effectSpatial = this._effectCandidateBuffers = null;
+                _physicsSpatial.clear();
+                CollisionSystem.clearSpatialGrid();
                 if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
                 if (this.scenes) this.scenes.abort();                       // a scene left playing doesn't run on into the next game
                 if (this._rideState && this._rideState.on) { this._rideEl.classList.remove('show'); this._rideState.on = false; }   // the ride tag goes with the run

@@ -1331,14 +1331,17 @@
         
             checkEnvironmentCollision(nextX, nextY, angle, walls, buildings) {
                 const futureOBB = { x: nextX, y: nextY, angle: angle, length: this.length, width: this.width };
-                if (walls) {
-                    for (let w of walls) {
+                const bounds = { left: nextX - this.length, right: nextX + this.length, top: nextY - this.width, bottom: nextY + this.width };
+                const wallCandidates = _physicsSpatial.query(walls, bounds);
+                if (wallCandidates) {
+                    for (let w of wallCandidates) {
                         if (nextX + this.length < w.x || nextX - this.length > w.x + w.w || nextY + this.width < w.y || nextY - this.width > w.y + w.h) continue;
                         if (PhysicsSystem.checkOBBvsAABB(futureOBB, w)) return true;
                     }
                 }
-                if (buildings) {
-                    for (let b of buildings) {
+                const buildingCandidates = _physicsSpatial.query(buildings, bounds);
+                if (buildingCandidates) {
+                    for (let b of buildingCandidates) {
                         if (nextX + this.length < b.x || nextX - this.length > b.x + b.w || nextY + this.width < b.y || nextY - this.width > b.y + b.h) continue;
                         if (PhysicsSystem.checkOBBvsAABB(futureOBB, b)) return true;
                     }

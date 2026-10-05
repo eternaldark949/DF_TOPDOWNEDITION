@@ -1,3 +1,6 @@
+        // Shared immutable falloff tables; softArea only reads these stops.
+        const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
+        const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
         // GameEngine — Lighting, bloom, wet reflections, atmosphere.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -240,7 +243,8 @@
                 const litLamps = scratch.litLamps;
                 if (this.lightingBaked) {
                     const visibleLamps = scratch.visibleLamps;
-                    for (const lamp of this.lamps) {
+                    for (const entry of this._queryLampCandidates({ left: vL, right: vR, top: vT, bottom: vB }, 'lampLighting')) {
+                        const lamp = entry.item;
                         if (!inView(lamp.x, lamp.y, lamp.radius)) continue;
                         if (!lamp._shadowPoly || lamp._shadowPoly.length === 0) continue;
                         // Room switches fade lamps; a faulty street lamp stutters now and then
@@ -398,8 +402,6 @@
                         lc.restore();
                     }
                 };
-                const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
-                const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
                 for (const s of softLights) {
                     lc.globalAlpha = Math.min(1, s.a);
                     if (s.src.w) { softArea(s, '_hole', s.src.soft ? HOLE_AREA_SOFT : HOLE_AREA); continue; }

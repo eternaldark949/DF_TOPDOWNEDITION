@@ -28,11 +28,41 @@
                 return this._laserGeom;
             },
 
+            /** Editors changing static effects within the same tick/draw invalidate once after their batch. */
+            invalidateEffectSpatial() {
+                this._effectSpatialEpoch = (this._effectSpatialEpoch || 0) + 1;
+            },
+
+            _effectCandidateBuffer(key) {
+                const buffers = this._effectCandidateBuffers || (this._effectCandidateBuffers = new Map());
+                let out = buffers.get(key);
+                if (!out) { out = []; buffers.set(key, out); }
+                return out;
+            },
+
+            _queryEffectCandidates(kind, items, bounds, bufferKey = kind) {
+                let spatial = this._effectSpatial;
+                if (!spatial || spatial.map !== this.activeMap) spatial = this._effectSpatial = { map: this.activeMap, grids: new Map() };
+                let grid = spatial.grids.get(kind);
+                if (!grid) { grid = new EffectRenderGrid(); spatial.grids.set(kind, grid); }
+                grid.refresh(items, kind, _simTick, this._renderDrawId, _frameTime, this._effectSpatialEpoch || 0);
+                return grid.query(bounds, this._effectCandidateBuffer(bufferKey));
+            },
+
+            _queryLampCandidates(bounds, bufferKey) {
+                return this._queryEffectCandidates('lamps', this.lamps, bounds, bufferKey);
+            },
+
+            _queryPuddleCandidates(bounds, bufferKey) {
+                return this._queryEffectCandidates('puddles', this.puddlesFor(this.activeMap), bounds, bufferKey);
+            },
+
             // Buildings/foliage are authored on loadMap and static during play. Editors/runtime
             // geometry edits (including same-length replacements/reorders) must invalidate once
             // AFTER their batch of changes. Array identity/length changes are also detected below.
             invalidateRenderSpatial(map = this.activeMap) {
                 if (map) map._renderSpatialRevision = (map._renderSpatialRevision || 0) + 1;
+                if (map === this.activeMap) { this.invalidateEffectSpatial(); this.invalidatePhysicsSpatial(); }
                 this._renderBuildingLists = null;
             },
 
@@ -707,7 +737,8 @@
                 let visibility = 1.0 - (this.getAmbientDarkness() * 1.3);
                 
                 // 2. STATIC LIGHTS (Lamps)
-                for (let lamp of this.lamps) {
+                for (const entry of this._queryLampCandidates({ left: this.player.x, right: this.player.x, top: this.player.y, bottom: this.player.y }, 'lampVisibility')) {
+                    const lamp = entry.item;
                     // Skip lamps in rooms with lights switched off
                     if (this.roomSystem.isLampRoomDark(lamp)) continue;
                     

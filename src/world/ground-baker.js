@@ -39,7 +39,56 @@
             /** Only the city is baked (other maps keep their own ground). */
             activeFor(map) { return !!(map && map.id === 'hub_949' && this.game.traffic && this.game.traffic.network && this.game.traffic.network.roads.length); }
 
-            invalidate() { this.cache.clear(); this.weight = 0; }
+            // Geometry/order edits must invalidate the baked pixels and their static candidates together.
+            invalidate() { this.cache.clear(); this.weight = 0; this._sources = null; }
+
+            _viewTiles(view) {
+                const map = this.game.activeMap, G = CONFIG.GROUND_BAKE;
+                if (map.id !== this.mapId) { this.invalidate(); this.mapId = map.id; }
+                const z = this.game.camera.zoom || 1;
+                if (this.lod === 0 && z < G.HALF_RES_BELOW) this.lod = 1;
+                else if (this.lod === 1 && z > G.FULL_RES_ABOVE) this.lod = 0;
+                const S = this.S, cols = Math.ceil(map.width / S) - 1, rows = Math.ceil(map.height / S) - 1;
+                const range = v => [Math.max(0, Math.floor(v.left / S)), Math.max(0, Math.floor(v.top / S)),
+                    Math.min(cols, Math.floor(v.right / S)), Math.min(rows, Math.floor(v.bottom / S))];
+                const need = (Math.ceil((view.right - view.left) / S) + 1) * (Math.ceil((view.bottom - view.top) / S) + 1) * (this.lod ? 0.25 : 1);
+                this.max = Math.max(G.MIN_TILES, Math.min(G.MAX_TILES, Math.ceil(need * 2 + 4)));
+                this._trim();
+                return { G, S, range, bounds: range(view) };
+            }
+
+            /** Unchanged tile painters, prepared one at a time while the arriving map is hidden. */
+            warmupJobs(view) {
+                const { bounds } = this._viewTiles(view), [i0, j0, i1, j1] = bounds, lod = this.lod;
+                const weight = (i1 - i0 + 1) * (j1 - j0 + 1) * (lod ? 0.25 : 1), jobs = [];
+                // Oversized views keep the normal bounded draw policy instead of baking tiles that
+                // cannot all be retained and immediately evicting the beginning of the same view.
+                if (i1 < i0 || j1 < j0 || !Number.isFinite(weight) || weight > this.max) return jobs;
+                for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+                    const key = i + ',' + j + ',' + lod, hit = this.cache.get(key);
+                    if (hit) { this.cache.delete(key); this.cache.set(key, hit); }
+                    else jobs.push(() => {
+                        if (!this.cache.has(key)) this._storeTile(i, j, lod);
+                    });
+                }
+                return jobs;
+            }
+
+            /** Query candidates in ORIGINAL array order, retaining the painter's exact hit checks/RNG. */
+            _groundSources(map, net) {
+                const arrays = [map.floorZones, map.cityLayout && map.cityLayout.blocks, net.roads, net.intersections, map.pavements, map.crosswalks];
+                let sources = this._sources;
+                if (!sources || arrays.some((a, i) => sources[i].items !== a || sources[i].length !== (a ? a.length : 0))) {
+                    sources = arrays.map((items, i) => {
+                        const grid = new OrderedRenderGrid(this.S);
+                        grid.build(items, v => ({ left: v.x, top: v.y, right: v.x + (i === 3 ? v.width : v.w), bottom: v.y + (i === 3 ? v.height : v.h) }));
+                        return { items, length: items ? items.length : 0, grid, results: [] };
+                    });
+                    this._sources = sources;
+                }
+                return sources;
+            }
+
 
             /**
              * Blit the tiles under the view. Missing tiles are painted within a small
@@ -49,24 +98,12 @@
              * tiles that are already there. stats: this frame's counts (tests read it).
              */
             draw(ctx, view) {
-                const map = this.game.activeMap, G = CONFIG.GROUND_BAKE;
-                if (map.id !== this.mapId) { this.invalidate(); this.mapId = map.id; }
-                const z = this.game.camera.zoom || 1;                            // zoomed out: half-resolution tiles (much cheaper to blit)
-                if (this.lod === 0 && z < G.HALF_RES_BELOW) this.lod = 1;         // with a band, so a wobbling zoom doesn't
-                else if (this.lod === 1 && z > G.FULL_RES_ABOVE) this.lod = 0;    // flip every tile back and forth
-                const S = this.S, cols = Math.ceil(map.width / S) - 1, rows = Math.ceil(map.height / S) - 1;
-                const range = (v) => [Math.max(0, Math.floor(v.left / S)), Math.max(0, Math.floor(v.top / S)),
-                                      Math.min(cols, Math.floor(v.right / S)), Math.min(rows, Math.floor(v.bottom / S))];
-                const [i0, j0, i1, j1] = range(view);
-                // What to keep: twice the tiles a view this size can touch, plus a few for the road ahead
-                // (a phone at walking zoom: ~16 tiles, ~16 MB), never past the old flat 40
-                const need = (Math.ceil((view.right - view.left) / S) + 1) * (Math.ceil((view.bottom - view.top) / S) + 1) * (this.lod ? 0.25 : 1);
-                this.max = Math.max(G.MIN_TILES, Math.min(G.MAX_TILES, Math.ceil(need * 2 + 4)));
-                this._trim();
+                const { G, S, range, bounds } = this._viewTiles(view);
+                const [i0, j0, i1, j1] = bounds;
                 this.t0 = performance.now(); this.baked = 0;
                 this.stats = { flat: 0, stand: 0, baked: 0 };
                 for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-                    let t = this._tile(i, j, this.lod);
+                    let t = this._tile(i, j, this.lod, true);
                     if (!t) { t = this.cache.get(i + ',' + j + ',' + (1 - this.lod)); if (t) this.stats.stand++; }
                     if (t) ctx.drawImage(t, i * S, j * S, S, S);
                     else { this.stats.flat++; ctx.fillStyle = GROUND_LOOK.lot; ctx.fillRect(i * S, j * S, S, S); }
@@ -86,18 +123,23 @@
                 this.stats.baked = this.baked;
             }
 
-            /** Room to paint another tile this frame: a couple always, more while the frame has time. */
-            _canBake() {
+            /** Visible gaps retain the original minimum; optional ahead work respects the elapsed budget. */
+            _canBake(visible = false) {
                 const G = CONFIG.GROUND_BAKE;
-                return this.baked < G.MIN_PER_FRAME || (this.baked < G.MAX_PER_FRAME && performance.now() - this.t0 < G.FRAME_MS);
+                return (visible && this.baked < G.MIN_PER_FRAME) || (this.baked < G.MAX_PER_FRAME && performance.now() - this.t0 < G.FRAME_MS);
             }
 
-            _tile(i, j, lod) {
+            _tile(i, j, lod, visible = false) {
                 const key = i + ',' + j + ',' + lod;
                 const hit = this.cache.get(key);
                 if (hit) { this.cache.delete(key); this.cache.set(key, hit); return hit; }   // most recent last
-                if (!this._canBake()) return null;
+                if (!this._canBake(visible)) return null;
                 this.baked++;
+                return this._storeTile(i, j, lod);
+            }
+
+            _storeTile(i, j, lod) {
+                const key = i + ',' + j + ',' + lod;
                 const cv = this._bake(i, j, lod);
                 cv._w = lod ? 0.25 : 1;                                          // memory, in full-size tiles
                 this.cache.set(key, cv); this.weight = (this.weight || 0) + cv._w;
@@ -128,24 +170,27 @@
                     c.fillStyle = rnd() < 0.5 ? 'rgba(255, 240, 255, 0.022)' : 'rgba(0, 0, 0, 0.14)';
                     c.fillRect(x0 + rnd() * S, y0 + rnd() * S, 1 + rnd() * 3, 1 + rnd() * 2);
                 }
+                const sources = this._groundSources(map, g.traffic.network);
+                const query = i => sources[i].grid.query(R, sources[i].results);
                 // 2. Floor zones: green ones are lawns, the rest tint the ground
-                for (const z of map.floorZones || []) {
+                for (const entry of query(0)) {
+                    const z = entry.item;
                     if (!hits(z.x, z.y, z.w, z.h)) continue;
                     if (this._isGreen(z.color)) this._paintLawn(c, z, R, rnd);
                     else { c.globalAlpha = 0.45; c.fillStyle = z.color; c.fillRect(z.x, z.y, z.w, z.h); c.globalAlpha = 1; }
                 }
                 // 3. Parks and plazas (city-layout zones)
                 const city = map.cityLayout;
-                if (city) for (const b of city.blocks) {
+                if (city) for (const entry of query(1)) {
+                    const b = entry.item;
                     if ((b.type === 'PARK' || b.type === 'PLAZA') && hits(b.x, b.y, b.w, b.h) && typeof paintParkGround === 'function') paintParkGround(c, b, R);
                 }
                 // 4. Roads, then intersections over them
-                const net = g.traffic.network;
-                for (const road of net.roads) if (hits(road.x, road.y, road.w, road.h)) this.paintRoad(c, road, R, rnd);
-                for (const ix of net.intersections) if (hits(ix.x, ix.y, ix.width, ix.height)) this._paintIntersection(c, ix);
+                for (const entry of query(2)) { const road = entry.item; if (hits(road.x, road.y, road.w, road.h)) this.paintRoad(c, road, R, rnd); }
+                for (const entry of query(3)) { const ix = entry.item; if (hits(ix.x, ix.y, ix.width, ix.height)) this._paintIntersection(c, ix); }
                 // 5. Pavements and crossings
-                for (const p of map.pavements || []) if (hits(p.x, p.y, p.w, p.h)) this._paintPavement(c, p, R, rnd);
-                for (const cw of map.crosswalks || []) if (hits(cw.x, cw.y, cw.w, cw.h)) this._paintCrossing(c, cw, rnd);
+                for (const entry of query(4)) { const p = entry.item; if (hits(p.x, p.y, p.w, p.h)) this._paintPavement(c, p, R, rnd); }
+                for (const entry of query(5)) { const cw = entry.item; if (hits(cw.x, cw.y, cw.w, cw.h)) this._paintCrossing(c, cw, rnd); }
                 return cv;
             }
 

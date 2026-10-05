@@ -14,6 +14,77 @@
            Hooks: building-v2.js (_applyStyle, lights, faces, roof, sign,
            emissive), engine/draw.js (ground), engine/map-loading.js (forecourt).
            ===================================================================== */
+        /** Conservative viewport test for decorative bodies/effects that bypass normal actor culling.
+         * The 160-unit reach exceeds current poses, maximum stride, tendrils, cloth trains and
+         * umbrellas, with a warm-up margin. Body/head build scales and effect stretch are included.
+         * Armed or unknown/custom looks retain the original draw path; their extent is not assumed.
+         */
+        function decorativeBodyInView(x, y, look, effectScale = 1, glowRadius = 0) {
+            const cb = typeof game !== 'undefined' && game._cullBounds && game._cullBounds.view;
+            if (!cb || !Number.isFinite(x) || !Number.isFinite(y) || !look) return true;
+            if (x >= cb.left && x <= cb.right && y >= cb.top && y <= cb.bottom) return true;
+            const height = look.height || 1, build = look.build && BUILDS[look.build];
+            if (!Number.isFinite(height) || height <= 0 || (look.build && !build) || look.weapon) return true;
+            if (look.pose && look.pose !== 'none' && !POSES[look.pose]) return true;
+            if (look.body && look.body.kind !== 'android') return true;
+            if (look.hair && !HAIR_RENDERERS[look.hair.type]) return true;
+            for (const pair of [['hat', 'hats'], ['top', 'tops'], ['bottom', 'bottoms'], ['shoes', 'shoes']]) {
+                const piece = look[pair[0]];
+                if (piece && !WARDROBE[pair[1]][piece.type]) return true;
+            }
+            if (look.train && look.train.type !== 'dress_train' && look.train.type !== 'silk_flow') return true;
+            if (look.jewelry && (!Array.isArray(look.jewelry) || look.jewelry.some(j => !j || !WARDROBE.jewelry[j.type]))) return true;
+            if (look.held && !['glass', 'champagne_glass', 'umbrella'].includes(look.held.type)) return true;
+            if (look.held && look.held.drink && !GLASS_DRINKS[look.held.drink]) return true;
+            // Custom geometry controls are deliberately outside the bounded draw path.
+            if (look.isDriving || look.isShootingFromCar ||
+                ['recoil', 'kick', 'scopeK', 'lerpSpeed', 'punchTicks'].some(k => look[k] !== undefined)) return true;
+            if (look.held && look.held.type === 'umbrella' && look.held.open !== undefined &&
+                (!Number.isFinite(look.held.open) || look.held.open < 0 || look.held.open > 1)) return true;
+            const breadth = build ? Math.max(build.w, build.d, build.head) : 1;
+            const hover = look.body && look.body.hover ? 1.035 : 1;
+            const zoom = game.view && game.view.zoom > 0 ? game.view.zoom : 1;
+            // Contact shadows and the scene's small notepad stay unscaled even on tiny bodies.
+            const radius = Math.max(160 * height * breadth * hover * effectScale, glowRadius, 48) + 60 / zoom;
+            const epsilon = 1e-7 * Math.max(1, Math.abs(x), Math.abs(y), radius);
+            return !(x + radius < cb.left - epsilon || x - radius > cb.right + epsilon ||
+                     y + radius < cb.top - epsilon || y - radius > cb.bottom + epsilon);
+        }
+
+        /** Preserve hidden decorative-body gait, pose clocks and random seeds in draw order.
+         * Hair/cloth/slosh pause outside the warm-up margin, as with normally culled actors.
+         * Advancing their clocks avoids a 12-slice catch-up burst when the body returns.
+         */
+        function tickHiddenDecorativeBody(entity, look) {
+            RenderStats.culled++;
+            // Weather initializes its seed before pose/blink seeds and advances lightning
+            // reactions even for a hidden outdoor body; preserve that order and state.
+            if (!look.isDriving) weatherAt(entity);
+            const gait = syncHumanoidGait(entity);
+            if (!look.isDriving && look.pose !== 'none') {
+                const ps = entity._pose || (entity._pose = { still: 0, t: 0, name: null, w: 0, last: _gameTimeSec, seed: Math.random() * 97 });
+                const dt = Math.max(0, Math.min(0.1, _gameTimeSec - ps.last));
+                ps.last = _gameTimeSec;
+                const moving = gait.speed > 0.15;
+                ps.still = moving ? 0 : ps.still + dt;
+                const name = POSES[look.pose] ? look.pose : 'idle';
+                if (name !== ps.name) { ps.name = name; ps.t = 0; }
+                ps.t += dt;
+                const target = look.poseWhileMoving || (!moving && ps.still > 0.4) ? 1 : 0;
+                ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
+                if (look.poseInstant) ps.w = target;
+            }
+            if (entity._blinkSeed === undefined) entity._blinkSeed = Math.floor(Math.random() * 997);
+            const held = look.held;
+            if (!look.isDriving && held && (held.type === 'glass' || held.type === 'champagne_glass')) {
+                const drink = GLASS_DRINKS[held.drink || 'champagne'] || GLASS_DRINKS.champagne;
+                if (drink.glass !== 'mug' && entity._glintPhase === undefined) entity._glintPhase = Math.random() * 60;
+            }
+            if (entity._hairSim) { entity._hairSim.t = _gameTimeSec; entity._hairSim.acc = 0; }
+            if (entity._cloth) for (const sim of Object.values(entity._cloth)) { sim.t = _gameTimeSec; sim.acc = 0; }
+            if (entity._glassSlosh) { entity._glassSlosh.t = _gameTimeSec; entity._glassSlosh.acc = 0; }
+        }
+
         const MCX = {
             CANOPY_Z: 12, SIGN_Z: 24, FIN: 46,
             C: {
@@ -341,6 +412,7 @@
                 const cam = typeof game !== 'undefined' ? game.camera : null;
                 if (cam && Math.hypot(G.door.x - cam.x, G.door.y - cam.y) > 1400) return;          // off screen: don't draw
                 for (const p of [...Q.people, Q.bouncer].sort((a, b) => a.y - b.y)) {
+                    if (!decorativeBodyInView(p.x, p.y, p.look)) { tickHiddenDecorativeBody(p, p.look); continue; }
                     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle); ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
                     drawProceduralHumanoid(ctx, p, { stance: 'idle', ...p.look });
                     ctx.restore();

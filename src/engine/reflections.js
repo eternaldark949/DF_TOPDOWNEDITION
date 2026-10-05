@@ -125,7 +125,8 @@
             /** Is (x, y) in a puddle that's showing? Its strength (0 = dry ground) */
             _inPuddle(x, y) {
                 const wet = this._wetHere(); if (wet < 0.05) return 0;
-                for (const p of this.puddlesFor(this.activeMap)) {
+                for (const entry of this._queryPuddleCandidates({ left: x, right: x, top: y, bottom: y }, 'puddlePoint')) {
+                    const p = entry.item;
                     if (Math.abs(p.x - x) > p.r + 4 || Math.abs(p.y - y) > p.r + 4) continue;
                     const k = this._puddleK(p, wet); if (k <= 0) continue;
                     const g = 0.65 + 0.35 * k, c = Math.cos(-p.ang), sn = Math.sin(-p.ang), dx = x - p.x, dy = y - p.y;
@@ -190,7 +191,9 @@
                     mc.globalCompositeOperation = 'source-over'; mc.fillStyle = 'rgba(255,255,255,0.95)';
                     for (const [x, y, r] of surf.water) { mc.beginPath(); mc.arc(x, y, r, 0, Math.PI * 2); mc.fill(); }
                 }
-                for (const p of wet >= 0.02 ? this.puddlesFor(this.activeMap) : []) {
+                for (const entry of wet >= 0.02 ? this._queryPuddleCandidates({ left: v.x - hw, right: v.x + hw,
+                    top: v.y - hh - 160, bottom: v.y + hh }, 'puddleMask') : []) {
+                    const p = entry.item;
                     if (!near(p.x, p.y, p.r)) continue;
                     const k = this._puddleK(p, wet); if (k <= 0) continue;
                     any = true;
@@ -220,7 +223,10 @@
                 // meets the street (foreshortened), billboards about their front edge
                 const dark = this.getAmbientDarkness();
                 if (night > 0.01 && q === 'high' && CONFIG.BUILDINGS.LEAN) {
-                    for (const b of this.activeMap.buildings || []) {
+                    const reflectedBuildings = this._queryRenderBuildings({ left: v.x - hw, right: v.x + hw,
+                        top: v.y - hh - 40, bottom: v.y + hh + 260 }, this._effectCandidateBuffer('reflectedBuildings'));
+                    for (const entry of reflectedBuildings) {
+                        const b = entry.item;
                         if (!b.isV2 || !b.drawEmissive) continue;
                         const gy = b.y + b.h;
                         if (gy < v.y - hh - 40 || gy > v.y + hh + 260 || b.x > v.x + hw || b.x + b.w < v.x - hw) continue;
@@ -244,7 +250,9 @@
                 const rs = this.roomSystem;
                 if (night > 0.01) {
                     const LH = REFLECT.LAMP_H;
-                    for (const l of this.lamps || []) {
+                    for (const entry of this._queryLampCandidates({ left: v.x - hw - LH * 2, right: v.x + hw + LH * 2,
+                        top: v.y - hh - LH * 2 - 160, bottom: v.y + hh + LH * 2 }, 'lampReflections')) {
+                        const l = entry.item;
                         if (!near(l.x, l.y, LH * 2)) continue;
                         const k = (rs && rs.active ? rs.lampLight(l) : 1) * lampFlicker(l) * night;
                         if (k < 0.02) continue;
@@ -388,7 +396,9 @@
                 const clip = new Path2D(), rim = new Path2D();
                 let n = 0;
                 ctx.save();
-                for (const p of this.puddlesFor(this.activeMap)) {
+                for (const entry of this._queryPuddleCandidates({ left: v.x - hw, right: v.x + hw,
+                    top: v.y - hh, bottom: v.y + hh }, 'puddleGround')) {
+                    const p = entry.item;
                     if (p.x < v.x - hw - p.r || p.x > v.x + hw + p.r || p.y < v.y - hh - p.r || p.y > v.y + hh + p.r) continue;
                     const k = this._puddleK(p, wet); if (k <= 0) continue;
                     const g = 0.65 + 0.35 * k, c = Math.cos(p.ang), sn = Math.sin(p.ang);
@@ -450,7 +460,9 @@
                 const visible = this._reflVisiblePuddles || (this._reflVisiblePuddles = { list: [], records: [] });
                 const vis = visible.list, previous = vis.length;
                 let count = 0;
-                for (const p of this.puddlesFor(this.activeMap)) {
+                for (const entry of this._queryPuddleCandidates({ left: v.x - hw, right: v.x + hw,
+                    top: v.y - hh, bottom: v.y + hh }, 'puddleUpdate')) {
+                    const p = entry.item;
                     if (p.x < v.x - hw || p.x > v.x + hw || p.y < v.y - hh || p.y > v.y + hh) continue;
                     const k = this._puddleK(p, wet);
                     if (k > 0.2) {

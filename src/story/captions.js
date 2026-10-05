@@ -6,6 +6,16 @@
             isShowing: false,
             queue: [],
             cooldowns: {}, // Per-character cooldowns to prevent spam
+            // Stable name classifications; current NPC names and dancer flags are read on every call.
+            _greetingNames: new Map([
+                ['Ms. Jean', ['msJean', true]], ['Dr. Yin', ['drYin', true]],
+                ['Contractor', ['contractor', true]], ['Barista Ren', ['baristaRen', true]],
+                ['LUVSH4D3', ['luvsh4d3', true]],
+                ['Starlight', ['dancers', false]], ['Nova', ['dancers', false]],
+                ['Cherry', ['dancers', false]], ['Blade', ['dancers', false]], ['Velvet', ['dancers', false]],
+                ['Victoria', ['victoria', false]], ['Yenna', ['yenna', false]],
+                ['Sabrina', ['sabrina', false]], ['Max', ['max', false]], ['Josh', ['josh', false]]
+            ]),
             
             // Character-specific dialogue lines
             dialogues: {
@@ -434,21 +444,14 @@
                 let category = 'greeting';
                 let dialogueKey = null;
                 
-                // Match NPC to dialogue set
-                if (name === 'Ms. Jean') {
-                    dialogueKey = 'msJean';
-                } else if (name === 'Dr. Yin') {
-                    dialogueKey = 'drYin';
-                } else if (name === 'Contractor') {
-                    dialogueKey = 'contractor';
-                } else if (name === 'Barista Ren') {
-                    dialogueKey = 'baristaRen';
-                } else if (name === 'LUVSH4D3') {
-                    dialogueKey = 'luvsh4d3';
-                } else if (npc.isDancer || ['Starlight', 'Nova', 'Cherry', 'Blade', 'Velvet'].includes(name)) {
+                // Fixed named greetings win; dancer status can override teammate greetings.
+                const entry = this._greetingNames.get(name);
+                if (entry && entry[1]) {
+                    dialogueKey = entry[0];
+                } else if (npc.isDancer || (entry && entry[0] === 'dancers')) {
                     dialogueKey = 'dancers';
                     category = 'follow';
-                } else if (['Victoria', 'Yenna', 'Sabrina', 'Max', 'Josh'].includes(name)) {
+                } else if (entry) {
                     dialogueKey = name.toLowerCase();
                 }
                 
