@@ -163,26 +163,26 @@ test('Held ring flick requires fresh outward speed, rearms deliberately and pres
   }
 }, {events:true});
 
-function setupDrive(env, {taxi=false,lane='R0.S0.L2',destination='clinic'}={}) {
+function setupDrive(env, {taxi=false,lane='R0.S0.L2',destination='clinic',endpoint=false}={}) {
   env.run(`{
     game._doLoadMap('hub_949'); game.story.update=()=>{}; game.running=true; game.paused=false;
     game.traffic.vehicles=[]; game.traffic.spawnTimer=1e9; GameSettings.getMaxTraffic=()=>0;
     game.zibSystem.passengerRide=null; game.zibSystem.activeZibs=[]; game.zibSystem.trySpawn=()=>{};
     game.keys={}; game.joystick.active=false; game.joystick.dx=game.joystick.dy=0; game.handbrakeHeld=false;
     const selected=game.traffic.network.allLanes.find(l=>l.id===${JSON.stringify(lane)});
-    const offset=Math.min(200,selected.length*.3);
+    const offset=${endpoint} ? selected.length-12 : Math.min(200,selected.length*.3);
     game.car=game.ownedCar; game.car.disableAutoDrive(); game.car.clearNavWaypoints();
     Object.assign(game.car,{x:selected.start.x+selected.ux*offset,y:selected.start.y+selected.uy*offset,
       angle:selected.angle,vx:0,vy:0,speed:0,handbrake:false,pedal:0,steer:0,yawRate:0,
       visible:true,dead:false,hasDriver:true,controlMode:'PLAYER'});
     game.isDriving=true; game.player.visible=true; Object.assign(game.player,game.car.getSeatWorldPos(0));
-    const point=game.dropOffRegistry[${JSON.stringify(destination)}]; game.currency=10000;
+    const point=${endpoint} ? selected.end : game.dropOffRegistry[${JSON.stringify(destination)}]; game.currency=10000;
     if(${taxi}) {
       const cab=new TrafficVehicle(selected,'LADY','suv2','AI');
       Object.assign(cab,{x:game.car.x,y:game.car.y,angle:selected.angle,speed:0,vx:0,vy:0,isZib:true,driverType:'zib',hasDriver:false});
       game.ownedCar.visible=false; game.ownedCar.active=false; game.isDriving=false;
       game.traffic.vehicles.push(cab); game.zibSystem.activeZibs.push(cab);
-      game.zibSystem.startRide(cab,${JSON.stringify(destination)},point.x,point.y,75,game);
+      game.zibSystem.startRide(cab,${endpoint ? 'null' : JSON.stringify(destination)},point.x,point.y,75,game);
     } else {game.ui.navMarker={...point};game.navDestination={...point};game.toggleAutoDrive();}
     globalThis.__driveTarget={...game.car.navDestination}; globalThis.__driveCar=game.car;
   }`);
@@ -208,6 +208,51 @@ for (const taxi of [false, true]) test(`${taxi ? 'Zib' : 'Player'} autodrive fol
   if (taxi) equal([result.currency,result.isDriving,result.traffic], [9925,false,true]);
   else equal([result.currency,result.mode], [10000,'PLAYER']);
 }, {events:true,timers:true});
+
+for (const taxi of [false, true]) for (const lane of ['R0.S0.L2','R1.S1.L2']) {
+  test(`${taxi ? 'Zib' : 'Player'} completes a passed endpoint stop on ${lane}`, env => {
+    setupDrive(env, {taxi,lane,endpoint:true});
+    const radius=taxi ? 40 : 35, car=env.probe.game.car;
+    const initial=value(env, `return {x:__driveCar.x,y:__driveCar.y,
+      distance:Math.hypot(__driveCar.x-__driveTarget.x,__driveCar.y-__driveTarget.y),
+      steps:__driveCar._driveRoute.transitions.length};`);
+    equal(initial.steps, 0); ok(initial.distance > radius, 'clamping moves the stop behind the car');
+    const timerStart=env.pendingTimers.length;
+    // A passed longitudinal stop still requires the right lane, lateral proximity,
+    // a finished route and no active turn before either arrival flow completes.
+    const guards=value(env, `
+      const car=__driveCar, route=car._driveRoute, lane=car.currentLane, x=car.x, y=car.y;
+      const arrived=()=>${taxi ? '!game.zibSystem.isPassenger' : '!game.navDestination'};
+      const check=()=>${taxi ? 'game.zibSystem.tick(game)' : 'game.checkNavArrival()'};
+      const result=[];
+      car.x=x-lane.uy*${radius+1}; car.y=y+lane.ux*${radius+1}; check(); result.push(arrived());
+      car.x=x; car.y=y; route.transitions.push({}); check(); result.push(arrived()); route.transitions.pop();
+      car.currentTurnPath={}; check(); result.push(arrived()); car.currentTurnPath=null;
+      car.currentLane=game.traffic.network.allLanes.find(l=>l!==lane); check(); result.push(arrived()); car.currentLane=lane;
+      return result;
+    `);
+    equal(guards, [false,false,false,false], 'arrival guards retain an active journey');
+    env.run('game.update();');
+    equal(env.probe.game.navDestination, null, 'passed stop completes on the next update');
+    near(car.x, initial.x); near(car.y, initial.y);
+    near(car.speed, 0); near(car.vx, 0); near(car.vy, 0);
+    ok(!env.pendingTimers.slice(timerStart).some(t=>t.ms===400), 'arrival uses no teleport');
+    if(taxi) equal([env.probe.game.currency,env.probe.game.isDriving,env.probe.game.zibSystem.isPassenger], [9925,false,false]);
+    else equal([env.probe.game.currency,car.controlMode], [10000,'PLAYER']);
+  }, {events:true,timers:true});
+}
+
+test('Arrival without a drive route keeps the direct-distance threshold', env => {
+  const result=value(env, `
+    const car={x:50,y:0,currentTurnPath:null,_driveRoute:null};
+    const near=game._hasReachedDriveDestination(car,25,0,35);
+    const passedFar=game._hasReachedDriveDestination(car,0,0,35);
+    car.currentTurnPath={};
+    const turning=game._hasReachedDriveDestination(car,25,0,35);
+    return {near,passedFar,turning};
+  `);
+  equal(result, {near:true,passedFar:false,turning:false});
+});
 
 test('Autodrive keyboard repeat, player takeover and passenger input guards', env => {
   setupDrive(env); env.run('game.toggleAutoDrive();');

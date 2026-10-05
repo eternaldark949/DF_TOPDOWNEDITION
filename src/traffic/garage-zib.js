@@ -404,9 +404,7 @@
             tick(game) {
                 if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
-                const dist = Math.hypot(ride.zib.x - ride.destinationX, ride.zib.y - ride.destinationY);
-                const route = ride.zib._driveRoute;
-                if (dist < 40 && !ride.zib.currentTurnPath && (!route || route.index >= route.transitions.length)) {
+                if (game._hasReachedDriveDestination(ride.zib, ride.destinationX, ride.destinationY, 40)) {
                     this.completeRide(game); return;
                 }
                 

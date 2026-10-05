@@ -595,6 +595,21 @@
                 }
             },
             
+            /** A final stop passed on its lane is reached while lateral proximity still applies. */
+            _hasReachedDriveDestination(car, x, y, radius) {
+                if (!car || car.currentTurnPath) return false;
+                const route = car._driveRoute;
+                if (route && (route.index < route.transitions.length || car.currentLane !== route.endLane)) return false;
+                const dx = x - car.x, dy = y - car.y;
+                if (Math.hypot(dx, dy) < radius) return true;
+                if (!route) return false;
+                // Endpoint clearance can move the safe stop behind an already-nearby car.
+                // Forward-only autodrive cannot return to it, so accept passing that stop
+                // on the final lane without accepting a car on another road or mid-turn.
+                const lane = route.endLane;
+                return dx * lane.ux + dy * lane.uy <= 0 && Math.abs(dx * lane.uy - dy * lane.ux) < radius;
+            },
+
             // Check if player has reached navigation destination
             checkNavArrival() {
                 if (this.zibSystem && this.zibSystem.isPassenger) return;
@@ -604,11 +619,10 @@
                 const target = driving && this.car.controlMode === 'AI' && this.car.navDestination
                     ? this.car.navDestination : this.navDestination;
                 const actor = driving ? this.car : this.player;
-                const dist = Math.hypot(actor.x - target.x, actor.y - target.y);
-                
                 const autoDriving = driving && this.car.controlMode === 'AI';
-                if (autoDriving && this.car.currentTurnPath) return;
-                if (dist < (autoDriving ? 35 : this.navCheckDistance)) {
+                const reached = autoDriving ? this._hasReachedDriveDestination(this.car, target.x, target.y, 35)
+                    : Math.hypot(actor.x - target.x, actor.y - target.y) < this.navCheckDistance;
+                if (reached) {
                     // Arrived at destination
                     showMessage("DESTINATION REACHED");
                     audioSys.sfx('ui');
