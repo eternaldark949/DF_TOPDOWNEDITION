@@ -2538,6 +2538,9 @@
         #joystick-ring.off { display: none; }
         #joystick-ring.pulse { animation: flitRingPulse 0.45s ease-out; }
         #joystick-ring.flash { animation: flitRingFlash 0.35s ease-out; }
+        #joystick-ring.blocked { animation: flitRingBlocked 0.32s ease-out; }   /* no clear landing: a crimson shudder */
+        @keyframes flitRingBlocked { 0%, 100% { transform: translate(-50%, -50%); } 20% { transform: translate(calc(-50% - 4px), -50%); filter: drop-shadow(0 0 10px rgba(255, 70, 100, 0.95)) hue-rotate(-60deg); }
+            45% { transform: translate(calc(-50% + 3px), -50%); } 70% { transform: translate(calc(-50% - 2px), -50%); } }
         @keyframes flitRingPulse { 0% { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.08); } 100% { transform: translate(-50%, -50%) scale(1); } }
         @keyframes flitRingFlash { 0% { filter: drop-shadow(0 0 14px rgba(232, 194, 122, 1)) brightness(1.8); } 100% { filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6)); } }
         #btn-flit.hidden-by-setting { display: none !important; }
@@ -26681,7 +26684,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 L.push({ x0: this.x, y0: this.y, x1: tx, y1: ty, t0: _gameTimeSec, a: this.angle, look: this.look, boss: !!this.bossName, seed: Math.random() * 100 });
                 if (L.length > 12) L.shift();
                 this.x = tx; this.y = ty;
-                g.emitNoise(tx, ty, 220, 'dash', false);
+                g.emitNoise(tx, ty, 220, 'dash', false, { src: this });
                 return true;
             }
         }
@@ -33802,6 +33805,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Driving routes must follow directed lane links from the actual car lane.
             // The map's pedestrian route may choose a different lane or a drawing-only
             // fallback curve, neither of which an occupied car can safely follow.
+            /** A lane a car can leave: a straight link onward or a turn that starts from it (map-edge lanes have neither) */
+            laneHasExit(lane) {
+                if (!lane) return false;
+                if (lane.connections && lane.connections.length) return true;
+                return !!(lane.turnPaths && lane.turnPaths.some(tp => tp.fromLane === lane && tp.toLane));
+            }
+
             buildDrivePath(startLane, startX, startY, endX, endY) {
                 if (!startLane || !this.allLanes.includes(startLane)) return null;
                 const project = (lane, x, y) => {
@@ -34557,6 +34567,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!allLanes || allLanes.length === 0) return;
                 const lane = allLanes[Math.floor(Math.random() * allLanes.length)];
                 if (!lane || !lane.start) return;
+                if (trafficManager.network.laneHasExit && !trafficManager.network.laneHasExit(lane)) return;   // a dead end to the map's edge: no ride could start here
 
                 const zib = new TrafficVehicle(lane, ZIB_CONFIG.brand, ZIB_CONFIG.model, 'AI');
                 zib.color = ZIB_CONFIG.paintColor;
@@ -34632,7 +34643,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!success) {
                     showMessage(`ZIB REROUTING...`);
                     const ride = this.passengerRide;
-                    setTimeout(() => { if (this.passengerRide === ride) this.teleportToDestination(game); }, 500);
+                    // our routing failed, not her ride: the teleport is on the house
+                    setTimeout(() => { if (this.passengerRide === ride) this.teleportToDestination(game, { free: true }); }, 500);
                 }
                 // Ensure driverType stays 'zib' after enableAutoDrive
                 zib.driverType = 'zib';
@@ -34677,13 +34689,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             /** Teleport player to destination instantly — the premium Zib feature. */
-            teleportToDestination(game) {
+            teleportToDestination(game, opts = {}) {
                 if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
                 ride.teleporting = true;
+                const fare = opts.free ? 0 : ride.fare;
                 
-                // Charge full fare
-                game.currency -= ride.fare;
+                // Charge full fare (nothing when Zib couldn't find a route)
+                game.currency -= fare;
                 if (game.currency < 0) game.currency = 0;
                 game.updateUI();
                 
@@ -34726,7 +34739,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this._exitZib(game, ride.zib);
                     this.passengerRide = null;
                     
-                    showMessage(`TELEPORTED — ${ride.fare} PERSONICS CHARGED. THANK YOU FOR RIDING ZIB.`);
+                    showMessage(fare ? `TELEPORTED — ${fare} PERSONICS CHARGED. THANK YOU FOR RIDING ZIB.` : `TELEPORTED — NO CHARGE. SORRY FOR THE DETOUR.`);
 
                     // Fade back in
                     setTimeout(() => {
@@ -34773,16 +34786,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // DON'T disable autodrive — let the Zib continue driving as traffic AI
                 // Just clear its passenger-set destination so it resumes normal lane following
                 if (!game.traffic.vehicles.includes(zib)) game.traffic.vehicles.push(zib);
-
-                game.isDriving = false;
-                game.player.visible = true;
-                game.car = game.ownedCar;
-                game.autodriveBtn.classList.remove('engaged');
-                game.autodriveBtn.style.display = 'none';
-                game.handbrakeHeld = false;
-                if (game.handbrakeBtn) { game.handbrakeBtn.style.display = 'none'; game.handbrakeBtn.classList.remove('held'); }
-                if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
-                if (game.holsterBtn) game.holsterBtn.style.display = 'flex';
+                this._onFoot(game);
 
                 const exitDist = zib.width / 2 + 25;
                 game.player.x = zib.x + Math.sin(zib.angle) * exitDist;
@@ -34794,6 +34798,41 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     game.velvetCat.inCar = false;
                     game.velvetCat.x = game.player.x - 25; game.velvetCat.y = game.player.y + 20;
                 }
+            }
+
+            /**
+             * The map changed under a ride (death and the medbay, a story scene): the ride just ends,
+             * nothing charged, the cab left behind with the old map. Called from _doLoadMap.
+             */
+            abandonRide(game) {
+                const ride = this.passengerRide; if (!ride) return;
+                this.passengerRide = null;
+                const zib = ride.zib;
+                if (zib) {
+                    if (zib.disableAutoDrive) zib.disableAutoDrive();
+                    if (zib.clearNavWaypoints) zib.clearNavWaypoints();
+                    zib.hasDriver = false; zib.driverType = 'traffic'; zib.navDestination = null;
+                    if (zib.clearSeats) zib.clearSeats();
+                    const i = this.activeZibs.indexOf(zib); if (i >= 0) this.activeZibs.splice(i, 1);
+                    const j = game.traffic && game.traffic.vehicles ? game.traffic.vehicles.indexOf(zib) : -1;
+                    if (j >= 0) game.traffic.vehicles.splice(j, 1);
+                }
+                if (game.teammates) game.teammates.forEach(tm => { if (tm.inCar) { tm.inCar = false; tm.seatIndex = -1; } });
+                if (game.velvetCat) game.velvetCat.inCar = false;
+                this._onFoot(game);
+            }
+
+            /** Back on foot after a ride: her own car is the car again, the drive buttons go, the route clears */
+            _onFoot(game) {
+                game.isDriving = false;
+                game.player.visible = true;
+                game.car = game.ownedCar;
+                game.autodriveBtn.classList.remove('engaged');
+                game.autodriveBtn.style.display = 'none';
+                game.handbrakeHeld = false;
+                if (game.handbrakeBtn) { game.handbrakeBtn.style.display = 'none'; game.handbrakeBtn.classList.remove('held'); }
+                if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
+                if (game.holsterBtn) game.holsterBtn.style.display = 'flex';
 
                 game.navDestination = null;
                 if (game.ui) {
@@ -38698,7 +38737,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                                      top: view.top + Math.min(0, ly), bottom: view.bottom + Math.max(0, ly) });
                     for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) {
                         if (i >= i0 && i <= i1 && j >= j0 && j <= j1) continue;
-                        if (!this._canBake()) break;
+                        if (!this._canBake(this.baked === 0)) break;   // nothing on screen needed baking: one tile ahead is always allowed
                         this._tile(i, j, this.lod);
                     }
                 }
@@ -51196,17 +51235,45 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (L.length < 24) L.push({ x, y, reach, kind, t: _gameTimeSec, heard: (this._dbgHeard || []).map(e => ({ x: e.x, y: e.y })) });
                     this._dbgHeard = null;
                 }
-                const R = this.noiseRipples || (this.noiseRipples = []);
                 if (fromPlayer) {
                     if (heard) this._lastContactAt = _gameTimeSec;
                     // opts.ring === false: no ripple (her footsteps; a puddle step keeps one, small)
-                    if (opts.ring !== false && R.filter(r => !r.enemy).length < 12) R.push({ x, y, reach, t: 0, seed: Math.random() * 100 });
+                    if (opts.ring !== false) this._spawnRing(x, y, reach, false, opts.src);
                 } else if (opts.ring !== false && GameSettings.enemyRings !== false && this.player
-                           && Math.hypot(this.player.x - x, this.player.y - y) <= reach && R.filter(r => r.enemy).length < 6) {
+                           && Math.hypot(this.player.x - x, this.player.y - y) <= reach) {
                     // theirs, in ember, when it reaches her: gunfire, a dash, a guard's hard steps
-                    R.push({ x, y, reach: Math.min(reach, 260), t: 0, seed: Math.random() * 100, enemy: true });
+                    this._spawnRing(x, y, Math.min(reach, 260), true, opts.src);
                 }
                 return heard;
+            },
+
+            /**
+             * A ring for a sound, limited per source so a burst of fire reads as one rich pulse,
+             * not a stack of glass: the source is `src` (an enemy), her (a sound at her feet), or
+             * else a 90 px patch of map (glass, a door). A sound within RING_GAP of that source's
+             * last ring swells it instead (`boost`); each source keeps at most RING_PER_SRC rings.
+             */
+            _spawnRing(x, y, reach, enemy, src) {
+                const R = this.noiseRipples || (this.noiseRipples = []);
+                const P = this.player, RING_GAP = 0.18, RING_PER_SRC = 2;
+                const key = src || (!enemy && P && Math.abs(x - P.x) + Math.abs(y - P.y) < 60 ? P : null);
+                const patch = key ? null : ((x / 90) | 0) * 100003 + ((y / 90) | 0);
+                let young = null, mine = 0, oldest = -1, side = 0;
+                for (let i = 0; i < R.length; i++) {
+                    const r = R[i]; if (!r.enemy !== !enemy) continue;
+                    side++;
+                    if (key ? r.src !== key : r.patch !== patch) continue;
+                    mine++; if (oldest < 0) oldest = i;
+                    if (!young || r.born > young.born) young = r;
+                }
+                if (young && _gameTimeSec - young.born < RING_GAP) {
+                    young.boost = Math.min(0.6, (young.boost || 0) + 0.25);       // a pulse train swells one ring
+                    young.reach = Math.max(young.reach, reach);
+                    return;
+                }
+                if (mine >= RING_PER_SRC) { R.splice(oldest, 1); side--; }
+                if (side >= (enemy ? 6 : 12)) return;                                // the overall caps, as before
+                R.push({ x, y, reach, t: 0, seed: Math.random() * 100, enemy, src: key, patch, born: _gameTimeSec, boost: 0 });
             },
 
             /** Ripples grow to their reach and fade over half a second. */
@@ -51253,8 +51320,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const N = 72, TAU = Math.PI * 2;
                 ctx.save();
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
-                // the newest few bend the light; older, fainter ones keep only the tinted band
-                let bends = 0;
+                // Four rings bend the light: hers first (newest first), then theirs nearest her; the rest keep only the tinted band
+                const B = this._ringBend || (this._ringBend = []); B.length = 0;
+                const P = this.player;
+                for (let ri = R.length - 1; ri >= 0; ri--) if (this._ringT(R[ri]) < 0.6) B.push(R[ri]);
+                if (B.length > 4) {
+                    const rank = r => r.enemy ? 1e7 + (P ? Math.hypot(r.x - P.x, r.y - P.y) : 0) : 0;   // (drawing never writes to the rings)
+                    B.sort((a, b) => rank(a) - rank(b)); B.length = 4;
+                }
                 for (let ri = R.length - 1; ri >= 0; ri--) {
                     const r = R[ri];
                     const t = this._ringT(r), e = 1 - Math.pow(1 - t, 2);
@@ -51266,7 +51339,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // off screen: wholly outside it, or grown past its farthest corner
                     if (rad - th > Math.hypot(Math.max(cx, W - cx), Math.max(cy, H - cy))) continue;
                     if (pad < 0 || cx + pad < 0 || cx - pad > W || cy + pad < 0 || cy - pad > H) continue;
-                    const bend = bends < 4 && t < 0.6; if (bend) bends++;
+                    const bend = B.includes(r);
                     if (bend && !copied) { this._mirageCtx.drawImage(this.canvas, 0, 0, sw, sh); copied = true; }
                     const seed = r.seed ?? (r.seed = Math.random() * 100), ph = _gameTimeSec;
                     // a rolling swell, a ripple, and fine teeth that flicker: the jagged edge
@@ -51285,7 +51358,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     band.moveTo(inner[0], inner[1]);
                     for (let i = 2; i < inner.length; i += 2) band.lineTo(inner[i], inner[i + 1]);
                     band.closePath();
-                    const k = (1 - t) * (1 - t);                                  // opacity fades independently of the narrowing band
+                    const k = (1 - t) * (1 - t) * (1 + (r.boost || 0));          // opacity fades independently of the narrowing band; a pulse train swells it
                     const spawn = Math.max(0, 1 - t * 4);
                     const glowK = k * (1 + 0.2 * spawn * spawn);                    // 20% more visible at spawn, original fade from quarter-life
                     if (bend) {
@@ -51299,13 +51372,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             const u0 = cx + (x0 - cx) / sc, v0 = cy + (y0 - cy) / sc, u1 = cx + (x1 - cx) / sc, v1 = cy + (y1 - cy) / sc;
                             ctx.save();
                             ctx.clip(band, 'evenodd');
-                            ctx.globalAlpha = 0.90 * k;
+                            ctx.globalAlpha = Math.min(1, 0.90 * k);
                             ctx.drawImage(cv, u0 / 4, v0 / 4, (u1 - u0) / 4, (v1 - v0) / 4, x0 + 1.8 * k, y0, x1 - x0, y1 - y0);
                             ctx.restore();
                         }
                     }
-                    ctx.globalAlpha = 0.04 * glowK;
-                    ctx.fillStyle = r.enemy ? '#ffb08a' : '#efe4ff'; ctx.fill(band, 'evenodd');
+                    // the glass's tint: hers a cool lavender whisper, theirs a warm ember (no outline either way)
+                    ctx.globalAlpha = (r.enemy ? 0.09 : 0.04) * glowK;
+                    ctx.fillStyle = r.enemy ? '#ff9a62' : '#efe4ff'; ctx.fill(band, 'evenodd');
                     ctx.globalAlpha = 1;
                 }
                 ctx.restore();
@@ -52353,7 +52427,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.emitNoise(e.x, e.y, Math.round(reach), 'step', true, { ring: false });
                 } else if (e instanceof Ganger && (mat === 'marble' || mat === 'metal' || mat === 'wood') && (shoe === 'boots' || shoe === 'heels') && (e._stepN = (e._stepN || 0) + 1) % 2 === 0) {
                     // a guard's hard steps: a faint ember ring where you can hear them (nobody else is alerted)
-                    this.emitNoise(e.x, e.y, 120, 'enemyStep', false, { hear: false });
+                    this.emitNoise(e.x, e.y, 120, 'enemyStep', false, { hear: false, src: e });
                 }
             }
         });
@@ -53226,7 +53300,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const pips = [1, 2, 3].map(k => `<i class="${k <= r ? 'on' : ''}"></i>`).join('');
                         html += `<div class="tun-node${can ? ' can' : ''}${locked ? ' locked' : ''}" data-tree="${tree.id}" data-i="${i}">
                             <div class="tun-node-top"><b>${n.name}</b><span class="tun-pips">${pips}</span></div>
-                            <div class="tun-dim">${n.desc(Math.max(1, Math.min(3, r + (r < 3 ? 1 : 0))), R)}${r > 0 && r < 3 ? ' <span class="tun-next">(next rank)</span>' : ''}${n.unlockLevel ? ` <span class="tun-next">(${levelLocked ? 'requires' : 'unlocks at'} Level ${n.unlockLevel})</span>` : ''}</div></div>`;
+                            <div class="tun-dim">${n.desc(Math.max(1, Math.min(3, r + (r < 3 ? 1 : 0))), R)}${r > 0 && r < 3 ? ' <span class="tun-next">(next rank)</span>' : ''}${levelLocked ? ` <span class="tun-next">(requires Level ${n.unlockLevel})</span>` : ''}</div></div>`;
                     });
                     html += `</div>`;
                 }
@@ -53270,7 +53344,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     html += `<div class="df-card accent" style="--acc:${tree.color}"><div class="df-head"><div class="title" style="color:${tree.color}">${tree.name}</div><span class="count df-chip info">${spent} / ${tree.nodes.length * 3}</span></div>`;
                     for (const n of tree.nodes) {
                         const r = R.rank(n.id);
-                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r), R)}${n.unlockLevel ? ` <span class="df-hint">(requires Level ${n.unlockLevel})</span>` : ''}</span></div>`;
+                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r), R)}${n.unlockLevel && R.level < n.unlockLevel ? ` <span class="df-hint">(requires Level ${n.unlockLevel})</span>` : ''}</span></div>`;
                     }
                     html += `</div>`;
                 }
@@ -53953,7 +54027,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (typeof angleOverride === 'number') flitAngle = angleOverride;
 
                 const landing = this.findFlitLanding(flitAngle, flitDist);
-                if (!landing) return false;
+                if (!landing) {
+                    // No clear landing that way (the map's edge, a solid run of wall): no charge spent, and she
+                    // feels it — the ring shudders crimson with a soft knock (at most every 0.4 s)
+                    if (!(this._flitBlockedAt > _gameTimeSec - 0.4)) {
+                        this._flitBlockedAt = _gameTimeSec;
+                        if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('blocked'); void r.offsetWidth; r.classList.add('blocked'); }
+                        audioSys.sfx('knock');
+                    }
+                    return false;
+                }
                 const targetX = landing.x, targetY = landing.y;
 
                 if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }
@@ -56702,6 +56785,8 @@ engineMixin({
                 // =========================================================
                 //  PHASE 1: CLEANUP
                 // =========================================================
+                // A Zib ride doesn't survive the map changing under it (death, a scene): it ends, uncharged
+                if (this.zibSystem && this.zibSystem.passengerRide) this.zibSystem.abandonRide(this);
                 CollisionSystem.clearSpatialGrid();
                 
                 if (this._staticWallEntities) {
@@ -58605,6 +58690,14 @@ engineMixin({
                         return;
                     }
                     
+                    // A dead end to the map's edge has no way on: say so rather than fail
+                    const net = this.traffic && this.traffic.network;
+                    if (net && net.laneHasExit && this.car.currentLane && !this.car.currentTurnPath && !net.laneHasExit(this.car.currentLane)) {
+                        showMessage("DEAD END AHEAD — TURN AROUND TO ENGAGE AUTO-DRIVE");
+                        audioSys.sfx('ui');
+                        return;
+                    }
+                    const pinned = this.navDestination;
                     // Try to enable auto-drive
                     const success = this.car.enableAutoDrive(this.traffic.network, this.activeMap.walls);
                     
@@ -58627,6 +58720,7 @@ engineMixin({
                         if (!this._refreshAutoDriveRoute()) {
                             this.car.disableAutoDrive();
                             this.car.clearNavWaypoints();
+                            this.navDestination = pinned; this.car.navDestination = null;   // her pin stays where she put it
                             this.autodriveBtn.classList.remove('engaged');
                             showMessage("AUTO-DRIVE FAILED - NO DRIVABLE ROUTE");
                             return;
@@ -58651,7 +58745,13 @@ engineMixin({
                 // Forward-only autodrive cannot return to it, so accept passing that stop
                 // on the final lane without accepting a car on another road or mid-turn.
                 const lane = route.endLane;
-                return dx * lane.ux + dy * lane.uy <= 0 && Math.abs(dx * lane.uy - dy * lane.ux) < radius;
+                if (dx * lane.ux + dy * lane.uy <= 0 && Math.abs(dx * lane.uy - dy * lane.ux) < radius) return true;
+                // Stopped beside the stop on the final lane (too far off its centre to count above, with the
+                // speed cap at zero so it can't creep closer): half a second still there is arrival
+                if (Math.abs(car.speed || 0) < 0.15 && Math.hypot(dx, dy) < radius * 2) {
+                    if ((car._stillAtStop = (car._stillAtStop || 0) + 1) > 30) { car._stillAtStop = 0; return true; }
+                } else car._stillAtStop = 0;
+                return false;
             },
 
             // Check if player has reached navigation destination
@@ -59687,7 +59787,7 @@ engineMixin({
                     // Unified projectile collection — handles single shots, arrays, or null
                     if (result) {
                         const shots = Array.isArray(result) ? result : [result];
-                        if (shots.some(s => s instanceof ProjectileEntity && !s.melee)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false);   // their gunfire draws their friends
+                        if (shots.some(s => s instanceof ProjectileEntity && !s.melee)) this.emitNoise(enemy.x, enemy.y, CONFIG.NOISE.enemyShot, 'enemyShot', false, { src: enemy });   // their gunfire draws their friends
                         for (const shot of shots) {
                             if (shot instanceof ProjectileEntity && shot.melee) { this.projectiles.push(shot); continue; }   // a claw: no flash, no casing
                             if (shot instanceof ProjectileEntity) {
@@ -61837,7 +61937,12 @@ engineMixin({
                 // Rain on screen: outdoors, or fading in as she steps out onto a veranda
                 const rainK = this.activeMap.type === 'outdoor' ? 1 : (this.roomSystem.active ? this.roomSystem.outdoorness : 0);
                 if (rainK > 0.01 && this.weather.isRaining) {
-                    const rainLamps = this.activeMap._interiorLights ? [...this.lamps, ...this.activeMap._interiorLights] : this.lamps;
+                    const IL = this.activeMap._interiorLights;
+                    // one joined list per map's lamps (a fresh array each frame would rebuild the rain's lamp grid every frame)
+                    if (IL && (this._rainLampsSrc !== this.lamps || this._rainLampsIL !== IL || this._rainLamps.length !== this.lamps.length + IL.length)) {
+                        this._rainLamps = [...this.lamps, ...IL]; this._rainLampsSrc = this.lamps; this._rainLampsIL = IL;
+                    }
+                    const rainLamps = IL ? this._rainLamps : this.lamps;
                     this.ctx.save(); this.ctx.globalAlpha = rainK;
                     this.weather.drawRainOverlay(this.ctx, this.view, rainLamps);   // the view, so Cinematic View's pan carries the rain too
                     this.ctx.restore();
@@ -65571,8 +65676,9 @@ engineMixin({
                 const ringFlit = (dx, dy) => {
                     if (!GameSettings.flitRing || !J.ringArmed || !J.armed || !canFlit()) return;
                     J.ringArmed = false; J.armed = false;
-                    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
-                    this.triggerFlit(Math.atan2(dy, dx), 'ring');
+                    if (this.triggerFlit(Math.atan2(dy, dx), 'ring')) {
+                        try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
+                    } else { J.ringArmed = true; J.armed = true; }   // blocked: still armed, a fresh flick tries again
                 };
                 const sampleRing = (e, dx, dy, radius) => {
                     if (!J.ringArmed && radius <= RING_OUT) { J.ringArmed = true; ringCount = 0; }
@@ -65581,8 +65687,12 @@ engineMixin({
                     const now = ringTime(e), last = (ringHead + ringCount - 1) % ringTimes.length;
                     // Long held touches have no move events: require fresh motion evidence.
                     // Same/reversed timestamps cannot establish speed, nor can a stale event gap.
-                    if (!ringCount || now <= ringTimes[last] || now - ringTimes[last] > RING_WINDOW) { seedRing(radius, now); return; }
-                    const movingOut = radius > ringRadii[last];
+                    if (!ringCount || now <= ringTimes[last]) { seedRing(radius, now); return; }
+                    // A rested thumb sends no move events, so a flick out of a rest arrives as one big jump.
+                    // Measure it from the resting radius, as if it took the whole window (a slow phone's
+                    // sparse events then still need a real flick: about 60 px in a single event)
+                    if (now - ringTimes[last] > RING_WINDOW) seedRing(ringRadii[last], now - RING_WINDOW);
+                    const prev = (ringHead + ringCount - 1) % ringTimes.length, movingOut = radius > ringRadii[prev];
                     while (ringCount && now - ringTimes[ringHead] > RING_WINDOW) { ringHead = (ringHead + 1) % ringTimes.length; ringCount--; }
                     if (radius >= RING_IN && movingOut) {
                         for (let i = 0; i < ringCount; i++) {
@@ -65630,7 +65740,7 @@ engineMixin({
                             const now = performance.now(); J.trail.push({ x: deltaX, y: deltaY, t: now });
                             while (J.trail.length > 2 && now - J.trail[0].t > 150) J.trail.shift();
                             const t0 = J.trail[0];
-                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; this.triggerFlit(angle, 'flick'); }
+                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; if (!this.triggerFlit(angle, 'flick')) J.armed = true; }
                         }
                         break;
                     }
@@ -67349,8 +67459,7 @@ engineMixin({
                     const cy = lane.start.y + lane.uy * t;
                     const dist = Math.hypot(px - cx, py - cy);
                     // Must be within reasonable range and not a dead-end
-                    const hasExit = (lane.connections && lane.connections.length > 0) || 
-                                   (lane.turnPaths && lane.turnPaths.length > 0);
+                    const hasExit = game.traffic.network.laneHasExit(lane);
                     if (dist < bestDist && hasExit) {
                         bestDist = dist;
                         bestLane = lane;

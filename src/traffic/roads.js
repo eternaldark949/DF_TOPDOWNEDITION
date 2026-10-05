@@ -1708,6 +1708,13 @@
             // Driving routes must follow directed lane links from the actual car lane.
             // The map's pedestrian route may choose a different lane or a drawing-only
             // fallback curve, neither of which an occupied car can safely follow.
+            /** A lane a car can leave: a straight link onward or a turn that starts from it (map-edge lanes have neither) */
+            laneHasExit(lane) {
+                if (!lane) return false;
+                if (lane.connections && lane.connections.length) return true;
+                return !!(lane.turnPaths && lane.turnPaths.some(tp => tp.fromLane === lane && tp.toLane));
+            }
+
             buildDrivePath(startLane, startX, startY, endX, endY) {
                 if (!startLane || !this.allLanes.includes(startLane)) return null;
                 const project = (lane, x, y) => {

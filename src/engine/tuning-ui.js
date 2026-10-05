@@ -79,7 +79,7 @@
                         const pips = [1, 2, 3].map(k => `<i class="${k <= r ? 'on' : ''}"></i>`).join('');
                         html += `<div class="tun-node${can ? ' can' : ''}${locked ? ' locked' : ''}" data-tree="${tree.id}" data-i="${i}">
                             <div class="tun-node-top"><b>${n.name}</b><span class="tun-pips">${pips}</span></div>
-                            <div class="tun-dim">${n.desc(Math.max(1, Math.min(3, r + (r < 3 ? 1 : 0))), R)}${r > 0 && r < 3 ? ' <span class="tun-next">(next rank)</span>' : ''}${n.unlockLevel ? ` <span class="tun-next">(${levelLocked ? 'requires' : 'unlocks at'} Level ${n.unlockLevel})</span>` : ''}</div></div>`;
+                            <div class="tun-dim">${n.desc(Math.max(1, Math.min(3, r + (r < 3 ? 1 : 0))), R)}${r > 0 && r < 3 ? ' <span class="tun-next">(next rank)</span>' : ''}${levelLocked ? ` <span class="tun-next">(requires Level ${n.unlockLevel})</span>` : ''}</div></div>`;
                     });
                     html += `</div>`;
                 }
@@ -123,7 +123,7 @@
                     html += `<div class="df-card accent" style="--acc:${tree.color}"><div class="df-head"><div class="title" style="color:${tree.color}">${tree.name}</div><span class="count df-chip info">${spent} / ${tree.nodes.length * 3}</span></div>`;
                     for (const n of tree.nodes) {
                         const r = R.rank(n.id);
-                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r), R)}${n.unlockLevel ? ` <span class="df-hint">(requires Level ${n.unlockLevel})</span>` : ''}</span></div>`;
+                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r), R)}${n.unlockLevel && R.level < n.unlockLevel ? ` <span class="df-hint">(requires Level ${n.unlockLevel})</span>` : ''}</span></div>`;
                     }
                     html += `</div>`;
                 }

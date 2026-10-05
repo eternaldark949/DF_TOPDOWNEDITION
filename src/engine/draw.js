@@ -1190,7 +1190,12 @@
                 // Rain on screen: outdoors, or fading in as she steps out onto a veranda
                 const rainK = this.activeMap.type === 'outdoor' ? 1 : (this.roomSystem.active ? this.roomSystem.outdoorness : 0);
                 if (rainK > 0.01 && this.weather.isRaining) {
-                    const rainLamps = this.activeMap._interiorLights ? [...this.lamps, ...this.activeMap._interiorLights] : this.lamps;
+                    const IL = this.activeMap._interiorLights;
+                    // one joined list per map's lamps (a fresh array each frame would rebuild the rain's lamp grid every frame)
+                    if (IL && (this._rainLampsSrc !== this.lamps || this._rainLampsIL !== IL || this._rainLamps.length !== this.lamps.length + IL.length)) {
+                        this._rainLamps = [...this.lamps, ...IL]; this._rainLampsSrc = this.lamps; this._rainLampsIL = IL;
+                    }
+                    const rainLamps = IL ? this._rainLamps : this.lamps;
                     this.ctx.save(); this.ctx.globalAlpha = rainK;
                     this.weather.drawRainOverlay(this.ctx, this.view, rainLamps);   // the view, so Cinematic View's pan carries the rain too
                     this.ctx.restore();

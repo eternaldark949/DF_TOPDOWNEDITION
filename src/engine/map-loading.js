@@ -232,6 +232,8 @@ engineMixin({
                 // =========================================================
                 //  PHASE 1: CLEANUP
                 // =========================================================
+                // A Zib ride doesn't survive the map changing under it (death, a scene): it ends, uncharged
+                if (this.zibSystem && this.zibSystem.passengerRide) this.zibSystem.abandonRide(this);
                 CollisionSystem.clearSpatialGrid();
                 
                 if (this._staticWallEntities) {

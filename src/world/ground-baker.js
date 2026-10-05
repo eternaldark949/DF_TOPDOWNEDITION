@@ -116,7 +116,7 @@
                                                      top: view.top + Math.min(0, ly), bottom: view.bottom + Math.max(0, ly) });
                     for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) {
                         if (i >= i0 && i <= i1 && j >= j0 && j <= j1) continue;
-                        if (!this._canBake()) break;
+                        if (!this._canBake(this.baked === 0)) break;   // nothing on screen needed baking: one tile ahead is always allowed
                         this._tile(i, j, this.lod);
                     }
                 }

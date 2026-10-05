@@ -95,7 +95,7 @@
                     this.emitNoise(e.x, e.y, Math.round(reach), 'step', true, { ring: false });
                 } else if (e instanceof Ganger && (mat === 'marble' || mat === 'metal' || mat === 'wood') && (shoe === 'boots' || shoe === 'heels') && (e._stepN = (e._stepN || 0) + 1) % 2 === 0) {
                     // a guard's hard steps: a faint ember ring where you can hear them (nobody else is alerted)
-                    this.emitNoise(e.x, e.y, 120, 'enemyStep', false, { hear: false });
+                    this.emitNoise(e.x, e.y, 120, 'enemyStep', false, { hear: false, src: e });
                 }
             }
         });

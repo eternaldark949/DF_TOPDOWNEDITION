@@ -561,6 +561,14 @@
                         return;
                     }
                     
+                    // A dead end to the map's edge has no way on: say so rather than fail
+                    const net = this.traffic && this.traffic.network;
+                    if (net && net.laneHasExit && this.car.currentLane && !this.car.currentTurnPath && !net.laneHasExit(this.car.currentLane)) {
+                        showMessage("DEAD END AHEAD — TURN AROUND TO ENGAGE AUTO-DRIVE");
+                        audioSys.sfx('ui');
+                        return;
+                    }
+                    const pinned = this.navDestination;
                     // Try to enable auto-drive
                     const success = this.car.enableAutoDrive(this.traffic.network, this.activeMap.walls);
                     
@@ -583,6 +591,7 @@
                         if (!this._refreshAutoDriveRoute()) {
                             this.car.disableAutoDrive();
                             this.car.clearNavWaypoints();
+                            this.navDestination = pinned; this.car.navDestination = null;   // her pin stays where she put it
                             this.autodriveBtn.classList.remove('engaged');
                             showMessage("AUTO-DRIVE FAILED - NO DRIVABLE ROUTE");
                             return;
@@ -607,7 +616,13 @@
                 // Forward-only autodrive cannot return to it, so accept passing that stop
                 // on the final lane without accepting a car on another road or mid-turn.
                 const lane = route.endLane;
-                return dx * lane.ux + dy * lane.uy <= 0 && Math.abs(dx * lane.uy - dy * lane.ux) < radius;
+                if (dx * lane.ux + dy * lane.uy <= 0 && Math.abs(dx * lane.uy - dy * lane.ux) < radius) return true;
+                // Stopped beside the stop on the final lane (too far off its centre to count above, with the
+                // speed cap at zero so it can't creep closer): half a second still there is arrival
+                if (Math.abs(car.speed || 0) < 0.15 && Math.hypot(dx, dy) < radius * 2) {
+                    if ((car._stillAtStop = (car._stillAtStop || 0) + 1) > 30) { car._stillAtStop = 0; return true; }
+                } else car._stillAtStop = 0;
+                return false;
             },
 
             // Check if player has reached navigation destination

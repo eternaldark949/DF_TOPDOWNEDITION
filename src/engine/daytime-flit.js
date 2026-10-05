@@ -192,7 +192,16 @@
                 if (typeof angleOverride === 'number') flitAngle = angleOverride;
 
                 const landing = this.findFlitLanding(flitAngle, flitDist);
-                if (!landing) return false;
+                if (!landing) {
+                    // No clear landing that way (the map's edge, a solid run of wall): no charge spent, and she
+                    // feels it — the ring shudders crimson with a soft knock (at most every 0.4 s)
+                    if (!(this._flitBlockedAt > _gameTimeSec - 0.4)) {
+                        this._flitBlockedAt = _gameTimeSec;
+                        if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('blocked'); void r.offsetWidth; r.classList.add('blocked'); }
+                        audioSys.sfx('knock');
+                    }
+                    return false;
+                }
                 const targetX = landing.x, targetY = landing.y;
 
                 if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }

@@ -111,11 +111,14 @@ function flitFixture(env, walls) {
 function flitState(env) {
   return value(env, 'return {player:{x:game.player.x,y:game.player.y,angle:game.player.angle},charge:game.flitState,ghost:game._afterimage,vfx:game.flitVFX,effects:__effects,random:__randomCalls};');
 }
-test('Rejected Flit spends no charge or effects; shortened landing clears the actor radius', env => {
+test('Rejected Flit spends no charge, only the blocked cue; shortened landing clears the actor radius', env => {
   flitFixture(env, [{x:0,y:0,w:300,h:300}]);
   const before = flitState(env);
-  equal(env.run('game.triggerFlit()'), false); equal(flitState(env), before);
-  env.run('game.activeMap.walls=[{x:210,y:50,w:50,h:100}];');
+  equal(env.run('game.triggerFlit()'), false);
+  const rejected = flitState(env);
+  ok(rejected.effects.includes('audio') && rejected.effects.includes('ring'), 'a blocked flit is felt: the ring shudders, a knock');
+  equal({...rejected, effects: []}, before);
+  env.run('__effects.length=0; game.activeMap.walls=[{x:210,y:50,w:50,h:100}];');
   equal(env.run('game.triggerFlit()'), true);
   const after = flitState(env);
   near(after.player.x, 198); near(after.player.y, 100);
@@ -147,6 +150,8 @@ test('Held ring flick requires fresh outward speed, rearms deliberately and pres
   const cases = [
     ['slow push',0,{steps:[start,{t:300,x:30},{t:600,x:60},{t:900,x:90}]}],
     ['flick from held walking position',1,{steps:[start,{t:250,x:20},{t:450,x:35},{t:1450,x:37},{t:1480,x:60},{t:1510,x:88}]}],
+    ['flick out of a rest',1,{steps:[start,{t:40,x:40},{t:900,x:110}]}],
+    ['sparse slow events stay a push',0,{steps:[start,{t:40,x:40},{t:180,x:70},{t:320,x:95}]}],
     ['stale history and outer jitter',0,{steps:[start,{t:40,x:45},{t:80,x:75},{t:2080,x:79},{t:2110,x:83},{t:2140,x:86}]}],
     ['one activation per excursion',1,{steps:[...fast,{t:100,x:110},{t:120,x:140},{t:1000,x:141},{t:1030,x:175}]}],
     ['return inside rearms',2,{steps:[...fast,{t:300,x:65},{t:800,x:66},{t:830,x:95},{t:860,x:130}]}],
@@ -241,6 +246,65 @@ for (const taxi of [false, true]) for (const lane of ['R0.S0.L2','R1.S1.L2']) {
     else equal([env.probe.game.currency,car.controlMode], [10000,'PLAYER']);
   }, {events:true,timers:true});
 }
+
+test('Map-edge dead ends start no ride, keep her pin, and a failed route is free', env => {
+  setupDrive(env);
+  const result=value(env, `
+    const N=game.traffic.network, lanes=N.allLanes, dead=lanes.filter(l=>!N.laneHasExit(l));
+    // Zib spawning: force the random pick onto each dead end in turn
+    const zs=game.zibSystem, tm={network:N,vehicles:[]}, R0=Math.random; let spawned=0;
+    for (const l of dead) {
+      const seq=[0,(lanes.indexOf(l)+0.5)/lanes.length]; Math.random=()=>seq.length?seq.shift():0.5;
+      zs.activeZibs=[]; zs.trySpawn(tm); spawned+=zs.activeZibs.length;
+    }
+    Math.random=R0; zs.activeZibs=[];
+    // Player autodrive on a dead end: refused with a reason, the pin left where she put it
+    const lane=dead[0], car=game.car; car.disableAutoDrive(); car.clearNavWaypoints();
+    Object.assign(car,{x:lane.start.x+lane.ux*lane.length*0.5,y:lane.start.y+lane.uy*lane.length*0.5,angle:lane.angle,currentLane:lane,currentTurnPath:null,speed:0,vx:0,vy:0,controlMode:'PLAYER'});
+    const pin={...game.dropOffRegistry.clinic}; game.navDestination={...pin}; game.toggleAutoDrive();
+    return {dead:dead.length,routable:lanes.length-dead.length,spawned,mode:car.controlMode,pin:game.navDestination};
+  `);
+  ok(result.dead > 0 && result.routable > 0, 'the hub has both kinds of lane');
+  equal(result.spawned, 0, 'no Zib spawns on a dead end');
+  equal(result.mode, 'PLAYER', 'autodrive refused on a dead end');
+  equal(result.pin, value(env, 'return {...game.dropOffRegistry.clinic};'), 'her pin stays');
+  // a ride the game can't route teleports free
+  setupDrive(env, {taxi:true});
+  env.run('game.zibSystem.teleportToDestination(game,{free:true});');
+  equal(env.probe.game.currency, 10000, 'no fare for our routing failure');
+}, {events:true,timers:true});
+
+test('A map switch mid-ride ends the ride uncharged, with no ghost cab', env => {
+  setupDrive(env, {taxi:true});
+  env.run('for(let i=0;i<30;i++)game.update();');
+  const mid=value(env, `const cab=game.car; game._doLoadMap('hotel_lobby');
+    return {passenger:game.zibSystem.isPassenger,driving:game.isDriving,own:game.car===game.ownedCar,
+            listed:game.zibSystem.activeZibs.includes(cab),currency:game.currency};`);
+  equal(mid, {passenger:false,driving:false,own:true,listed:false,currency:10000});
+  const later=value(env, `game._doLoadMap('hub_949'); game.story.update=()=>{};
+    for(let i=0;i<700;i++)game.update(); return {passenger:game.zibSystem.isPassenger,currency:game.currency};`);
+  equal(later, {passenger:false,currency:10000}, 'no stuck-teleport fare later');
+}, {events:true,timers:true});
+
+for (const taxi of [false, true]) test(`${taxi ? 'Zib' : 'Player'} stopped beside the final stop arrives after a still half-second`, env => {
+  setupDrive(env, {taxi,endpoint:true});
+  const radius=taxi ? 40 : 35;
+  const result=value(env, `
+    const car=__driveCar, lane=car._driveRoute.endLane, t=car._driveRoute.destination;
+    const arrived=()=>${taxi ? '!game.zibSystem.isPassenger' : '!game.navDestination'};
+    const check=()=>${taxi ? 'game.zibSystem.tick(game)' : 'game.checkNavArrival()'};
+    Object.assign(car,{currentLane:lane,currentTurnPath:null,speed:0,vx:0,vy:0});
+    // far beside it: never
+    car.x=t.x-lane.uy*${radius*2+5}+lane.ux*20; car.y=t.y+lane.ux*${radius*2+5}+lane.uy*20;
+    for(let i=0;i<40;i++)check(); const far=arrived();
+    // beside it, within reach but off the lane centre: after 30 still ticks
+    car.x=t.x-lane.uy*${radius+8}+lane.ux*20; car.y=t.y+lane.ux*${radius+8}+lane.uy*20;
+    for(let i=0;i<29;i++)check(); const early=arrived();
+    for(let i=0;i<3;i++)check(); const late=arrived();
+    return {far,early,late};
+  `);
+  equal(result, {far:false,early:false,late:true});
+}, {events:true,timers:true});
 
 test('Arrival without a drive route keeps the direct-distance threshold', env => {
   const result=value(env, `

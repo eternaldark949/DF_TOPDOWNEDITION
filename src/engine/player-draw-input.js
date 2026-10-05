@@ -312,8 +312,9 @@
                 const ringFlit = (dx, dy) => {
                     if (!GameSettings.flitRing || !J.ringArmed || !J.armed || !canFlit()) return;
                     J.ringArmed = false; J.armed = false;
-                    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
-                    this.triggerFlit(Math.atan2(dy, dx), 'ring');
+                    if (this.triggerFlit(Math.atan2(dy, dx), 'ring')) {
+                        try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
+                    } else { J.ringArmed = true; J.armed = true; }   // blocked: still armed, a fresh flick tries again
                 };
                 const sampleRing = (e, dx, dy, radius) => {
                     if (!J.ringArmed && radius <= RING_OUT) { J.ringArmed = true; ringCount = 0; }
@@ -322,8 +323,12 @@
                     const now = ringTime(e), last = (ringHead + ringCount - 1) % ringTimes.length;
                     // Long held touches have no move events: require fresh motion evidence.
                     // Same/reversed timestamps cannot establish speed, nor can a stale event gap.
-                    if (!ringCount || now <= ringTimes[last] || now - ringTimes[last] > RING_WINDOW) { seedRing(radius, now); return; }
-                    const movingOut = radius > ringRadii[last];
+                    if (!ringCount || now <= ringTimes[last]) { seedRing(radius, now); return; }
+                    // A rested thumb sends no move events, so a flick out of a rest arrives as one big jump.
+                    // Measure it from the resting radius, as if it took the whole window (a slow phone's
+                    // sparse events then still need a real flick: about 60 px in a single event)
+                    if (now - ringTimes[last] > RING_WINDOW) seedRing(ringRadii[last], now - RING_WINDOW);
+                    const prev = (ringHead + ringCount - 1) % ringTimes.length, movingOut = radius > ringRadii[prev];
                     while (ringCount && now - ringTimes[ringHead] > RING_WINDOW) { ringHead = (ringHead + 1) % ringTimes.length; ringCount--; }
                     if (radius >= RING_IN && movingOut) {
                         for (let i = 0; i < ringCount; i++) {
@@ -371,7 +376,7 @@
                             const now = performance.now(); J.trail.push({ x: deltaX, y: deltaY, t: now });
                             while (J.trail.length > 2 && now - J.trail[0].t > 150) J.trail.shift();
                             const t0 = J.trail[0];
-                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; this.triggerFlit(angle, 'flick'); }
+                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; if (!this.triggerFlit(angle, 'flick')) J.armed = true; }
                         }
                         break;
                     }

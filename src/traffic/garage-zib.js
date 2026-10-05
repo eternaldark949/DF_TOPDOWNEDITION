@@ -306,6 +306,7 @@
                 if (!allLanes || allLanes.length === 0) return;
                 const lane = allLanes[Math.floor(Math.random() * allLanes.length)];
                 if (!lane || !lane.start) return;
+                if (trafficManager.network.laneHasExit && !trafficManager.network.laneHasExit(lane)) return;   // a dead end to the map's edge: no ride could start here
 
                 const zib = new TrafficVehicle(lane, ZIB_CONFIG.brand, ZIB_CONFIG.model, 'AI');
                 zib.color = ZIB_CONFIG.paintColor;
@@ -381,7 +382,8 @@
                 if (!success) {
                     showMessage(`ZIB REROUTING...`);
                     const ride = this.passengerRide;
-                    setTimeout(() => { if (this.passengerRide === ride) this.teleportToDestination(game); }, 500);
+                    // our routing failed, not her ride: the teleport is on the house
+                    setTimeout(() => { if (this.passengerRide === ride) this.teleportToDestination(game, { free: true }); }, 500);
                 }
                 // Ensure driverType stays 'zib' after enableAutoDrive
                 zib.driverType = 'zib';
@@ -426,13 +428,14 @@
             }
 
             /** Teleport player to destination instantly — the premium Zib feature. */
-            teleportToDestination(game) {
+            teleportToDestination(game, opts = {}) {
                 if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
                 ride.teleporting = true;
+                const fare = opts.free ? 0 : ride.fare;
                 
-                // Charge full fare
-                game.currency -= ride.fare;
+                // Charge full fare (nothing when Zib couldn't find a route)
+                game.currency -= fare;
                 if (game.currency < 0) game.currency = 0;
                 game.updateUI();
                 
@@ -475,7 +478,7 @@
                     this._exitZib(game, ride.zib);
                     this.passengerRide = null;
                     
-                    showMessage(`TELEPORTED — ${ride.fare} PERSONICS CHARGED. THANK YOU FOR RIDING ZIB.`);
+                    showMessage(fare ? `TELEPORTED — ${fare} PERSONICS CHARGED. THANK YOU FOR RIDING ZIB.` : `TELEPORTED — NO CHARGE. SORRY FOR THE DETOUR.`);
 
                     // Fade back in
                     setTimeout(() => {
@@ -522,16 +525,7 @@
                 // DON'T disable autodrive — let the Zib continue driving as traffic AI
                 // Just clear its passenger-set destination so it resumes normal lane following
                 if (!game.traffic.vehicles.includes(zib)) game.traffic.vehicles.push(zib);
-
-                game.isDriving = false;
-                game.player.visible = true;
-                game.car = game.ownedCar;
-                game.autodriveBtn.classList.remove('engaged');
-                game.autodriveBtn.style.display = 'none';
-                game.handbrakeHeld = false;
-                if (game.handbrakeBtn) { game.handbrakeBtn.style.display = 'none'; game.handbrakeBtn.classList.remove('held'); }
-                if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
-                if (game.holsterBtn) game.holsterBtn.style.display = 'flex';
+                this._onFoot(game);
 
                 const exitDist = zib.width / 2 + 25;
                 game.player.x = zib.x + Math.sin(zib.angle) * exitDist;
@@ -543,6 +537,41 @@
                     game.velvetCat.inCar = false;
                     game.velvetCat.x = game.player.x - 25; game.velvetCat.y = game.player.y + 20;
                 }
+            }
+
+            /**
+             * The map changed under a ride (death and the medbay, a story scene): the ride just ends,
+             * nothing charged, the cab left behind with the old map. Called from _doLoadMap.
+             */
+            abandonRide(game) {
+                const ride = this.passengerRide; if (!ride) return;
+                this.passengerRide = null;
+                const zib = ride.zib;
+                if (zib) {
+                    if (zib.disableAutoDrive) zib.disableAutoDrive();
+                    if (zib.clearNavWaypoints) zib.clearNavWaypoints();
+                    zib.hasDriver = false; zib.driverType = 'traffic'; zib.navDestination = null;
+                    if (zib.clearSeats) zib.clearSeats();
+                    const i = this.activeZibs.indexOf(zib); if (i >= 0) this.activeZibs.splice(i, 1);
+                    const j = game.traffic && game.traffic.vehicles ? game.traffic.vehicles.indexOf(zib) : -1;
+                    if (j >= 0) game.traffic.vehicles.splice(j, 1);
+                }
+                if (game.teammates) game.teammates.forEach(tm => { if (tm.inCar) { tm.inCar = false; tm.seatIndex = -1; } });
+                if (game.velvetCat) game.velvetCat.inCar = false;
+                this._onFoot(game);
+            }
+
+            /** Back on foot after a ride: her own car is the car again, the drive buttons go, the route clears */
+            _onFoot(game) {
+                game.isDriving = false;
+                game.player.visible = true;
+                game.car = game.ownedCar;
+                game.autodriveBtn.classList.remove('engaged');
+                game.autodriveBtn.style.display = 'none';
+                game.handbrakeHeld = false;
+                if (game.handbrakeBtn) { game.handbrakeBtn.style.display = 'none'; game.handbrakeBtn.classList.remove('held'); }
+                if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
+                if (game.holsterBtn) game.holsterBtn.style.display = 'flex';
 
                 game.navDestination = null;
                 if (game.ui) {
