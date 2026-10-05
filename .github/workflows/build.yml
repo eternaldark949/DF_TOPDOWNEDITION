@@ -27,10 +27,16 @@ jobs:
         if: github.event_name == 'pull_request'
         run: node tools/build.mjs --check
 
-      - name: Build and commit (main)
+      - name: Build game (main)
+        if: github.event_name != 'pull_request'
+        run: node tools/build.mjs
+
+      - name: Check gameplay and rendering regressions
+        run: node tools/test-game-regressions.cjs
+
+      - name: Commit rebuilt game (main)
         if: github.event_name != 'pull_request'
         run: |
-          node tools/build.mjs
           if git diff --quiet -- "DFAB V8.html"; then
             echo "Game file already up to date."
           else
