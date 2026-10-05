@@ -69,8 +69,8 @@
 
             /**
              * Mirage rings (the default): each sound is a thick band with a jagged, rippling
-             * edge that bends the lit scene beneath it, like heat shimmer, plus a faint violet
-             * rim. Screen space, after the lighting. The frame is copied once (quarter size) when
+             * edge that bends the lit scene beneath it, like heat shimmer, with a faint violet
+             * tint and no outline. Screen space, after the lighting. The frame is copied once (quarter size) when
              * any ring is alive; each band is a clip of that copy, scaled out from its centre.
              */
             drawMirageRings(ctx) {
@@ -86,28 +86,29 @@
                 const N = 72, TAU = Math.PI * 2;
                 ctx.save();
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
-                // the newest few bend the light; older, fainter ones are a rim only
+                // the newest few bend the light; older, fainter ones keep only the tinted band
                 let bends = 0;
                 for (let ri = R.length - 1; ri >= 0; ri--) {
                     const r = R[ri];
                     const t = this._ringT(r), e = 1 - Math.pow(1 - t, 2);
                     const rad = (12 + (r.reach - 12) * e) * z;
                     const cx = (r.x - v.x + (v.shakeX || 0)) * z + W / 2, cy = (r.y - v.y + (v.shakeY || 0)) * z + H / 2;
-                    const th = Math.max(4, 11 * z) * (1 - 0.55 * t);
+                    const taper = 1 - 0.82 * e;                                // narrow with radial expansion, retaining 18% at full reach
+                    const th = Math.max(4, 11 * z) * taper * 1.015 * 2;
+                    const amp = th * 0.7, pad = rad + th + amp;
                     // off screen: wholly outside it, or grown past its farthest corner
                     if (rad - th > Math.hypot(Math.max(cx, W - cx), Math.max(cy, H - cy))) continue;
-                    if (rad + th < 0 || cx + rad + th < 0 || cx - rad - th > W || cy + rad + th < 0 || cy - rad - th > H) continue;
+                    if (pad < 0 || cx + pad < 0 || cx - pad > W || cy + pad < 0 || cy - pad > H) continue;
                     const bend = bends < 4 && t < 0.6; if (bend) bends++;
                     if (bend && !copied) { this._mirageCtx.drawImage(this.canvas, 0, 0, sw, sh); copied = true; }
                     const seed = r.seed ?? (r.seed = Math.random() * 100), ph = _gameTimeSec;
-                    const amp = th * 0.7;
                     // a rolling swell, a ripple, and fine teeth that flicker: the jagged edge
                     const jag = (a, i) => amp * (0.42 * Math.sin(3 * a + seed + ph * 5) + 0.26 * Math.sin(7 * a - seed * 1.7 - ph * 8)
                         + 0.16 * Math.sin(17 * a + seed * 0.6 + ph * 13) + 0.3 * ((i & 1) ? 1 : -1) * (0.6 + 0.4 * Math.sin(ph * 20 + i)));
                     const outer = new Path2D(), inner = [];
                     for (let i = 0; i <= N; i++) {
                         const a = i / N * TAU, j = jag(a, i % N);
-                        const ro = rad + th / 2 + j, ri = Math.max(0, rad - th / 2 + j * 0.55);
+                        const ro = Math.max(0, rad + th / 2 + j), ri = Math.max(0, rad - th / 2 + j * 0.55);
                         const c = Math.cos(a), s = Math.sin(a);
                         if (i === 0) outer.moveTo(cx + c * ro, cy + s * ro); else outer.lineTo(cx + c * ro, cy + s * ro);
                         inner.push(cx + c * ri, cy + s * ri);
@@ -117,11 +118,13 @@
                     band.moveTo(inner[0], inner[1]);
                     for (let i = 2; i < inner.length; i += 2) band.lineTo(inner[i], inner[i + 1]);
                     band.closePath();
-                    const k = (1 - t) * (1 - t);                                  // a soft presence that fades early, at full width
+                    const k = (1 - t) * (1 - t);                                  // opacity fades independently of the narrowing band
+                    const spawn = Math.max(0, 1 - t * 4);
+                    const glowK = k * (1 + 0.2 * spawn * spawn);                    // 20% more visible at spawn, original fade from quarter-life
                     if (bend) {
                         // the bend: the scene under the band, pushed outward from the sound and nudged along it.
                         // Only the band's box is copied back (clamped to the screen), not the whole frame.
-                        const pad = rad + th + amp, x0 = Math.max(0, cx - pad), y0 = Math.max(0, cy - pad);
+                        const x0 = Math.max(0, cx - pad), y0 = Math.max(0, cy - pad);
                         const x1 = Math.min(W, cx + pad), y1 = Math.min(H, cy + pad);
                         if (x1 > x0 && y1 > y0) {
                             const sc = 1 + (0.034 + 4.5 / Math.max(40, rad)) * k;
@@ -134,11 +137,7 @@
                             ctx.restore();
                         }
                     }
-                    // a whisper of light on the outer edge, brighter where the ripple crests
-                    ctx.globalAlpha = (r.enemy ? 0.32 : 0.14) * k;
-                    ctx.strokeStyle = r.enemy ? '#ff7a4a' : '#d8c6ff'; ctx.lineWidth = r.enemy ? 1.4 : 1;
-                    ctx.stroke(outer);
-                    ctx.globalAlpha = 0.04 * k;
+                    ctx.globalAlpha = 0.04 * glowK;
                     ctx.fillStyle = r.enemy ? '#ffb08a' : '#efe4ff'; ctx.fill(band, 'evenodd');
                     ctx.globalAlpha = 1;
                 }
