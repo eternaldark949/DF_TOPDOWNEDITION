@@ -312,9 +312,10 @@
              * Query all items overlapping the given viewport bounds.
              * Returns a Set (auto-deduplicates items spanning multiple cells).
              * @param {object} bounds - { left, right, top, bottom }
+             * @param {Set} [results] - Optional caller-owned scratch set, cleared before use.
              */
-            query(bounds) {
-                const results = new Set();
+            query(bounds, results = new Set()) {
+                results.clear();
                 
                 const minCX = Math.floor(bounds.left / this.cellSize);
                 const maxCX = Math.floor(bounds.right / this.cellSize);
@@ -333,6 +334,67 @@
                     }
                 }
                 
+                return results;
+            }
+        }
+
+
+        // Ordered broadphase for static buildings/foliage. Deduplicate ARRAY SLOTS,
+        // so duplicate references still draw twice and foliage density keeps its original index.
+        // Exact existing pass predicates run after the query; the grid never changes their margins.
+        class OrderedRenderGrid {
+            constructor(cellSize = 400) {
+                this.cellSize = cellSize;
+                this.cells = new Map();
+                this.entries = [];
+                this.always = [];
+                this.stamp = 0;
+            }
+
+            build(items, boundsFor) {
+                this.cells.clear(); this.entries.length = 0; this.always.length = 0;
+                if (!items) return;
+                items.forEach((item, index) => {
+                    const entry = { item, index, stamp: 0, standardV2: false };
+                    this.entries.push(entry);
+                    const b = boundsFor(item, entry);
+                    if (!b || ![b.left, b.right, b.top, b.bottom].every(Number.isFinite)) {
+                        this.always.push(entry); return;
+                    }
+                    const x0 = Math.floor(Math.min(b.left, b.right) / this.cellSize), x1 = Math.floor(Math.max(b.left, b.right) / this.cellSize);
+                    const y0 = Math.floor(Math.min(b.top, b.bottom) / this.cellSize), y1 = Math.floor(Math.max(b.top, b.bottom) / this.cellSize);
+                    // Huge/invalid editor objects remain candidates without allocating a map-sized grid.
+                    if (![x0, x1, y0, y1].every(Number.isSafeInteger) || (x1 - x0 + 1) * (y1 - y0 + 1) > 8192) { this.always.push(entry); return; }
+                    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+                        const key = x + ',' + y;
+                        let cell = this.cells.get(key);
+                        if (!cell) { cell = []; this.cells.set(key, cell); }
+                        cell.push(entry);
+                    }
+                });
+            }
+
+            query(bounds, results) {
+                results.length = 0;
+                if (!bounds || ![bounds.left, bounds.right, bounds.top, bounds.bottom].every(Number.isFinite)) {
+                    for (const entry of this.entries) results.push(entry);
+                    return results;
+                }
+                const x0 = Math.floor(bounds.left / this.cellSize), x1 = Math.floor(bounds.right / this.cellSize);
+                const y0 = Math.floor(bounds.top / this.cellSize), y1 = Math.floor(bounds.bottom / this.cellSize);
+                if (![x0, x1, y0, y1].every(Number.isSafeInteger) || x1 < x0 || y1 < y0 || (x1 - x0 + 1) * (y1 - y0 + 1) > 8192) {
+                    for (const entry of this.entries) results.push(entry);
+                    return results;
+                }
+                const stamp = ++this.stamp;
+                for (const entry of this.always) { entry.stamp = stamp; results.push(entry); }
+                for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+                    const cell = this.cells.get(x + ',' + y);
+                    if (cell) for (const entry of cell) if (entry.stamp !== stamp) {
+                        entry.stamp = stamp; results.push(entry);
+                    }
+                }
+                results.sort((a, b) => a.index - b.index);
                 return results;
             }
         }

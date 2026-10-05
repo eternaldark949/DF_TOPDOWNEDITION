@@ -305,20 +305,37 @@
             constructor() {
                 this.metrics = {};
                 this.frameCounts = 0;
-                this.report = []; 
+                this.report = [];
+                this.enabled = true;   // standalone profilers retain their original sampling behavior
             }
-        
+
+            setEnabled(on) {
+                on = !!on;
+                if (on === this.enabled) return;
+                this.enabled = on;
+                this.frameCounts = 0;
+                this.report = [];
+                this._frameStart = null;
+                this._warned = null;
+                for (const label in this.metrics) {
+                    const m = this.metrics[label];
+                    m.current = 0; m.avg = 0; m.open = false;
+                }
+            }
+
             /* Per-frame tap used by PerfBench.
                `current` only ever grows within a frame (tick() resets it at frame
                end), so snapshotting at frame start and subtracting at frame end
                yields this frame's cost per section without disturbing the
                existing 30-frame averaging. */
             beginFrame() {
+                if (!this.enabled) return;
                 if (!this._frameStart) this._frameStart = {};
                 for (const k in this.metrics) this._frameStart[k] = this.metrics[k].current;
             }
             frameDeltas() {
                 const out = {};
+                if (!this.enabled) return out;
                 if (!this._frameStart) return out;
                 for (const k in this.metrics) {
                     out[k] = this.metrics[k].current - (this._frameStart[k] || 0);
@@ -327,6 +344,7 @@
             }
 
             start(label) {
+                if (!this.enabled) return;
                 if (!this.metrics[label]) {
                     this.metrics[label] = { current: 0, avg: 0, open: false, wrapper: false };
                 }
@@ -337,6 +355,7 @@
             }
         
             stop(label) {
+                if (!this.enabled) return;
                 const m = this.metrics[label];
                 if (!m) return;
                 if (!m.open) {
@@ -364,6 +383,7 @@
              * section (sounds started from the AI, say), so it's shown but not added to the total.
              */
             add(label, ms, nested) {
+                if (!this.enabled) return;
                 const m = this.metrics[label] || (this.metrics[label] = { current: 0, avg: 0, open: false, wrapper: false });
                 if (nested) m.nested = true;
                 m.current += ms;
@@ -371,6 +391,7 @@
 
             /** Mark a label as wrapping other sections so totals don't double-count. */
             markWrapper(label) {
+                if (!this.enabled) return;
                 if (!this.metrics[label]) {
                     this.metrics[label] = { current: 0, avg: 0, open: false };
                 }
@@ -378,6 +399,7 @@
             }
         
             tick() {
+                if (!this.enabled) return;
                 this.frameCounts++;
                 if (this.frameCounts >= 30) {
                     this.report = [];

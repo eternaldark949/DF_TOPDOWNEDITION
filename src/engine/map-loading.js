@@ -93,6 +93,7 @@ engineMixin({
             /** What belongs to the map being left: effects at its coordinates, walks across its floor,
                 a finisher or slow-mo in progress, and caches that would hold the old map alive. */
             _clearMapResidue() {
+                this._clearRenderSpatial();
                 if (this.finisher) this.endFinisher(true);
                 this.finCam = null;
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
@@ -950,6 +951,10 @@ engineMixin({
                 // Build spatial transition grid for O(1) lookups (replaces per-frame .find())
                 this._transitionGrid.build(this.activeMap.transitions);
                 
+                // Buildings/foliage are now complete (all authored and generated writes precede this).
+                this.invalidateRenderSpatial();
+                this._ensureRenderSpatial();
+
                 // Build render grids for static geometry — O(visible cells) draw instead of O(N)
                 this._renderGridWalls = new RenderGrid(400);
                 this._renderGridWalls.build(this.activeMap.walls);

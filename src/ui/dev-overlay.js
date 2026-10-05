@@ -29,6 +29,7 @@
 
             /** Show or hide the pill and the layer panel to match the settings */
             sync(game) {
+                game._syncProfiler();
                 const mode = game.showProfiler ? (GameSettings.profilerMode && GameSettings.profilerMode !== 'off' ? GameSettings.profilerMode : 'compact') : 'off';
                 if (mode !== 'off') this._ensureProf();
                 if (this._prof) {

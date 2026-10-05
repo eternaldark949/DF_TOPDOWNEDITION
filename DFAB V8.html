@@ -4398,6 +4398,7 @@
         // ============================================================================
         let _frameTime = performance.now();
         let _frameTimeSec = _frameTime / 1000;
+        let _profileSampling = false;   // detailed clocks are idle when the profiler and benchmark are off
         let _zoomLOD = 0; // 0 = full quality, 1 = reduced, 2 = minimal (updated per frame)
         
         const CONFIG = Object.freeze({
@@ -9461,6 +9462,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             for (const name of names) {
                 const fn = obj[name];
                 obj[name] = function (...args) {
+                    if (!_profileSampling) return fn.apply(this, args);
                     const t0 = performance.now();
                     try { return fn.apply(this, args); }
                     finally {
@@ -14100,9 +14102,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * Query all items overlapping the given viewport bounds.
              * Returns a Set (auto-deduplicates items spanning multiple cells).
              * @param {object} bounds - { left, right, top, bottom }
+             * @param {Set} [results] - Optional caller-owned scratch set, cleared before use.
              */
-            query(bounds) {
-                const results = new Set();
+            query(bounds, results = new Set()) {
+                results.clear();
                 
                 const minCX = Math.floor(bounds.left / this.cellSize);
                 const maxCX = Math.floor(bounds.right / this.cellSize);
@@ -14121,6 +14124,67 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 
+                return results;
+            }
+        }
+
+
+        // Ordered broadphase for static buildings/foliage. Deduplicate ARRAY SLOTS,
+        // so duplicate references still draw twice and foliage density keeps its original index.
+        // Exact existing pass predicates run after the query; the grid never changes their margins.
+        class OrderedRenderGrid {
+            constructor(cellSize = 400) {
+                this.cellSize = cellSize;
+                this.cells = new Map();
+                this.entries = [];
+                this.always = [];
+                this.stamp = 0;
+            }
+
+            build(items, boundsFor) {
+                this.cells.clear(); this.entries.length = 0; this.always.length = 0;
+                if (!items) return;
+                items.forEach((item, index) => {
+                    const entry = { item, index, stamp: 0, standardV2: false };
+                    this.entries.push(entry);
+                    const b = boundsFor(item, entry);
+                    if (!b || ![b.left, b.right, b.top, b.bottom].every(Number.isFinite)) {
+                        this.always.push(entry); return;
+                    }
+                    const x0 = Math.floor(Math.min(b.left, b.right) / this.cellSize), x1 = Math.floor(Math.max(b.left, b.right) / this.cellSize);
+                    const y0 = Math.floor(Math.min(b.top, b.bottom) / this.cellSize), y1 = Math.floor(Math.max(b.top, b.bottom) / this.cellSize);
+                    // Huge/invalid editor objects remain candidates without allocating a map-sized grid.
+                    if (![x0, x1, y0, y1].every(Number.isSafeInteger) || (x1 - x0 + 1) * (y1 - y0 + 1) > 8192) { this.always.push(entry); return; }
+                    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+                        const key = x + ',' + y;
+                        let cell = this.cells.get(key);
+                        if (!cell) { cell = []; this.cells.set(key, cell); }
+                        cell.push(entry);
+                    }
+                });
+            }
+
+            query(bounds, results) {
+                results.length = 0;
+                if (!bounds || ![bounds.left, bounds.right, bounds.top, bounds.bottom].every(Number.isFinite)) {
+                    for (const entry of this.entries) results.push(entry);
+                    return results;
+                }
+                const x0 = Math.floor(bounds.left / this.cellSize), x1 = Math.floor(bounds.right / this.cellSize);
+                const y0 = Math.floor(bounds.top / this.cellSize), y1 = Math.floor(bounds.bottom / this.cellSize);
+                if (![x0, x1, y0, y1].every(Number.isSafeInteger) || x1 < x0 || y1 < y0 || (x1 - x0 + 1) * (y1 - y0 + 1) > 8192) {
+                    for (const entry of this.entries) results.push(entry);
+                    return results;
+                }
+                const stamp = ++this.stamp;
+                for (const entry of this.always) { entry.stamp = stamp; results.push(entry); }
+                for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+                    const cell = this.cells.get(x + ',' + y);
+                    if (cell) for (const entry of cell) if (entry.stamp !== stamp) {
+                        entry.stamp = stamp; results.push(entry);
+                    }
+                }
+                results.sort((a, b) => a.index - b.index);
                 return results;
             }
         }
@@ -20491,20 +20555,37 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             constructor() {
                 this.metrics = {};
                 this.frameCounts = 0;
-                this.report = []; 
+                this.report = [];
+                this.enabled = true;   // standalone profilers retain their original sampling behavior
             }
-        
+
+            setEnabled(on) {
+                on = !!on;
+                if (on === this.enabled) return;
+                this.enabled = on;
+                this.frameCounts = 0;
+                this.report = [];
+                this._frameStart = null;
+                this._warned = null;
+                for (const label in this.metrics) {
+                    const m = this.metrics[label];
+                    m.current = 0; m.avg = 0; m.open = false;
+                }
+            }
+
             /* Per-frame tap used by PerfBench.
                `current` only ever grows within a frame (tick() resets it at frame
                end), so snapshotting at frame start and subtracting at frame end
                yields this frame's cost per section without disturbing the
                existing 30-frame averaging. */
             beginFrame() {
+                if (!this.enabled) return;
                 if (!this._frameStart) this._frameStart = {};
                 for (const k in this.metrics) this._frameStart[k] = this.metrics[k].current;
             }
             frameDeltas() {
                 const out = {};
+                if (!this.enabled) return out;
                 if (!this._frameStart) return out;
                 for (const k in this.metrics) {
                     out[k] = this.metrics[k].current - (this._frameStart[k] || 0);
@@ -20513,6 +20594,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             start(label) {
+                if (!this.enabled) return;
                 if (!this.metrics[label]) {
                     this.metrics[label] = { current: 0, avg: 0, open: false, wrapper: false };
                 }
@@ -20523,6 +20605,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         
             stop(label) {
+                if (!this.enabled) return;
                 const m = this.metrics[label];
                 if (!m) return;
                 if (!m.open) {
@@ -20550,6 +20633,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * section (sounds started from the AI, say), so it's shown but not added to the total.
              */
             add(label, ms, nested) {
+                if (!this.enabled) return;
                 const m = this.metrics[label] || (this.metrics[label] = { current: 0, avg: 0, open: false, wrapper: false });
                 if (nested) m.nested = true;
                 m.current += ms;
@@ -20557,6 +20641,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** Mark a label as wrapping other sections so totals don't double-count. */
             markWrapper(label) {
+                if (!this.enabled) return;
                 if (!this.metrics[label]) {
                     this.metrics[label] = { current: 0, avg: 0, open: false };
                 }
@@ -20564,6 +20649,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         
             tick() {
+                if (!this.enabled) return;
                 this.frameCounts++;
                 if (this.frameCounts >= 30) {
                     this.report = [];
@@ -27150,9 +27236,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** A section's roof outline, with its rounded corners (world coordinates). */
             _roofPath(section, si, inset = 0) {
-                const r = this._roundSec && this._roundSec[si], p = new Path2D(), x = this.x + section.x + inset, y = this.y + section.y + inset;
+                const r = this._roundSec && this._roundSec[si];
+                // Keep the three inset variants used by the renderer; unusual caller insets remain uncached.
+                const cacheable = inset === 0 || inset === 2.5 || inset === 6;
+                let cached, bySection;
+                if (cacheable) {
+                    bySection = this._roofOutlines || (this._roofOutlines = new WeakMap());
+                    cached = bySection.get(section);
+                    let same = cached && cached.si === si && cached.x === this.x && cached.y === this.y &&
+                        cached.sx === section.x && cached.sy === section.y && cached.w === section.w && cached.h === section.h &&
+                        cached.rounds === this._roundSec && cached.r === r && (!r || cached.radii.length === r.length);
+                    if (same && r) for (let i = 0; i < r.length; i++) if (cached.radii[i] !== r[i]) { same = false; break; }
+                    if (!same) {
+                        cached = { si, x: this.x, y: this.y, sx: section.x, sy: section.y, w: section.w, h: section.h,
+                            rounds: this._roundSec, r, radii: r ? r.slice() : null, paths: new Map() };
+                        bySection.set(section, cached);
+                    }
+                    const hit = cached.paths.get(inset);
+                    if (hit) return hit;
+                }
+                const p = new Path2D(), x = this.x + section.x + inset, y = this.y + section.y + inset;
                 const w = section.w - inset * 2, h = section.h - inset * 2;
                 if (r) p.roundRect(x, y, w, h, r.map(v => Math.max(0, v - inset))); else p.rect(x, y, w, h);
+                if (cacheable) cached.paths.set(inset, p);
                 return p;
             },
 
@@ -27178,10 +27284,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** Faces the camera can see (outward side toward the camera). */
             _visibleFaces(cam) {
-                return this._leanFaces().filter(f =>
+                const all = this._leanFaces();
+                // A four-sided building is cheaper to filter directly than to validate a geometry snapshot.
+                if (all.length <= 4) return all.filter(f =>
                     (f.side === 'S' && cam.y > f.y1) || (f.side === 'N' && cam.y < f.y1) ||
                     (f.side === 'E' && cam.x > f.x1) || (f.side === 'W' && cam.x < f.x1) ||
                     (f.side === 'C' && (cam.x - (f.x1 + f.x2) / 2) * f.nx + (cam.y - (f.y1 + f.y2) / 2) * f.ny > 0));
+                const cached = this._visibleFaceCache;
+                // Faces are mutable world geometry: check their identity and fields before sharing a result.
+                let same = cached && cached.all === all && cached.geometry.length === all.length;
+                if (same) for (let i = 0; i < all.length; i++) {
+                    const f = all[i], g = cached.geometry[i];
+                    if (g.face !== f || g.side !== f.side || g.x1 !== f.x1 || g.y1 !== f.y1 ||
+                        g.x2 !== f.x2 || g.y2 !== f.y2 || g.nx !== f.nx || g.ny !== f.ny) { same = false; break; }
+                }
+                if (same && cached.x === cam.x && cached.y === cam.y) return cached.visible;
+                const geometry = same ? cached.geometry : all.map(f => ({ face: f, side: f.side,
+                    x1: f.x1, y1: f.y1, x2: f.x2, y2: f.y2, nx: f.nx, ny: f.ny }));
+                const visible = all.filter(f =>
+                    (f.side === 'S' && cam.y > f.y1) || (f.side === 'N' && cam.y < f.y1) ||
+                    (f.side === 'E' && cam.x > f.x1) || (f.side === 'W' && cam.x < f.x1) ||
+                    (f.side === 'C' && (cam.x - (f.x1 + f.x2) / 2) * f.nx + (cam.y - (f.y1 + f.y2) / 2) * f.ny > 0));
+                this._visibleFaceCache = { all, geometry, x: cam.x, y: cam.y, visible };
+                return visible;
             },
 
             _drawLeanTop(ctx) {
@@ -27309,6 +27434,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const ex = bx - ax, ey = by - ay, tx = cx - dx, ty = cy - dy, ux = dx - ax, uy = dy - ay;
                 const seed = this._seed || Math.round(this.x + this.y);
                 const t = Math.floor(_gameTimeSec / 7);             // lights change every few seconds
+                // A face retains only its latest seven-second lighting bucket. TV flicker stays live below.
+                let lightHashes = null;
+                if (emissive) {
+                    const byFace = this._windowLightHashes || (this._windowLightHashes = new WeakMap());
+                    lightHashes = byFace.get(f);
+                    if (!lightHashes || lightHashes.seed !== seed || lightHashes.section !== f.section || lightHashes.side !== f.side ||
+                        lightHashes.floors !== floors || lightHashes.cols !== cols || lightHashes.t !== t) {
+                        lightHashes = { seed, section: f.section, side: f.side, floors, cols, t, values: [] };
+                        byFace.set(f, lightHashes);
+                    }
+                }
                 const lit = this.colors.windowLit || '#ffe2a8';
                 const mask = this.facadeFeature === 'silver_queen' ? this._sqWindowMask(f) : null;
                 // By day the glass holds the sky, brightest on faces turned to the sun, a sheen sliding along with it
@@ -27324,7 +27460,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const sills = this.sills && _zoomLOD < 2 && depth > floors * 2.4;
                 const rim = sills && emissive ? LandmarkKit.rim(this, this._sqDark != null ? this._sqDark : 0.6) : null;
                 const nxo = f.side === 'E' ? 1 : f.side === 'W' ? -1 : 0, nyo = f.side === 'S' ? 1 : f.side === 'N' ? -1 : 0;
-                const glass = new Path2D(), litP = new Path2D(), lavP = new Path2D(), tvA = new Path2D(), tvB = new Path2D();
+                // Each pass creates only the paths it fills; window lighting hashes are emissive-only.
+                const glass = emissive ? null : new Path2D();
+                const litP = emissive ? new Path2D() : null, lavP = emissive ? new Path2D() : null;
+                const tvA = emissive ? new Path2D() : null, tvB = emissive ? new Path2D() : null;
                 const lipP = sills ? new Path2D() : null, shP = sills && !emissive ? new Path2D() : null, sheen = _FW_SHEEN;
                 sheen.length = 0;                                   // [u0, u1, v0, v1, a] × n, reused
                 const sOut = 1.6, sLo = 0.2 / floors, sSh = 0.5 / floors;
@@ -27339,7 +27478,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     for (let c = 0; c < cols; c++) {
                         if (mask && mask(fl, (c + 0.5) / cols)) continue;
                         const u0 = (c + 0.25) / cols, u1 = (c + 0.75) / cols;
-                        const h = _bldHash(seed + f.section * 31 + (f.side.charCodeAt(0)), fl * 57 + c * 13 + (_bldHash(seed, fl + c) > 0.93 ? t : 0));
+                        let h = 0;
+                        if (emissive) {
+                            const index = fl * cols + c;
+                            h = lightHashes.values[index];
+                            if (h === undefined) {
+                                h = _bldHash(seed + f.section * 31 + (f.side.charCodeAt(0)), fl * 57 + c * 13 + (_bldHash(seed, fl + c) > 0.93 ? t : 0));
+                                lightHashes.values[index] = h;
+                            }
+                        }
                         const isLit = h < (this.style ? 0.5 : 0.3);
                         if (sills && (!emissive || rim.a > 0.01)) {                 // the sill: a lip just under the glass, a shadow under it
                             const w0 = u0 - 0.06 / cols, w1 = u1 + 0.06 / cols;
@@ -47857,6 +48004,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.dropOffRegistry = {};   // Zib taxi drop-off points per landmarkId
                 
                 this.profiler = new Profiler(); // Initialize the performance tracker
+                this.profiler.setEnabled(false);
                 
                 // Unified Entity System feature flag
                 this.useNewCollisionSystem = true;
@@ -50394,7 +50542,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         rc.beginPath(); rc.moveTo(l.x, l.y + 4); rc.lineTo(l.x, l.y + LH * 0.9); rc.stroke();
                     }
                 }
-                const cars = this.traffic && this.traffic.vehicles ? (this.isDriving && this.car ? [this.car, ...this.traffic.vehicles] : this.traffic.vehicles) : [];
+                const cars = this._reflCars(this._reflLightCars || (this._reflLightCars = []));
                 if (night > 0.01) for (const c of cars) {
                     if (!c || c.dead || c.visible === false || !near(c.x, c.y, 60)) continue;
                     const ca = Math.cos(c.angle), sa = Math.sin(c.angle), h = (c.length || 40) / 2, wd = (c.width || 20) / 3, f = (c.fade ?? 1) * night;
@@ -50420,11 +50568,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const pj of this.projectiles || []) if (pj.active !== false) glow(pj.x, pj.y + 12, /^#[0-9a-f]{6}$/i.test(pj.color || '') ? pj.color : '#ffffff', 12, 26, 0.6);
                 // Whoever stands between a light and its reflection blocks it: their mirrored shape
                 rc.globalCompositeOperation = 'destination-out';
-                for (const m of this._reflMovers(near)) this._reflShape(rc, m, 0.85);
+                const movers = this._reflMovers(near, this._reflPrepareMovers || (this._reflPrepareMovers = { list: [], records: [], cars: [] }), cars);
+                for (const m of movers) this._reflShape(rc, m, 0.85);
                 rc.globalCompositeOperation = 'source-over';
                 // A mirror floor gives back colour too: whoever stands on it, and the things set on it
                 if (surf && surf.mirror) {
-                    for (const m of this._reflMovers(near)) { rc.fillStyle = m.col && /^#[0-9a-f]{6}$/i.test(m.col) ? m.col : '#b48cff'; this._reflShape(rc, m, 0.5); }
+                    for (const m of movers) { rc.fillStyle = m.col && /^#[0-9a-f]{6}$/i.test(m.col) ? m.col : '#b48cff'; this._reflShape(rc, m, 0.5); }
                     for (const pr of this.props || []) {
                         if (!near(pr.x, pr.y, 200)) continue;
                         rc.globalAlpha = 0.42; rc.fillStyle = pr.color || '#6a3aa0';
@@ -50441,18 +50590,45 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._refl = { R, q, wet };
             },
 
-            /** Everyone and everything that stands on the street near the view, for reflections and splashes */
-            _reflMovers(near) {
-                const out = [];
-                const walker = (e, col) => { if (e && !e.dead && e.visible !== false && !e.inCar && near(e.x, e.y, 40)) out.push({ e, x: e.x, y: e.y, kind: 'walker', col }); };
+            /** Reflection car order: the driven car first, then traffic, including any duplicate. */
+            _reflCars(out) {
+                const vehicles = this.traffic && this.traffic.vehicles;
+                if (!vehicles || !this.isDriving || !this.car) {
+                    if (out) out.length = 0;
+                    return vehicles || out || [];
+                }
+                const cars = out || [];
+                cars.length = 0; cars.push(this.car);
+                for (const c of vehicles) cars.push(c);
+                return cars;
+            },
+
+            /**
+             * Everyone near the view, in the original actor order. Default calls own fresh results.
+             * A caller-owned buffer reuses records until its next fill; every fill refreshes all fields.
+             * Separate prepare, ground, and update buffers keep their distinct visibility bounds apart.
+             */
+            _reflMovers(near, buffer, cars) {
+                const out = buffer ? buffer.list : [], pool = buffer && buffer.records;
+                const previous = out.length;
+                let count = 0;
+                const add = (e, kind, col) => {
+                    const m = pool ? (pool[count] || (pool[count] = {})) : {};
+                    m.e = e; m.x = e.x; m.y = e.y; m.kind = kind; m.col = col;
+                    out[count++] = m;
+                };
+                const walker = (e, col) => { if (e && !e.dead && e.visible !== false && !e.inCar && near(e.x, e.y, 40)) add(e, 'walker', col); };
                 const lookCol = (e) => { const L = e.look || e.appearance; return (L && L.top && L.top.color) || null; };
                 if (!this.isDriving) walker(this.player, '#c9a6ff');
                 for (const t of this.teammates || []) if (t.recruited) walker(t, lookCol(t));
                 for (const n of this.npcs || []) walker(n, lookCol(n));
                 for (const e of this.enemies || []) walker(e, lookCol(e));
                 for (const p of (this.pedestrians && this.pedestrians.pedestrians) || []) walker(p, lookCol(p));
-                const cars = this.traffic && this.traffic.vehicles ? (this.isDriving && this.car ? [this.car, ...this.traffic.vehicles] : this.traffic.vehicles) : [];
-                for (const c of cars) if (c && !c.dead && c.visible !== false && near(c.x, c.y, 60)) out.push({ e: c, x: c.x, y: c.y, kind: 'car', col: c.bodyColor || c.color || null });
+                if (!cars) cars = this._reflCars(buffer && buffer.cars);
+                for (const c of cars) if (c && !c.dead && c.visible !== false && near(c.x, c.y, 60)) add(c, 'car', c.bodyColor || c.color || null);
+                // Retired pool slots must not retain actors from an old view or map.
+                if (pool) for (let i = count; i < previous; i++) { pool[i].e = null; pool[i].col = null; }
+                out.length = count;
                 return out;
             },
 
@@ -50478,14 +50654,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const wet = this._wetHere(), surf = this._surfaces();
                 if ((wet < 0.02 && !surf) || !this.reflectQuality()) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 80, hh = this.canvas.height / 2 / z + 80;
+                const near = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m - 60 && y < v.y + hh + m;
+                const buffer = this._reflGroundMovers || (this._reflGroundMovers = { list: [], records: [], cars: [] });
+                let movers = null;
                 if (surf) {
                     // people mirrored in polished floors (softer than in a puddle) and rings on the water
                     const fl = new Path2D();
                     for (const [x, y, w, h] of surf.rects) fl.rect(x, y, w, h);
                     for (const [x, y, r] of surf.water) { fl.moveTo(x + r, y); fl.arc(x, y, r, 0, Math.PI * 2); }
-                    const nearS = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m - 60 && y < v.y + hh + m;
                     ctx.save(); ctx.clip(fl);
-                    if (!surf.mirror) { ctx.fillStyle = 'rgba(2, 1, 6, 1)'; for (const m of this._reflMovers(nearS)) this._reflShape(ctx, m, 0.26); }
+                    if (!surf.mirror) {
+                        movers = this._reflMovers(near, buffer);
+                        ctx.fillStyle = 'rgba(2, 1, 6, 1)'; for (const m of movers) this._reflShape(ctx, m, 0.26);
+                    }
                     ctx.restore(); ctx.globalAlpha = 1;
                     if (wet < 0.02) { this._drawRipples(ctx, true); return; }
                 }
@@ -50511,10 +50692,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (n) {
                     // the mirrored shapes of whoever stands at the water, and the rings on it
                     ctx.save(); ctx.clip(clip);
-                    const near = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m - 60 && y < v.y + hh + m;
+                    if (!movers) movers = this._reflMovers(near, buffer);
                     ctx.fillStyle = night > 0.5 ? 'rgba(2, 1, 6, 1)' : 'rgba(26, 22, 36, 1)';
-                    for (const m of this._reflMovers(near)) this._reflShape(ctx, m, 0.42 + 0.2 * day);
-                    for (const m of this._reflMovers(near)) if (m.col && /^#[0-9a-f]{6}$/i.test(m.col)) { ctx.fillStyle = m.col; this._reflShape(ctx, m, 0.12); }
+                    for (const m of movers) this._reflShape(ctx, m, 0.42 + 0.2 * day);
+                    for (const m of movers) if (m.col && /^#[0-9a-f]{6}$/i.test(m.col)) { ctx.fillStyle = m.col; this._reflShape(ctx, m, 0.12); }
                     this._drawRipples(ctx, night > 0.5);
                     ctx.restore();
                     ctx.globalAlpha = 1;
@@ -50552,11 +50733,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 if (wet < 0.05) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 40, hh = this.canvas.height / 2 / z + 40;
-                const vis = [];
+                const visible = this._reflVisiblePuddles || (this._reflVisiblePuddles = { list: [], records: [] });
+                const vis = visible.list, previous = vis.length;
+                let count = 0;
                 for (const p of this.puddlesFor(this.activeMap)) {
                     if (p.x < v.x - hw || p.x > v.x + hw || p.y < v.y - hh || p.y > v.y + hh) continue;
-                    const k = this._puddleK(p, wet); if (k > 0.2) vis.push([p, k]);
+                    const k = this._puddleK(p, wet);
+                    if (k > 0.2) {
+                        const entry = visible.records[count] || (visible.records[count] = [null, 0]);
+                        entry[0] = p; entry[1] = k; vis[count++] = entry;
+                    }
                 }
+                for (let i = count; i < previous; i++) visible.records[i][0] = null;
+                vis.length = count;
                 if (!vis.length) return;
                 const W = this.weather, rain = W && W.isRaining ? W.intensity : 0;
                 // raindrops
@@ -50574,7 +50763,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     return p.lobes.some(L => ((lx - L.dx) / (L.rx * g)) ** 2 + ((ly - L.dy) / (L.ry * g)) ** 2 <= 1);
                 };
                 const near = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m && y < v.y + hh + m;
-                for (const m of this._reflMovers(near)) {
+                const movers = this._reflMovers(near, this._reflUpdateMovers || (this._reflUpdateMovers = { list: [], records: [], cars: [] }));
+                for (const m of movers) {
                     const e = m.e, px = e._splX ?? e.x, py = e._splY ?? e.y, sp = Math.hypot(e.x - px, e.y - py);
                     e._splX = e.x; e._splY = e.y;
                     const every = m.kind === 'car' ? 3 : 15;
@@ -51069,6 +51259,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** Show or hide the pill and the layer panel to match the settings */
             sync(game) {
+                game._syncProfiler();
                 const mode = game.showProfiler ? (GameSettings.profilerMode && GameSettings.profilerMode !== 'off' ? GameSettings.profilerMode : 'compact') : 'off';
                 if (mode !== 'off') this._ensureProf();
                 if (this._prof) {
@@ -54805,6 +54996,7 @@ engineMixin({
             /** What belongs to the map being left: effects at its coordinates, walks across its floor,
                 a finisher or slow-mo in progress, and caches that would hold the old map alive. */
             _clearMapResidue() {
+                this._clearRenderSpatial();
                 if (this.finisher) this.endFinisher(true);
                 this.finCam = null;
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
@@ -55662,6 +55854,10 @@ engineMixin({
                 // Build spatial transition grid for O(1) lookups (replaces per-frame .find())
                 this._transitionGrid.build(this.activeMap.transitions);
                 
+                // Buildings/foliage are now complete (all authored and generated writes precede this).
+                this.invalidateRenderSpatial();
+                this._ensureRenderSpatial();
+
                 // Build render grids for static geometry — O(visible cells) draw instead of O(N)
                 this._renderGridWalls = new RenderGrid(400);
                 this._renderGridWalls.build(this.activeMap.walls);
@@ -56192,6 +56388,127 @@ engineMixin({
                 return this._laserGeom;
             },
 
+            // Buildings/foliage are authored on loadMap and static during play. Editors/runtime
+            // geometry edits (including same-length replacements/reorders) must invalidate once
+            // AFTER their batch of changes. Array identity/length changes are also detected below.
+            invalidateRenderSpatial(map = this.activeMap) {
+                if (map) map._renderSpatialRevision = (map._renderSpatialRevision || 0) + 1;
+                this._renderBuildingLists = null;
+            },
+
+            _clearRenderSpatial() {
+                this._renderSpatialMap = null; this._renderSpatialRevision = -1;
+                this._renderBuildingSource = null; this._renderFoliageSource = null;
+                this._orderedBuildings = null; this._orderedFoliage = null;
+                this._renderBuildingLists = null; this._renderBuildingListsStorage = null;
+                this._forecourtCandidates = null; this._foliageCandidates = null;
+                this._sunBuildingCandidates = null; this._sunFoliageCandidates = null;
+            },
+
+            _ensureRenderSpatial() {
+                const map = this.activeMap, revision = map._renderSpatialRevision || 0;
+                const buildings = map.buildings, foliage = map.foliage;
+                if (this._renderSpatialMap === map && this._renderSpatialRevision === revision &&
+                    this._renderBuildingSource === buildings && this._renderBuildingLength === (buildings ? buildings.length : 0) &&
+                    this._renderFoliageSource === foliage && this._renderFoliageLength === (foliage ? foliage.length : 0)) return;
+                this._renderSpatialMap = map; this._renderSpatialRevision = revision;
+                this._renderBuildingSource = buildings; this._renderBuildingLength = buildings ? buildings.length : 0;
+                this._renderFoliageSource = foliage; this._renderFoliageLength = foliage ? foliage.length : 0;
+                this._renderBuildingLists = null;
+                const bg = this._orderedBuildings || (this._orderedBuildings = new OrderedRenderGrid());
+                const fg = this._orderedFoliage || (this._orderedFoliage = new OrderedRenderGrid());
+                this._renderBuildingMaxFloors = 0; this._renderBuildingMaxReach = 0;
+                bg.build(buildings, (b, entry) => {
+                    entry.standardV2 = !!(b.isV2 && b.inView === BuildingV2.prototype.inView && b._leanScale === BuildingV2.prototype._leanScale);
+                    // Missing/nonfinite dimensions can pass the legacy shadow/forecourt
+                    // predicates differently from the base pass's 200px fallback; keep them live.
+                    if (![b.x, b.y, b.w, b.h].every(Number.isFinite)) return null;
+                    // Unknown visibility implementations retain their original per-pass checks.
+                    if (b.isV2 && (!entry.standardV2 || !Number.isFinite(b.floors) || b.floors < 0 ||
+                        !Number.isFinite(b.emissiveReach || 0))) return null;
+                    if (entry.standardV2) {
+                        this._renderBuildingMaxFloors = Math.max(this._renderBuildingMaxFloors, b.floors);
+                        this._renderBuildingMaxReach = Math.max(this._renderBuildingMaxReach, b.emissiveReach || 0);
+                    }
+                    return { left: b.x, right: b.x + (b.w || 200), top: b.y, bottom: b.y + (b.h || 200) };
+                });
+                fg.build(foliage, f => {
+                    // Include the anchor as well as a generous canopy envelope. The original
+                    // anchor predicate remains final, including for oversized editor trees.
+                    const s = Math.abs(f.size || 1), r = 80 * Math.max(1, s), cy = foliageCanopyY(f);
+                    return { left: f.x - r, right: f.x + r, top: Math.min(f.y, cy - r), bottom: Math.max(f.y, cy + r) };
+                });
+            },
+
+            _queryRenderBuildings(bounds, results) {
+                this._ensureRenderSpatial();
+                return this._orderedBuildings.query(bounds, results);
+            },
+
+            _queryRenderFoliage(bounds, results) {
+                this._ensureRenderSpatial();
+                return this._orderedFoliage.query(bounds, results);
+            },
+
+            _prepareRenderBuildingLists(bounds) {
+                this._ensureRenderSpatial();
+                const cam = this.camera, B = CONFIG.BUILDINGS, C = CONFIG.CULLING;
+                let lists = this._renderBuildingLists;
+                // Cache only this draw's view. Subsequent calls also catch explicit geometry
+                // invalidation and map/collection replacements through _ensureRenderSpatial.
+                if (lists && lists.frame === this._renderDrawId && lists.bounds === bounds &&
+                    lists.camX === cam.x && lists.camY === cam.y && lists.zoom === cam.zoom &&
+                    lists.lean === B.LEAN && lists.camHeight === B.CAM_HEIGHT && lists.refZoom === B.REF_ZOOM &&
+                    lists.floorHeight === B.FLOOR_HEIGHT && lists.maxFloors === B.MAX_FLOORS &&
+                    lists.extra === C.LEAN_EXTRA && lists.margin === C.BUILDINGS_VIEW) return lists;
+                lists = this._renderBuildingListsStorage || (this._renderBuildingListsStorage = { base: [], v2: [], candidates: [] });
+                lists.base.length = 0; lists.v2.length = 0;
+                lists.frame = this._renderDrawId; lists.bounds = bounds; lists.camX = cam.x; lists.camY = cam.y; lists.zoom = cam.zoom;
+                lists.lean = B.LEAN; lists.camHeight = B.CAM_HEIGHT; lists.refZoom = B.REF_ZOOM;
+                lists.floorHeight = B.FLOOR_HEIGHT; lists.maxFloors = B.MAX_FLOORS; lists.extra = C.LEAN_EXTRA; lists.margin = C.BUILDINGS_VIEW;
+                const V = bounds.view, cb = bounds.buildings;
+                let query = null, k = 1;
+                const pad = Math.max(0, this._renderBuildingMaxReach + C.BUILDINGS_VIEW);
+                let safe = [cam.x, cam.y, V.left, V.right, V.top, V.bottom, pad].every(Number.isFinite);
+                if (B.LEAN) {
+                    const h = (Math.min(this._renderBuildingMaxFloors, B.MAX_FLOORS) + C.LEAN_EXTRA) * B.FLOOR_HEIGHT;
+                    const cameraHeight = leanCamHeight();
+                    safe = safe && Number.isFinite(h) && h >= 0 && Number.isFinite(cameraHeight) && cameraHeight > h &&
+                        Number.isFinite(B.MAX_FLOORS) && B.MAX_FLOORS >= 0 && Number.isFinite(C.LEAN_EXTRA) && C.LEAN_EXTRA >= 0 &&
+                        Number.isFinite(B.FLOOR_HEIGHT) && B.FLOOR_HEIGHT >= 0;
+                    if (safe) k = 1 + h / (cameraHeight - h);
+                }
+                if (safe) {
+                    // A projected roof is cam + (footprint - cam) * k. Inverse-project the
+                    // padded view at the largest k and union it with k=1 and legacy bounds.
+                    // Every intermediate roof/wall scale is covered, even when V is offset
+                    // by cinematic pan, shake or a finisher independently of the lean camera.
+                    const left = V.left - pad, right = V.right + pad, top = V.top - pad, bottom = V.bottom + pad;
+                    query = { left: Math.min(cb.left, left, cam.x + (left - cam.x) / k),
+                        right: Math.max(cb.right, right, cam.x + (right - cam.x) / k),
+                        top: Math.min(cb.top, top, cam.y + (top - cam.y) / k),
+                        bottom: Math.max(cb.bottom, bottom, cam.y + (bottom - cam.y) / k) };
+                    // Broadphase roundoff may only add candidates, including at cell boundaries.
+                    const guard = 32 * Number.EPSILON * Math.max(1, Math.abs(cam.x), Math.abs(cam.y),
+                        Math.abs(query.left), Math.abs(query.right), Math.abs(query.top), Math.abs(query.bottom));
+                    query.left -= guard; query.right += guard; query.top -= guard; query.bottom += guard;
+                }
+                // A singular/unusual projection takes the original full candidate scan.
+                const candidates = this._orderedBuildings.query(query, lists.candidates);
+                for (const entry of candidates) {
+                    const b = entry.item;
+                    if (entry.standardV2) {
+                        if (b.inView(V, cam)) { lists.base.push(entry); lists.v2.push(entry); }
+                    } else {
+                        if (b.isV2) lists.v2.push(entry);
+                        if (b.isV2 && b.inView) lists.base.push(entry); // custom predicate runs at its original base pass
+                        else if (!(b.x + (b.w || 200) < cb.left || b.x > cb.right || b.y + (b.h || 200) < cb.top || b.y > cb.bottom)) lists.base.push(entry);
+                    }
+                }
+                this._renderBuildingLists = lists;
+                return lists;
+            },
+
             /** After lighting: building windows/neon/rooftop lights, then the sky layer. */
             drawEmissivePass(ctx) {
                 const dark = this.getAmbientDarkness();
@@ -56201,14 +56518,22 @@ engineMixin({
                     const V = this._cullBounds && this._cullBounds.view;
                     const z = this.camera.zoom || 1;
                     const hw = this.canvas.width / 2 / z + 200, hh = this.canvas.height / 2 / z + 200;
-                    for (const b of this.activeMap.buildings) {
-                        if (!b.isV2 || !b.drawEmissive) continue;
-                        if (V) { if (!b.inView(V, this.camera)) continue; }               // what could reach the screen (BuildingV2.inView)
-                        else {
+                    if (V) {
+                        const visible = this._prepareRenderBuildingLists(this._cullBounds).v2;
+                        for (const entry of visible) {
+                            const b = entry.item;
+                            if (!b.isV2 || !b.drawEmissive) continue;
+                            if (!entry.standardV2 && !b.inView(V, this.camera)) continue;
+                            b.drawEmissive(ctx, dark);
+                        }
+                    } else {
+                        // Standalone calls without a draw view retain their original fallback predicate.
+                        for (const b of this.activeMap.buildings) {
+                            if (!b.isV2 || !b.drawEmissive) continue;
                             const m = b.emissiveReach || 0;
                             if (b.x + b.w < this.camera.x - hw - m || b.x > this.camera.x + hw + m || b.y + b.h < this.camera.y - hh - m || b.y > this.camera.y + hh + m) continue;
+                            b.drawEmissive(ctx, dark);
                         }
-                        b.drawEmissive(ctx, dark);
                     }
                 }
                 // Car lamps in the dark: tail and brake lights, headlights, signals (traffic/car-art.js)
@@ -57005,6 +57330,7 @@ engineMixin({
                ===================================================================== */
             update() {
                 if (!this.running || this.paused) return;
+                this._syncProfiler();
                 
                 // Gait clock — advances only when the world actually steps, so
                 // walk animation freezes with everything else while paused.
@@ -58600,6 +58926,12 @@ engineMixin({
         // GameEngine — The frame renderer (draw).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /** Keep diagnostics available on demand without timing normal gameplay. */
+            _syncProfiler() {
+                _profileSampling = !!(this.showProfiler || PerfBench.active);
+                this.profiler.setEnabled(_profileSampling);
+            },
+
             /* THE VIEW — where the camera actually is this frame (draw() resolves it once:
                the cutscene camera, or her position plus the scope lean and the drive
                look-ahead). Everything that maps world <-> screen reads it — the world, both
@@ -58636,7 +58968,9 @@ engineMixin({
             draw() {
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
+                this._renderDrawId = (this._renderDrawId || 0) + 1;
                 // --- PROFILER START ---
+                this._syncProfiler();
                 this.profiler.beginFrame();
                 RenderStats.bodies = 0; RenderStats.culled = 0; RenderStats.peopleMs = 0; RenderStats.bldBase = 0; RenderStats.bldTops = 0;
                 RenderStats.timed = !!(this.showProfiler && GameSettings.profilerMode === 'full');
@@ -58782,7 +59116,7 @@ engineMixin({
                 // Floor Zones (Grass, Industrial ground - drawn UNDER roads)
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (this._renderGridFloorZones && !bakedGround) {
-                    const visibleZones = this._renderGridFloorZones.query(cullBounds.world);
+                    const visibleZones = this._renderGridFloorZones.query(cullBounds.world, this._renderGridFloorZones._drawResults || (this._renderGridFloorZones._drawResults = new Set()));
                     for (const z of visibleZones) {
                         this.ctx.fillStyle = z.color;
                         this.ctx.fillRect(z.x, z.y, z.w, z.h);
@@ -58835,26 +59169,17 @@ engineMixin({
                 if (!_baseline) {   // ── to the end of Render:Entities
                 // Buildings - BASE LAYER (shadows, ground floor) - drawn before entities
                 this.profiler.start('Render:Buildings');
-                // PERFORMANCE: AABB viewport culling
+                // One ordered visibility list shared by base, roofs, signs and emissive details.
+                const renderBuildings = this._prepareRenderBuildingLists(cullBounds);
                 if (this.activeMap.buildings) {
-                    const cb = cullBounds.buildings, V = cullBounds.view, cam = this.camera;
-                    this.activeMap.buildings.forEach(b => {
-                        // Leaning buildings: anything of them that could reach the screen (BuildingV2.inView);
-                        // the rest by the wide rect
-                        if (b.isV2 && b.inView) { if (!b.inView(V, cam)) return; }
-                        else {
-                            const bRight = b.x + (b.w || 200);
-                            const bBottom = b.y + (b.h || 200);
-                            if (bRight < cb.left || b.x > cb.right || bBottom < cb.top || b.y > cb.bottom) return;
-                        }
+                    const V = cullBounds.view, cam = this.camera;
+                    for (const entry of renderBuildings.base) {
+                        const b = entry.item;
+                        if (!entry.standardV2 && b.isV2 && b.inView && !b.inView(V, cam)) continue;
                         RenderStats.bldBase++;
-                        
-                        if (b.drawBase) {
-                            b.drawBase(this.ctx);
-                        } else {
-                            b.draw(this.ctx);
-                        }
-                    });
+                        if (b.drawBase) b.drawBase(this.ctx);
+                        else b.draw(this.ctx);
+                    }
                 }
                 
                 // BuildingV3 — Ground layer (beneath player: facade, sidewalk)
@@ -58915,7 +59240,7 @@ engineMixin({
                 // Pavements
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (this._renderGridPavements && !bakedGround) {
-                    const visiblePavements = this._renderGridPavements.query(cullBounds.world);
+                    const visiblePavements = this._renderGridPavements.query(cullBounds.world, this._renderGridPavements._drawResults || (this._renderGridPavements._drawResults = new Set()));
                     for (const p of visiblePavements) {
                         p.draw(this.ctx);
                     }
@@ -58924,7 +59249,7 @@ engineMixin({
                 // Crosswalks
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (this._renderGridCrosswalks && !bakedGround) {
-                    const visibleCrosswalks = this._renderGridCrosswalks.query(cullBounds.world);
+                    const visibleCrosswalks = this._renderGridCrosswalks.query(cullBounds.world, this._renderGridCrosswalks._drawResults || (this._renderGridCrosswalks._drawResults = new Set()));
                     for (const cw of visibleCrosswalks) {
                         this.ctx.fillStyle = '#1a1a20';
                         this.ctx.fillRect(cw.x, cw.y, cw.w, cw.h);
@@ -58955,7 +59280,10 @@ engineMixin({
                 // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)
                 if (this.activeMap.buildings && this.activeMap.type === 'outdoor') {
                     const cbW = cullBounds.world;
-                    for (const b of this.activeMap.buildings) {
+                    const candidates = this._queryRenderBuildings({ left: cbW.left - 60, right: cbW.right + 60, top: cbW.top - 480, bottom: cbW.bottom },
+                        this._forecourtCandidates || (this._forecourtCandidates = []));
+                    for (const entry of candidates) {
+                        const b = entry.item;
                         const ground = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : b.style === 'moon_city' ? b._mcDrawGround : null;
                         if (!ground) continue;
                         if (b.x + b.w + 60 < cbW.left || b.x - 60 > cbW.right || b.y > cbW.bottom || b.y + b.h + 480 < cbW.top) continue;
@@ -59200,7 +59528,7 @@ engineMixin({
                 // Map Walls
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 {
-                    const visibleWalls = this._renderGridWalls.query(cullBounds.world);
+                    const visibleWalls = this._renderGridWalls.query(cullBounds.world, this._renderGridWalls._drawResults || (this._renderGridWalls._drawResults = new Set()));
                     const ws = this.activeMap.wallStyle;                 // a map may dress its walls (the House: black marble, gold)
                     for (const w of visibleWalls) {
                         this.ctx.fillStyle = ws ? ws.fill : '#222'; 
@@ -59537,13 +59865,14 @@ engineMixin({
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
-                    this.activeMap.buildings.forEach(b => {
+                    for (const entry of renderBuildings.v2) {
+                        const b = entry.item;
                         if (b.isV2 && b.drawTop) {
-                            if (!b.inView(V, cam)) return;
+                            if (!entry.standardV2 && !b.inView(V, cam)) continue;
                             RenderStats.bldTops++;
                             b.drawTop(this.ctx, this.worldMinutes);
                         }
-                    });
+                    }
                 }
                 
                 // Billboards — tilted panels standing up from the ground, drawn over the player like roofs
@@ -59562,13 +59891,13 @@ engineMixin({
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
-                    this.activeMap.buildings.forEach(b => {
+                    for (const entry of renderBuildings.v2) {
+                        const b = entry.item;
                         if (b.isV2 && b.drawSign) {
-                            if (!b.inView(V, cam)) return;
-                            
+                            if (!entry.standardV2 && !b.inView(V, cam)) continue;
                             b.drawSign(this.ctx);
                         }
-                    });
+                    }
                 }
                 
                 // Foliage (trees and bushes) - drawn AFTER player so canopy appears overhead
@@ -59578,12 +59907,15 @@ engineMixin({
                     const windDir = this.weather ? this.weather.windDirection : 1;
                     const cb = cullBounds.foliage;
                     const foliageScale = GameSettings.getFoliageScale();
-                    this.activeMap.foliage.forEach((f, idx) => {
-                        // Density culling: skip foliage based on setting (uses stable index so same trees always hidden)
-                        if (foliageScale < 1.0 && (idx % Math.round(1 / foliageScale)) !== 0) return;
-                        if (f.x < cb.left || f.x > cb.right || f.y < cb.top || f.y > cb.bottom) return;
-                        f.draw(this.ctx, wind, windDir, _gameTimeSec);  // smooth game time (was sampled once per tick)
-                    });
+                    const foliageStride = foliageScale < 1.0 ? Math.round(1 / foliageScale) : 1;
+                    const candidates = this._queryRenderFoliage(cb, this._foliageCandidates || (this._foliageCandidates = []));
+                    for (const entry of candidates) {
+                        const f = entry.item, idx = entry.index;
+                        // Original array index keeps exactly the same density selection, even after spatial culling.
+                        if (foliageScale < 1.0 && (idx % foliageStride) !== 0) continue;
+                        if (f.x < cb.left || f.x > cb.right || f.y < cb.top || f.y > cb.bottom) continue;
+                        f.draw(this.ctx, wind, windDir, _gameTimeSec);
+                    }
                 }
                 
                 // Floating leaf particles - drawn after foliage, before weather
@@ -59752,7 +60084,7 @@ engineMixin({
                 
                 // Rain on screen: outdoors, or fading in as she steps out onto a veranda
                 const rainK = this.activeMap.type === 'outdoor' ? 1 : (this.roomSystem.active ? this.roomSystem.outdoorness : 0);
-                if (rainK > 0.01) {
+                if (rainK > 0.01 && this.weather.isRaining) {
                     const rainLamps = this.activeMap._interiorLights ? [...this.lamps, ...this.activeMap._interiorLights] : this.lamps;
                     this.ctx.save(); this.ctx.globalAlpha = rainK;
                     this.weather.drawRainOverlay(this.ctx, this.view, rainLamps);   // the view, so Cinematic View's pan carries the rain too
@@ -62419,6 +62751,60 @@ engineMixin({
                interior lights baked into sprites, headlight beams as sprites.
                Soft shadows render the layer at half resolution and blur that.
                ===================================================================== */
+            /** Keep the original stable full sort for small or unusual inputs. For a wide
+             * view, retain only the nearest budget of lamps, with original-order ties. */
+            _selectLightingLamps(lamps, limit, heap, nearest) {
+                heap.length = nearest.length = 0;
+                const n = lamps.length;
+                if (!Number.isInteger(limit) || limit <= 0 || limit >= n || n <= 64 || n <= limit * 2 ||
+                    lamps.some(lamp => !Number.isFinite(lamp._distSq))) {
+                    lamps.sort((a, b) => a._distSq - b._distSq);
+                    return lamps;
+                }
+                const compare = (i, j) => lamps[i]._distSq - lamps[j]._distSq || i - j;
+                // A max-heap: its root is the farthest retained lamp (latest on a tie).
+                for (let i = 0; i < n; i++) {
+                    if (heap.length < limit) {
+                        let child = heap.length;
+                        heap.push(i);
+                        while (child > 0) {
+                            const parent = (child - 1) >> 1;
+                            if (compare(heap[parent], i) >= 0) break;
+                            heap[child] = heap[parent]; child = parent;
+                        }
+                        heap[child] = i;
+                    } else if (compare(i, heap[0]) < 0) {
+                        let parent = 0;
+                        while (parent * 2 + 1 < heap.length) {
+                            let child = parent * 2 + 1;
+                            if (child + 1 < heap.length && compare(heap[child + 1], heap[child]) > 0) child++;
+                            if (compare(i, heap[child]) >= 0) break;
+                            heap[parent] = heap[child]; parent = child;
+                        }
+                        heap[parent] = i;
+                    }
+                }
+                heap.sort(compare);
+                for (const i of heap) nearest.push(lamps[i]);
+                return nearest;
+            },
+
+            /** Scratch records never retain a map's lights or vehicles between frames. */
+            _releaseLightingScratch(scratch) {
+                for (const b of scratch.beams) b.owner = null;
+                for (const s of scratch.softLights) s.src = null;
+                for (const g of scratch.propGlows) g.p = null;
+                scratch.iVisible.length = scratch.litLamps.length = scratch.visibleLamps.length = 0;
+                scratch.beams.length = scratch.softLights.length = scratch.propGlows.length = 0;
+                scratch.lampHeap.length = scratch.nearestLamps.length = 0;
+                scratch.cars.clear();
+                // Bound the retained empty records even after exceptionally crowded views.
+                if (scratch.beamPool.length > 64) scratch.beamPool.length = 64;
+                if (scratch.softPool.length > 512) scratch.softPool.length = 512;
+                if (scratch.propPool.length > 128) scratch.propPool.length = 128;
+                scratch.busy = false;
+            },
+
             drawLightingSystem(ctx) {
                 const ambient = this.getAmbientDarkness();
                 const flash = this.weather.lightningFlash > 0 ? this.weather.lightningFlash : 0;
@@ -62426,8 +62812,24 @@ engineMixin({
                 const finalOpacity = ambient * (1.0 - this.nvIntensity) * (1 - 0.8 * flash);
                 
                 // Optimization: If shadows are invisible and we don't need the NV boost, stop.
-                if (finalOpacity <= 0.01 && !this.nightVision) return; 
+                if (finalOpacity <= 0.01 && !this.nightVision) return;
 
+                let scratch = this._lightingScratch;
+                if (!scratch || scratch.busy) {
+                    scratch = { iVisible: [], litLamps: [], visibleLamps: [], beams: [], softLights: [], propGlows: [],
+                        lampHeap: [], nearestLamps: [], beamPool: [], softPool: [], propPool: [], cars: new Set(), busy: false };
+                    // A reentrant render receives its own buffers while the outer frame is using its pools.
+                    if (!this._lightingScratch) this._lightingScratch = scratch;
+                }
+                scratch.busy = true;
+                try {
+                    this._renderLightingSystem(ctx, ambient, flash, finalOpacity, scratch);
+                } finally {
+                    this._releaseLightingScratch(scratch);
+                }
+            },
+
+            _renderLightingSystem(ctx, ambient, flash, finalOpacity, scratch) {
                 // Layer resolution: lighting quality, halved for soft shadows (the upscale softens edges)
                 const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1);
                 const lw = Math.max(1, Math.round(this.canvas.width * LS)), lh = Math.max(1, Math.round(this.canvas.height * LS));
@@ -62463,7 +62865,7 @@ engineMixin({
             
                 // 3b. INTERIOR LIGHTS (buildings on the city map) — baked sprites, each with its own wall shadows
                 const iLights = this.activeMap._interiorLights;
-                const iVisible = [];
+                const iVisible = scratch.iVisible;
                 if (iLights && iLights.length > 0) {
                     const iSegsByLevel = this.activeMap._interiorShadowSegs || {};
                     lc.globalCompositeOperation = 'destination-out';
@@ -62477,9 +62879,9 @@ engineMixin({
             
                 // 4. STREET AND ROOM LAMPS — cached shadow shapes and gradients, nearest first within the budget
                 lc.globalCompositeOperation = 'destination-out';
-                const litLamps = [];
+                const litLamps = scratch.litLamps;
                 if (this.lightingBaked) {
-                    const visibleLamps = [];
+                    const visibleLamps = scratch.visibleLamps;
                     for (const lamp of this.lamps) {
                         if (!inView(lamp.x, lamp.y, lamp.radius)) continue;
                         if (!lamp._shadowPoly || lamp._shadowPoly.length === 0) continue;
@@ -62491,8 +62893,8 @@ engineMixin({
                         lamp._distSq = dx * dx + dy * dy;
                         visibleLamps.push(lamp);
                     }
-                    visibleLamps.sort((a, b) => a._distSq - b._distSq);
-                    for (const lamp of visibleLamps) {
+                    const nearest = this._selectLightingLamps(visibleLamps, this._maxLitLamps, scratch.lampHeap, scratch.nearestLamps);
+                    for (const lamp of nearest) {
                         if (litLamps.length >= this._maxLitLamps) break;
                         const poly = lamp._shadowPoly;
                         if (lamp._shadowPathOf !== poly) {
@@ -62502,10 +62904,10 @@ engineMixin({
                             path.closePath();
                             lamp._shadowPath = path; lamp._shadowPathOf = poly;
                         }
-                        if (!lamp._holeGrad || lamp._holeGradAt !== lamp.x + ',' + lamp.y + ',' + lamp.radius) {
+                        if (!lamp._holeGrad || lamp._holeGradX !== lamp.x || lamp._holeGradY !== lamp.y || lamp._holeGradRadius !== lamp.radius) {
                             const g = lc.createRadialGradient(lamp.x, lamp.y, 10, lamp.x, lamp.y, lamp.radius);
                             g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                            lamp._holeGrad = g; lamp._holeGradAt = lamp.x + ',' + lamp.y + ',' + lamp.radius;
+                            lamp._holeGrad = g; lamp._holeGradX = lamp.x; lamp._holeGradY = lamp.y; lamp._holeGradRadius = lamp.radius;
                         }
                         lc.globalAlpha = Math.min(1, lamp._litK);
                         lc.fillStyle = lamp._holeGrad;
@@ -62536,11 +62938,13 @@ engineMixin({
                 }
             
                 // Headlights: the player's car, up to six in traffic, bumper cars
-                const beams = [];
+                const beams = scratch.beams;
                 const beamOf = (owner, stat, color, haze) => {
                     const off = owner.length / 2;
-                    beams.push({ owner, cx: owner.x + Math.cos(owner.angle) * off, cy: owner.y + Math.sin(owner.angle) * off,
-                                 L: stat * 6, W: stat * 1.5, color, haze });
+                    const b = scratch.beamPool[beams.length] || (scratch.beamPool[beams.length] = {});
+                    beams.push(b);   // register before reading source fields, so finally can always release it
+                    b.owner = owner; b.cx = owner.x + Math.cos(owner.angle) * off; b.cy = owner.y + Math.sin(owner.angle) * off;
+                    b.L = stat * 6; b.W = stat * 1.5; b.color = color; b.haze = haze;
                 };
                 if (this.isDriving || (this.car && this.car.forceLights)) beamOf(this.car, this.car.lightRange || 60, this.car.headlightColor || '#ffffdd', this.isDriving ? 1 : 0);
                 if (this.traffic && this.traffic.vehicles) {
@@ -62560,7 +62964,8 @@ engineMixin({
                 for (const b of beams) this._drawBeam(b);
                 // Underglow: each pool lights its own patch of street
                 if (this.traffic) {
-                    const soft = glowSprite('255, 255, 255', 0.5), cars = new Set(this.traffic.vehicles);
+                    const soft = glowSprite('255, 255, 255', 0.5), cars = scratch.cars;
+                    for (const v of this.traffic.vehicles || []) cars.add(v);
                     if (this.car) cars.add(this.car); if (this.ownedCar) cars.add(this.ownedCar);
                     lc.globalAlpha = 0.55;
                     for (const v of cars) {
@@ -62578,7 +62983,7 @@ engineMixin({
                 // Fixed ones come from activeMap.softLights; props with a `light` carry theirs
                 // with them when pushed. Room switches fade the lights in that room.
                 // (Props are walked once: lights, and vending machines / medbays.)
-                const softLights = [], propGlows = [];
+                const softLights = scratch.softLights, propGlows = scratch.propGlows;
                 {
                     const tNow = _frameTime / 1000;
                     const push = (src, x, y) => {
@@ -62588,14 +62993,20 @@ engineMixin({
                         const k = rsOn ? rs.lightAt(x, y) : 1;
                         if (k < 0.01) return;
                         const f = src.flicker ? 0.82 + 0.18 * Math.sin(tNow * src.flicker + x * 0.7) * Math.sin(tNow * src.flicker * 0.37 + y) : 1;
-                        softLights.push({ src, x, y, r, a: (src.intensity ?? 0.8) * f * k });
+                        const s = scratch.softPool[softLights.length] || (scratch.softPool[softLights.length] = {});
+                        softLights.push(s);
+                        s.src = src; s.x = x; s.y = y; s.r = r; s.a = (src.intensity ?? 0.8) * f * k;
                     };
                     for (const s of (this.activeMap.softLights || [])) push(s, s.x, s.y);
                     for (const p of this.props) {
                         if (p.light && p.visible !== false) { const c = p.getCenter(); push(p.light, c.x + (p.light.dx || 0), c.y + (p.light.dy || 0)); }
                         if (p.interactionType === 'medbay_refill' || p.interactionType === 'vending_machine') {
                             const c = p.getCenter();
-                            if (inView(c.x, c.y, 180)) propGlows.push({ p, x: c.x, y: c.y, medbay: p.interactionType === 'medbay_refill' });
+                            if (inView(c.x, c.y, 180)) {
+                                const g = scratch.propPool[propGlows.length] || (scratch.propPool[propGlows.length] = {});
+                                propGlows.push(g);
+                                g.p = p; g.x = c.x; g.y = c.y; g.medbay = p.interactionType === 'medbay_refill';
+                            }
                         }
                     }
                 }
@@ -62934,6 +63345,9 @@ engineMixin({
                 c.setTransform(m.a * R, m.b * R, m.c * R, m.d * R, m.e * R, m.f * R);
                 c.fillStyle = 'rgb(92, 76, 150)'; c.beginPath();                              // lavender-tinted shade, painted in its colour (no tint pass)
                 const B = CONFIG.BUILDINGS, dx = S.dx * S.len, dy = S.dy * S.len;
+                // Keep only each building's latest hulls; weak keys release them with the building.
+                // Replay their points into the common path so overlapping shadows still fill once.
+                const buildingShadows = this._sunBuildingShadows || (this._sunBuildingShadows = new WeakMap());
                 const hull = (pts) => {                                                        // convex hull (monotone chain)
                     pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
                     const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
@@ -62942,12 +63356,31 @@ engineMixin({
                     for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
                     return lo.slice(0, -1).concat(up.slice(0, -1));
                 };
-                for (const b of map.buildings || []) {
+                const buildingCandidates = this._queryRenderBuildings({ left: cull.left - 300, right: cull.right + 300, top: cull.top - 300, bottom: cull.bottom + 300 },
+                    this._sunBuildingCandidates || (this._sunBuildingCandidates = []));
+                for (const entry of buildingCandidates) {
+                    const b = entry.item;
                     if (!b.isV2 || b.x > cull.right + 300 || b.x + b.w < cull.left - 300 || b.y > cull.bottom + 300 || b.y + b.h < cull.top - 300) continue;
                     const hgt = Math.min(b.floors, B.MAX_FLOORS) * B.FLOOR_HEIGHT, ox = dx * hgt, oy = dy * hgt;
+                    // Rounded corner data is lazily initialized by the footprint helper.
+                    if (b.roundR) b._leanFaces();
+                    let cached = buildingShadows.get(b);
+                    if (!cached || cached.x !== b.x || cached.y !== b.y || cached.ox !== ox || cached.oy !== oy ||
+                        cached.roundR !== b.roundR || cached.footprint !== b._footprint || cached.sections.length !== b.sections.length) {
+                        cached = { x: b.x, y: b.y, ox, oy, roundR: b.roundR, footprint: b._footprint, sections: new Array(b.sections.length) };
+                        buildingShadows.set(b, cached);
+                    }
                     b.sections.forEach((s, si) => {
-                        const fp = b._footprint(s, si);                                              // (rounded corners traced)
-                        const h = hull(fp.concat(fp.map(([x, y]) => [x + ox, y + oy])));
+                        const r = b._roundSec && b._roundSec[si];
+                        const r0 = r && r[0], r1 = r && r[1], r2 = r && r[2], r3 = r && r[3];
+                        let sh = cached.sections[si];
+                        if (!sh || sh.section !== s || sh.x !== s.x || sh.y !== s.y || sh.w !== s.w || sh.h !== s.h ||
+                            sh.r0 !== r0 || sh.r1 !== r1 || sh.r2 !== r2 || sh.r3 !== r3) {
+                            const fp = b._footprint(s, si);                                          // (rounded corners traced)
+                            sh = cached.sections[si] = { section: s, x: s.x, y: s.y, w: s.w, h: s.h, r0, r1, r2, r3,
+                                hull: hull(fp.concat(fp.map(([x, y]) => [x + ox, y + oy]))) };
+                        }
+                        const h = sh.hull;
                         h.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath();
                     });
                 }
@@ -62963,7 +63396,10 @@ engineMixin({
                     }
                     hull(pts).forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath();
                 }
-                for (const f of map.foliage || []) {                                             // canopies, thrown along the sun
+                const foliageCandidates = this._queryRenderFoliage({ left: cull.left - 120, right: cull.right + 120, top: cull.top - 120, bottom: cull.bottom + 120 },
+                    this._sunFoliageCandidates || (this._sunFoliageCandidates = []));
+                for (const entry of foliageCandidates) {                                        // canopies, thrown along the sun
+                    const f = entry.item;
                     if (f.x < cull.left - 120 || f.x > cull.right + 120 || f.y < cull.top - 120 || f.y > cull.bottom + 120) continue;
                     const s = f.size || 1, ht = (f.type === 'bush' ? 8 : 34) * s, r = (f.type === 'bush' ? 12 : f.type === 'palm' ? 17 : 19) * s;
                     // Swept from under the canopy out along the sun (tapering back to the tree), so a long shadow stays attached
@@ -63025,15 +63461,25 @@ engineMixin({
                 if (S.golden > 0.02) {
                     ctx.globalCompositeOperation = 'screen';
                     const sx = W / 2 - S.dx * W * 0.7, sy = H / 2 - S.dy * H * 0.7;
-                    const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, Math.max(W, H) * 1.1);
-                    g.addColorStop(0, `rgba(255, 160, 150, ${0.12 * S.golden * k})`); g.addColorStop(1, 'rgba(255, 160, 150, 0)');
-                    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+                    const radius = Math.max(W, H) * 1.1, alpha = 0.12 * S.golden * k;
+                    let haze = this._daylightHaze;
+                    if (!haze || haze.ctx !== ctx || haze.sx !== sx || haze.sy !== sy || haze.radius !== radius || haze.alpha !== alpha) {
+                        const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, radius);
+                        g.addColorStop(0, `rgba(255, 160, 150, ${alpha})`); g.addColorStop(1, 'rgba(255, 160, 150, 0)');
+                        haze = this._daylightHaze = { ctx, sx, sy, radius, alpha, gradient: g };
+                    }
+                    ctx.fillStyle = haze.gradient; ctx.fillRect(0, 0, W, H);
                 }
                 // A soft violet vignette keeps the frame dreamy
                 ctx.globalCompositeOperation = 'multiply';
-                const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
-                v.addColorStop(0, 'rgba(255,255,255,0)'); v.addColorStop(1, `rgba(150, 130, 205, ${0.3 * k})`);
-                ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+                const alpha = 0.3 * k;
+                let vignette = this._daylightVignette;
+                if (!vignette || vignette.ctx !== ctx || vignette.W !== W || vignette.H !== H || vignette.alpha !== alpha) {
+                    const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+                    v.addColorStop(0, 'rgba(255,255,255,0)'); v.addColorStop(1, `rgba(150, 130, 205, ${alpha})`);
+                    vignette = this._daylightVignette = { ctx, W, H, alpha, gradient: v };
+                }
+                ctx.fillStyle = vignette.gradient; ctx.fillRect(0, 0, W, H);
                 ctx.restore();
             }
         });
@@ -63494,6 +63940,7 @@ engineMixin({
              * Resets: inventory, quest progress, health, currency, driving, entities.
              */
             resetGameState() {
+                this._clearRenderSpatial();
                 if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
                 if (this.scenes) this.scenes.abort();                       // a scene left playing doesn't run on into the next game
                 if (this._rideState && this._rideState.on) { this._rideEl.classList.remove('show'); this._rideState.on = false; }   // the ride tag goes with the run
@@ -63669,9 +64116,10 @@ engineMixin({
             },
             loop() {
                 if (!this.running) return;
-                const _a0 = performance.now();
+                this._syncProfiler();
+                const _a0 = this.profiler.enabled ? performance.now() : 0;
                 ambience.update(this);                                   // the beds, the music, the motor (Audio:Ambience in the profiler)
-                if (this.profiler) this.profiler.add('Audio:Ambience', performance.now() - _a0);
+                if (this.profiler.enabled) this.profiler.add('Audio:Ambience', performance.now() - _a0);
                 
                 /* FPS LIMITER — skip frame if too soon.
                    Scheduled against a running due-time rather than the last

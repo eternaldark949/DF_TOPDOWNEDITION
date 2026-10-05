@@ -24,6 +24,7 @@
                ===================================================================== */
             update() {
                 if (!this.running || this.paused) return;
+                this._syncProfiler();
                 
                 // Gait clock — advances only when the world actually steps, so
                 // walk animation freezes with everything else while paused.

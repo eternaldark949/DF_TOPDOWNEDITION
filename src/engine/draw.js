@@ -1,6 +1,12 @@
         // GameEngine — The frame renderer (draw).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /** Keep diagnostics available on demand without timing normal gameplay. */
+            _syncProfiler() {
+                _profileSampling = !!(this.showProfiler || PerfBench.active);
+                this.profiler.setEnabled(_profileSampling);
+            },
+
             /* THE VIEW — where the camera actually is this frame (draw() resolves it once:
                the cutscene camera, or her position plus the scope lean and the drive
                look-ahead). Everything that maps world <-> screen reads it — the world, both
@@ -37,7 +43,9 @@
             draw() {
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
+                this._renderDrawId = (this._renderDrawId || 0) + 1;
                 // --- PROFILER START ---
+                this._syncProfiler();
                 this.profiler.beginFrame();
                 RenderStats.bodies = 0; RenderStats.culled = 0; RenderStats.peopleMs = 0; RenderStats.bldBase = 0; RenderStats.bldTops = 0;
                 RenderStats.timed = !!(this.showProfiler && GameSettings.profilerMode === 'full');
@@ -183,7 +191,7 @@
                 // Floor Zones (Grass, Industrial ground - drawn UNDER roads)
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (this._renderGridFloorZones && !bakedGround) {
-                    const visibleZones = this._renderGridFloorZones.query(cullBounds.world);
+                    const visibleZones = this._renderGridFloorZones.query(cullBounds.world, this._renderGridFloorZones._drawResults || (this._renderGridFloorZones._drawResults = new Set()));
                     for (const z of visibleZones) {
                         this.ctx.fillStyle = z.color;
                         this.ctx.fillRect(z.x, z.y, z.w, z.h);
@@ -236,26 +244,17 @@
                 if (!_baseline) {   // ── to the end of Render:Entities
                 // Buildings - BASE LAYER (shadows, ground floor) - drawn before entities
                 this.profiler.start('Render:Buildings');
-                // PERFORMANCE: AABB viewport culling
+                // One ordered visibility list shared by base, roofs, signs and emissive details.
+                const renderBuildings = this._prepareRenderBuildingLists(cullBounds);
                 if (this.activeMap.buildings) {
-                    const cb = cullBounds.buildings, V = cullBounds.view, cam = this.camera;
-                    this.activeMap.buildings.forEach(b => {
-                        // Leaning buildings: anything of them that could reach the screen (BuildingV2.inView);
-                        // the rest by the wide rect
-                        if (b.isV2 && b.inView) { if (!b.inView(V, cam)) return; }
-                        else {
-                            const bRight = b.x + (b.w || 200);
-                            const bBottom = b.y + (b.h || 200);
-                            if (bRight < cb.left || b.x > cb.right || bBottom < cb.top || b.y > cb.bottom) return;
-                        }
+                    const V = cullBounds.view, cam = this.camera;
+                    for (const entry of renderBuildings.base) {
+                        const b = entry.item;
+                        if (!entry.standardV2 && b.isV2 && b.inView && !b.inView(V, cam)) continue;
                         RenderStats.bldBase++;
-                        
-                        if (b.drawBase) {
-                            b.drawBase(this.ctx);
-                        } else {
-                            b.draw(this.ctx);
-                        }
-                    });
+                        if (b.drawBase) b.drawBase(this.ctx);
+                        else b.draw(this.ctx);
+                    }
                 }
                 
                 // BuildingV3 — Ground layer (beneath player: facade, sidewalk)
@@ -316,7 +315,7 @@
                 // Pavements
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (this._renderGridPavements && !bakedGround) {
-                    const visiblePavements = this._renderGridPavements.query(cullBounds.world);
+                    const visiblePavements = this._renderGridPavements.query(cullBounds.world, this._renderGridPavements._drawResults || (this._renderGridPavements._drawResults = new Set()));
                     for (const p of visiblePavements) {
                         p.draw(this.ctx);
                     }
@@ -325,7 +324,7 @@
                 // Crosswalks
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (this._renderGridCrosswalks && !bakedGround) {
-                    const visibleCrosswalks = this._renderGridCrosswalks.query(cullBounds.world);
+                    const visibleCrosswalks = this._renderGridCrosswalks.query(cullBounds.world, this._renderGridCrosswalks._drawResults || (this._renderGridCrosswalks._drawResults = new Set()));
                     for (const cw of visibleCrosswalks) {
                         this.ctx.fillStyle = '#1a1a20';
                         this.ctx.fillRect(cw.x, cw.y, cw.w, cw.h);
@@ -356,7 +355,10 @@
                 // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)
                 if (this.activeMap.buildings && this.activeMap.type === 'outdoor') {
                     const cbW = cullBounds.world;
-                    for (const b of this.activeMap.buildings) {
+                    const candidates = this._queryRenderBuildings({ left: cbW.left - 60, right: cbW.right + 60, top: cbW.top - 480, bottom: cbW.bottom },
+                        this._forecourtCandidates || (this._forecourtCandidates = []));
+                    for (const entry of candidates) {
+                        const b = entry.item;
                         const ground = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : b.style === 'moon_city' ? b._mcDrawGround : null;
                         if (!ground) continue;
                         if (b.x + b.w + 60 < cbW.left || b.x - 60 > cbW.right || b.y > cbW.bottom || b.y + b.h + 480 < cbW.top) continue;
@@ -601,7 +603,7 @@
                 // Map Walls
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 {
-                    const visibleWalls = this._renderGridWalls.query(cullBounds.world);
+                    const visibleWalls = this._renderGridWalls.query(cullBounds.world, this._renderGridWalls._drawResults || (this._renderGridWalls._drawResults = new Set()));
                     const ws = this.activeMap.wallStyle;                 // a map may dress its walls (the House: black marble, gold)
                     for (const w of visibleWalls) {
                         this.ctx.fillStyle = ws ? ws.fill : '#222'; 
@@ -938,13 +940,14 @@
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
-                    this.activeMap.buildings.forEach(b => {
+                    for (const entry of renderBuildings.v2) {
+                        const b = entry.item;
                         if (b.isV2 && b.drawTop) {
-                            if (!b.inView(V, cam)) return;
+                            if (!entry.standardV2 && !b.inView(V, cam)) continue;
                             RenderStats.bldTops++;
                             b.drawTop(this.ctx, this.worldMinutes);
                         }
-                    });
+                    }
                 }
                 
                 // Billboards — tilted panels standing up from the ground, drawn over the player like roofs
@@ -963,13 +966,13 @@
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
-                    this.activeMap.buildings.forEach(b => {
+                    for (const entry of renderBuildings.v2) {
+                        const b = entry.item;
                         if (b.isV2 && b.drawSign) {
-                            if (!b.inView(V, cam)) return;
-                            
+                            if (!entry.standardV2 && !b.inView(V, cam)) continue;
                             b.drawSign(this.ctx);
                         }
-                    });
+                    }
                 }
                 
                 // Foliage (trees and bushes) - drawn AFTER player so canopy appears overhead
@@ -979,12 +982,15 @@
                     const windDir = this.weather ? this.weather.windDirection : 1;
                     const cb = cullBounds.foliage;
                     const foliageScale = GameSettings.getFoliageScale();
-                    this.activeMap.foliage.forEach((f, idx) => {
-                        // Density culling: skip foliage based on setting (uses stable index so same trees always hidden)
-                        if (foliageScale < 1.0 && (idx % Math.round(1 / foliageScale)) !== 0) return;
-                        if (f.x < cb.left || f.x > cb.right || f.y < cb.top || f.y > cb.bottom) return;
-                        f.draw(this.ctx, wind, windDir, _gameTimeSec);  // smooth game time (was sampled once per tick)
-                    });
+                    const foliageStride = foliageScale < 1.0 ? Math.round(1 / foliageScale) : 1;
+                    const candidates = this._queryRenderFoliage(cb, this._foliageCandidates || (this._foliageCandidates = []));
+                    for (const entry of candidates) {
+                        const f = entry.item, idx = entry.index;
+                        // Original array index keeps exactly the same density selection, even after spatial culling.
+                        if (foliageScale < 1.0 && (idx % foliageStride) !== 0) continue;
+                        if (f.x < cb.left || f.x > cb.right || f.y < cb.top || f.y > cb.bottom) continue;
+                        f.draw(this.ctx, wind, windDir, _gameTimeSec);
+                    }
                 }
                 
                 // Floating leaf particles - drawn after foliage, before weather
@@ -1153,7 +1159,7 @@
                 
                 // Rain on screen: outdoors, or fading in as she steps out onto a veranda
                 const rainK = this.activeMap.type === 'outdoor' ? 1 : (this.roomSystem.active ? this.roomSystem.outdoorness : 0);
-                if (rainK > 0.01) {
+                if (rainK > 0.01 && this.weather.isRaining) {
                     const rainLamps = this.activeMap._interiorLights ? [...this.lamps, ...this.activeMap._interiorLights] : this.lamps;
                     this.ctx.save(); this.ctx.globalAlpha = rainK;
                     this.weather.drawRainOverlay(this.ctx, this.view, rainLamps);   // the view, so Cinematic View's pan carries the rain too

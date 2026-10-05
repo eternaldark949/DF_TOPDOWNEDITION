@@ -109,6 +109,60 @@
                interior lights baked into sprites, headlight beams as sprites.
                Soft shadows render the layer at half resolution and blur that.
                ===================================================================== */
+            /** Keep the original stable full sort for small or unusual inputs. For a wide
+             * view, retain only the nearest budget of lamps, with original-order ties. */
+            _selectLightingLamps(lamps, limit, heap, nearest) {
+                heap.length = nearest.length = 0;
+                const n = lamps.length;
+                if (!Number.isInteger(limit) || limit <= 0 || limit >= n || n <= 64 || n <= limit * 2 ||
+                    lamps.some(lamp => !Number.isFinite(lamp._distSq))) {
+                    lamps.sort((a, b) => a._distSq - b._distSq);
+                    return lamps;
+                }
+                const compare = (i, j) => lamps[i]._distSq - lamps[j]._distSq || i - j;
+                // A max-heap: its root is the farthest retained lamp (latest on a tie).
+                for (let i = 0; i < n; i++) {
+                    if (heap.length < limit) {
+                        let child = heap.length;
+                        heap.push(i);
+                        while (child > 0) {
+                            const parent = (child - 1) >> 1;
+                            if (compare(heap[parent], i) >= 0) break;
+                            heap[child] = heap[parent]; child = parent;
+                        }
+                        heap[child] = i;
+                    } else if (compare(i, heap[0]) < 0) {
+                        let parent = 0;
+                        while (parent * 2 + 1 < heap.length) {
+                            let child = parent * 2 + 1;
+                            if (child + 1 < heap.length && compare(heap[child + 1], heap[child]) > 0) child++;
+                            if (compare(i, heap[child]) >= 0) break;
+                            heap[parent] = heap[child]; parent = child;
+                        }
+                        heap[parent] = i;
+                    }
+                }
+                heap.sort(compare);
+                for (const i of heap) nearest.push(lamps[i]);
+                return nearest;
+            },
+
+            /** Scratch records never retain a map's lights or vehicles between frames. */
+            _releaseLightingScratch(scratch) {
+                for (const b of scratch.beams) b.owner = null;
+                for (const s of scratch.softLights) s.src = null;
+                for (const g of scratch.propGlows) g.p = null;
+                scratch.iVisible.length = scratch.litLamps.length = scratch.visibleLamps.length = 0;
+                scratch.beams.length = scratch.softLights.length = scratch.propGlows.length = 0;
+                scratch.lampHeap.length = scratch.nearestLamps.length = 0;
+                scratch.cars.clear();
+                // Bound the retained empty records even after exceptionally crowded views.
+                if (scratch.beamPool.length > 64) scratch.beamPool.length = 64;
+                if (scratch.softPool.length > 512) scratch.softPool.length = 512;
+                if (scratch.propPool.length > 128) scratch.propPool.length = 128;
+                scratch.busy = false;
+            },
+
             drawLightingSystem(ctx) {
                 const ambient = this.getAmbientDarkness();
                 const flash = this.weather.lightningFlash > 0 ? this.weather.lightningFlash : 0;
@@ -116,8 +170,24 @@
                 const finalOpacity = ambient * (1.0 - this.nvIntensity) * (1 - 0.8 * flash);
                 
                 // Optimization: If shadows are invisible and we don't need the NV boost, stop.
-                if (finalOpacity <= 0.01 && !this.nightVision) return; 
+                if (finalOpacity <= 0.01 && !this.nightVision) return;
 
+                let scratch = this._lightingScratch;
+                if (!scratch || scratch.busy) {
+                    scratch = { iVisible: [], litLamps: [], visibleLamps: [], beams: [], softLights: [], propGlows: [],
+                        lampHeap: [], nearestLamps: [], beamPool: [], softPool: [], propPool: [], cars: new Set(), busy: false };
+                    // A reentrant render receives its own buffers while the outer frame is using its pools.
+                    if (!this._lightingScratch) this._lightingScratch = scratch;
+                }
+                scratch.busy = true;
+                try {
+                    this._renderLightingSystem(ctx, ambient, flash, finalOpacity, scratch);
+                } finally {
+                    this._releaseLightingScratch(scratch);
+                }
+            },
+
+            _renderLightingSystem(ctx, ambient, flash, finalOpacity, scratch) {
                 // Layer resolution: lighting quality, halved for soft shadows (the upscale softens edges)
                 const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1);
                 const lw = Math.max(1, Math.round(this.canvas.width * LS)), lh = Math.max(1, Math.round(this.canvas.height * LS));
@@ -153,7 +223,7 @@
             
                 // 3b. INTERIOR LIGHTS (buildings on the city map) — baked sprites, each with its own wall shadows
                 const iLights = this.activeMap._interiorLights;
-                const iVisible = [];
+                const iVisible = scratch.iVisible;
                 if (iLights && iLights.length > 0) {
                     const iSegsByLevel = this.activeMap._interiorShadowSegs || {};
                     lc.globalCompositeOperation = 'destination-out';
@@ -167,9 +237,9 @@
             
                 // 4. STREET AND ROOM LAMPS — cached shadow shapes and gradients, nearest first within the budget
                 lc.globalCompositeOperation = 'destination-out';
-                const litLamps = [];
+                const litLamps = scratch.litLamps;
                 if (this.lightingBaked) {
-                    const visibleLamps = [];
+                    const visibleLamps = scratch.visibleLamps;
                     for (const lamp of this.lamps) {
                         if (!inView(lamp.x, lamp.y, lamp.radius)) continue;
                         if (!lamp._shadowPoly || lamp._shadowPoly.length === 0) continue;
@@ -181,8 +251,8 @@
                         lamp._distSq = dx * dx + dy * dy;
                         visibleLamps.push(lamp);
                     }
-                    visibleLamps.sort((a, b) => a._distSq - b._distSq);
-                    for (const lamp of visibleLamps) {
+                    const nearest = this._selectLightingLamps(visibleLamps, this._maxLitLamps, scratch.lampHeap, scratch.nearestLamps);
+                    for (const lamp of nearest) {
                         if (litLamps.length >= this._maxLitLamps) break;
                         const poly = lamp._shadowPoly;
                         if (lamp._shadowPathOf !== poly) {
@@ -192,10 +262,10 @@
                             path.closePath();
                             lamp._shadowPath = path; lamp._shadowPathOf = poly;
                         }
-                        if (!lamp._holeGrad || lamp._holeGradAt !== lamp.x + ',' + lamp.y + ',' + lamp.radius) {
+                        if (!lamp._holeGrad || lamp._holeGradX !== lamp.x || lamp._holeGradY !== lamp.y || lamp._holeGradRadius !== lamp.radius) {
                             const g = lc.createRadialGradient(lamp.x, lamp.y, 10, lamp.x, lamp.y, lamp.radius);
                             g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                            lamp._holeGrad = g; lamp._holeGradAt = lamp.x + ',' + lamp.y + ',' + lamp.radius;
+                            lamp._holeGrad = g; lamp._holeGradX = lamp.x; lamp._holeGradY = lamp.y; lamp._holeGradRadius = lamp.radius;
                         }
                         lc.globalAlpha = Math.min(1, lamp._litK);
                         lc.fillStyle = lamp._holeGrad;
@@ -226,11 +296,13 @@
                 }
             
                 // Headlights: the player's car, up to six in traffic, bumper cars
-                const beams = [];
+                const beams = scratch.beams;
                 const beamOf = (owner, stat, color, haze) => {
                     const off = owner.length / 2;
-                    beams.push({ owner, cx: owner.x + Math.cos(owner.angle) * off, cy: owner.y + Math.sin(owner.angle) * off,
-                                 L: stat * 6, W: stat * 1.5, color, haze });
+                    const b = scratch.beamPool[beams.length] || (scratch.beamPool[beams.length] = {});
+                    beams.push(b);   // register before reading source fields, so finally can always release it
+                    b.owner = owner; b.cx = owner.x + Math.cos(owner.angle) * off; b.cy = owner.y + Math.sin(owner.angle) * off;
+                    b.L = stat * 6; b.W = stat * 1.5; b.color = color; b.haze = haze;
                 };
                 if (this.isDriving || (this.car && this.car.forceLights)) beamOf(this.car, this.car.lightRange || 60, this.car.headlightColor || '#ffffdd', this.isDriving ? 1 : 0);
                 if (this.traffic && this.traffic.vehicles) {
@@ -250,7 +322,8 @@
                 for (const b of beams) this._drawBeam(b);
                 // Underglow: each pool lights its own patch of street
                 if (this.traffic) {
-                    const soft = glowSprite('255, 255, 255', 0.5), cars = new Set(this.traffic.vehicles);
+                    const soft = glowSprite('255, 255, 255', 0.5), cars = scratch.cars;
+                    for (const v of this.traffic.vehicles || []) cars.add(v);
                     if (this.car) cars.add(this.car); if (this.ownedCar) cars.add(this.ownedCar);
                     lc.globalAlpha = 0.55;
                     for (const v of cars) {
@@ -268,7 +341,7 @@
                 // Fixed ones come from activeMap.softLights; props with a `light` carry theirs
                 // with them when pushed. Room switches fade the lights in that room.
                 // (Props are walked once: lights, and vending machines / medbays.)
-                const softLights = [], propGlows = [];
+                const softLights = scratch.softLights, propGlows = scratch.propGlows;
                 {
                     const tNow = _frameTime / 1000;
                     const push = (src, x, y) => {
@@ -278,14 +351,20 @@
                         const k = rsOn ? rs.lightAt(x, y) : 1;
                         if (k < 0.01) return;
                         const f = src.flicker ? 0.82 + 0.18 * Math.sin(tNow * src.flicker + x * 0.7) * Math.sin(tNow * src.flicker * 0.37 + y) : 1;
-                        softLights.push({ src, x, y, r, a: (src.intensity ?? 0.8) * f * k });
+                        const s = scratch.softPool[softLights.length] || (scratch.softPool[softLights.length] = {});
+                        softLights.push(s);
+                        s.src = src; s.x = x; s.y = y; s.r = r; s.a = (src.intensity ?? 0.8) * f * k;
                     };
                     for (const s of (this.activeMap.softLights || [])) push(s, s.x, s.y);
                     for (const p of this.props) {
                         if (p.light && p.visible !== false) { const c = p.getCenter(); push(p.light, c.x + (p.light.dx || 0), c.y + (p.light.dy || 0)); }
                         if (p.interactionType === 'medbay_refill' || p.interactionType === 'vending_machine') {
                             const c = p.getCenter();
-                            if (inView(c.x, c.y, 180)) propGlows.push({ p, x: c.x, y: c.y, medbay: p.interactionType === 'medbay_refill' });
+                            if (inView(c.x, c.y, 180)) {
+                                const g = scratch.propPool[propGlows.length] || (scratch.propPool[propGlows.length] = {});
+                                propGlows.push(g);
+                                g.p = p; g.x = c.x; g.y = c.y; g.medbay = p.interactionType === 'medbay_refill';
+                            }
                         }
                     }
                 }
