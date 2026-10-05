@@ -153,7 +153,7 @@
             // =====================
             
             static _processProjectiles(onScreen, game, candidates = null) {
-                const projectiles = candidates ? this._activeLayer(candidates) : onScreen.filter(e => 
+                const projectiles = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.PROJECTILE && e.active
                 );
                 
@@ -272,7 +272,7 @@
             }
             
             static _processVehicles(onScreen, game, candidates = null) {
-                const vehicles = candidates ? this._activeLayer(candidates) : onScreen.filter(e => 
+                const vehicles = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.VEHICLE && e.active
                 );
                 
@@ -320,7 +320,7 @@
             }
             
             static _processActors(onScreen, game, candidates = null) {
-                const actors = candidates ? this._activeLayer(candidates) : onScreen.filter(e => 
+                const actors = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.ACTOR && e.active
                 );
                 
@@ -411,7 +411,7 @@
             }
             
             static _processDynamics(onScreen, game, candidates = null) {
-                const dynamics = candidates ? this._activeLayer(candidates) : onScreen.filter(e => 
+                const dynamics = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.DYNAMIC && e.active
                 );
                 if (!dynamics.length) return;

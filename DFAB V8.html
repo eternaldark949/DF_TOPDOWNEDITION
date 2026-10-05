@@ -15084,7 +15084,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // =====================
             
             static _processProjectiles(onScreen, game, candidates = null) {
-                const projectiles = candidates ? this._activeLayer(candidates) : onScreen.filter(e => 
+                const projectiles = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.PROJECTILE && e.active
                 );
                 
@@ -15203,7 +15203,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             static _processVehicles(onScreen, game, candidates = null) {
-                const vehicles = candidates ? this._activeLayer(candidates) : onScreen.filter(e => 
+                const vehicles = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.VEHICLE && e.active
                 );
                 
@@ -15251,7 +15251,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             static _processActors(onScreen, game, candidates = null) {
-                const actors = candidates ? this._activeLayer(candidates) : onScreen.filter(e => 
+                const actors = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.ACTOR && e.active
                 );
                 
@@ -15342,7 +15342,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             static _processDynamics(onScreen, game, candidates = null) {
-                const dynamics = candidates ? this._activeLayer(candidates) : onScreen.filter(e => 
+                const dynamics = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.DYNAMIC && e.active
                 );
                 if (!dynamics.length) return;
@@ -43865,7 +43865,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const shoulderPoseX = hipAnchorX - walkBounce + (punchStrike !== null ? bodyRecoil : 0);
             let hipRotation = 0;    // pose targets; walk sway is added after smoothing
             let torsoRotation = 0;
-            const armSwing = isDriving ? 0 : walkOppSin * gaitSpeed;        
+            const armSwing = isDriving ? 0 : walkOppSin * gaitSpeed;
 
             // --- 3b. POSE (ui/poses.js): what the body does while standing still ---
             // Fades in after a moment standing, out the moment the character walks.
@@ -44317,16 +44317,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const rWalkX = walkOppSin * strideLen * fwdAmt;
             const lWalkY = walkSin * strafeLen * sideAmt;
             const rWalkY = walkOppSin * strafeLen * sideAmt;
-        
+
             const lFootX = -3 + lWalkX + pf('lf', 0);
             const rFootX = -3 + rWalkX + pf('rf', 0);
             const lFootY = lBaseY + lWalkY + pf('lf', 1);
             const rFootY = rBaseY + rWalkY + pf('rf', 1);
-        
+
             const lKneeX = (hipAnchorX + lFootX) / 2;
             const lKneeY = (lBaseY + lFootY) / 2;
             const rKneeX = (hipAnchorX + rFootX) / 2;
-            const rKneeY = (rBaseY + rFootY) / 2;        
+            const rKneeY = (rBaseY + rFootY) / 2;
             const botP = WD && clothes.bottom ? WD.bottoms[clothes.bottom.type] : null;
             const shoeP = WD && clothes.shoes ? WD.shoes[clothes.shoes.type] : null;
             const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
@@ -53962,7 +53962,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Spend attunement
                 this.flitState.attunement -= cost;
-                this.flitState.active = true; 
+                this.flitState.active = true;
                 this.flitState.duration = this.flitState.maxDuration;
                 if (this.flitState.attunement < cost) this.flitBtn.classList.add('cooldown');
                 
@@ -61687,7 +61687,7 @@ engineMixin({
                     const outdoorRoom = !!lr && lr.type === 'outdoor';
                     const lampDay = this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight;
                     if (lampPaintInView(l, this.ctx, cullBounds.view, viewZoom, lampDay)) l.draw(this.ctx, lampDay);
-                } 
+                }
             
                 if (RenderStats.timed) this._entLap('Entities: World tops');   // roofs, signs, foliage, lamps
                 if (RenderStats.timed) WorldRenderProfiler.end(this.profiler);

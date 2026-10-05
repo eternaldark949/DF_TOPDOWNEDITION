@@ -1304,7 +1304,7 @@
             const shoulderPoseX = hipAnchorX - walkBounce + (punchStrike !== null ? bodyRecoil : 0);
             let hipRotation = 0;    // pose targets; walk sway is added after smoothing
             let torsoRotation = 0;
-            const armSwing = isDriving ? 0 : walkOppSin * gaitSpeed;        
+            const armSwing = isDriving ? 0 : walkOppSin * gaitSpeed;
 
             // --- 3b. POSE (ui/poses.js): what the body does while standing still ---
             // Fades in after a moment standing, out the moment the character walks.
@@ -1756,16 +1756,16 @@
             const rWalkX = walkOppSin * strideLen * fwdAmt;
             const lWalkY = walkSin * strafeLen * sideAmt;
             const rWalkY = walkOppSin * strafeLen * sideAmt;
-        
+
             const lFootX = -3 + lWalkX + pf('lf', 0);
             const rFootX = -3 + rWalkX + pf('rf', 0);
             const lFootY = lBaseY + lWalkY + pf('lf', 1);
             const rFootY = rBaseY + rWalkY + pf('rf', 1);
-        
+
             const lKneeX = (hipAnchorX + lFootX) / 2;
             const lKneeY = (lBaseY + lFootY) / 2;
             const rKneeX = (hipAnchorX + rFootX) / 2;
-            const rKneeY = (rBaseY + rFootY) / 2;        
+            const rKneeY = (rBaseY + rFootY) / 2;
             const botP = WD && clothes.bottom ? WD.bottoms[clothes.bottom.type] : null;
             const shoeP = WD && clothes.shoes ? WD.shoes[clothes.shoes.type] : null;
             const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;

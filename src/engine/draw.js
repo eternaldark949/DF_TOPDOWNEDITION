@@ -1052,7 +1052,7 @@
                     const outdoorRoom = !!lr && lr.type === 'outdoor';
                     const lampDay = this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight;
                     if (lampPaintInView(l, this.ctx, cullBounds.view, viewZoom, lampDay)) l.draw(this.ctx, lampDay);
-                } 
+                }
             
                 if (RenderStats.timed) this._entLap('Entities: World tops');   // roofs, signs, foliage, lamps
                 if (RenderStats.timed) WorldRenderProfiler.end(this.profiler);

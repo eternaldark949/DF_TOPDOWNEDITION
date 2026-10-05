@@ -199,7 +199,7 @@
                 
                 // Spend attunement
                 this.flitState.attunement -= cost;
-                this.flitState.active = true; 
+                this.flitState.active = true;
                 this.flitState.duration = this.flitState.maxDuration;
                 if (this.flitState.attunement < cost) this.flitBtn.classList.add('cooldown');
                 
