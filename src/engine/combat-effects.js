@@ -438,7 +438,7 @@
                 const shotSpeed  = stats.projectileSpeed || 25;
                 // Arms: Hollow Points; Flit: Flit-Strike (shots just after a flit); Arms: Quick-Draw (first shot after drawing)
                 let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
-                if (_gameTimeSec - this.flitState.lastFlitAt <= 1) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
+                if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
                 if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= 0.8 && !this._drawShotUsed) { shotDamage *= 1 + 0.25 * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
                 shotDamage = Math.round(shotDamage);
                 const shotLife   = stats.projectileLife || 60;
@@ -475,7 +475,8 @@
             
                 // Gunfire carries: gangers in earshot come to look (engine/noise.js)
                 { const N = CONFIG.NOISE, id = (this.currentWeapon && this.currentWeapon.id) || '';
-                  this.emitNoise(this.player.x, this.player.y, isSniperVisual || id.includes('sniper') ? N.sniper : id.includes('rifle') ? N.rifle : N.pistol, 'shot'); }
+                  const reach = isSniperVisual || id.includes('sniper') ? N.sniper : id.includes('rifle') ? N.rifle : N.pistol;
+                  this.emitNoise(this.player.x, this.player.y, this.resonance.stat('gunNoise', reach), 'shot'); }
                 this._loudUntil = _gameTimeSec + 10;                     // she's fired: the crew is weapons free (engine/sneak.js)
 
                 // 5. Spawn Muzzle Flash

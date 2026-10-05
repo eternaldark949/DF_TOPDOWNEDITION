@@ -5498,15 +5498,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            does it become levels and Tuning points she can install. Die first and
            half of the unsettled Resonance scatters on the way back to her.
 
-           Three trees of five nodes, three ranks each; a node opens once the one
-           above it has a rank. `stat(key, base)` gives any stat with the installed
+           Three trees of six nodes, three ranks each; a node opens once the one
+           above it has a rank. The sixth nodes also require level 30.
+           `stat(key, base)` gives any stat with the installed
            ranks applied — the game asks it wherever a number could be tuned.
            ===================================================================== */
         const RESONANCE = {
-            CAP: 30,
+            CAP: 50,
             nextLevel: level => 120 + 70 * level,                 // Resonance from `level` to the next
             DEATH_LOSS: 0.5,
             RESPEC_COST: 200,
+            POST_CAP_XP_PER_PP: 100,                            // Dr. Yin exchanges settled surplus; fractions carry forward
             // Kill awards: base by toughness, then style multipliers (they stack)
             BASE: { Ganger: 20, Drone: 30, GatlingGunner: 80 },
             USUAL_HP: { Ganger: 40, Drone: 60, GatlingGunner: 200 },
@@ -5518,9 +5520,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             { id: 'flit', name: 'Flit', color: '#b89cff', blurb: 'Tune the jump between dimensions.', nodes: [
                 { id: 'reach',        name: 'Reach',        desc: r => `+${10 * r}% flit distance` },
                 { id: 'quick_return', name: 'Quick Return', desc: r => `−${10 * r}% attunement per flit` },
-                { id: 'flit_strike',  name: 'Flit-Strike',  desc: r => `Shots within 1 s after a flit deal +${20 * r}%` },
+                { id: 'flit_strike',  name: 'Flit-Strike',  desc: (r, R) => `Shots within ${R ? R.stat('flitStrikeWindow', 1) : 1} s after a flit deal +${20 * r}%` },
                 { id: 'afterimage',   name: 'Afterimage',   desc: r => `Your flit ghost draws gangers' eyes for ${(0.5 * r).toFixed(1)} s` },
                 { id: 'double_step',  name: 'Double Step',  desc: r => `+${20 * r} max attunement${r >= 3 ? '; a second flit within 0.6 s costs half' : ''}` },
+                { id: 'long_echo',    name: 'Long Echo',    unlockLevel: 30, desc: r => `Flit-Strike lasts ${(1 + 0.25 * r).toFixed(2)} s; its damage bonus stays the same` },
             ] },
             { id: 'frame', name: 'Frame', color: '#c4566e', blurb: 'What Dr. Yin builds into you.', nodes: [
                 { id: 'reinforced',   name: 'Reinforced',   desc: r => `+${10 * r} max health` },
@@ -5528,6 +5531,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 { id: 'stim_potency', name: 'Stim Potency', desc: r => `Stims heal +${15 * r}` },
                 { id: 'idle_mend',    name: 'Idle Mend',    desc: r => `Regen starts ${2 * r} s sooner, +${r} HP/s` },
                 { id: 'last_stand',   name: 'Last Stand',   desc: r => `Survive a lethal hit at 1 HP (every ${[0, 120, 90, 60][r]} s)` },
+                { id: 'grounded',     name: 'Grounded',     unlockLevel: 30, desc: r => `−${15 * r}% knockback from damage` },
             ] },
             { id: 'arms', name: 'Arms', color: '#e8c27a', blurb: 'Steadier hands, heavier hits.', nodes: [
                 { id: 'steady',       name: 'Steady',       desc: r => `−${12 * r}% spread` },
@@ -5535,6 +5539,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 { id: 'hollow_points',name: 'Hollow Points',desc: r => `+${8 * r}% gun damage` },
                 { id: 'heavy_hands',  name: 'Heavy Hands',  desc: r => `+${25 * r}% punch damage and knockback` },
                 { id: 'quick_draw',   name: 'Quick-Draw',   desc: r => `First shot within 0.8 s of drawing: +${25 * r}%` },
+                { id: 'low_signature',name: 'Low Signature',unlockLevel: 30, desc: r => `Gunshots carry ${10 * r}% less far to enemies` },
             ] },
         ];
 
@@ -5554,15 +5559,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 switch (key) {
                     case 'flitDistance':   return base * (1 + 0.10 * r('reach'));
                     case 'flitCost':       return base * (1 - 0.10 * r('quick_return'));
+                    case 'flitStrikeWindow': return base + 0.25 * r('long_echo');
                     case 'maxAttunement':  return base + 20 * r('double_step');
                     case 'maxHealth':      return base + 10 * r('reinforced');
                     case 'damageTaken':    return base * (1 - 0.06 * r('plating'));
+                    case 'knockbackTaken': return base * (1 - 0.15 * r('grounded'));
                     case 'stimHeal':       return base + 15 * r('stim_potency');
                     case 'regenDelay':     return Math.max(60, base - 120 * r('idle_mend'));   // frames
                     case 'regenAmount':    return base + r('idle_mend');                        // HP per second
                     case 'spread':         return base * (1 - 0.12 * r('steady'));
                     case 'fireCooldown':   return base * (1 - 0.08 * r('quick_hands'));
                     case 'gunDamage':      return base * (1 + 0.08 * r('hollow_points'));
+                    case 'gunNoise':       return base * (1 - 0.10 * r('low_signature'));
                     case 'punchDamage':    return base * (1 + 0.25 * r('heavy_hands'));
                     default: return base;
                 }
@@ -5602,8 +5610,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 while (this.level < RESONANCE.CAP && this.xp >= this.toNext()) {
                     this.xp -= this.toNext(); this.level++; this.points++; gained++;
                 }
-                if (this.level >= RESONANCE.CAP) this.xp = 0;
                 return gained;
+            }
+
+            /** Exchange settled surplus only at the cap. The saved xp field retains the remainder. */
+            cashOut() {
+                if (this.level < RESONANCE.CAP) return 0;
+                const pp = Math.floor(this.xp / RESONANCE.POST_CAP_XP_PER_PP);
+                this.xp -= pp * RESONANCE.POST_CAP_XP_PER_PP;
+                return pp;
             }
 
             /** Returning to Dr. Yin after dying: part of the unsettled Resonance scatters. Returns what was lost. */
@@ -5618,7 +5633,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const tree = RESONANCE_TREES.find(t => t.id === treeId);
                 if (!tree || this.points < 1) return false;
                 const node = tree.nodes[nodeIndex];
-                if (!node || this.rank(node.id) >= 3) return false;
+                if (!node || this.rank(node.id) >= 3 || this.level < (node.unlockLevel || 0)) return false;
                 return nodeIndex === 0 || this.rank(tree.nodes[nodeIndex - 1].id) > 0;
             }
 
@@ -5651,7 +5666,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             deserialize(d) {
                 this.reset();
                 if (!d) return;
-                this.level = Math.min(RESONANCE.CAP, d.level | 0); this.xp = +d.xp || 0; this.unsettled = +d.unsettled || 0;
+                this.level = Math.max(0, Math.min(RESONANCE.CAP, d.level | 0));
+                this.xp = Number.isFinite(+d.xp) ? Math.max(0, Math.floor(+d.xp)) : 0;
+                this.unsettled = Number.isFinite(+d.unsettled) ? Math.max(0, Math.floor(+d.unsettled)) : 0;
                 this.points = d.points | 0;
                 const known = new Set(RESONANCE_TREES.flatMap(t => t.nodes.map(n => n.id)));
                 for (const [k, v] of Object.entries(d.ranks || {})) if (known.has(k)) this.ranks[k] = Math.max(0, Math.min(3, v | 0));
@@ -20098,7 +20115,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 
                 // Use ActorEntity's damage system
-                const damaged = super.takeDamage(amount, knockbackX, knockbackY);
+                const kbScale = g && g.resonance ? g.resonance.stat('knockbackTaken', 1) : 1;
+                const damaged = super.takeDamage(amount, knockbackX * kbScale, knockbackY * kbScale);
                 if (lastStood) this.invincibleTimer = 60;                 // a moment's grace after Last Stand
                 
                 if (damaged && this._game) {
@@ -50646,7 +50664,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const shotSpeed  = stats.projectileSpeed || 25;
                 // Arms: Hollow Points; Flit: Flit-Strike (shots just after a flit); Arms: Quick-Draw (first shot after drawing)
                 let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
-                if (_gameTimeSec - this.flitState.lastFlitAt <= 1) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
+                if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
                 if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= 0.8 && !this._drawShotUsed) { shotDamage *= 1 + 0.25 * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
                 shotDamage = Math.round(shotDamage);
                 const shotLife   = stats.projectileLife || 60;
@@ -50683,7 +50701,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
                 // Gunfire carries: gangers in earshot come to look (engine/noise.js)
                 { const N = CONFIG.NOISE, id = (this.currentWeapon && this.currentWeapon.id) || '';
-                  this.emitNoise(this.player.x, this.player.y, isSniperVisual || id.includes('sniper') ? N.sniper : id.includes('rifle') ? N.rifle : N.pistol, 'shot'); }
+                  const reach = isSniperVisual || id.includes('sniper') ? N.sniper : id.includes('rifle') ? N.rifle : N.pistol;
+                  this.emitNoise(this.player.x, this.player.y, this.resonance.stat('gunNoise', reach), 'shot'); }
                 this._loudUntil = _gameTimeSec + 10;                     // she's fired: the crew is weapons free (engine/sneak.js)
 
                 // 5. Spawn Muzzle Flash
@@ -53166,7 +53185,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const R = this.resonance;
                 body.innerHTML = `
                     <div class="tun-quote">"Hold still, Stella. Let's see what the fighting did to you."</div>
-                    <div class="tun-choice" data-act="tune"><b>TUNE RESONANCE</b><span>${R.unsettled > 0 ? R.unsettled + ' unsettled to settle' : 'Spend Tuning points, review your trees'}</span></div>
+                    <div class="tun-choice" data-act="tune"><b>TUNE RESONANCE</b><span>${R.unsettled > 0 ? R.unsettled + ' unsettled to settle' : 'Spend Tuning points, review your trees'}${R.level >= RESONANCE.CAP ? ` · ${RESONANCE.POST_CAP_XP_PER_PP} Resonance = 1 PP` : ''}</span></div>
                     <div class="tun-choice" data-act="aug"><b>AUGMENTS</b><span>Browse and install augments</span></div>`;
                 body.querySelector('[data-act="tune"]').onclick = () => this.openTuning();
                 body.querySelector('[data-act="aug"]').onclick = () => { this.closeTuning(); this.openAugmentShop(); };
@@ -53177,10 +53196,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const R = this.resonance;
                 const before = R.level, carried = R.unsettled;
                 const gained = R.tune();
+                const pp = R.cashOut();
+                this.currency += pp;
                 this.applyResonanceStats();
                 this.updateUI();
-                if (gained > 0) audioSys.sfx('ui');
-                this._tuneReveal = carried > 0 ? { carried, gained, from: before } : null;
+                if (gained > 0 || pp > 0) audioSys.sfx('ui');
+                this._tuneReveal = carried > 0 || pp > 0 ? { carried, gained, from: before, pp } : null;
                 this.renderTuning();
             },
 
@@ -53192,21 +53213,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let html = `<div class="tun-head">
                         <div><span class="tun-lv">◈ LEVEL ${R.level}</span>${R.level >= RESONANCE.CAP ? ' <span class="tun-dim">(tuned to the limit)</span>' : ''}</div>
                         <div class="tun-bar"><div style="width:${pct}%"></div></div>
-                        <div class="tun-dim">${next === Infinity ? '' : `${R.xp} / ${next} to the next level`} · <b style="color:#e8c27a">${R.points} Tuning point${R.points === 1 ? '' : 's'}</b></div>
+                        <div class="tun-dim">${next === Infinity ? `${RESONANCE.POST_CAP_XP_PER_PP} Resonance = 1 PP · ${R.xp} / ${RESONANCE.POST_CAP_XP_PER_PP} saved toward the next PP` : `${R.xp} / ${next} to the next level`} · <b style="color:#e8c27a">${R.points} Tuning point${R.points === 1 ? '' : 's'}</b></div>
                     </div>`;
                 if (rv) html += `<div class="tun-quote">${rv.gained > 0
                         ? `"There. ${rv.carried} settled — you're ${rv.gained > 1 ? rv.gained + ' levels' : 'a level'} stronger. Choose where it goes."`
-                        : R.level >= RESONANCE.CAP ? `"${rv.carried} settled. You're tuned as far as I can take you — for now."`
-                        : `"${rv.carried} settled. Not enough to rise yet — keep moving, keep flitting."`}</div>`;
+                        : R.level >= RESONANCE.CAP ? `"${rv.carried} settled. You're fully tuned; I can exchange the surplus for PP."`
+                        : `"${rv.carried} settled. Not enough to rise yet — keep moving, keep flitting."`}${rv.pp > 0 ? ` <b>+${rv.pp} PP</b> from surplus Resonance.` : ''}</div>`;
                 html += `<div class="tun-trees">`;
                 for (const tree of RESONANCE_TREES) {
                     html += `<div class="tun-tree" style="--c:${tree.color}"><div class="tun-tree-name">${tree.name.toUpperCase()}</div><div class="tun-dim">${tree.blurb}</div>`;
                     tree.nodes.forEach((n, i) => {
-                        const r = R.rank(n.id), can = R.canRaise(tree.id, i), locked = i > 0 && R.rank(tree.nodes[i - 1].id) === 0;
+                        const r = R.rank(n.id), can = R.canRaise(tree.id, i), levelLocked = R.level < (n.unlockLevel || 0);
+                        const locked = levelLocked || (i > 0 && R.rank(tree.nodes[i - 1].id) === 0);
                         const pips = [1, 2, 3].map(k => `<i class="${k <= r ? 'on' : ''}"></i>`).join('');
                         html += `<div class="tun-node${can ? ' can' : ''}${locked ? ' locked' : ''}" data-tree="${tree.id}" data-i="${i}">
                             <div class="tun-node-top"><b>${n.name}</b><span class="tun-pips">${pips}</span></div>
-                            <div class="tun-dim">${n.desc(Math.max(1, Math.min(3, r + (r < 3 ? 1 : 0))))}${r > 0 && r < 3 ? ' <span class="tun-next">(next rank)</span>' : ''}</div></div>`;
+                            <div class="tun-dim">${n.desc(Math.max(1, Math.min(3, r + (r < 3 ? 1 : 0))), R)}${r > 0 && r < 3 ? ' <span class="tun-next">(next rank)</span>' : ''}${n.unlockLevel ? ` <span class="tun-next">(${levelLocked ? 'requires' : 'unlocks at'} Level ${n.unlockLevel})</span>` : ''}</div></div>`;
                     });
                     html += `</div>`;
                 }
@@ -53238,18 +53260,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const pct = next === Infinity ? 100 : Math.max(0, Math.min(100, Math.round(R.xp / next * 100)));
                 let html = `<div class="df-section"><span><span class="glint">◆</span>Resonance</span><span class="count">Level ${R.level}</span></div>`;
                 html += `<div class="df-card"><div class="df-head"><div class="grow"><div class="title script">Level ${R.level}</div>`;
-                html += `<div class="eyebrow" style="margin-top:2px;">${next === Infinity ? 'Tuned to the limit' : `${R.xp} / ${next} to the next level`}</div></div>`;
+                html += `<div class="eyebrow" style="margin-top:2px;">${next === Infinity ? `Tuned to the limit · ${R.xp} / ${RESONANCE.POST_CAP_XP_PER_PP} saved toward the next PP` : `${R.xp} / ${next} to the next level`}</div></div>`;
                 html += `<div class="df-chips" style="justify-content:flex-end;"><span class="df-chip active">${R.points} Tuning point${R.points === 1 ? '' : 's'}</span>`;
                 html += `<span class="df-chip gold">${R.unsettled} unsettled</span><span class="df-chip info">Dark Element ◆ ${this.darkElement || 0}</span></div></div>`;
                 html += `<div class="df-bar${pct ? '' : ' zero'}" style="margin-top:12px;"><i style="--v:${pct}%"></i></div>`;
                 html += `<div class="df-hint" style="margin-top:12px;">Visit Dr. Yin at the medbay to tune. Unsettled Resonance is lost by half if you fall before you get there.</div></div>`;
+                if (R.level >= RESONANCE.CAP) html += `<div class="df-hint" style="margin-bottom:12px;">Dr. Yin exchanges surplus Resonance at ${RESONANCE.POST_CAP_XP_PER_PP} Resonance per PP. Settled remainders carry forward.</div>`;
                 html += `<div class="df-grid" style="margin-top:14px;">`;
                 for (const tree of RESONANCE_TREES) {
                     const spent = tree.nodes.reduce((a, n) => a + R.rank(n.id), 0);
                     html += `<div class="df-card accent" style="--acc:${tree.color}"><div class="df-head"><div class="title" style="color:${tree.color}">${tree.name}</div><span class="count df-chip info">${spent} / ${tree.nodes.length * 3}</span></div>`;
                     for (const n of tree.nodes) {
                         const r = R.rank(n.id);
-                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r))}</span></div>`;
+                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r), R)}${n.unlockLevel ? ` <span class="df-hint">(requires Level ${n.unlockLevel})</span>` : ''}</span></div>`;
                     }
                     html += `</div>`;
                 }
@@ -53780,8 +53803,124 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return Math.floor(cost);
             },
 
-            /** Flit. `angleOverride` (radians) comes from the move stick's ring or a flick; otherwise
-             *  the way she's moving (keys, stick) or facing. Returns true if she flitted. */
+            /** Event-only landing search: teleport through obstacles, but finish with a clear player circle. */
+            findFlitLanding(angle, distance) {
+                const p = this.player, map = this.activeMap, margin = 20, minTravel = 1;
+                if (!p || !map || ![p.x, p.y, angle, distance, map.width, map.height].every(Number.isFinite) || distance < minTravel || map.width < margin * 2 || map.height < margin * 2) return null;
+                const sx = p.x, sy = p.y, ux = Math.cos(angle), uy = Math.sin(angle);
+                const radius = Number.isFinite(p.radius) && p.radius > 0 ? p.radius : 12;
+                const rects = [], leaves = [];
+                const addRect = r => {
+                    if (r && [r.x, r.y, r.w, r.h].every(Number.isFinite) && r.w > 0 && r.h > 0) rects.push(r);
+                };
+                for (const r of map.walls || []) addRect(r);
+                if (Array.isArray(map.buildingColliders)) for (const r of map.buildingColliders) addRect(r);
+                else for (const b of map.buildings || []) {
+                    if (b.isV2 && typeof b.getCollisionShapes === 'function') for (const r of b.getCollisionShapes()) addRect(r);
+                    else addRect(b);
+                }
+                if (this.useNewCollisionSystem) for (const e of this._staticBillboardEntities || []) {
+                    if (e.active && e.hasCollision && !e.markedForDestroy) addRect(e.getBoundingBox());
+                }
+                const rooms = this.roomSystem;
+                if (rooms && rooms.active) for (const door of rooms.doors || []) {
+                    // Sliding panels and arches do not push actors; hinged leaves do.
+                    if (door.type !== 'hinged') continue;
+                    const half = door.halfThick;
+                    if (!Number.isFinite(half) || half < 0) continue;
+                    for (const s of door.leaves()) if (s.length === 4 && s.every(Number.isFinite)) leaves.push({ s, r: radius + half });
+                }
+                const clear = (x, y) => {
+                    for (const r of rects) {
+                        const dx = x - Math.max(r.x, Math.min(r.x + r.w, x)), dy = y - Math.max(r.y, Math.min(r.y + r.h, y));
+                        if (Math.hypot(dx, dy) < radius) return false;
+                    }
+                    for (const leaf of leaves) {
+                        const [ax, ay, bx, by] = leaf.s, dx = bx - ax, dy = by - ay, n = dx * dx + dy * dy;
+                        const t = n ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / n)) : 0;
+                        if (Math.hypot(x - ax - dx * t, y - ay - dy * t) < leaf.r) return false;
+                    }
+                    return true;
+                };
+                // Keep the original map-clamped endpoint exactly when it is already safe.
+                const tx = Math.max(margin, Math.min(map.width - margin, sx + ux * distance));
+                const ty = Math.max(margin, Math.min(map.height - margin, sy + uy * distance));
+                if ((tx - sx) * ux + (ty - sy) * uy >= minTravel && Math.hypot(tx - sx, ty - sy) >= minTravel && clear(tx, ty)) return { x: tx, y: ty };
+
+                // A blocked endpoint searches only along the requested ray, inside the same map margin.
+                let lo = minTravel, hi = distance;
+                const trim = (s, u, a, b) => {
+                    if (u === 0) return s >= a && s <= b;
+                    let t0 = (a - s) / u, t1 = (b - s) / u;
+                    if (t0 > t1) [t0, t1] = [t1, t0];
+                    lo = Math.max(lo, t0); hi = Math.min(hi, t1); return lo <= hi;
+                };
+                if (!trim(sx, ux, margin, map.width - margin) || !trim(sy, uy, margin, map.height - margin)) return null;
+                const intervals = [];
+                const add = (a, b) => { a = Math.max(lo, a); b = Math.min(hi, b); if (a < b) intervals.push([a, b]); };
+                const box = (x, y, dx, dy, left, top, right, bottom) => {
+                    let a = lo, b = hi;
+                    for (const [s, u, min, max] of [[x, dx, left, right], [y, dy, top, bottom]]) {
+                        if (u === 0) { if (s <= min || s >= max) return; }
+                        else {
+                            let t0 = (min - s) / u, t1 = (max - s) / u;
+                            if (t0 > t1) [t0, t1] = [t1, t0];
+                            a = Math.max(a, t0); b = Math.min(b, t1); if (a >= b) return;
+                        }
+                    }
+                    add(a, b);
+                };
+                const disc = (cx, cy, r) => {
+                    const dx = sx - cx, dy = sy - cy, n = ux * ux + uy * uy;
+                    const center = -(dx * ux + dy * uy) / n, cross = dx * uy - dy * ux;
+                    const span2 = (r * r - cross * cross / n) / n;
+                    if (span2 > 0) { const span = Math.sqrt(span2); add(center - span, center + span); }
+                };
+                const rayMinX = Math.min(sx + ux * lo, sx + ux * hi), rayMaxX = Math.max(sx + ux * lo, sx + ux * hi);
+                const rayMinY = Math.min(sy + uy * lo, sy + uy * hi), rayMaxY = Math.max(sy + uy * lo, sy + uy * hi);
+                for (const r of rects) {
+                    const left = r.x, top = r.y, right = left + r.w, bottom = top + r.h;
+                    if (right + radius < rayMinX || left - radius > rayMaxX || bottom + radius < rayMinY || top - radius > rayMaxY) continue;
+                    // Rounded AABB: two strips and four corner discs, rather than an oversized square.
+                    box(sx, sy, ux, uy, left - radius, top, right + radius, bottom);
+                    box(sx, sy, ux, uy, left, top - radius, right, bottom + radius);
+                    disc(left, top, radius); disc(right, top, radius); disc(left, bottom, radius); disc(right, bottom, radius);
+                }
+                for (const leaf of leaves) {
+                    const [ax, ay, bx, by] = leaf.s, dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+                    if (len) {
+                        const vx = dx / len, vy = dy / len;
+                        box((sx - ax) * vx + (sy - ay) * vy, -(sx - ax) * vy + (sy - ay) * vx,
+                            ux * vx + uy * vy, -ux * vy + uy * vx, 0, -leaf.r, len, leaf.r);
+                    }
+                    disc(ax, ay, leaf.r); disc(bx, by, leaf.r);
+                }
+                intervals.sort((a, b) => a[0] - b[0]);
+                const merged = [];
+                for (const interval of intervals) {
+                    const last = merged[merged.length - 1];
+                    // Touching intervals retain their shared safe tangent point.
+                    if (last && interval[0] < last[1]) last[1] = Math.max(last[1], interval[1]);
+                    else merged.push(interval);
+                }
+                const epsilon = Math.max(1e-7, Number.EPSILON * Math.max(1, Math.abs(sx), Math.abs(sy), map.width, map.height) * 64);
+                let t = hi;
+                const landing = () => {
+                    const x = sx + ux * t, y = sy + uy * t;
+                    return t >= lo && x >= margin && x <= map.width - margin && y >= margin && y <= map.height - margin && clear(x, y) ? { x, y } : null;
+                };
+                let result = landing();
+                if (result) return result;
+                t = hi - epsilon; result = landing(); if (result) return result;
+                for (let i = merged.length - 1; i >= 0; i--) {
+                    const [a, b] = merged[i];
+                    if (t < a || t > b + epsilon) continue;
+                    t = a; result = landing(); if (result) return result;
+                    t = a - epsilon; result = landing(); if (result) return result;
+                }
+                return null;
+            },
+
             triggerFlit(angleOverride, source) {
                 if (this.isDriving || this.paused) return false;
                 if (this.hud && !this.hud.has('flit')) return false;   // not introduced yet (ui/hud-reveal.js)
@@ -53790,14 +53929,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Check attunement pool
                 if (this.flitState.attunement < cost) return false;
-                if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }
-                
-                // Spend attunement
-                this.flitState.attunement -= cost;
-                this.flitState.active = true; 
-                this.flitState.duration = this.flitState.maxDuration;
-                if (this.flitState.attunement < cost) this.flitBtn.classList.add('cooldown');
-                
                 // --- Capture start state for VFX ---
                 const startX = this.player.x;
                 const startY = this.player.y;
@@ -53806,10 +53937,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let flitDist = this.player.buffSystem.getStat('flitDistance', 120);
                 if (this.augments && this.augments.isEquipped('flit_ext')) flitDist *= 1.3; // 30% more range
                 if (this.resonance) flitDist = this.resonance.stat('flitDistance', flitDist);   // Flit: Reach
-                this.flitState.lastFlitAt = _gameTimeSec;
-                // Flit: Afterimage — gangers keep seeing you where you left
-                const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
-                this._afterimage = ai ? { x: this.player.x, y: this.player.y, until: _gameTimeSec + 0.5 * ai } : null;
 
                 // Flit direction: use movement keys (WASD) or joystick if active, otherwise fall back to facing angle
                 let flitAngle = this.player.angle;
@@ -53827,15 +53954,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 if (typeof angleOverride === 'number') flitAngle = angleOverride;
 
-                let targetX = this.player.x + Math.cos(flitAngle) * flitDist; let targetY = this.player.y + Math.sin(flitAngle) * flitDist;
-                let hitWall = false; for(let w of this.activeMap.walls) { if (targetX > w.x && targetX < w.x + w.w && targetY > w.y && targetY < w.y + w.h) { hitWall = true; break; } }
-                if (hitWall) { targetX = this.player.x + Math.cos(flitAngle) * 20; targetY = this.player.y + Math.sin(flitAngle) * 20; }
+                const landing = this.findFlitLanding(flitAngle, flitDist);
+                if (!landing) return false;
+                const targetX = landing.x, targetY = landing.y;
+
+                if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }
                 
-                // Clamp target within map bounds
-                const margin = 20;
-                targetX = Math.max(margin, Math.min(this.activeMap.width - margin, targetX));
-                targetY = Math.max(margin, Math.min(this.activeMap.height - margin, targetY));
+                // Spend attunement
+                this.flitState.attunement -= cost;
+                this.flitState.active = true; 
+                this.flitState.duration = this.flitState.maxDuration;
+                if (this.flitState.attunement < cost) this.flitBtn.classList.add('cooldown');
                 
+                this.flitState.lastFlitAt = _gameTimeSec;
+                // Flit: Afterimage — gangers keep seeing you where you left
+                const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
+                this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + 0.5 * ai } : null;
+
                 this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player); showMessage("FLIT!"); this.triggerShake(4);
 
                 // --- Spawn Flit VFX ---
