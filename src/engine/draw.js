@@ -1201,6 +1201,9 @@
                     this.bokeh.update(this.deltaTime || 16);
                     this.bokeh.draw(this.ctx, this.canvas.width, this.canvas.height, _frameTime);
                 }
+
+                // A small player cue stays legible above the light, refraction and weather.
+                this.drawPlayerMarker(this.ctx);
                 
                 // Mission waypoint marker (screen-space indicator)
                 if (this.missions.activeMission && this.missions.activeMission.status === 'active' 

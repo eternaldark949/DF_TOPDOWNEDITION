@@ -127,13 +127,13 @@
                         const x0 = Math.max(0, cx - pad), y0 = Math.max(0, cy - pad);
                         const x1 = Math.min(W, cx + pad), y1 = Math.min(H, cy + pad);
                         if (x1 > x0 && y1 > y0) {
-                            const sc = 1 + (0.034 + 4.5 / Math.max(40, rad)) * k;
+                            const sc = 1 + (0.051 + 6.75 / Math.max(40, rad)) * k;
                             // the source box that lands on [x0,x1]×[y0,y1] once scaled about (cx, cy)
                             const u0 = cx + (x0 - cx) / sc, v0 = cy + (y0 - cy) / sc, u1 = cx + (x1 - cx) / sc, v1 = cy + (y1 - cy) / sc;
                             ctx.save();
                             ctx.clip(band, 'evenodd');
-                            ctx.globalAlpha = 0.75 * k;
-                            ctx.drawImage(cv, u0 / 4, v0 / 4, (u1 - u0) / 4, (v1 - v0) / 4, x0 + 1.2 * k, y0, x1 - x0, y1 - y0);
+                            ctx.globalAlpha = 0.90 * k;
+                            ctx.drawImage(cv, u0 / 4, v0 / 4, (u1 - u0) / 4, (v1 - v0) / 4, x0 + 1.8 * k, y0, x1 - x0, y1 - y0);
                             ctx.restore();
                         }
                     }

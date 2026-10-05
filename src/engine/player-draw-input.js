@@ -1,6 +1,33 @@
         // GameEngine — Drawing the player, emotes, pausable timers, sidebar portrait, joysticks.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /** An unanimated ivory diamond below the player, sized in CSS pixels rather than world units. */
+            drawPlayerMarker(ctx) {
+                const p = this.player;
+                if (!this.running || !p || !p.visible || p.isHidden || p.dead || this.isDriving || p.inCar ||
+                    (this.scenes && this.scenes.running) || (this.cutscene && this.cutscene.active) ||
+                    this.cineCam || this.finisher || this.finCam) return;
+                const v = this.view;
+                if (!v) return;
+                const scale = this._renderScale || 1, z = v.zoom;
+                const x = this.canvas.width / 2 + (p.x - v.x + (v.shakeX || 0)) * z;
+                const y = this.canvas.height / 2 + (p.y - v.y + (v.shakeY || 0)) * z + Math.max(16 * z, 10 * scale) + 5 * scale;
+                const r = 3.5 * scale, guard = r + scale;
+                if (!Number.isFinite(x) || !Number.isFinite(y) || x < -guard || x > this.canvas.width + guard ||
+                    y < -guard || y > this.canvas.height + guard) return;
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.globalAlpha = 0.95;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+                ctx.filter = 'none';
+                ctx.beginPath();
+                ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath();
+                ctx.fillStyle = '#fff3d8'; ctx.fill();
+                ctx.strokeStyle = '#251229'; ctx.lineWidth = 1.5 * scale; ctx.lineJoin = 'round'; ctx.stroke();
+                ctx.restore();
+            },
+
             drawPlayer() {
                 this.ctx.save(); 
                 this.ctx.translate(this.player.x, this.player.y); 

@@ -51296,13 +51296,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const x0 = Math.max(0, cx - pad), y0 = Math.max(0, cy - pad);
                         const x1 = Math.min(W, cx + pad), y1 = Math.min(H, cy + pad);
                         if (x1 > x0 && y1 > y0) {
-                            const sc = 1 + (0.034 + 4.5 / Math.max(40, rad)) * k;
+                            const sc = 1 + (0.051 + 6.75 / Math.max(40, rad)) * k;
                             // the source box that lands on [x0,x1]×[y0,y1] once scaled about (cx, cy)
                             const u0 = cx + (x0 - cx) / sc, v0 = cy + (y0 - cy) / sc, u1 = cx + (x1 - cx) / sc, v1 = cy + (y1 - cy) / sc;
                             ctx.save();
                             ctx.clip(band, 'evenodd');
-                            ctx.globalAlpha = 0.75 * k;
-                            ctx.drawImage(cv, u0 / 4, v0 / 4, (u1 - u0) / 4, (v1 - v0) / 4, x0 + 1.2 * k, y0, x1 - x0, y1 - y0);
+                            ctx.globalAlpha = 0.90 * k;
+                            ctx.drawImage(cv, u0 / 4, v0 / 4, (u1 - u0) / 4, (v1 - v0) / 4, x0 + 1.8 * k, y0, x1 - x0, y1 - y0);
                             ctx.restore();
                         }
                     }
@@ -61836,6 +61836,9 @@ engineMixin({
                     this.bokeh.update(this.deltaTime || 16);
                     this.bokeh.draw(this.ctx, this.canvas.width, this.canvas.height, _frameTime);
                 }
+
+                // A small player cue stays legible above the light, refraction and weather.
+                this.drawPlayerMarker(this.ctx);
                 
                 // Mission waypoint marker (screen-space indicator)
                 if (this.missions.activeMission && this.missions.activeMission.status === 'active' 
@@ -65245,6 +65248,33 @@ engineMixin({
         // GameEngine — Drawing the player, emotes, pausable timers, sidebar portrait, joysticks.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /** An unanimated ivory diamond below the player, sized in CSS pixels rather than world units. */
+            drawPlayerMarker(ctx) {
+                const p = this.player;
+                if (!this.running || !p || !p.visible || p.isHidden || p.dead || this.isDriving || p.inCar ||
+                    (this.scenes && this.scenes.running) || (this.cutscene && this.cutscene.active) ||
+                    this.cineCam || this.finisher || this.finCam) return;
+                const v = this.view;
+                if (!v) return;
+                const scale = this._renderScale || 1, z = v.zoom;
+                const x = this.canvas.width / 2 + (p.x - v.x + (v.shakeX || 0)) * z;
+                const y = this.canvas.height / 2 + (p.y - v.y + (v.shakeY || 0)) * z + Math.max(16 * z, 10 * scale) + 5 * scale;
+                const r = 3.5 * scale, guard = r + scale;
+                if (!Number.isFinite(x) || !Number.isFinite(y) || x < -guard || x > this.canvas.width + guard ||
+                    y < -guard || y > this.canvas.height + guard) return;
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.globalAlpha = 0.95;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+                ctx.filter = 'none';
+                ctx.beginPath();
+                ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath();
+                ctx.fillStyle = '#fff3d8'; ctx.fill();
+                ctx.strokeStyle = '#251229'; ctx.lineWidth = 1.5 * scale; ctx.lineJoin = 'round'; ctx.stroke();
+                ctx.restore();
+            },
+
             drawPlayer() {
                 this.ctx.save(); 
                 this.ctx.translate(this.player.x, this.player.y); 
