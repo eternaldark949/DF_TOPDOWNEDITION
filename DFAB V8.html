@@ -32926,6 +32926,94 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              *   - GATE_EXIT: Exiting an intersection
              *   - DESTINATION: Final target
              */
+            // Driving routes must follow directed lane links from the actual car lane.
+            // The map's pedestrian route may choose a different lane or a drawing-only
+            // fallback curve, neither of which an occupied car can safely follow.
+            buildDrivePath(startLane, startX, startY, endX, endY) {
+                if (!startLane || !this.allLanes.includes(startLane)) return null;
+                const project = (lane, x, y) => {
+                    const along = clamp(lane.getDistanceAlong(x, y), 0, lane.length);
+                    const x0 = lane.start.x + lane.ux * along, y0 = lane.start.y + lane.uy * along;
+                    return { along, x: x0, y: y0, distance: Math.hypot(x - x0, y - y0) };
+                };
+                const origin = project(startLane, startX, startY);
+                const targets = new Map();
+                let nearest = Infinity;
+                for (const lane of this.allLanes) {
+                    const point = project(lane, endX, endY);
+                    targets.set(lane, point); nearest = Math.min(nearest, point.distance);
+                }
+                for (const [lane, point] of targets) {
+                    if (point.distance > nearest + (lane.road.laneWidth || 60) + 0.01) targets.delete(lane);
+                }
+                const distances = new Map(), previous = new Map(), settled = new Set();
+                const relax = (fromLane, cost, source = false) => {
+                    const links = (fromLane.connections || []).map(toLane => ({ fromLane, toLane, turnPath: null }));
+                    for (const turnPath of fromLane.turnPaths || []) {
+                        if (turnPath.fromLane === fromLane && turnPath.toLane) links.push({ fromLane, toLane: turnPath.toLane, turnPath });
+                    }
+                    for (const link of links) {
+                        if (!targets.has(link.toLane) && !this.allLanes.includes(link.toLane)) continue;
+                        const cp = link.turnPath?.controlPoints;
+                        const length = cp ? cp.slice(1).reduce((sum, point, i) => sum + Math.hypot(point.x - cp[i].x, point.y - cp[i].y), 0)
+                            : Math.hypot(fromLane.end.x - link.toLane.start.x, fromLane.end.y - link.toLane.start.y);
+                        const nextCost = cost + length;
+                        if (nextCost < (distances.get(link.toLane) ?? Infinity)) {
+                            distances.set(link.toLane, nextCost);
+                            previous.set(link.toLane, { link, from: source ? null : fromLane });
+                        }
+                    }
+                };
+                relax(startLane, startLane.length - origin.along, true);
+                let best = null, bestCost = Infinity;
+                const direct = targets.get(startLane);
+                if (direct && direct.along >= origin.along - 1) {
+                    best = { lane: startLane, point: direct, direct: true };
+                    bestCost = Math.max(0, direct.along - origin.along) + direct.distance * 4;
+                }
+                while (true) {
+                    let lane = null, cost = Infinity;
+                    for (const [candidate, value] of distances) {
+                        if (!settled.has(candidate) && value < cost) { lane = candidate; cost = value; }
+                    }
+                    if (!lane) break;
+                    settled.add(lane);
+                    const point = targets.get(lane);
+                    const finalCost = point ? cost + point.along + point.distance * 4 : Infinity;
+                    if (finalCost < bestCost) { best = { lane, point, direct: false }; bestCost = finalCost; }
+                    relax(lane, cost + lane.length);
+                }
+                if (!best) return null;
+                const transitions = [];
+                if (!best.direct) {
+                    let lane = best.lane;
+                    while (lane) {
+                        const step = previous.get(lane);
+                        if (!step) return null;
+                        transitions.push(step.link); lane = step.from;
+                    }
+                    transitions.reverse();
+                }
+                const lanePoint = (type, lane, point) => ({ type, x: point.x, y: point.y,
+                    lane, laneId: lane.id, segment: lane.segment, segmentId: lane.segmentId,
+                    road: lane.road, roadId: lane.roadId });
+                const waypoints = [lanePoint('LANE_START', startLane, { x: startX, y: startY })];
+                for (const link of transitions) {
+                    waypoints.push(lanePoint('LANE_END', link.fromLane, link.fromLane.end));
+                    const tp = link.turnPath;
+                    if (tp) {
+                        waypoints.push({ type: 'TURN_PATH', x: tp.controlPoints[0].x, y: tp.controlPoints[0].y,
+                            turnPath: tp, turnPathId: tp.id, controlPoints: tp.controlPoints,
+                            fromLaneId: tp.fromLaneId, toLaneId: tp.toLaneId, toSegmentId: tp.toSegmentId,
+                            intersection: tp.fromGate.intersection, intersectionId: tp.fromGate.intersectionId });
+                    }
+                    waypoints.push(lanePoint('GATE_EXIT', link.toLane, link.toLane.start));
+                }
+                waypoints.push(lanePoint('DESTINATION', best.lane, best.point));
+                return { startLane, transitions, index: 0, waypoints,
+                    target: { x: endX, y: endY }, destination: { x: best.point.x, y: best.point.y }, endLane: best.lane };
+            }
+
             buildPrecisePath(startX, startY, endX, endY) {
                 const path = [];
                 
@@ -33602,7 +33690,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 zib.glowColor = ZIB_CONFIG.underglowColor;
                 zib.headlightColor = ZIB_CONFIG.headlightColor;
                 zib.isZib = true;
-                zib.driverType = 'zib';
+                zib.driverType = 'traffic';
+                zib.hasDriver = false;
                 trafficManager.vehicles.push(zib);
                 this.activeZibs.push(zib);
             }
@@ -33615,7 +33704,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let closest = null;
                 let closestDist = range;
                 for (const zib of this.activeZibs) {
-                    if (!zib.visible || zib.hasDriver) continue;
+                    if (!zib.visible || zib.dead || zib.markedForDestroy || zib.fading || zib.hasDriver) continue;
                     if (this.passengerRide && this.passengerRide.zib === zib) continue;
                     const dist = Math.hypot(px - zib.x, py - zib.y);
                     if (dist < closestDist) { closestDist = dist; closest = zib; }
@@ -33629,6 +33718,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             startRide(zib, landmarkId, destX, destY, fare, game) {
+                if (this.passengerRide || !zib || zib.dead || zib.markedForDestroy) return;
                 this.passengerRide = { zib, destinationX: destX, destinationY: destY, fare, startX: zib.x, startY: zib.y };
 
                 const idx = game.traffic.vehicles.indexOf(zib);
@@ -33664,56 +33754,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.passengerRide.destinationX = driveDestX;
                 this.passengerRide.destinationY = driveDestY;
 
-                // Calculate nav path from the ZIB's position (not the player's old position).
-                // navMarker uses the SAME drop-off point so the path terminates where the
-                // arrival check is measuring — no mismatch between path end and stop point.
-                const savedPX = game.player.x, savedPY = game.player.y;
-                game.player.x = zib.x;
-                game.player.y = zib.y;
-                if (game.ui) {
-                    game.ui.navMarker = { x: driveDestX, y: driveDestY };
-                    game.ui.calculateNavPath();
-                }
-                game.player.x = savedPX;
-                game.player.y = savedPY;
-
-                // enableAutoDrive snaps to nearest lane — driverType 'zib' is preserved
-                const success = zib.enableAutoDrive(game.traffic.network, game.activeMap.walls);
+                if (game.ui) game.ui.navMarker = { x: driveDestX, y: driveDestY };
+                const success = zib.enableAutoDrive(game.traffic.network, game.activeMap.walls) && game._refreshAutoDriveRoute();
                 if (!success) {
-                    // Autodrive failed — can't find a lane. Teleport to destination as fallback.
                     showMessage(`ZIB REROUTING...`);
-                    setTimeout(() => this.teleportToDestination(game), 500);
-                    return;
-                }
-                if (game.ui && game.ui.navPath && game.ui.navPath.length > 1) {
-                    const waypoints = game.ui.navPath.slice(1).map(p => ({
-                        x: p.x, y: p.y,
-                        type: p.type,
-                        turnPath: p.turnPath,
-                        turnPathId: p.turnPathId,
-                        controlPoints: p.controlPoints,
-                        fromLaneId: p.fromLaneId,
-                        toLaneId: p.toLaneId,
-                        toSegmentId: p.toSegmentId,
-                        road: p.road,
-                        roadId: p.roadId,
-                        segment: p.segment,
-                        segmentId: p.segmentId,
-                        intersection: p.intersection,
-                        intersectionId: p.intersectionId,
-                        gate: p.gate,
-                        gateId: p.gateId,
-                        lane: p.lane,
-                        laneId: p.laneId
-                    }));
-                    zib.setNavWaypoints(waypoints);
+                    const ride = this.passengerRide;
+                    setTimeout(() => { if (this.passengerRide === ride) this.teleportToDestination(game); }, 500);
                 }
                 // Ensure driverType stays 'zib' after enableAutoDrive
                 zib.driverType = 'zib';
 
-                const availableSeats = zib.seats - 2;
-                let seatsFilled = 0;
-                if (game.teammates) game.teammates.forEach(tm => { if (tm.recruited && !tm.downed && seatsFilled < availableSeats) { tm.inCar = true; seatsFilled++; } });
+                zib.clearSeats();
+                zib.seatOccupants[0] = true;
+                zib.seatOccupants[1] = true;
+                if (game.teammates) game.teammates.forEach(tm => {
+                    if (tm.recruited && !tm.downed) zib.assignPassenger(tm);
+                });
+                if (game.velvetCat && game.questState.hasVelvetCat) game.velvetCat.inCar = true;
+                Object.assign(game.player, zib.getSeatWorldPos(0));
 
                 game.autodriveBtn.style.display = 'none';
                 if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'flex';
@@ -33722,13 +33780,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             tick(game) {
-                if (!this.passengerRide) return;
+                if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
                 const dist = Math.hypot(ride.zib.x - ride.destinationX, ride.zib.y - ride.destinationY);
-                if (dist < 120) { this.completeRide(game); return; }
+                const route = ride.zib._driveRoute;
+                if (dist < 40 && !ride.zib.currentTurnPath && (!route || route.index >= route.transitions.length)) {
+                    this.completeRide(game); return;
+                }
                 
                 // Stuck detection — if Zib barely moves for 10 seconds, force-complete
-                if (!ride._stuckX) { ride._stuckX = ride.zib.x; ride._stuckY = ride.zib.y; ride._stuckTimer = 0; }
+                if (ride._stuckX === undefined) { ride._stuckX = ride.zib.x; ride._stuckY = ride.zib.y; ride._stuckTimer = 0; }
                 const moved = Math.hypot(ride.zib.x - ride._stuckX, ride.zib.y - ride._stuckY);
                 if (moved < 20) {
                     ride._stuckTimer++;
@@ -33746,8 +33807,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** Teleport player to destination instantly — the premium Zib feature. */
             teleportToDestination(game) {
-                if (!this.passengerRide) return;
+                if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
+                ride.teleporting = true;
                 
                 // Charge full fare
                 game.currency -= ride.fare;
@@ -33760,9 +33822,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 fadeOverlay.classList.add('active');
 
                 setTimeout(() => {
+                    if (this.passengerRide !== ride) {
+                        fadeOverlay.classList.remove('active');
+                        game.pauseSystem.release('zib_teleport');
+                        return;
+                    }
+                    const lane = ride.zib._driveRoute?.endLane || game.traffic.network.findBestLaneAt(
+                        ride.destinationX, ride.destinationY,
+                        ride.destinationX + Math.cos(ride.zib.angle) * 100,
+                        ride.destinationY + Math.sin(ride.zib.angle) * 100
+                    );
+                    ride.zib.disableAutoDrive();
+                    ride.zib.currentLane = lane;
+                    if (lane) ride.zib.angle = lane.angle;
+                    ride.zib.vx = ride.zib.vy = ride.zib.speed = 0;
                     // Teleport Zib + player to destination
                     ride.zib.x = ride.destinationX;
                     ride.zib.y = ride.destinationY;
+                    ride.zib.prevX = ride.zib.x; ride.zib.prevY = ride.zib.y;
                     game.player.x = ride.destinationX;
                     game.player.y = ride.destinationY;
                     
@@ -33789,8 +33866,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             completeRide(game) {
-                if (!this.passengerRide) return;
+                if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
+                ride.zib.vx = ride.zib.vy = ride.zib.speed = 0;
                 game.currency -= ride.fare;
                 if (game.currency < 0) game.currency = 0;
                 game.updateUI();
@@ -33800,7 +33878,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
 
             exitEarly(game) {
-                if (!this.passengerRide) return;
+                if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
                 const totalDist = Math.hypot(ride.destinationX - ride.startX, ride.destinationY - ride.startY);
                 const traveledDist = Math.hypot(ride.zib.x - ride.startX, ride.zib.y - ride.startY);
@@ -33817,7 +33895,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _exitZib(game, zib) {
                 // Player exits — Zib should drive off as normal AI traffic
                 zib.hasDriver = false;
-                zib.driverType = 'zib';
+                zib.driverType = 'traffic';
                 zib.controlMode = 'AI';
                 zib.navDestination = null;
                 if (zib.clearNavWaypoints) zib.clearNavWaypoints();
@@ -33828,6 +33906,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 game.isDriving = false;
                 game.player.visible = true;
                 game.car = game.ownedCar;
+                game.autodriveBtn.classList.remove('engaged');
+                game.autodriveBtn.style.display = 'none';
+                game.handbrakeHeld = false;
+                if (game.handbrakeBtn) { game.handbrakeBtn.style.display = 'none'; game.handbrakeBtn.classList.remove('held'); }
                 if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
                 if (game.holsterBtn) game.holsterBtn.style.display = 'flex';
 
@@ -33836,10 +33918,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 game.player.y = zib.y - Math.cos(zib.angle) * exitDist;
 
                 if (game.teammates) game.teammates.forEach(tm => { if (tm.inCar) { tm.inCar = false; tm.seatIndex = -1; tm.x = game.player.x + (Math.random() - 0.5) * 30; tm.y = game.player.y + (Math.random() - 0.5) * 30; }});
+                zib.clearSeats();
+                if (game.velvetCat && game.questState.hasVelvetCat) {
+                    game.velvetCat.inCar = false;
+                    game.velvetCat.x = game.player.x - 25; game.velvetCat.y = game.player.y + 20;
+                }
 
                 game.navDestination = null;
-                if (game.ui?.navMarker) game.ui.navMarker = null;
-                if (game.ui?.navPath) game.ui.navPath = null;
+                if (game.ui) {
+                    game.ui.navMarker = null;
+                    game.ui.navPath = [];
+                    game.ui.roadLevelPath = [];
+                    game.ui.precisePath = null;
+                    game.ui.drawablePathSegments = [];
+                }
             }
 
             get isPassenger() { return this.passengerRide !== null; }
@@ -35012,6 +35104,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.navWaypoints = [];
                 this.currentWaypointIndex = 0;
                 this.navDestination = null;
+                this._driveRoute = null;
             }
             
             /**
@@ -35242,8 +35335,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 if (nearestLane && nearestDist < 80) {
+                    const driverType = this.driverType;
+                    this.disableAutoDrive();
                     this.currentLane = nearestLane;
                     this.controlMode = 'AI';
+                    this.dead = false;
+                    this.manualGas = 0;
+                    this.manualTurn = 0;
+                    this._driveRoute = null;
+                    this.driverType = driverType;
                     // Preserve existing driverType if already set (e.g. 'zib'), default to 'player'
                     if (!this.driverType || this.driverType === 'traffic') {
                         this.driverType = 'player';
@@ -35255,6 +35355,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             disableAutoDrive() {
                 this.controlMode = 'PLAYER';
+                this._driveRoute = null;
                 
                 // --- Release from intersection queue/occupancy ---
                 if (this.currentIntersection) {
@@ -35825,6 +35926,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 this._allVehicles = allVehicles;
                 this._playerCar = playerCar;
+                if (this._driveRoute) this.advanceToRelevantWaypoint();
 
                 if (this.postIntersectionGraceTimer > 0) this.postIntersectionGraceTimer--;
 
@@ -36075,7 +36177,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 };
 
                 // Check for player car
-                if (playerCar && (playerCar.x !== 0 || playerCar.y !== 0)) {
+                if (playerCar && playerCar !== this && (playerCar.x !== 0 || playerCar.y !== 0)) {
                     const result = checkTunnelEx(playerCar.x, playerCar.y, lookAheadDist, dynamicTunnelWidth);
                     const parkedEmpty = !playerCar.hasDriver && playerCar.controlMode === 'PARKED';
                     if (!parkedEmpty && !(this.currentTurnPath && playerCar.isWaiting && !playerCar.wasInIntersection)) senseQueue(playerCar);
@@ -36489,6 +36591,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Safety caps come last, so no boost or nudge can push a car into the one ahead or over its line
                 targetSpeed = Math.min(targetSpeed, followCap, stopLineCap);
+                const route = this._driveRoute;
+                if (route && route.index >= route.transitions.length && !this.currentTurnPath && this.currentLane === route.endLane) {
+                    const remaining = (route.destination.x - this.x) * this.currentLane.ux
+                        + (route.destination.y - this.y) * this.currentLane.uy;
+                    targetSpeed = Math.min(targetSpeed, Math.sqrt(2 * (this.brake || 0.3) * Math.max(0, remaining - 20)));
+                }
                 
                 // Calculate throttle to achieve target speed
                 targetThrottle = AIDriverSolver.calculateThrottle(this, targetSpeed, 0.6);
@@ -36641,6 +36749,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // any code reading currentLane this frame).
                         const nextLane = this.currentTurnPath.toLane;
                         if (nextLane && typeof nextLane.length === 'number' && nextLane.start) {
+                            const step = this._driveRoute?.transitions[this._driveRoute.index];
+                            if (step && step.turnPath === this.currentTurnPath) this._driveRoute.index++;
                             this.currentLane = nextLane;
                             this.currentTurnPath = null;
                             this.turnProgress = 0;
@@ -36695,7 +36805,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const isDeadEnd = !hasConnections && !hasTurnPaths;
                 
                 // For autodrive player/zib: handle dead-ends (3 car lengths out)
-                if (this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib') && isDeadEnd && distToLaneEnd < 200) {
+                if (!this._driveRoute && this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib') && isDeadEnd && distToLaneEnd < 200) {
                     maxSpeed = Math.max(0, (distToLaneEnd - 50) / 150) * this.maxSpeed; // Gradual slowdown
                     if (distToLaneEnd < 80) {
                         if (this.driverType === 'zib') {
@@ -36716,8 +36826,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // NAVIGATION-AWARE CONNECTION SELECTION
                         // For autodrive, pick the connection that leads to the expected road/segment
                         let nextLane = this.currentLane.connections[0]; // Default to first
+                        const routeStep = this._driveRoute?.transitions[this._driveRoute.index];
+                        if (routeStep && !routeStep.turnPath && routeStep.fromLane === this.currentLane) nextLane = routeStep.toLane;
                         
-                        if (this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib')) {
+                        if (!this._driveRoute && this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib')) {
                             const expectedSegment = this.getExpectedNavSegment();
                             if (expectedSegment) {
                                 for (let conn of this.currentLane.connections) {
@@ -36744,6 +36856,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                         
                         this.currentLane = nextLane;
+                        const step = this._driveRoute?.transitions[this._driveRoute.index];
+                        if (step && !step.turnPath && step.toLane === nextLane) this._driveRoute.index++;
                     } else {
                         if (this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib')) {
                             if (this.driverType === 'zib') {
@@ -36787,6 +36901,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             updateTurnPlanning() {
                 if (this.plannedTurn || !this.currentLane.turnPaths || this.currentLane.turnPaths.length === 0) return;
+                if (this._driveRoute) {
+                    const step = this._driveRoute.transitions[this._driveRoute.index];
+                    if (step && step.fromLane === this.currentLane && step.turnPath) {
+                        this.plannedTurn = step.turnPath;
+                        const diff = normalizeAngle(step.toLane.angle - this.currentLane.angle);
+                        this.turnSignal = Math.abs(diff) > 0.5 ? (diff > 0 ? 'right' : 'left') : null;
+                        this.turnSignalTimer = 150;
+                    }
+                    return;
+                }
                 
                 // Plan early enough to see where we're going from the stop line (and to check the exit has room)
                 const planReach = 200 + this.length / 2 + this.stoppingDistance();
@@ -38171,6 +38295,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const handleMarkerPlacement = (clientX, clientY) => {
                     // Only place markers on outdoor maps with road networks
                     if (this.game.activeMap.type === 'indoor') return;
+                    if (this.game.zibSystem?.isPassenger) return;
                     
                     const rect = canvas.getBoundingClientRect();
                     const canvasX = clientX - rect.left;
@@ -38188,6 +38313,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             this.navPath = [];
                             this.roadLevelPath = [];
                             this.game.navDestination = null;
+                            if (this.game.isDriving && this.game.car?.controlMode === 'AI') {
+                                this.game.car.disableAutoDrive();
+                                this.game.car.clearNavWaypoints();
+                                this.game.autodriveBtn.classList.remove('engaged');
+                            }
                             showMessage("NAVIGATION CANCELLED");
                             this.renderGoldenMap();
                             return;
@@ -38197,8 +38327,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Set new marker
                     this.navMarker = { x: worldCoords.x, y: worldCoords.y };
                     this.navPathDirty = true;
-                    this.calculateNavPath();
                     this.game.navDestination = this.navMarker; // Share with game engine for AutoDrive
+                    if (this.game.isDriving && this.game.car?.controlMode === 'AI') this.game.car.navDestination = null;
+                    if (this.game.isDriving && this.game.car?.controlMode === 'AI' && !this.game.car.currentTurnPath) {
+                        if (!this.game._refreshAutoDriveRoute()) {
+                            this.game.car.disableAutoDrive();
+                            this.game.car.clearNavWaypoints();
+                            this.game.autodriveBtn.classList.remove('engaged');
+                        }
+                    }
+                    this.calculateNavPath();
                     showMessage("DESTINATION SET");
                     this.renderGoldenMap();
                 };
@@ -38361,7 +38499,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // === V2 PRECISE PATHFINDING ===
                 if (network.buildPrecisePath) {
-                    this.precisePath = network.buildPrecisePath(
+                    const drivingRoute = this.game.isDriving && this.game.car?.controlMode === 'AI'
+                        ? this.game.car._driveRoute : null;
+                    this.precisePath = drivingRoute ? drivingRoute.waypoints : network.buildPrecisePath(
                         player.x, player.y,
                         this.navMarker.x, this.navMarker.y
                     );
@@ -48419,7 +48559,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if ((e.key === 'c' || e.key === 'C') && this.running && !this.paused && !e.ctrlKey && !e.metaKey) this.toggleSneak();   // engine/sneak.js
                     
                     // AUTO-DRIVE TOGGLE (only while driving)
-                    if ((e.key === 'q' || e.key === 'Q') && this.isDriving && this.running && !this.paused) {
+                    if ((e.key === 'q' || e.key === 'Q') && !e.repeat && this.isDriving && this.running && !this.paused) {
                         this.toggleAutoDrive();
                     }
                     
@@ -56840,8 +56980,41 @@ engineMixin({
             },
             
             // Inside GameEngine class
+            _refreshAutoDriveRoute() {
+                const car = this.car, target = this.navDestination;
+                if (!car || !target || !car.currentLane || car.currentTurnPath) return false;
+                car._gpsCheckTimer = 0;
+                const route = this.traffic.network.buildDrivePath(car.currentLane, car.x, car.y, target.x, target.y);
+                car.plannedTurn = null;
+                car.clearNavWaypoints();
+                if (!route) { car.manualGas = -Math.abs(car.speed) / Math.max(1, car.maxSpeed); return false; }
+                // Stop clear of a road boundary or intersection gate, with the body
+                // fully on the final lane rather than hanging over its endpoint.
+                const endLane = route.endLane, margin = Math.min(endLane.length / 2, car.length / 2 + 10);
+                const along = clamp(endLane.getDistanceAlong(route.destination.x, route.destination.y), margin, endLane.length - margin);
+                route.destination.x = endLane.start.x + endLane.ux * along;
+                route.destination.y = endLane.start.y + endLane.uy * along;
+                Object.assign(route.waypoints[route.waypoints.length - 1], route.destination);
+                car.setNavWaypoints(route.waypoints.slice(1));
+                car._driveRoute = route;
+                car.navDestination = route.destination;
+                if (this.zibSystem?.passengerRide?.zib === car) {
+                    this.zibSystem.passengerRide.destinationX = route.destination.x;
+                    this.zibSystem.passengerRide.destinationY = route.destination.y;
+                }
+                if (this.ui) {
+                    this.ui.precisePath = route.waypoints;
+                    this.ui.navPath = route.waypoints;
+                    this.ui.drawablePathSegments = this.traffic.network.getDrawablePath(route.waypoints);
+                    this.ui.roadLevelPath = this.ui._buildRoadLevelPath(car, this.traffic.network);
+                    this.ui.lastPlayerNavPos = { x: car.x, y: car.y };
+                }
+                return true;
+            },
+
             toggleAutoDrive() {
                 if (!this.car || !this.isDriving) return;
+                if (this.zibSystem && this.zibSystem.isPassenger) return;
                 
                 if (this.car.controlMode === 'AI') {
                     // Switch back to manual control
@@ -56877,17 +57050,12 @@ engineMixin({
                         this.navDestination = driveTarget;
                         this.car.navDestination = driveTarget;
                         
-                        if (this.ui) {
-                            // Use car's current position as path origin
-                            const savedPX = this.player.x, savedPY = this.player.y;
-                            this.player.x = this.car.x;
-                            this.player.y = this.car.y;
-                            this.ui.calculateNavPath();
-                            this.player.x = savedPX;
-                            this.player.y = savedPY;
-                            if (this.ui.navPath && this.ui.navPath.length > 1) {
-                                this.car.setNavWaypoints(this.ui.navPath.slice(1));
-                            }
+                        if (!this._refreshAutoDriveRoute()) {
+                            this.car.disableAutoDrive();
+                            this.car.clearNavWaypoints();
+                            this.autodriveBtn.classList.remove('engaged');
+                            showMessage("AUTO-DRIVE FAILED - NO DRIVABLE ROUTE");
+                            return;
                         }
                         showMessage("AUTO-DRIVE: FOLLOWING NAVIGATION");
                         audioSys.sfx('ui');
@@ -56899,14 +57067,18 @@ engineMixin({
             
             // Check if player has reached navigation destination
             checkNavArrival() {
+                if (this.zibSystem && this.zibSystem.isPassenger) return;
                 if (!this.navDestination) return;
                 
-                const dist = Math.hypot(
-                    this.player.x - this.navDestination.x,
-                    this.player.y - this.navDestination.y
-                );
+                const driving = this.isDriving && this.car;
+                const target = driving && this.car.controlMode === 'AI' && this.car.navDestination
+                    ? this.car.navDestination : this.navDestination;
+                const actor = driving ? this.car : this.player;
+                const dist = Math.hypot(actor.x - target.x, actor.y - target.y);
                 
-                if (dist < this.navCheckDistance) {
+                const autoDriving = driving && this.car.controlMode === 'AI';
+                if (autoDriving && this.car.currentTurnPath) return;
+                if (dist < (autoDriving ? 35 : this.navCheckDistance)) {
                     // Arrived at destination
                     showMessage("DESTINATION REACHED");
                     audioSys.sfx('ui');
@@ -56927,6 +57099,7 @@ engineMixin({
                     
                     // Disable autodrive if it was following nav
                     if (this.isDriving && this.car && this.car.controlMode === 'AI') {
+                        this.car.vx = this.car.vy = this.car.speed = 0;
                         this.car.disableAutoDrive();
                         this.autodriveBtn.classList.remove('engaged');
                     }
@@ -58431,74 +58604,34 @@ engineMixin({
                     // roughly doubling Physics:Player whenever the minigame ran.)
                 } else if (this.isDriving) {
                     if (this.car.controlMode === 'AI') {
-                        // PER-FRAME WAYPOINT SYNC & GPS SANITY CHECK
-                        // Handles: exhausted waypoints, faulty data, off-route detection
-                        if ((this.car.driverType === 'player' || this.car.driverType === 'zib') 
-                            && this.navDestination) {
-                            
-                            const hasWaypoints = this.car.navWaypoints && this.car.navWaypoints.length > 0 
-                                && this.car.currentWaypointIndex < this.car.navWaypoints.length;
-                            
-                            // Track recalc timer per car
-                            if (!this.car._gpsCheckTimer) this.car._gpsCheckTimer = 0;
-                            this.car._gpsCheckTimer++;
-                            
-                            let needsRecalc = false;
-                            
-                            // Case 1: No waypoints at all
-                            if (!hasWaypoints) {
-                                needsRecalc = true;
-                            }
-                            
-                            // Case 2: Periodic sanity check (every 3 seconds)
-                            if (!needsRecalc && hasWaypoints && this.car._gpsCheckTimer > 180) {
-                                this.car._gpsCheckTimer = 0;
-                                
-                                // Check if current waypoint is unreachably far
-                                const wp = this.car.navWaypoints[this.car.currentWaypointIndex];
-                                if (wp) {
-                                    const wpDist = Math.hypot(this.car.x - wp.x, this.car.y - wp.y);
-                                    // If nearest waypoint is more than 500px away, route is likely broken
-                                    if (wpDist > 500) {
-                                        needsRecalc = true;
-                                    }
-                                }
-                                
-                                // Check if car is on the expected road (when on a lane, not mid-turn)
-                                if (!needsRecalc && this.car.currentLane && !this.car.currentTurnPath) {
-                                    if (!this.car.isOnExpectedRoad()) {
-                                        // Give benefit of the doubt — only recalc if off-road for 2+ checks
-                                        if (!this.car._offRouteCount) this.car._offRouteCount = 0;
-                                        this.car._offRouteCount++;
-                                        if (this.car._offRouteCount >= 2) {
-                                            needsRecalc = true;
-                                            this.car._offRouteCount = 0;
+                        // Keep the driving route tied to the actual lane and destination.
+                        // Refresh after a turn, rather than inventing a new entry mid-curve.
+                        if ((this.car.driverType === 'player' || this.car.driverType === 'zib') && this.navDestination) {
+                            const route = this.car._driveRoute;
+                            this.car._gpsCheckTimer = (this.car._gpsCheckTimer || 0) + 1;
+                            const changed = !route || route.target.x !== this.navDestination.x || route.target.y !== this.navDestination.y;
+                            const expected = route && (route.transitions[route.index]?.fromLane || route.endLane);
+                            const offRoute = route && this.car.currentLane && this.car.currentLane !== expected;
+                            if (!this.car.currentTurnPath && (changed || (offRoute && this.car._gpsCheckTimer > 180))) {
+                                if (!route && this.car._gpsCheckTimer < 30) {
+                                    // A failed route retries at most twice per second.
+                                } else {
+                                    if (!this._refreshAutoDriveRoute()) {
+                                        if (this.zibSystem?.isPassenger) this.zibSystem.teleportToDestination(this);
+                                        else {
+                                            this.car.disableAutoDrive(); this.car.clearNavWaypoints();
+                                            this.autodriveBtn.classList.remove('engaged');
+                                            showMessage("AUTO-DRIVE FAILED - NO DRIVABLE ROUTE");
                                         }
-                                    } else {
-                                        this.car._offRouteCount = 0;
-                                    }
-                                }
-                            }
-                            
-                            // Recalculate GPS path from current position
-                            if (needsRecalc) {
-                                this.car.navDestination = this.navDestination;
-                                if (this.ui) {
-                                    const savedPX = this.player.x, savedPY = this.player.y;
-                                    this.player.x = this.car.x;
-                                    this.player.y = this.car.y;
-                                    this.ui.calculateNavPath();
-                                    this.player.x = savedPX;
-                                    this.player.y = savedPY;
-                                    if (this.ui.navPath && this.ui.navPath.length > 1) {
-                                        this.car.setNavWaypoints(this.ui.navPath.slice(1));
-                                        this.car._gpsCheckTimer = 0;
                                     }
                                 }
                             }
                         }
-                        this.car.update(this.player, null, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, getColliders(this.activeMap));
-                        if (inputX !== 0 || inputY !== 0) { this.car.disableAutoDrive(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED"); }
+                        this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, getColliders(this.activeMap), this.decals, this.teammates);
+                        if (!(this.zibSystem && this.zibSystem.isPassenger) &&
+                            (inputX !== 0 || inputY !== 0 || this.keys[' '] || this.handbrakeHeld)) {
+                            this.car.disableAutoDrive(); this.car.clearNavWaypoints(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED");
+                        }
                     } else {
                         this.car.driverInput(inputX, inputY, this.joystick.active);
                         this.car.handbrake = !!(this.keys[' '] || this.handbrakeHeld);
@@ -65530,7 +65663,8 @@ engineMixin({
                 zib.glowColor = ZIB_CONFIG.underglowColor;
                 zib.headlightColor = ZIB_CONFIG.headlightColor;
                 zib.isZib = true;
-                zib.driverType = 'zib';
+                zib.driverType = 'traffic';
+                zib.hasDriver = false;
                 
                 // Position Zib on the lane near the player
                 const lx = px - bestLane.start.x;

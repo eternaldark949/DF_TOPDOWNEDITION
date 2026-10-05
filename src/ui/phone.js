@@ -1236,7 +1236,8 @@
                 zib.glowColor = ZIB_CONFIG.underglowColor;
                 zib.headlightColor = ZIB_CONFIG.headlightColor;
                 zib.isZib = true;
-                zib.driverType = 'zib';
+                zib.driverType = 'traffic';
+                zib.hasDriver = false;
                 
                 // Position Zib on the lane near the player
                 const lx = px - bestLane.start.x;

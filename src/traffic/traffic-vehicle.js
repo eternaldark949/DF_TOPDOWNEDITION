@@ -612,6 +612,7 @@
                 this.navWaypoints = [];
                 this.currentWaypointIndex = 0;
                 this.navDestination = null;
+                this._driveRoute = null;
             }
             
             /**
@@ -842,8 +843,15 @@
                     }
                 }
                 if (nearestLane && nearestDist < 80) {
+                    const driverType = this.driverType;
+                    this.disableAutoDrive();
                     this.currentLane = nearestLane;
                     this.controlMode = 'AI';
+                    this.dead = false;
+                    this.manualGas = 0;
+                    this.manualTurn = 0;
+                    this._driveRoute = null;
+                    this.driverType = driverType;
                     // Preserve existing driverType if already set (e.g. 'zib'), default to 'player'
                     if (!this.driverType || this.driverType === 'traffic') {
                         this.driverType = 'player';
@@ -855,6 +863,7 @@
             
             disableAutoDrive() {
                 this.controlMode = 'PLAYER';
+                this._driveRoute = null;
                 
                 // --- Release from intersection queue/occupancy ---
                 if (this.currentIntersection) {
@@ -1425,6 +1434,7 @@
                 
                 this._allVehicles = allVehicles;
                 this._playerCar = playerCar;
+                if (this._driveRoute) this.advanceToRelevantWaypoint();
 
                 if (this.postIntersectionGraceTimer > 0) this.postIntersectionGraceTimer--;
 
@@ -1675,7 +1685,7 @@
                 };
 
                 // Check for player car
-                if (playerCar && (playerCar.x !== 0 || playerCar.y !== 0)) {
+                if (playerCar && playerCar !== this && (playerCar.x !== 0 || playerCar.y !== 0)) {
                     const result = checkTunnelEx(playerCar.x, playerCar.y, lookAheadDist, dynamicTunnelWidth);
                     const parkedEmpty = !playerCar.hasDriver && playerCar.controlMode === 'PARKED';
                     if (!parkedEmpty && !(this.currentTurnPath && playerCar.isWaiting && !playerCar.wasInIntersection)) senseQueue(playerCar);
@@ -2089,6 +2099,12 @@
                 
                 // Safety caps come last, so no boost or nudge can push a car into the one ahead or over its line
                 targetSpeed = Math.min(targetSpeed, followCap, stopLineCap);
+                const route = this._driveRoute;
+                if (route && route.index >= route.transitions.length && !this.currentTurnPath && this.currentLane === route.endLane) {
+                    const remaining = (route.destination.x - this.x) * this.currentLane.ux
+                        + (route.destination.y - this.y) * this.currentLane.uy;
+                    targetSpeed = Math.min(targetSpeed, Math.sqrt(2 * (this.brake || 0.3) * Math.max(0, remaining - 20)));
+                }
                 
                 // Calculate throttle to achieve target speed
                 targetThrottle = AIDriverSolver.calculateThrottle(this, targetSpeed, 0.6);
@@ -2241,6 +2257,8 @@
                         // any code reading currentLane this frame).
                         const nextLane = this.currentTurnPath.toLane;
                         if (nextLane && typeof nextLane.length === 'number' && nextLane.start) {
+                            const step = this._driveRoute?.transitions[this._driveRoute.index];
+                            if (step && step.turnPath === this.currentTurnPath) this._driveRoute.index++;
                             this.currentLane = nextLane;
                             this.currentTurnPath = null;
                             this.turnProgress = 0;
@@ -2295,7 +2313,7 @@
                 const isDeadEnd = !hasConnections && !hasTurnPaths;
                 
                 // For autodrive player/zib: handle dead-ends (3 car lengths out)
-                if (this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib') && isDeadEnd && distToLaneEnd < 200) {
+                if (!this._driveRoute && this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib') && isDeadEnd && distToLaneEnd < 200) {
                     maxSpeed = Math.max(0, (distToLaneEnd - 50) / 150) * this.maxSpeed; // Gradual slowdown
                     if (distToLaneEnd < 80) {
                         if (this.driverType === 'zib') {
@@ -2316,8 +2334,10 @@
                         // NAVIGATION-AWARE CONNECTION SELECTION
                         // For autodrive, pick the connection that leads to the expected road/segment
                         let nextLane = this.currentLane.connections[0]; // Default to first
+                        const routeStep = this._driveRoute?.transitions[this._driveRoute.index];
+                        if (routeStep && !routeStep.turnPath && routeStep.fromLane === this.currentLane) nextLane = routeStep.toLane;
                         
-                        if (this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib')) {
+                        if (!this._driveRoute && this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib')) {
                             const expectedSegment = this.getExpectedNavSegment();
                             if (expectedSegment) {
                                 for (let conn of this.currentLane.connections) {
@@ -2344,6 +2364,8 @@
                         }
                         
                         this.currentLane = nextLane;
+                        const step = this._driveRoute?.transitions[this._driveRoute.index];
+                        if (step && !step.turnPath && step.toLane === nextLane) this._driveRoute.index++;
                     } else {
                         if (this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib')) {
                             if (this.driverType === 'zib') {
@@ -2387,6 +2409,16 @@
              */
             updateTurnPlanning() {
                 if (this.plannedTurn || !this.currentLane.turnPaths || this.currentLane.turnPaths.length === 0) return;
+                if (this._driveRoute) {
+                    const step = this._driveRoute.transitions[this._driveRoute.index];
+                    if (step && step.fromLane === this.currentLane && step.turnPath) {
+                        this.plannedTurn = step.turnPath;
+                        const diff = normalizeAngle(step.toLane.angle - this.currentLane.angle);
+                        this.turnSignal = Math.abs(diff) > 0.5 ? (diff > 0 ? 'right' : 'left') : null;
+                        this.turnSignalTimer = 150;
+                    }
+                    return;
+                }
                 
                 // Plan early enough to see where we're going from the stop line (and to check the exit has room)
                 const planReach = 200 + this.length / 2 + this.stoppingDistance();

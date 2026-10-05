@@ -1125,74 +1125,34 @@
                     // roughly doubling Physics:Player whenever the minigame ran.)
                 } else if (this.isDriving) {
                     if (this.car.controlMode === 'AI') {
-                        // PER-FRAME WAYPOINT SYNC & GPS SANITY CHECK
-                        // Handles: exhausted waypoints, faulty data, off-route detection
-                        if ((this.car.driverType === 'player' || this.car.driverType === 'zib') 
-                            && this.navDestination) {
-                            
-                            const hasWaypoints = this.car.navWaypoints && this.car.navWaypoints.length > 0 
-                                && this.car.currentWaypointIndex < this.car.navWaypoints.length;
-                            
-                            // Track recalc timer per car
-                            if (!this.car._gpsCheckTimer) this.car._gpsCheckTimer = 0;
-                            this.car._gpsCheckTimer++;
-                            
-                            let needsRecalc = false;
-                            
-                            // Case 1: No waypoints at all
-                            if (!hasWaypoints) {
-                                needsRecalc = true;
-                            }
-                            
-                            // Case 2: Periodic sanity check (every 3 seconds)
-                            if (!needsRecalc && hasWaypoints && this.car._gpsCheckTimer > 180) {
-                                this.car._gpsCheckTimer = 0;
-                                
-                                // Check if current waypoint is unreachably far
-                                const wp = this.car.navWaypoints[this.car.currentWaypointIndex];
-                                if (wp) {
-                                    const wpDist = Math.hypot(this.car.x - wp.x, this.car.y - wp.y);
-                                    // If nearest waypoint is more than 500px away, route is likely broken
-                                    if (wpDist > 500) {
-                                        needsRecalc = true;
-                                    }
-                                }
-                                
-                                // Check if car is on the expected road (when on a lane, not mid-turn)
-                                if (!needsRecalc && this.car.currentLane && !this.car.currentTurnPath) {
-                                    if (!this.car.isOnExpectedRoad()) {
-                                        // Give benefit of the doubt — only recalc if off-road for 2+ checks
-                                        if (!this.car._offRouteCount) this.car._offRouteCount = 0;
-                                        this.car._offRouteCount++;
-                                        if (this.car._offRouteCount >= 2) {
-                                            needsRecalc = true;
-                                            this.car._offRouteCount = 0;
+                        // Keep the driving route tied to the actual lane and destination.
+                        // Refresh after a turn, rather than inventing a new entry mid-curve.
+                        if ((this.car.driverType === 'player' || this.car.driverType === 'zib') && this.navDestination) {
+                            const route = this.car._driveRoute;
+                            this.car._gpsCheckTimer = (this.car._gpsCheckTimer || 0) + 1;
+                            const changed = !route || route.target.x !== this.navDestination.x || route.target.y !== this.navDestination.y;
+                            const expected = route && (route.transitions[route.index]?.fromLane || route.endLane);
+                            const offRoute = route && this.car.currentLane && this.car.currentLane !== expected;
+                            if (!this.car.currentTurnPath && (changed || (offRoute && this.car._gpsCheckTimer > 180))) {
+                                if (!route && this.car._gpsCheckTimer < 30) {
+                                    // A failed route retries at most twice per second.
+                                } else {
+                                    if (!this._refreshAutoDriveRoute()) {
+                                        if (this.zibSystem?.isPassenger) this.zibSystem.teleportToDestination(this);
+                                        else {
+                                            this.car.disableAutoDrive(); this.car.clearNavWaypoints();
+                                            this.autodriveBtn.classList.remove('engaged');
+                                            showMessage("AUTO-DRIVE FAILED - NO DRIVABLE ROUTE");
                                         }
-                                    } else {
-                                        this.car._offRouteCount = 0;
-                                    }
-                                }
-                            }
-                            
-                            // Recalculate GPS path from current position
-                            if (needsRecalc) {
-                                this.car.navDestination = this.navDestination;
-                                if (this.ui) {
-                                    const savedPX = this.player.x, savedPY = this.player.y;
-                                    this.player.x = this.car.x;
-                                    this.player.y = this.car.y;
-                                    this.ui.calculateNavPath();
-                                    this.player.x = savedPX;
-                                    this.player.y = savedPY;
-                                    if (this.ui.navPath && this.ui.navPath.length > 1) {
-                                        this.car.setNavWaypoints(this.ui.navPath.slice(1));
-                                        this.car._gpsCheckTimer = 0;
                                     }
                                 }
                             }
                         }
-                        this.car.update(this.player, null, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, getColliders(this.activeMap));
-                        if (inputX !== 0 || inputY !== 0) { this.car.disableAutoDrive(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED"); }
+                        this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, getColliders(this.activeMap), this.decals, this.teammates);
+                        if (!(this.zibSystem && this.zibSystem.isPassenger) &&
+                            (inputX !== 0 || inputY !== 0 || this.keys[' '] || this.handbrakeHeld)) {
+                            this.car.disableAutoDrive(); this.car.clearNavWaypoints(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED");
+                        }
                     } else {
                         this.car.driverInput(inputX, inputY, this.joystick.active);
                         this.car.handbrake = !!(this.keys[' '] || this.handbrakeHeld);

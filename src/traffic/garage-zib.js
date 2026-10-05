@@ -312,7 +312,8 @@
                 zib.glowColor = ZIB_CONFIG.underglowColor;
                 zib.headlightColor = ZIB_CONFIG.headlightColor;
                 zib.isZib = true;
-                zib.driverType = 'zib';
+                zib.driverType = 'traffic';
+                zib.hasDriver = false;
                 trafficManager.vehicles.push(zib);
                 this.activeZibs.push(zib);
             }
@@ -325,7 +326,7 @@
                 let closest = null;
                 let closestDist = range;
                 for (const zib of this.activeZibs) {
-                    if (!zib.visible || zib.hasDriver) continue;
+                    if (!zib.visible || zib.dead || zib.markedForDestroy || zib.fading || zib.hasDriver) continue;
                     if (this.passengerRide && this.passengerRide.zib === zib) continue;
                     const dist = Math.hypot(px - zib.x, py - zib.y);
                     if (dist < closestDist) { closestDist = dist; closest = zib; }
@@ -339,6 +340,7 @@
             }
 
             startRide(zib, landmarkId, destX, destY, fare, game) {
+                if (this.passengerRide || !zib || zib.dead || zib.markedForDestroy) return;
                 this.passengerRide = { zib, destinationX: destX, destinationY: destY, fare, startX: zib.x, startY: zib.y };
 
                 const idx = game.traffic.vehicles.indexOf(zib);
@@ -374,56 +376,24 @@
                 this.passengerRide.destinationX = driveDestX;
                 this.passengerRide.destinationY = driveDestY;
 
-                // Calculate nav path from the ZIB's position (not the player's old position).
-                // navMarker uses the SAME drop-off point so the path terminates where the
-                // arrival check is measuring — no mismatch between path end and stop point.
-                const savedPX = game.player.x, savedPY = game.player.y;
-                game.player.x = zib.x;
-                game.player.y = zib.y;
-                if (game.ui) {
-                    game.ui.navMarker = { x: driveDestX, y: driveDestY };
-                    game.ui.calculateNavPath();
-                }
-                game.player.x = savedPX;
-                game.player.y = savedPY;
-
-                // enableAutoDrive snaps to nearest lane — driverType 'zib' is preserved
-                const success = zib.enableAutoDrive(game.traffic.network, game.activeMap.walls);
+                if (game.ui) game.ui.navMarker = { x: driveDestX, y: driveDestY };
+                const success = zib.enableAutoDrive(game.traffic.network, game.activeMap.walls) && game._refreshAutoDriveRoute();
                 if (!success) {
-                    // Autodrive failed — can't find a lane. Teleport to destination as fallback.
                     showMessage(`ZIB REROUTING...`);
-                    setTimeout(() => this.teleportToDestination(game), 500);
-                    return;
-                }
-                if (game.ui && game.ui.navPath && game.ui.navPath.length > 1) {
-                    const waypoints = game.ui.navPath.slice(1).map(p => ({
-                        x: p.x, y: p.y,
-                        type: p.type,
-                        turnPath: p.turnPath,
-                        turnPathId: p.turnPathId,
-                        controlPoints: p.controlPoints,
-                        fromLaneId: p.fromLaneId,
-                        toLaneId: p.toLaneId,
-                        toSegmentId: p.toSegmentId,
-                        road: p.road,
-                        roadId: p.roadId,
-                        segment: p.segment,
-                        segmentId: p.segmentId,
-                        intersection: p.intersection,
-                        intersectionId: p.intersectionId,
-                        gate: p.gate,
-                        gateId: p.gateId,
-                        lane: p.lane,
-                        laneId: p.laneId
-                    }));
-                    zib.setNavWaypoints(waypoints);
+                    const ride = this.passengerRide;
+                    setTimeout(() => { if (this.passengerRide === ride) this.teleportToDestination(game); }, 500);
                 }
                 // Ensure driverType stays 'zib' after enableAutoDrive
                 zib.driverType = 'zib';
 
-                const availableSeats = zib.seats - 2;
-                let seatsFilled = 0;
-                if (game.teammates) game.teammates.forEach(tm => { if (tm.recruited && !tm.downed && seatsFilled < availableSeats) { tm.inCar = true; seatsFilled++; } });
+                zib.clearSeats();
+                zib.seatOccupants[0] = true;
+                zib.seatOccupants[1] = true;
+                if (game.teammates) game.teammates.forEach(tm => {
+                    if (tm.recruited && !tm.downed) zib.assignPassenger(tm);
+                });
+                if (game.velvetCat && game.questState.hasVelvetCat) game.velvetCat.inCar = true;
+                Object.assign(game.player, zib.getSeatWorldPos(0));
 
                 game.autodriveBtn.style.display = 'none';
                 if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'flex';
@@ -432,13 +402,16 @@
             }
 
             tick(game) {
-                if (!this.passengerRide) return;
+                if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
                 const dist = Math.hypot(ride.zib.x - ride.destinationX, ride.zib.y - ride.destinationY);
-                if (dist < 120) { this.completeRide(game); return; }
+                const route = ride.zib._driveRoute;
+                if (dist < 40 && !ride.zib.currentTurnPath && (!route || route.index >= route.transitions.length)) {
+                    this.completeRide(game); return;
+                }
                 
                 // Stuck detection — if Zib barely moves for 10 seconds, force-complete
-                if (!ride._stuckX) { ride._stuckX = ride.zib.x; ride._stuckY = ride.zib.y; ride._stuckTimer = 0; }
+                if (ride._stuckX === undefined) { ride._stuckX = ride.zib.x; ride._stuckY = ride.zib.y; ride._stuckTimer = 0; }
                 const moved = Math.hypot(ride.zib.x - ride._stuckX, ride.zib.y - ride._stuckY);
                 if (moved < 20) {
                     ride._stuckTimer++;
@@ -456,8 +429,9 @@
 
             /** Teleport player to destination instantly — the premium Zib feature. */
             teleportToDestination(game) {
-                if (!this.passengerRide) return;
+                if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
+                ride.teleporting = true;
                 
                 // Charge full fare
                 game.currency -= ride.fare;
@@ -470,9 +444,24 @@
                 fadeOverlay.classList.add('active');
 
                 setTimeout(() => {
+                    if (this.passengerRide !== ride) {
+                        fadeOverlay.classList.remove('active');
+                        game.pauseSystem.release('zib_teleport');
+                        return;
+                    }
+                    const lane = ride.zib._driveRoute?.endLane || game.traffic.network.findBestLaneAt(
+                        ride.destinationX, ride.destinationY,
+                        ride.destinationX + Math.cos(ride.zib.angle) * 100,
+                        ride.destinationY + Math.sin(ride.zib.angle) * 100
+                    );
+                    ride.zib.disableAutoDrive();
+                    ride.zib.currentLane = lane;
+                    if (lane) ride.zib.angle = lane.angle;
+                    ride.zib.vx = ride.zib.vy = ride.zib.speed = 0;
                     // Teleport Zib + player to destination
                     ride.zib.x = ride.destinationX;
                     ride.zib.y = ride.destinationY;
+                    ride.zib.prevX = ride.zib.x; ride.zib.prevY = ride.zib.y;
                     game.player.x = ride.destinationX;
                     game.player.y = ride.destinationY;
                     
@@ -499,8 +488,9 @@
             }
 
             completeRide(game) {
-                if (!this.passengerRide) return;
+                if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
+                ride.zib.vx = ride.zib.vy = ride.zib.speed = 0;
                 game.currency -= ride.fare;
                 if (game.currency < 0) game.currency = 0;
                 game.updateUI();
@@ -510,7 +500,7 @@
             }
 
             exitEarly(game) {
-                if (!this.passengerRide) return;
+                if (!this.passengerRide || this.passengerRide.teleporting) return;
                 const ride = this.passengerRide;
                 const totalDist = Math.hypot(ride.destinationX - ride.startX, ride.destinationY - ride.startY);
                 const traveledDist = Math.hypot(ride.zib.x - ride.startX, ride.zib.y - ride.startY);
@@ -527,7 +517,7 @@
             _exitZib(game, zib) {
                 // Player exits — Zib should drive off as normal AI traffic
                 zib.hasDriver = false;
-                zib.driverType = 'zib';
+                zib.driverType = 'traffic';
                 zib.controlMode = 'AI';
                 zib.navDestination = null;
                 if (zib.clearNavWaypoints) zib.clearNavWaypoints();
@@ -538,6 +528,10 @@
                 game.isDriving = false;
                 game.player.visible = true;
                 game.car = game.ownedCar;
+                game.autodriveBtn.classList.remove('engaged');
+                game.autodriveBtn.style.display = 'none';
+                game.handbrakeHeld = false;
+                if (game.handbrakeBtn) { game.handbrakeBtn.style.display = 'none'; game.handbrakeBtn.classList.remove('held'); }
                 if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
                 if (game.holsterBtn) game.holsterBtn.style.display = 'flex';
 
@@ -546,10 +540,20 @@
                 game.player.y = zib.y - Math.cos(zib.angle) * exitDist;
 
                 if (game.teammates) game.teammates.forEach(tm => { if (tm.inCar) { tm.inCar = false; tm.seatIndex = -1; tm.x = game.player.x + (Math.random() - 0.5) * 30; tm.y = game.player.y + (Math.random() - 0.5) * 30; }});
+                zib.clearSeats();
+                if (game.velvetCat && game.questState.hasVelvetCat) {
+                    game.velvetCat.inCar = false;
+                    game.velvetCat.x = game.player.x - 25; game.velvetCat.y = game.player.y + 20;
+                }
 
                 game.navDestination = null;
-                if (game.ui?.navMarker) game.ui.navMarker = null;
-                if (game.ui?.navPath) game.ui.navPath = null;
+                if (game.ui) {
+                    game.ui.navMarker = null;
+                    game.ui.navPath = [];
+                    game.ui.roadLevelPath = [];
+                    game.ui.precisePath = null;
+                    game.ui.drawablePathSegments = [];
+                }
             }
 
             get isPassenger() { return this.passengerRide !== null; }

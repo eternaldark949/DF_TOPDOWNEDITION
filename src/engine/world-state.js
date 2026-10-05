@@ -480,8 +480,41 @@
             },
             
             // Inside GameEngine class
+            _refreshAutoDriveRoute() {
+                const car = this.car, target = this.navDestination;
+                if (!car || !target || !car.currentLane || car.currentTurnPath) return false;
+                car._gpsCheckTimer = 0;
+                const route = this.traffic.network.buildDrivePath(car.currentLane, car.x, car.y, target.x, target.y);
+                car.plannedTurn = null;
+                car.clearNavWaypoints();
+                if (!route) { car.manualGas = -Math.abs(car.speed) / Math.max(1, car.maxSpeed); return false; }
+                // Stop clear of a road boundary or intersection gate, with the body
+                // fully on the final lane rather than hanging over its endpoint.
+                const endLane = route.endLane, margin = Math.min(endLane.length / 2, car.length / 2 + 10);
+                const along = clamp(endLane.getDistanceAlong(route.destination.x, route.destination.y), margin, endLane.length - margin);
+                route.destination.x = endLane.start.x + endLane.ux * along;
+                route.destination.y = endLane.start.y + endLane.uy * along;
+                Object.assign(route.waypoints[route.waypoints.length - 1], route.destination);
+                car.setNavWaypoints(route.waypoints.slice(1));
+                car._driveRoute = route;
+                car.navDestination = route.destination;
+                if (this.zibSystem?.passengerRide?.zib === car) {
+                    this.zibSystem.passengerRide.destinationX = route.destination.x;
+                    this.zibSystem.passengerRide.destinationY = route.destination.y;
+                }
+                if (this.ui) {
+                    this.ui.precisePath = route.waypoints;
+                    this.ui.navPath = route.waypoints;
+                    this.ui.drawablePathSegments = this.traffic.network.getDrawablePath(route.waypoints);
+                    this.ui.roadLevelPath = this.ui._buildRoadLevelPath(car, this.traffic.network);
+                    this.ui.lastPlayerNavPos = { x: car.x, y: car.y };
+                }
+                return true;
+            },
+
             toggleAutoDrive() {
                 if (!this.car || !this.isDriving) return;
+                if (this.zibSystem && this.zibSystem.isPassenger) return;
                 
                 if (this.car.controlMode === 'AI') {
                     // Switch back to manual control
@@ -517,17 +550,12 @@
                         this.navDestination = driveTarget;
                         this.car.navDestination = driveTarget;
                         
-                        if (this.ui) {
-                            // Use car's current position as path origin
-                            const savedPX = this.player.x, savedPY = this.player.y;
-                            this.player.x = this.car.x;
-                            this.player.y = this.car.y;
-                            this.ui.calculateNavPath();
-                            this.player.x = savedPX;
-                            this.player.y = savedPY;
-                            if (this.ui.navPath && this.ui.navPath.length > 1) {
-                                this.car.setNavWaypoints(this.ui.navPath.slice(1));
-                            }
+                        if (!this._refreshAutoDriveRoute()) {
+                            this.car.disableAutoDrive();
+                            this.car.clearNavWaypoints();
+                            this.autodriveBtn.classList.remove('engaged');
+                            showMessage("AUTO-DRIVE FAILED - NO DRIVABLE ROUTE");
+                            return;
                         }
                         showMessage("AUTO-DRIVE: FOLLOWING NAVIGATION");
                         audioSys.sfx('ui');
@@ -539,14 +567,18 @@
             
             // Check if player has reached navigation destination
             checkNavArrival() {
+                if (this.zibSystem && this.zibSystem.isPassenger) return;
                 if (!this.navDestination) return;
                 
-                const dist = Math.hypot(
-                    this.player.x - this.navDestination.x,
-                    this.player.y - this.navDestination.y
-                );
+                const driving = this.isDriving && this.car;
+                const target = driving && this.car.controlMode === 'AI' && this.car.navDestination
+                    ? this.car.navDestination : this.navDestination;
+                const actor = driving ? this.car : this.player;
+                const dist = Math.hypot(actor.x - target.x, actor.y - target.y);
                 
-                if (dist < this.navCheckDistance) {
+                const autoDriving = driving && this.car.controlMode === 'AI';
+                if (autoDriving && this.car.currentTurnPath) return;
+                if (dist < (autoDriving ? 35 : this.navCheckDistance)) {
                     // Arrived at destination
                     showMessage("DESTINATION REACHED");
                     audioSys.sfx('ui');
@@ -567,6 +599,7 @@
                     
                     // Disable autodrive if it was following nav
                     if (this.isDriving && this.car && this.car.controlMode === 'AI') {
+                        this.car.vx = this.car.vy = this.car.speed = 0;
                         this.car.disableAutoDrive();
                         this.autodriveBtn.classList.remove('engaged');
                     }
