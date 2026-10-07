@@ -859,7 +859,7 @@
                                 const kbX = Math.cos(angle) * knockbackStrength;
                                 const kbY = Math.sin(angle) * knockbackStrength;
                                 e.lastHitBy = p.owner; e.lastHitMelee = !!p.melee;       // who gets the Resonance
-                                if (e.takeDamage(p.damage, kbX, kbY) && p.melee && e.interruptMelee) e.interruptMelee();
+                                if (e.takeDamage(p.damage, kbX, kbY, p.melee ? null : { shot: true }) && p.melee && e.interruptMelee) e.interruptMelee();
                                 
                                 // Spawn sticky DOT orb (Golden Child)
                                 if (p.sticky && !e.dead) {

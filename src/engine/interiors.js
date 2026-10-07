@@ -713,13 +713,6 @@
                 ctx.restore();
             },
 
-            /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
-            /* =====================================================================
-               COZY CAFE — the floor, painted once (released when she leaves: MAP_BAKES),
-               and the glow: the fire, pendant lamps, candles, string lights, steam,
-               and the windows by the benches (sky by day, the city's lights by night,
-               rain running down them when it rains outside)
-               ===================================================================== */
             /** Enni Cole: rose stone, cream marble and champagne inlay. Painted once and released on exit. */
             drawEnniInterior(ctx) {
                 if (!this._enniFloor) this._enniFloor = this._paintEnniFloor();
@@ -832,6 +825,12 @@
                 ctx.restore();
             },
 
+            /* =====================================================================
+               COZY CAFE — the floor, painted once (released when she leaves: MAP_BAKES),
+               and the glow: the fire, pendant lamps, candles, string lights, steam,
+               and the windows by the benches (sky by day, the city's lights by night,
+               rain running down them when it rains outside)
+               ===================================================================== */
             drawCafeInterior(ctx) {
                 if (!this._cafeFloor) this._cafeFloor = this._paintCafeFloor();
                 ctx.drawImage(this._cafeFloor, 0, 0);
@@ -947,6 +946,7 @@
                 }
             },
 
+            /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
             drawApartmentGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these

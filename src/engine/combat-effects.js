@@ -155,6 +155,13 @@
             /** Lay flames along the distance actually flown, including the hand's starting point. */
             emitFireTrail(shot, x0, y0, x1, y1) {
                 if (!shot.isFireball || !shot.active || shot.markedForDestroy) return;
+                // Flames stop at the wall the fireball meets this step (it's destroyed in the collision pass after)
+                const map = this.activeMap;
+                if (map && isLineBlocked(x0, y0, x1, y1, map.walls, getColliders(map))) {
+                    let lo = 0, hi = 1;
+                    for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (isLineBlocked(x0, y0, x0 + (x1 - x0) * m, y0 + (y1 - y0) * m, map.walls, getColliders(map))) hi = m; else lo = m; }
+                    x1 = x0 + (x1 - x0) * lo; y1 = y0 + (y1 - y0) * lo;
+                }
                 const dx = x1 - x0, dy = y1 - y0, distance = Math.hypot(dx, dy);
                 if (distance < 0.001) return;
                 const F = this._fireTrail || (this._fireTrail = []), now = _gameTimeMs();

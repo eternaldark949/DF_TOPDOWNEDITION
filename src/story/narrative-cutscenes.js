@@ -35,7 +35,7 @@
         
             end() {
                 this.active = false;
-                this.game.scenes?.ui?.showPause(false);
+                if (!this.game.scenes?.running) this.game.scenes?.ui?.showPause(false);   // a cutscene ending inside a scene (a boss intro) keeps the scene's pause and skip
                 window.pauseMenuController?._syncCutsceneMenu();
                 // 1. Remove Letterbox
                 if (this.bars) this.bars.classList.remove('active');

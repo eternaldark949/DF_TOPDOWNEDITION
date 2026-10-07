@@ -4758,6 +4758,7 @@
                 MAX_EXPANSIONS: 12000,       // Search cap per path / flood
                 WAYPOINT_REACHED: 10,       // px — advance to the next waypoint inside this
                 REPATH_TICKS: 20,           // Re-plan a followed path this often
+                FAIL_RETRY_TICKS: 30,       // A failed search waits this long before trying again
                 // --- Eyeline positioning ---
                 EYELINE_ENABLED: true,
                 SEARCH_PATH_DIST: 320,      // Farthest a teammate will walk (path distance) to find a shot
@@ -6265,9 +6266,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.rows = Math.max(1, Math.ceil((map.height || 1) / this.cell));
                 const n = this.cols * this.rows;
                 this.blocked = new Uint8Array(n); this._occupancy = new Uint16Array(n);
+                this._near = new Uint16Array(n);   // geometry within radius + half a cell diagonal: only there can a step between neighbours be blocked
                 this.g = new Float32Array(n); this.parent = new Int32Array(n);
                 this.seen = new Uint32Array(n); this.closed = new Uint32Array(n);
                 this.gen = 0; this.revision = 0;
+                this._changes = []; this._dirty = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };   // where recent revisions changed (pathTouched)
                 this._heapIdx = []; this._heapF = [];
                 this._geometry = new Map(); this._buckets = new Map();
                 this._tracked = new Map(); this._present = new Set(); this._records = [];
@@ -6290,7 +6293,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Missing sources previously created a fresh fallback array on every
                 // lookup. Preserve their same-tick live edits while sharing one empty
                 // source and reusing the membership records instead of allocating.
-                const continuous = !map.walls || (!map.buildingColliders && !map.buildings) || !map.navObstacles || live === empty;
                 let membership = this._epoch < 0;
                 if (sources[0] !== walls) { sources[0] = walls; membership = true; }
                 if (sources[1] !== cols) { sources[1] = cols; membership = true; }
@@ -6299,12 +6301,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (let s = 0; s < 4; s++) {
                     const items = sources[s], prior = slots[s];
                     if (prior.length !== items.length) membership = true;
-                    if (newTick || membership || continuous) for (let i = 0; i < items.length; i++) if (prior[i] !== items[i]) {
+                    if (newTick || membership) for (let i = 0; i < items.length; i++) if (prior[i] !== items[i]) {
                         membership = true; prior[i] = items[i];
                     }
                     prior.length = items.length;
                 }
-                if (!newTick && !membership && !continuous) return;
+                if (!newTick && !membership) return;                               // geometry is checked once per simulation tick
                 this._epoch = _simTick;
                 let changed = false;
                 if (membership) {
@@ -6317,7 +6319,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this._records.push(entry);
                     }
                     for (const [p, entry] of this._tracked) if (!present.has(p)) {
-                        if (entry.geometry) { this._removeGeometry(entry.geometry); this._geometry.delete(p); changed = true; }
+                        if (entry.geometry) { this._note(entry.geometry); this._removeGeometry(entry.geometry); this._geometry.delete(p); changed = true; }
                         this._tracked.delete(p);
                     }
                     present.clear();
@@ -6327,25 +6329,51 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const entry = records[index], p = entry.p;
                     let o = entry.geometry;
                     if (p.active === false || p.hasCollision === false || p.noNav) {
-                        if (o) { this._removeGeometry(o); this._geometry.delete(p); entry.geometry = null; changed = true; }
+                        if (o) { this._note(o); this._removeGeometry(o); this._geometry.delete(p); entry.geometry = null; changed = true; }
                         continue;
                     }
                     const w = p.width ?? p.w, h = p.height ?? p.h, angle = p.angle || 0;
                     const x = p.x, y = p.y;
                     if (!(w > 0 && h > 0) || !Number.isFinite(x + y + w + h + angle)) {
-                        if (o) { this._removeGeometry(o); this._geometry.delete(p); entry.geometry = null; changed = true; }
+                        if (o) { this._note(o); this._removeGeometry(o); this._geometry.delete(p); entry.geometry = null; changed = true; }
                         continue;
                     }
                     if (o && o.x === x && o.y === y && o.w === w && o.h === h && o.angle === angle) continue;
-                    if (o) this._removeGeometry(o);
-                    o = { x, y, w, h, angle, hw: w / 2, hh: h / 2, cx: x + w / 2, cy: y + h / 2, c: Math.cos(angle), s: Math.sin(angle), cells: [], keys: [], stamp: 0 };
-                    entry.geometry = o; this._geometry.set(p, o); this._addGeometry(o); changed = true;
+                    if (o) { this._note(o); this._removeGeometry(o); }
+                    o = { x, y, w, h, angle, hw: w / 2, hh: h / 2, cx: x + w / 2, cy: y + h / 2, c: Math.cos(angle), s: Math.sin(angle), cells: [], near: [], keys: [], stamp: 0 };
+                    entry.geometry = o; this._geometry.set(p, o); this._addGeometry(o); this._note(o); changed = true;
                 }
-                if (changed) this.revision++;
+                if (changed) {
+                    // A new revision, and where it changed: only paths passing near it need re-planning
+                    const D = this._dirty;
+                    this._changes.push({ rev: ++this.revision, x0: D.x0, y0: D.y0, x1: D.x1, y1: D.y1 });
+                    if (this._changes.length > 32) this._changes.shift();
+                    D.x0 = D.y0 = Infinity; D.x1 = D.y1 = -Infinity;
+                }
+            }
+
+            /** Widen this refresh's changed area by a geometry's footprint */
+            _note(o) {
+                const D = this._dirty, ex = Math.abs(o.c) * o.hw + Math.abs(o.s) * o.hh, ey = Math.abs(o.s) * o.hw + Math.abs(o.c) * o.hh;
+                if (o.cx - ex < D.x0) D.x0 = o.cx - ex; if (o.cx + ex > D.x1) D.x1 = o.cx + ex;
+                if (o.cy - ey < D.y0) D.y0 = o.cy - ey; if (o.cy + ey > D.y1) D.y1 = o.cy + ey;
+            }
+
+            /** Has anything changed near this cached path (its box) since it was planned? */
+            pathTouched(st) {
+                const C = this._changes;
+                if (!st.box || !C.length || C[0].rev > st.revision + 1) return true;     // (history no longer reaches back that far)
+                const b = st.box, pad = this.radius + this.cell;
+                for (let i = C.length - 1; i >= 0 && C[i].rev > st.revision; i--) {
+                    const c = C[i];
+                    if (c.x1 + pad >= b.x0 && c.x0 - pad <= b.x1 && c.y1 + pad >= b.y0 && c.y0 - pad <= b.y1) return true;
+                }
+                return false;
             }
 
             _removeGeometry(o) {
                 for (const i of o.cells) this.blocked[i] = --this._occupancy[i] ? 1 : 0;
+                for (const i of o.near) this._near[i]--;
                 for (const key of o.keys) { const b = this._buckets.get(key); b.delete(o); if (!b.size) this._buckets.delete(key); }
             }
 
@@ -6358,10 +6386,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (!b) this._buckets.set(key, b = new Set());
                     b.add(o); o.keys.push(key);
                 }
-                for (let row = Math.max(0, Math.floor(top / this.cell)); row <= Math.min(this.rows - 1, Math.floor(bottom / this.cell)); row++) {
-                    for (let col = Math.max(0, Math.floor(left / this.cell)); col <= Math.min(this.cols - 1, Math.floor(right / this.cell)); col++) {
-                        const i = row * this.cols + col;
-                        if (this._pointDistance2(o, this.cx(i), this.cy(i)) < r * r - 1e-6) { o.cells.push(i); this._occupancy[i]++; this.blocked[i] = 1; }
+                // Blocked cells (centre within the radius) and near cells (within radius + half a cell diagonal):
+                // a step between two neighbouring cells, neither of them near, can't touch this geometry
+                const rn = r + this.cell * 0.7072 + 1, gx = rn - r;
+                for (let row = Math.max(0, Math.floor((top - gx) / this.cell)); row <= Math.min(this.rows - 1, Math.floor((bottom + gx) / this.cell)); row++) {
+                    for (let col = Math.max(0, Math.floor((left - gx) / this.cell)); col <= Math.min(this.cols - 1, Math.floor((right + gx) / this.cell)); col++) {
+                        const i = row * this.cols + col, d2 = this._pointDistance2(o, this.cx(i), this.cy(i));
+                        if (d2 < rn * rn) { o.near.push(i); this._near[i]++; }
+                        if (d2 < r * r - 1e-6) { o.cells.push(i); this._occupancy[i]++; this.blocked[i] = 1; }
                     }
                 }
             }
@@ -6483,7 +6515,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** Shared search: A* when goal >= 0, bounded Dijkstra when goal < 0. */
             _search(start, goal, maxCost) {
                 const gen = ++this.gen, cols = this.cols, c = this.cell, D = c * Math.SQRT2;
-                const G = this.g, P = this.parent, S = this.seen, CL = this.closed, B = this.blocked;
+                const G = this.g, P = this.parent, S = this.seen, CL = this.closed, B = this.blocked, NR = this._near;
                 this._heapIdx.length = 0; this._heapF.length = 0;
                 const gc = goal >= 0 ? goal % cols : 0, gr = goal >= 0 ? Math.floor(goal / cols) : 0;
                 const h = (i) => {
@@ -6511,7 +6543,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             if (dr && dc && (B[row * cols + nc] || B[nr * cols + col])) continue;  // no corner cutting
                             const ni = nr * cols + nc;
                             if (CL[ni] === gen) continue;
-                            if (!this.lineWalkable(this.cx(cur), this.cy(cur), this.cx(ni), this.cy(ni))) continue;
+                            if ((NR[cur] || NR[ni]) && !this.lineWalkable(this.cx(cur), this.cy(cur), this.cx(ni), this.cy(ni))) continue;   // (exact sweep only near geometry)
                             const ng = G[cur] + (dr && dc ? D : c);
                             if (ng > maxCost) continue;
                             if (S[ni] !== gen || ng < G[ni]) {
@@ -6775,7 +6807,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             });
         }
 
-        /** Cached routing: failed searches wait for a retry instead of steering into walls. */
+        /** A cached path's box: where it runs, so a change elsewhere on the map leaves it alone */
+        function _navBox(x, y, pts) {
+            let x0 = x, y0 = y, x1 = x, y1 = y;
+            for (const q of pts) { if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x; if (q.y < y0) y0 = q.y; if (q.y > y1) y1 = q.y; }
+            return { x0, y0, x1, y1 };
+        }
+
+        /**
+         * Cached routing. A path is re-planned when the map changes near it, its goal moves
+         * more than 32 px (a smaller move re-aims its last leg when that's clear), it's lost,
+         * or REPATH_TICKS pass. A failed search waits FAIL_RETRY_TICKS before trying again,
+         * wherever the goal goes, instead of searching the whole grid every tick.
+         */
         function navWaypoint(ent, gx, gy, map) {
             const N = CONFIG.NAV, nav = map ? NavGrid.for(map) : null;
             if (!nav || nav.lineWalkable(ent.x, ent.y, gx, gy)) {
@@ -6783,10 +6827,27 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return { x: gx, y: gy, finalLeg: true, remaining: Math.hypot(gx - ent.x, gy - ent.y) };
             }
             let st = ent._navPath;
-            const changed = !st || st.nav !== nav || st.revision !== nav.revision || Math.hypot(st.goalX - gx, st.goalY - gy) > 8;
-            if (changed || _simTick >= st.repathAt || (!st.failed && (st.idx >= st.pts.length || !nav.lineWalkable(ent.x, ent.y, st.pts[st.idx].x, st.pts[st.idx].y)))) {
-                const pts = nav.findPath(ent.x, ent.y, gx, gy);
-                st = ent._navPath = { nav, revision: nav.revision, pts: pts || [], idx: 0, failed: !(pts && pts.length), goalX: gx, goalY: gy, repathAt: _simTick + N.REPATH_TICKS };
+            let replan = !st || st.nav !== nav;
+            if (!replan && st.revision !== nav.revision) {
+                if (nav.pathTouched(st)) replan = true; else st.revision = nav.revision;
+            }
+            if (!replan) {
+                const moved = Math.hypot(st.goalX - gx, st.goalY - gy);
+                if (st.failed) replan = _simTick >= st.repathAt;
+                else if (moved > 32) replan = true;
+                else if (moved > 0.5) {
+                    const n = st.pts.length, prev = n > 1 ? st.pts[n - 2] : null;
+                    if (prev && nav.lineWalkable(prev.x, prev.y, gx, gy)) {
+                        st.pts[n - 1] = { x: gx, y: gy }; st.goalX = gx; st.goalY = gy;
+                        const b = st.box; if (gx < b.x0) b.x0 = gx; if (gx > b.x1) b.x1 = gx; if (gy < b.y0) b.y0 = gy; if (gy > b.y1) b.y1 = gy;
+                    } else replan = true;
+                }
+                if (!replan && !st.failed && (_simTick >= st.repathAt || st.idx >= st.pts.length || !nav.lineWalkable(ent.x, ent.y, st.pts[st.idx].x, st.pts[st.idx].y))) replan = true;
+            }
+            if (replan) {
+                const pts = nav.findPath(ent.x, ent.y, gx, gy), failed = !(pts && pts.length);
+                st = ent._navPath = { nav, revision: nav.revision, pts: pts || [], idx: 0, failed, goalX: gx, goalY: gy,
+                                      repathAt: _simTick + (failed ? (N.FAIL_RETRY_TICKS || 30) : N.REPATH_TICKS), box: _navBox(ent.x, ent.y, pts || []) };
             }
             if (st.failed) return { x: ent.x, y: ent.y, finalLeg: false, blocked: true, remaining: Infinity };
             while (st.idx < st.pts.length - 1 && nav.lineWalkable(ent.x, ent.y, st.pts[st.idx + 1].x, st.pts[st.idx + 1].y)) st.idx++;
@@ -6821,13 +6882,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         /** One step (px) of up to `speed` toward (gx, gy), routed around obstacles. */
         function actorSteer(ent, gx, gy, speed, map) {
-            const wp = navWaypoint(ent, gx, gy, map);
+            let wp = navWaypoint(ent, gx, gy, map);
+            // `remaining`: route distance left this tick (straight distance when there's no route yet), for stuck checks
+            const remaining = wp.blocked ? Math.hypot(gx - ent.x, gy - ent.y) : wp.remaining;
+            if (wp.blocked) wp = { x: gx, y: gy };   // no route found (yet): edge straight on where a step is clear, never into a wall
             const dx = wp.x - ent.x, dy = wp.y - ent.y, d = Math.hypot(dx, dy);
-            if (d < 1e-3) return { x: 0, y: 0 };
+            if (d < 1e-3) return { x: 0, y: 0, remaining };
             const step = Math.min(Math.max(0, speed), d), vx = (dx / d) * step, vy = (dy / d) * step;
             const nav = map ? NavGrid.for(map) : null;
-            if (nav && !nav.lineWalkable(ent.x, ent.y, ent.x + vx, ent.y + vy)) return { x: 0, y: 0 };
-            return { x: vx, y: vy };
+            if (nav && !nav.lineWalkable(ent.x, ent.y, ent.x + vx, ent.y + vy)) return { x: 0, y: 0, remaining };
+            return { x: vx, y: vy, remaining };
         }
 
         /**
@@ -6925,7 +6989,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             _progress(w, d) {
                 const wp = navWaypoint(w.actor, w.x, w.y, w.map);
-                const remaining = wp.remaining ?? d;
+                const remaining = Number.isFinite(wp.remaining) ? wp.remaining : d;   // no route yet: straight-line progress counts
                 if (remaining < w.best - 1) { w.best = remaining; w.stuck = 0; return true; } // useful progress along the route, including detours
                 if (++w.stuck > w.timeout) { this._end(w, 'failed'); return false; }
                 return true;
@@ -20279,7 +20343,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * @returns {boolean} - Whether damage was applied
              */
             takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
-                if (this.dead || (this.invincibleTimer > 0 && !(opts && opts.type === 'bleed'))) return false;
+                // A bullet always lands: i-frames guard against a swing or a bump hitting twice, not against rapid fire
+                // (a fast gun used to lose ~4 of every 5 bullets to them). Bullets don't start i-frames either.
+                const shot = !!(opts && opts.shot);
+                if (this.dead || (this.invincibleTimer > 0 && !(opts && (opts.type === 'bleed' || shot)))) return false;
                 
                 this.hp -= amount;
                 // Damage number, health bar, blood, flinch (engine/combat-fx.js); opts.type: the kind of damage
@@ -20292,7 +20359,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 
                 // Trigger invincibility frames
-                if (this.invincibleDuration > 0) {
+                if (this.invincibleDuration > 0 && !shot) {
                     this.invincibleTimer = this.invincibleDuration;
                 }
                 
@@ -24200,13 +24267,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
         
-        /**
-         * =====================================================================
-         *  PEDESTRIAN MANAGER
-         * =====================================================================
-         * Manages the spawning, updating, and despawning of pedestrians.
-         * Similar to TrafficManager but for foot traffic.
-         */
         // Local crowd searches retain source-array order. Each moved pedestrian updates
         // its cell immediately, so the original reverse-order simulation sees live neighbours.
         const _crowdPointOrder = (a, b) => a.index - b.index;
@@ -24295,6 +24355,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        /**
+         * =====================================================================
+         *  PEDESTRIAN MANAGER
+         * =====================================================================
+         * Manages the spawning, updating, and despawning of pedestrians.
+         * Similar to TrafficManager but for foot traffic.
+         */
         class PedestrianManager {
             constructor() {
                 this.pedestrians = [];
@@ -24574,7 +24641,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
                         if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
                         // Stuck? (blocked by a crowd): give up on this stop after a while
-                        const remaining = navWaypoint(w, gx, gy, M).remaining;
+                        const remaining = s.remaining;                                     // (from this tick's steer: no second route walk)
                         if (remaining < w.lastD - 0.2) { w.lastD = remaining; w.stuck = 0; } else if (++w.stuck > 360) { w.steps.shift(); w._slot = undefined; w.stuck = 0; w.lastD = Infinity; }
                         w.look.pose = undefined;
                         continue;
@@ -24874,7 +24941,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         if (nav && !nav.lineWalkable(w.x, w.y, w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }
                         gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
                         if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
-                        const remaining = navWaypoint(w, gx, gy, M).remaining;
+                        const remaining = s.remaining;                                     // (from this tick's steer: no second route walk)
                         if (remaining < w.lastD - 0.2) { w.lastD = remaining; w.stuck = 0; }
                         else if (++w.stuck > 360) { w.steps.shift(); this._releaseStep(w, step); w.stuck = 0; w.lastD = Infinity; }
                         w.look.pose = undefined;
@@ -25124,6 +25191,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             onMapLoaded(game) {
                 this.release(true);
                 if (!game.activeMap || game.activeMap.id !== FURNITURE_GRAB.MAP) return;
+                if (game.questState) game.questState.aptVisited = true;          // she's been home: the furniture is hers (Inventory → Items)
                 const L = (game.questState && game.questState.aptLayout) || {};
                 game.activeMap.props.forEach((p, i) => {
                     p._aptIdx = i;
@@ -41844,7 +41912,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         
             end() {
                 this.active = false;
-                this.game.scenes?.ui?.showPause(false);
+                if (!this.game.scenes?.running) this.game.scenes?.ui?.showPause(false);   // a cutscene ending inside a scene (a boss intro) keeps the scene's pause and skip
                 window.pauseMenuController?._syncCutsceneMenu();
                 // 1. Remove Letterbox
                 if (this.bars) this.bars.classList.remove('active');
@@ -47588,13 +47656,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 name: 'RB-98', type: 'weapon', icon: '🧬',
                 desc: 'High-velocity rifle blaster. SMG-class fire rate.',
                 weaponMode: 'normal',
-                stats: { fireRate: 6, recoil: 4, damage: 15, projectileColor: '#00ffcc', projectileSpeed: 28, flashRadius: 40 }
+                stats: { fireRate: 6, recoil: 4, damage: 12, projectileColor: '#00ffcc', projectileSpeed: 28, flashRadius: 40 }
             },
             'pistol_anavia': {
                 name: 'Anavia', type: 'weapon', icon: '💠',
                 desc: 'A specialized energy blaster that fires ethereal periwinkle bolts.',
                 weaponMode: 'normal',
-                stats: { fireRate: 4, recoil: 3, damage: 12, projectileColor: '#CCCCFF', projectileSpeed: 24, flashRadius: 45 }
+                stats: { fireRate: 4, recoil: 3, damage: 8, projectileColor: '#CCCCFF', projectileSpeed: 24, flashRadius: 45 }
             },
             'sniper_sr86': {
                 name: 'SR-86', type: 'weapon', icon: '🎯',
@@ -47633,7 +47701,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 desc: 'Red-hot projectile cast from the palm.',
                 stats: {
                     fireRate: 70,           // Cooldown in frames between casts
-                    damage: 80,
+                    damage: 50,             // one-shots a ganger (40 HP) without trivialising the gauntlet's gunners
                     projectileColor: '#ff3300',
                     projectileSpeed: 18,
                     spread: 0.15,
@@ -47821,7 +47889,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     isEquipped, registryLabel: isEquipped ? 'EQUIPPED' : 'OWNED'
                 });
             }
-            for (const entry of APARTMENT_FURNITURE_REGISTRY) {
+            // Furniture is hers once she's been home (Apartment 949 loaded once: questState.aptVisited);
+            // counts come from the apartment as built, the registry's numbers until it has been
+            const aptProps = game?.questState?.aptVisited && typeof maps !== 'undefined' && maps.apt_949 && maps.apt_949.props;
+            const placed = new Map();
+            if (aptProps && aptProps.length) for (const p of aptProps) if (p && p.decorType) placed.set(p.decorType, (placed.get(p.decorType) || 0) + 1);
+            if (game?.questState?.aptVisited) for (const base of APARTMENT_FURNITURE_REGISTRY) {
+                const n = placed.size ? (placed.get(base.id) || 0) : base.quantity;
+                if (!n) continue;
+                const entry = n === base.quantity ? base : { ...base, quantity: n };
                 result.push({
                     id: 'furniture:' + entry.id, source: 'furniture', sourceId: entry.id,
                     category: 'items', type: 'furniture', name: entry.name, description: entry.description,
@@ -48158,7 +48234,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const filter = typeof invSidebar !== 'undefined' && invSidebar.filterEnabled ? invSidebar.activeFilter : null;
                 let entries = this.getEntries();
                 if (equippedOnly) entries = entries.filter(entry => entry.isEquipped);
-                if (filter && filter !== 'all') entries = entries.filter(entry => entry.category === filter);
+                if (filter && filter !== 'all' && !equippedOnly) entries = entries.filter(entry => entry.category === filter);   // Equipped lists everything worn and held
                 const labels = { items: 'Items', collectibles: 'Collectibles', weapons: 'Weapons', pets: 'Pets', mounts: 'Mounts' };
                 if (!entries.length) {
                     const empty = document.createElement('div');
@@ -52047,6 +52123,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** Lay flames along the distance actually flown, including the hand's starting point. */
             emitFireTrail(shot, x0, y0, x1, y1) {
                 if (!shot.isFireball || !shot.active || shot.markedForDestroy) return;
+                // Flames stop at the wall the fireball meets this step (it's destroyed in the collision pass after)
+                const map = this.activeMap;
+                if (map && isLineBlocked(x0, y0, x1, y1, map.walls, getColliders(map))) {
+                    let lo = 0, hi = 1;
+                    for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (isLineBlocked(x0, y0, x0 + (x1 - x0) * m, y0 + (y1 - y0) * m, map.walls, getColliders(map))) hi = m; else lo = m; }
+                    x1 = x0 + (x1 - x0) * lo; y1 = y0 + (y1 - y0) * lo;
+                }
                 const dx = x1 - x0, dy = y1 - y0, distance = Math.hypot(dx, dy);
                 if (distance < 0.001) return;
                 const F = this._fireTrail || (this._fireTrail = []), now = _gameTimeMs();
@@ -53675,6 +53758,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._refl = null;
                 const q = this.reflectQuality(), wet = this._wetHere();
                 const surf = this._surfaces();
+                // Out of Ultra: its full-screen detail layer and scratch canvases go (they're rebuilt on the way back in)
+                if (q !== 'ultra' && this._reflDetailCv) this._reflDetailCv = this._ultraWalkerCanvas = this._ultraCarScratch = null;
                 if (!q || !this.view || (wet < 0.02 && !surf)) return;
                 const W = this.canvas.width, H = this.canvas.height, s = q === 'ultra' ? 1 : q === 'high' ? 0.5 : 0.25;
                 const rw = Math.max(1, Math.round(W * s)), rh = Math.max(1, Math.round(H * s));
@@ -53834,7 +53919,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     });
                     for (const m of this._ultraReflectionMovers(near)) {
                         if (m.kind === 'car') this._drawUltraReflectionCar(dc, m.e);
-                        else this._drawUltraReflectionWalker(dc, m.e);
+                        else if (!this._drawUltraReflectionWalker(dc, m.e)) {
+                            // no reflected art (drones, automata): their silhouette still blocks the reflected lights
+                            rc.globalCompositeOperation = 'destination-out'; this._reflShape(rc, m, 0.85);
+                            rc.globalCompositeOperation = 'source-over';
+                        }
                     }
                     // A reflected body interrupts the reflected lights through its actual art,
                     // including gaps between limbs and leaves, rather than the cheap silhouette.
@@ -53881,6 +53970,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const e of this._ultraReflectionCars(buffer.cars)) add(e, 'car');
                 for (let i = count; i < previous; i++) buffer.records[i].e = null;
                 out.length = count;
+                // Detailed reflections cost a full body draw each: the ULTRA_MAX nearest her (she's always first)
+                const P = this.player, MAX = 12;
+                if (count > MAX && P) {
+                    const px = P.x, py = P.y;
+                    out.sort((a, b) => ((a.x - px) ** 2 + (a.y - py) ** 2) - ((b.x - px) ** 2 + (b.y - py) ** 2));
+                    out.length = MAX;
+                }
                 seen.clear();
                 return out;
             },
@@ -54571,18 +54667,26 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (d.type !== 'arch') for (const s of d.leaves()) leaves.push({ s, r: r + (d.halfThick || 0) });
                 }
                 const probe = Object.create(pl);
+                // Something she already touches only blocks a step that takes her deeper into it (backed
+                // against a wall or brushing a passer-by, she can still step away from it toward the target)
+                const rectD2 = (b, x, y) => { const dx = x - Math.max(b.x, Math.min(b.x + b.w, x)), dy = y - Math.max(b.y, Math.min(b.y + b.h, y)); return dx * dx + dy * dy; };
+                const ec = e => { const b = e.getBoundingBox(); return [b.x + b.w / 2, b.y + b.h / 2]; };
                 const clear = (x, y) => {
                     if (x < r || y < r || x > map.width - r || y > map.height - r) return false;
                     for (const b of rects) {
-                        const dx = x - Math.max(b.x, Math.min(b.x + b.w, x)), dy = y - Math.max(b.y, Math.min(b.y + b.h, y));
-                        if (dx * dx + dy * dy < r * r) return false;
+                        const d2 = rectD2(b, x, y);
+                        if (d2 < r * r && d2 <= rectD2(b, sx, sy)) return false;
                     }
                     for (const leaf of leaves) {
-                        const [ax, ay, bx, by] = leaf.s;
-                        if (CollisionSystem.distToSegmentSquared(x, y, ax, ay, bx, by) < leaf.r * leaf.r) return false;
+                        const [ax, ay, bx, by] = leaf.s, d2 = CollisionSystem.distToSegmentSquared(x, y, ax, ay, bx, by);
+                        if (d2 < leaf.r * leaf.r && d2 <= CollisionSystem.distToSegmentSquared(sx, sy, ax, ay, bx, by)) return false;
                     }
                     probe.x = x; probe.y = y;
-                    for (const e of solids) if (CollisionSystem._checkCollision(probe, e)) return false;
+                    for (const e of solids) {
+                        if (!CollisionSystem._checkCollision(probe, e)) continue;
+                        const [cx, cy] = ec(e);
+                        if ((x - cx) ** 2 + (y - cy) ** 2 <= (sx - cx) ** 2 + (sy - cy) ** 2) return false;
+                    }
                     return true;
                 };
                 let traveled = 0;
@@ -54605,8 +54709,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const side = this._slashSide = -(this._slashSide || 1);
                 this._slashT = _gameTimeSec;
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
-                this.meleeStepIn(ang);
                 const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
+                // Step in only when there's someone to step in on: a slash at nothing stays where she is
+                // (held, it used to creep her ~30 px/s into zones and lamplight)
+                const inReach = e => {
+                    if (!e || e.dead) return false;
+                    const dx = e.x - pl.x, dy = e.y - pl.y, d = Math.hypot(dx, dy);
+                    return d <= reach + 8 + (e.radius || 14) && Math.abs(normalizeAngle(Math.atan2(dy, dx) - ang)) <= arc / 2 + (d < 26 ? 0.6 : 0)
+                        && !isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols);
+                };
+                if (this.enemies.some(inReach)) this.meleeStepIn(ang);
                 let bladeDamage = st.damage || 25;
                 if (this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) {
                     bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
@@ -58934,6 +59046,7 @@ engineMixin({
                 this._ultraMoverBuffer = this._ultraExtraRecords = this._ultraActorSeen = null;
                 this._ultraCars = this._ultraCarSeen = this._ultraFoliageCandidates = null;
                 this._ultraWalkerProxies = null;
+                this._reflDetailCv = this._ultraWalkerCanvas = this._ultraCarScratch = null;   // Ultra's canvases (rebuilt on demand)
                 this._refl = null;
             },
 
@@ -60500,10 +60613,17 @@ engineMixin({
             updateCarLightTrails() {
                 const z = this.camera.zoom || 1, pad = CAR_TAIL_TRAIL.VIEW_PAD;
                 const hw = this.canvas.width / 2 / z + pad, hh = this.canvas.height / 2 / z + pad;
-                const view = { left: this.camera.x - hw, right: this.camera.x + hw, top: this.camera.y - hh, bottom: this.camera.y + hh };
-                const cars = new Set(this.traffic ? this.traffic.vehicles : []);
-                for (const v of [this.car, this.ownedCar, this.deliveryVehicle]) if (v instanceof TrafficVehicle) cars.add(v);
+                // (one view box and one set, reused every tick)
+                const view = this._trailView || (this._trailView = { left: 0, right: 0, top: 0, bottom: 0 });
+                view.left = this.camera.x - hw; view.right = this.camera.x + hw; view.top = this.camera.y - hh; view.bottom = this.camera.y + hh;
+                const cars = this._trailCars || (this._trailCars = new Set());
+                cars.clear();
+                if (this.traffic) for (const v of this.traffic.vehicles) cars.add(v);
+                if (this.car instanceof TrafficVehicle) cars.add(this.car);
+                if (this.ownedCar instanceof TrafficVehicle) cars.add(this.ownedCar);
+                if (this.deliveryVehicle instanceof TrafficVehicle) cars.add(this.deliveryVehicle);
                 for (const v of cars) updateCarTailTrail(v, this.activeMap, view, _simTick);
+                cars.clear();   // (no references held past the tick)
             },
 
             /** Ordinary gunners' hot metal emits its own light after the darkness pass. */
@@ -62245,7 +62365,7 @@ engineMixin({
                                 const kbX = Math.cos(angle) * knockbackStrength;
                                 const kbY = Math.sin(angle) * knockbackStrength;
                                 e.lastHitBy = p.owner; e.lastHitMelee = !!p.melee;       // who gets the Resonance
-                                if (e.takeDamage(p.damage, kbX, kbY) && p.melee && e.interruptMelee) e.interruptMelee();
+                                if (e.takeDamage(p.damage, kbX, kbY, p.melee ? null : { shot: true }) && p.melee && e.interruptMelee) e.interruptMelee();
                                 
                                 // Spawn sticky DOT orb (Golden Child)
                                 if (p.sticky && !e.dead) {
@@ -65124,13 +65244,6 @@ engineMixin({
                 ctx.restore();
             },
 
-            /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
-            /* =====================================================================
-               COZY CAFE — the floor, painted once (released when she leaves: MAP_BAKES),
-               and the glow: the fire, pendant lamps, candles, string lights, steam,
-               and the windows by the benches (sky by day, the city's lights by night,
-               rain running down them when it rains outside)
-               ===================================================================== */
             /** Enni Cole: rose stone, cream marble and champagne inlay. Painted once and released on exit. */
             drawEnniInterior(ctx) {
                 if (!this._enniFloor) this._enniFloor = this._paintEnniFloor();
@@ -65243,6 +65356,12 @@ engineMixin({
                 ctx.restore();
             },
 
+            /* =====================================================================
+               COZY CAFE — the floor, painted once (released when she leaves: MAP_BAKES),
+               and the glow: the fire, pendant lamps, candles, string lights, steam,
+               and the windows by the benches (sky by day, the city's lights by night,
+               rain running down them when it rains outside)
+               ===================================================================== */
             drawCafeInterior(ctx) {
                 if (!this._cafeFloor) this._cafeFloor = this._paintCafeFloor();
                 ctx.drawImage(this._cafeFloor, 0, 0);
@@ -65358,6 +65477,7 @@ engineMixin({
                 }
             },
 
+            /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
             drawApartmentGlow(ctx) {
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these
@@ -66938,13 +67058,14 @@ engineMixin({
                     const pulse = 0.96 + 0.04 * Math.sin(now * 0.023 + (p.id || 0));
                     stamp(p, p.x, p.y, FIREBALL_LIGHT_RADIUS, (color ? 0.32 : 0.98) * pulse);
                 }
-                const trail = this._fireTrail || [], cells = new Set();
+                const trail = this._fireTrail || [], cells = this._fireCells || (this._fireCells = new Set());
+                cells.clear();   // (one reused set, numeric cell keys: no strings or sets per pass)
                 let lit = 0;
                 for (let i = trail.length - 1; i >= 0 && lit < 48; i--) {
                     const p = trail[i], f = Math.max(0, Math.min(1, 1 - (now - p.born) / p.life));
                     if (f <= 0.02 || !inView(p.x, p.y, FIRE_TRAIL_LIGHT_RADIUS)) continue;
                     // Flames are dense; one pool per 40px cell gives a continuous wash without hundreds of raycasts.
-                    const cell = Math.floor(p.x / 40) + ',' + Math.floor(p.y / 40);
+                    const cell = Math.floor(p.x / 40) * 100003 + Math.floor(p.y / 40);
                     if (cells.has(cell)) continue;
                     cells.add(cell); lit++;
                     const fade = Math.pow(f, 1.35), flicker = 0.90 + 0.10 * Math.sin(now * 0.034 + (p.seed || 0) * 7);
@@ -67077,25 +67198,30 @@ engineMixin({
                 const eligible = GameSettings.adaptiveLighting && GameSettings.softShadows && this.running &&
                     !this.paused && !this.cineCam && !this.cutscene?.active && !this.scenes?.running &&
                     !PerfBench.active && !this.showProfiler && !GameSettings.baseline && !document.hidden &&
-                    this.activeMap?.type === 'outdoor' && !this.nightVision && !(this.weather?.lightningFlash > 0.01);
+                    this.activeMap?.type === 'outdoor' && !this.nightVision;
+                // A lightning flash pauses measuring (its frames aren't typical); it doesn't reset the state.
+                // Nor does the zoom's lamp budget: crossing a zoom step mustn't throw the light layer back to full.
+                const flashing = this.weather?.lightningFlash > 0.01;
                 const baseScale = this.lightingScale, renderScale = this._renderScale || 1;
-                const fpsLimit = GameSettings.fpsLimit, lampBudget = this._maxLitLamps || 40;
+                const fpsLimit = GameSettings.fpsLimit;
                 const now = eligible ? performance.now() : 0;
                 let s = this._adaptiveLighting;
                 if (!s || s.map !== this.activeMap || s.baseScale !== baseScale || s.renderScale !== renderScale ||
-                    s.fpsLimit !== fpsLimit || s.lampBudget !== lampBudget || s.eligible !== !!eligible || (eligible && now - s.last > 800)) {
-                    s = this._adaptiveLighting = { map: this.activeMap, baseScale, renderScale, fpsLimit, lampBudget,
-                        key: `${baseScale}:${renderScale}:${fpsLimit}:${lampBudget}`, eligible: !!eligible, factor: 1, mode: 'full',
+                    s.fpsLimit !== fpsLimit || s.eligible !== !!eligible || (eligible && now - s.last > 800)) {
+                    s = this._adaptiveLighting = { map: this.activeMap, baseScale, renderScale, fpsLimit,
+                        key: `${baseScale}:${renderScale}:${fpsLimit}`, eligible: !!eligible, factor: 1, mode: 'full',
                         last: now, begin: now + 1000, cooldown: now + 3000, count: 0, frames: 0, lights: 0,
-                        baselineFrame: 0, baselineLight: 0, stable: 0 };
+                        baselineFrame: 0, baselineLight: 0, stable: 0,
+                        backoff: s && s.backoff || 15000 };   // (remembered: how long to wait after giving reduced back)
                 }
+                s.flashing = flashing;
                 if (eligible) s.last = now;
                 return s.factor;
             },
 
             _sampleAdaptiveLighting(lightMs, now) {
                 const s = this._adaptiveLighting, frameMs = this._renderFrameMs;
-                if (!s?.eligible || !Number.isFinite(lightMs) || !Number.isFinite(frameMs) ||
+                if (!s?.eligible || s.flashing || !Number.isFinite(lightMs) || !Number.isFinite(frameMs) ||
                     frameMs < 2 || frameMs > 100 || now < s.begin) return;
                 s.frames += frameMs; s.lights += lightMs; s.count++;
                 if (now - s.begin < 3000 || s.count < 12) return;
@@ -67112,7 +67238,10 @@ engineMixin({
                 } else if (s.mode === 'reduced') {
                     s.stable = frame <= target * 1.06 ? s.stable + 1 : 0;
                     if (s.stable >= 3 && now >= s.cooldown) {
-                        s.factor = 1; s.mode = 'full'; s.cooldown = now + 15000; s.begin = now + 500;
+                        // Back to full; if it needs reducing again, the next trial waits twice as long (up to 4 min),
+                        // so a borderline phone settles instead of flipping resolution every half minute
+                        s.factor = 1; s.mode = 'full'; s.cooldown = now + s.backoff; s.begin = now + 500;
+                        s.backoff = Math.min(240000, s.backoff * 2);
                     }
                 } else if (now >= s.cooldown && frame > target * 1.18 && light > 2.5) {
                     s.baselineFrame = frame; s.baselineLight = light;
@@ -70451,6 +70580,13 @@ engineMixin({
                 this.init();
             }
             
+            /** Pick a filter tab from code (as a tap on it would) */
+            selectFilter(name) {
+                for (const i of this.rightSidebar?.querySelectorAll('.filter-item') || []) i.classList.toggle('active', i.dataset.filter === name);
+                this.activeFilter = name;
+                if (this.onFilterChange) this.onFilterChange(this.filterEnabled, name);
+            }
+
             init() {
                 // Handle clicks
                 if (this.leftHandle) {
@@ -71350,8 +71486,9 @@ engineMixin({
 
             executeQuick(action) {
                 if (!this._actionAllowed(action, true)) return;
-                if (action === 'equip') { this.close(); Screens.open('equipped'); }
-                else if (action === 'drop') { this.close(); Screens.open('inventory'); }
+                // Equip / Drop open on the Weapons tab: the guns are what these shortcuts are for
+                if (action === 'equip') { this.close(); if (typeof invSidebar !== 'undefined') invSidebar.selectFilter('weapons'); Screens.open('equipped'); }
+                else if (action === 'drop') { this.close(); if (typeof invSidebar !== 'undefined') invSidebar.selectFilter('weapons'); Screens.open('inventory'); }
                 else if (action === 'cinematic') this.enterCinematic();
             }
 

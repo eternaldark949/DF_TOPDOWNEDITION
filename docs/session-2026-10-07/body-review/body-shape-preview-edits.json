@@ -1,8 +1,8 @@
 {
-  "source": "/workspace/library-files/DFAB-V8-scrapyard-bounded-animation.html",
+  "source": "DFAB-V8-scrapyard-bounded-animation.html",
   "sourceSha256": "d38c84b950ec3722d24acaf9faaabfd37988355aae04268095068ce8c9be21f1",
-  "baseline": "/workspace/scratch/DFAB-V8-body-baseline-preview.html",
-  "candidate": "/workspace/scratch/DFAB-V8-body-shape-preview.html",
+  "baseline": "DFAB-V8-body-baseline-preview.html",
+  "candidate": "DFAB-V8-body-shape-preview.html",
   "baselineSha256": "d663c3dbb8a9ff9451201bdcfa65cee3b81ea614bf52d55e79a16a65dcab9a93",
   "candidateSha256": "802551468a0ef45d58d0e32eb549377462f05fb7c5dbccf6698cc5dbfd26e385",
   "instrumentationEdits": [

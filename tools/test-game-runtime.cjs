@@ -59,6 +59,8 @@ function runtime(file,options={}) {
     set textContent(v){this._text=String(v);}
     appendChild(n){this.children.push(n);n.parentNode=this;n.parentElement=this;return n;}
     removeChild(n){this.children=this.children.filter(x=>x!==n);n.parentNode=null;n.parentElement=null;return n;}
+    replaceChildren(...ns){for(const c of this.children){c.parentNode=null;c.parentElement=null;}this.children.length=0;for(const n of ns)this.appendChild(typeof n==='string'?Object.assign(new Node(),{textContent:n}):n);}
+    append(...ns){for(const n of ns)this.appendChild(typeof n==='string'?Object.assign(new Node(),{textContent:n}):n);}
     addEventListener(k,f){if(options.events){this._events ||= new Map();if(!this._events.has(k))this._events.set(k,[]);this._events.get(k).push(f);}} removeEventListener(){} dispatchEvent(e){for(const f of this._events?.get(e.type)||[])f(e);return true;}
   }
   class Element extends Node {

@@ -834,13 +834,6 @@
             }
         }
         
-        /**
-         * =====================================================================
-         *  PEDESTRIAN MANAGER
-         * =====================================================================
-         * Manages the spawning, updating, and despawning of pedestrians.
-         * Similar to TrafficManager but for foot traffic.
-         */
         // Local crowd searches retain source-array order. Each moved pedestrian updates
         // its cell immediately, so the original reverse-order simulation sees live neighbours.
         const _crowdPointOrder = (a, b) => a.index - b.index;
@@ -929,6 +922,13 @@
             }
         }
 
+        /**
+         * =====================================================================
+         *  PEDESTRIAN MANAGER
+         * =====================================================================
+         * Manages the spawning, updating, and despawning of pedestrians.
+         * Similar to TrafficManager but for foot traffic.
+         */
         class PedestrianManager {
             constructor() {
                 this.pedestrians = [];

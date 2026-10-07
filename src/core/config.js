@@ -275,6 +275,7 @@
                 MAX_EXPANSIONS: 12000,       // Search cap per path / flood
                 WAYPOINT_REACHED: 10,       // px — advance to the next waypoint inside this
                 REPATH_TICKS: 20,           // Re-plan a followed path this often
+                FAIL_RETRY_TICKS: 30,       // A failed search waits this long before trying again
                 // --- Eyeline positioning ---
                 EYELINE_ENABLED: true,
                 SEARCH_PATH_DIST: 320,      // Farthest a teammate will walk (path distance) to find a shot

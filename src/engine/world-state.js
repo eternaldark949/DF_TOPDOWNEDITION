@@ -183,10 +183,17 @@
             updateCarLightTrails() {
                 const z = this.camera.zoom || 1, pad = CAR_TAIL_TRAIL.VIEW_PAD;
                 const hw = this.canvas.width / 2 / z + pad, hh = this.canvas.height / 2 / z + pad;
-                const view = { left: this.camera.x - hw, right: this.camera.x + hw, top: this.camera.y - hh, bottom: this.camera.y + hh };
-                const cars = new Set(this.traffic ? this.traffic.vehicles : []);
-                for (const v of [this.car, this.ownedCar, this.deliveryVehicle]) if (v instanceof TrafficVehicle) cars.add(v);
+                // (one view box and one set, reused every tick)
+                const view = this._trailView || (this._trailView = { left: 0, right: 0, top: 0, bottom: 0 });
+                view.left = this.camera.x - hw; view.right = this.camera.x + hw; view.top = this.camera.y - hh; view.bottom = this.camera.y + hh;
+                const cars = this._trailCars || (this._trailCars = new Set());
+                cars.clear();
+                if (this.traffic) for (const v of this.traffic.vehicles) cars.add(v);
+                if (this.car instanceof TrafficVehicle) cars.add(this.car);
+                if (this.ownedCar instanceof TrafficVehicle) cars.add(this.ownedCar);
+                if (this.deliveryVehicle instanceof TrafficVehicle) cars.add(this.deliveryVehicle);
                 for (const v of cars) updateCarTailTrail(v, this.activeMap, view, _simTick);
+                cars.clear();   // (no references held past the tick)
             },
 
             /** Ordinary gunners' hot metal emits its own light after the darkness pass. */

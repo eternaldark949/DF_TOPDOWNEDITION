@@ -396,6 +396,104 @@ test('Mirage rings keep one quarter-resolution snapshot, at most four bends and 
   }
 }, {affine:true});
 
+test('Every rapid-fire bullet that lands deals damage; a melee swing keeps its i-frames', env => {
+  const r = value(env, `
+    game._doLoadMap('hotel_lobby'); game.story.update=()=>{}; game.running=true; game.paused=false;
+    game.enemies.length=0; game.projectiles.length=0;
+    const g=new Ganger(game.player.x+300, game.player.y, {hp:40}); game.enemies.push(g);
+    let shots=0;
+    for (let i=0;i<60 && !g.dead;i++) {
+      if (i%4===0) { game.projectiles.push(new ProjectileEntity({x:g.x-20,y:g.y,angle:0,isEnemy:false,owner:game.player,color:'#ccccff',speed:24,damage:ITEM_REGISTRY.pistol_anavia.stats.damage,life:30})); shots++; }
+      game.update();
+    }
+    const m=new Ganger(0,0,{hp:100});
+    const first=m.takeDamage(10,0,0,{type:'melee'}), second=m.takeDamage(10,0,0,{type:'melee'});
+    return {dead:g.dead, shots, first, second, fireball:ABILITY_REGISTRY.fireball.stats.damage};
+  `);
+  equal(r.dead, true, 'the ganger falls');
+  equal(r.shots, 5, 'five 8-damage Anavia bolts at 15/s drop a 40 HP ganger (not ~20)');
+  equal([r.first, r.second], [true, false], 'a second swing inside the i-frames still misses');
+  equal(r.fireball, 50);
+});
+
+test('Nav grid: once per tick, local invalidation, failed searches back off, steering falls back straight', env => {
+  const r = value(env, `
+    game._doLoadMap('cozy_cafe_interior'); game.running=true;
+    const map=game.activeMap, nav=NavGrid.for(map);
+    const p=game.props.find(q=>q.active!==false && q.hasCollision!==false && !q.noNav && q.width>20 && q.height>20);
+    const rev0=nav.revision;
+    p.x+=6; NavGrid.for(map); const sameTick=nav.revision===rev0;
+    _simTick++; NavGrid.for(map); const nextTick=nav.revision>rev0;
+    const far={revision:rev0, box:{x0:-900,y0:-900,x1:-800,y1:-800}}, near={revision:rev0, box:{x0:p.x,y0:p.y,x1:p.x+p.width,y1:p.y+p.height}};
+    const local=[nav.pathTouched(far), nav.pathTouched(near)];
+    p.x-=6; _simTick++; NavGrid.for(map);
+    // a search that fails waits FAIL_RETRY_TICKS, wherever the goal goes
+    const realFind=nav.findPath; let searches=0; nav.findPath=function(){searches++;return null;};
+    const ent={x:p.x-60,y:p.y+p.height/2}, gx=p.x+p.width/2, gy=p.y+p.height/2;
+    for(let i=0;i<10;i++){ _simTick++; navWaypoint(ent,gx+(i%2?40:-40),gy,map); }
+    const early=searches;
+    for(let i=0;i<CONFIG.NAV.FAIL_RETRY_TICKS;i++){ _simTick++; navWaypoint(ent,gx,gy,map); }
+    const later=searches;
+    ent._navPath=null; const step=actorSteer(ent,gx,gy,1.5,map);
+    nav.findPath=realFind;
+    return {sameTick,nextTick,local,early,later,step:Math.hypot(step.x,step.y),remaining:step.remaining};
+  `);
+  equal([r.sameTick, r.nextTick], [true, true], 'geometry is read once per simulation tick');
+  equal(r.local, [false, true], 'only paths near a change re-plan');
+  equal(r.early, 1, 'one failed search, then it waits'); equal(r.later, 2, 'and retries after FAIL_RETRY_TICKS');
+  ok(r.step > 1, 'no route: steering edges straight on where the step is clear'); ok(Number.isFinite(r.remaining), 'with a finite remaining distance');
+});
+
+test('Melee steps in only on a target in reach', env => {
+  const r = value(env, `
+    game._doLoadMap('hotel_lobby'); game.story.update=()=>{}; game.running=true; game.paused=false;
+    game.enemies.length=0; game.currentWeapon=createItemFromRegistry('maiden_kukri', game); game.isDriving=false;
+    const pl=game.player; pl.angle=0; const x0=pl.x;
+    game.meleeSlash(); const idle=pl.x-x0;
+    const g=new Ganger(pl.x+40, pl.y, {hp:400}); game.enemies.push(g);
+    const x1=pl.x; game.meleeSlash(); const engaged=pl.x-x1;
+    return {idle, engaged};
+  `);
+  equal(r.idle, 0, 'a slash at nothing stays put');
+  ok(r.engaged > 0, 'a slash at someone in reach steps in');
+});
+
+test('Pause → Equip opens the Weapons tab and lists the equipped gun; furniture waits for the apartment', env => {
+  const r = value(env, `
+    game._doLoadMap('hotel_lobby'); game.running=true; game.paused=false;
+    const furnitureBefore=game.inventory.getEntries().filter(e=>e.source==='furniture').length;
+    const gun=game.inventory.items.find(i=>i.type==='weapon'); game.inventory.equipItem(gun.id);
+    invSidebar.filterEnabled=true; invSidebar.activeFilter='items';
+    pauseMenuController.open(); pauseMenuController.executeQuick('equip');
+    game.inventory.render();
+    const equipped=game.inventory.getEntries().filter(e=>e.isEquipped).length;
+    const shown=game.inventory.uiList.children.filter(c=>String(c.className||'').split(' ').includes('ui-pill')).length;
+    game._doLoadMap('apt_949');
+    const furnitureAfter=game.inventory.getEntries().filter(e=>e.source==='furniture').length;
+    const gunShown=game.inventory.getEntries().some(e=>e.isEquipped && e.category==='weapons');
+    return {screen:Screens.current, filter:invSidebar.activeFilter, equipped, shown, gunShown, furnitureBefore, furnitureAfter};
+  `);
+  equal([r.screen, r.filter], ['equipped', 'weapons']);
+  ok(r.gunShown && r.equipped > 0 && r.shown === r.equipped, 'the equipped screen lists everything equipped, gun included');
+  equal(r.furnitureBefore, 0, 'no furniture before she has been home');
+  ok(r.furnitureAfter > 20, 'the apartment furniture once she has');
+});
+
+test('Adaptive lighting survives zoom lamp-budget steps and lightning', env => {
+  const r = value(env, `
+    game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+    GameSettings.adaptiveLighting=true; GameSettings.softShadows=true; game.cutscene.active=false; game._adaptiveLighting=null;
+    game._lightingAdaptiveScale(); const s=game._adaptiveLighting; s.mode='reduced'; s.factor=0.8;
+    game._maxLitLamps=10; const afterZoom=game._lightingAdaptiveScale();
+    game.weather.lightningFlash=0.6; const afterFlash=game._lightingAdaptiveScale();
+    const same=game._adaptiveLighting===s, flashing=s.flashing;
+    game.weather.lightningFlash=0;
+    return {eligible:s.eligible, afterZoom, afterFlash, same, flashing};
+  `);
+  ok(r.eligible, 'the hub at night is eligible');
+  equal([r.afterZoom, r.afterFlash, r.same, r.flashing], [0.8, 0.8, true, true]);
+});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');

@@ -80,18 +80,26 @@
                     if (d.type !== 'arch') for (const s of d.leaves()) leaves.push({ s, r: r + (d.halfThick || 0) });
                 }
                 const probe = Object.create(pl);
+                // Something she already touches only blocks a step that takes her deeper into it (backed
+                // against a wall or brushing a passer-by, she can still step away from it toward the target)
+                const rectD2 = (b, x, y) => { const dx = x - Math.max(b.x, Math.min(b.x + b.w, x)), dy = y - Math.max(b.y, Math.min(b.y + b.h, y)); return dx * dx + dy * dy; };
+                const ec = e => { const b = e.getBoundingBox(); return [b.x + b.w / 2, b.y + b.h / 2]; };
                 const clear = (x, y) => {
                     if (x < r || y < r || x > map.width - r || y > map.height - r) return false;
                     for (const b of rects) {
-                        const dx = x - Math.max(b.x, Math.min(b.x + b.w, x)), dy = y - Math.max(b.y, Math.min(b.y + b.h, y));
-                        if (dx * dx + dy * dy < r * r) return false;
+                        const d2 = rectD2(b, x, y);
+                        if (d2 < r * r && d2 <= rectD2(b, sx, sy)) return false;
                     }
                     for (const leaf of leaves) {
-                        const [ax, ay, bx, by] = leaf.s;
-                        if (CollisionSystem.distToSegmentSquared(x, y, ax, ay, bx, by) < leaf.r * leaf.r) return false;
+                        const [ax, ay, bx, by] = leaf.s, d2 = CollisionSystem.distToSegmentSquared(x, y, ax, ay, bx, by);
+                        if (d2 < leaf.r * leaf.r && d2 <= CollisionSystem.distToSegmentSquared(sx, sy, ax, ay, bx, by)) return false;
                     }
                     probe.x = x; probe.y = y;
-                    for (const e of solids) if (CollisionSystem._checkCollision(probe, e)) return false;
+                    for (const e of solids) {
+                        if (!CollisionSystem._checkCollision(probe, e)) continue;
+                        const [cx, cy] = ec(e);
+                        if ((x - cx) ** 2 + (y - cy) ** 2 <= (sx - cx) ** 2 + (sy - cy) ** 2) return false;
+                    }
                     return true;
                 };
                 let traveled = 0;
@@ -114,8 +122,16 @@
                 const side = this._slashSide = -(this._slashSide || 1);
                 this._slashT = _gameTimeSec;
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
-                this.meleeStepIn(ang);
                 const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
+                // Step in only when there's someone to step in on: a slash at nothing stays where she is
+                // (held, it used to creep her ~30 px/s into zones and lamplight)
+                const inReach = e => {
+                    if (!e || e.dead) return false;
+                    const dx = e.x - pl.x, dy = e.y - pl.y, d = Math.hypot(dx, dy);
+                    return d <= reach + 8 + (e.radius || 14) && Math.abs(normalizeAngle(Math.atan2(dy, dx) - ang)) <= arc / 2 + (d < 26 ? 0.6 : 0)
+                        && !isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols);
+                };
+                if (this.enemies.some(inReach)) this.meleeStepIn(ang);
                 let bladeDamage = st.damage || 25;
                 if (this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) {
                     bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');

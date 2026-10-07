@@ -202,6 +202,7 @@ engineMixin({
                 this._ultraMoverBuffer = this._ultraExtraRecords = this._ultraActorSeen = null;
                 this._ultraCars = this._ultraCarSeen = this._ultraFoliageCandidates = null;
                 this._ultraWalkerProxies = null;
+                this._reflDetailCv = this._ultraWalkerCanvas = this._ultraCarScratch = null;   // Ultra's canvases (rebuilt on demand)
                 this._refl = null;
             },
 

@@ -25,9 +25,11 @@
                 this.rows = Math.max(1, Math.ceil((map.height || 1) / this.cell));
                 const n = this.cols * this.rows;
                 this.blocked = new Uint8Array(n); this._occupancy = new Uint16Array(n);
+                this._near = new Uint16Array(n);   // geometry within radius + half a cell diagonal: only there can a step between neighbours be blocked
                 this.g = new Float32Array(n); this.parent = new Int32Array(n);
                 this.seen = new Uint32Array(n); this.closed = new Uint32Array(n);
                 this.gen = 0; this.revision = 0;
+                this._changes = []; this._dirty = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };   // where recent revisions changed (pathTouched)
                 this._heapIdx = []; this._heapF = [];
                 this._geometry = new Map(); this._buckets = new Map();
                 this._tracked = new Map(); this._present = new Set(); this._records = [];
@@ -50,7 +52,6 @@
                 // Missing sources previously created a fresh fallback array on every
                 // lookup. Preserve their same-tick live edits while sharing one empty
                 // source and reusing the membership records instead of allocating.
-                const continuous = !map.walls || (!map.buildingColliders && !map.buildings) || !map.navObstacles || live === empty;
                 let membership = this._epoch < 0;
                 if (sources[0] !== walls) { sources[0] = walls; membership = true; }
                 if (sources[1] !== cols) { sources[1] = cols; membership = true; }
@@ -59,12 +60,12 @@
                 for (let s = 0; s < 4; s++) {
                     const items = sources[s], prior = slots[s];
                     if (prior.length !== items.length) membership = true;
-                    if (newTick || membership || continuous) for (let i = 0; i < items.length; i++) if (prior[i] !== items[i]) {
+                    if (newTick || membership) for (let i = 0; i < items.length; i++) if (prior[i] !== items[i]) {
                         membership = true; prior[i] = items[i];
                     }
                     prior.length = items.length;
                 }
-                if (!newTick && !membership && !continuous) return;
+                if (!newTick && !membership) return;                               // geometry is checked once per simulation tick
                 this._epoch = _simTick;
                 let changed = false;
                 if (membership) {
@@ -77,7 +78,7 @@
                         this._records.push(entry);
                     }
                     for (const [p, entry] of this._tracked) if (!present.has(p)) {
-                        if (entry.geometry) { this._removeGeometry(entry.geometry); this._geometry.delete(p); changed = true; }
+                        if (entry.geometry) { this._note(entry.geometry); this._removeGeometry(entry.geometry); this._geometry.delete(p); changed = true; }
                         this._tracked.delete(p);
                     }
                     present.clear();
@@ -87,25 +88,51 @@
                     const entry = records[index], p = entry.p;
                     let o = entry.geometry;
                     if (p.active === false || p.hasCollision === false || p.noNav) {
-                        if (o) { this._removeGeometry(o); this._geometry.delete(p); entry.geometry = null; changed = true; }
+                        if (o) { this._note(o); this._removeGeometry(o); this._geometry.delete(p); entry.geometry = null; changed = true; }
                         continue;
                     }
                     const w = p.width ?? p.w, h = p.height ?? p.h, angle = p.angle || 0;
                     const x = p.x, y = p.y;
                     if (!(w > 0 && h > 0) || !Number.isFinite(x + y + w + h + angle)) {
-                        if (o) { this._removeGeometry(o); this._geometry.delete(p); entry.geometry = null; changed = true; }
+                        if (o) { this._note(o); this._removeGeometry(o); this._geometry.delete(p); entry.geometry = null; changed = true; }
                         continue;
                     }
                     if (o && o.x === x && o.y === y && o.w === w && o.h === h && o.angle === angle) continue;
-                    if (o) this._removeGeometry(o);
-                    o = { x, y, w, h, angle, hw: w / 2, hh: h / 2, cx: x + w / 2, cy: y + h / 2, c: Math.cos(angle), s: Math.sin(angle), cells: [], keys: [], stamp: 0 };
-                    entry.geometry = o; this._geometry.set(p, o); this._addGeometry(o); changed = true;
+                    if (o) { this._note(o); this._removeGeometry(o); }
+                    o = { x, y, w, h, angle, hw: w / 2, hh: h / 2, cx: x + w / 2, cy: y + h / 2, c: Math.cos(angle), s: Math.sin(angle), cells: [], near: [], keys: [], stamp: 0 };
+                    entry.geometry = o; this._geometry.set(p, o); this._addGeometry(o); this._note(o); changed = true;
                 }
-                if (changed) this.revision++;
+                if (changed) {
+                    // A new revision, and where it changed: only paths passing near it need re-planning
+                    const D = this._dirty;
+                    this._changes.push({ rev: ++this.revision, x0: D.x0, y0: D.y0, x1: D.x1, y1: D.y1 });
+                    if (this._changes.length > 32) this._changes.shift();
+                    D.x0 = D.y0 = Infinity; D.x1 = D.y1 = -Infinity;
+                }
+            }
+
+            /** Widen this refresh's changed area by a geometry's footprint */
+            _note(o) {
+                const D = this._dirty, ex = Math.abs(o.c) * o.hw + Math.abs(o.s) * o.hh, ey = Math.abs(o.s) * o.hw + Math.abs(o.c) * o.hh;
+                if (o.cx - ex < D.x0) D.x0 = o.cx - ex; if (o.cx + ex > D.x1) D.x1 = o.cx + ex;
+                if (o.cy - ey < D.y0) D.y0 = o.cy - ey; if (o.cy + ey > D.y1) D.y1 = o.cy + ey;
+            }
+
+            /** Has anything changed near this cached path (its box) since it was planned? */
+            pathTouched(st) {
+                const C = this._changes;
+                if (!st.box || !C.length || C[0].rev > st.revision + 1) return true;     // (history no longer reaches back that far)
+                const b = st.box, pad = this.radius + this.cell;
+                for (let i = C.length - 1; i >= 0 && C[i].rev > st.revision; i--) {
+                    const c = C[i];
+                    if (c.x1 + pad >= b.x0 && c.x0 - pad <= b.x1 && c.y1 + pad >= b.y0 && c.y0 - pad <= b.y1) return true;
+                }
+                return false;
             }
 
             _removeGeometry(o) {
                 for (const i of o.cells) this.blocked[i] = --this._occupancy[i] ? 1 : 0;
+                for (const i of o.near) this._near[i]--;
                 for (const key of o.keys) { const b = this._buckets.get(key); b.delete(o); if (!b.size) this._buckets.delete(key); }
             }
 
@@ -118,10 +145,14 @@
                     if (!b) this._buckets.set(key, b = new Set());
                     b.add(o); o.keys.push(key);
                 }
-                for (let row = Math.max(0, Math.floor(top / this.cell)); row <= Math.min(this.rows - 1, Math.floor(bottom / this.cell)); row++) {
-                    for (let col = Math.max(0, Math.floor(left / this.cell)); col <= Math.min(this.cols - 1, Math.floor(right / this.cell)); col++) {
-                        const i = row * this.cols + col;
-                        if (this._pointDistance2(o, this.cx(i), this.cy(i)) < r * r - 1e-6) { o.cells.push(i); this._occupancy[i]++; this.blocked[i] = 1; }
+                // Blocked cells (centre within the radius) and near cells (within radius + half a cell diagonal):
+                // a step between two neighbouring cells, neither of them near, can't touch this geometry
+                const rn = r + this.cell * 0.7072 + 1, gx = rn - r;
+                for (let row = Math.max(0, Math.floor((top - gx) / this.cell)); row <= Math.min(this.rows - 1, Math.floor((bottom + gx) / this.cell)); row++) {
+                    for (let col = Math.max(0, Math.floor((left - gx) / this.cell)); col <= Math.min(this.cols - 1, Math.floor((right + gx) / this.cell)); col++) {
+                        const i = row * this.cols + col, d2 = this._pointDistance2(o, this.cx(i), this.cy(i));
+                        if (d2 < rn * rn) { o.near.push(i); this._near[i]++; }
+                        if (d2 < r * r - 1e-6) { o.cells.push(i); this._occupancy[i]++; this.blocked[i] = 1; }
                     }
                 }
             }
@@ -243,7 +274,7 @@
             /** Shared search: A* when goal >= 0, bounded Dijkstra when goal < 0. */
             _search(start, goal, maxCost) {
                 const gen = ++this.gen, cols = this.cols, c = this.cell, D = c * Math.SQRT2;
-                const G = this.g, P = this.parent, S = this.seen, CL = this.closed, B = this.blocked;
+                const G = this.g, P = this.parent, S = this.seen, CL = this.closed, B = this.blocked, NR = this._near;
                 this._heapIdx.length = 0; this._heapF.length = 0;
                 const gc = goal >= 0 ? goal % cols : 0, gr = goal >= 0 ? Math.floor(goal / cols) : 0;
                 const h = (i) => {
@@ -271,7 +302,7 @@
                             if (dr && dc && (B[row * cols + nc] || B[nr * cols + col])) continue;  // no corner cutting
                             const ni = nr * cols + nc;
                             if (CL[ni] === gen) continue;
-                            if (!this.lineWalkable(this.cx(cur), this.cy(cur), this.cx(ni), this.cy(ni))) continue;
+                            if ((NR[cur] || NR[ni]) && !this.lineWalkable(this.cx(cur), this.cy(cur), this.cx(ni), this.cy(ni))) continue;   // (exact sweep only near geometry)
                             const ng = G[cur] + (dr && dc ? D : c);
                             if (ng > maxCost) continue;
                             if (S[ni] !== gen || ng < G[ni]) {
@@ -535,7 +566,19 @@
             });
         }
 
-        /** Cached routing: failed searches wait for a retry instead of steering into walls. */
+        /** A cached path's box: where it runs, so a change elsewhere on the map leaves it alone */
+        function _navBox(x, y, pts) {
+            let x0 = x, y0 = y, x1 = x, y1 = y;
+            for (const q of pts) { if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x; if (q.y < y0) y0 = q.y; if (q.y > y1) y1 = q.y; }
+            return { x0, y0, x1, y1 };
+        }
+
+        /**
+         * Cached routing. A path is re-planned when the map changes near it, its goal moves
+         * more than 32 px (a smaller move re-aims its last leg when that's clear), it's lost,
+         * or REPATH_TICKS pass. A failed search waits FAIL_RETRY_TICKS before trying again,
+         * wherever the goal goes, instead of searching the whole grid every tick.
+         */
         function navWaypoint(ent, gx, gy, map) {
             const N = CONFIG.NAV, nav = map ? NavGrid.for(map) : null;
             if (!nav || nav.lineWalkable(ent.x, ent.y, gx, gy)) {
@@ -543,10 +586,27 @@
                 return { x: gx, y: gy, finalLeg: true, remaining: Math.hypot(gx - ent.x, gy - ent.y) };
             }
             let st = ent._navPath;
-            const changed = !st || st.nav !== nav || st.revision !== nav.revision || Math.hypot(st.goalX - gx, st.goalY - gy) > 8;
-            if (changed || _simTick >= st.repathAt || (!st.failed && (st.idx >= st.pts.length || !nav.lineWalkable(ent.x, ent.y, st.pts[st.idx].x, st.pts[st.idx].y)))) {
-                const pts = nav.findPath(ent.x, ent.y, gx, gy);
-                st = ent._navPath = { nav, revision: nav.revision, pts: pts || [], idx: 0, failed: !(pts && pts.length), goalX: gx, goalY: gy, repathAt: _simTick + N.REPATH_TICKS };
+            let replan = !st || st.nav !== nav;
+            if (!replan && st.revision !== nav.revision) {
+                if (nav.pathTouched(st)) replan = true; else st.revision = nav.revision;
+            }
+            if (!replan) {
+                const moved = Math.hypot(st.goalX - gx, st.goalY - gy);
+                if (st.failed) replan = _simTick >= st.repathAt;
+                else if (moved > 32) replan = true;
+                else if (moved > 0.5) {
+                    const n = st.pts.length, prev = n > 1 ? st.pts[n - 2] : null;
+                    if (prev && nav.lineWalkable(prev.x, prev.y, gx, gy)) {
+                        st.pts[n - 1] = { x: gx, y: gy }; st.goalX = gx; st.goalY = gy;
+                        const b = st.box; if (gx < b.x0) b.x0 = gx; if (gx > b.x1) b.x1 = gx; if (gy < b.y0) b.y0 = gy; if (gy > b.y1) b.y1 = gy;
+                    } else replan = true;
+                }
+                if (!replan && !st.failed && (_simTick >= st.repathAt || st.idx >= st.pts.length || !nav.lineWalkable(ent.x, ent.y, st.pts[st.idx].x, st.pts[st.idx].y))) replan = true;
+            }
+            if (replan) {
+                const pts = nav.findPath(ent.x, ent.y, gx, gy), failed = !(pts && pts.length);
+                st = ent._navPath = { nav, revision: nav.revision, pts: pts || [], idx: 0, failed, goalX: gx, goalY: gy,
+                                      repathAt: _simTick + (failed ? (N.FAIL_RETRY_TICKS || 30) : N.REPATH_TICKS), box: _navBox(ent.x, ent.y, pts || []) };
             }
             if (st.failed) return { x: ent.x, y: ent.y, finalLeg: false, blocked: true, remaining: Infinity };
             while (st.idx < st.pts.length - 1 && nav.lineWalkable(ent.x, ent.y, st.pts[st.idx + 1].x, st.pts[st.idx + 1].y)) st.idx++;
@@ -581,13 +641,16 @@
 
         /** One step (px) of up to `speed` toward (gx, gy), routed around obstacles. */
         function actorSteer(ent, gx, gy, speed, map) {
-            const wp = navWaypoint(ent, gx, gy, map);
+            let wp = navWaypoint(ent, gx, gy, map);
+            // `remaining`: route distance left this tick (straight distance when there's no route yet), for stuck checks
+            const remaining = wp.blocked ? Math.hypot(gx - ent.x, gy - ent.y) : wp.remaining;
+            if (wp.blocked) wp = { x: gx, y: gy };   // no route found (yet): edge straight on where a step is clear, never into a wall
             const dx = wp.x - ent.x, dy = wp.y - ent.y, d = Math.hypot(dx, dy);
-            if (d < 1e-3) return { x: 0, y: 0 };
+            if (d < 1e-3) return { x: 0, y: 0, remaining };
             const step = Math.min(Math.max(0, speed), d), vx = (dx / d) * step, vy = (dy / d) * step;
             const nav = map ? NavGrid.for(map) : null;
-            if (nav && !nav.lineWalkable(ent.x, ent.y, ent.x + vx, ent.y + vy)) return { x: 0, y: 0 };
-            return { x: vx, y: vy };
+            if (nav && !nav.lineWalkable(ent.x, ent.y, ent.x + vx, ent.y + vy)) return { x: 0, y: 0, remaining };
+            return { x: vx, y: vy, remaining };
         }
 
         /**

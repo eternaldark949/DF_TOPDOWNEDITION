@@ -39,13 +39,13 @@
                 name: 'RB-98', type: 'weapon', icon: '🧬',
                 desc: 'High-velocity rifle blaster. SMG-class fire rate.',
                 weaponMode: 'normal',
-                stats: { fireRate: 6, recoil: 4, damage: 15, projectileColor: '#00ffcc', projectileSpeed: 28, flashRadius: 40 }
+                stats: { fireRate: 6, recoil: 4, damage: 12, projectileColor: '#00ffcc', projectileSpeed: 28, flashRadius: 40 }
             },
             'pistol_anavia': {
                 name: 'Anavia', type: 'weapon', icon: '💠',
                 desc: 'A specialized energy blaster that fires ethereal periwinkle bolts.',
                 weaponMode: 'normal',
-                stats: { fireRate: 4, recoil: 3, damage: 12, projectileColor: '#CCCCFF', projectileSpeed: 24, flashRadius: 45 }
+                stats: { fireRate: 4, recoil: 3, damage: 8, projectileColor: '#CCCCFF', projectileSpeed: 24, flashRadius: 45 }
             },
             'sniper_sr86': {
                 name: 'SR-86', type: 'weapon', icon: '🎯',
@@ -84,7 +84,7 @@
                 desc: 'Red-hot projectile cast from the palm.',
                 stats: {
                     fireRate: 70,           // Cooldown in frames between casts
-                    damage: 80,
+                    damage: 50,             // one-shots a ganger (40 HP) without trivialising the gauntlet's gunners
                     projectileColor: '#ff3300',
                     projectileSpeed: 18,
                     spread: 0.15,
@@ -272,7 +272,15 @@
                     isEquipped, registryLabel: isEquipped ? 'EQUIPPED' : 'OWNED'
                 });
             }
-            for (const entry of APARTMENT_FURNITURE_REGISTRY) {
+            // Furniture is hers once she's been home (Apartment 949 loaded once: questState.aptVisited);
+            // counts come from the apartment as built, the registry's numbers until it has been
+            const aptProps = game?.questState?.aptVisited && typeof maps !== 'undefined' && maps.apt_949 && maps.apt_949.props;
+            const placed = new Map();
+            if (aptProps && aptProps.length) for (const p of aptProps) if (p && p.decorType) placed.set(p.decorType, (placed.get(p.decorType) || 0) + 1);
+            if (game?.questState?.aptVisited) for (const base of APARTMENT_FURNITURE_REGISTRY) {
+                const n = placed.size ? (placed.get(base.id) || 0) : base.quantity;
+                if (!n) continue;
+                const entry = n === base.quantity ? base : { ...base, quantity: n };
                 result.push({
                     id: 'furniture:' + entry.id, source: 'furniture', sourceId: entry.id,
                     category: 'items', type: 'furniture', name: entry.name, description: entry.description,
@@ -609,7 +617,7 @@
                 const filter = typeof invSidebar !== 'undefined' && invSidebar.filterEnabled ? invSidebar.activeFilter : null;
                 let entries = this.getEntries();
                 if (equippedOnly) entries = entries.filter(entry => entry.isEquipped);
-                if (filter && filter !== 'all') entries = entries.filter(entry => entry.category === filter);
+                if (filter && filter !== 'all' && !equippedOnly) entries = entries.filter(entry => entry.category === filter);   // Equipped lists everything worn and held
                 const labels = { items: 'Items', collectibles: 'Collectibles', weapons: 'Weapons', pets: 'Pets', mounts: 'Mounts' };
                 if (!entries.length) {
                     const empty = document.createElement('div');

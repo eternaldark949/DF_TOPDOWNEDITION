@@ -22,6 +22,13 @@
                 this.init();
             }
             
+            /** Pick a filter tab from code (as a tap on it would) */
+            selectFilter(name) {
+                for (const i of this.rightSidebar?.querySelectorAll('.filter-item') || []) i.classList.toggle('active', i.dataset.filter === name);
+                this.activeFilter = name;
+                if (this.onFilterChange) this.onFilterChange(this.filterEnabled, name);
+            }
+
             init() {
                 // Handle clicks
                 if (this.leftHandle) {

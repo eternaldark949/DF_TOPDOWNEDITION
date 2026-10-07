@@ -96,7 +96,10 @@
              * @returns {boolean} - Whether damage was applied
              */
             takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
-                if (this.dead || (this.invincibleTimer > 0 && !(opts && opts.type === 'bleed'))) return false;
+                // A bullet always lands: i-frames guard against a swing or a bump hitting twice, not against rapid fire
+                // (a fast gun used to lose ~4 of every 5 bullets to them). Bullets don't start i-frames either.
+                const shot = !!(opts && opts.shot);
+                if (this.dead || (this.invincibleTimer > 0 && !(opts && (opts.type === 'bleed' || shot)))) return false;
                 
                 this.hp -= amount;
                 // Damage number, health bar, blood, flinch (engine/combat-fx.js); opts.type: the kind of damage
@@ -109,7 +112,7 @@
                 }
                 
                 // Trigger invincibility frames
-                if (this.invincibleDuration > 0) {
+                if (this.invincibleDuration > 0 && !shot) {
                     this.invincibleTimer = this.invincibleDuration;
                 }
                 

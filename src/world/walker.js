@@ -65,7 +65,7 @@
 
             _progress(w, d) {
                 const wp = navWaypoint(w.actor, w.x, w.y, w.map);
-                const remaining = wp.remaining ?? d;
+                const remaining = Number.isFinite(wp.remaining) ? wp.remaining : d;   // no route yet: straight-line progress counts
                 if (remaining < w.best - 1) { w.best = remaining; w.stuck = 0; return true; } // useful progress along the route, including detours
                 if (++w.stuck > w.timeout) { this._end(w, 'failed'); return false; }
                 return true;

@@ -123,7 +123,7 @@
                         gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
                         if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
                         // Stuck? (blocked by a crowd): give up on this stop after a while
-                        const remaining = navWaypoint(w, gx, gy, M).remaining;
+                        const remaining = s.remaining;                                     // (from this tick's steer: no second route walk)
                         if (remaining < w.lastD - 0.2) { w.lastD = remaining; w.stuck = 0; } else if (++w.stuck > 360) { w.steps.shift(); w._slot = undefined; w.stuck = 0; w.lastD = Infinity; }
                         w.look.pose = undefined;
                         continue;

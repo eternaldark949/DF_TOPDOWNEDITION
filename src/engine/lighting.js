@@ -115,13 +115,14 @@
                     const pulse = 0.96 + 0.04 * Math.sin(now * 0.023 + (p.id || 0));
                     stamp(p, p.x, p.y, FIREBALL_LIGHT_RADIUS, (color ? 0.32 : 0.98) * pulse);
                 }
-                const trail = this._fireTrail || [], cells = new Set();
+                const trail = this._fireTrail || [], cells = this._fireCells || (this._fireCells = new Set());
+                cells.clear();   // (one reused set, numeric cell keys: no strings or sets per pass)
                 let lit = 0;
                 for (let i = trail.length - 1; i >= 0 && lit < 48; i--) {
                     const p = trail[i], f = Math.max(0, Math.min(1, 1 - (now - p.born) / p.life));
                     if (f <= 0.02 || !inView(p.x, p.y, FIRE_TRAIL_LIGHT_RADIUS)) continue;
                     // Flames are dense; one pool per 40px cell gives a continuous wash without hundreds of raycasts.
-                    const cell = Math.floor(p.x / 40) + ',' + Math.floor(p.y / 40);
+                    const cell = Math.floor(p.x / 40) * 100003 + Math.floor(p.y / 40);
                     if (cells.has(cell)) continue;
                     cells.add(cell); lit++;
                     const fade = Math.pow(f, 1.35), flicker = 0.90 + 0.10 * Math.sin(now * 0.034 + (p.seed || 0) * 7);
@@ -254,25 +255,30 @@
                 const eligible = GameSettings.adaptiveLighting && GameSettings.softShadows && this.running &&
                     !this.paused && !this.cineCam && !this.cutscene?.active && !this.scenes?.running &&
                     !PerfBench.active && !this.showProfiler && !GameSettings.baseline && !document.hidden &&
-                    this.activeMap?.type === 'outdoor' && !this.nightVision && !(this.weather?.lightningFlash > 0.01);
+                    this.activeMap?.type === 'outdoor' && !this.nightVision;
+                // A lightning flash pauses measuring (its frames aren't typical); it doesn't reset the state.
+                // Nor does the zoom's lamp budget: crossing a zoom step mustn't throw the light layer back to full.
+                const flashing = this.weather?.lightningFlash > 0.01;
                 const baseScale = this.lightingScale, renderScale = this._renderScale || 1;
-                const fpsLimit = GameSettings.fpsLimit, lampBudget = this._maxLitLamps || 40;
+                const fpsLimit = GameSettings.fpsLimit;
                 const now = eligible ? performance.now() : 0;
                 let s = this._adaptiveLighting;
                 if (!s || s.map !== this.activeMap || s.baseScale !== baseScale || s.renderScale !== renderScale ||
-                    s.fpsLimit !== fpsLimit || s.lampBudget !== lampBudget || s.eligible !== !!eligible || (eligible && now - s.last > 800)) {
-                    s = this._adaptiveLighting = { map: this.activeMap, baseScale, renderScale, fpsLimit, lampBudget,
-                        key: `${baseScale}:${renderScale}:${fpsLimit}:${lampBudget}`, eligible: !!eligible, factor: 1, mode: 'full',
+                    s.fpsLimit !== fpsLimit || s.eligible !== !!eligible || (eligible && now - s.last > 800)) {
+                    s = this._adaptiveLighting = { map: this.activeMap, baseScale, renderScale, fpsLimit,
+                        key: `${baseScale}:${renderScale}:${fpsLimit}`, eligible: !!eligible, factor: 1, mode: 'full',
                         last: now, begin: now + 1000, cooldown: now + 3000, count: 0, frames: 0, lights: 0,
-                        baselineFrame: 0, baselineLight: 0, stable: 0 };
+                        baselineFrame: 0, baselineLight: 0, stable: 0,
+                        backoff: s && s.backoff || 15000 };   // (remembered: how long to wait after giving reduced back)
                 }
+                s.flashing = flashing;
                 if (eligible) s.last = now;
                 return s.factor;
             },
 
             _sampleAdaptiveLighting(lightMs, now) {
                 const s = this._adaptiveLighting, frameMs = this._renderFrameMs;
-                if (!s?.eligible || !Number.isFinite(lightMs) || !Number.isFinite(frameMs) ||
+                if (!s?.eligible || s.flashing || !Number.isFinite(lightMs) || !Number.isFinite(frameMs) ||
                     frameMs < 2 || frameMs > 100 || now < s.begin) return;
                 s.frames += frameMs; s.lights += lightMs; s.count++;
                 if (now - s.begin < 3000 || s.count < 12) return;
@@ -289,7 +295,10 @@
                 } else if (s.mode === 'reduced') {
                     s.stable = frame <= target * 1.06 ? s.stable + 1 : 0;
                     if (s.stable >= 3 && now >= s.cooldown) {
-                        s.factor = 1; s.mode = 'full'; s.cooldown = now + 15000; s.begin = now + 500;
+                        // Back to full; if it needs reducing again, the next trial waits twice as long (up to 4 min),
+                        // so a borderline phone settles instead of flipping resolution every half minute
+                        s.factor = 1; s.mode = 'full'; s.cooldown = now + s.backoff; s.begin = now + 500;
+                        s.backoff = Math.min(240000, s.backoff * 2);
                     }
                 } else if (now >= s.cooldown && frame > target * 1.18 && light > 2.5) {
                     s.baselineFrame = frame; s.baselineLight = light;

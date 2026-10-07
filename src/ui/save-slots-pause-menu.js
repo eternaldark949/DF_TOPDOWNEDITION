@@ -749,8 +749,9 @@
 
             executeQuick(action) {
                 if (!this._actionAllowed(action, true)) return;
-                if (action === 'equip') { this.close(); Screens.open('equipped'); }
-                else if (action === 'drop') { this.close(); Screens.open('inventory'); }
+                // Equip / Drop open on the Weapons tab: the guns are what these shortcuts are for
+                if (action === 'equip') { this.close(); if (typeof invSidebar !== 'undefined') invSidebar.selectFilter('weapons'); Screens.open('equipped'); }
+                else if (action === 'drop') { this.close(); if (typeof invSidebar !== 'undefined') invSidebar.selectFilter('weapons'); Screens.open('inventory'); }
                 else if (action === 'cinematic') this.enterCinematic();
             }
 

@@ -187,6 +187,8 @@
                 this._refl = null;
                 const q = this.reflectQuality(), wet = this._wetHere();
                 const surf = this._surfaces();
+                // Out of Ultra: its full-screen detail layer and scratch canvases go (they're rebuilt on the way back in)
+                if (q !== 'ultra' && this._reflDetailCv) this._reflDetailCv = this._ultraWalkerCanvas = this._ultraCarScratch = null;
                 if (!q || !this.view || (wet < 0.02 && !surf)) return;
                 const W = this.canvas.width, H = this.canvas.height, s = q === 'ultra' ? 1 : q === 'high' ? 0.5 : 0.25;
                 const rw = Math.max(1, Math.round(W * s)), rh = Math.max(1, Math.round(H * s));
@@ -346,7 +348,11 @@
                     });
                     for (const m of this._ultraReflectionMovers(near)) {
                         if (m.kind === 'car') this._drawUltraReflectionCar(dc, m.e);
-                        else this._drawUltraReflectionWalker(dc, m.e);
+                        else if (!this._drawUltraReflectionWalker(dc, m.e)) {
+                            // no reflected art (drones, automata): their silhouette still blocks the reflected lights
+                            rc.globalCompositeOperation = 'destination-out'; this._reflShape(rc, m, 0.85);
+                            rc.globalCompositeOperation = 'source-over';
+                        }
                     }
                     // A reflected body interrupts the reflected lights through its actual art,
                     // including gaps between limbs and leaves, rather than the cheap silhouette.
@@ -393,6 +399,13 @@
                 for (const e of this._ultraReflectionCars(buffer.cars)) add(e, 'car');
                 for (let i = count; i < previous; i++) buffer.records[i].e = null;
                 out.length = count;
+                // Detailed reflections cost a full body draw each: the ULTRA_MAX nearest her (she's always first)
+                const P = this.player, MAX = 12;
+                if (count > MAX && P) {
+                    const px = P.x, py = P.y;
+                    out.sort((a, b) => ((a.x - px) ** 2 + (a.y - py) ** 2) - ((b.x - px) ** 2 + (b.y - py) ** 2));
+                    out.length = MAX;
+                }
                 seen.clear();
                 return out;
             },
