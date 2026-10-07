@@ -32,7 +32,7 @@
             let reach = 1;
             if (map.type === 'indoor') {
                 const rs = game.roomSystem;
-                if (entity !== game.player || !rs || !rs.active) return null;
+                if ((entity !== game.player && entity._reflectionSource !== game.player) || !rs || !rs.active) return null;
                 reach = rs.outdoorness;
                 if (reach < 0.01) return null;
             }

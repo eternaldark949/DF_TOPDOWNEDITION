@@ -1,6 +1,21 @@
         // Shared immutable falloff tables; softArea only reads these stops.
         const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
         const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
+        // One warm, wide falloff reused for the fireball and its dying flame stream.
+        let _fireballLightSprite = null;
+        function _getFireballLightSprite() {
+            if (_fireballLightSprite) return _fireballLightSprite;
+            const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+            const c = cv.getContext('2d'), g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
+            g.addColorStop(0, 'rgba(255, 177, 65, 1)');
+            g.addColorStop(0.12, 'rgba(255, 151, 36, 0.96)');
+            g.addColorStop(0.35, 'rgba(255, 112, 20, 0.68)');
+            g.addColorStop(0.64, 'rgba(255, 83, 12, 0.27)');
+            g.addColorStop(1, 'rgba(255, 70, 8, 0)');
+            c.fillStyle = g; c.fillRect(0, 0, 256, 256);
+            return (_fireballLightSprite = cv);
+        }
+
         // GameEngine — Lighting, bloom, wet reflections, atmosphere.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -59,6 +74,70 @@
                 this._clipBeam(ctx, b.owner, b.cx, b.cy, b.L, b.W);
                 ctx.translate(b.cx, b.cy); ctx.rotate(b.owner.angle);
                 ctx.drawImage(this._beamSprite(b.color, b.L, b.W), 0, -b.W, b.L, 2 * b.W);
+                ctx.restore();
+            },
+
+            /** Firelight follows the same opaque walls/buildings as vehicle headlights. */
+            _clipFireLight(ctx, owner, x, y, r) {
+                const map = this.activeMap, revision = map._renderSpatialRevision || 0;
+                // Runtime geometry edits invalidate the joined obstacle list as well as the clip.
+                if (map._fireLightOccluderRevision !== revision) { map._occluderCache = null; map._fireLightOccluderRevision = revision; }
+                const occluders = getOccluders(map);
+                let cached = owner._fireLightClip;
+                if (!cached || cached.map !== map || cached.occluders !== occluders || cached.revision !== revision ||
+                    cached.x !== x || cached.y !== y || cached.r !== r) {
+                    const poly = computeVisibilityPoly(x, y, r, occluders, { aMin: 0, aMax: Math.PI * 2, arcStep: 0.18 });
+                    const path = new Path2D();
+                    if (poly.length) {
+                        path.moveTo(poly[0].x, poly[0].y);
+                        for (let i = 1; i < poly.length; i++) path.lineTo(poly[i].x, poly[i].y);
+                        path.closePath();
+                    }
+                    cached = owner._fireLightClip = { map, occluders, revision, x, y, r, path };
+                }
+                ctx.clip(cached.path);
+            },
+
+            /** Broad live firelight, with a bounded set of fading pools along the stream. */
+            _drawFireLights(ctx, mode, inView, gain = 1) {
+                const now = _gameTimeMs(), sprite = _getFireballLightSprite(), color = mode === 'color';
+                const stamp = (owner, x, y, r, strength) => {
+                    if (!Number.isFinite(x) || !Number.isFinite(y) || strength <= 0.01 || !inView(x, y, r)) return;
+                    ctx.save();
+                    this._clipFireLight(ctx, owner, x, y, r);
+                    ctx.globalAlpha = Math.min(1, strength * gain);
+                    ctx.drawImage(sprite, x - r, y - r, r * 2, r * 2);
+                    ctx.restore();
+                };
+                for (const p of this.projectiles) {
+                    if (!p.isFireball || p.active === false || p.visible === false || p.dead || p.markedForDestroy || p.life <= 0 ||
+                        !Number.isFinite(p.vx) || !Number.isFinite(p.vy) || p.vx * p.vx + p.vy * p.vy < 0.0001) continue;
+                    const pulse = 0.96 + 0.04 * Math.sin(now * 0.023 + (p.id || 0));
+                    stamp(p, p.x, p.y, FIREBALL_LIGHT_RADIUS, (color ? 0.32 : 0.98) * pulse);
+                }
+                const trail = this._fireTrail || [], cells = new Set();
+                let lit = 0;
+                for (let i = trail.length - 1; i >= 0 && lit < 48; i--) {
+                    const p = trail[i], f = Math.max(0, Math.min(1, 1 - (now - p.born) / p.life));
+                    if (f <= 0.02 || !inView(p.x, p.y, FIRE_TRAIL_LIGHT_RADIUS)) continue;
+                    // Flames are dense; one pool per 40px cell gives a continuous wash without hundreds of raycasts.
+                    const cell = Math.floor(p.x / 40) + ',' + Math.floor(p.y / 40);
+                    if (cells.has(cell)) continue;
+                    cells.add(cell); lit++;
+                    const fade = Math.pow(f, 1.35), flicker = 0.90 + 0.10 * Math.sin(now * 0.034 + (p.seed || 0) * 7);
+                    stamp(p, p.x, p.y, FIRE_TRAIL_LIGHT_RADIUS, (color ? 0.14 : 0.58) * fade * flicker);
+                }
+            },
+
+            /** Warm orange spill also reads by day or in a map with no ambient-darkness layer. */
+            drawFireLightGlow(ctx) {
+                if (!this.projectiles.some(p => p.isFireball) && !(this._fireTrail && this._fireTrail.length)) return;
+                const V = this.view || this.camera, x = V.x, y = V.y;
+                const zoom = V.zoom || this.camera.zoom;
+                const hw = this.canvas.width / (2 * zoom), hh = this.canvas.height / (2 * zoom);
+                const inView = (px, py, r) => px + r > x - hw && px - r < x + hw && py + r > y - hh && py - r < y + hh;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                this._drawFireLights(ctx, 'color', inView, 0.38 * (1 - 0.70 * this.getAmbientDarkness()));
                 ctx.restore();
             },
 
@@ -166,7 +245,60 @@
                 scratch.busy = false;
             },
 
+            /** Only the already-soft outdoor light layer can change resolution. Trials are
+             * rare and bounded (80% per axis), and stay only when both frame cadence and
+             * measured light submission improve. This is not a GPU-completion timer.
+             * Photos, cinematics, benchmarks, interiors and manual sharp shadows use full
+             * selected fidelity; the main canvas, people, particles and UI never resize. */
+            _lightingAdaptiveScale() {
+                const eligible = GameSettings.adaptiveLighting && GameSettings.softShadows && this.running &&
+                    !this.paused && !this.cineCam && !this.cutscene?.active && !this.scenes?.running &&
+                    !PerfBench.active && !this.showProfiler && !GameSettings.baseline && !document.hidden &&
+                    this.activeMap?.type === 'outdoor' && !this.nightVision && !(this.weather?.lightningFlash > 0.01);
+                const baseScale = this.lightingScale, renderScale = this._renderScale || 1;
+                const fpsLimit = GameSettings.fpsLimit, lampBudget = this._maxLitLamps || 40;
+                const now = eligible ? performance.now() : 0;
+                let s = this._adaptiveLighting;
+                if (!s || s.map !== this.activeMap || s.baseScale !== baseScale || s.renderScale !== renderScale ||
+                    s.fpsLimit !== fpsLimit || s.lampBudget !== lampBudget || s.eligible !== !!eligible || (eligible && now - s.last > 800)) {
+                    s = this._adaptiveLighting = { map: this.activeMap, baseScale, renderScale, fpsLimit, lampBudget,
+                        key: `${baseScale}:${renderScale}:${fpsLimit}:${lampBudget}`, eligible: !!eligible, factor: 1, mode: 'full',
+                        last: now, begin: now + 1000, cooldown: now + 3000, count: 0, frames: 0, lights: 0,
+                        baselineFrame: 0, baselineLight: 0, stable: 0 };
+                }
+                if (eligible) s.last = now;
+                return s.factor;
+            },
+
+            _sampleAdaptiveLighting(lightMs, now) {
+                const s = this._adaptiveLighting, frameMs = this._renderFrameMs;
+                if (!s?.eligible || !Number.isFinite(lightMs) || !Number.isFinite(frameMs) ||
+                    frameMs < 2 || frameMs > 100 || now < s.begin) return;
+                s.frames += frameMs; s.lights += lightMs; s.count++;
+                if (now - s.begin < 3000 || s.count < 12) return;
+                const frame = s.frames / s.count, light = s.lights / s.count;
+                const target = 1000 / (GameSettings.fpsLimit > 0 ? Math.min(60, GameSettings.fpsLimit) : 60);
+                s.begin = now; s.count = s.frames = s.lights = 0;
+                if (s.mode === 'trial') {
+                    if (frame < s.baselineFrame * 0.95 && light < s.baselineLight * 0.92) {
+                        s.mode = 'reduced'; s.stable = 0; s.cooldown = now + 15000;
+                    } else {
+                        s.factor = 1; s.mode = 'full'; s.cooldown = now + 30000;
+                    }
+                    s.begin = now + 500;   // ignore buffer rebuilds when entering either state
+                } else if (s.mode === 'reduced') {
+                    s.stable = frame <= target * 1.06 ? s.stable + 1 : 0;
+                    if (s.stable >= 3 && now >= s.cooldown) {
+                        s.factor = 1; s.mode = 'full'; s.cooldown = now + 15000; s.begin = now + 500;
+                    }
+                } else if (now >= s.cooldown && frame > target * 1.18 && light > 2.5) {
+                    s.baselineFrame = frame; s.baselineLight = light;
+                    s.factor = 0.8; s.mode = 'trial'; s.stable = 0; s.begin = now + 500;
+                }
+            },
+
             drawLightingSystem(ctx) {
+                this._lightingAdaptiveScale();
                 const ambient = this.getAmbientDarkness();
                 const flash = this.weather.lightningFlash > 0 ? this.weather.lightningFlash : 0;
                 // Maintain the shadow opacity (ambient), fading it as night vision turns on; lightning lifts it
@@ -183,16 +315,19 @@
                     if (!this._lightingScratch) this._lightingScratch = scratch;
                 }
                 scratch.busy = true;
+                const sample = this._adaptiveLighting.eligible && ((this._renderDrawId & 7) === 0);
+                const started = sample ? performance.now() : 0;
                 try {
                     this._renderLightingSystem(ctx, ambient, flash, finalOpacity, scratch);
                 } finally {
                     this._releaseLightingScratch(scratch);
+                    if (sample) { const now = performance.now(); this._sampleAdaptiveLighting(now - started, now); }
                 }
             },
 
             _renderLightingSystem(ctx, ambient, flash, finalOpacity, scratch) {
                 // Layer resolution: lighting quality, halved for soft shadows (the upscale softens edges)
-                const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1);
+                const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * (this._adaptiveLighting?.factor || 1);
                 const lw = Math.max(1, Math.round(this.canvas.width * LS)), lh = Math.max(1, Math.round(this.canvas.height * LS));
                 if (this.lightCanvas.width !== lw || this.lightCanvas.height !== lh) { this.lightCanvas.width = lw; this.lightCanvas.height = lh; }
                 const lc = this.lightCtx;
@@ -281,7 +416,8 @@
             
                 // 5. DYNAMIC HOLES — shots and muzzle flashes light softly around them
                 const white = glowSprite('255, 255, 255', 0.3);
-                for (const p of this.projectiles) if (inView(p.x, p.y, 50)) lc.drawImage(white, p.x - 50, p.y - 50, 100, 100);
+                for (const p of this.projectiles) if (!p.isFireball && inView(p.x, p.y, 50)) lc.drawImage(white, p.x - 50, p.y - 50, 100, 100);
+                this._drawFireLights(lc, 'hole', inView);
                 for (const f of this.muzzleFlashes) {
                     const r = f.radius * 1.6;
                     if (inView(f.x, f.y, r)) lc.drawImage(white, f.x - r, f.y - r, r * 2, r * 2);
@@ -487,10 +623,13 @@
                     lc.beginPath(); lc.arc(s.x, s.y, s.r, 0, Math.PI * 2); lc.fill();
                 }
 
+                // Fireballs and their dying flames cast a wide orange pool, not the small ordinary-shot tint.
+                lc.globalAlpha = 1; this._drawFireLights(lc, 'color', inView);
+
                 // Shots light in their own colour
                 const hexOr = (c, d) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : d;
                 for (const p of this.projectiles) {
-                    if (!inView(p.x, p.y, 40)) continue;
+                    if (p.isFireball || !inView(p.x, p.y, 40)) continue;
                     lc.globalAlpha = 0.3; drawGlow(lc, p.x, p.y, 40, hexOr(p.color, '#ffd9a0'), 0.25);
                 }
                 for (const f of this.muzzleFlashes) {

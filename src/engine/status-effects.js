@@ -60,6 +60,50 @@
                 }
             },
 
+            /** A small committed blade step, stopped by bodies and solids along the entire path. */
+            meleeStepIn(angle, distance = 8) {
+                const pl = this.player, map = this.activeMap;
+                if (!pl || !map || this.isDriving || !Number.isFinite(angle) || !(distance > 0)) return 0;
+                distance = Math.min(8, distance);
+                const sx = pl.x, sy = pl.y, ux = Math.cos(angle), uy = Math.sin(angle), r = pl.radius || 12;
+                const rects = [...(map.walls || []), ...getColliders(map)];
+                const left = Math.min(sx, sx + ux * distance) - r, right = Math.max(sx, sx + ux * distance) + r;
+                const top = Math.min(sy, sy + uy * distance) - r, bottom = Math.max(sy, sy + uy * distance) + r;
+                const solids = this.useNewCollisionSystem ? GameEntity.registry.collidable.filter(e => {
+                    if (e === pl || !e.active || e.dead || e.isTrigger || e.markedForDestroy
+                        || !(e.collisionLayer & (GameEntity.LAYER.STATIC | GameEntity.LAYER.DYNAMIC | GameEntity.LAYER.VEHICLE | GameEntity.LAYER.ACTOR))) return false;
+                    const b = e.getBoundingBox();
+                    return b.x <= right && b.x + b.w >= left && b.y <= bottom && b.y + b.h >= top;
+                }) : [];
+                const leaves = [];
+                if (this.roomSystem && this.roomSystem.active) for (const d of this.roomSystem.doors || []) {
+                    if (d.type !== 'arch') for (const s of d.leaves()) leaves.push({ s, r: r + (d.halfThick || 0) });
+                }
+                const probe = Object.create(pl);
+                const clear = (x, y) => {
+                    if (x < r || y < r || x > map.width - r || y > map.height - r) return false;
+                    for (const b of rects) {
+                        const dx = x - Math.max(b.x, Math.min(b.x + b.w, x)), dy = y - Math.max(b.y, Math.min(b.y + b.h, y));
+                        if (dx * dx + dy * dy < r * r) return false;
+                    }
+                    for (const leaf of leaves) {
+                        const [ax, ay, bx, by] = leaf.s;
+                        if (CollisionSystem.distToSegmentSquared(x, y, ax, ay, bx, by) < leaf.r * leaf.r) return false;
+                    }
+                    probe.x = x; probe.y = y;
+                    for (const e of solids) if (CollisionSystem._checkCollision(probe, e)) return false;
+                    return true;
+                };
+                let traveled = 0;
+                for (let d = Math.min(1, distance); d <= distance; d = Math.min(distance, d + 1)) {
+                    const x = sx + ux * d, y = sy + uy * d;
+                    if (!clear(x, y)) break;
+                    pl.x = x; pl.y = y; traveled = d;
+                    if (d === distance) break;
+                }
+                return traveled;
+            },
+
             /**
              * A melee weapon's slash: everyone in the arc before her within reach (and not behind a
              * wall) takes the blade's damage and starts to bleed. A gold arc, a swish, a quiet noise.
@@ -70,7 +114,12 @@
                 const side = this._slashSide = -(this._slashSide || 1);
                 this._slashT = _gameTimeSec;
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
+                this.meleeStepIn(ang);
                 const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
+                let bladeDamage = st.damage || 25;
+                if (this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) {
+                    bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
+                }
                 let hit = 0;
                 for (const e of this.enemies) {
                     if (!e || e.dead) continue;
@@ -80,8 +129,9 @@
                     if (isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols)) continue;
                     e.lastHitBy = pl; e.lastHitMelee = true;
                     const kx = dx / (d || 1) * 3, ky = dy / (d || 1) * 3;
-                    const dmg = Math.round(st.damage || 25);
-                    e.takeDamage(dmg, kx, ky, { type: st.damageType || 'melee' });
+                    const dmg = Math.round(bladeDamage);
+                    if (!e.takeDamage(dmg, kx, ky, { type: st.damageType || 'melee' })) continue;
+                    if (!e.dead && e.interruptMelee) e.interruptMelee();
                     if (st.bleedDps) this.applyStatus(e, 'bleed', { dps: st.bleedDps, secs: st.bleedSecs || 3, by: pl });
                     if (!e.dead && typeof Ganger !== 'undefined' && e instanceof Ganger) { e.suspicion = 100; e.state = 'ALERT'; e.angle = Math.atan2(-dy, -dx); }
                     hit++;

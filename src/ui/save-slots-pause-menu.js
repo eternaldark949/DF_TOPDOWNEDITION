@@ -464,8 +464,7 @@
                 // Click handlers for menu items
                 this.menuItems.forEach((item, index) => {
                     item.addEventListener('click', () => {
-                        this.setActiveIndex(index);
-                        this.executeAction(item.dataset.action);
+                        if (this.setActiveIndex(index)) this.executeAction(item.dataset.action);
                     });
                     
                     item.addEventListener('mouseenter', () => {
@@ -475,32 +474,33 @@
                 
                 // Quick Access (left column)
                 this.quickItems.forEach((item, index) => {
-                    item.addEventListener('click', () => { this.setQuickIndex(index); this.executeQuick(item.dataset.action); });
+                    item.addEventListener('click', () => { if (this.setQuickIndex(index)) this.executeQuick(item.dataset.action); });
                     item.addEventListener('mouseenter', () => this.setQuickIndex(index));
                 });
 
                 // Now Playing: the disc changes station, the chevron plays / pauses (the music widget does the work)
-                document.getElementById('pause-np-disc')?.addEventListener('click', () => { game.musicWidget?.cycleStation(); this._syncNowPlaying(); });
+                document.getElementById('pause-np-disc')?.addEventListener('click', () => { if (this._inCutscene()) return; game.musicWidget?.cycleStation(); this._syncNowPlaying(); });
                 document.getElementById('pause-np-play')?.addEventListener('click', () => {
+                    if (this._inCutscene()) return;
                     game.musicWidget?.handlePlayClick();
                     setTimeout(() => this._syncNowPlaying(), 120);   // togglePlay settles after the AudioContext resumes
                 });
 
-                // Cinematic view: drag pans, pinch or wheel zooms, a quick tap brings the menu back
+                this._installUiInputGuards();
+                // Cinematic view: drag pans and pinch/wheel zooms; exit is explicit.
                 this._cinePtrs = new Map();
                 const cineOn = () => document.body.classList.contains('cinematic-view');
                 window.addEventListener('pointerdown', (e) => {
-                    if (!cineOn() || e.target.closest?.('#cine-bar, #cine-grade')) return;
+                    if (!cineOn()) return;
+                    if (e.target.closest?.('#cine-bar, #cine-grade')) return;
                     e.preventDefault(); e.stopPropagation();
-                    this._cinePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now() });
-                    if (this._cinePtrs.size > 1) this._cineGesture = true;            // a pinch is never a tap
+                    this._cinePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
                 }, true);
                 window.addEventListener('pointermove', (e) => {
                     const p = this._cinePtrs.get(e.pointerId);
                     if (!cineOn() || !p) return;
                     e.preventDefault();
                     if (this._cinePtrs.size === 1) {
-                        if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) > 8) this._cineGesture = true;
                         this._cinePan(e.clientX - p.x, e.clientY - p.y);
                     } else {
                         const [a, b] = [...this._cinePtrs.values()];
@@ -517,9 +517,7 @@
                     this._cinePtrs.delete(e.pointerId);
                     if (!cineOn()) return;
                     e.preventDefault(); e.stopPropagation();
-                    const tap = !this._cineGesture && e.type === 'pointerup' && performance.now() - p.t0 < 400;
-                    if (!this._cinePtrs.size) this._cineGesture = false;
-                    if (tap) this.exitCinematic();
+                    // Releasing a pan or tapping the frame leaves cinematic view open.
                 };
                 window.addEventListener('pointerup', up, true);
                 window.addEventListener('pointercancel', up, true);
@@ -575,12 +573,13 @@
                 });
             }
             
-            open() {
-                if (!game.running) return; // Don't open if not in game
+            open(force = false) {
+                if (!game.running || document.body.classList.contains('cinematic-view') || (!force && hudInputBlocked())) return;
                 
                 this.menu.classList.add('active');
                 this.isOpen = true;
                 game.pauseSystem.acquire('pause_menu');
+                this._syncCutsceneMenu();
                 this.setActiveIndex(0);
                 this._syncNowPlaying();
                 
@@ -629,6 +628,7 @@
                 const abandonBtn = document.getElementById('btn-abandon-mission');
                 if (abandonBtn) {
                     abandonBtn.onclick = () => {
+                        if (this._inCutscene()) return;
                         if (game.missions && game.missions.activeMission) {
                             game.missions.abandonMission();
                             const st = document.getElementById('pause-obj-side-text'); if (st) st.innerHTML = '<span class="pause-obj-none">Mission abandoned</span>';
@@ -644,6 +644,7 @@
                 this.inSettings = false;
                 this.settingsPanel.classList.remove('active');
                 this.navMain.style.display = '';
+                this.navMain.inert = false;
                 // Just release our token — the registry handles whether the world
                 // remains paused. If dialogue, a shop, or another menu is also open,
                 // their tokens keep the pause; this close is simply a no-op for the
@@ -651,64 +652,162 @@
                 game.pauseSystem.release('pause_menu');
             }
             
-            toggle() {
-                if (this.isOpen) {
-                    this.close();
-                } else {
-                    this.open();
-                }
+            toggle(force = false) {
+                if (this.isOpen) this.close();
+                else this.open(force);
             }
             
+            /** A paused cutscene exposes only actions that leave its held state intact. */
+            _inCutscene() { return !!(game.scenes?.running || game.cutscene?.active); }
+
+            _actionAllowed(action, quick = false) {
+                return !this._inCutscene() || (quick ? action === 'cinematic' : ['resume', 'settings', 'quit'].includes(action));
+            }
+
+            _visibleIndices(quick = false) {
+                const items = quick ? this.quickItems : this.menuItems;
+                return Array.from(items, (item, index) => index).filter(index => !items[index].hidden && this._actionAllowed(items[index].dataset.action, quick));
+            }
+
+            get visibleMenuItems() { return this._visibleIndices().map(index => this.menuItems[index]); }
+            get visibleQuickItems() { return this._visibleIndices(true).map(index => this.quickItems[index]); }
+
+            _syncCutsceneMenu() {
+                const cutscene = this._inCutscene();
+                for (const [items, quick] of [[this.menuItems, false], [this.quickItems, true]]) {
+                    for (const item of items) { item.hidden = !this._actionAllowed(item.dataset.action, quick); item.inert = item.hidden; }
+                }
+                for (const id of ['pause-np', 'pause-mission']) {
+                    const group = document.getElementById(id); if (group) { group.hidden = cutscene; group.inert = cutscene; }
+                }
+                this.menu.classList.toggle('cutscene-menu', cutscene);
+                const main = this._visibleIndices(), quick = this._visibleIndices(true);
+                if (!main.includes(this.activeIndex)) this.activeIndex = main[0] ?? 0;
+                if (!quick.includes(this.quickIndex)) this.quickIndex = -1;
+                this.menuItems.forEach((item, index) => item.classList.toggle('active', this.quickIndex < 0 && index === this.activeIndex));
+                this.quickItems.forEach((item, index) => item.classList.toggle('active', index === this.quickIndex));
+                const focused = document.activeElement;
+                if (this.isOpen && !this.inSettings && focused instanceof Element && focused.closest('#pause-menu [hidden]')) {
+                    (this.quickIndex >= 0 ? this.quickItems[this.quickIndex] : this.menuItems[this.activeIndex])?.focus({ preventScroll: true });
+                }
+            }
+
             setActiveIndex(index) {
+                this._syncCutsceneMenu();
+                if (this.inSettings || !this._visibleIndices().includes(index)) return false;
                 this.quickItems.forEach(item => item.classList.remove('active'));
                 this.quickIndex = -1;
                 this.menuItems.forEach(item => item.classList.remove('active'));
                 this.activeIndex = index;
                 this.menuItems[index].classList.add('active');
                 this.menuItems[index].focus();
+                return true;
             }
 
-            // One highlight at a time: lighting a Quick Access item dims the main list's
             setQuickIndex(index) {
+                this._syncCutsceneMenu();
+                if (!this._visibleIndices(true).includes(index)) return false;
                 this.menuItems.forEach(item => item.classList.remove('active'));
                 this.quickItems.forEach(item => item.classList.remove('active'));
                 this.quickIndex = index;
                 this.quickItems[index].classList.add('active');
                 this.quickItems[index].focus();
-            }
-            
-            navigateUp() {
-                if (this.quickIndex >= 0) { this.setQuickIndex(this.quickIndex > 0 ? this.quickIndex - 1 : this.quickItems.length - 1); return; }
-                const newIndex = this.activeIndex > 0 ? this.activeIndex - 1 : this.menuItems.length - 1;
-                this.setActiveIndex(newIndex);
-            }
-            
-            navigateDown() {
-                if (this.quickIndex >= 0) { this.setQuickIndex((this.quickIndex + 1) % this.quickItems.length); return; }
-                const newIndex = this.activeIndex < this.menuItems.length - 1 ? this.activeIndex + 1 : 0;
-                this.setActiveIndex(newIndex);
+                return true;
             }
 
-            // ← Quick Access (left column) · → the main list
-            navigateLeft() { if (this.quickIndex < 0 && !this.inSettings) this.setQuickIndex(0); }
-            navigateRight() { if (this.quickIndex >= 0) this.setActiveIndex(this.activeIndex); }
-            
+            _navigateVisible(delta) {
+                if (!this.isOpen || (this.inSettings && this.quickIndex < 0)) return;
+                this._syncCutsceneMenu();
+                const quick = this.quickIndex >= 0, indices = this._visibleIndices(quick);
+                if (!indices.length) return;
+                const current = indices.indexOf(quick ? this.quickIndex : this.activeIndex);
+                const next = indices[(current + delta + indices.length) % indices.length];
+                if (quick) this.setQuickIndex(next); else this.setActiveIndex(next);
+            }
+
+            navigateUp() { this._navigateVisible(-1); }
+            navigateDown() { this._navigateVisible(1); }
+
+            // Move between the visible Quick Access and main lists, preserving the main selection.
+            navigateLeft() {
+                if (!this.isOpen || this.inSettings || this.quickIndex >= 0) return;
+                this._syncCutsceneMenu();
+                const first = this._visibleIndices(true)[0]; if (first !== undefined) this.setQuickIndex(first);
+            }
+            navigateRight() {
+                if (!this.isOpen || this.quickIndex < 0) return;
+                if (this.inSettings) { this.quickIndex = -1; this.quickItems.forEach(item => item.classList.remove('active')); this.settingsPanel.focus({ preventScroll: true }); }
+                else this.setActiveIndex(this.activeIndex);
+            }
+
             selectCurrent() {
+                if (!this.isOpen || (this.inSettings && this.quickIndex < 0)) return;
+                this._syncCutsceneMenu();
                 if (this.quickIndex >= 0) { this.executeQuick(this.quickItems[this.quickIndex].dataset.action); return; }
                 this.executeAction(this.menuItems[this.activeIndex].dataset.action);
             }
 
             executeQuick(action) {
+                if (!this._actionAllowed(action, true)) return;
                 if (action === 'equip') { this.close(); Screens.open('equipped'); }
                 else if (action === 'drop') { this.close(); Screens.open('inventory'); }
                 else if (action === 'cinematic') this.enterCinematic();
             }
 
-            // The world held still with every bit of HUD faded away; a tap or Esc brings the menu back
+            /** Remove unrelated DOM layers from hit testing and keyboard focus during photo view. */
+            _cineMuteUi(on) {
+                this._cineUiObserver?.disconnect();
+                if (!on) {
+                    for (const [el, wasInert] of this._cineUiState || []) {
+                        el.removeAttribute('data-cine-muted'); el.inert = wasInert;
+                    }
+                    this._cineUiState = null; syncHudInput(game); return;
+                }
+                this._cineUiState = new Map();
+                const keep = new Set(['game-container', 'cine-bar', 'cine-grade', 'cinematic-hint', 'cine-flash']);
+                const mute = el => {
+                    if (!(el instanceof HTMLElement) || keep.has(el.id) || el.matches('script, style, link, a[download]') || this._cineUiState.has(el)) return;
+                    this._cineUiState.set(el, el.inert); el.setAttribute('data-cine-muted', ''); el.inert = true;
+                };
+                for (const el of document.body.children) mute(el);
+                mute(document.getElementById('game-ui'));
+                this._cineUiObserver = new MutationObserver(records => {
+                    for (const r of records) for (const el of r.addedNodes) mute(el);
+                });
+                this._cineUiObserver.observe(document.body, { childList: true });
+                syncHudInput(game);
+            }
+
+            _installUiInputGuards() {
+                const cineOn = () => document.body.classList.contains('cinematic-view');
+                const allowed = target => target instanceof Element && !!target.closest('#cine-bar, #cine-grade, a[download]');
+                const stop = e => { if (e.cancelable) e.preventDefault(); e.stopImmediatePropagation(); };
+                // Pointer events steer the camera; compatibility mouse/touch events
+                // must not also reach the old HUD listeners or a newly opened menu.
+                for (const type of ['mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'pointerdown', 'pointerup', 'pointermove', 'pointercancel']) {
+                    window.addEventListener(type, e => {
+                        if (e.target instanceof Element && e.target.closest('#game-ui.hud-input-blocked, [data-cine-muted]')) { stop(e); return; }
+                        if (cineOn() && !allowed(e.target) && !type.startsWith('pointer')) stop(e);
+                    }, { capture: true, passive: false });
+                }
+                window.addEventListener('keydown', e => {
+                    if (!cineOn()) return;
+                    if (e.key === 'Escape') { stop(e); this.exitCinematic(); return; }
+                    // Native Tab navigation and grade-slider/button keys still work;
+                    // gameplay and scene listeners never receive those keystrokes.
+                    if (e.key !== 'Tab' && !allowed(e.target) && e.cancelable) e.preventDefault();
+                    e.stopImmediatePropagation();
+                }, true);
+                window.addEventListener('keyup', e => { if (cineOn()) e.stopImmediatePropagation(); }, true);
+            }
+
+            // The world held still with HUD input disabled; the exit button or Esc returns to pause.
             //   opts.grade: open with the grade drawer showing; opts.back: 'settings' returns there
             //   opts.focus {x, y, zoom}: frame a spot (the finisher's capture prompt)
             enterCinematic(opts = {}) {
+                if (document.body.classList.contains('cinematic-view')) return;
                 this.close();
+                clearGameplayInputs(game);
                 game.pauseSystem.acquire('cinematic_view');
                 game.cineCam = { dx: 0, dy: 0, zoom: game.camera.zoom };          // draw() keeps going while it's set
                 const f = opts.focus;
@@ -720,10 +819,13 @@
                     if (f.zoom) game.camera.zoom = Math.max(lo, Math.min(hi, f.zoom));
                 }
                 this._cineBack = opts.back || null;
-                this._cineGrade(!!opts.grade);
                 if (game.weather) game.weather._cineDensity = 0;                     // re-measured on the first pan
-                this._cinePtrs?.clear(); this._cineGesture = false;
+                this._cinePtrs?.clear();
                 document.body.classList.add('cinematic-view');
+                this._cineMuteUi(true);
+                document.getElementById('cine-bar').inert = false;
+                this._cineGrade(!!opts.grade);
+                document.querySelector('#cine-bar [data-cine="back"]')?.focus({ preventScroll: true });
                 const hint = document.getElementById('cinematic-hint');
                 if (hint) { hint.classList.remove('show'); void hint.offsetWidth; hint.classList.add('show'); }
             }
@@ -732,16 +834,21 @@
                 if (!document.body.classList.contains('cinematic-view')) return;
                 document.body.classList.remove('cinematic-view');
                 this._cineGrade(false);
+                document.getElementById('cine-bar').inert = true;
+                this._cinePtrs?.clear();
+                this._cineMuteUi(false);
                 document.getElementById('cinematic-hint')?.classList.remove('show');
                 if (game.cineCam) { game.camera.zoom = game.cineCam.zoom; game.cineCam = null; }
                 game.pauseSystem.release('cinematic_view');
-                this.open();
+                this.open(true);
                 if (this._cineBack === 'settings') this.openSettings();
                 this._cineBack = null;
             }
 
             /** Show or hide the grade drawer over the held frame */
             _cineGrade(on) {
+                on = !!on && document.body.classList.contains('cinematic-view');
+                document.getElementById('cine-grade').inert = !on;
                 document.body.classList.toggle('cine-grade-open', on);
                 document.querySelector('#cine-bar [data-cine="grade"]')?.classList.toggle('on', on);
                 if (on) syncGradeDrawer();
@@ -803,8 +910,13 @@
                 gradePhotoPass(out, src.clientWidth);                              // the temperature / tint wash and vignette, as on screen
                 const flash = document.getElementById('cine-flash');
                 if (flash) { flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go'); }
-                const d = new Date(), z = (n) => String(n).padStart(2, '0');
-                const name = `Dimensions-Freelancer-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.png`;
+                const d = new Date(), z = (n, width = 2) => String(n).padStart(width, '0');
+                const stamp = `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}-${z(d.getMilliseconds(), 3)}`;
+                // Reserve the name before the asynchronous PNG export, including same-millisecond captures.
+                this._pictureSequence = this._pictureStamp === stamp ? this._pictureSequence + 1 : 0;
+                this._pictureStamp = stamp;
+                const suffix = this._pictureSequence ? `-${this._pictureSequence + 1}` : '';
+                const name = `Dimensions-Freelancer-${stamp}${suffix}.png`;
                 out.toBlob(async (blob) => {
                     if (!blob) return;
                     this._lastPicture = blob;
@@ -832,6 +944,7 @@
             }
             
             executeAction(action) {
+                if (!this._actionAllowed(action)) return;
                 switch(action) {
                     case 'resume':
                         this.close();
@@ -880,16 +993,25 @@
             
             // --- SETTINGS PANEL ---
             openSettings() {
+                this._syncCutsceneMenu();
+                this.quickIndex = -1;
+                this.quickItems.forEach(item => item.classList.remove('active'));
                 this.inSettings = true;
                 this.navMain.style.display = 'none';
+                this.navMain.inert = true;
                 this.settingsPanel.classList.add('active');
                 this._syncSettingsUI();
+                this.settingsPanel.tabIndex = -1;
+                this.settingsPanel.focus({ preventScroll: true });
             }
             
             closeSettings() {
                 this.inSettings = false;
                 this.settingsPanel.classList.remove('active');
                 this.navMain.style.display = '';
+                this.navMain.inert = false;
+                this._syncCutsceneMenu();
+                this.setActiveIndex(this.activeIndex);
             }
             
             _syncSettingsUI() {
@@ -900,6 +1022,7 @@
                 this._updateValueEl('set-crowd', GameSettings.crowdQuality || 'high');
                 this._updateValueEl('set-rain', GameSettings.rainDensity);
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
+                this._updateValueEl('set-adaptive-lighting', GameSettings.adaptiveLighting ? 'on' : 'off');
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
                 for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease'], ['set-scopeview', 'scopeView'], ['set-scopeslow', 'scopeSlow']])
                     this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
@@ -946,7 +1069,7 @@
                 el.className = 'settings-value';
                 if (value === 'low' || value === 'off') el.classList.add('val-low');
                 else if (value === 'medium') el.classList.add('val-medium');
-                else if (value === 'high' || value === 'on') el.classList.add('val-high');
+                else if (value === 'ultra' || value === 'high' || value === 'on') el.classList.add('val-high');
                 else if (value === 'none') el.classList.add('val-off');
             }
             
@@ -972,7 +1095,7 @@
                     this._updateValueEl(el.id, GameSettings.bloom ? 'on' : 'off');
                     
                 } else if (key === 'reflections') {
-                    const order = ['high', 'medium', 'off'];
+                    const order = ['ultra', 'high', 'medium', 'off'];
                     GameSettings.reflections = order[(order.indexOf(GameSettings.reflections || 'high') + 1) % order.length];
                     GameSettings.wetReflections = GameSettings.reflections !== 'off';
                     this._updateValueEl(el.id, GameSettings.reflections);
@@ -1089,6 +1212,12 @@
                     else GameSettings.fpsLimit = 0;
                     this._updateValueEl(el.id, GameSettings.fpsLimit === 0 ? 'none' : String(GameSettings.fpsLimit));
                     
+                } else if (key === 'adaptiveLighting') {
+                    GameSettings.adaptiveLighting = !GameSettings.adaptiveLighting;
+                    game._adaptiveLighting = null;
+                    game.resize();
+                    this._updateValueEl(el.id, GameSettings.adaptiveLighting ? 'on' : 'off');
+
                 } else if (key === 'lightingQuality') {
                     // Cycle HIGH → MEDIUM → LOW
                     if (GameSettings.lightingQuality === 'high') {

@@ -18,6 +18,7 @@
             van_interior:        { floor: (g, c) => g.drawVanInterior(c),     glow: (g, c) => g.drawVanGlow(c) },     // chapter 1's ride (engine/van-art.js)
             hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) },
             ethereal_plane:      { glow: (g, c) => g.drawEtherealGlow(c) },
+            enni_cole_interior:  { floor: (g, c) => g.drawEnniInterior(c),    glow: (g, c) => g.drawEnniGlow(c) },
             cozy_cafe_interior:  { floor: (g, c) => g.drawCafeInterior(c),    glow: (g, c) => g.drawCafeGlow(c) },     // the hearth, candles, pendants, steam
             demoness_palace:     { floor: (g, c) => g.drawPalaceInterior(c), glow: (g, c) => g.drawPalaceGlow(c) }   // engine/palace-art.js      // engine/reflections.js: its mirror floor gives this back
         };
@@ -719,6 +720,118 @@
                and the windows by the benches (sky by day, the city's lights by night,
                rain running down them when it rains outside)
                ===================================================================== */
+            /** Enni Cole: rose stone, cream marble and champagne inlay. Painted once and released on exit. */
+            drawEnniInterior(ctx) {
+                if (!this._enniFloor) this._enniFloor = this._paintEnniFloor();
+                ctx.drawImage(this._enniFloor, 0, 0);
+            },
+
+            _paintEnniFloor() {
+                const cv = document.createElement('canvas'); cv.width=2000; cv.height=1400;
+                const c=cv.getContext('2d'),r=seededRandom(1849),GOLD='#c6a365',CREAM='#e8ded1';
+                const rr=(x,y,w,h,rad,col,stroke,lw=1)=>{c.beginPath();c.roundRect(x,y,w,h,rad);c.fillStyle=col;c.fill();if(stroke){c.strokeStyle=stroke;c.lineWidth=lw;c.stroke();}};
+                c.fillStyle='#432630';c.fillRect(0,0,2000,1400);
+                // Large honed marble slabs: light enough to read the displays, soft warm-grey joints.
+                for(let y=50,row=0;y<1350;y+=100,row++)for(let x=50,col=0;x<1950;x+=100,col++) {
+                    const v=r()*10|0;c.fillStyle=`rgb(${204+v},${194+v},${181+v})`;c.fillRect(x,y,100,100);
+                    c.strokeStyle='rgba(104,84,69,.18)';c.lineWidth=.7;c.strokeRect(x+.5,y+.5,99,99);
+                }
+                c.save();c.beginPath();c.rect(50,50,1900,1300);c.clip();
+                for(let i=0;i<105;i++){
+                    let x=50+r()*1900,y=50+r()*1300;c.strokeStyle=`rgba(117,88,84,${.045+r()*.08})`;c.lineWidth=.5+r()*1.7;c.beginPath();c.moveTo(x,y);
+                    for(let k=0;k<4;k++){const nx=x+(r()-.45)*130,ny=y+(r()-.55)*100;c.quadraticCurveTo(x+30,y-22,nx,ny);x=nx;y=ny;}c.stroke();
+                }
+                // The rose/burgundy perimeter and dark polished brass-bordered promenade.
+                c.strokeStyle='#8a5966';c.lineWidth=23;c.strokeRect(73,73,1854,1254);
+                c.strokeStyle=GOLD;c.lineWidth=2;c.strokeRect(88,88,1824,1224);
+                c.strokeStyle='rgba(246,231,199,.65)';c.lineWidth=1;c.strokeRect(92,92,1816,1216);
+                for(const x of [605,1395]){c.fillStyle='#4b3b3f';c.fillRect(x-12,95,24,1210);c.fillStyle=GOLD;c.fillRect(x-14,95,2,1210);c.fillRect(x+12,95,2,1210);}
+                for(const y of [565,1085]){c.fillStyle='#4b3b3f';c.fillRect(95,y-8,1810,16);c.fillStyle=GOLD;c.fillRect(95,y-9,1810,1);c.fillRect(95,y+8,1810,1);}
+                // Showroom rugs are actual matte islands in the reflection mask, never obstacles.
+                const rug=(x,y,w,h,col)=>{
+                    rr(x+3,y+4,w,h,7,'rgba(56,30,34,.2)');rr(x,y,w,h,7,col,'#b59a75',2);
+                    c.strokeStyle='rgba(228,203,164,.7)';c.lineWidth=1;c.strokeRect(x+9,y+9,w-18,h-18);
+                    c.fillStyle='rgba(246,225,192,.11)';for(let yy=y+19;yy<y+h-15;yy+=15)for(let xx=x+20;xx<x+w-15;xx+=15){c.beginPath();c.arc(xx,yy,.8,0,Math.PI*2);c.fill();}
+                };
+                rug(650,120,450,290,'#8c796b');rug(1105,100,290,320,'#684552');rug(1120,435,270,200,'#9b8973');
+                // Dark stone surrounds the open atrium medallion; the EC monogram lies in champagne metal.
+                const mx=1000,my=780;
+                c.fillStyle='#40353c';c.beginPath();c.arc(mx,my,196,0,Math.PI*2);c.fill();
+                const mg=c.createRadialGradient(mx-55,my-65,10,mx,my,187);mg.addColorStop(0,'#eee4d3');mg.addColorStop(1,'#c7b49d');
+                c.fillStyle=mg;c.beginPath();c.arc(mx,my,187,0,Math.PI*2);c.fill();
+                for(const [rad,lw,col]of[[194,2,GOLD],[179,2,GOLD],[166,1,'#ac8b5c']]){c.strokeStyle=col;c.lineWidth=lw;c.beginPath();c.arc(mx,my,rad,0,Math.PI*2);c.stroke();}
+                for(let i=0;i<48;i++){const a=i*Math.PI/24;c.strokeStyle=i%4?'#b29565':'#755161';c.lineWidth=i%4?1:2;c.beginPath();c.moveTo(mx+Math.cos(a)*170,my+Math.sin(a)*170);c.lineTo(mx+Math.cos(a)*177,my+Math.sin(a)*177);c.stroke();}
+                c.textAlign='center';c.textBaseline='middle';c.font='italic 100px Georgia, serif';c.fillStyle='#895965';c.fillText('EC',mx,my+2);
+                c.font='13px Georgia, serif';c.fillStyle='#725238';c.fillText('ENNI COLE',mx,my+83);
+                c.font='10px Georgia, serif';c.fillText('LIVING EXCEPTIONALLY',mx,my+103);
+                // A deep rose runner announces the front door while the entire middle aisle stays clear.
+                rr(870,1000,260,350,6,'#71364d','#b89a66',2);c.strokeStyle='rgba(235,209,165,.7)';c.lineWidth=1;c.strokeRect(879,1010,242,330);
+                c.fillStyle='rgba(207,161,165,.14)';for(let y=1018;y<1340;y+=17)for(let x=889;x<1115;x+=17){c.beginPath();c.arc(x,y,1,0,Math.PI*2);c.fill();}
+                c.font='italic 40px Georgia, serif';c.fillStyle='#ead4a5';c.fillText('Enni Cole',1000,1265);
+                c.font='10px Georgia, serif';c.fillText('FOOD  •  HOME  •  TECHNOLOGY',1000,1300);
+                // Departments are set into the floor; no floating game labels or new shopping UI.
+                const title=(str,x,y,sub)=>{c.font='22px Georgia, serif';c.fillStyle='#694450';c.fillText(str,x,y);c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText(sub,x,y+22);};
+                title('THE FOOD HALL',285,250,'FRESH  •  FINE FOODS  •  THE CELLAR');
+                title('TECHNOLOGY',1710,250,'PERSONAL  •  AUDIO  •  HOME');
+                c.font='17px Georgia, serif';c.fillStyle='#735663';c.fillText('LIVING & INTERIORS',1000,510);
+                c.font='italic 12px Georgia, serif';c.fillStyle='#8c715a';c.fillText('Customer Services',740,1142);c.fillText('Concierge & Collection',1265,1142);
+                // Low shopfront glass on each side of the open arched entrance: charcoal mullions,
+                // warm reflected city light and small champagne handles.
+                for(const [x0,x1]of[[80,780],[1220,1920]])for(let x=x0;x<x1;x+=100){
+                    rr(x,1317,94,28,1,'#31333a',GOLD,.8);const g=c.createLinearGradient(x,1318,x+90,1340);g.addColorStop(0,'#6b6267');g.addColorStop(.6,'#aa8f77');g.addColorStop(1,'#4c464f');rr(x+4,1320,86,22,1,g);
+                    c.fillStyle='rgba(249,226,180,.4)';c.fillRect(x+8,1321,2,19);c.fillStyle='#302c32';c.fillRect(x+46,1320,3,22);
+                }
+                c.restore();return cv;
+            },
+
+            /** Warm chandelier bulbs and restrained cabinet lighting, above the darkness layer. */
+            drawEnniGlow(ctx) {
+                const t=_frameTime/1000;
+                ctx.save();ctx.globalCompositeOperation='lighter';
+                glowA(ctx,1000,780,190,'255,218,162',.025);
+                // Compact warm halos leave the marble and individual crystal fittings readable.
+                for(const [R,n]of[[87,24],[57,16]])for(let i=0;i<n;i++){
+                    const a=i*Math.PI*2/n;
+                    glowA(ctx,1000+Math.cos(a)*R,780+Math.sin(a)*R,8.5,'255,222,176',.075);
+                }
+                // Small warm pendant shades over each department and both service counters.
+                for(const [X,Y,R]of[[285,280,12],[285,790,12],[1710,280,12],[1710,870,12],[740,1190,9],[1265,1190,9]]){
+                    ctx.globalCompositeOperation='lighter';glowA(ctx,X,Y,75,'255,220,169',.075);
+                    ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+                    ctx.fillStyle='#b69b65';ctx.strokeStyle='#5d4933';ctx.lineWidth=1;ctx.beginPath();ctx.arc(X,Y,R,0,Math.PI*2);ctx.fill();ctx.stroke();
+                    ctx.fillStyle='#fff1cf';ctx.beginPath();ctx.arc(X,Y,3,0,Math.PI*2);ctx.fill();
+                }
+                // Faint practical illumination remains attached to the actual case/display coordinates.
+                for(const p of this.props){
+                    if(p.decorType==='ec_cold'){
+                        ctx.globalCompositeOperation='lighter';ctx.globalAlpha=1;ctx.strokeStyle='rgba(218,245,247,.65)';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(p.x+8,p.y+8);ctx.lineTo(p.x+p.width-8,p.y+8);ctx.stroke();
+                    }else if(p.decorType==='ec_tvwall'){
+                        ctx.globalCompositeOperation='lighter';glowA(ctx,p.x+p.width/2,p.y+p.height/2,85,'163,193,224',.055);
+                    }else if(p.decorType==='ec_side'){
+                        ctx.globalCompositeOperation='lighter';glowA(ctx,p.x+p.width/2,p.y+p.height/2,28,'255,219,161',.1);
+                    }
+                }
+                // Paint opaque champagne hardware last: glowA changes globalAlpha, so explicitly reset
+                // it before this solid fixture pass. The same pass stays legible in floor reflections.
+                ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+                for(const R of [87,57]){
+                    ctx.strokeStyle='#79623f';ctx.lineWidth=3.5;ctx.beginPath();ctx.arc(1000,780,R,0,Math.PI*2);ctx.stroke();
+                    ctx.strokeStyle='#cfb889';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(1000,780,R-.7,-Math.PI*.95,Math.PI*.65);ctx.stroke();
+                }
+                for(let i=0;i<12;i++){
+                    const a=i*Math.PI/6;ctx.strokeStyle='#a98c5b';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(1000+Math.cos(a)*15,780+Math.sin(a)*15);ctx.lineTo(1000+Math.cos(a)*87,780+Math.sin(a)*87);ctx.stroke();
+                }
+                ctx.fillStyle='#96784b';ctx.strokeStyle='#ecd5a4';ctx.lineWidth=1;ctx.beginPath();ctx.arc(1000,780,10,0,Math.PI*2);ctx.fill();ctx.stroke();
+                for(const [R,n]of[[87,24],[57,16]])for(let i=0;i<n;i++){
+                    const a=i*Math.PI*2/n,X=1000+Math.cos(a)*R,Y=780+Math.sin(a)*R;
+                    ctx.fillStyle='#ab8b54';ctx.beginPath();ctx.arc(X,Y,3.4,0,Math.PI*2);ctx.fill();
+                    ctx.fillStyle='#fff0c9';ctx.beginPath();ctx.arc(X,Y,2.15,0,Math.PI*2);ctx.fill();
+                    ctx.strokeStyle='rgba(248,233,204,.85)';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(X,Y+3);ctx.lineTo(X-2,Y+8);ctx.lineTo(X,Y+12);ctx.lineTo(X+2,Y+8);ctx.closePath();ctx.stroke();
+                    if(Math.sin(t*.8+i*2.17)>.985){ctx.strokeStyle='#fffdf2';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(X-4,Y);ctx.lineTo(X+4,Y);ctx.moveTo(X,Y-4);ctx.lineTo(X,Y+4);ctx.stroke();}
+                }
+                ctx.restore();
+            },
+
             drawCafeInterior(ctx) {
                 if (!this._cafeFloor) this._cafeFloor = this._paintCafeFloor();
                 ctx.drawImage(this._cafeFloor, 0, 0);

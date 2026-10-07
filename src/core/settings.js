@@ -145,11 +145,12 @@
             
             // --- VISUAL ---
             lightingQuality: 'high',        // 'low' | 'medium' | 'high'
+            adaptiveLighting: true,         // measured outdoor soft-light trials; character and HUD resolution stay fixed
             filmGrain: true,                // Film grain overlay
             softShadows: true,              // Soft shadow edges: the light layer at half resolution, blurred (on for high quality)
             bloom: true,                    // Post-process light bleed
             wetReflections: true,           // (old saves) false → reflections 'off'
-            reflections: 'high',            // 'high' | 'medium' | 'off': puddles and the wet street mirror the lights (engine/reflections.js)
+            reflections: 'high',            // 'ultra' | 'high' | 'medium' | 'off': puddles and the wet street mirror the lights (engine/reflections.js)
             photoReflections: true,         // Cinematic View's own toggle
             atmosphereTint: '',             // Color wash: '' | 'amber' | 'violet' | 'crimson' | 'teal'
             colorGrade: 'none',             // 'none' | 'amber_night' | 'violet_noir' | 'crimson' | 'cold_teal' | 'dreampunk' | 'custom'

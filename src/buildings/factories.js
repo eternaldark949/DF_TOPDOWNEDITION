@@ -57,75 +57,209 @@
             });
         }
         
-        /**
-         * Factory function to create Enni Cole luxury shopping center.
-         * U-shaped building with large jet-black framed skylights.
-         */
+        // Enni Cole: rose stone, champagne brass and warm glass. Static detail is baked once;
+        // visible wall quads share the landmark camera projection and never advance simulation.
+        const ENNI_EXTERIOR = {
+            stone: '#71354d', stoneLo: '#422031', steel: '#1c2028', gold: '#d0ac72',
+            goldHi: '#f3ddb0', glass: '#352d30', warm: '#ffd392', rose: '#d96896'
+        };
+        Object.assign(BuildingV2.prototype, {
+            _ecH() { return Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS) * CONFIG.BUILDINGS.FLOOR_HEIGHT; },
+            _ecK(z) { return CONFIG.BUILDINGS.LEAN ? LandmarkKit.k(z) : 1; },
+            _ecP(x, y, z) {
+                const k = this._ecK(z), cam = game.camera;
+                return [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
+            },
+            _ecVisible() {
+                return CONFIG.BUILDINGS.LEAN ? this._visibleFaces(game.camera) : [];
+            },
+            _ecLights() {
+                const t = this.attachedTransition, cx = t.x + t.w / 2, cy = t.y - 10;
+                // Six small, fixed lights replace the old all-edge pink wash.
+                for (const [dx, dy, color, radius] of [
+                    [-85, -12, '#dd79a2', 130], [85, -12, '#dd79a2', 130],
+                    [-44, 14, '#ffd69a', 135], [44, 14, '#ffd69a', 135]
+                ]) this.attachedLights.push(new LampEntity({ x: cx + dx, y: cy + dy, lampType: 3, color, lightRadius: radius }));
+                for (const dx of [330, 690]) this.attachedLights.push(new LampEntity({
+                    x: this.x + dx, y: this.y + 284, lampType: 3, color: '#f4c88b', lightRadius: 135
+                }));
+            },
+            _ecDrawBase(ctx) {
+                const K = LandmarkKit;
+                const sprite = K.sprite(this, 'ec_ground', this.x - 16, this.y - 12, 932, 784, 1, c => {
+                    const x = this.x, y = this.y, T = ENNI_EXTERIOR;
+                    for (const s of this.sections) { c.fillStyle = 'rgba(0,0,0,.43)'; c.fillRect(x+s.x+18,y+s.y+18,s.w,s.h); }
+                    // Inset stone courtyard and a small entry apron leave the existing pedestrian paths clear.
+                    c.fillStyle = '#30272e'; c.fillRect(x+252,y+283,396,414);
+                    c.strokeStyle = 'rgba(211,178,135,.14)'; c.lineWidth = 1; c.beginPath();
+                    for(let gx=270;gx<648;gx+=54){c.moveTo(x+gx,y+286);c.lineTo(x+gx,y+697);}
+                    for(let gy=300;gy<697;gy+=54){c.moveTo(x+254,y+gy);c.lineTo(x+646,y+gy);}c.stroke();
+                    const t = this.attachedTransition, cx=t.x+t.w/2, yy=t.y-10;
+                    c.fillStyle='#61515a';c.beginPath();c.roundRect(cx-116,yy-5,232,54,[5,5,16,16]);c.fill();
+                    c.strokeStyle='rgba(208,172,114,.55)';c.lineWidth=1;c.stroke();
+                    for(const sy of [13,29,45]){c.strokeStyle='rgba(211,185,151,.28)';c.beginPath();c.moveTo(cx-112,yy+sy);c.lineTo(cx+112,yy+sy);c.stroke();}
+                    for(const dx of [-128,128]){
+                        const px=cx+dx,py=yy+24;
+                        c.fillStyle='rgba(0,0,0,.35)';c.beginPath();c.ellipse(px+4,py+5,19,15,0,0,Math.PI*2);c.fill();
+                        const gold=c.createLinearGradient(px-15,py,px+15,py);gold.addColorStop(0,'#58432c');gold.addColorStop(.45,T.gold);gold.addColorStop(1,'#755539');
+                        c.fillStyle=gold;c.beginPath();c.ellipse(px,py,16,12,0,0,Math.PI*2);c.fill();
+                        c.strokeStyle=T.goldHi;c.lineWidth=1;c.stroke();
+                        const green=c.createRadialGradient(px-5,py-5,2,px,py,18);green.addColorStop(0,'#547654');green.addColorStop(.65,'#294b36');green.addColorStop(1,'#152b23');
+                        c.fillStyle=green;c.beginPath();c.ellipse(px,py-3,14,17,0,0,Math.PI*2);c.fill();
+                        c.fillStyle='rgba(124,159,103,.24)';for(let j=0;j<11;j++){const a=j*2.4,rr=3+j%4*2;c.beginPath();c.arc(px+Math.cos(a)*rr,py-3+Math.sin(a)*rr,2,0,Math.PI*2);c.fill();}
+                    }
+                });
+                ctx.drawImage(sprite.cv,sprite.x,sprite.y,sprite.w,sprite.h);
+            },
+            _ecRoofSprite(emissive) {
+                const T=ENNI_EXTERIOR, x=this.x, y=this.y;
+                return LandmarkKit.sprite(this,emissive?'ec_roof_lit':'ec_roof',x-4,y-4,908,708,1,c=>{
+                    const glass=(gx,gy,w,h,rows,cols)=>{
+                        c.save();c.beginPath();c.roundRect(gx,gy,w,h,22);c.clip();
+                        if(!emissive){
+                            const g=c.createLinearGradient(gx,gy,gx+w,gy+h);g.addColorStop(0,'#3b3439');g.addColorStop(.52,'#514034');g.addColorStop(1,'#23282d');c.fillStyle=g;c.fillRect(gx,gy,w,h);
+                            // Curated displays under the glass: warm islands and precise floor lines, not bright roof floodlights.
+                            c.fillStyle='rgba(195,145,91,.10)';c.fillRect(gx+8,gy+8,w-16,h-16);
+                            c.strokeStyle='rgba(220,188,132,.10)';c.lineWidth=1;c.beginPath();for(let i=1;i<cols;i++){const xx=gx+w*i/cols;c.moveTo(xx,gy);c.lineTo(xx,gy+h);}for(let j=1;j<rows;j++){const yy=gy+h*j/rows;c.moveTo(gx,yy);c.lineTo(gx+w,yy);}c.stroke();
+                            c.fillStyle='rgba(221,186,137,.20)';for(let i=0;i<cols;i++){c.fillRect(gx+w*(i+.18)/cols,gy+h*.23,w*.56/cols,h*.12);c.fillRect(gx+w*(i+.18)/cols,gy+h*.67,w*.56/cols,h*.10);}
+                            c.fillStyle='rgba(183,193,211,.07)';c.beginPath();c.moveTo(gx,gy);c.lineTo(gx+w*.45,gy);c.lineTo(gx+w,gy+h*.82);c.lineTo(gx+w,gy+h);c.lineTo(gx+w*.77,gy+h);c.closePath();c.fill();
+                        }else{
+                            const g=c.createLinearGradient(gx,gy,gx,gy+h);g.addColorStop(0,'rgba(236,164,83,.08)');g.addColorStop(.5,'rgba(255,197,113,.17)');g.addColorStop(1,'rgba(255,190,98,.07)');c.fillStyle=g;c.fillRect(gx,gy,w,h);
+                        }
+                        for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
+                            const cx=gx+w*(i+.5)/cols,cy=gy+h*(j+.5)/rows;
+                            if(emissive){const g=c.createRadialGradient(cx,cy,0,cx,cy,24);g.addColorStop(0,'rgba(255,210,139,.20)');g.addColorStop(1,'rgba(255,192,105,0)');c.fillStyle=g;c.fillRect(cx-24,cy-24,48,48);}
+                            c.strokeStyle=emissive?'rgba(255,221,164,.75)':'rgba(181,136,83,.65)';c.lineWidth=1;c.beginPath();c.arc(cx,cy,9,0,Math.PI*2);c.stroke();
+                            c.fillStyle=emissive?'#ffe9b8':'#ceaa73';for(let k=0;k<6;k++){const a=k*Math.PI/3;c.beginPath();c.arc(cx+Math.cos(a)*8,cy+Math.sin(a)*8,emissive?1.35:1.1,0,Math.PI*2);c.fill();}
+                        }
+                        if(!emissive){
+                            c.strokeStyle='#1d2028';c.lineWidth=5;c.beginPath();for(let i=1;i<cols*2;i++){const xx=gx+w*i/(cols*2);c.moveTo(xx,gy);c.lineTo(xx,gy+h);}for(let j=1;j<rows*2;j++){const yy=gy+h*j/(rows*2);c.moveTo(gx,yy);c.lineTo(gx+w,yy);}c.stroke();
+                            c.strokeStyle='rgba(221,197,153,.20)';c.lineWidth=.8;c.stroke();
+                        }
+                        c.restore();
+                        c.beginPath();c.roundRect(gx,gy,w,h,22);c.lineWidth=emissive?1:4;c.strokeStyle=emissive?'rgba(237,187,123,.30)':T.steel;c.stroke();
+                        if(!emissive){c.beginPath();c.roundRect(gx+3,gy+3,w-6,h-6,19);c.lineWidth=1;c.strokeStyle='rgba(208,172,114,.62)';c.stroke();}
+                    };
+                    if(!emissive){
+                        for(const s of this.sections){
+                            const sx=x+s.x,sy=y+s.y;
+                            const g=c.createLinearGradient(sx,sy,sx+s.w,sy+s.h);g.addColorStop(0,'#382934');g.addColorStop(.45,'#2d242c');g.addColorStop(1,'#201e27');c.fillStyle=g;c.fillRect(sx,sy,s.w,s.h);
+                            c.strokeStyle='rgba(143,86,107,.24)';c.lineWidth=1;c.beginPath();for(let k=28;k<s.h;k+=45){c.moveTo(sx+7,sy+k);c.lineTo(sx+s.w-7,sy+k);}c.stroke();
+                        }
+                        c.strokeStyle=T.stone;c.lineWidth=8;for(const f of this._leanFaces()){c.beginPath();c.moveTo(f.x1,f.y1);c.lineTo(f.x2,f.y2);c.stroke();}
+                        c.strokeStyle='rgba(230,199,153,.70)';c.lineWidth=1.4;for(const f of this._leanFaces()){c.beginPath();c.moveTo(f.x1,f.y1);c.lineTo(f.x2,f.y2);c.stroke();}
+                        // A rose stone entrance cap echoes the reference's grand corner bay.
+                        c.fillStyle='#663046';c.beginPath();c.roundRect(x+28,y+635,194,62,[10,10,27,27]);c.fill();
+                        c.strokeStyle='rgba(214,165,130,.65)';c.lineWidth=1.5;c.stroke();
+                    }
+                    glass(x+54,y+37,792,202,2,6);
+                    glass(x+41,y+323,168,281,3,2);glass(x+691,y+323,168,321,3,2);
+                    // Roof-top brass medallion in the quiet courtyard-facing stone band.
+                    if(!emissive){
+                        c.strokeStyle='rgba(208,172,114,.40)';c.lineWidth=.8;c.beginPath();c.moveTo(x+280,y+261);c.lineTo(x+349,y+261);c.moveTo(x+551,y+261);c.lineTo(x+620,y+261);c.stroke();
+                    }
+                });
+            },
+            _ecFace(ctx, f, emissive=false) {
+                const T=ENNI_EXTERIOR,H=this._ecH(),L=Math.hypot(f.x2-f.x1,f.y2-f.y1);
+                const P=(u,z)=>this._ecP(f.x1+(f.x2-f.x1)*u,f.y1+(f.y2-f.y1)*u,z);
+                const quad=(u0,u1,z0,z1,fill,stroke=null,width=1)=>{
+                    const a=P(u0,z0),b=P(u1,z0),d=P(u0,z1),e=P(u1,z1);
+                    ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.lineTo(...e);ctx.lineTo(...d);ctx.closePath();
+                    if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke();}
+                };
+                const entrance=f.side==='S'&&Math.abs(f.y1-(this.y+700))<1&&f.x1<this.x+250;
+                if(!emissive){quad(0,1,0,H*.55,T.stoneLo);quad(0,1,H*.55,H,T.steel);}
+                const n=Math.max(2,Math.round(L/77)),pad=8/L;
+                for(let i=0;i<n;i++){
+                    const u0=i/n+pad,u1=(i+1)/n-pad;
+                    for(const [z0,z1] of [[4,H*.48],[H*.59,H-4]]){
+                        if(!emissive){quad(u0,u1,z0,z1,'#6b4733','rgba(204,158,101,.62)',1.4);quad(u0+.018,u1-.018,z0+1,z1-1,'rgba(244,179,96,.12)');}
+                        else{
+                            quad(u0+.006,u1-.006,z0+1,z1-1,'rgba(255,192,108,.32)');
+                            const a=P((u0+u1)/2,z0+(z1-z0)*.57);
+                            ctx.fillStyle='rgba(255,237,180,.85)';ctx.beginPath();ctx.arc(...a,1.35,0,Math.PI*2);ctx.fill();
+                        }
+                        if(!emissive){
+                            quad((u0+u1)/2-.002,(u0+u1)/2+.002,z0,z1,T.steel);
+                            quad(u0,u1,z0+(z1-z0)*.44,z0+(z1-z0)*.44+.65,'#252127');
+                            quad(u0+.025,u0+.039,z0+2,z1-1,'rgba(221,231,237,.19)');
+                        }
+                    }
+                    if(!emissive){quad(i/n,i/n+pad*.58,0,H*.54,T.stone);quad(i/n,i/n+pad*.35,H*.56,H,'#24272f');}
+                }
+                if(!emissive){
+                    quad(0,1,H*.51,H*.57,'#5d303e','rgba(211,166,112,.45)',1);
+                    quad(0,1,H-2,H,'#303039','rgba(211,175,118,.55)',.9);
+                }else{
+                    // Deliberate rose uplight on stone piers leaves the glass warm amber.
+                    for(let i=0;i<=n;i++){const u=i/n;quad(Math.max(0,u-.012),Math.min(1,u+.012),1,H*.50,'rgba(225,75,129,.16)');}
+                }
+                if(entrance&&!emissive){
+                    // Arched transom: use the wall's own u/z projection rather than screen-space decoration.
+                    const mid=.5,wide=.19,zbase=5,zspring=H*.26,zpeak=H*.48;
+                    ctx.beginPath();ctx.moveTo(...P(mid-wide,zbase));ctx.lineTo(...P(mid+wide,zbase));ctx.lineTo(...P(mid+wide,zspring));
+                    for(let i=0;i<=16;i++){const a=i*Math.PI/16;ctx.lineTo(...P(mid+Math.cos(a)*wide,zspring+Math.sin(a)*(zpeak-zspring)));}ctx.closePath();
+                    ctx.fillStyle='#8b5737';ctx.fill();ctx.strokeStyle=T.gold;ctx.lineWidth=2;ctx.stroke();
+                    const a=P(.5,zbase),b=P(.5,zpeak);ctx.strokeStyle='#201c22';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();
+                }
+            },
+            _ecWordmark(ctx, emissive=false) {
+                LandmarkKit.flat(ctx,this._ecK(this._ecH()),c=>{
+                    c.textAlign='center';c.textBaseline='middle';
+                    c.font='35px "Great Vibes", "URW Chancery L", "Z003", cursive';
+                    c.fillStyle=emissive?'rgba(255,230,173,.88)':ENNI_EXTERIOR.goldHi;
+                    c.fillText('Enni Cole',this.x+450,this.y+263);
+                });
+            },
+            _ecCanopy(ctx, emissive=false) {
+                const t=this.attachedTransition,cx=t.x+t.w/2,sy=t.y-22,T=ENNI_EXTERIOR;
+                LandmarkKit.flat(ctx,this._ecK(this._ecH()*.30),c=>{
+                    c.beginPath();c.roundRect(cx-99,sy-10,198,54,[8,8,27,27]);
+                    if(!emissive){
+                        const g=LandmarkKit.grad(this,'ec_canopy',()=>{const q=c.createLinearGradient(cx,sy-10,cx,sy+44);q.addColorStop(0,'#20242b');q.addColorStop(1,'#0f131b');return q;});
+                        c.fillStyle=g;c.fill();c.strokeStyle=T.gold;c.lineWidth=1.7;c.stroke();
+                        c.beginPath();c.roundRect(cx-94,sy-5,188,43,[5,5,23,23]);c.strokeStyle='rgba(221,192,143,.28)';c.lineWidth=.8;c.stroke();
+                    }else{c.strokeStyle='rgba(245,205,143,.70)';c.lineWidth=1;c.stroke();}
+                    c.textAlign='center';c.textBaseline='middle';c.font='38px "Great Vibes", "URW Chancery L", "Z003", cursive';
+                    c.fillStyle=emissive?'rgba(255,230,173,.96)':T.goldHi;c.fillText('Enni Cole',cx,sy+12);
+                    if(!emissive){c.font='6.6px Montserrat, sans-serif';c.fillStyle='#bba889';c.fillText('G R O C E R Y   ·   H O M E   ·   T E C H',cx,sy+33);}
+                });
+            },
+            _ecDrawTop(ctx) {
+                ctx.save();
+                for(const f of this._ecVisible())this._ecFace(ctx,f,false);
+                LandmarkKit.drawSprite(ctx,this._ecRoofSprite(false),this._ecK(this._ecH()));
+                this._ecWordmark(ctx,false);
+                this._ecCanopy(ctx,false);
+                ctx.restore();
+            },
+            _ecDrawEmissive(ctx,dark) {
+                const glow=Math.max(.12,Math.min(.78,dark*.95));
+                ctx.save();ctx.globalAlpha*=glow;ctx.globalCompositeOperation='lighter';
+                for(const f of this._ecVisible())this._ecFace(ctx,f,true);
+                LandmarkKit.drawSprite(ctx,this._ecRoofSprite(true),this._ecK(this._ecH()));
+                this._ecWordmark(ctx,true);
+                this._ecCanopy(ctx,true);ctx.restore();
+            }
+        });
+
+        /** Enni Cole luxury department store: the original U-shaped city footprint is preserved. */
         function createEnniCole(x, y, config = {}) {
             return new BuildingV2({
-                id: 'enni_cole',
-                x: x,
-                y: y,
-                label: 'Enni Cole',
-                type: 'shopping',
-                floors: 6,
-                
-                // U-shaped luxury shopping center
+                id: 'enni_cole', x, y, label: 'Enni Cole', type: 'shopping', style: 'enni_cole', floors: 6,
                 sections: [
-                    { x: 0, y: 0, w: 900, h: 280 },       // Main hall (north)
-                    { x: 0, y: 280, w: 250, h: 420 },     // West wing
-                    { x: 650, y: 280, w: 250, h: 420 },   // East wing
+                    { x: 0, y: 0, w: 900, h: 280 },
+                    { x: 0, y: 280, w: 250, h: 420 },
+                    { x: 650, y: 280, w: 250, h: 420 }
                 ],
-                
-                // Large skylights with jet black frames
-                windowWidth: 22,
-                windowHeight: 28,
-                windowSpacingX: 45,
-                windowSpacingY: 40,
-                windowMarginX: 35,
-                windowMarginY: 30,
-                
-                // Colors - upscale pink/rose gold theme
-                roofColor: '#c9a0b0',           // Dusty rose roof
-                roofLightColor: '#dba4b6',      // Lighter pink highlight
-                wallColor: '#1a1a1a',           // Jet black walls
-                wallLightColor: '#2a2a2a',      // Dark charcoal
-                accentColor: '#ff69b4',         // Hot pink accent
-                windowColor: '#0a0a0f',         // Very dark glass (jet black)
-                windowLitColor: '#fff0f5',      // Lavender blush when lit
-                windowFrameColor: '#050508',    // Jet black frames
-                balconyColor: '#1a1a1a',        // Black railings
-                
-                // Luxurious verandas on each wing
-                balconies: [
-                    // Main hall entrance canopy indicators
-                    { section: 0, side: 'south', startX: 350, width: 200, floors: [1, 2] },
-                    // West wing balconies
-                    { section: 1, side: 'south', startX: 40, width: 150, floors: [1, 3, 5] },
-                    // East wing balconies  
-                    { section: 2, side: 'south', startX: 50, width: 150, floors: [2, 4, 6] },
-                ],
-                
-                // Custom roof props for shopping center
-                roofProps: [
-                    // Large central skylight atrium in main hall
-                    { type: 'atrium', section: 0, x: 300, y: 60, w: 300, h: 160 },
-                    // AC units on wings
-                    { type: 'ac_unit', section: 1, x: 30, y: 30, w: 50, h: 35 },
-                    { type: 'ac_unit', section: 2, x: 170, y: 30, w: 50, h: 35 },
-                    // Decorative vents
-                    { type: 'vent', section: 0, x: 50, y: 100, w: 30, h: 30 },
-                    { type: 'vent', section: 0, x: 820, y: 100, w: 30, h: 30 },
-                ],
-                
-                // Attachments
-                sign: { text: 'Enni Cole', color: '#ff69b4', size: 36 },
-                door: { 
-                    target: config.doorTarget || 'enni_cole_interior', 
-                    label: 'Enter Store', 
-                    lightColor: '#ff69b4' 
-                },
-                
+                roofColor: '#2d242c', roofLightColor: '#463541',
+                wallColor: '#71354d', wallLightColor: '#8b4760', accentColor: '#d0ac72',
+                windowColor: '#352d30', windowLitColor: '#ffd392', windowFrameColor: '#1c2028',
+                balconyColor: '#1c2028', balconies: [],
+                roofProps: [{ type: 'atrium', section: 0, x: 54, y: 37, w: 792, h: 202 }],
+                sign: { text: 'Enni Cole', color: '#f3ddb0', size: 38 },
+                door: { target: config.doorTarget || 'enni_cole_interior', label: 'Enter Store', lightColor: null },
                 ...config
             });
         }

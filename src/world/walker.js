@@ -20,9 +20,13 @@
                 // A goal on furniture or in a wall: the nearest spot a body can stand
                 const nav = typeof game !== 'undefined' && game.activeMap ? NavGrid.for(game.activeMap) : null;
                 if (nav && !nav.walkable(x, y)) { const f = nav.nearestFree(x, y, 6); if (f !== null && f !== undefined) { x = nav.cx(f); y = nav.cy(f); } }
-                const pts = (o.via || []).concat([[x, y]]);
+                const pts = (o.via || []).concat([[x, y]]).map(([px, py]) => {
+                    if (nav && !nav.walkable(px, py)) { const f = nav.nearestFree(px, py, 6); if (f !== null) return [nav.cx(f), nav.cy(f)]; }
+                    return [px, py];
+                });
+                actor._navPath = null;
                 const w = { actor, x: pts[0][0], y: pts[0][1], pts: pts.slice(1), face: o.face, speed: o.speed || 1.5, arrive: o.arrive ?? 6, timeout: o.timeout ?? 300,
-                            onArrive: o.onArrive, onFail: o.onFail, state: 'walk', best: Infinity, stuck: 0, isPlayer };
+                            onArrive: o.onArrive, onFail: o.onFail, state: 'walk', best: Infinity, stuck: 0, isPlayer, map: typeof game !== 'undefined' ? game.activeMap : null };
                 if (isPlayer) actor._walk = w; else this.walks.push(w);
                 return { done: () => w.state !== 'walk' && w.state !== 'turn', ok: () => w.state === 'arrived', cancel: () => this._end(w, 'cancelled') };
             },
@@ -39,6 +43,7 @@
             _end(w, state) {
                 if (w.state !== 'walk' && w.state !== 'turn') return;
                 w.state = state;
+                w.actor._navPath = null;
                 if (w.isPlayer && w.actor._walk === w) w.actor._walk = null;
                 const i = this.walks.indexOf(w); if (i >= 0) this.walks.splice(i, 1);
                 if (state === 'arrived' && w.onArrive) w.onArrive();
@@ -59,7 +64,9 @@
             },
 
             _progress(w, d) {
-                if (d < w.best - 1) { w.best = d; w.stuck = 0; return true; }            // (a pixel of real progress resets the clock)
+                const wp = navWaypoint(w.actor, w.x, w.y, w.map);
+                const remaining = wp.remaining ?? d;
+                if (remaining < w.best - 1) { w.best = remaining; w.stuck = 0; return true; } // useful progress along the route, including detours
                 if (++w.stuck > w.timeout) { this._end(w, 'failed'); return false; }
                 return true;
             },
@@ -68,6 +75,7 @@
             stepPlayer(game) {
                 const w = game.player._walk;
                 if (!w) return null;
+                if (w.map !== game.activeMap) { this._end(w, 'cancelled'); return null; }
                 const a = game.player, d = Math.hypot(w.x - a.x, w.y - a.y);
                 if (w.state !== 'turn' && d <= Math.max(w.arrive, 8) && w.pts.length) { [w.x, w.y] = w.pts.shift(); w.best = Infinity; w.stuck = 0; return this.stepPlayer(game); }   // a via point: on to the next
                 if (w.state === 'turn' || d <= w.arrive) { this._settle(w); return { x: 0, y: 0 }; }
@@ -82,7 +90,7 @@
                 const map = game.activeMap; if (!map) return;
                 for (let i = this.walks.length - 1; i >= 0; i--) {
                     const w = this.walks[i], a = w.actor;
-                    if (!a || a.dead) { this._end(w, 'cancelled'); continue; }
+                    if (!a || a.dead || w.map !== map) { this._end(w, 'cancelled'); continue; }
                     let d = Math.hypot(w.x - a.x, w.y - a.y);
                     if (w.state !== 'turn' && d <= Math.max(w.arrive, 8) && w.pts.length) { [w.x, w.y] = w.pts.shift(); w.best = Infinity; w.stuck = 0; d = Math.hypot(w.x - a.x, w.y - a.y); }
                     if (w.state === 'turn' || d <= w.arrive) { gaitCommand(a, 0, 0); this._settle(w); continue; }

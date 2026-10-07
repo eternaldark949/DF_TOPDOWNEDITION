@@ -98,6 +98,15 @@
             transition: width 0.2s ease-out; 
         }
         
+        /* A successful execution briefly warms the existing health bar. */
+        #ui-health.execution-heal #health-bar {
+            animation: execution-health-pulse 0.6s ease-out;
+        }
+        @keyframes execution-health-pulse {
+            0%, 100% { filter: brightness(1); }
+            25% { filter: brightness(2.4); box-shadow: inset 0 1px 0 #ffe8b0, 0 0 10px #edba6b; }
+        }
+
         #ui-flit-bar-container { 
             position: absolute; 
             top: 36px;
@@ -120,6 +129,26 @@
             transition: width 0.2s ease-out; 
         }
         
+        /* Equipped-item slot: one item, with loaded-ammo presentation ready for magazines. */
+        #ui-equipment { position: absolute; top: 60px; left: 90px; width: 76px; z-index: 20;
+            pointer-events: none; color: #f8f1e9; text-align: center; }
+        #equipment-art { display: block; width: 74px; height: 74px; border-radius: 26px;
+            border: 1px dashed rgba(233, 224, 216, 0.62);
+            background: radial-gradient(ellipse at 45% 30%, rgba(47, 5, 26, 0.92), rgba(8, 3, 7, 0.94));
+            box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.65), 0 0 9px rgba(244, 223, 202, 0.12); }
+        #equipment-ammo { margin-top: 4px; height: 22px; font: 500 16px/22px var(--font-ui);
+            text-shadow: 0 1px 4px #000; font-variant-numeric: tabular-nums; }
+        #equipment-ammo-track { height: 2px; margin-top: 3px; background: rgba(247, 237, 221, 0.16); }
+        #equipment-ammo-fill { display: block; height: 100%; width: 100%; transform-origin: left;
+            background: #f7eddf; box-shadow: 0 0 5px rgba(255, 226, 179, 0.25); }
+        #ui-equipment.unlimited #equipment-ammo-fill { opacity: 0.55; }
+        #ui-equipment.low-ammo #equipment-ammo { color: #e7b07b; }
+        #ui-equipment.low-ammo #equipment-ammo-fill { background: #e7b07b; }
+        #ui-equipment.holstered #equipment-art { opacity: 0.65; }
+        #equipment-ammo-track[hidden] { display: none; }
+        body.landscape #game-ui #ui-location { top: 173px; }
+        @media (orientation: portrait) { body:not(.landscape) #ui-ride { top: 184px; } }
+
         /* Audio Viz */
         #audio-viz { position: absolute; bottom: 20px; left: 20px; display: none; gap: 2px; height: 20px; align-items: flex-end; opacity: 0.5; }
         .viz-bar { width: 4px; background: var(--glow-color); animation: viz 0.5s infinite ease-in-out alternate; }
@@ -726,6 +755,7 @@
         /* --- PAUSE MENU, after ETERNAL's mock-up ---
            The game blurred behind a plum veil that deepens to the right. Left: Now Playing, Quick Access,
            objectives. Right: a script "Paused" and letter-spaced caps, the active one a lit pill. */
+        #pause-menu [hidden] { display: none !important; }
         #pause-menu {
             position: fixed;
             top: 0;
@@ -963,6 +993,12 @@
             .pause-backdrop { background: linear-gradient(180deg, rgba(10, 2, 10, 0.92) 0%, rgba(14, 3, 12, 0.85) 60%, rgba(20, 4, 10, 0.7) 100%); }
             .pause-np { margin: 0 auto; }
         }
+
+        /* Hidden layers cannot be re-enabled by a descendant's pointer-events:auto. */
+        #game-ui.hud-input-blocked, #game-ui.hud-input-blocked *,
+        [data-cine-muted], [data-cine-muted] * { pointer-events: none !important; }
+        [data-cine-muted] { opacity: 0 !important; }
+        body.cinematic-view #pause-menu { display: none !important; }
 
         /* Cinematic view: the HUD fades away; the hint fades in, then out */
         body.cinematic-view #game-ui, body.cinematic-view #scanlines, body.cinematic-view #ui-layer,

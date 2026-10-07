@@ -178,31 +178,22 @@
             },
             'enni_cole_interior': {
                 id: 'enni_cole_interior', width: 2000, height: 1400, type: 'indoor',
-                label: 'Enni Cole', floorColor: '#0a0a0c',
-                spawn: { x: 1000, y: 1300 },
-                zones: [
-                    { x: 450, y: 280, w: 1100, h: 800, color: '#0e0e12' },
-                    { x: 60, y: 60, w: 380, h: 1100, color: '#100a0e' },
-                    { x: 1540, y: 60, w: 400, h: 1100, color: '#100a0e' },
-                    { x: 200, y: 60, w: 1600, h: 200, color: '#12080e' },
-                    { x: 920, y: 280, w: 160, h: 920, color: '#1a0e14', texture: 'carpet' },
-                    { x: 700, y: 1150, w: 600, h: 130, color: '#0f0f14' },
-                ],
+                label: 'Enni Cole', floorColor: '#c7bcae', ambientDarkness: 0.36,
+                navProps: 'all', wallStyle: { fill: '#44232f', stroke: 'rgba(229,192,131,0.65)' },
+                spawn: { x: 1000, y: 1300 }, zones: [],
                 walls: [
                     { x: 0, y: 0, w: 2000, h: 50 }, { x: 0, y: 1350, w: 850, h: 50 },
                     { x: 1150, y: 1350, w: 850, h: 50 }, { x: 0, y: 0, w: 50, h: 1400 },
-                    { x: 1950, y: 0, w: 50, h: 1400 }, { x: 440, y: 60, w: 20, h: 580 },
-                    { x: 440, y: 760, w: 20, h: 400 }, { x: 1540, y: 60, w: 20, h: 580 },
-                    { x: 1540, y: 760, w: 20, h: 400 }, { x: 200, y: 260, w: 250, h: 15 },
-                    { x: 1550, y: 260, w: 250, h: 15 }, { x: 60, y: 1060, w: 150, h: 15 },
-                    { x: 260, y: 1060, w: 150, h: 15 }, { x: 60, y: 1060, w: 15, h: 120 },
-                    { x: 210, y: 1060, w: 15, h: 120 }, { x: 400, y: 1060, w: 15, h: 120 },
+                    { x: 1950, y: 0, w: 50, h: 1400 }
                 ],
                 transitions: [ { x: 850, y: 1320, w: 300, h: 80, target: 'hub_949', label: 'Exit to City' } ],
                 landmarks: [
-                    { id: 'enni_cole_exit', x: 1000, y: 1370 }, { id: 'enni_cole_atrium', x: 1000, y: 650 },
-                    { id: 'enni_cole_couture', x: 250, y: 600 }, { id: 'enni_cole_accessories', x: 1750, y: 600 },
-                    { id: 'enni_cole_checkout', x: 1000, y: 1220 }, { id: 'enni_cole_gallery', x: 1000, y: 130 }
+                    { id: 'enni_cole_exit', x: 1000, y: 1370 }, { id: 'enni_cole_atrium', x: 1000, y: 780 },
+                    // The original IDs remain aliases for scenes and existing saves.
+                    { id: 'enni_cole_couture', x: 285, y: 760 }, { id: 'enni_cole_accessories', x: 1740, y: 590 },
+                    { id: 'enni_cole_checkout', x: 1000, y: 1150 }, { id: 'enni_cole_gallery', x: 1000, y: 90 },
+                    { id: 'enni_cole_groceries', x: 285, y: 760 }, { id: 'enni_cole_electronics', x: 1740, y: 590 },
+                    { id: 'enni_cole_furniture', x: 1000, y: 450 }
                 ]
             },
             'cozy_cafe_interior': {

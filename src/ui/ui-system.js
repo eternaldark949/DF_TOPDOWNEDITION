@@ -931,12 +931,14 @@
                 // ── Areas and routes, in map space ──
                 ctx.save(); ctx.translate(ox, oy); ctx.scale(finalScale, finalScale);
                 const rz = this.game.restrictedZone;
-                if (rz) {                                                   // the danger zone: a crimson wash and a slow dashed edge
-                    const t = _frameTime / 400;
+                if (rz) {                                                   // the danger zone: a crimson wash and a travelling pulsing edge
+                    const borderNow = performance.now();
+                    const t = (borderNow % (Math.PI * 2 * 400 / 1.5)) / 400; // one bounded pulse cycle
                     ctx.fillStyle = rz.cleared ? 'rgba(60, 14, 30, 0.28)' : 'rgba(150, 10, 40, 0.24)';
                     ctx.fillRect(rz.x, rz.y, rz.w, rz.h);
                     ctx.strokeStyle = rz.cleared ? 'rgba(255, 170, 90, 0.45)' : `rgba(255, 60, 70, ${0.5 + Math.sin(t * 1.5) * 0.2})`;
-                    ctx.lineWidth = 2 * this._u; ctx.setLineDash([10 * this._u, 7 * this._u]); ctx.lineDashOffset = _frameTime / 50 * this._u;
+                    ctx.lineWidth = 2 * this._u; ctx.setLineDash([10 * this._u, 7 * this._u]);
+                    ctx.lineDashOffset = ((borderNow % 850) / 50) * this._u; // bounded to one 17-unit dash cycle before zoom scaling
                     ctx.strokeRect(rz.x, rz.y, rz.w, rz.h); ctx.setLineDash([]);
                 }
                 let quest = null;

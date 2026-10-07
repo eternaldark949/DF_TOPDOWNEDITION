@@ -6,6 +6,110 @@
          * Procedurally rendered, curious idle behaviors, rides in vehicles.
          * Acquired once, persists via questState.hasVelvetCat.
          */
+        // Retained coat options for future customization. Palette records and semantic colors are immutable.
+        // Eye, muzzle, nose, inner-ear and whisker colors remain part of the shared feline artwork.
+        const VELVET_CAT_PALETTES = Object.freeze({
+            default: Object.freeze({
+                id: 'default', label: 'Default plum',
+                colors: Object.freeze({
+                    tailBase: "#211226",
+                    tailMiddle: "#2f1c35",
+                    tailTip: "#190d20",
+                    tailNap: "rgba(123,87,142,.18)",
+                    raisedPaw: "#3a2440",
+                    pawTop: "#2b1932",
+                    pawShadow: "#160b1c",
+                    pawRim: "rgba(108,75,120,.24)",
+                    legShade: "#1b0e23",
+                    bodyTop: "#35223d",
+                    bodyMiddle: "#27152e",
+                    bodyShade: "#1b0d22",
+                    bodyDeep: "#120a19",
+                    napStart: "rgba(125,91,147,0)",
+                    napHighlight: "rgba(143,109,160,.10)",
+                    napShade: "rgba(118,84,139,.055)",
+                    napEnd: "rgba(118,84,139,0)",
+                    furStroke: "rgba(164,126,180,.065)",
+                    bodyRim: "rgba(110,78,128,.23)",
+                    earTip: "#211126",
+                    earMiddle: "#3b2541",
+                    earBase: "#24142d",
+                    earRim: "rgba(151,103,147,.20)",
+                    headTop: "#382440",
+                    headMiddle: "#2c1934",
+                    headShadow: "#190e22",
+                    cheekFur: "rgba(133,92,150,.21)",
+                    groomArm: "#24122c",
+                })
+            }),
+            tinge: Object.freeze({
+                id: 'tinge', label: 'Velvet tinge',
+                colors: Object.freeze({
+                    tailBase: "#2b1226",
+                    tailMiddle: "#3d1c31",
+                    tailTip: "#200d1e",
+                    tailNap: "rgba(134,78,117,.18)",
+                    raisedPaw: "#46223a",
+                    pawTop: "#35172d",
+                    pawShadow: "#1a0b1b",
+                    pawRim: "rgba(122,70,105,.24)",
+                    legShade: "#240e23",
+                    bodyTop: "#442039",
+                    bodyMiddle: "#30142c",
+                    bodyShade: "#210d21",
+                    bodyDeep: "#150a18",
+                    napStart: "rgba(137,82,120,0)",
+                    napHighlight: "rgba(155,93,127,.10)",
+                    napShade: "rgba(133,75,112,.055)",
+                    napEnd: "rgba(133,75,112,0)",
+                    furStroke: "rgba(171,113,145,.065)",
+                    bodyRim: "rgba(123,70,107,.23)",
+                    earTip: "#2b1126",
+                    earMiddle: "#482239",
+                    earBase: "#2f1329",
+                    earRim: "rgba(156,92,128,.20)",
+                    headTop: "#452139",
+                    headMiddle: "#36172f",
+                    headShadow: "#210d21",
+                    cheekFur: "rgba(145,83,123,.21)",
+                    groomArm: "#2d1128",
+                })
+            }),
+            full: Object.freeze({
+                id: 'full', label: 'Full velvet color',
+                colors: Object.freeze({
+                    tailBase: "#581832",
+                    tailMiddle: "#70203d",
+                    tailTip: "#330f25",
+                    tailNap: "rgba(190,89,126,.18)",
+                    raisedPaw: "#7a2542",
+                    pawTop: "#5e1935",
+                    pawShadow: "#310e24",
+                    pawRim: "rgba(174,78,111,.24)",
+                    legShade: "#3e1029",
+                    bodyTop: "#8a2545",
+                    bodyMiddle: "#681d39",
+                    bodyShade: "#49132d",
+                    bodyDeep: "#330f25",
+                    napStart: "rgba(188,83,119,0)",
+                    napHighlight: "rgba(204,104,139,.10)",
+                    napShade: "rgba(171,71,108,.055)",
+                    napEnd: "rgba(171,71,108,0)",
+                    furStroke: "rgba(215,132,157,.065)",
+                    bodyRim: "rgba(174,76,104,.23)",
+                    earTip: "#4e1430",
+                    earMiddle: "#79243f",
+                    earBase: "#561730",
+                    earRim: "rgba(179,88,115,.20)",
+                    headTop: "#8e2d4d",
+                    headMiddle: "#671e3a",
+                    headShadow: "#350f25",
+                    cheekFur: "rgba(188,91,124,.21)",
+                    groomArm: "#4d142e",
+                })
+            }),
+        });
+
         class VelvetCat extends ActorEntity {
             constructor(x, y) {
                 super({
@@ -24,6 +128,7 @@
                 this.state = 'idle';       // idle, following, sitting, sleeping
                 this.inCar = false;
                 this.visible = true;
+                this.coatPalette = 'default'; // Reserved for future customization; current appearance is unchanged.
                 
                 // Animation
                 this.walkPhase = 0;
@@ -117,114 +222,233 @@
             
             draw(ctx) {
                 if (!this.visible || this.inCar) return;
-                
+
+                // A missing/unrecognized selector uses the exact original coat colors.
+                const coatColors = Object.prototype.hasOwnProperty.call(VELVET_CAT_PALETTES, this.coatPalette)
+                    ? VELVET_CAT_PALETTES[this.coatPalette].colors : VELVET_CAT_PALETTES.default.colors;
+
+                const phase = Number.isFinite(this.tailPhase) ? this.tailPhase : 0;
+                const sleeping = this.state === 'sleeping';
+                const sitting = this.state === 'sitting' || (this.state === 'idle' && this.idleBehavior === 'sit');
+                const grooming = this.state === 'idle' && this.idleBehavior === 'groom';
+                const looking = this.state === 'idle' && this.idleBehavior === 'look';
+                const walking = this.state === 'following';
+                const stride = walking ? Math.sin(this.walkPhase) * 2.5 : 0;
+                const lift = walking ? Math.cos(this.walkPhase) : 0;
+                const length = sitting ? 12 : 16;
+                const headX = sleeping ? 5.3 : length - 2;
+                const headY = sleeping ? 2.1 : 0;
+                const headTurn = sleeping ? .77 : grooming ? -.17 + Math.sin(phase * 3.2) * .045 : looking ? Math.sin(phase * .7) * .15 : 0;
+
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
-                
-                const walk = Math.sin(this.walkPhase);
-                const isSitting = this.idleBehavior === 'sit' && this.state === 'idle';
-                
-                // Shadow
-                ctx.fillStyle = 'rgba(0,0,0,0.3)';
-                ctx.beginPath();
-                ctx.ellipse(0, 4, 10, 5, 0, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Body — elongated velvet ellipse
-                const bodyLen = isSitting ? 12 : 16;
-                ctx.fillStyle = '#1a0a1e'; // Deep velvet
-                ctx.beginPath();
-                ctx.ellipse(0, 0, bodyLen, 7, 0, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Velvet sheen (lighter upper half)
-                ctx.fillStyle = '#2a1a2e';
-                ctx.beginPath();
-                ctx.ellipse(0, -1, bodyLen - 2, 4, 0, Math.PI, Math.PI * 2);
-                ctx.fill();
-                
-                // Legs (skip when sitting)
-                if (!isSitting) {
-                    ctx.fillStyle = '#150818';
-                    const legSwing = walk * 3;
-                    // Front legs
-                    ctx.fillRect(bodyLen - 6, -5 + legSwing, 3, 6);
-                    ctx.fillRect(bodyLen - 6, 2 - legSwing, 3, 6);
-                    // Back legs
-                    ctx.fillRect(-bodyLen + 3, -5 - legSwing, 3, 6);
-                    ctx.fillRect(-bodyLen + 3, 2 + legSwing, 3, 6);
-                }
-                
-                // Head
-                const headX = bodyLen - 2;
-                ctx.fillStyle = '#1a0a1e';
-                ctx.beginPath();
-                ctx.arc(headX, 0, 6, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Ears
-                ctx.fillStyle = '#1a0a1e';
-                ctx.beginPath();
-                ctx.moveTo(headX - 2, -5);
-                ctx.lineTo(headX + 1, -11);
-                ctx.lineTo(headX + 4, -5);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.moveTo(headX - 2, 5);
-                ctx.lineTo(headX + 1, 11);
-                ctx.lineTo(headX + 4, 5);
-                ctx.fill();
-                
-                // Inner ears (pink)
-                ctx.fillStyle = '#3a1a2a';
-                ctx.beginPath();
-                ctx.moveTo(headX - 1, -5);
-                ctx.lineTo(headX + 1, -9);
-                ctx.lineTo(headX + 3, -5);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.moveTo(headX - 1, 5);
-                ctx.lineTo(headX + 1, 9);
-                ctx.lineTo(headX + 3, 5);
-                ctx.fill();
-                
-                // Eyes — glowing violet
-                ctx.fillStyle = '#a469ff';
-                ctx.shadowColor = '#a469ff';
-                ctx.shadowBlur = 4;
-                ctx.beginPath();
-                ctx.arc(headX + 3, -2.5, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(headX + 3, 2.5, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
-                
-                // Tail — animated bezier
-                const tailSway = Math.sin(this.tailPhase) * 8;
-                const tailSway2 = Math.sin(this.tailPhase * 1.3 + 1) * 5;
-                ctx.strokeStyle = '#1a0a1e';
-                ctx.lineWidth = 3;
                 ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.shadowBlur = 0;
+
+                // A compact ground shadow; the feline outline itself stays smooth and short-haired.
+                ctx.fillStyle = 'rgba(0,0,0,.27)';
                 ctx.beginPath();
-                ctx.moveTo(-bodyLen + 2, 0);
-                ctx.bezierCurveTo(
-                    -bodyLen - 8, tailSway,
-                    -bodyLen - 16, tailSway2,
-                    -bodyLen - 20, tailSway * 0.7
-                );
-                ctx.stroke();
-                
-                // Grooming animation (licking paw)
-                if (this.idleBehavior === 'groom' && this.state === 'idle') {
-                    const groomPhase = Math.sin(_frameTime / 300);
-                    ctx.fillStyle = '#2a1a2e';
-                    ctx.beginPath();
-                    ctx.arc(headX + 2, -4 + groomPhase * 2, 2, 0, Math.PI * 2);
-                    ctx.fill();
+                ctx.ellipse(sleeping ? -3 : -1, 2.5, sleeping ? 13 : length + 1, sleeping ? 9 : 7.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Supple, tapering tail, painted behind the rump. All motion comes from update's phase.
+                const sway = Math.sin(phase) * 5.3;
+                const curl = Math.sin(phase * 1.3 + 1) * 2;
+                const tailShade = ctx.createLinearGradient(-length, -2, -35, 6);
+                tailShade.addColorStop(0, coatColors.tailBase);
+                tailShade.addColorStop(.48, coatColors.tailMiddle);
+                tailShade.addColorStop(1, coatColors.tailTip);
+                ctx.strokeStyle = tailShade;
+                ctx.lineWidth = 3.2;
+                ctx.beginPath();
+                if (sleeping) {
+                    ctx.moveTo(-13, -1);
+                    ctx.bezierCurveTo(-20, 5, -12, 11.4, -2, 10.1);
+                    ctx.bezierCurveTo(5, 9.6, 9.5, 7.7, 10, 4.8);
+                } else if (sitting) {
+                    ctx.moveTo(-length + 2, 0);
+                    ctx.bezierCurveTo(-21, sway * .35, -24, 9 + curl, -17, 10);
+                    ctx.bezierCurveTo(-12, 10.6, -9, 9.5, -8, 7.8);
+                } else {
+                    ctx.moveTo(-length + 2, 0);
+                    ctx.bezierCurveTo(-21, 1 + sway * .40, -29, 7 + sway * .45, -33, 4 + sway * .40);
                 }
-                
+                ctx.stroke();
+                if (!sleeping && !sitting) {
+                    ctx.lineWidth = 1.9;
+                    ctx.beginPath();
+                    ctx.moveTo(-33, 4 + sway * .40);
+                    ctx.bezierCurveTo(-36, 1.5 + sway * .32, -34.1, -1 + curl, -31.7, .1 + curl);
+                    ctx.stroke();
+                }
+                ctx.strokeStyle = coatColors.tailNap;
+                ctx.lineWidth = .65;
+                ctx.beginPath();
+                if (sleeping) {
+                    ctx.moveTo(-14, .3);ctx.bezierCurveTo(-17, 5.7, -10, 10.3, -3, 9.8);
+                } else if (sitting) {
+                    ctx.moveTo(-11, -.5);ctx.bezierCurveTo(-20, sway * .35, -22, 8, -17, 9.7);
+                } else {
+                    ctx.moveTo(-15, -.6);ctx.bezierCurveTo(-22, .5 + sway * .40, -28, 6.3 + sway * .45, -32.4, 3.8 + sway * .40);
+                }
+                ctx.stroke();
+
+                // Round paws belong beneath the torso. Opposite diagonal pairs step along facing +X.
+                const paw = (x, y, rx = 2.8, ry = 1.85, raised = false) => {
+                    const g = ctx.createLinearGradient(x - rx, y - ry, x + rx, y + ry);
+                    g.addColorStop(0, raised ? coatColors.raisedPaw : coatColors.pawTop);
+                    g.addColorStop(1, coatColors.pawShadow);
+                    ctx.fillStyle = g;ctx.beginPath();ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);ctx.fill();
+                    ctx.strokeStyle = coatColors.pawRim;ctx.lineWidth = .45;
+                    ctx.beginPath();ctx.moveTo(x + rx * .63, y - .48);ctx.lineTo(x + rx * .84, y - .48);
+                    ctx.moveTo(x + rx * .63, y + .42);ctx.lineTo(x + rx * .84, y + .42);ctx.stroke();
+                };
+                if (!sleeping) {
+                    if (sitting) {
+                        paw(-5.5, -6.4, 3.2, 2.1);paw(-5.5, 6.4, 3.2, 2.1);
+                        paw(10.1, -2.8, 2.8, 1.75);paw(10.1, 2.8, 2.8, 1.75);
+                    } else {
+                        for (const side of [-1, 1]) {
+                            for (const front of [false, true]) {
+                                if (grooming && front && side === -1) continue;
+                                const sign = (front ? 1 : -1) * side;
+                                const jointX = front ? 7.8 : -9.1;
+                                const footX = (front ? 9.4 : -10.5) + stride * sign;
+                                const footY = side * (front ? 6.6 : 6.1) + side * Math.max(0, lift * sign) * .38;
+                                ctx.strokeStyle = coatColors.legShade;ctx.lineWidth = 3;
+                                ctx.beginPath();ctx.moveTo(jointX, side * 4.1);ctx.quadraticCurveTo(footX - .8, side * 5.2, footX, footY);ctx.stroke();
+                                paw(footX, footY, front ? 2.65 : 2.95, 1.8);
+                            }
+                        }
+                    }
+                }
+
+                // Rounded haunches, a small waist, and muscular shoulders replace the capsule body.
+                const body = new Path2D();
+                if (sleeping) {
+                    body.moveTo(-15, 1);
+                    body.bezierCurveTo(-15.5, -5.1, -8.8, -8.9, -3, -8.1);
+                    body.bezierCurveTo(4.1, -8, 9.1, -3.2, 8.5, 3);
+                    body.bezierCurveTo(7.7, 8.1, -.1, 10.2, -7.5, 8.8);
+                    body.bezierCurveTo(-12.8, 7.5, -15.4, 5.1, -15, 1);
+                } else {
+                    const s = length / 16;
+                    body.moveTo(-16 * s, 0);
+                    body.bezierCurveTo(-16 * s, -4.5, -12.2 * s, -7.1, -8.5 * s, -7.1);
+                    body.bezierCurveTo(-4.2 * s, -7, -3.7 * s, -4.9, .2 * s, -4.8);
+                    body.bezierCurveTo(4.2 * s, -4.9, 5.9 * s, -6.7, 9.1 * s, -6.2);
+                    body.bezierCurveTo(12.6 * s, -5.8, 14.4 * s, -3.6, 14.2 * s, 0);
+                    body.bezierCurveTo(14.4 * s, 3.6, 12.6 * s, 5.8, 9.1 * s, 6.2);
+                    body.bezierCurveTo(5.9 * s, 6.7, 4.2 * s, 4.9, .2 * s, 4.8);
+                    body.bezierCurveTo(-3.7 * s, 4.9, -4.2 * s, 7, -8.5 * s, 7.1);
+                    body.bezierCurveTo(-12.2 * s, 7.1, -16 * s, 4.5, -16 * s, 0);
+                }
+                body.closePath();
+                const coat = ctx.createLinearGradient(-5, -7.5, 4, 7.5);
+                coat.addColorStop(0, coatColors.bodyTop);
+                coat.addColorStop(.36, coatColors.bodyMiddle);
+                coat.addColorStop(.7, coatColors.bodyShade);
+                coat.addColorStop(1, coatColors.bodyDeep);
+                ctx.fillStyle = coat;ctx.fill(body);
+                ctx.save();ctx.clip(body);
+                // A broad soft band of directional nap, with restrained short fur rather than gloss.
+                const nap = ctx.createLinearGradient(-11, -6, 6, 5);
+                nap.addColorStop(0, coatColors.napStart);
+                nap.addColorStop(.40, coatColors.napHighlight);
+                nap.addColorStop(.62, coatColors.napShade);
+                nap.addColorStop(1, coatColors.napEnd);
+                ctx.fillStyle = nap;ctx.fill(body);
+                ctx.strokeStyle = coatColors.furStroke;ctx.lineWidth = .26;
+                ctx.beginPath();
+                for (let i = 0; i < 17; i++) {
+                    // Irrational offsets scatter the fixed strands without a visible row pattern or RNG.
+                    const x = -12.3 + ((i * .61803398875 + .19) % 1) * 24;
+                    const y = -5.6 + ((i * .41421356237 + .36) % 1) * 11.2;
+                    const short = .70 + (Math.sin(i * 2.41) + 1) * .23;
+                    const tilt = Math.sin(i * 1.73) * .16;
+                    ctx.moveTo(x, y);ctx.quadraticCurveTo(x + short * .48, y + tilt + .06, x + short, y + tilt);
+                }
+                ctx.stroke();ctx.restore();
+                ctx.strokeStyle = coatColors.bodyRim;ctx.lineWidth = .6;
+                ctx.beginPath();
+                if (sleeping) {ctx.moveTo(-13, -3);ctx.bezierCurveTo(-10, -8, -4.2, -8.5, .5, -6.9);}
+                else {ctx.moveTo(-length + 2, -3.4);ctx.bezierCurveTo(-length + 5, -7.2, -6, -6.3, -3.8, -5.4);}
+                ctx.stroke();
+
+                // The face turns slightly for existing look/groom states; no animation state is written here.
+                ctx.save();ctx.translate(headX, headY);ctx.rotate(headTurn);
+                for (const side of [-1, 1]) {
+                    const ear = ctx.createLinearGradient(-2, side * 9.8, 0, side * 3.7);
+                    ear.addColorStop(0, coatColors.earTip);ear.addColorStop(.55, coatColors.earMiddle);ear.addColorStop(1, coatColors.earBase);
+                    ctx.fillStyle = ear;ctx.beginPath();
+                    ctx.moveTo(-4.0, side * 3.5);
+                    ctx.quadraticCurveTo(-3.0, side * 6.8, -1.55, side * 10.1);
+                    ctx.quadraticCurveTo(-1.12, side * 10.9, -.68, side * 9.8);
+                    ctx.lineTo(1.6, side * 4.25);ctx.closePath();ctx.fill();
+                    ctx.fillStyle = '#593047';ctx.beginPath();
+                    ctx.moveTo(-2.65, side * 4.4);ctx.lineTo(-1.18, side * 8.7);ctx.lineTo(.38, side * 4.7);ctx.closePath();ctx.fill();
+                    ctx.strokeStyle = coatColors.earRim;ctx.lineWidth = .5;
+                    ctx.beginPath();ctx.moveTo(-3.15, side * 4.7);ctx.lineTo(-1.55, side * 9.2);ctx.stroke();
+                }
+                const face = ctx.createLinearGradient(-3, -5.2, 5, 4.5);
+                face.addColorStop(0, coatColors.headTop);face.addColorStop(.42, coatColors.headMiddle);face.addColorStop(1, coatColors.headShadow);
+                ctx.fillStyle = face;ctx.beginPath();
+                ctx.moveTo(-4.7, 0);
+                ctx.bezierCurveTo(-4.8, -4.1, -1.8, -5.7, 1.3, -4.75);
+                ctx.bezierCurveTo(3.8, -4.1, 4.45, -2.55, 5.8, -1.05);
+                ctx.quadraticCurveTo(6.45, 0, 5.8, 1.05);
+                ctx.bezierCurveTo(4.45, 2.55, 3.8, 4.1, 1.3, 4.75);
+                ctx.bezierCurveTo(-1.8, 5.7, -4.8, 4.1, -4.7, 0);ctx.closePath();ctx.fill();
+                // Just three small cheek tips per side suggest a short plush coat.
+                ctx.strokeStyle = coatColors.cheekFur;ctx.lineWidth = .42;
+                ctx.beginPath();
+                for (const side of [-1, 1]) {
+                    ctx.moveTo(.8, side * 4.5);ctx.lineTo(1.7, side * 4.85);
+                    ctx.moveTo(1.7, side * 4.1);ctx.lineTo(2.65, side * 4.55);
+                    ctx.moveTo(2.55, side * 3.6);ctx.lineTo(3.3, side * 3.95);
+                }
+                ctx.stroke();
+                for (const side of [-1, 1]) {
+                    ctx.save();ctx.translate(2.55, side * 2.42);ctx.rotate(side * .22);
+                    if (sleeping) {
+                        ctx.strokeStyle = '#b18abc';ctx.lineWidth = .65;
+                        ctx.beginPath();ctx.moveTo(-1.35, 0);ctx.quadraticCurveTo(0, .58, 1.3, -.04);ctx.stroke();
+                    } else {
+                        ctx.beginPath();ctx.moveTo(-1.68, 0);ctx.quadraticCurveTo(-.1, -1.04, 1.6, 0);ctx.quadraticCurveTo(-.1, 1.0, -1.68, 0);
+                        ctx.fillStyle = '#ac7fc4';ctx.fill();ctx.strokeStyle = '#120918';ctx.lineWidth = .48;ctx.stroke();
+                        ctx.fillStyle = '#170d20';ctx.beginPath();ctx.ellipse(.18, 0, .35, .78, 0, 0, Math.PI * 2);ctx.fill();
+                        ctx.fillStyle = '#e8d7ed';ctx.beginPath();ctx.arc(-.48, -.30, .32, 0, Math.PI * 2);ctx.fill();
+                    }
+                    ctx.restore();
+                }
+                // Paired muzzle pads and tiny muted-pink nose preserve a compact feline snout.
+                ctx.fillStyle = '#422a45';ctx.beginPath();
+                ctx.ellipse(4.55, -1.12, 1.38, 1.27, -.16, 0, Math.PI * 2);
+                ctx.ellipse(4.55, 1.12, 1.38, 1.27, .16, 0, Math.PI * 2);ctx.fill();
+                ctx.fillStyle = '#b38c9c';ctx.beginPath();ctx.moveTo(6.1, 0);ctx.lineTo(5.12, -.66);ctx.lineTo(5.12, .66);ctx.closePath();ctx.fill();
+                ctx.strokeStyle = '#170d20';ctx.lineWidth = .45;ctx.beginPath();
+                ctx.moveTo(5.28, 0);ctx.lineTo(4.86, 0);ctx.quadraticCurveTo(4.8, -.46, 4.32, -.66);
+                ctx.moveTo(4.86, 0);ctx.quadraticCurveTo(4.8, .46, 4.32, .66);ctx.stroke();
+                ctx.strokeStyle = 'rgba(168,142,176,.44)';ctx.lineWidth = .35;ctx.beginPath();
+                for (const side of [-1, 1]) {
+                    ctx.moveTo(4.9, side * 1.35);ctx.quadraticCurveTo(3.5, side * 3.2, 2.65, side * 5.5);
+                    ctx.moveTo(5.15, side * 1.1);ctx.quadraticCurveTo(5.0, side * 3.5, 5.6, side * 5.3);
+                    ctx.moveTo(5.45, side * .82);ctx.quadraticCurveTo(6.9, side * 2.1, 7.15, side * 3.95);
+                }
+                ctx.stroke();
+                if (grooming) {
+                    const lick = Math.sin(phase * 3.2);
+                    ctx.strokeStyle = coatColors.groomArm;ctx.lineWidth = 2.8;
+                    ctx.beginPath();ctx.moveTo(-5.0, -4.1);ctx.quadraticCurveTo(-.5, -4.7, 4.55, -3.7 + lick * .26);ctx.stroke();
+                    paw(4.65, -3.7 + lick * .26, 2.15, 1.5, true);
+                    if (lick > .25) {
+                        ctx.strokeStyle = '#b27f97';ctx.lineWidth = .75;
+                        ctx.beginPath();ctx.moveTo(5.7, -.4);ctx.lineTo(5.45, -1.12 - lick * .38);ctx.stroke();
+                    }
+                }
+                ctx.restore();
                 ctx.restore();
             }
         }
@@ -572,7 +796,11 @@
                     this.telegraphThreshold = 30;                 // ~0.5 s: dodgeable on reaction
                     this.bossName = WARDENS[this.persona].name;
                 }
-                this._heat = 0;           // barrels: 0 cool … 1 glowing
+                this._heat = 0;           // the Wardens' original barrel heat
+                // Ordinary gunner visual momentum: advanced by simulation, never by draw().
+                this._barrelPhase = 0;
+                this._barrelSpeed = 0;
+                this._barrelHeat = 0;
             }
 
             /** Sleep until the intro wakes them (kneeling, eyes dark). */
@@ -743,6 +971,7 @@
                     this.isTelegraphing = false;
                     if (this.burstCount > 0) { this.burstCount = 0; this.burstTimer = 0; }
                     this.burstCooldown = Math.max(this.burstCooldown, this.telegraphThreshold + 1);   // it'll telegraph again first
+                    this._updateBarrelVisuals();
                     return shots;
                 }
                 if (this.burstCooldown > 0) {
@@ -784,7 +1013,85 @@
                     this.burstCount = 0;
                     this.burstTimer = 0;
                 }
+                this._updateBarrelVisuals();
                 return shots;
+            }
+
+            /** Wind up before a burst, retain momentum afterward, and cool back to dark steel. */
+            _updateBarrelVisuals() {
+                if (this.persona) return; // the Sanctum Wardens retain their authored animation
+                const firing = this.burstCount > 0 && this.burstCooldown === 0;
+                const lead = Math.max(0, Math.min(1, (36 - this.burstCooldown) / 36));
+                const anticipating = this.burstCooldown >= 0 && this.burstCooldown < 36 && this._holdFire <= 0;
+                const target = firing ? 0.32 : anticipating ? 0.32 * lead * lead * (3 - 2 * lead) : 0;
+                const speed = this._barrelSpeed || 0;
+                this._barrelSpeed = target > speed ? Math.min(target, speed + 0.012) : Math.max(target, speed - 0.004);
+                this._barrelPhase = ((this._barrelPhase || 0) + this._barrelSpeed) % (Math.PI * 2);
+                this._barrelHeat = Math.max(0, Math.min(1, (this._barrelHeat || 0) + (firing ? 0.0185 : -0.007)));
+            }
+
+            /** Six parallel barrels. Paint the rear of the cylinder before its near side. */
+            _drawBarrels(ctx) {
+                const phase = this._barrelPhase || 0;
+                for (let pass = 0; pass < 2; pass++) for (let i = 0; i < 6; i++) {
+                    const a = phase + i * Math.PI / 3, depth = Math.cos(a);
+                    if ((depth >= 0 ? 1 : 0) !== pass) continue;
+                    const by = Math.sin(a) * 8, shade = Math.round(38 + (depth + 1) * 12);
+                    ctx.fillStyle = `rgb(${shade},${shade},${shade + 3})`;
+                    ctx.fillRect(5, by - 2, 30, 4);
+                    ctx.fillStyle = 'rgba(175,180,190,0.20)';
+                    ctx.fillRect(5, by - 1.6, 30, 0.45);
+                    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+                    ctx.fillRect(11, by - 2, 0.8, 4);
+                    ctx.fillRect(29, by - 2, 0.8, 4);
+                }
+            }
+
+            /** Three small shared incandescent strips; cross-fades give a smooth heat ramp. */
+            static _getHeatStrips() {
+                if (GatlingGunner._heatStrips) return GatlingGunner._heatStrips;
+                return (GatlingGunner._heatStrips = [
+                    ['rgba(65,3,2,0)', '#631008', '#c72e0b', '#ee5415'],
+                    ['rgba(90,14,3,0)', '#8e2108', '#ee6913', '#ffc34d'],
+                    ['rgba(110,25,4,0)', '#ad420d', '#ffc245', '#fff1ba']
+                ].map((colors,stage) => {
+                    const cv = document.createElement('canvas'); cv.width = 120; cv.height = 16;
+                    const c = cv.getContext('2d'), g = c.createLinearGradient(0,0,120,0);
+                    for (const [i,stop] of [0,0.22,0.72,1].entries()) g.addColorStop(stop,colors[i]);
+                    c.fillStyle = g; c.fillRect(0,0,120,16);
+                    c.fillStyle = stage === 2 ? 'rgba(255,250,214,0.85)' : stage === 1 ? 'rgba(255,204,100,0.55)' : 'rgba(255,100,24,0.35)';
+                    c.fillRect(68,2,52,2);
+                    c.fillRect(116,0,4,16);
+                    return cv;
+                }));
+            }
+
+            /** Incandescence above ambient darkness, restricted to the heated barrel metal. */
+            drawHeat(ctx) {
+                if (this.dead || this.visible === false || this.persona || this._barrelHeat <= 0.02 ||
+                    (this.invincibleTimer > 0 && this.invincibleTimer % 6 < 3)) return;
+                const heat = this._barrelHeat, intensity = heat * heat;
+                const strips = GatlingGunner._getHeatStrips();
+                const stage = heat * 2, lo = Math.min(2, Math.floor(stage)), hi = Math.min(2, lo + 1), blend = stage - lo;
+                ctx.save(); ctx.translate(this.x,this.y); ctx.rotate(this.angle);
+                const alpha = ctx.globalAlpha;
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = alpha * 0.25 * intensity;
+                drawGlow(ctx,25,0,22 + heat * 6,'255,88,20',0);
+                ctx.globalAlpha = alpha * 0.16 * intensity * heat;
+                drawGlow(ctx,34,0,11,'255,202,91',0.1);
+                for (let pass = 0; pass < 2; pass++) for (let i = 0; i < 6; i++) {
+                    const a = (this._barrelPhase || 0) + i * Math.PI / 3, depth = Math.cos(a);
+                    if ((depth >= 0 ? 1 : 0) !== pass) continue;
+                    const by = Math.sin(a) * 8, light = intensity * (0.70 + (depth + 1) * 0.15);
+                    ctx.globalAlpha = alpha * light * (1 - blend);
+                    ctx.drawImage(strips[lo],5,by - 2,30,4);
+                    if (blend > 0) {
+                        ctx.globalAlpha = alpha * light * blend;
+                        ctx.drawImage(strips[hi],5,by - 2,30,4);
+                    }
+                }
+                ctx.restore();
             }
             
             /**
@@ -852,23 +1159,13 @@
                 ctx.shadowColor = '#ff0000'; 
                 ctx.shadowBlur = 10;
                 ctx.beginPath(); 
-                ctx.arc(0, -5, 8, 0, Math.PI*2); 
+                ctx.arc(6, 0, 8, 0, Math.PI*2); 
                 ctx.fill(); 
                 ctx.shadowBlur = 0;
                 
                 // Barrels
                 const spinning = this.burstCount > 0 && this.burstCooldown === 0;
-                const barrelRotation = spinning ? (_frameTime / 20) : 0;
-                ctx.save();
-                ctx.rotate(barrelRotation);
-                for (let i = 0; i < 6; i++) {
-                    const ba = (i / 6) * Math.PI * 2;
-                    const bx = Math.cos(ba) * 8; 
-                    const by = Math.sin(ba) * 8;
-                    ctx.fillStyle = '#333'; 
-                    ctx.fillRect(bx - 2, by - 2, 30, 4);
-                }
-                ctx.restore();
+                this._drawBarrels(ctx);
                 
                 // Muzzle Flash
                 if (spinning && this.burstTimer < 3) {
@@ -876,7 +1173,7 @@
                     ctx.shadowColor = '#ffaa00'; 
                     ctx.shadowBlur = 20;
                     ctx.beginPath(); 
-                    ctx.arc(25, 0, 8, 0, Math.PI*2); 
+                    ctx.arc(35, 0, 8, 0, Math.PI*2); 
                     ctx.fill(); 
                     ctx.shadowBlur = 0;
                 }
@@ -1129,6 +1426,18 @@
                 };
             }
 
+            /** A landed melee hit breaks an ordinary gunner's aim; repeat hits cannot lock it down. */
+            interruptMelee() {
+                if (this.dead || this.hunter || this.bossName || this._noMeleeInterrupt || this.mass >= 20
+                    || _gameTimeSec < (this._meleeResistUntil || 0)) return false;
+                this._meleeInterruptUntil = _gameTimeSec + 0.20;
+                this._meleeResistUntil = _gameTimeSec + 0.65;
+                this.cooldown = Math.max(this.cooldown, this.telegraphThreshold + 1);
+                this.isTelegraphing = false;
+                this._aimPoint = null;
+                return true;
+            }
+
             // ... [canSeePoint method from previous turn] ...
             canSeePoint(tx, ty, walls, buildings) {
                 const dist = Math.hypot(tx - this.x, ty - this.y);
@@ -1229,6 +1538,9 @@
                 }
 
                 // --- 3. MOVEMENT & BEHAVIOR ---
+                // Keep detecting and moving during the interruption, but hold aim/fire until it ends.
+                const meleeInterrupted = _gameTimeSec < (this._meleeInterruptUntil || 0);
+                if (meleeInterrupted) this.isTelegraphing = false;
                 let moveX = 0;
                 let moveY = 0;
 
@@ -1245,9 +1557,9 @@
                         moveX = -Math.cos(this.angle) * 1.5;
                         moveY = -Math.sin(this.angle) * 1.5;
                     }
-                    this.cooldown--;
+                    if (!meleeInterrupted) this.cooldown--;
                     // Telegraph: track player with predictive aim
-                    if (this.cooldown > 0 && this.cooldown <= this.telegraphThreshold && canSee) {
+                    if (!meleeInterrupted && this.cooldown > 0 && this.cooldown <= this.telegraphThreshold && canSee) {
                         this.isTelegraphing = true;
                         // Predictive aim: lead the player based on movement
                         const projSpeed = this._weaponStats.speed || 24;
@@ -1261,7 +1573,7 @@
                     } else {
                         this.isTelegraphing = false;
                     }
-                    if (this.cooldown <= 0 && canSee) {
+                    if (!meleeInterrupted && this.cooldown <= 0 && canSee) {
                         this.isTelegraphing = false;
                         const ws = this._weaponStats;
                         this.cooldown = ws.fireRate + Math.random() * 20;
@@ -1308,9 +1620,9 @@
                                 }
                             }
                         }
-                        this.cooldown--;
+                        if (!meleeInterrupted) this.cooldown--;
                         // Suppress only with a clear line (or rounds that go through walls)
-                        if (this.cooldown <= 0 && (clearShot || this._weaponStats.penetrating)) {
+                        if (!meleeInterrupted && this.cooldown <= 0 && (clearShot || this._weaponStats.penetrating)) {
                             const ws = this._weaponStats;
                             this.cooldown = 15; // Suppression fire stays fast
                             this._shotTick = _simTick;   // recoil kick
@@ -1536,8 +1848,8 @@
                     const knockbackStrength = projectile.damage * 0.3;
                     const kbX = (projectile.vx / speed) * knockbackStrength;
                     const kbY = (projectile.vy / speed) * knockbackStrength;
-                    this.takeDamage(projectile.damage, kbX, kbY);
-                } else { this.takeDamage(projectile.damage); }
+                    if (this.takeDamage(projectile.damage, kbX, kbY) && projectile.melee) this.interruptMelee();
+                } else if (this.takeDamage(projectile.damage) && projectile.melee) { this.interruptMelee(); }
             }
 
             /** The vision cone's outline in world space, cast against the map's walls and buildings (cached). */

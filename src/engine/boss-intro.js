@@ -37,7 +37,10 @@
                     const fit = Math.min(cw / (Math.max(...xs) - Math.min(...xs) + 220), ch / (Math.max(...ys) - Math.min(...ys) + 320));
                     this._bossIntro.fit = { x: cx, y: cy + 30, zoom: Math.max(0.45, Math.min(1.35, fit)) };
                     this.cutscene.camTargetX = bosses[0].x; this.cutscene.camTargetY = bosses[0].y; this.cutscene.camZoomTarget = 1.15;   // to the first of them
-                    const me = this._bossIntro, skip = () => { if (me.f > 20) me.skipped = true; };
+                    const me = this._bossIntro, skip = e => {
+                        if (this.paused || e.key === 'Escape' || e.target instanceof Element && e.target.closest('#cine-controls, #pause-menu, #cine-bar, #cine-grade')) return;
+                        if (me.f > 20) me.skipped = true;
+                    };
                     this._bossIntroSkip = skip;
                     window.addEventListener('pointerdown', skip); window.addEventListener('keydown', skip);
                 }

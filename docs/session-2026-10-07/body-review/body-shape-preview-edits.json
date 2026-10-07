@@ -1,0 +1,119 @@
+{
+  "source": "/workspace/library-files/DFAB-V8-scrapyard-bounded-animation.html",
+  "sourceSha256": "d38c84b950ec3722d24acaf9faaabfd37988355aae04268095068ce8c9be21f1",
+  "baseline": "/workspace/scratch/DFAB-V8-body-baseline-preview.html",
+  "candidate": "/workspace/scratch/DFAB-V8-body-shape-preview.html",
+  "baselineSha256": "d663c3dbb8a9ff9451201bdcfa65cee3b81ea614bf52d55e79a16a65dcab9a93",
+  "candidateSha256": "802551468a0ef45d58d0e32eb549377462f05fb7c5dbccf6698cc5dbfd26e385",
+  "instrumentationEdits": [
+    {
+      "old": "            // 1. Feet\n",
+      "new": "            // 1. Feet\n            if (config._bodyPartHook) config._bodyPartHook('feet', ctx, g);\n",
+      "purpose": "Optional capture label; painting, pose and transforms are unchanged."
+    },
+    {
+      "old": "            // 2. Calves\n",
+      "new": "            // 2. Calves\n            if (config._bodyPartHook) config._bodyPartHook('calves', ctx, g);\n",
+      "purpose": "Optional capture label; painting, pose and transforms are unchanged."
+    },
+    {
+      "old": "            // 3. Thighs\n",
+      "new": "            // 3. Thighs\n            if (config._bodyPartHook) config._bodyPartHook('thighs', ctx, g);\n",
+      "purpose": "Optional capture label; painting, pose and transforms are unchanged."
+    },
+    {
+      "old": "            // 4. Hips & Skirt\n",
+      "new": "            // 4. Hips & Skirt\n            if (config._bodyPartHook) config._bodyPartHook('hips', ctx, g);\n",
+      "purpose": "Optional capture label; painting, pose and transforms are unchanged."
+    },
+    {
+      "old": "            // 6. Fists\n",
+      "new": "            // 6. Fists\n            if (config._bodyPartHook) config._bodyPartHook('hands', ctx, g);\n",
+      "purpose": "Optional capture label; painting, pose and transforms are unchanged."
+    },
+    {
+      "old": "            // 7. Forearms (fabric only under long sleeves)\n",
+      "new": "            // 7. Forearms (fabric only under long sleeves)\n            if (config._bodyPartHook) config._bodyPartHook('forearms', ctx, g);\n",
+      "purpose": "Optional capture label; painting, pose and transforms are unchanged."
+    },
+    {
+      "old": "            // 8. Upper Arms (fabric under short or long sleeves)\n",
+      "new": "            // 8. Upper Arms (fabric under short or long sleeves)\n            if (config._bodyPartHook) config._bodyPartHook('upperArms', ctx, g);\n",
+      "purpose": "Optional capture label; painting, pose and transforms are unchanged."
+    },
+    {
+      "old": "            // 9. Torso\n",
+      "new": "            // 9. Torso\n            if (config._bodyPartHook) config._bodyPartHook('torso', ctx, g);\n",
+      "purpose": "Optional capture label; painting, pose and transforms are unchanged."
+    },
+    {
+      "old": "            // 10. Head & Hair\n",
+      "new": "            // 10. Head & Hair\n            if (config._bodyPartHook) config._bodyPartHook('head', ctx, g);\n",
+      "purpose": "Optional capture label; painting, pose and transforms are unchanged."
+    },
+    {
+      "old": "            // 11. HELD ITEMS\n",
+      "new": "            // 11. HELD ITEMS\n            if (config._bodyPartHook) config._bodyPartHook('held', ctx, g);\n",
+      "purpose": "Optional capture label; painting, pose and transforms are unchanged."
+    }
+  ],
+  "candidateEdits": [
+    {
+      "old": "            h.ctx = ctx; h.scale = S; h.skin = skinColor;\n",
+      "new": "            h.ctx = ctx; h.scale = S; h.skin = skinColor;\n            // Review-only body study: outfit, android and driving art remain original.\n            h.bodyShapePreview = !!config._bodyShapePreview && !A && !isDriving\n                && !config.top && !config.bottom && !config.shoes && !config.train\n                && !config.hair && !config.hat && !(config.jewelry && config.jewelry.length);\n",
+      "purpose": "Gate candidate contours to explicitly requested bare-body review renders."
+    },
+    {
+      "old": "        // Retain body-drawing buffers and helpers per owner. Values are rewritten every\n",
+      "new": "        // Contour helpers used only by the body-shape review configuration.\n        // The limb endpoints and original two-pixel cap overhang are retained.\n        function _bodyPreviewLimbPath(ctx, len, width) {\n            ctx.beginPath(); ctx.moveTo(-len, 0);\n            ctx.bezierCurveTo(-len, -width * 0.52, -len * 0.86, -width * 0.95, -len * 0.52, -width * 0.96);\n            ctx.bezierCurveTo(-len * 0.16, -width * 0.99, len * 0.44, -width * 0.75, len * 0.80, -width * 0.53);\n            ctx.bezierCurveTo(len * 0.97, -width * 0.39, len, -width * 0.15, len, 0);\n            ctx.bezierCurveTo(len, width * 0.15, len * 0.97, width * 0.39, len * 0.80, width * 0.53);\n            ctx.bezierCurveTo(len * 0.44, width * 0.75, -len * 0.16, width * 0.99, -len * 0.52, width * 0.96);\n            ctx.bezierCurveTo(-len * 0.86, width * 0.95, -len, width * 0.52, -len, 0);\n            ctx.closePath();\n        }\n        function _bodyPreviewFootPath(ctx, x, y) {\n            // Ankle stays at x,y; heel projects 2.8px behind and toe 8.2px ahead.\n            ctx.beginPath(); ctx.moveTo(x - 2.8, y - 1.55);\n            ctx.bezierCurveTo(x - 2.8, y - 2.35, x - 1.9, y - 2.65, x - 0.3, y - 2.45);\n            ctx.bezierCurveTo(x + 2.1, y - 2.4, x + 4.2, y - 2.65, x + 6.2, y - 2.65);\n            ctx.bezierCurveTo(x + 8.9, y - 2.65, x + 8.9, y + 2.65, x + 6.2, y + 2.65);\n            ctx.bezierCurveTo(x + 4.2, y + 2.65, x + 2.1, y + 2.4, x - 0.3, y + 2.45);\n            ctx.bezierCurveTo(x - 1.9, y + 2.65, x - 2.8, y + 2.35, x - 2.8, y + 1.55);\n            ctx.closePath();\n        }\n        function _bodyPreviewHandPath(ctx, x, y) {\n            ctx.beginPath(); ctx.moveTo(x - 3.5, y);\n            ctx.bezierCurveTo(x - 3.5, y - 1.8, x - 1.8, y - 2.5, x + 0.3, y - 2.5);\n            ctx.bezierCurveTo(x + 2.6, y - 2.5, x + 3.55, y - 1.3, x + 3.55, y);\n            ctx.bezierCurveTo(x + 3.55, y + 1.3, x + 2.6, y + 2.5, x + 0.3, y + 2.5);\n            ctx.bezierCurveTo(x - 1.8, y + 2.5, x - 3.5, y + 1.8, x - 3.5, y);\n            ctx.closePath();\n        }\n        function _bodyPreviewHipPath(ctx, x, width) {\n            const end = x + width;\n            ctx.beginPath(); ctx.moveTo(x + width * 0.38, -10.5);\n            ctx.bezierCurveTo(x + width * 0.14, -10.5, x, -8.4, x, -5.3);\n            ctx.bezierCurveTo(x, -1.8, x, 1.8, x, 5.3);\n            ctx.bezierCurveTo(x, 8.4, x + width * 0.14, 10.5, x + width * 0.38, 10.5);\n            ctx.bezierCurveTo(end - width * 0.2, 10.5, end, 8.9, end, 6.9);\n            ctx.bezierCurveTo(end, 2.7, end, -2.7, end, -6.9);\n            ctx.bezierCurveTo(end, -8.9, end - width * 0.2, -10.5, x + width * 0.38, -10.5);\n            ctx.closePath();\n        }\n        function _bodyPreviewTorsoPath(ctx, x, width) {\n            const end = x + width;\n            ctx.beginPath(); ctx.moveTo(x, -5.5);\n            ctx.bezierCurveTo(x, -7.5, x + width * 0.25, -7.6, x + width * 0.45, -8.2);\n            ctx.bezierCurveTo(x + width * 0.72, -9.3, end - 0.3, -9.5, end, -6.2);\n            ctx.bezierCurveTo(end + 0.2, -2.6, end + 0.2, 2.6, end, 6.2);\n            ctx.bezierCurveTo(end - 0.3, 9.5, x + width * 0.72, 9.3, x + width * 0.45, 8.2);\n            ctx.bezierCurveTo(x + width * 0.25, 7.6, x, 7.5, x, 5.5);\n            ctx.bezierCurveTo(x + 0.45, 2.5, x + 0.45, -2.5, x, -5.5);\n            ctx.closePath();\n        }\n\n        // Retain body-drawing buffers and helpers per owner. Values are rewritten every\n",
+      "purpose": "Restrained, reusable curved contours; no new shading, colors, joints or animation."
+    },
+    {
+      "old": "                if (!SH) {\n                    // ellipse's own rotation gives the same shape without changing the\n",
+      "new": "                if (h.bodyShapePreview) {\n                    ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);\n                    ctx.fillStyle = color; _bodyPreviewLimbPath(ctx, len, width); ctx.fill();\n                    if (SH) {\n                        const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;\n                        ctx.save(); _bodyPreviewLimbPath(ctx, len, width); ctx.clip();\n                        if (gloss) {\n                            ctx.fillStyle = SH.hl2;\n                            ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.36, 0, 0, Math.PI*2); ctx.fill();\n                        } else if (SH.lx || SH.ly) {\n                            _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.3);\n                        }\n                        ctx.restore();\n                    }\n                    ctx.restore();\n                    return;\n                }\n                if (!SH) {\n                    // ellipse's own rotation gives the same shape without changing the\n",
+      "purpose": "Taper four limb segments toward distal joints, retaining exact endpoints and original shading values."
+    },
+    {
+      "old": "                ctx.beginPath(); ctx.roundRect(lFootX - HEEL_TO_ANKLE, lFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();\n                ctx.beginPath(); ctx.roundRect(rFootX - HEEL_TO_ANKLE, rFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();\n",
+      "new": "                if (h.bodyShapePreview) {\n                    _bodyPreviewFootPath(ctx, lFootX, lFootY); ctx.fill();\n                    _bodyPreviewFootPath(ctx, rFootX, rFootY); ctx.fill();\n                } else {\n                    ctx.beginPath(); ctx.roundRect(lFootX - HEEL_TO_ANKLE, lFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();\n                    ctx.beginPath(); ctx.roundRect(rFootX - HEEL_TO_ANKLE, rFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();\n                }\n",
+      "purpose": "Bare feet gently shaped, 11px long by 5.3px across; original ankle location retained."
+    },
+    {
+      "old": "            ctx.beginPath(); ctx.roundRect(hipXOff, -11, hipWidth, 22, [8, 3, 3, 8]); ctx.fill();\n",
+      "new": "            if (h.bodyShapePreview) { _bodyPreviewHipPath(ctx, hipXOff, hipWidth); ctx.fill(); }\n            else { ctx.beginPath(); ctx.roundRect(hipXOff, -11, hipWidth, 22, [8, 3, 3, 8]); ctx.fill(); }\n",
+      "purpose": "Rounded hips with an easier transition toward the waist; width and anchor unchanged."
+    },
+    {
+      "old": "            // 6. Fists\n            if (config._bodyPartHook) config._bodyPartHook('hands', ctx, g);\n            ctx.fillStyle = darken(skinColor, 0.4);\n            ctx.beginPath(); ctx.ellipse(lFistX, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();\n            ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();\n",
+      "new": "            // 6. Fists\n            if (config._bodyPartHook) config._bodyPartHook('hands', ctx, g);\n            ctx.fillStyle = darken(skinColor, 0.4);\n            if (h.bodyShapePreview) {\n                _bodyPreviewHandPath(ctx, lFistX, lFistY); ctx.fill();\n                _bodyPreviewHandPath(ctx, rFistX, rFistY); ctx.fill();\n            } else {\n                ctx.beginPath(); ctx.ellipse(lFistX, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();\n                ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();\n            }\n",
+      "purpose": "Hands shaped and reduced from 8x6px to about 7.05x5px without moving grips."
+    },
+    {
+      "old": "            ctx.fillStyle = darken(skinColor, 0.1);\n            ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill();\n",
+      "new": "            ctx.fillStyle = darken(skinColor, 0.1);\n            if (h.bodyShapePreview) { _bodyPreviewTorsoPath(ctx, torsoXOff, torsoWidth); ctx.fill(); }\n            else { ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill(); }\n",
+      "purpose": "Softer shoulder contour and slight waist taper; gender/build dimensions and anchor retained."
+    },
+    {
+      "old": "                ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();\n",
+      "new": "                ctx.beginPath();\n                if (dyn._bodyShapePreview) ctx.ellipse(headX, 0, 7.7, 7.4, 0, 0, Math.PI*2);\n                else ctx.arc(headX, 0, 8, 0, Math.PI*2);\n                ctx.fill();\n",
+      "purpose": "Head becomes a restrained 15.4x14.8px oval; center and original face marks remain unchanged."
+    },
+    {
+      "old": "            walkDyn.sway = torsoRotation; walkDyn.wind = W ? W.hairWind : null; walkDyn.android = A;\n",
+      "new": "            walkDyn.sway = torsoRotation; walkDyn.wind = W ? W.hairWind : null; walkDyn.android = A;\n            walkDyn._bodyShapePreview = h.bodyShapePreview;\n",
+      "purpose": "Pass explicit review flag to the head helper; reset every draw."
+    }
+  ],
+  "shapeSpec": {
+    "scope": "Preview only: shape and proportion study of the bare procedural body. No outfit, colors, gradients, gait, pose, joints, IK, collision or muzzle changes.",
+    "flag": "config._bodyShapePreview = true; only active with no top/bottom/shoes/train/hair/hat/jewelry and no android/driving.",
+    "captureHook": "config._bodyPartHook(name, ctx, g); names: feet, calves, thighs, hips, hands, forearms, upperArms, torso, head, held.",
+    "head": "Original diameter16 circle -> centered ellipse15.4x14.8; original eye marks preserved.",
+    "limbs": "Same four segment widths/endpoints; curved proximal belly tapers toward elbow/wrist/knee/ankle, same2px cap overhang.",
+    "hips": "Original x span/anchor;22px transverse extent reduced to21px with smoothly rounded rear and front.",
+    "torso": "Original width/anchor and gender/build setup; shaped shoulders and modest waist taper replace rounded rectangle.",
+    "hands": "Original8x6 ellipse -> rounded7.05x5 contour, unchanged fist center.",
+    "feet": "Original12x6 rounded rectangle -> gently shaped11x5.3 contour, unchanged ankle.",
+    "femaleChest": "Original female bare chest contours retained for now; no new parts invented."
+  }
+}

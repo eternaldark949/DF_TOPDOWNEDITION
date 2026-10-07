@@ -76,7 +76,11 @@
              * authoritative write interface.
              */
             _sync() {
-                if (this.game) this.game.paused = this.tokens.size > 0;
+                if (this.game) {
+                    const paused = this.tokens.size > 0;
+                    if (paused && !this.game.paused) clearGameplayInputs(this.game);
+                    this.game.paused = paused;
+                }
             }
         }
         

@@ -124,51 +124,20 @@
                 }
             }
 
-            /**
-             * Smart pathfinding with obstacle avoidance.
-             * Uses feeler raycasts to steer around walls and buildings.
-             */
+            /** Routed NPC movement, retaining the existing 60px follow stopping distance. */
             smartMove(targetX, targetY, speed, walls, buildings, traffic) {
                 if (this.dead || this.inCar) return;
-                
-                // 1. Desired Velocity
-                const dx = targetX - this.x;
-                const dy = targetY - this.y;
-                const dist = Math.hypot(dx, dy);
-                
-                if (dist < 60) return; // Stop if close
-
-                // Normalize desired velocity
-                let vx = (dx / dist) * speed;
-                let vy = (dy / dist) * speed;
-
-                // 2. Obstacle Avoidance (Raycast Feeler)
-                const feelerLen = 40;
-                const nextX = this.x + vx * (feelerLen/speed);
-                const nextY = this.y + vy * (feelerLen/speed);
-
-                let avoidanceX = 0;
-                let avoidanceY = 0;
-                let hit = false;
-
-                hit = isLineBlocked(this.x, this.y, nextX, nextY, walls, buildings);
-
-                // If blocked, apply lateral force (simple steer)
-                if (hit) {
-                    // Try rotating vector 90 degrees
-                    avoidanceX = -vy * 2.0; 
-                    avoidanceY = vx * 2.0;
+                if (Math.hypot(targetX - this.x, targetY - this.y) < 60) {
+                    this.velX = this.velY = 0; gaitCommand(this, 0, 0);
+                    return;
                 }
-                
-                this.velX = vx + avoidanceX;
-                this.velY = vy + avoidanceY;
-
-                // Apply movement (bypassing ActorEntity velocity for direct control)
-                gaitCommand(this, vx + avoidanceX, vy + avoidanceY);
-                this.x += vx + avoidanceX;
-                this.y += vy + avoidanceY;
+                const map = typeof game !== 'undefined' ? game.activeMap : null;
+                const v = actorSteer(this, targetX, targetY, speed, map);
+                this.velX = v.x; this.velY = v.y;
+                gaitCommand(this, v.x, v.y);
+                this.x += v.x; this.y += v.y;
             }
-            
+
             /**
              * Override ActorEntity update for NPC-specific logic.
              * Applies knockback physics but not AI movement (handled by smartMove).

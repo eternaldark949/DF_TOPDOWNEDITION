@@ -1,59 +1,160 @@
         // =====================================================================
         //  NAV GRID — walkability grid + A* / Dijkstra for companions
         // =====================================================================
-        //  One grid per map, built lazily from walls + building colliders, each
-        //  inflated by CONFIG.NAV.AGENT_RADIUS so a cell is "free" only if an
-        //  actor centered in it clears every obstacle. Rebuilt automatically if
-        //  the map object or its obstacle count changes.
+        // One map grid, with exact swept-body checks for smoothing and movement.
+        // Solid props stay live (including rotation); changed footprints update only
+        // their occupied cells. Geometry is checked once per simulation tick, using
+        // persistent membership buffers rather than rebuilding duplicate sets each tick.
         class NavGrid {
+            static _empty = Object.freeze([]);
             static for(map) {
                 if (!map) return null;
-                const sig = (map.walls ? map.walls.length : 0) + ':' + getColliders(map).length + ':' + (map.navObstacles ? map.navObstacles.length : 0) + ':' + map.width + 'x' + map.height;
-                if (!NavGrid._cache || NavGrid._cache.map !== map || NavGrid._cache.sig !== sig) {
-                    NavGrid._cache = { map, sig, grid: new NavGrid(map) };
+                const c = NavGrid._cache;
+                if (!c || c.map !== map || c.grid.width !== map.width || c.grid.height !== map.height) {
+                    NavGrid._cache = { map, grid: new NavGrid(map) };
                 }
-                return NavGrid._cache.grid;
+                const grid = NavGrid._cache.grid;
+                grid._refresh();
+                return grid;
             }
 
             constructor(map) {
-                const N = CONFIG.NAV;
-                this.cell = N.CELL;
+                this.map = map; this.width = map.width; this.height = map.height;
+                this.cell = CONFIG.NAV.CELL; this.radius = CONFIG.NAV.AGENT_RADIUS;
                 this.cols = Math.max(1, Math.ceil((map.width || 1) / this.cell));
                 this.rows = Math.max(1, Math.ceil((map.height || 1) / this.cell));
                 const n = this.cols * this.rows;
-                this.blocked = new Uint8Array(n);
-                this.g = new Float32Array(n);
-                this.parent = new Int32Array(n);
-                this.seen = new Uint32Array(n);    // generation stamps (avoid clearing arrays)
-                this.closed = new Uint32Array(n);
-                this.gen = 0;
-                this._heapIdx = [];
-                this._heapF = [];
-                this._rasterize(map);
+                this.blocked = new Uint8Array(n); this._occupancy = new Uint16Array(n);
+                this.g = new Float32Array(n); this.parent = new Int32Array(n);
+                this.seen = new Uint32Array(n); this.closed = new Uint32Array(n);
+                this.gen = 0; this.revision = 0;
+                this._heapIdx = []; this._heapF = [];
+                this._geometry = new Map(); this._buckets = new Map();
+                this._tracked = new Map(); this._present = new Set(); this._records = [];
+                this._sources = [null, null, null, null]; this._sourceSlots = [[], [], [], []];
+                this._bucketSize = 128; this._queryStamp = 0; this._epoch = -1;
+                for (let i = 0; i < n; i++) {
+                    const x = this.cx(i), y = this.cy(i), r = this.radius;
+                    if (x < r || y < r || x > this.width - r || y > this.height - r) this._occupancy[i] = this.blocked[i] = 1;
+                }
+                this._refresh();
             }
 
-            _rasterize(map) {
-                const c = this.cell, r = CONFIG.NAV.AGENT_RADIUS, cols = this.cols, rows = this.rows;
-                const mark = (x0, y0, x1, y1) => {
-                    const c0 = Math.max(0, Math.floor(x0 / c)), c1 = Math.min(cols - 1, Math.floor(x1 / c));
-                    const r0 = Math.max(0, Math.floor(y0 / c)), r1 = Math.min(rows - 1, Math.floor(y1 / c));
-                    for (let row = r0; row <= r1; row++) {
-                        const cy = (row + 0.5) * c;
-                        if (cy < y0 || cy > y1) continue;
-                        for (let col = c0; col <= c1; col++) {
-                            const cx = (col + 0.5) * c;
-                            if (cx >= x0 && cx <= x1) this.blocked[row * cols + col] = 1;
-                        }
+            _refresh() {
+                const map = this.map, empty = NavGrid._empty;
+                const walls = map.walls || empty, cols = map.buildingColliders || map.buildings || empty;
+                const nav = map.navObstacles || empty;
+                const live = typeof game !== 'undefined' && game.activeMap === map ? game.props || empty : empty;
+                const sources = this._sources, slots = this._sourceSlots;
+                const newTick = this._epoch !== _simTick;
+                // Missing sources previously created a fresh fallback array on every
+                // lookup. Preserve their same-tick live edits while sharing one empty
+                // source and reusing the membership records instead of allocating.
+                const continuous = !map.walls || (!map.buildingColliders && !map.buildings) || !map.navObstacles || live === empty;
+                let membership = this._epoch < 0;
+                if (sources[0] !== walls) { sources[0] = walls; membership = true; }
+                if (sources[1] !== cols) { sources[1] = cols; membership = true; }
+                if (sources[2] !== nav) { sources[2] = nav; membership = true; }
+                if (sources[3] !== live) { sources[3] = live; membership = true; }
+                for (let s = 0; s < 4; s++) {
+                    const items = sources[s], prior = slots[s];
+                    if (prior.length !== items.length) membership = true;
+                    if (newTick || membership || continuous) for (let i = 0; i < items.length; i++) if (prior[i] !== items[i]) {
+                        membership = true; prior[i] = items[i];
                     }
-                };
-                const W = cols * c, H = rows * c;
-                mark(-c, -c, W + c, r); mark(-c, (map.height || H) - r, W + c, H + c);       // map edges
-                mark(-c, -c, r, H + c); mark((map.width || W) - r, -c, W + c, H + c);
-                const obstacles = [...(map.walls || []), ...getColliders(map), ...(map.navObstacles || [])];
-                for (const o of obstacles) {
-                    if (!o || !(o.w > 0) || !(o.h > 0)) continue;
-                    mark(o.x - r, o.y - r, o.x + o.w + r, o.y + o.h + r);
+                    prior.length = items.length;
                 }
+                if (!newTick && !membership && !continuous) return;
+                this._epoch = _simTick;
+                let changed = false;
+                if (membership) {
+                    const present = this._present; present.clear(); this._records.length = 0;
+                    for (let s = 0; s < 4; s++) for (const p of sources[s]) {
+                        if (!p || present.has(p)) continue;
+                        present.add(p);
+                        let entry = this._tracked.get(p);
+                        if (!entry) this._tracked.set(p, entry = { p, geometry: null });
+                        this._records.push(entry);
+                    }
+                    for (const [p, entry] of this._tracked) if (!present.has(p)) {
+                        if (entry.geometry) { this._removeGeometry(entry.geometry); this._geometry.delete(p); changed = true; }
+                        this._tracked.delete(p);
+                    }
+                    present.clear();
+                }
+                const records = this._records;
+                for (let index = 0; index < records.length; index++) {
+                    const entry = records[index], p = entry.p;
+                    let o = entry.geometry;
+                    if (p.active === false || p.hasCollision === false || p.noNav) {
+                        if (o) { this._removeGeometry(o); this._geometry.delete(p); entry.geometry = null; changed = true; }
+                        continue;
+                    }
+                    const w = p.width ?? p.w, h = p.height ?? p.h, angle = p.angle || 0;
+                    const x = p.x, y = p.y;
+                    if (!(w > 0 && h > 0) || !Number.isFinite(x + y + w + h + angle)) {
+                        if (o) { this._removeGeometry(o); this._geometry.delete(p); entry.geometry = null; changed = true; }
+                        continue;
+                    }
+                    if (o && o.x === x && o.y === y && o.w === w && o.h === h && o.angle === angle) continue;
+                    if (o) this._removeGeometry(o);
+                    o = { x, y, w, h, angle, hw: w / 2, hh: h / 2, cx: x + w / 2, cy: y + h / 2, c: Math.cos(angle), s: Math.sin(angle), cells: [], keys: [], stamp: 0 };
+                    entry.geometry = o; this._geometry.set(p, o); this._addGeometry(o); changed = true;
+                }
+                if (changed) this.revision++;
+            }
+
+            _removeGeometry(o) {
+                for (const i of o.cells) this.blocked[i] = --this._occupancy[i] ? 1 : 0;
+                for (const key of o.keys) { const b = this._buckets.get(key); b.delete(o); if (!b.size) this._buckets.delete(key); }
+            }
+
+            _addGeometry(o) {
+                const r = this.radius, ex = Math.abs(o.c) * o.hw + Math.abs(o.s) * o.hh + r;
+                const ey = Math.abs(o.s) * o.hw + Math.abs(o.c) * o.hh + r;
+                const left = o.cx - ex, right = o.cx + ex, top = o.cy - ey, bottom = o.cy + ey, bs = this._bucketSize;
+                for (let bx = Math.floor(left / bs); bx <= Math.floor(right / bs); bx++) for (let by = Math.floor(top / bs); by <= Math.floor(bottom / bs); by++) {
+                    const key = bx + ',' + by; let b = this._buckets.get(key);
+                    if (!b) this._buckets.set(key, b = new Set());
+                    b.add(o); o.keys.push(key);
+                }
+                for (let row = Math.max(0, Math.floor(top / this.cell)); row <= Math.min(this.rows - 1, Math.floor(bottom / this.cell)); row++) {
+                    for (let col = Math.max(0, Math.floor(left / this.cell)); col <= Math.min(this.cols - 1, Math.floor(right / this.cell)); col++) {
+                        const i = row * this.cols + col;
+                        if (this._pointDistance2(o, this.cx(i), this.cy(i)) < r * r - 1e-6) { o.cells.push(i); this._occupancy[i]++; this.blocked[i] = 1; }
+                    }
+                }
+            }
+
+            _pointDistance2(o, x, y) {
+                const dx = x - o.cx, dy = y - o.cy;
+                const lx = dx * o.c + dy * o.s, ly = -dx * o.s + dy * o.c;
+                const ax = Math.max(0, Math.abs(lx) - o.hw), ay = Math.max(0, Math.abs(ly) - o.hh);
+                return ax * ax + ay * ay;
+            }
+
+            _segmentDistance2(o, x1, y1, x2, y2) {
+                const ax = (x1 - o.cx) * o.c + (y1 - o.cy) * o.s, ay = -(x1 - o.cx) * o.s + (y1 - o.cy) * o.c;
+                const bx = (x2 - o.cx) * o.c + (y2 - o.cy) * o.s, by = -(x2 - o.cx) * o.s + (y2 - o.cy) * o.c;
+                const dx = bx - ax, dy = by - ay;
+                let t0 = 0, t1 = 1;
+                const clip = (p, q) => {
+                    if (Math.abs(p) < 1e-12) return q >= 0;
+                    const t = q / p;
+                    if (p < 0) { if (t > t1) return false; t0 = Math.max(t0, t); }
+                    else { if (t < t0) return false; t1 = Math.min(t1, t); }
+                    return true;
+                };
+                if (clip(-dx, ax + o.hw) && clip(dx, o.hw - ax) && clip(-dy, ay + o.hh) && clip(dy, o.hh - ay)) return 0;
+                const point = (x, y) => { const px = Math.max(0, Math.abs(x) - o.hw), py = Math.max(0, Math.abs(y) - o.hh); return px * px + py * py; };
+                let best = Math.min(point(ax, ay), point(bx, by));
+                const len2 = dx * dx + dy * dy;
+                if (len2 > 1e-12) for (const x of [-o.hw, o.hw]) for (const y of [-o.hh, o.hh]) {
+                    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len2));
+                    const px = ax + dx * t - x, py = ay + dy * t - y;
+                    best = Math.min(best, px * px + py * py);
+                }
+                return best;
             }
 
             colOf(x) { return Math.floor(x / this.cell); }
@@ -63,42 +164,54 @@
             freeCell(col, row) {
                 return col >= 0 && row >= 0 && col < this.cols && row < this.rows && !this.blocked[row * this.cols + col];
             }
-            walkable(x, y) { return this.freeCell(this.colOf(x), this.rowOf(y)); }
+            walkable(x, y) {
+                const r = this.radius;
+                if (!Number.isFinite(x + y) || x < r || y < r || x > this.width - r || y > this.height - r) return false;
+                return this.lineWalkable(x, y, x, y);
+            }
 
-            /** Center of the nearest free cell (ring search), or null. */
-            nearestFree(x, y, maxRings = 8) {
+            /** Nearest free cell, optionally with a safe connector to the actual point. */
+            nearestFree(x, y, maxRings = 8, connected = false) {
                 const col = this.colOf(x), row = this.rowOf(y);
-                if (this.freeCell(col, row)) return row * this.cols + col;
-                let best = -1, bestD = Infinity;
-                for (let ring = 1; ring <= maxRings && best < 0; ring++) {
-                    for (let dr = -ring; dr <= ring; dr++) {
-                        for (let dc = -ring; dc <= ring; dc++) {
-                            if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring) continue;
-                            const cc = col + dc, rr = row + dr;
-                            if (!this.freeCell(cc, rr)) continue;
-                            const d = dc * dc + dr * dr;
-                            if (d < bestD) { bestD = d; best = rr * this.cols + cc; }
+                for (let ring = 0; ring <= maxRings; ring++) {
+                    let best = null, bestD = Infinity;
+                    for (let dr = -ring; dr <= ring; dr++) for (let dc = -ring; dc <= ring; dc++) {
+                        if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring) continue;
+                        const cc = col + dc, rr = row + dr;
+                        if (!this.freeCell(cc, rr)) continue;
+                        const i = rr * this.cols + cc, px = this.cx(i), py = this.cy(i);
+                        if (connected && !this.lineWalkable(x, y, px, py)) continue;
+                        const d = (px - x) ** 2 + (py - y) ** 2;
+                        if (d < bestD) { bestD = d; best = i; }
+                    }
+                    if (best !== null) return best;
+                }
+                return null;
+            }
+
+            /** Continuous circle sweep, including rotated prop bounds and rounded corners.
+             * A body already inside a safety margin may move out, never deeper into it. */
+            lineWalkable(x1, y1, x2, y2) {
+                if (!Number.isFinite(x1 + y1 + x2 + y2)) return false;
+                const r = this.radius;
+                if ((x2 < r && x2 <= x1) || (y2 < r && y2 <= y1) || (x2 > this.width - r && x2 >= x1) || (y2 > this.height - r && y2 >= y1)) return false;
+                const bs = this._bucketSize, stamp = ++this._queryStamp, rr = r * r - 1e-6;
+                for (let bx = Math.floor(Math.min(x1, x2) / bs); bx <= Math.floor(Math.max(x1, x2) / bs); bx++) {
+                    for (let by = Math.floor(Math.min(y1, y2) / bs); by <= Math.floor(Math.max(y1, y2) / bs); by++) {
+                        const b = this._buckets.get(bx + ',' + by); if (!b) continue;
+                        for (const o of b) {
+                            if (o.stamp === stamp) continue; o.stamp = stamp;
+                            const d = this._segmentDistance2(o, x1, y1, x2, y2);
+                            if (d >= rr) continue;
+                            const start = this._pointDistance2(o, x1, y1);
+                            if (start > 1e-6 && d >= start - 1e-6 && this._pointDistance2(o, x2, y2) > start + 1e-6) continue;
+                            return false;
                         }
                     }
                 }
-                return best >= 0 ? best : null;
-            }
-
-            /** True if an actor can walk the straight segment (start cell is forgiven:
-             *  actors pressed against a wall often stand inside the inflated margin). */
-            lineWalkable(x1, y1, x2, y2) {
-                const dx = x2 - x1, dy = y2 - y1, dist = Math.hypot(dx, dy);
-                const step = this.cell * 0.5;
-                const n = Math.max(1, Math.ceil(dist / step));
-                const startCol = this.colOf(x1), startRow = this.rowOf(y1);
-                for (let i = 1; i <= n; i++) {
-                    const t = i / n;
-                    const col = this.colOf(x1 + dx * t), row = this.rowOf(y1 + dy * t);
-                    if (col === startCol && row === startRow) continue;
-                    if (!this.freeCell(col, row)) return false;
-                }
                 return true;
             }
+
 
             // --- binary heap keyed by f ---
             _push(i, f) {
@@ -158,6 +271,7 @@
                             if (dr && dc && (B[row * cols + nc] || B[nr * cols + col])) continue;  // no corner cutting
                             const ni = nr * cols + nc;
                             if (CL[ni] === gen) continue;
+                            if (!this.lineWalkable(this.cx(cur), this.cy(cur), this.cx(ni), this.cy(ni))) continue;
                             const ng = G[cur] + (dr && dc ? D : c);
                             if (ng > maxCost) continue;
                             if (S[ni] !== gen || ng < G[ni]) {
@@ -177,13 +291,14 @@
                 for (let i = idx; i >= 0; i = this.parent[i]) cells.push(i);
                 cells.reverse();
                 const pts = cells.map(i => ({ x: this.cx(i), y: this.cy(i) }));
-                if (endX !== undefined) pts[pts.length - 1] = { x: endX, y: endY };
+                if (endX !== undefined) pts.push({ x: endX, y: endY });
                 // String-pulling: keep only waypoints we can't skip in a straight line
                 const out = [];
                 let fromX = sx, fromY = sy, i = 0;
                 while (i < pts.length) {
                     let j = pts.length - 1;
-                    while (j > i && !this.lineWalkable(fromX, fromY, pts[j].x, pts[j].y)) j--;
+                    while (j >= i && !this.lineWalkable(fromX, fromY, pts[j].x, pts[j].y)) j--;
+                    if (j < i) return null;
                     out.push(pts[j]);
                     fromX = pts[j].x; fromY = pts[j].y; i = j + 1;
                 }
@@ -192,16 +307,17 @@
 
             /** Smoothed waypoint list from (sx, sy) toward (tx, ty), or null if unreachable. */
             findPath(sx, sy, tx, ty) {
-                const start = this.nearestFree(sx, sy), goal = this.nearestFree(tx, ty);
+                if (this.lineWalkable(sx, sy, tx, ty)) return [{ x: tx, y: ty }];
+                const exact = this.walkable(tx, ty);
+                const start = this.nearestFree(sx, sy, 8, true), goal = this.nearestFree(tx, ty, 8, exact);
                 if (start === null || goal === null) return null;
                 if (!this._search(start, goal, Infinity)) return null;
-                const exact = this.walkable(tx, ty);
                 return this._buildPath(goal, sx, sy, exact ? tx : undefined, exact ? ty : undefined);
             }
 
             /** Bounded Dijkstra from (sx, sy). Returns reached cell indices (cost in this.g). */
             flood(sx, sy, maxCost) {
-                const start = this.nearestFree(sx, sy);
+                const start = this.nearestFree(sx, sy, 8, true);
                 if (start === null) return [];
                 this._search(start, -1, maxCost);
                 return this._reached || [];
@@ -419,31 +535,25 @@
             });
         }
 
-        /**
-         * The point an actor should walk toward on its way to (gx, gy): the goal
-         * itself when the straight line is walkable, otherwise the current waypoint
-         * of a grid path (cached on ent._navPath, re-planned when the goal moves by
-         * more than 32px or every REPATH_TICKS). Unreachable goals fall back to
-         * heading straight, which is the old behavior.
-         */
+        /** Cached routing: failed searches wait for a retry instead of steering into walls. */
         function navWaypoint(ent, gx, gy, map) {
-            const N = CONFIG.NAV;
-            const nav = map ? NavGrid.for(map) : null;
+            const N = CONFIG.NAV, nav = map ? NavGrid.for(map) : null;
             if (!nav || nav.lineWalkable(ent.x, ent.y, gx, gy)) {
                 ent._navPath = null;
-                return { x: gx, y: gy, finalLeg: true };
+                return { x: gx, y: gy, finalLeg: true, remaining: Math.hypot(gx - ent.x, gy - ent.y) };
             }
             let st = ent._navPath;
-            if (!st || Math.hypot(st.goalX - gx, st.goalY - gy) > 32 || _simTick >= st.repathAt || st.idx >= st.pts.length) {
+            const changed = !st || st.nav !== nav || st.revision !== nav.revision || Math.hypot(st.goalX - gx, st.goalY - gy) > 8;
+            if (changed || _simTick >= st.repathAt || (!st.failed && (st.idx >= st.pts.length || !nav.lineWalkable(ent.x, ent.y, st.pts[st.idx].x, st.pts[st.idx].y)))) {
                 const pts = nav.findPath(ent.x, ent.y, gx, gy);
-                st = ent._navPath = pts && pts.length ? { pts, idx: 0, goalX: gx, goalY: gy, repathAt: _simTick + N.REPATH_TICKS } : null;
+                st = ent._navPath = { nav, revision: nav.revision, pts: pts || [], idx: 0, failed: !(pts && pts.length), goalX: gx, goalY: gy, repathAt: _simTick + N.REPATH_TICKS };
             }
-            if (!st) return { x: gx, y: gy, finalLeg: true };
-            while (st.idx < st.pts.length - 1 &&
-                   (Math.hypot(st.pts[st.idx].x - ent.x, st.pts[st.idx].y - ent.y) < N.WAYPOINT_REACHED ||
-                    nav.lineWalkable(ent.x, ent.y, st.pts[st.idx + 1].x, st.pts[st.idx + 1].y))) st.idx++;
+            if (st.failed) return { x: ent.x, y: ent.y, finalLeg: false, blocked: true, remaining: Infinity };
+            while (st.idx < st.pts.length - 1 && nav.lineWalkable(ent.x, ent.y, st.pts[st.idx + 1].x, st.pts[st.idx + 1].y)) st.idx++;
             const wp = st.pts[st.idx];
-            return { x: wp.x, y: wp.y, finalLeg: st.idx === st.pts.length - 1 };
+            let remaining = Math.hypot(wp.x - ent.x, wp.y - ent.y);
+            for (let i = st.idx + 1; i < st.pts.length; i++) remaining += Math.hypot(st.pts[i].x - st.pts[i - 1].x, st.pts[i].y - st.pts[i - 1].y);
+            return { x: wp.x, y: wp.y, finalLeg: st.idx === st.pts.length - 1, remaining };
         }
 
         /**
@@ -474,8 +584,10 @@
             const wp = navWaypoint(ent, gx, gy, map);
             const dx = wp.x - ent.x, dy = wp.y - ent.y, d = Math.hypot(dx, dy);
             if (d < 1e-3) return { x: 0, y: 0 };
-            const step = Math.min(speed, d);
-            return { x: (dx / d) * step, y: (dy / d) * step };
+            const step = Math.min(Math.max(0, speed), d), vx = (dx / d) * step, vy = (dy / d) * step;
+            const nav = map ? NavGrid.for(map) : null;
+            if (nav && !nav.lineWalkable(ent.x, ent.y, ent.x + vx, ent.y + vy)) return { x: 0, y: 0 };
+            return { x: vx, y: vy };
         }
 
         /**
@@ -484,15 +596,25 @@
          * FORMATION_ARRIVE_GAIN, like the old direct follow.
          */
         function companionNavStep(tm, gx, gy, topSpeed, game) {
-            const C = CONFIG.COMPANION;
-            const wp0 = navWaypoint(tm, gx, gy, game && game.activeMap);
+            const C = CONFIG.COMPANION, map = game && game.activeMap;
+            const nav = map ? NavGrid.for(map) : null;
+            const wp0 = navWaypoint(tm, gx, gy, map);
+            const stop = () => { tm.velX = tm.velY = 0; gaitCommand(tm, 0, 0); };
+            if (wp0.blocked) { stop(); return; }
             const det = detourAroundPlayer(tm, wp0.x, wp0.y, game && game.player);
-            const wp = (det.x === wp0.x && det.y === wp0.y) ? wp0 : { x: det.x, y: det.y, finalLeg: false };
+            const detoured = det.x !== wp0.x || det.y !== wp0.y;
+            // A detour beside the player must also clear furniture/walls; do not replace the final-goal path cache.
+            const useDetour = detoured && (!nav || (nav.walkable(det.x, det.y) && nav.lineWalkable(tm.x, tm.y, det.x, det.y)));
+            const wp = useDetour ? { x: det.x, y: det.y, finalLeg: false } : wp0;
             const dx = wp.x - tm.x, dy = wp.y - tm.y, d = Math.hypot(dx, dy);
-            if (d <= (wp.finalLeg ? C.FORMATION_DEADZONE : 0.5)) return;
+            if (d <= (wp.finalLeg ? C.FORMATION_DEADZONE : 0.5)) { stop(); return; }
             const step = wp.finalLeg ? Math.min(topSpeed, d * C.FORMATION_ARRIVE_GAIN) : Math.min(topSpeed, d);
-            gaitCommand(tm, (dx / d) * step, (dy / d) * step);
-            tm.x += (dx / d) * step;
-            tm.y += (dy / d) * step;
+            const vx = (dx / d) * step, vy = (dy / d) * step;
+            if (nav && !nav.lineWalkable(tm.x, tm.y, tm.x + vx, tm.y + vy)) {
+                tm._navPath = null; stop(); return;
+            }
+            tm.velX = vx; tm.velY = vy;
+            gaitCommand(tm, vx, vy);
+            tm.x += vx; tm.y += vy;
         }
-        
+

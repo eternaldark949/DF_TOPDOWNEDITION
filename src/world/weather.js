@@ -132,7 +132,42 @@
            ===================================================================== */
         // drawRainOverlay's per-frame tables, made once
         const _RAIN_SCRATCH = { bandPaths: new Array(4), corePaths: new Array(4), bandAlpha: new Float32Array(4), bandWidth: new Float32Array(4),
-                                coreAlpha: new Float32Array(4), coreWidth: new Float32Array(4), bandCount: new Int32Array(4), lamps: [], lit: [] };
+                                coreAlpha: new Float32Array(4), coreWidth: new Float32Array(4), bandCount: new Int32Array(4), lamps: [], lit: [],
+                                lampGrid: { cells: [], active: [] } };
+        /** Reuse only the cells touched last frame; no per-drop candidate arrays. */
+        function _clearRainGrid(grid) {
+            for (const cell of grid.active) cell.length = 0;
+            grid.active.length = 0;
+        }
+        /** Every cell retains lamp order, so the original first matching light still wins. */
+        function _rainLampGrid(S, count) {
+            const G = S.lampGrid, C = 128;
+            _clearRainGrid(G);
+            if (count <= 4) return null;    // small sets are cheaper to walk directly
+            let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+            for (let i = 0; i < count; i++) {
+                const l = S.lamps[i], r = Math.abs(l.sr);
+                if (!Number.isFinite(l.sx) || !Number.isFinite(l.sy) || !Number.isFinite(r)) return null;
+                left = Math.min(left, l.sx - r); right = Math.max(right, l.sx + r);
+                top = Math.min(top, l.sy - r); bottom = Math.max(bottom, l.sy + r);
+            }
+            const x0 = Math.floor(left / C), y0 = Math.floor(top / C);
+            const cols = Math.floor(right / C) - x0 + 1, rows = Math.floor(bottom / C) - y0 + 1;
+            if (cols * rows > 4096 || cols <= 0 || rows <= 0) return null;
+            G.x0 = x0; G.y0 = y0; G.cols = cols; G.rows = rows; G.size = C;
+            for (let i = 0; i < count; i++) {
+                const l = S.lamps[i], r = Math.abs(l.sr);
+                const xa = Math.floor((l.sx - r) / C) - x0, xb = Math.floor((l.sx + r) / C) - x0;
+                const ya = Math.floor((l.sy - r) / C) - y0, yb = Math.floor((l.sy + r) / C) - y0;
+                for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) {
+                    const at = y * cols + x, cell = G.cells[at] || (G.cells[at] = []);
+                    if (cell.length === 0) G.active.push(cell);
+                    cell.push(i);
+                }
+            }
+            return G;
+        }
+
         /* A particle's colour, parsed once: { fill, mode } — mode 1: an rgba(…, 1) whose alpha follows life;
            0.5: an rgba(…, 0.5) whose alpha is half its life; 0: anything else (drawn as is, faded by life).
            null: a colour the old string edit mangled, kept on the old path. */
@@ -1138,6 +1173,9 @@
                 // Collect lit drop data for the colored pass: 9 numbers a drop (tail, head, rgb, alpha, width)
                 const litDrops = screenLamps ? S.lit : null;
                 if (litDrops) litDrops.length = 0;
+                // The direct loop is cheaper for ordinary rain; build a grid only for busy, wide views.
+                const lampGrid = screenLamps && nLamps > 4 && nLamps * this.drops.length >= 32768
+                    ? _rainLampGrid(S, nLamps) : null;
                 
                 // Sort drops into bands and build paths
                 // Render interpolation: step each drop back by the frame's lag (drops fall
@@ -1186,8 +1224,15 @@
                     
                     // Check lamp proximity for light interaction
                     if (screenLamps) {
-                        for (let k = 0; k < nLamps; k++) {
-                            const sl = screenLamps[k];
+                        let nearby = null, nearbyCount = nLamps;
+                        if (lampGrid) {
+                            const gx = Math.floor(ax / lampGrid.size) - lampGrid.x0, gy = Math.floor(ay / lampGrid.size) - lampGrid.y0;
+                            nearby = gx >= 0 && gx < lampGrid.cols && gy >= 0 && gy < lampGrid.rows
+                                ? lampGrid.cells[gy * lampGrid.cols + gx] : null;
+                            nearbyCount = nearby ? nearby.length : 0;
+                        }
+                        for (let k = 0; k < nearbyCount; k++) {
+                            const sl = screenLamps[lampGrid ? nearby[k] : k];
                             const ddx = ax - sl.sx, ddy = ay - sl.sy;
                             const distSq = ddx * ddx + ddy * ddy;
                             if (distSq < sl.srSq) {

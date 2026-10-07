@@ -823,7 +823,7 @@
                 this._hiddenTeammates = [];
                 
                 // Hide HUD elements during minigame
-                ['ui-currency', 'ui-scrap', 'ui-health', 'ui-flit-bar-container', 'btn-phone', 'btn-heal'].forEach(id => {
+                ['ui-currency', 'ui-scrap', 'ui-health', 'ui-flit-bar-container', 'ui-equipment', 'btn-phone', 'btn-heal'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.style.display = 'none';
                 });
@@ -1039,7 +1039,7 @@
                 this.active = false;
                 
                 // Restore HUD elements
-                ['ui-currency', 'ui-scrap', 'ui-health', 'ui-flit-bar-container', 'btn-phone'].forEach(id => {
+                ['ui-currency', 'ui-scrap', 'ui-health', 'ui-flit-bar-container', 'ui-equipment', 'btn-phone'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.style.display = '';
                 });

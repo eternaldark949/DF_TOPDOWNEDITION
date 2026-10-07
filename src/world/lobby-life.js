@@ -119,11 +119,12 @@
                             if (od < 20 && od > 0.1) { vx += (ox / od) * 0.35; vy += (oy / od) * 0.35; }
                         }
                         const nav = NavGrid.for(M);
-                        if (nav && !nav.walkable(w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }     // never shoved into furniture
+                        if (nav && !nav.lineWalkable(w.x, w.y, w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }     // never shoved into furniture
                         gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
                         if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
                         // Stuck? (blocked by a crowd): give up on this stop after a while
-                        if (d < w.lastD - 0.2) { w.lastD = d; w.stuck = 0; } else if (++w.stuck > 360) { w.steps.shift(); w._slot = undefined; w.stuck = 0; w.lastD = Infinity; }
+                        const remaining = navWaypoint(w, gx, gy, M).remaining;
+                        if (remaining < w.lastD - 0.2) { w.lastD = remaining; w.stuck = 0; } else if (++w.stuck > 360) { w.steps.shift(); w._slot = undefined; w.stuck = 0; w.lastD = Infinity; }
                         w.look.pose = undefined;
                         continue;
                     }

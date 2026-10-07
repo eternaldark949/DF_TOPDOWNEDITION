@@ -209,13 +209,14 @@
                     // Only draw if zone is visible in viewport
                     if (rz.x + rz.w > wb.left && rz.x < wb.right && rz.y + rz.h > wb.top && rz.y < wb.bottom) {
                         this.ctx.save();
-                        // Pulsing crimson dashed border
-                        const t = _frameTime / 500;
+                        // Travelling crimson dashes, with both animation phases bounded.
+                        const borderNow = performance.now();
+                        const t = (borderNow % (Math.PI * 2 * 500)) / 500;
                         const alpha = rz.active && !rz.cleared ? 0.6 + Math.sin(t) * 0.2 : 0.25;
                         this.ctx.strokeStyle = `rgba(200, 20, 0, ${alpha})`;
                         this.ctx.lineWidth = 3;
                         this.ctx.setLineDash([12, 8]);
-                        this.ctx.lineDashOffset = _frameTime / 40;
+                        this.ctx.lineDashOffset = (borderNow % 800) / 40; // 0..20: exactly one dash-plus-gap cycle
                         this.ctx.strokeRect(rz.x, rz.y, rz.w, rz.h);
                         this.ctx.setLineDash([]);
                         
@@ -1051,13 +1052,16 @@
                     const lr = rsys.active && l._roomId ? rsys.rooms[l._roomId] : null;
                     const outdoorRoom = !!lr && lr.type === 'outdoor';
                     const lampDay = this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight;
-                    if (lampPaintInView(l, this.ctx, cullBounds.view, viewZoom, lampDay)) l.draw(this.ctx, lampDay);
+                    if (lampPaintInView(l, this.ctx, cullBounds.view, viewZoom, lampDay)) {
+                        l.draw(this.ctx, lampDay);
+                        l._bulbDay = lampDay; l._bulbPaintFrame = this._renderDrawId;
+                    }
                 }
             
                 if (RenderStats.timed) this._entLap('Entities: World tops');   // roofs, signs, foliage, lamps
                 if (RenderStats.timed) WorldRenderProfiler.end(this.profiler);
                 // 3. Draw projectiles and weather effects
-                this.projectiles.forEach(p => p.draw(this.ctx));
+                this.projectiles.forEach(p => { if (!p.isFireball) p.draw(this.ctx); });
                 
                 // Debug: nav grid, companion paths and eyeline spots
                 // (with the debug overlay, or on its own via `game.navDebug = true`)
@@ -1154,8 +1158,12 @@
                 this.drawLightingSystem(this.ctx);
                 // By day, the sun's warmth over the frame (engine/daylight.js)
                 this.drawDaylight(this.ctx);
+                this.drawFireLightGlow(this.ctx);
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
                 this.drawEmissivePass(this.ctx);
+                this.drawGunnerHeat(this.ctx, cullBounds.entities);
+                this.drawFireTrail(this.ctx, cullBounds.view);
+                for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
                 // The veil at the edge of an outdoor map (world/map-edge.js), above the darkness
                 this.drawMapEdge(this.ctx);
                 // Looking down a sniper's sight: the world narrows to her line

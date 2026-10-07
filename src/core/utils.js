@@ -192,7 +192,7 @@
             entity.walkPhase = ph0 + humanoidCadence(g.speed) * steps;
             // A foot lands each half-cycle (phase past π/2 + kπ): footsteps and their noise (engine/footsteps.js)
             if (g.speed > 0 && Math.floor((entity.walkPhase - Math.PI / 2) / Math.PI) > Math.floor((ph0 - Math.PI / 2) / Math.PI)
-                && typeof game !== 'undefined' && game && game.onStep) game.onStep(entity, g.speed);
+                && !entity._reflectionProxy && typeof game !== 'undefined' && game && game.onStep) game.onStep(entity, g.speed);
             // Phase one tick back, so the renderer can blend walk phase in step
             // with the interpolated body position (see RenderInterp).
             g.phasePrev = entity.walkPhase - humanoidCadence(g.speed);

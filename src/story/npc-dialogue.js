@@ -135,7 +135,7 @@
                 }
             },
             'Chef Koda': { text: () => "Kitchen's closed to Freelancers. But if Ren likes you, the Amber's on the house.", buttons: () => ({ accept: null, decline: 'Leave' }) },
-            'Valentina': { text: () => "The Enni Cole list is closed tonight, darling. Unless you're somebody.", buttons: () => ({ accept: null, decline: 'Leave' }) },
+            'Valentina': { text: () => "Welcome to Enni Cole, darling. The food hall is to your left, electronics to your right, and the furniture gallery is beyond the atrium. Take your time.", buttons: () => ({ accept: null, decline: 'Leave' }) },
 
             // ── By role ──
             '@dancer': {

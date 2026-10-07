@@ -98,14 +98,15 @@
                 try { this.saveGame({ auto: true }); } catch (e) { console.warn('autosave', e); }
                 if (this.musicWidget && this.musicWidget.isPlaying) this.musicWidget.togglePlay(false);
                 const pm = typeof pauseMenuController !== 'undefined' ? pauseMenuController : null;
-                if (pm && !pm.isOpen && !this.paused && !(this.scenes && this.scenes.running)) pm.open();
+                if (pm && !pm.isOpen && !this.paused && !(this.scenes && this.scenes.running)) pm.open(true);
             },
 
             initEvents() {
                 window.addEventListener('resize', () => { this.resize(); });
                 document.addEventListener('visibilitychange', () => { if (document.hidden) this.onPageHidden(); });
                 window.addEventListener('pagehide', () => this.onPageHidden());
-                window.addEventListener('keydown', (e) => { 
+                window.addEventListener('keydown', (e) => {
+                    if (!this.running || this.paused || hudInputBlocked() || e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
                     this.keys[e.key] = true; 
                     if (e.key === 'h' || e.key === 'H') this.useBooster();
                     // Furniture (engine/furniture.js): G grabs / confirms / lets go, R turns, directions pick a side
@@ -155,6 +156,7 @@
                 });
                 
                 this.canvas.addEventListener('mousedown', (e) => {
+                    if (!this.running || this.paused || hudInputBlocked()) return;
                     this.mouseDown = true;
                 });
                 
@@ -169,6 +171,7 @@
                 const grabBtn = document.getElementById('btn-grab');
                 if (grabBtn) {
                     let held = null, long = false;
+                    this._cancelGrabHold = () => { clearTimeout(held); held = null; long = false; };
                     grabBtn.addEventListener('pointerdown', (e) => {
                         e.preventDefault(); e.stopPropagation(); long = false;
                         held = setTimeout(() => { long = true; if (this.furniture.state === 'idle') this.furniture.resetLayout(); }, 900);
@@ -183,7 +186,7 @@
                 }
                 // Choosing a side: a tap on a handle (world space) picks it, before anything else hears the tap
                 this.canvas.addEventListener('pointerdown', (e) => {
-                    if (!this.furniture || this.furniture.state !== 'choose') return;
+                    if (!this.running || this.paused || hudInputBlocked() || !this.furniture || this.furniture.state !== 'choose') return;
                     const rect = this.canvas.getBoundingClientRect(), sx = rect.width ? this.canvas.width / rect.width : 1, sy = rect.height ? this.canvas.height / rect.height : 1;
                     const w = this.viewToWorld((e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy);
                     if (this.furniture.tap(w.x, w.y)) { e.preventDefault(); e.stopImmediatePropagation(); }
@@ -281,6 +284,8 @@
                 
                 const healStart = (e) => {
                     e.preventDefault();
+                    if (!this.running || this.paused || hudInputBlocked() || this._healPressed) return;
+                    this._healPressed = true;
                     this._healHeld = false;
                     this._healHoldTimer = setTimeout(() => {
                         this._healHeld = true;
@@ -289,6 +294,8 @@
                 };
                 const healEnd = (e) => {
                     e.preventDefault();
+                    if (!this._healPressed) return;
+                    this._healPressed = false;
                     if (this._healHoldTimer) {
                         clearTimeout(this._healHoldTimer);
                         this._healHoldTimer = null;

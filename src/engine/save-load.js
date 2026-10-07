@@ -118,6 +118,7 @@ engineMixin({
                         foliageDensity: GameSettings.foliageDensity,
                         rainDensity: GameSettings.rainDensity,
                         lightingQuality: GameSettings.lightingQuality,
+                        adaptiveLighting: GameSettings.adaptiveLighting,
                         filmGrain: GameSettings.filmGrain,
                         softShadows: GameSettings.softShadows,
                         bloom: GameSettings.bloom,
@@ -645,7 +646,7 @@ engineMixin({
                             }
                         }
                         
-                        this.inventory.render();
+                        // Render once after cosmetics and all ownership data restore below.
                     }
 
                     // 9. Restore Phone Data (Message History)
@@ -753,6 +754,8 @@ engineMixin({
                     if (save.settings) {
                         // (density and crowd detail stay this device's own — core/settings.js dfab_density — a save doesn't carry them over)
                         GameSettings.lightingQuality = save.settings.lightingQuality || 'high';
+                        GameSettings.adaptiveLighting = save.settings.adaptiveLighting !== false;
+                        this._adaptiveLighting = null;
                         GameSettings.filmGrain = save.settings.filmGrain !== false;
                         GameSettings.softShadows = save.settings.softShadows ?? (GameSettings.lightingQuality === 'high');
                         GameSettings.bloom = save.settings.bloom !== false;
@@ -790,6 +793,8 @@ engineMixin({
                         console.log(`[LOAD] Restored settings (lighting: ${GameSettings.lightingQuality}, bloom: ${GameSettings.bloom}, wet: ${GameSettings.wetReflections}, tint: ${GameSettings.atmosphereTint || 'off'}, grade: ${GameSettings.colorGrade}, audio: ${GameSettings.audioEnabled ? 'on' : 'off'})`);
                     }
 
+                    // Refresh registry views after all existing ownership sources restore.
+                    this.inventory?.render();
                     // Update UI
                     this.updateUI();
                     

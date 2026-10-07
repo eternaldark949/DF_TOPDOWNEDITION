@@ -693,6 +693,8 @@
             }
             }
             for (const j of jewelry) if (WD.jewelry[j.type].at === 'neck') WD.jewelry[j.type].portrait(ctx, P, j);
+            // Earrings sit beneath both hair passes; the face covers their inner attachment.
+            for (const j of jewelry) if (WD.jewelry[j.type].underHair) WD.jewelry[j.type].portrait(ctx, P, j);
 
             // ─── HAIR (BACK LAYER — behind face, over shoulders) ───
             const hairBackSoft = ['long', 'demon_dancer', 'dreadlocks'];
@@ -966,7 +968,7 @@
             }
 
             // ─── JEWELRY AND HAT ───
-            for (const j of jewelry) if (WD.jewelry[j.type].at === 'head') WD.jewelry[j.type].portrait(ctx, P, j);
+            for (const j of jewelry) if (WD.jewelry[j.type].at === 'head' && !WD.jewelry[j.type].underHair) WD.jewelry[j.type].portrait(ctx, P, j);
             for (const j of jewelry) if (WD.jewelry[j.type].portraitOver) WD.jewelry[j.type].portraitOver(ctx, P, j);   // a mask's eyes, through the fringe
             const hatPiece = WD && config.hat ? WD.hats[config.hat.type] : null;
             if (hatPiece) hatPiece.portrait(ctx, P, config.hat);
@@ -992,15 +994,19 @@
                     ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
                 }
             }
+            // Earrings attach to the head beneath hair; other head jewelry retains its layer.
+            if (jewelry && typeof WARDROBE !== 'undefined') {
+                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && piece.underHair) piece.draw(ctx, { headX }, j); }
+            }
             // Hair (all styles render on top of head) — strand physics via hairGeometry().
             // A raised hood hides short styles; long ones still spill out from under it.
             if (hair && !(hatPiece && hatPiece.hides === 'most' && !HAIR_SPILLS_FROM_HOOD.includes(hair.type))) {
                 const renderer = HAIR_RENDERERS[hair.type];
                 if (renderer) renderer(ctx, hair.color, headX, dyn, hairGeometry(ctx, headX, hair, dyn));
             }
-            // Jewelry worn on the head (sunglasses, earrings)
+            // Other head jewelry keeps its existing layer above hair.
             if (jewelry && typeof WARDROBE !== 'undefined') {
-                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && (piece.at === 'head' || piece.at === 'face')) piece.draw(ctx, { headX }, j); }
+                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && !piece.underHair && (piece.at === 'head' || piece.at === 'face')) piece.draw(ctx, { headX }, j); }
             }
             // Hat (renders on top of everything)
             if (hatPiece) hatPiece.draw(ctx, headX, hat, dyn);
@@ -1095,7 +1101,7 @@
                     const on = lampWake(n.l) * lampFlicker(n.l) * (n.l.intensity ?? 1);
                     const k = on * (1 - n.d / C.RIM_R) * Math.min(1, (sun.night - 0.3) / 0.4) * C.RIM_A;
                     if (k > 0.03) {
-                        if (ped) _shadeRims++;
+                        if (ped && !entity._reflectionProxy) _shadeRims++;
                         const wx = n.l.x - entity.x, wy = n.l.y - entity.y, m = Math.hypot(wx, wy) || 1;
                         const col = /^#[0-9a-f]{6}$/i.test(n.l.color || '') ? hexToRgb(n.l.color) : '255, 238, 187';
                         S.rim = { ang: Math.atan2(-s * wx / m + c * wy / m, c * wx / m + s * wy / m), style: `rgba(${col}, ${k.toFixed(3)})` };
@@ -1196,7 +1202,7 @@
             const S = bodyScale(config), A = androidLook(config.body);
             const hover = A && A.hover && !config.isDriving;
             if (!config.isDriving && _zoomLOD < 2) {
-                const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a);         // the body's facing on screen, for its light
+                const t = ctx.getTransform(); _bodyRot = entity._reflectionProxy ? (entity.angle || 0) : Math.atan2(t.b, t.a); // original facing for mirrored art
                 if (!config.noShadow) drawHumanContactShadow(ctx);
             }
             if (!S && !hover) return _drawHumanoidBody(ctx, entity, config, null, A);
@@ -1788,6 +1794,14 @@
             g.fists[0][0] = lFistX; g.fists[0][1] = lFistY; g.fists[1][0] = rFistX; g.fists[1][1] = rFistY;
             g.elbows[0][0] = lElbowX; g.elbows[0][1] = lElbowY; g.elbows[1][0] = rElbowX; g.elbows[1][1] = rElbowY;
 
+            // Floor-layer trains paint before the feet; waist overlays paint after the hips below.
+            const groundTrain = WD && clothes.train && WD.trains[clothes.train.type];
+            if (groundTrain && !groundTrain.overWaist) {
+                ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
+                groundTrain.draw(ctx, g, clothes.train);
+                ctx.restore();
+            }
+
             // 1. Feet
             if (shoeP) {
                 shoeP.draw(ctx, g, clothes.shoes);
@@ -1837,6 +1851,13 @@
             if (botP && botP.hips) botP.hips(ctx, g, clothes.bottom);
             ctx.restore();
         
+            // Crimson Flame attaches over the waist, before arms and the upper body.
+            if (groundTrain && groundTrain.overWaist) {
+                ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
+                groundTrain.draw(ctx, g, clothes.train);
+                ctx.restore();
+            }
+
             // 5. Trains (Dress Train)
             if (clothes.train) {
                 ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation * 0.8);
@@ -1989,7 +2010,7 @@
             }
             
             // DEBUG: Red circle at entity center point
-            if (typeof game !== 'undefined' && game.dbg && game.dbg('colliders')) {
+            if (!entity._reflectionProxy && typeof game !== 'undefined' && game.dbg && game.dbg('colliders')) {
                 ctx.fillStyle = 'rgba(255, 106, 184, 0.9)';
                 ctx.beginPath();
                 ctx.arc(0, 0, 3, 0, Math.PI * 2);

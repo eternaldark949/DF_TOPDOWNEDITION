@@ -152,6 +152,73 @@
                 if (Math.random() < 0.85) F.push({ k: 'dust', x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 4, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, t: 0, life: 36, col: fx.dust, ph: Math.random() * 6.28 });
                 while (F.length > 160) F.shift();
             },
+            /** Lay flames along the distance actually flown, including the hand's starting point. */
+            emitFireTrail(shot, x0, y0, x1, y1) {
+                if (!shot.isFireball || !shot.active || shot.markedForDestroy) return;
+                const dx = x1 - x0, dy = y1 - y0, distance = Math.hypot(dx, dy);
+                if (distance < 0.001) return;
+                const F = this._fireTrail || (this._fireTrail = []), now = _gameTimeMs();
+                const angle = Math.atan2(dy, dx);
+                const add = (x, y, born) => {
+                    this._fireTrailSerial = ((this._fireTrailSerial || 0) + 1) >>> 0;
+                    const seed = (this._fireTrailSerial * 0.61803398875) % 1;
+                    F.push({ x, y, born, life: 1500 + seed * 300, seed, angle });
+                };
+                if (!shot._fireTrailStarted) {
+                    shot._fireTrailStarted = true; shot._fireTrailGap = 0;
+                    add(x0, y0, now - CONFIG.LOOP.STEP_MS);
+                }
+                // Interpolate emission points at high speed; frame spacing must not leave holes.
+                const gap = shot._fireTrailGap || 0;
+                for (let d = FIRE_TRAIL_SPACING - gap; d <= distance; d += FIRE_TRAIL_SPACING) {
+                    const u = d / distance;
+                    add(x0 + dx * u, y0 + dy * u, now - CONFIG.LOOP.STEP_MS * (1 - u));
+                }
+                shot._fireTrailGap = (gap + distance) % FIRE_TRAIL_SPACING;
+                if (F.length > FIRE_TRAIL_MAX) F.splice(0, F.length - FIRE_TRAIL_MAX);
+            },
+            updateFireTrail() {
+                const F = this._fireTrail;
+                if (!F || !F.length) return;
+                const now = _gameTimeMs(); let write = 0;
+                for (let i = 0; i < F.length; i++) {
+                    const p = F[i]; if (now - p.born < p.life) F[write++] = p;
+                }
+                F.length = write;
+            },
+            /** World-space flames keep burning after the projectile disappears; game time freezes them. */
+            drawFireTrail(ctx, cb) {
+                const F = this._fireTrail;
+                if (!F || !F.length) return;
+                const sprites = _getFireTrailSprites(), now = _gameTimeMs(), baseAlpha = ctx.globalAlpha;
+                const stride = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2 ? 2 : 1;
+                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                for (let i = 0; i < F.length; i += stride) {
+                    const p = F[i], age = now - p.born;
+                    if (age < 0 || age >= p.life) continue;
+                    if (cb && (p.x < cb.left - 26 || p.x > cb.right + 26 || p.y < cb.top - 26 || p.y > cb.bottom + 26)) continue;
+                    const u = age / p.life, fade = Math.pow(1 - u, 1.45);
+                    const phase = ((age / 720 + p.seed) % 1) * sprites.frames;
+                    const frame = Math.floor(phase), blend = phase - frame, next = (frame + 1) % sprites.frames;
+                    const drift = Math.sin(age * 0.009 + p.seed * 6.28) * u * 3.2;
+                    const size = (0.85 + p.seed * 0.3) * (1 + Math.sin(u * Math.PI) * 0.25) * (1 - u * 0.55);
+                    ctx.save();
+                    ctx.translate(p.x - Math.sin(p.angle) * drift, p.y + Math.cos(p.angle) * drift);
+                    ctx.rotate(p.angle + Math.sin(age * 0.012 + p.seed * 9) * (0.12 + u * 0.28));
+                    ctx.scale(size, size * (0.9 + 0.25 * Math.sin(age * 0.016 + p.seed * 6.28)));
+                    ctx.globalAlpha = baseAlpha * 0.68 * fade * (1 - blend);
+                    ctx.drawImage(sprites.atlas, (frame % sprites.cols) * sprites.w * sprites.K,
+                        Math.floor(frame / sprites.cols) * sprites.h * sprites.K, sprites.w * sprites.K, sprites.h * sprites.K,
+                        -22, -18, sprites.w, sprites.h);
+                    ctx.globalAlpha = baseAlpha * 0.68 * fade * blend;
+                    ctx.drawImage(sprites.atlas, (next % sprites.cols) * sprites.w * sprites.K,
+                        Math.floor(next / sprites.cols) * sprites.h * sprites.K, sprites.w * sprites.K, sprites.h * sprites.K,
+                        -22, -18, sprites.w, sprites.h);
+                    ctx.restore();
+                }
+                ctx.restore();
+            },
+
             updateShotFx() {
                 const F = this.shotFx;
                 if (!F || !F.length) return;
@@ -337,7 +404,7 @@
                 // scale rather than multiplying against it, so 'low' lighting at
                 // 0.5 render scale doesn't end up at quarter resolution.
                 // Match the final draw size so resize does not allocate a larger buffer first.
-                const lightScale = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1);
+                const lightScale = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * this._lightingAdaptiveScale();
                 const lightW = Math.max(1, Math.round(bufW * lightScale));
                 const lightH = Math.max(1, Math.round(bufH * lightScale));
                 if (this.lightCanvas.width !== lightW || this.lightCanvas.height !== lightH) {
@@ -538,6 +605,7 @@
             },
             
             useBooster() {
+                if (!this.running || this.paused || hudInputBlocked()) return;
                 if (this.playerHealth >= this.maxPlayerHealth) { 
                     showMessage("HEALTH FULL"); 
                     return; 
@@ -559,6 +627,7 @@
              * Costs 1 booster from the player's supply.
              */
             useBoosterOnAlly() {
+                if (!this.running || this.paused || hudInputBlocked()) return;
                 if (this.boosterCount <= 0) {
                     showMessage("NO BOOSTERS TO SHARE.");
                     return;

@@ -41,14 +41,16 @@
                 }
             }
         
-            getNearby(client) {
+            getNearby(client, out) {
                 const r = Math.max(client.length, client.width) / 2;          // any heading
                 const minCol = Math.floor((client.x - r) / this.cellSize);
                 const maxCol = Math.floor((client.x + r) / this.cellSize);
                 const minRow = Math.floor((client.y - r) / this.cellSize);
                 const maxRow = Math.floor((client.y + r) / this.cellSize);
         
-                const stamp = ++this._stamp, nearby = [];
+                // Callers may own a buffer; omitted buffers retain the original fresh-array API.
+                const stamp = ++this._stamp, nearby = out || [];
+                nearby.length = 0;
                 for (let c = minCol; c <= maxCol; c++) {
                     for (let r = minRow; r <= maxRow; r++) {
                         const contents = this.cells.get(this.getKey(c, r));
@@ -260,7 +262,7 @@
                 // 2. BROAD PHASE: SPATIAL GRID
                 for (let n1 = 0; n1 < allVehicles.length; n1++) {
                     const v1 = allVehicles[n1];
-                    const neighbors = this.grid.getNearby(v1);
+                    const neighbors = this.grid.getNearby(v1, this._collisionNeighbours || (this._collisionNeighbours = []));
                     
                     for (let v2 of neighbors) {
                         if (v1 === v2) continue; 

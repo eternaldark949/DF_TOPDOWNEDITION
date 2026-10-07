@@ -61,6 +61,7 @@
                 this.updateExecution();                                // a takedown in progress (engine/executions.js)
                 this.updateSneak();
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
+                this.updateFireTrail();
                 this.updateShotFx();
             
                 this.updateTime();
@@ -546,9 +547,8 @@
                             const topSpeed = (dSpot > C.CATCHUP_DISTANCE ? C.CATCHUP_SPEED : (dSpot > C.MATCH_DISTANCE ? C.MATCH_SPEED : C.CONTRACT_SPEED)) * (this.crewSneaking() ? SNEAK.SPEED : 1);
                             companionNavStep(tm, eyelineSpot.x, eyelineSpot.y, topSpeed, this);
                         } else if (tm._formationSlot) {
-                            // Soft arrival on slot via smartMove (which still does
-                            // obstacle avoidance against walls/buildings). Adaptive
-                            // speed mirrors the permanent-teammate path.
+                            // Route every approach, including the short final arrival,
+                            // with the same clearance as permanent teammates.
                             const slot = tm._formationSlot;
                             const dxSlot = slot.x - tm.x;
                             const dySlot = slot.y - tm.y;
@@ -558,30 +558,7 @@
                             if (distSlot > C.CATCHUP_DISTANCE) topSpeed = C.CATCHUP_SPEED;
                             else if (distSlot > C.MATCH_DISTANCE) topSpeed = C.MATCH_SPEED;
                             if (this.crewSneaking()) topSpeed *= SNEAK.SPEED;                   // creeping with her
-                            if (distSlot > C.FORMATION_DEADZONE) {
-                                // smartMove uses its own internal stop-at-60 check, so
-                                // for short approaches we step directly. This avoids
-                                // the smartMove early-out fighting our soft-arrival.
-                                if (distSlot > 60) {
-                                    // Head for the next nav waypoint (the slot itself when the way is clear);
-                                    // smartMove still handles traffic and small obstacles on the way
-                                    const wp0 = navWaypoint(tm, slot.x, slot.y, this.activeMap);
-                                    if (wp0.x !== slot.x || wp0.y !== slot.y) {
-                                        // Blocked straight line: follow the nav path directly (smartMove's
-                                        // wall feelers fight paths that hug corners, like gateways)
-                                        companionNavStep(tm, slot.x, slot.y, topSpeed, this);
-                                    } else {
-                                        // Open ground: smartMove, which also dodges traffic
-                                        const wp = detourAroundPlayer(tm, wp0.x, wp0.y, this.player);
-                                        tm.smartMove(wp.x, wp.y, topSpeed, this.activeMap.walls, getColliders(this.activeMap), this.traffic.vehicles);
-                                    }
-                                } else {
-                                    const step = Math.min(topSpeed, distSlot * C.FORMATION_ARRIVE_GAIN);
-                                    gaitCommand(tm, (dxSlot / distSlot) * step, (dySlot / distSlot) * step);
-                                    tm.x += (dxSlot / distSlot) * step;
-                                    tm.y += (dySlot / distSlot) * step;
-                                }
-                            }
+                            companionNavStep(tm, slot.x, slot.y, topSpeed, this);
                         }
 
                         // Combat — uses unified updateCombat (reads weapon or ability).
@@ -882,7 +859,7 @@
                                 const kbX = Math.cos(angle) * knockbackStrength;
                                 const kbY = Math.sin(angle) * knockbackStrength;
                                 e.lastHitBy = p.owner; e.lastHitMelee = !!p.melee;       // who gets the Resonance
-                                e.takeDamage(p.damage, kbX, kbY);
+                                if (e.takeDamage(p.damage, kbX, kbY) && p.melee && e.interruptMelee) e.interruptMelee();
                                 
                                 // Spawn sticky DOT orb (Golden Child)
                                 if (p.sticky && !e.dead) {
@@ -1310,6 +1287,7 @@
                     CollisionSystem.update(this.camera, this.canvas, this);
                 }
                 if (this.furniture) this.furniture.afterCollision(this);   // a held piece follows her (or holds her back)
+                this.updateCarLightTrails();
                 this.profiler.stop('Physics:Collisions');
             
                 this.profiler.start('Logic:UI_Interact');
@@ -1447,8 +1425,9 @@
                 // 1. WALKING COLLISION (Player vs Traffic)
                 if (!this.isDriving) {
                     // Create dummy for Grid Query
-                    const playerDummy = { x: this.player.x, y: this.player.y, length: 30, width: 30 };
-                    const nearby = this.traffic.grid.getNearby(playerDummy);
+                    const playerDummy = this._trafficPlayerQuery || (this._trafficPlayerQuery = { x: 0, y: 0, length: 30, width: 30 });
+                    playerDummy.x = this.player.x; playerDummy.y = this.player.y;
+                    const nearby = this.traffic.grid.getNearby(playerDummy, this._trafficPlayerNear || (this._trafficPlayerNear = []));
                     
                     for (let v of nearby) {
                         // Translate player to vehicle local space
@@ -1524,7 +1503,10 @@
                 for (const tm of this.teammates) {
                     if (!tm || tm.inCar || tm.dead || !(tm.recruited || tm.hired)) continue;
                     if (tm._carHitCd > 0) tm._carHitCd--;
-                    for (const v of this.traffic.grid.getNearby({ x: tm.x, y: tm.y, length: 30, width: 30 })) {
+                    const crewQuery = this._trafficCrewQuery || (this._trafficCrewQuery = { x: 0, y: 0, length: 30, width: 30 });
+                    crewQuery.x = tm.x; crewQuery.y = tm.y;
+                    const nearby = this.traffic.grid.getNearby(crewQuery, this._trafficCrewNear || (this._trafficCrewNear = []));
+                    for (const v of nearby) {
                         if (v === this.car && this.isDriving && tm.inCar) continue;
                         if (v.fade !== undefined && v.fade < 0.5) continue;                 // a car fading in or out isn't solid yet
                         const c = Math.cos(-v.angle), s = Math.sin(-v.angle), dx = tm.x - v.x, dy = tm.y - v.y;

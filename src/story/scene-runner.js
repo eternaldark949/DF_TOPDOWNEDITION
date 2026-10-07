@@ -41,7 +41,20 @@
             }
             /** Walk a list of points at `speed` px/tick; done when they arrive. */
             walk(points, speed) {
-                this.path = points.map(p => ({ x: p.x, y: p.y })); if (speed) this.speed = speed;
+                const map = typeof game !== 'undefined' ? game.activeMap : null;
+                const nav = map ? NavGrid.for(map) : null;
+                this.path = points.map(p => {
+                    let x = p.x, y = p.y;
+                    // As with Walker.goTo, authored points on scenery resolve to a nearby standing spot.
+                    if (nav && !nav.walkable(x, y)) {
+                        const f = nav.nearestFree(x, y, 6);
+                        if (f !== null && f !== undefined) { x = nav.cx(f); y = nav.cy(f); }
+                    }
+                    return { x, y };
+                });
+                if (!this.path.length) this.path = null;
+                this._navPath = null; this._walkStalled = 0;
+                if (speed) this.speed = speed;
                 return { done: () => !this.path };
             }
             face(target, frames = 20) {
@@ -57,9 +70,22 @@
             }
             tick() {
                 if (this.path) {
-                    const p = this.path[0], dx = p.x - this.x, dy = p.y - this.y, d = Math.hypot(dx, dy);
-                    if (d <= this.speed) { this.x = p.x; this.y = p.y; this.path.shift(); if (!this.path.length) this.path = null; }
-                    else { this.x += dx / d * this.speed; this.y += dy / d * this.speed; this.angle = Math.atan2(dy, dx); }
+                    const p = this.path[0], d = Math.hypot(p.x - this.x, p.y - this.y);
+                    const map = typeof game !== 'undefined' ? game.activeMap : null;
+                    const v = actorSteer(this, p.x, p.y, this.speed, map);
+                    gaitCommand(this, v.x, v.y);
+                    this.x += v.x; this.y += v.y;
+                    if (Math.hypot(v.x, v.y) > 1e-4) {
+                        this._walkStalled = 0;
+                        if (d > this.speed) this.angle = Math.atan2(v.y, v.x);
+                    } else this._walkStalled = (this._walkStalled || 0) + 1;
+                    if (Math.hypot(p.x - this.x, p.y - this.y) < 1e-3) {
+                        this.path.shift(); this._navPath = null; this._walkStalled = 0;
+                        if (!this.path.length) this.path = null;
+                    } else if (this._walkStalled >= 300) {
+                        // An unreachable route finishes its wait without teleporting the actor through scenery.
+                        this.path = null; this._navPath = null; gaitCommand(this, 0, 0);
+                    }
                 }
                 if (this.facing) {
                     const f = this.facing, diff = normalizeAngle(f.to - this.angle);
@@ -215,6 +241,7 @@
                 ui.style.opacity = on ? 1 : (this.active ? 0 : ui.style.opacity);
                 ui.classList.toggle('scene-hud', !!on);
                 document.body.classList.toggle('scene-hud-on', !!on);          // the letterbox steps back (styles/coach.css)
+                syncHudInput(this.game);
             }
 
             _loadMap(id, at) {

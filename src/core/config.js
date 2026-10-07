@@ -3,6 +3,42 @@
         // run  localStorage.dfab_debug = '1'  in the console and reload. Warnings and errors always show.
         (() => { let on = false; try { on = localStorage.getItem('dfab_debug') === '1'; } catch (e) { /* private mode */ } if (!on) console.log = () => {}; })();
 
+        // A faded HUD must relinquish input as well as paint. All callers share
+        // the current visibility state, so closing one layer cannot unlock another.
+        function hudInputBlocked() {
+            const ui = document.getElementById('game-ui');
+            return document.body.classList.contains('cinematic-view') || document.body.classList.contains('screen-menu-open') || ui?.style.opacity === '0';
+        }
+
+        function clearGameplayInputs(g) {
+            if (!g) return;
+            g.mouseDown = false;
+            if (g.keys) for (const k in g.keys) g.keys[k] = false;
+            if (g.joystick) Object.assign(g.joystick, { active: false, dx: 0, dy: 0, id: null, armed: true, ringArmed: true, trail: [] });
+            if (g.fireJoystick) Object.assign(g.fireJoystick, { active: false, dx: 0, dy: 0, id: null, firing: false, armed: false, aimed: false, remembered: false });
+            g._releaseShot = null; g._releaseWait = 0; g._aimMemory = null;
+            clearTimeout(g._healHoldTimer); g._healHoldTimer = null; g._healHeld = false; g._healPressed = false;
+            g._cancelGrabHold?.();
+            g.handbrakeHeld = false; if (g.car) g.car.handbrake = false;
+            document.getElementById('btn-handbrake')?.classList.remove('held');
+            if (g.emoteJoystick) Object.assign(g.emoteJoystick, { active: false, touchId: null, highlighted: null });
+            g.emoteBtn?.classList.remove('dragging');
+            for (const el of Object.values(g.emoteOverlays || {})) el?.classList.remove('highlighted');
+            if (g.emoteKnob) { g.emoteKnob.style.setProperty('--lx', '0px'); g.emoteKnob.style.setProperty('--ly', '0px'); }
+            document.getElementById('game-ui')?.classList.remove('aiming', 'emote-active');
+            const zone = document.getElementById('joystick-zone'); if (zone) zone.style.display = 'none';
+            const moveKnob = document.getElementById('joystick-knob'); if (moveKnob) moveKnob.style.transform = 'translate(-50%, -50%)';
+            const knob = document.getElementById('fire-joystick-knob'); if (knob) knob.style.transform = 'translate(-50%, -50%)';
+            for (const id of ['fire-ring', 'fire-band']) document.getElementById(id)?.classList.remove('hot', 'armed');
+        }
+
+        function syncHudInput(g) {
+            const ui = document.getElementById('game-ui'); if (!ui) return;
+            const blocked = hudInputBlocked();
+            if (blocked && !ui.classList.contains('hud-input-blocked')) clearGameplayInputs(g);
+            ui.classList.toggle('hud-input-blocked', blocked);
+            ui.inert = blocked;
+        }
         // Fireplaces: where the art draws the fire, and where the ambience hears it crackle
         const HEARTHS = { apt_949: { x: 580, y: 432 }, keepers_parlor: { x: 450, y: 62 }, cozy_cafe_interior: { x: 90, y: 535 } };
 

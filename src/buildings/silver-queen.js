@@ -370,6 +370,7 @@
                 ctx.fillStyle = '#e4e0f2'; ctx.fill(lanO); ctx.fillStyle = '#5b4d86'; ctx.fill(lanI);
                 for (const [ox, oy] of SQ_ENTRY.posts) {                                                    // triple-globe lamp posts
                     const x = g.dx + ox, y = g.yf + oy, top = P3(x, y, 26), kk = this._sqK(26);
+                    ctx.save(); ctx.translate(x, y); ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE); ctx.translate(-x, -y);
                     ctx.strokeStyle = '#3a2a6e'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(top[0], top[1]); ctx.stroke();
                     const l = P3(x - 9, y, 26), rr = P3(x + 9, y, 26);
                     ctx.strokeStyle = T.gold; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(l[0], l[1]); ctx.lineTo(rr[0], rr[1]); ctx.stroke();
@@ -378,6 +379,7 @@
                         ctx.fillStyle = '#f4ecff'; ctx.beginPath(); ctx.arc(q[0], q[1], 3.3 * kk, 0, Math.PI * 2); ctx.fill();
                         ctx.strokeStyle = 'rgba(189,168,238,0.9)'; ctx.lineWidth = 0.7; ctx.stroke();
                     }
+                    ctx.restore();
                 }
                 ctx.restore();
             },
@@ -501,12 +503,18 @@
                     ctx.beginPath(); for (let i = 0; i < 6; i++) { const an = i * Math.PI / 3; ctx[i ? 'lineTo' : 'moveTo'](p[0] + Math.cos(an) * 5.6 * kT, p[1] + Math.sin(an) * 5.6 * kT); } ctx.closePath();
                     ctx.fillStyle = near ? `rgba(255,244,236,${0.95 * a})` : `rgba(232,218,255,${0.9 * a})`; ctx.fill();
                 }
-                for (const [ox, oy] of SQ_ENTRY.posts) for (const gx of [-9, 0, 9]) {                         // glitter globes on the lamp posts
-                    const q = P3(g.dx + ox + gx, g.yf + oy, gx ? 26 : 30), f = 0.9 + 0.1 * Math.sin(t * 3.1 + gx + oy);
-                    sqGlow(ctx, q[0], q[1], 13, `rgba(255,220,170,${0.55 * a * f})`, 'rgba(255,200,150,0)');
-                    ctx.fillStyle = `rgba(255,248,235,${0.95 * a})`; ctx.beginPath(); ctx.arc(q[0], q[1], 2.8, 0, Math.PI * 2); ctx.fill();
-                    const tw = lod ? 0 : Math.pow(Math.max(0, Math.sin(t * 4.3 + gx * 0.7 + oy)), 8);
-                    if (tw > 0.05) { ctx.fillStyle = `rgba(255,255,255,${tw * a})`; sqGlint(ctx, q[0] + 1.5, q[1] - 1.5, 2 + tw * 4); }
+                // The whole globe burns bright, with a warm corona and soft bloom baked once.
+                const postBulb = _lampBulbEmissionSprite('#ffdcaa', 3.2, 'globe');
+                const postGlowSpan = 48 * this._sqK(26);
+                for (const [ox, oy] of SQ_ENTRY.posts) {
+                    const x = g.dx + ox, y = g.yf + oy;
+                    ctx.save(); ctx.translate(x, y); ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE); ctx.translate(-x, -y);
+                    for (const gx of [-9, 0, 9]) {
+                        const q = P3(x + gx, y, gx ? 26 : 30), f = 0.96 + 0.04 * Math.sin(t * 3.1 + gx + oy);
+                        ctx.globalAlpha = a * f;
+                        ctx.drawImage(postBulb, q[0] - postGlowSpan / 2, q[1] - postGlowSpan / 2, postGlowSpan, postGlowSpan);
+                    }
+                    ctx.restore();
                 }
                 ctx.restore();
             },

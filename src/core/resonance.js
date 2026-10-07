@@ -29,7 +29,7 @@
             { id: 'flit', name: 'Flit', color: '#b89cff', blurb: 'Tune the jump between dimensions.', nodes: [
                 { id: 'reach',        name: 'Reach',        desc: r => `+${10 * r}% flit distance` },
                 { id: 'quick_return', name: 'Quick Return', desc: r => `−${10 * r}% attunement per flit` },
-                { id: 'flit_strike',  name: 'Flit-Strike',  desc: (r, R) => `Shots within ${R ? R.stat('flitStrikeWindow', 1) : 1} s after a flit deal +${20 * r}%` },
+                { id: 'flit_strike',  name: 'Flit-Strike',  desc: (r, R) => `Shots and blade hits within ${R ? R.stat('flitStrikeWindow', 1) : 1} s after a flit deal +${20 * r}%` },
                 { id: 'afterimage',   name: 'Afterimage',   desc: r => `Your flit ghost draws gangers' eyes for ${(0.5 * r).toFixed(1)} s` },
                 { id: 'double_step',  name: 'Double Step',  desc: r => `+${20 * r} max attunement${r >= 3 ? '; a second flit within 0.6 s costs half' : ''}` },
                 { id: 'long_echo',    name: 'Long Echo',    unlockLevel: 30, desc: r => `Flit-Strike lasts ${(1 + 0.25 * r).toFixed(2)} s; its damage bonus stays the same` },

@@ -143,6 +143,10 @@
                     }
                 }
                 c.fill();
+                // Living fire lifts the daytime cast shade locally, before that layer darkens the scene.
+                c.save(); c.globalCompositeOperation = 'destination-out';
+                this._drawFireLights(c, 'hole', (x, y, r) => x + r > cull.left && x - r < cull.right && y + r > cull.top && y - r < cull.bottom);
+                c.restore();
                 ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.globalCompositeOperation = 'multiply';
                 ctx.globalAlpha = 0.62 * strength;

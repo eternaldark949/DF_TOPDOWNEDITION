@@ -84,7 +84,7 @@
                 desc: 'Red-hot projectile cast from the palm.',
                 stats: {
                     fireRate: 70,           // Cooldown in frames between casts
-                    damage: 30,
+                    damage: 80,
                     projectileColor: '#ff3300',
                     projectileSpeed: 18,
                     spread: 0.15,
@@ -213,6 +213,95 @@
             return item;
         }
         
+        // Views of existing ownership. These records never enter physical InventorySystem.items,
+        // capacity calculations, save payloads, map entities or cosmetic acquisition methods.
+        const INVENTORY_SPECIAL_COSMETICS = new Set(['outfit_academy', 'acc_umbrella']);
+        const APARTMENT_FURNITURE_REGISTRY = Object.freeze([
+            { id: 'apt_sofa', name: 'Sofa', quantity: 1, icon: '▰', description: 'Wine-red two-seat sofa with cushions and a knit throw.' },
+            { id: 'apt_coffee', name: 'Coffee Table', quantity: 1, icon: '▭', description: 'Rounded walnut coffee table with books and flowers.' },
+            { id: 'apt_chair', name: 'Armchair', quantity: 2, icon: '▣', description: 'Blush upholstered lounge and bedroom armchairs.' },
+            { id: 'apt_side', name: 'Side Table', quantity: 3, icon: '▥', description: 'Walnut side tables with integrated lamps; two indoors and one on the veranda.' },
+            { id: 'apt_bookshelf', name: 'Bookshelf', quantity: 1, icon: '▤', description: 'Walnut shelf stocked with books and ornaments.' },
+            { id: 'apt_console', name: 'Console', quantity: 1, icon: '♫', description: 'Walnut media console with a turntable and stereo speakers.' },
+            { id: 'apt_fireplace', name: 'Fireplace', quantity: 1, icon: '♨', description: 'Linear glass fireplace set into a stone surround.' },
+            { id: 'apt_floor_lamp', name: 'Floor Lamp', quantity: 3, icon: '◉', description: 'Cream floor lamps with brass trim.' },
+            { id: 'apt_plant', name: 'Plant', quantity: 6, icon: '♣', description: 'Potted foliage throughout the living room, bedroom and bathroom.' },
+            { id: 'apt_craft', name: 'Crafting Table', quantity: 1, icon: '⚒', description: 'Walnut and steel workbench with tools, a vise and a schematic tablet.' },
+            { id: 'apt_fridge', name: 'Refrigerator', quantity: 1, icon: '▣', description: 'Metal-finished refrigerator with brass trim.' },
+            { id: 'apt_sink', name: 'Kitchen Sink', quantity: 1, icon: '◡', description: 'Kitchen sink set into cream quartz with a brass tap.' },
+            { id: 'apt_counter', name: 'Kitchen Counter', quantity: 3, icon: '▬', description: 'Cream quartz countertop sections with walnut front edges.' },
+            { id: 'apt_gas_range', name: 'Gas Range', quantity: 1, icon: '♨', description: 'Five-burner black steel gas range with brass knobs.' },
+            { id: 'apt_induction', name: 'Induction Cooktop', quantity: 1, icon: '⊚', description: 'Four-zone black glass induction cooktop.' },
+            { id: 'apt_island', name: 'Kitchen Island', quantity: 1, icon: '▰', description: 'Quartz bar island with waterfall ends and integrated pendant shades.' },
+            { id: 'apt_stool', name: 'Stool', quantity: 4, icon: '●', description: 'Wine-red stools with brass frames along the kitchen island.' },
+            { id: 'apt_bed', name: 'Bed', quantity: 1, icon: '▰', description: 'Queen bed with a blush headboard, wine-red duvet and knit throw.' },
+            { id: 'apt_nightstand', name: 'Nightstand', quantity: 2, icon: '▥', description: 'Walnut bedside cabinets with brass pulls and integrated lamps.' },
+            { id: 'apt_wardrobe', name: 'Wardrobe', quantity: 1, icon: '▥', description: 'Tall walnut wardrobe with brass handles.' },
+            { id: 'apt_vanity', name: 'Dressing Vanity', quantity: 1, icon: '◯', description: 'Walnut dressing table with a brass-framed round mirror and a stool.' },
+            { id: 'apt_tub', name: 'Bathtub', quantity: 1, icon: '◡', description: 'Freestanding oval bathtub with brass fittings.' },
+            { id: 'apt_bath_vanity', name: 'Bathroom Vanity', quantity: 1, icon: '▭', description: 'Double marble vanity with brass taps and a mirror.' },
+            { id: 'apt_shower', name: 'Shower', quantity: 1, icon: '▣', description: 'Walk-in tiled shower with glass screening and a brass rain head.' },
+            { id: 'apt_towels', name: 'Towel Rack', quantity: 1, icon: '║', description: 'Walnut towel stand with blush and cream towels.' },
+            { id: 'apt_lounger', name: 'Lounger', quantity: 2, icon: '▰', description: 'Walnut-framed veranda loungers with cream cushions.' },
+            { id: 'apt_bistro', name: 'Bistro Set', quantity: 1, icon: '◉', description: 'Veranda bistro table and its two chairs, treated as one set.' },
+            { id: 'apt_telescope', name: 'Telescope', quantity: 1, icon: '⌕', description: 'Brass telescope on a tripod overlooking the city.' },
+            { id: 'apt_planter', name: 'Planter', quantity: 3, icon: '♣', description: 'Rectangular planted troughs along the veranda railing.' }
+        ].map(entry => Object.freeze(entry)));
+
+        function getOwnedInventoryEntries(game) {
+            const result = [], cosmetics = game?.cosmetics;
+            const registry = typeof COSMETICS_REGISTRY !== 'undefined' ? COSMETICS_REGISTRY : {};
+            const icons = { wig: '≋', skin: '◉', vocal: '♪', outfit: '✦', accessory: '◇', hat: '⌂', jewelry: '◆' };
+            const labels = { wig: 'Wig', skin: 'Skin', vocal: 'Voice', outfit: 'Outfit', accessory: 'Accessory', hat: 'Hat', jewelry: 'Jewelry' };
+            const seen = new Set();
+            for (const sourceId of Array.isArray(cosmetics?.owned) ? cosmetics.owned : []) {
+                const entry = registry[sourceId];
+                if (!entry || seen.has(sourceId)) continue;
+                seen.add(sourceId);
+                const collectible = INVENTORY_SPECIAL_COSMETICS.has(sourceId);
+                const isEquipped = typeof cosmetics.isEquipped === 'function' ? !!cosmetics.isEquipped(sourceId) :
+                    entry.category === 'jewelry' ? !!cosmetics.equippedJewelry?.includes(sourceId) :
+                    cosmetics[{ wig: 'equippedWig', skin: 'equippedSkin', vocal: 'equippedVocal', outfit: 'equippedOutfit',
+                        accessory: 'equippedAccessory', hat: 'equippedHat' }[entry.category]] === sourceId;
+                result.push({
+                    id: 'cosmetic:' + sourceId, source: 'cosmetic', sourceId,
+                    category: collectible ? 'collectibles' : 'items', type: collectible ? 'collectible' : 'cosmetic',
+                    name: entry.name, description: entry.desc || '',
+                    icon: sourceId === 'acc_umbrella' ? '☂' : icons[entry.category] || '◇',
+                    detail: (labels[entry.category] || 'Cosmetic') + (isEquipped ? ' · Equipped' : ' · Owned'),
+                    isEquipped, registryLabel: isEquipped ? 'EQUIPPED' : 'OWNED'
+                });
+            }
+            for (const entry of APARTMENT_FURNITURE_REGISTRY) {
+                result.push({
+                    id: 'furniture:' + entry.id, source: 'furniture', sourceId: entry.id,
+                    category: 'items', type: 'furniture', name: entry.name, description: entry.description,
+                    icon: entry.icon, detail: entry.quantity > 1 ? 'Apartment 949 · ' + entry.quantity + ' placed' : 'Apartment 949 · Placed',
+                    quantity: entry.quantity, registryLabel: 'PLACED'
+                });
+            }
+            if (game?.questState?.hasVelvetCat) {
+                result.push({ id: 'pet:velvet_cat', source: 'pet', sourceId: 'velvet_cat', category: 'pets', type: 'pet',
+                    name: 'Velvet Cat', description: 'Velvet, your velvet-furred feline companion. Follows you and rides in vehicles.',
+                    icon: '🐾', detail: 'Feline companion', registryLabel: 'OWNED' });
+            }
+            const garage = game?.garage;
+            for (const [index, car] of (Array.isArray(garage?.cars) ? garage.cars : []).entries()) {
+                if (!car) continue;
+                const sourceId = String(car.id ?? ('garage_' + index));
+                const name = typeof garage.getDisplayName === 'function' ? garage.getDisplayName(index) :
+                    [car.brand, car.model].filter(Boolean).join(' ') || 'Owned Vehicle';
+                result.push({
+                    id: 'mount:' + sourceId + ':' + index, source: 'garage', sourceId,
+                    category: 'mounts', type: 'mount', name,
+                    description: 'An owned garage vehicle. Manage it through Car.ME or Torque Auto.',
+                    icon: '▰', detail: (index === garage.activeIndex ? 'Active vehicle' : 'In garage') + (car.isDefault ? ' · Default' : ''),
+                    registryLabel: index === garage.activeIndex ? 'ACTIVE' : 'OWNED', color: car.paintColor || null
+                });
+            }
+            return result;
+        }
+
         class InventorySystem {
             constructor(game) {
                 this.game = game;
@@ -347,143 +436,198 @@
                 else Screens.open('inventory');
             }
         
+            // The carried inventory remains the save/capacity source. Ownership
+            // registries are views over cosmetics, the apartment, pets and garage.
+            getEntries() {
+                const categoryOf = type => ({
+                    weapon: 'weapons', attachment: 'weapons',
+                    collectible: 'collectibles', intel: 'collectibles',
+                    pet: 'pets', mount: 'mounts', vehicle: 'mounts'
+                }[type] || 'items');
+                const carried = this.items.map(item => ({
+                    id: item.id, source: 'carried', sourceId: item.id,
+                    category: categoryOf(item.type), type: item.type,
+                    name: item.name, description: item.description, icon: item.icon,
+                    detail: item.type === 'attachment' ? 'Weapon attachment' : '',
+                    isEquipped: this.isItemEquipped(item.id), item
+                }));
+                return carried.concat(getOwnedInventoryEntries(this.game));
+            }
+
+            _cosmeticAction(entry) {
+                const cosmetics = this.game.cosmetics;
+                const definition = COSMETICS_REGISTRY[entry.sourceId];
+                if (!cosmetics || !definition || !cosmetics.isOwned(entry.sourceId)) return;
+                if (cosmetics.isEquipped(entry.sourceId)) {
+                    if (definition.category === 'accessory') cosmetics.unequipAccessory();
+                    else if (definition.category === 'hat') cosmetics.unequipHat();
+                    else if (definition.category === 'jewelry') cosmetics.unequipJewelry(entry.sourceId);
+                    else return;
+                } else cosmetics.equip(entry.sourceId);
+                audioSys.sfx('ui');
+                this.game.renderSidebarPortrait();
+                this.render();
+            }
+
+            _dropCarriedItem(item) {
+                // Registry entries never reach the existing physical drop path.
+                if (!this.items.includes(item)) return;
+                if (this.game.loot) {
+                    const throwAngle = Math.random() * Math.PI * 2;
+                    this.game.loot.push({
+                        x: this.game.player.x + Math.cos(throwAngle) * 50,
+                        y: this.game.player.y + Math.sin(throwAngle) * 50,
+                        type: 'weapon_drop', item,
+                        angle: Math.random() * 6.28, dropTime: Date.now(),
+                        draw: function(ctx) {
+                            ctx.save();
+                            ctx.translate(this.x, this.y);
+                            const bob = Math.sin(_frameTime / 500) * 3;
+                            ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75;
+                            drawGlow(ctx, 0, 0, 22, '#a469ff', 0.3);
+                            ctx.restore();
+                            drawWeapon(ctx, this.item.id, 0, bob, this.angle, 0.8);
+                            ctx.restore();
+                        }
+                    });
+                }
+                this.removeItem(item.id);
+                showMessage(`DROPPED: ${item.name}`);
+            }
+
+            _renderEntry(entry) {
+                const el = document.createElement('div');
+                el.className = `ui-pill type-${entry.type}${entry.isEquipped ? ' active-item' : ''}`;
+                el.dataset.id = entry.id;
+                el.dataset.source = entry.source;
+                el.dataset.category = entry.category;
+
+                const icon = document.createElement('div');
+                icon.className = 'pill-icon';
+                // Existing carried icons are registry-authored SVG/markup; owned
+                // registry labels and descriptions are inserted as plain text.
+                if (entry.source === 'carried') icon.innerHTML = entry.icon || '';
+                else icon.textContent = entry.icon || '◇';
+                if (entry.color) icon.style.borderColor = entry.color;
+                el.appendChild(icon);
+
+                const body = document.createElement('div');
+                body.className = 'inventory-entry-body';
+                const head = document.createElement('div');
+                head.className = 'inventory-entry-head';
+                const name = document.createElement('span');
+                name.className = 'pill-name'; name.textContent = entry.name;
+                head.appendChild(name);
+                const tag = document.createElement('span');
+                tag.className = entry.isEquipped ? 'pill-equipped-tag' : 'inventory-registry-tag';
+                tag.textContent = entry.isEquipped ? 'EQUIPPED' : (entry.registryLabel || '');
+                if (tag.textContent) head.appendChild(tag);
+                body.appendChild(head);
+                const desc = document.createElement('div');
+                desc.className = 'pill-desc'; desc.textContent = entry.description || '';
+                body.appendChild(desc);
+                if (entry.detail) {
+                    const detail = document.createElement('div');
+                    detail.className = 'inventory-entry-detail'; detail.textContent = entry.detail;
+                    body.appendChild(detail);
+                }
+                el.appendChild(body);
+
+                const actions = [];
+                if (entry.source === 'carried') {
+                    const config = this.typeConfig[entry.type] || {};
+                    if (config.slot || config.consumable || entry.item.action) {
+                        actions.push({ className: 'use-btn', label: entry.isEquipped ? config.unequipLabel : (config.equipLabel || 'USE'), run: () => {
+                            // Read current state at the time of the action.
+                            if (!this.items.includes(entry.item)) return;
+                            if (config.slot) {
+                                if (this.isItemEquipped(entry.id)) this.unequipSlot(config.slot);
+                                else this.equipItem(entry.id);
+                            } else if (config.consumable) {
+                                if (entry.item.action) entry.item.action(entry.item);
+                                this.removeItem(entry.id);
+                            } else if (entry.item.action) entry.item.action(entry.item);
+                        }});
+                    }
+                    actions.push({ className: 'drop-btn', label: 'DROP', run: () => this._dropCarriedItem(entry.item) });
+                } else if (entry.source === 'cosmetic') {
+                    const definition = COSMETICS_REGISTRY[entry.sourceId];
+                    const optional = ['accessory', 'hat', 'jewelry'].includes(definition?.category);
+                    if (!entry.isEquipped || optional) actions.push({
+                        className: 'use-btn', label: entry.isEquipped ? 'REMOVE' : 'EQUIP',
+                        run: () => this._cosmeticAction(entry)
+                    });
+                }
+
+                if (actions.length) {
+                    const control = document.createElement('button');
+                    control.type = 'button'; control.className = 'control-node';
+                    control.setAttribute('aria-label', `Actions for ${entry.name}`);
+                    control.setAttribute('aria-expanded', 'false');
+                    el.appendChild(control);
+                    const menu = document.createElement('div');
+                    menu.className = 'node-menu';
+                    const close = () => {
+                        el.classList.remove('expanded');
+                        control.setAttribute('aria-expanded', 'false');
+                        menu.querySelectorAll('button').forEach(button => button.tabIndex = -1);
+                    };
+                    const toggle = () => {
+                        this.uiList.querySelectorAll('.ui-pill.expanded').forEach(other => {
+                            if (other === el) return;
+                            other.classList.remove('expanded');
+                            other.querySelector('.control-node')?.setAttribute('aria-expanded', 'false');
+                            other.querySelectorAll('.node-menu button').forEach(button => button.tabIndex = -1);
+                        });
+                        const expanded = el.classList.toggle('expanded');
+                        control.setAttribute('aria-expanded', String(expanded));
+                        menu.querySelectorAll('button').forEach(button => button.tabIndex = expanded ? 0 : -1);
+                    };
+                    actions.forEach(action => {
+                        const button = document.createElement('button');
+                        button.type = 'button'; button.className = `node-btn ${action.className}`;
+                        button.textContent = action.label; button.tabIndex = -1;
+                        button.addEventListener('click', event => { event.stopPropagation(); action.run(); close(); });
+                        menu.appendChild(button);
+                    });
+                    el.appendChild(menu);
+                    control.addEventListener('click', event => { event.stopPropagation(); toggle(); });
+                    el.addEventListener('click', event => { if (!event.target.closest('button')) toggle(); });
+                    el.addEventListener('keydown', event => {
+                        if (event.key === 'Escape' && el.classList.contains('expanded')) {
+                            event.stopPropagation(); close(); control.focus();
+                        }
+                    });
+                } else el.classList.add('inventory-registry-readonly');
+                return el;
+            }
+
             render() {
                 if (!this.uiList) return;
-                this.uiList.innerHTML = '';
-                
-                // Get filter state from sidebar
-                // EQUIPPED is this list showing only what's equipped; the filter still narrows it
+                this.uiList.replaceChildren();
                 const equippedOnly = Screens.current === 'equipped';
-                let filteredItems = equippedOnly ? this.items.filter(i => this.isItemEquipped(i.id)) : this.items;
-                if (typeof invSidebar !== 'undefined' && invSidebar.filterEnabled && invSidebar.activeFilter) {
-                    const filter = invSidebar.activeFilter;
-                    if (filter !== 'all') {
-                        // Map filter names to item types
-                        // Filter is plural (weapons), item.type is singular (weapon)
-                        const filterToType = {
-                            'weapons': 'weapon',
-                            'collectibles': 'collectible',
-                            'pets': 'pet',
-                            'mounts': 'mount',
-                            'vehicles': 'vehicle',
-                            'consumables': 'consumable'
-                        };
-                        const targetType = filterToType[filter] || filter;
-                        filteredItems = filteredItems.filter(item => item.type === targetType);
-                    }
-                }
-                
-                if (filteredItems.length === 0) {
-                    const message = this.items.length === 0 ? 'NO ITEMS CARRIED' : equippedOnly ? 'NOTHING EQUIPPED' : 'NO MATCHING ITEMS';
-                    this.uiList.innerHTML = `<div style="color:#666; text-align:center; margin-top:50px;">${message}</div>`;
+                const filter = typeof invSidebar !== 'undefined' && invSidebar.filterEnabled ? invSidebar.activeFilter : null;
+                let entries = this.getEntries();
+                if (equippedOnly) entries = entries.filter(entry => entry.isEquipped);
+                if (filter && filter !== 'all') entries = entries.filter(entry => entry.category === filter);
+                const labels = { items: 'Items', collectibles: 'Collectibles', weapons: 'Weapons', pets: 'Pets', mounts: 'Mounts' };
+                if (!entries.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'inventory-empty';
+                    empty.textContent = equippedOnly ? 'NOTHING EQUIPPED IN THIS CATEGORY' : `NO OWNED ${(labels[filter] || 'ITEMS').toUpperCase()}`;
+                    this.uiList.appendChild(empty);
                     return;
                 }
-        
-                filteredItems.forEach(item => {
-                    const isEquipped = this.isItemEquipped(item.id);
-                    const config = this.typeConfig[item.type] || {};
-                    const el = document.createElement('div');
-                    el.className = `ui-pill type-${item.type} ${isEquipped ? 'active-item' : ''}`;
-                    el.dataset.id = item.id;
-                    el.innerHTML = `
-                        <div class="pill-icon">${item.icon}</div>
-                        <div style="flex:1; min-width:0;">
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <span class="pill-name">${item.name}</span>
-                                <span class="pill-equipped-tag">${isEquipped ? 'EQUIPPED' : ''}</span>
-                            </div>
-                            <div class="pill-desc">${item.description}</div>
-                        </div>
-                        <div class="control-node"></div>
-                        <div class="node-menu">
-                            <button class="node-btn use-btn">${isEquipped ? (config.unequipLabel || 'UNEQUIP') : (config.equipLabel || 'EQUIP')}</button>
-                            <button class="node-btn drop-btn">DROP</button>
-                        </div>
-                    `;
-                    // ... remaining logic
-
-        
-                    // Expand/Collapse Logic
-                    el.addEventListener('click', (e) => {
-                        if (e.target.tagName === 'BUTTON') return;
-                        Array.from(this.uiList.children).forEach(child => {
-                            if (child !== el) child.classList.remove('expanded');
-                        });
-                        el.classList.toggle('expanded');
-                    });
-        
-                    const useBtn = el.querySelector('.use-btn');
-                    const dropBtn = el.querySelector('.drop-btn');
-        
-                    // HANDLE "USE / EQUIP / UNEQUIP"
-                    useBtn.onclick = () => {
-                        const cfg = this.typeConfig[item.type] || {};
-                        if (cfg.slot) {
-                            // Equippable item (weapon or attachment)
-                            if (isEquipped) {
-                                this.unequipSlot(cfg.slot);
-                            } else {
-                                this.equipItem(item.id);
-                            }
-                        } else if (cfg.consumable) {
-                            // Consumables — use and remove
-                            if (item.action) item.action(item);
-                            this.removeItem(item.id);
-                        } else {
-                            // Non-equippable, non-consumable (intel, collectibles)
-                            if (item.action) item.action(item);
-                        }
-                        el.classList.remove('expanded');
-                    };
-        
-                    // Inside InventorySystem class
-                    
-                    dropBtn.onclick = () => {
-                        if (this.game.loot) {
-                            // 1. Calculate a safe drop distance (e.g., 50px)
-                            // We use a random angle so items don't pile up in one spot
-                            const throwDist = 50; 
-                            const throwAngle = Math.random() * Math.PI * 2;
-                    
-                            this.game.loot.push({
-                                // Calculate X/Y based on angle and distance
-                                x: this.game.player.x + Math.cos(throwAngle) * throwDist,
-                                y: this.game.player.y + Math.sin(throwAngle) * throwDist,
-                                
-                                type: 'weapon_drop',
-                                item: item,
-                                angle: Math.random() * 6.28,
-                                
-                                // NEW: Add a timestamp for when this was dropped
-                                dropTime: Date.now(), 
-                    
-                                // ... (Your existing draw function here) ...
-                                draw: function(ctx) {
-                                    // ... (Keep your draw logic from the previous step)
-                                    ctx.save();
-                                    ctx.translate(this.x, this.y);
-                                    const bob = Math.sin(_frameTime / 500) * 3;
-                                    
-                                    // Ground glow: a violet pool squashed flat under it
-                                    ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75;
-                                    drawGlow(ctx, 0, 0, 22, '#a469ff', 0.3);
-                                    ctx.restore();
-
-                                    drawWeapon(ctx, this.item.id, 0, bob, this.angle, 0.8);
-                                    ctx.restore();
-                                }
-                            });
-                        }
-                        
-                        // Play a "whoosh" or throw sound if you have one
-                    
-                        this.removeItem(item.id);
-                        showMessage(`DROPPED: ${item.name}`);
-                    };
-
-        
-                    this.uiList.appendChild(el);
-                });
+                // With filtering off, each category still has its own heading.
+                for (const [category, label] of Object.entries(labels)) {
+                    const group = entries.filter(entry => entry.category === category);
+                    if (!group.length) continue;
+                    const heading = document.createElement('h2');
+                    heading.className = 'inventory-section-title';
+                    heading.textContent = `${label} · ${group.length}`;
+                    this.uiList.appendChild(heading);
+                    group.forEach(entry => this.uiList.appendChild(this._renderEntry(entry)));
+                }
             }
         
         }

@@ -50,6 +50,7 @@
             }
         };
         const LAMP_TYPE_STYLE = { 1: 'antique_crook', 2: 'antique_twin' };
+        const LAMP_POST_SCALE = 1.5; // Street and entrance posts, scaled around their ground anchors.
 
         // The fluted cast-iron foot of the post, ringed in brass
         function _lampBase(c, x, y, r) {
@@ -84,6 +85,55 @@
             c.strokeStyle = LAMP_IRON_HI; c.lineWidth = 0.6;
             c.beginPath(); c.moveTo(x - r * 0.45, y - r * 0.2); c.lineTo(x - r * 0.1, y - r * 0.45); c.stroke();
             c.fillStyle = LAMP_BRASS; c.beginPath(); c.arc(x, y, r * 0.17, 0, Math.PI * 2); c.fill();
+        }
+
+        // Bulb artwork lives above the darkness layer; the old lamp bodies keep their materials.
+        // Gradients and pane masks are baked once, so each lit bulb costs one sprite draw.
+        const _lampBulbEmissionSprites = new Map();
+        function _lampBulbEmissionSprite(color, radius, shape = 'lantern', S = 3) {
+            color = /^#[0-9a-f]{6}$/i.test(color) ? color : '#ffeebb';
+            const key = `${color}|${radius}|${shape}|${S}`;
+            let cv = _lampBulbEmissionSprites.get(key);
+            if (cv) return cv;
+            cv = document.createElement('canvas'); cv.width = cv.height = 48 * S;
+            const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, 24 * S, 24 * S);
+            const rgb = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)).join(',');
+            const haloRadius = shape === 'globe' ? 18 : 24;
+            const halo = c.createRadialGradient(0, 0, radius * .6, 0, 0, haloRadius);
+            halo.addColorStop(0, `rgba(${rgb},0.30)`); halo.addColorStop(.25, `rgba(${rgb},0.20)`);
+            halo.addColorStop(.6, `rgba(${rgb},0.07)`); halo.addColorStop(1, `rgba(${rgb},0)`);
+            c.fillStyle = halo; c.fillRect(-24, -24, 48, 48);
+            const bloomRadius = radius * 1.65;
+            const bloom = c.createRadialGradient(0, 0, radius * .45, 0, 0, bloomRadius);
+            bloom.addColorStop(0, 'rgba(255,249,230,0.40)');
+            bloom.addColorStop(.48, `rgba(${rgb},0.26)`); bloom.addColorStop(1, `rgba(${rgb},0)`);
+            c.fillStyle = bloom; c.beginPath(); c.arc(0, 0, bloomRadius, 0, Math.PI * 2); c.fill();
+            if (shape === 'globe') {
+                const face = c.createRadialGradient(-radius * .12, -radius * .15, 0, 0, 0, radius);
+                face.addColorStop(0, '#ffffff'); face.addColorStop(.55, '#fffdf4');
+                face.addColorStop(.85, '#fff1ce'); face.addColorStop(1, color);
+                c.fillStyle = face; c.beginPath(); c.arc(0, 0, radius, 0, Math.PI * 2); c.fill();
+            } else {
+                // Light shines between the original corner ribs, leaving the iron cap opaque.
+                const face = c.createRadialGradient(0, 0, radius * .45, 0, 0, radius);
+                face.addColorStop(0, '#fff8e2'); face.addColorStop(.32, '#fffef9');
+                face.addColorStop(.70, '#fff5d9'); face.addColorStop(1, color);
+                c.fillStyle = face;
+                const points = Array.from({length:6}, (_, i) => {
+                    const a = Math.PI / 6 + i * Math.PI / 3; return {x:Math.cos(a),y:Math.sin(a)};
+                });
+                for (let i = 0; i < 6; i++) {
+                    const p = points[i], q = points[(i + 1) % 6], inset = .12;
+                    const a = {x:p.x+(q.x-p.x)*inset,y:p.y+(q.y-p.y)*inset};
+                    const b = {x:q.x+(p.x-q.x)*inset,y:q.y+(p.y-q.y)*inset};
+                    c.beginPath(); c.moveTo(a.x * radius * .91, a.y * radius * .91);
+                    c.lineTo(b.x * radius * .91, b.y * radius * .91);
+                    c.lineTo(b.x * radius * .59, b.y * radius * .59);
+                    c.lineTo(a.x * radius * .59, a.y * radius * .59); c.closePath(); c.fill();
+                }
+            }
+            _lampBulbEmissionSprites.set(key, cv);
+            return cv;
         }
 
         const _lampSprites = new Map();
@@ -123,7 +173,8 @@
                 left = -r; right = r; top = lamp.lampType === 5 ? Math.min(-12, -r) : -r;
                 bottom = lamp.lampType === 5 ? Math.max(12, r) : r;
             } else return true;
-            return worldPaintBoxInView(ctx, view, zoom, lamp.x, lamp.y, left, top, right, bottom, lamp.angle);
+            const scale = style ? LAMP_POST_SCALE : 1;
+            return worldPaintBoxInView(ctx, view, zoom, lamp.x, lamp.y, left * scale, top * scale, right * scale, bottom * scale, lamp.angle);
         }
 
         class LampEntity extends GameEntity {
@@ -153,6 +204,22 @@
             
             update() { }
 
+            /** Only the luminous panes and bloom: drawn after the world's darkness, never the post. */
+            drawEmissive(ctx, daylight = 0) {
+                const style = LAMP_TYPE_STYLE[this.lampType], k = Math.max(0, Math.min(1, this._lightK ?? 1));
+                if (!style || !this.visible || daylight >= .2 || this._forcedOff || k < .02) return;
+                ctx.save();
+                ctx.translate(this.x, this.y); ctx.rotate(this.angle); ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE);
+                const m = ctx.getTransform(), density = Math.hypot(m.a, m.b);
+                const S = density > 1.6 ? 3 : density > .8 ? 2 : 1;
+                const radius = style === 'antique_twin' ? 7 : 6.5;
+                ctx.globalAlpha *= k;
+                for (const b of LAMP_STYLES[style].bulbs) {
+                    ctx.drawImage(_lampBulbEmissionSprite(this.color, radius, 'lantern', S), b.x - 24, b.y - 24, 48, 48);
+                }
+                ctx.restore();
+            }
+
             /** This lamp's glow sprite (core/draw-helpers.js). */
             _glow() { return this._glowCv || (this._glowCv = glowSprite(/^#[0-9a-f]{6}$/i.test(this.color) ? this.color : '#ffeebb', 0.3)); }
             
@@ -169,6 +236,7 @@
                 let bulbs = [];
                 
                 const style = LAMP_TYPE_STYLE[this.lampType];
+                if (style) ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE);
                 if (style) { // A street lamp: its antique style, a baked sprite (LAMP_STYLES)
                     bulbs = LAMP_STYLES[style].bulbs;
                     

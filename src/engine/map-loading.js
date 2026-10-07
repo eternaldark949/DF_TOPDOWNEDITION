@@ -7,6 +7,7 @@
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
             apt_949: ['_backdropStatic'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
+            enni_cole_interior: ['_enniFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };
 
@@ -169,6 +170,7 @@ engineMixin({
                     // A slot replacement must also rebuild the concatenated occluders.
                     M._occluderCache = null;
                 }
+                if (NavGrid._cache && NavGrid._cache.map === M) NavGrid._cache.grid._epoch = -1;
                 CollisionSystem._staticRows.length = 0;
             },
 
@@ -197,6 +199,10 @@ engineMixin({
             _releaseReflectionScratch() {
                 this._reflPrepareMovers = this._reflGroundMovers = this._reflUpdateMovers = null;
                 this._reflLightCars = this._reflVisiblePuddles = null;
+                this._ultraMoverBuffer = this._ultraExtraRecords = this._ultraActorSeen = null;
+                this._ultraCars = this._ultraCarSeen = this._ultraFoliageCandidates = null;
+                this._ultraWalkerProxies = null;
+                this._refl = null;
             },
 
             /** What belongs to the map being left: effects at its coordinates, walks across its floor,
@@ -213,6 +219,7 @@ engineMixin({
                 this.finCam = null;
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
                 this.casings = []; this.shotFx = []; this.muzzleFlashes = []; this.flitVFX = [];
+                this._fireTrail = []; this._fireTrailSerial = 0;
                 this.noiseRipples = []; this.lastKnownMarkers = [];
                 this._edgeRipples = null; this._edgeTouch = null;                       // the veil's ripples (world/map-edge.js)
                 if (typeof Walker !== 'undefined') {                                   // walks are across the old floor
@@ -1137,7 +1144,7 @@ engineMixin({
                 // Maps that ask for it (the House) route paths around their big furniture too
                 if (this.activeMap.navProps) this.activeMap.navObstacles = this.props
                     .filter(p => (p.mass || 0) >= 1e6 && p.width * p.height >= (this.activeMap.navProps === 'all' ? 200 : 600) && !p.noNav)
-                    .map(p => ({ x: p.x, y: p.y, w: p.width, h: p.height }));
+                    .map(p => p); // retain live bounds/rotation; shared with the solid-prop navigation overlay
                 
                 // Auto-tag lamps with their containing room ID for per-room light control
                 if (this.roomSystem.active) {
@@ -1171,7 +1178,9 @@ engineMixin({
                     if (this.activeMap.walls) { this._staticWallEntities = createStaticEntitiesFromWalls(this.activeMap.walls); }
                     if (this.activeMap.buildings) { this._staticBuildingEntities = createStaticEntitiesFromBuildings(this.activeMap.buildings); }
                 }
-                this.activeMap.billboards = BILLBOARDS.filter(b => b.map === this.activeMap.id).map(cfg => new Billboard(cfg));
+                // Hub billboards are parked for now; keep their authored data for a later return.
+                this.activeMap.billboards = this.activeMap.id === 'hub_949' ? []
+                    : BILLBOARDS.filter(b => b.map === this.activeMap.id).map(cfg => new Billboard(cfg));
                 if (this.useNewCollisionSystem) this._staticBillboardEntities = this.activeMap.billboards.flatMap(b => b.colliders());
                 
                 CollisionSystem.processQueue();

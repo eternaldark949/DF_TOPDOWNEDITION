@@ -179,6 +179,25 @@
                 return lists;
             },
 
+            /** Sample once after all vehicles have moved and collisions have resolved. */
+            updateCarLightTrails() {
+                const z = this.camera.zoom || 1, pad = CAR_TAIL_TRAIL.VIEW_PAD;
+                const hw = this.canvas.width / 2 / z + pad, hh = this.canvas.height / 2 / z + pad;
+                const view = { left: this.camera.x - hw, right: this.camera.x + hw, top: this.camera.y - hh, bottom: this.camera.y + hh };
+                const cars = new Set(this.traffic ? this.traffic.vehicles : []);
+                for (const v of [this.car, this.ownedCar, this.deliveryVehicle]) if (v instanceof TrafficVehicle) cars.add(v);
+                for (const v of cars) updateCarTailTrail(v, this.activeMap, view, _simTick);
+            },
+
+            /** Ordinary gunners' hot metal emits its own light after the darkness pass. */
+            drawGunnerHeat(ctx, cull) {
+                for (const e of this.enemies) {
+                    if (!(e instanceof GatlingGunner) || e.persona || e.dead || e._barrelHeat <= 0.02) continue;
+                    if (cull && (e.x < cull.left || e.x > cull.right || e.y < cull.top || e.y > cull.bottom)) continue;
+                    e.drawHeat(ctx);
+                }
+            },
+
             /** After lighting: building windows/neon/rooftop lights, then the sky layer. */
             drawEmissivePass(ctx) {
                 const dark = this.getAmbientDarkness();
@@ -206,14 +225,25 @@
                         }
                     }
                 }
-                // Car lamps in the dark: tail and brake lights, headlights, signals (traffic/car-art.js)
-                if (dark > 0.04) {
+                // Street bulbs remain luminous above the ambient darkness. Reuse the body's on/fade state.
+                if (this._cullBounds) {
+                    const cb = this._cullBounds, z = this.camera.zoom || 1;
+                    for (const entry of this._queryLampCandidates(cb.lamps, 'lampEmission')) {
+                        const l = entry.item;
+                        if (l._bulbPaintFrame !== this._renderDrawId || !LAMP_TYPE_STYLE[l.lampType] || typeof l.drawEmissive !== 'function') continue;
+                        if (lampPaintInView(l, ctx, cb.view, z, l._bulbDay)) l.drawEmissive(ctx, l._bulbDay);
+                    }
+                }
+                // Motion trails and car lamps remain luminous above the ambient darkness.
+                {
                     const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z + 60, hh = this.canvas.height / 2 / z + 60, c = this.camera;
+                    const view = this._cullBounds && this._cullBounds.view || { left: c.x - hw, right: c.x + hw, top: c.y - hh, bottom: c.y + hh };
                     const cars = new Set(this.traffic ? this.traffic.vehicles : []);
                     for (const v of [this.car, this.ownedCar, this.deliveryVehicle]) if (v && v.draw === TrafficVehicle.prototype.draw) cars.add(v);
                     for (const v of cars) {
-                        if (!v.visible || v.dead || v.x < c.x - hw || v.x > c.x + hw || v.y < c.y - hh || v.y > c.y + hh) continue;
-                        drawCarGlow(ctx, v, dark);
+                        if (!v.visible || v.dead) continue;
+                        drawCarTailTrail(ctx, v, dark, view, this.activeMap);
+                        if (dark > 0.04 && !(v.x < c.x - hw || v.x > c.x + hw || v.y < c.y - hh || v.y > c.y + hh)) drawCarGlow(ctx, v, dark);
                     }
                 }
                 if (this.activeMap.billboards) {
