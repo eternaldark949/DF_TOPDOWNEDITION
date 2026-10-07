@@ -28,6 +28,7 @@ engineMixin({
                 // Pause game
                 this.pauseSystem.acquire('map_load');
                 const seq = this._loadSeq = (this._loadSeq || 0) + 1;
+                this._cancelMapTextureWarmup();
                 
                 // 3. Wait for Screen to go Black (400ms)
                 setTimeout(() => {
@@ -42,15 +43,103 @@ engineMixin({
                     // Now that activeMap is updated, this will calculate the correct lines
                     this.bakeStaticLighting(); 
                     
-                    // C. Fade Back In
-                    setTimeout(() => {
-                        if (seq !== this._loadSeq) return;
+                    // C. Use the existing black hold to prepare first-visible textures. Keep the
+                    // same 100ms minimum; unusually costly paints finish before revealing the map.
+                    const arrivingMap = this.activeMap;
+                    let held = false, prepared = false;
+                    const reveal = () => {
+                        if (seq !== this._loadSeq || arrivingMap !== this.activeMap || !held || !prepared) return;
+                        this._mapTextureTransition = null;
                         fadeOverlay.classList.remove('active');
                         this.pauseSystem.release('map_load');
-                    }, 100);
+                    };
+                    setTimeout(() => { held = true; reveal(); }, 100);
+                    this._prepareMapTextures(() => { prepared = true; reveal(); }, seq);
+                    this._mapTextureTransition = { map: arrivingMap, seq };
                 }, 400);
             },
             
+            /** Cancel queued texture work and, on reset/quit, invalidate pending transition callbacks. */
+            _cancelMapTextureWarmup(abandonTransition = false) {
+                const warm = this._mapTextureWarmup;
+                if (warm) {
+                    clearTimeout(warm.timer);
+                    warm.jobs.length = 0; warm.map = null; warm.done = null;
+                    this._mapTextureWarmup = null;
+                }
+                this._mapTextureTransition = null;
+                if (abandonTransition) {
+                    this._loadSeq = (this._loadSeq || 0) + 1;
+                    const fade = document.getElementById('fade-overlay');
+                    if (fade) fade.classList.remove('active');
+                    if (this.pauseSystem) this.pauseSystem.release('map_load');
+                }
+            },
+
+            /** Predict the first normal draw's center after spawn placement without advancing camera state. */
+            _firstMapGroundView() {
+                let x = this.camera.x, y = this.camera.y;
+                if (!(this.cutscene && this.cutscene.active)) {
+                    const dt = Math.min(100, Math.max(0, _frameTime - (this._camLeanT || _frameTime)));
+                    const drv = this.isDriving && this.car, LA = CONFIG.VEHICLE_DRIVE.CAM_LOOK_AHEAD, k = 1 - Math.exp(-dt / LA.TAU_MS);
+                    const dx = (this.driveLeanX || 0) + ((drv ? (this.car.vx || 0) * LA.PER_SPEED : 0) - (this.driveLeanX || 0)) * k;
+                    const dy = (this.driveLeanY || 0) + ((drv ? (this.car.vy || 0) * LA.PER_SPEED : 0) - (this.driveLeanY || 0)) * k;
+                    x = this.player.x + (this.scopeLeanX || 0) + dx;
+                    y = this.player.y + (this.scopeLeanY || 0) + dy;
+                }
+                if (this.cineCam) { x += this.cineCam.dx; y += this.cineCam.dy; }
+                if (this.finCam) { x += this.finCam.dx; y += this.finCam.dy; }
+                const hw = this.canvas.width / 2 / this.camera.zoom, hh = this.canvas.height / 2 / this.camera.zoom, map = this.activeMap;
+                return { left: Math.max(0, x - hw - 50), top: Math.max(0, y - hh - 50),
+                    right: Math.min(map.width, x + hw + 50), bottom: Math.min(map.height, y + hh + 50) };
+            },
+
+            /** Prepare only existing static bakes; moving details keep their original render-time updates. */
+            _prepareMapTextures(done, seq) {
+                this._cancelMapTextureWarmup();
+                const map = this.activeMap, jobs = [];
+                const floors = {
+                    house_of_death: [['_houseFloor', '_paintHouseFloor']],
+                    hotel_lobby: [['_lobbyFloor', '_paintLobbyFloor']],
+                    church_boss: [['_sanctumFloor', '_paintSanctumFloor']],
+                    hotel_suite: [['_suiteFloor', '_paintSuiteFloor']],
+                    moon_city_nightclub: [['_clubFloor', '_paintClubFloor']],
+                    cozy_cafe_interior: [['_cafeFloor', '_paintCafeFloor']],
+                    demoness_palace: [['_palaceFloor', '_paintPalaceFloor']],
+                    keepers_hill: [['_keeperHill', '_paintKeeperHill'], ['_keeperHouse', '_paintKeeperHouse']],
+                    keepers_parlor: [['_keeperParlor', '_paintKeeperParlor']],
+                    van_interior: [['_vanCabin', '_paintVanCabin']]
+                };
+                for (const [field, paint] of floors[map.id] || []) if (!this[field]) jobs.push(() => {
+                    if (!this[field]) this[field] = this[paint]();
+                });
+                // Ground labels use a downloaded font: speculative preparation must not freeze an
+                // earlier fallback face. The ordinary first draw remains responsible if it is not ready.
+                if (this.groundBaker && this.groundBaker.activeFor(map) &&
+                    (!document.fonts || document.fonts.check('600 11px Montserrat'))) {
+                    jobs.push(...this.groundBaker.warmupJobs(this._firstMapGroundView()));
+                }
+                if (!jobs.length) { done(); return; }
+                const warm = { map, seq, jobs, index: 0, timer: null, done };
+                this._mapTextureWarmup = warm;
+                const finish = () => {
+                    if (this._mapTextureWarmup !== warm) return;
+                    this._mapTextureWarmup = null;
+                    const callback = warm.done;
+                    warm.jobs.length = 0; warm.map = null; warm.done = null;
+                    if (callback) callback();
+                };
+                const step = () => {
+                    if (this._mapTextureWarmup !== warm || seq !== this._loadSeq || map !== this.activeMap) return;
+                    if (warm.index >= jobs.length) { finish(); return; }
+                    try { jobs[warm.index++](); }
+                    catch (error) { console.warn('Map texture preparation', error); finish(); return; }
+                    // One expensive canvas per task lets the browser present the fade between paints.
+                    warm.timer = setTimeout(step, 0);
+                };
+                warm.timer = setTimeout(step, 0);
+            },
+
             /**
              * Where to stand on entering an interior by its door: just inside, clear of the door's
              * trigger, on the side facing the room (a door on the south wall → step north).
@@ -70,6 +159,19 @@ engineMixin({
                 return { x: M.spawn.x, y: M.spawn.y, angle: -Math.PI / 2 };   // nothing clear: the map's own spawn
             },
 
+            /** Call after an editor/script changes static rectangles within the current tick. */
+            invalidatePhysicsSpatial(items) {
+                if (items) _physicsSpatial.invalidate(items);
+                else _physicsSpatial.clear();
+                const M = this.activeMap;
+                if (M) {
+                    _physicsSpatial.track(M.walls); _physicsSpatial.track(getColliders(M));
+                    // A slot replacement must also rebuild the concatenated occluders.
+                    M._occluderCache = null;
+                }
+                CollisionSystem._staticRows.length = 0;
+            },
+
             /** Take a wall out of the live map (the suite's breach): its collision body, the render grid,
              *  the lamp shadows it cast, and (through its signature) the nav grid all follow. */
             removeWall(w) {
@@ -78,6 +180,7 @@ engineMixin({
                 const bodies = this._staticWallEntities || [];
                 const body = bodies.length === M.walls.length ? bodies[i] : null;   // built from this array, in this order
                 M.walls.splice(i, 1);
+                this.invalidatePhysicsSpatial();
                 if (body) { body.active = false; body.markedForDestroy = true; body._finalDestroy(); bodies.splice(i, 1); }
                 if (this._renderGridWalls) this._renderGridWalls.build(M.walls);
                 this.bakeStaticLighting();
@@ -90,9 +193,22 @@ engineMixin({
                 for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (this[k] && !keep.includes(k)) this[k] = null;
             },
 
+            /** These buffers hold scratch draw records, never persistent gameplay state. */
+            _releaseReflectionScratch() {
+                this._reflPrepareMovers = this._reflGroundMovers = this._reflUpdateMovers = null;
+                this._reflLightCars = this._reflVisiblePuddles = null;
+            },
+
             /** What belongs to the map being left: effects at its coordinates, walks across its floor,
                 a finisher or slow-mo in progress, and caches that would hold the old map alive. */
             _clearMapResidue() {
+                // Direct scene/dev loads must also release a pending normal transition's fade.
+                this._cancelMapTextureWarmup(!!this._mapTextureWarmup || !!this._mapTextureTransition);
+                this._clearRenderSpatial();
+                this._releaseReflectionScratch();
+                this._effectSpatial = this._effectCandidateBuffers = null;
+                _physicsSpatial.clear();
+                CollisionSystem.clearSpatialGrid();
                 if (this.finisher) this.endFinisher(true);
                 this.finCam = null;
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
@@ -116,6 +232,8 @@ engineMixin({
                 // =========================================================
                 //  PHASE 1: CLEANUP
                 // =========================================================
+                // A Zib ride doesn't survive the map changing under it (death, a scene): it ends, uncharged
+                if (this.zibSystem && this.zibSystem.passengerRide) this.zibSystem.abandonRide(this);
                 CollisionSystem.clearSpatialGrid();
                 
                 if (this._staticWallEntities) {
@@ -166,7 +284,7 @@ engineMixin({
                 
                 // Clear all particles on map transition
                 if (this.weather) {
-                    this.weather.particles = [];
+                    this.weather.clearParticles();
                 }
 
                 // =========================================================
@@ -950,6 +1068,10 @@ engineMixin({
                 // Build spatial transition grid for O(1) lookups (replaces per-frame .find())
                 this._transitionGrid.build(this.activeMap.transitions);
                 
+                // Buildings/foliage are now complete (all authored and generated writes precede this).
+                this.invalidateRenderSpatial();
+                this._ensureRenderSpatial();
+
                 // Build render grids for static geometry — O(visible cells) draw instead of O(N)
                 this._renderGridWalls = new RenderGrid(400);
                 this._renderGridWalls.build(this.activeMap.walls);
@@ -1054,6 +1176,8 @@ engineMixin({
                 
                 CollisionSystem.processQueue();
                 GameEntity.queueEnabled = false;
+                _physicsSpatial.track(this.activeMap.walls);
+                _physicsSpatial.track(getColliders(this.activeMap));
                 
                 if (this.activeMap.id === 'hub_949' && this.questState.ambushCleared) { 
                     this.npcs.push(new NPC(2000, 9800, "Ms. Jean", 'ms_jean')); 

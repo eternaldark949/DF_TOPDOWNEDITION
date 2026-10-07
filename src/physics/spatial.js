@@ -227,21 +227,28 @@
                 
                 for (let cx = minCX; cx <= maxCX; cx++) {
                     for (let cy = minCY; cy <= maxCY; cy++) {
-                        const cell = this.cells.get(this._ckey(cx, cy));
-                        if (!cell) continue;
-                        for (let i = 0; i < cell.length; i++) {
-                            const other = cell[i];
-                            if (other !== entity && other._hashStamp !== stamp) { other._hashStamp = stamp; candidates.push(other); }
-                        }
+                        this._collectCell(this._ckey(cx, cy), stamp, candidates, entity);
                     }
                 }
                 
                 return candidates;
             }
+
+            // Cached static and refreshed dynamic cells retain the original insertion
+            // order within each cell; concatenating two grids would change contacts.
+            _collectCell(key, stamp, out, exclude = null) {
+                const moving = this.cells.get(key), fixed = this._staticCells && this._staticCells.get(key);
+                let i = 0, j = 0;
+                const n = moving ? moving.length : 0, m = fixed ? fixed.length : 0;
+                while (i < n || j < m) {
+                    const e = j >= m || (i < n && moving[i]._collisionOrder < fixed[j]._collisionOrder) ? moving[i++] : fixed[j++];
+                    if (e !== exclude && e._hashStamp !== stamp) { e._hashStamp = stamp; out.push(e); }
+                }
+            }
             
             // Get all entities in a radius (for explosions, etc.)
             getInRadius(x, y, radius) {
-                const stamp = ++this._stamp, results = [];
+                const stamp = ++this._stamp, results = [], candidates = [];
                 
                 const minCX = Math.floor((x - radius) / this.cellSize);
                 const maxCX = Math.floor((x + radius) / this.cellSize);
@@ -250,16 +257,10 @@
                 
                 for (let cx = minCX; cx <= maxCX; cx++) {
                     for (let cy = minCY; cy <= maxCY; cy++) {
-                        const cell = this.cells.get(this._ckey(cx, cy));
-                        if (!cell) continue;
-                        for (let i = 0; i < cell.length; i++) {
-                            const e = cell[i];
-                            if (e._hashStamp === stamp) continue;
-                            const dist = Math.hypot(e.x - x, e.y - y);
-                            if (dist <= radius + e.radius) { e._hashStamp = stamp; results.push(e); }
-                        }
+                        this._collectCell(this._ckey(cx, cy), stamp, candidates);
                     }
                 }
+                for (const e of candidates) if (Math.hypot(e.x - x, e.y - y) <= radius + e.radius) results.push(e);
                 
                 return results;
             }
@@ -312,9 +313,10 @@
              * Query all items overlapping the given viewport bounds.
              * Returns a Set (auto-deduplicates items spanning multiple cells).
              * @param {object} bounds - { left, right, top, bottom }
+             * @param {Set} [results] - Optional caller-owned scratch set, cleared before use.
              */
-            query(bounds) {
-                const results = new Set();
+            query(bounds, results = new Set()) {
+                results.clear();
                 
                 const minCX = Math.floor(bounds.left / this.cellSize);
                 const maxCX = Math.floor(bounds.right / this.cellSize);
@@ -337,6 +339,148 @@
             }
         }
 
+
+        // Ordered broadphase for static buildings/foliage. Deduplicate ARRAY SLOTS,
+        // so duplicate references still draw twice and foliage density keeps its original index.
+        // Exact existing pass predicates run after the query; the grid never changes their margins.
+        class OrderedRenderGrid {
+            constructor(cellSize = 400) {
+                this.cellSize = cellSize;
+                this.cells = new Map();
+                this.entries = [];
+                this.always = [];
+                this.stamp = 0;
+            }
+
+            build(items, boundsFor) {
+                this.cells.clear(); this.entries.length = 0; this.always.length = 0;
+                if (!items) return;
+                items.forEach((item, index) => {
+                    const entry = { item, index, stamp: 0, standardV2: false };
+                    this.entries.push(entry);
+                    const b = boundsFor(item, entry);
+                    if (!b || ![b.left, b.right, b.top, b.bottom].every(Number.isFinite)) {
+                        this.always.push(entry); return;
+                    }
+                    const x0 = Math.floor(Math.min(b.left, b.right) / this.cellSize), x1 = Math.floor(Math.max(b.left, b.right) / this.cellSize);
+                    const y0 = Math.floor(Math.min(b.top, b.bottom) / this.cellSize), y1 = Math.floor(Math.max(b.top, b.bottom) / this.cellSize);
+                    // Huge/invalid editor objects remain candidates without allocating a map-sized grid.
+                    if (![x0, x1, y0, y1].every(Number.isSafeInteger) || (x1 - x0 + 1) * (y1 - y0 + 1) > 8192) { this.always.push(entry); return; }
+                    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+                        const key = x + ',' + y;
+                        let cell = this.cells.get(key);
+                        if (!cell) { cell = []; this.cells.set(key, cell); }
+                        cell.push(entry);
+                    }
+                });
+            }
+
+            query(bounds, results) {
+                results.length = 0;
+                if (!bounds || ![bounds.left, bounds.right, bounds.top, bounds.bottom].every(Number.isFinite)) {
+                    for (const entry of this.entries) results.push(entry);
+                    return results;
+                }
+                const x0 = Math.floor(bounds.left / this.cellSize), x1 = Math.floor(bounds.right / this.cellSize);
+                const y0 = Math.floor(bounds.top / this.cellSize), y1 = Math.floor(bounds.bottom / this.cellSize);
+                if (![x0, x1, y0, y1].every(Number.isSafeInteger) || x1 < x0 || y1 < y0 || (x1 - x0 + 1) * (y1 - y0 + 1) > 8192) {
+                    for (const entry of this.entries) results.push(entry);
+                    return results;
+                }
+                const stamp = ++this.stamp;
+                for (const entry of this.always) { entry.stamp = stamp; results.push(entry); }
+                for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+                    const cell = this.cells.get(x + ',' + y);
+                    if (cell) for (const entry of cell) if (entry.stamp !== stamp) {
+                        entry.stamp = stamp; results.push(entry);
+                    }
+                }
+                results.sort((a, b) => a.index - b.index);
+                return results;
+            }
+        }
+
+        // Static rectangle searches share an ordered, map-owned broadphase. Arbitrary
+        // caller arrays keep their original linear path. Registered arrays validate
+        // slots/geometry once per simulation tick, never once per car or sight ray.
+        // Known same-tick edits explicitly invalidate; replacement/length changes
+        // rebuild immediately. Entries keep duplicate slots and original hit order.
+        const _physicsSpatial = {
+            records: new WeakMap(),
+            track(items) {
+                if (!items || this.records.has(items)) return;
+                this.records.set(items, { grid: new OrderedRenderGrid(400), slots: [], geometry: [], epoch: -1, dirty: true, linear: false, entries: [], items: [] });
+            },
+            invalidate(items) {
+                if (!items) { this.clear(); return; }
+                const c = this.records.get(items);
+                if (c) c.dirty = true;
+            },
+            clear() { this.records = new WeakMap(); },
+            query(items, bounds) {
+                if (!items) return items;
+                const c = this.records.get(items);
+                if (!c) return items;
+                let changed = c.dirty || c.slots.length !== items.length;
+                if (!changed && c.epoch !== _simTick) {
+                    for (let i = 0; i < items.length; i++) {
+                        const o = items[i], at = i * 4;
+                        if (c.slots[i] !== o || !o || !Object.is(c.geometry[at], o.x) || !Object.is(c.geometry[at + 1], o.y) || !Object.is(c.geometry[at + 2], o.w) || !Object.is(c.geometry[at + 3], o.h)) { changed = true; break; }
+                    }
+                }
+                if (changed) {
+                    c.slots.length = items.length; c.geometry.length = items.length * 4;
+                    c.linear = false;
+                    for (let i = 0; i < items.length; i++) {
+                        const o = items[i], at = i * 4;
+                        if (!(i in items)) c.linear = true;
+                        c.slots[i] = o;
+                        c.geometry[at] = o && o.x; c.geometry[at + 1] = o && o.y; c.geometry[at + 2] = o && o.w; c.geometry[at + 3] = o && o.h;
+                    }
+                    c.grid.build(items, o => o && ({ left: o.x, right: o.x + o.w, top: o.y, bottom: o.y + o.h }));
+                    c.dirty = false;
+                }
+                c.epoch = _simTick;
+                if (c.linear) return items;
+                c.grid.query(bounds, c.entries);
+                c.items.length = c.entries.length;
+                for (let i = 0; i < c.entries.length; i++) c.items[i] = c.entries[i].item;
+                return c.items;
+            }
+        };
+
+
+        // Mutable static effect geometry is verified once per tick/draw. Every source slot
+        // is retained, including duplicates and invisible lamp emitters. Unknown bounds stay live.
+        class EffectRenderGrid extends OrderedRenderGrid {
+            constructor() {
+                super(); this.source = null; this.kind = null; this.checkedTick = this.checkedDraw = this.checkedTime = null;
+                this.revision = -1;
+            }
+            refresh(items, kind, tick, draw, time, revision) {
+                let changed = this.source !== items || this.kind !== kind || this.revision !== revision || this.entries.length !== items.length;
+                if (!changed && this.checkedTick === tick && this.checkedDraw === draw && this.checkedTime === time) return;
+                if (!changed) {
+                    for (let i = 0; i < items.length; i++) {
+                        const e = this.entries[i], item = items[i], r = kind === 'puddles' ? item.r : item.radius;
+                        if (!e || e.item !== item || e.ex !== item.x || e.ey !== item.y || e.er !== r) { changed = true; break; }
+                    }
+                }
+                if (changed) {
+                    this.build(items, (item, e) => {
+                        const r = kind === 'puddles' ? item.r : item.radius;
+                        e.ex = item.x; e.ey = item.y; e.er = r;
+                        if (!Number.isFinite(item.x) || !Number.isFinite(item.y) || (r != null && !Number.isFinite(r))) return null;
+                        // Lamp body queries use anchors; light/material/rain queries retain their
+                        // own radii. A missing lamp radius still has the original 200px fallback.
+                        const reach = kind === 'puddles' ? Math.abs(r || 0) + 10 : Math.max(0, r || 0, Math.abs((r || 200) * 0.6));
+                        return { left: item.x - reach, right: item.x + reach, top: item.y - reach, bottom: item.y + reach };
+                    });
+                    this.source = items; this.kind = kind; this.revision = revision;
+                }
+                this.checkedTick = tick; this.checkedDraw = draw; this.checkedTime = time;
+            }
+        }
 
         /**
          * TransitionGrid — O(1) spatial lookup for map transition zones.

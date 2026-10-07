@@ -29,6 +29,44 @@
            Portrait versions take P = { cx, cy, fw, fh, w, h, eyeY, eyeSpacing }.
            ===================================================================== */
         const WARDROBE = (() => {
+            // Geometry specs are shared read-only after construction. Most bodies use
+            // the same local dimensions, so avoid recreating chains for every draw.
+            const clothPieces = new Map();
+            const pieceSpec = (key, a, b, c, build) => {
+                const p = clothPieces.get(key);
+                if (p && Object.is(p.a, a) && Object.is(p.b, b) && Object.is(p.c, c)) return p.spec;
+                const spec = build(a, b, c); clothPieces.set(key, { a, b, c, spec }); return spec;
+            };
+            const coatSpec = (back, front, len, s) => {
+                const mid = (front + back) / 2;
+                return { segs: 3, stiffness: 0.1, damping: 0.88, keepOut: 7, chains: [
+                    { a: { x: front - 1, y: s * 9 },  t: { x: front - 2, y: s * 13 } },
+                    { a: { x: mid, y: s * 10.5 },     t: { x: back - len * 0.35, y: s * 13.3 } },
+                    { a: { x: back, y: s * 8 },       t: { x: back - len * 0.85, y: s * 10.5 } },
+                    { a: { x: back, y: s * 2 },       t: { x: back - len + 2.5, y: s * 1.5 } } ] };
+            };
+            const coatLeft = (back, front, len) => coatSpec(back, front, len, -1);
+            const coatRight = (back, front, len) => coatSpec(back, front, len, 1);
+            const hoodSpec = h => ({ segs: 2, stiffness: 0.22, damping: 0.8,
+                chains: [{ a: { x: h - 4, y: 0 }, t: { x: h - 8, y: 0 } }] });
+            const skirtSpec = x => ({ segs: 2, stiffness: 0.2, damping: 0.84, chains: [
+                { a: { x: x + 1, y: -10 }, t: { x: x - 1.5, y: -12 } }, { a: { x: x, y: -4 }, t: { x: x - 3, y: -4.5 } },
+                { a: { x: x, y: 4 }, t: { x: x - 3, y: 4.5 } },         { a: { x: x + 1, y: 10 }, t: { x: x - 1.5, y: 12 } } ] });
+            const pleatedSpec = cx => {
+                const N = 16, chains = [];
+                for (let i = 0; i < N; i++) {
+                    const a = i / N * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+                    chains.push({ a: { x: cx + ca * 7, y: sa * 10.5 }, t: { x: cx + ca * 14.5, y: sa * 17.5 } });
+                }
+                return { segs: 2, stiffness: 0.16, damping: 0.85, keepOut: 7, chains };
+            };
+            const longSkirtSpec = (x0, xb) => {
+                const mid = (x0 + xb) / 2;
+                const ring = [[x0, 12, x0 - 1, 15], [mid, 13, mid - 2, 16], [xb + 2, 11, xb - 2, 13.5], [xb, 4, xb - 4, 5]];
+                const chains = [...ring.map(([ax, ay, tx, ty]) => ({ a: { x: ax, y: -ay }, t: { x: tx, y: -ty } })),
+                                ...ring.slice().reverse().map(([ax, ay, tx, ty]) => ({ a: { x: ax, y: ay }, t: { x: tx, y: ty } }))];
+                return { segs: 2, stiffness: 0.12, damping: 0.87, keepOut: 6, chains };
+            };
             const rr = (ctx, x, y, w, h, r, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
             const TORSO_R = [3, 5, 5, 3];
             const body = (ctx, g, c, shade = 0.1, y0 = -10, y1 = 10) => rr(ctx, g.torso.x, y0, g.torso.w, y1 - y0, TORSO_R, g.darken(c.color, shade));
@@ -47,13 +85,10 @@
                 ctx.beginPath(); ctx.arc(g.headInTorso, 0, r, 0, Math.PI * 2); ctx.stroke();
             };
             const coatTail = (ctx, g, c, len) => {                       // the hem seen from above: flares past the hips, split at the back vent
-                const back = g.hip.x + 1, front = g.hip.x + g.hip.w - 1, mid = (front + back) / 2;
+                const back = g.hip.x + 1, front = g.hip.x + g.hip.w - 1;
                 for (const s of [-1, 1]) {
-                    const hem = g.cloth(s < 0 ? 'coat_l' : 'coat_r', { segs: 3, stiffness: 0.1, damping: 0.88, keepOut: 7, chains: [
-                        { a: { x: front - 1, y: s * 9 },  t: { x: front - 2, y: s * 13 } },
-                        { a: { x: mid, y: s * 10.5 },     t: { x: back - len * 0.35, y: s * 13.3 } },
-                        { a: { x: back, y: s * 8 },       t: { x: back - len * 0.85, y: s * 10.5 } },
-                        { a: { x: back, y: s * 2 },       t: { x: back - len + 2.5, y: s * 1.5 } } ] });
+                    const key = s < 0 ? 'coat_l' : 'coat_r';
+                    const hem = g.cloth(key, pieceSpec(key, back, front, len, s < 0 ? coatLeft : coatRight));
                     drawClothPanel(ctx, hem, g.darken(c.color, 0.22), g.darken(c.color, 0.4));
                 }
             };
@@ -139,8 +174,7 @@
                         ctx.stroke();
                     },
                     collar(ctx, g, c) {                                   // the hood, bunched behind the neck; it bobs as you move
-                        const h = g.headInTorso, bob = g.cloth('hood', { segs: 2, stiffness: 0.22, damping: 0.8,
-                            chains: [{ a: { x: h - 4, y: 0 }, t: { x: h - 8, y: 0 } }] })[0];
+                        const h = g.headInTorso, bob = g.cloth('hood', pieceSpec('hood', h, 0, 0, hoodSpec))[0];
                         const dx = bob[2].x - (h - 8), dy = bob[2].y;
                         ctx.fillStyle = g.darken(c.color, 0.2);
                         ctx.beginPath(); ctx.ellipse(h - 7 + dx * 0.8, dy * 0.8, 4.2, 8.5, 0, 0, Math.PI * 2); ctx.fill();
@@ -308,9 +342,7 @@
                 shorts:   { legs: 'thigh', detail(ctx, g, c) { ctx.fillStyle = g.darken(c.color, 0.5); for (const [x, y] of g.knees) { ctx.beginPath(); ctx.arc(x + 1.5, y, 3.2, 0, Math.PI * 2); ctx.fill(); } } },
                 skirt:    { legs: 'bare', hips(ctx, g, c) {
                     const x = g.hip.x;                                    // a short flare at the back that flips as you move
-                    drawClothPanel(ctx, g.cloth('skirt', { segs: 2, stiffness: 0.2, damping: 0.84, chains: [
-                        { a: { x: x + 1, y: -10 }, t: { x: x - 1.5, y: -12 } }, { a: { x: x, y: -4 }, t: { x: x - 3, y: -4.5 } },
-                        { a: { x: x, y: 4 }, t: { x: x - 3, y: 4.5 } },         { a: { x: x + 1, y: 10 }, t: { x: x - 1.5, y: 12 } } ] }),
+                    drawClothPanel(ctx, g.cloth('skirt', pieceSpec('skirt', x, 0, 0, skirtSpec)),
                         g.darken(c.color, 0.26));
                     rr(ctx, g.hip.x, -11, g.hip.w, 23, [8, 3, 3, 8], g.darken(c.color, 0.2));
                 } },
@@ -329,12 +361,8 @@
                 // A full circle of pleats all the way round, simulated as cloth: it swirls out as she turns and
                 // bells behind her as she runs. Alternating pleat shades, a trim band, a frilled hem of scallops.
                 pleated_skirt: { legs: 'bare', hips(ctx, g, c) {
-                    const cx = g.hip.x + g.hip.w / 2, N = 16, chains = [];
-                    for (let i = 0; i < N; i++) {
-                        const a = i / N * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
-                        chains.push({ a: { x: cx + ca * 7, y: sa * 10.5 }, t: { x: cx + ca * 14.5, y: sa * 17.5 } });
-                    }
-                    const ch = g.cloth('pleated_skirt', { segs: 2, stiffness: 0.16, damping: 0.85, keepOut: 7, chains });
+                    const cx = g.hip.x + g.hip.w / 2, N = 16;
+                    const ch = g.cloth('pleated_skirt', pieceSpec('pleated_skirt', cx, 0, 0, pleatedSpec));
                     const tip = k => ch[k % N][ch[k % N].length - 1], root = k => ch[k % N][0];
                     const base = g.darken(c.color, 0.12), deep = g.darken(c.color, 0.34), trim = c.trim || '#f4eee6';
                     // Pleats: alternating wedges from the waist to the hem
@@ -360,11 +388,8 @@
                 } },
                 long_skirt: { legs: 'full', shade: 0.25, hips(ctx, g, c) {
                     // The hem swings around the legs: a ring of chains from one front side, round the back, to the other
-                    const x0 = g.hip.x + g.hip.w - 2, xb = g.hip.x - 2, mid = (x0 + xb) / 2;
-                    const ring = [[x0, 12, x0 - 1, 15], [mid, 13, mid - 2, 16], [xb + 2, 11, xb - 2, 13.5], [xb, 4, xb - 4, 5]];
-                    const chains = [...ring.map(([ax, ay, tx, ty]) => ({ a: { x: ax, y: -ay }, t: { x: tx, y: -ty } })),
-                                    ...ring.slice().reverse().map(([ax, ay, tx, ty]) => ({ a: { x: ax, y: ay }, t: { x: tx, y: ty } }))];
-                    drawClothPanel(ctx, g.cloth('long_skirt', { segs: 2, stiffness: 0.12, damping: 0.87, keepOut: 6, chains }),
+                    const x0 = g.hip.x + g.hip.w - 2, xb = g.hip.x - 2;
+                    drawClothPanel(ctx, g.cloth('long_skirt', pieceSpec('long_skirt', x0, xb, 0, longSkirtSpec)),
                         g.darken(c.color, 0.24), g.darken(c.color, 0.34));
                     rr(ctx, g.hip.x - 3, -13, g.hip.w + 3, 26, [10, 3, 3, 10], g.darken(c.color, 0.18));
                     ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 0.7; ctx.beginPath();

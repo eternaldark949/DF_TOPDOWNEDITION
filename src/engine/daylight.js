@@ -78,6 +78,9 @@
                 c.setTransform(m.a * R, m.b * R, m.c * R, m.d * R, m.e * R, m.f * R);
                 c.fillStyle = 'rgb(92, 76, 150)'; c.beginPath();                              // lavender-tinted shade, painted in its colour (no tint pass)
                 const B = CONFIG.BUILDINGS, dx = S.dx * S.len, dy = S.dy * S.len;
+                // Keep only each building's latest hulls; weak keys release them with the building.
+                // Replay their points into the common path so overlapping shadows still fill once.
+                const buildingShadows = this._sunBuildingShadows || (this._sunBuildingShadows = new WeakMap());
                 const hull = (pts) => {                                                        // convex hull (monotone chain)
                     pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
                     const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
@@ -86,12 +89,31 @@
                     for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
                     return lo.slice(0, -1).concat(up.slice(0, -1));
                 };
-                for (const b of map.buildings || []) {
+                const buildingCandidates = this._queryRenderBuildings({ left: cull.left - 300, right: cull.right + 300, top: cull.top - 300, bottom: cull.bottom + 300 },
+                    this._sunBuildingCandidates || (this._sunBuildingCandidates = []));
+                for (const entry of buildingCandidates) {
+                    const b = entry.item;
                     if (!b.isV2 || b.x > cull.right + 300 || b.x + b.w < cull.left - 300 || b.y > cull.bottom + 300 || b.y + b.h < cull.top - 300) continue;
                     const hgt = Math.min(b.floors, B.MAX_FLOORS) * B.FLOOR_HEIGHT, ox = dx * hgt, oy = dy * hgt;
+                    // Rounded corner data is lazily initialized by the footprint helper.
+                    if (b.roundR) b._leanFaces();
+                    let cached = buildingShadows.get(b);
+                    if (!cached || cached.x !== b.x || cached.y !== b.y || cached.ox !== ox || cached.oy !== oy ||
+                        cached.roundR !== b.roundR || cached.footprint !== b._footprint || cached.sections.length !== b.sections.length) {
+                        cached = { x: b.x, y: b.y, ox, oy, roundR: b.roundR, footprint: b._footprint, sections: new Array(b.sections.length) };
+                        buildingShadows.set(b, cached);
+                    }
                     b.sections.forEach((s, si) => {
-                        const fp = b._footprint(s, si);                                              // (rounded corners traced)
-                        const h = hull(fp.concat(fp.map(([x, y]) => [x + ox, y + oy])));
+                        const r = b._roundSec && b._roundSec[si];
+                        const r0 = r && r[0], r1 = r && r[1], r2 = r && r[2], r3 = r && r[3];
+                        let sh = cached.sections[si];
+                        if (!sh || sh.section !== s || sh.x !== s.x || sh.y !== s.y || sh.w !== s.w || sh.h !== s.h ||
+                            sh.r0 !== r0 || sh.r1 !== r1 || sh.r2 !== r2 || sh.r3 !== r3) {
+                            const fp = b._footprint(s, si);                                          // (rounded corners traced)
+                            sh = cached.sections[si] = { section: s, x: s.x, y: s.y, w: s.w, h: s.h, r0, r1, r2, r3,
+                                hull: hull(fp.concat(fp.map(([x, y]) => [x + ox, y + oy]))) };
+                        }
+                        const h = sh.hull;
                         h.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath();
                     });
                 }
@@ -107,7 +129,10 @@
                     }
                     hull(pts).forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath();
                 }
-                for (const f of map.foliage || []) {                                             // canopies, thrown along the sun
+                const foliageCandidates = this._queryRenderFoliage({ left: cull.left - 120, right: cull.right + 120, top: cull.top - 120, bottom: cull.bottom + 120 },
+                    this._sunFoliageCandidates || (this._sunFoliageCandidates = []));
+                for (const entry of foliageCandidates) {                                        // canopies, thrown along the sun
+                    const f = entry.item;
                     if (f.x < cull.left - 120 || f.x > cull.right + 120 || f.y < cull.top - 120 || f.y > cull.bottom + 120) continue;
                     const s = f.size || 1, ht = (f.type === 'bush' ? 8 : 34) * s, r = (f.type === 'bush' ? 12 : f.type === 'palm' ? 17 : 19) * s;
                     // Swept from under the canopy out along the sun (tapering back to the tree), so a long shadow stays attached
@@ -134,11 +159,28 @@
                 const i0 = Math.floor((cull.left - drift.x) / cell) - 1, i1 = Math.floor((cull.right - drift.x) / cell) + 1;
                 const j0 = Math.floor((cull.top - drift.y) / cell) - 1, j1 = Math.floor((cull.bottom - drift.y) / cell) + 1;
                 const a = (0.1 + 0.08 * S.overcast) * strength;
+                // Test the painted ellipse in backing-store pixels, not the deliberately wide
+                // world candidate rectangle. Reflection/custom affine contexts work too.
+                const m = ctx.getTransform(), cv = ctx.canvas;
+                const cc = Math.cos(0.3), ss = Math.sin(0.3);
+                const ex = Math.hypot(1.4 * (m.a * cc + m.c * ss), -m.a * ss + m.c * cc);
+                const ey = Math.hypot(1.4 * (m.b * cc + m.d * ss), -m.b * ss + m.d * cc);
+                const sx = Math.abs(ctx.shadowOffsetX || 0), sy = Math.abs(ctx.shadowOffsetY || 0);
+                const canCull = (!ctx.filter || ctx.filter === 'none') && !(ctx.shadowBlur > 0) &&
+                    [m.a, m.b, m.c, m.d, m.e, m.f, ex, ey, sx, sy, cv.width, cv.height].every(Number.isFinite) &&
+                    cv.width > 0 && cv.height > 0;
                 ctx.save(); ctx.globalCompositeOperation = 'multiply';
                 for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
                     const h = _bldHash(i * 13.1 + j * 7.7, 5);
                     if (h > 0.55 + 0.4 * S.overcast) continue;
                     const cx = i * cell + drift.x + _bldHash(i, j + 3) * cell, cy = j * cell + drift.y + _bldHash(j, i + 9) * cell, r = 280 + _bldHash(i + j, 2) * 320;
+                    if (canCull) {
+                        const px = m.a * cx + m.c * cy + m.e, py = m.b * cx + m.d * cy + m.f;
+                        const guard = 2 + 32 * Number.EPSILON * Math.max(1, Math.abs(px), Math.abs(py), r * ex, r * ey);
+                        const rx = r * ex + sx + guard, ry = r * ey + sy + guard;
+                        if (Number.isFinite(px) && Number.isFinite(py) && Number.isFinite(rx) && Number.isFinite(ry) &&
+                            (px + rx < 0 || px - rx > cv.width || py + ry < 0 || py - ry > cv.height)) continue;
+                    }
                     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
                     g.addColorStop(0, `rgba(96, 84, 150, ${a})`); g.addColorStop(1, 'rgba(96, 84, 150, 0)');
                     ctx.fillStyle = g; ctx.globalAlpha = 1; ctx.beginPath(); ctx.ellipse(cx, cy, r * 1.4, r, 0.3, 0, Math.PI * 2);
@@ -169,15 +211,25 @@
                 if (S.golden > 0.02) {
                     ctx.globalCompositeOperation = 'screen';
                     const sx = W / 2 - S.dx * W * 0.7, sy = H / 2 - S.dy * H * 0.7;
-                    const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, Math.max(W, H) * 1.1);
-                    g.addColorStop(0, `rgba(255, 160, 150, ${0.12 * S.golden * k})`); g.addColorStop(1, 'rgba(255, 160, 150, 0)');
-                    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+                    const radius = Math.max(W, H) * 1.1, alpha = 0.12 * S.golden * k;
+                    let haze = this._daylightHaze;
+                    if (!haze || haze.ctx !== ctx || haze.sx !== sx || haze.sy !== sy || haze.radius !== radius || haze.alpha !== alpha) {
+                        const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, radius);
+                        g.addColorStop(0, `rgba(255, 160, 150, ${alpha})`); g.addColorStop(1, 'rgba(255, 160, 150, 0)');
+                        haze = this._daylightHaze = { ctx, sx, sy, radius, alpha, gradient: g };
+                    }
+                    ctx.fillStyle = haze.gradient; ctx.fillRect(0, 0, W, H);
                 }
                 // A soft violet vignette keeps the frame dreamy
                 ctx.globalCompositeOperation = 'multiply';
-                const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
-                v.addColorStop(0, 'rgba(255,255,255,0)'); v.addColorStop(1, `rgba(150, 130, 205, ${0.3 * k})`);
-                ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+                const alpha = 0.3 * k;
+                let vignette = this._daylightVignette;
+                if (!vignette || vignette.ctx !== ctx || vignette.W !== W || vignette.H !== H || vignette.alpha !== alpha) {
+                    const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+                    v.addColorStop(0, 'rgba(255,255,255,0)'); v.addColorStop(1, `rgba(150, 130, 205, ${alpha})`);
+                    vignette = this._daylightVignette = { ctx, W, H, alpha, gradient: v };
+                }
+                ctx.fillStyle = vignette.gradient; ctx.fillRect(0, 0, W, H);
                 ctx.restore();
             }
         });

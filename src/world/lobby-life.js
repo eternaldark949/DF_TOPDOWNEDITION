@@ -86,7 +86,7 @@
             update(game) {
                 if (!game.activeMap || game.activeMap.id !== 'hotel_lobby') { if (this.walkers.length) { this.walkers = []; this.map = null; } return; }
                 if (this.map !== game.activeMap) this.reset(game);
-                const guests = this.walkers.filter(w => w.kind === 'guest').length;
+                let guests = 0; for (const w of this.walkers) if (w.kind === 'guest') guests++;
                 // Arrivals keep pace with departures: quicker when the lobby is thin
                 if (--this._spawnTimer <= 0 && guests < this._target()) { this._spawnGuest(false); this._spawnTimer = (guests < this._target() * 0.75 ? 25 : 60) + Math.random() * 50 | 0; }
                 const pl = game.player, M = game.activeMap;

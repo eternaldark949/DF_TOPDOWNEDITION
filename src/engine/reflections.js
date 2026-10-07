@@ -125,7 +125,8 @@
             /** Is (x, y) in a puddle that's showing? Its strength (0 = dry ground) */
             _inPuddle(x, y) {
                 const wet = this._wetHere(); if (wet < 0.05) return 0;
-                for (const p of this.puddlesFor(this.activeMap)) {
+                for (const entry of this._queryPuddleCandidates({ left: x, right: x, top: y, bottom: y }, 'puddlePoint')) {
+                    const p = entry.item;
                     if (Math.abs(p.x - x) > p.r + 4 || Math.abs(p.y - y) > p.r + 4) continue;
                     const k = this._puddleK(p, wet); if (k <= 0) continue;
                     const g = 0.65 + 0.35 * k, c = Math.cos(-p.ang), sn = Math.sin(-p.ang), dx = x - p.x, dy = y - p.y;
@@ -190,7 +191,9 @@
                     mc.globalCompositeOperation = 'source-over'; mc.fillStyle = 'rgba(255,255,255,0.95)';
                     for (const [x, y, r] of surf.water) { mc.beginPath(); mc.arc(x, y, r, 0, Math.PI * 2); mc.fill(); }
                 }
-                for (const p of wet >= 0.02 ? this.puddlesFor(this.activeMap) : []) {
+                for (const entry of wet >= 0.02 ? this._queryPuddleCandidates({ left: v.x - hw, right: v.x + hw,
+                    top: v.y - hh - 160, bottom: v.y + hh }, 'puddleMask') : []) {
+                    const p = entry.item;
                     if (!near(p.x, p.y, p.r)) continue;
                     const k = this._puddleK(p, wet); if (k <= 0) continue;
                     any = true;
@@ -220,7 +223,10 @@
                 // meets the street (foreshortened), billboards about their front edge
                 const dark = this.getAmbientDarkness();
                 if (night > 0.01 && q === 'high' && CONFIG.BUILDINGS.LEAN) {
-                    for (const b of this.activeMap.buildings || []) {
+                    const reflectedBuildings = this._queryRenderBuildings({ left: v.x - hw, right: v.x + hw,
+                        top: v.y - hh - 40, bottom: v.y + hh + 260 }, this._effectCandidateBuffer('reflectedBuildings'));
+                    for (const entry of reflectedBuildings) {
+                        const b = entry.item;
                         if (!b.isV2 || !b.drawEmissive) continue;
                         const gy = b.y + b.h;
                         if (gy < v.y - hh - 40 || gy > v.y + hh + 260 || b.x > v.x + hw || b.x + b.w < v.x - hw) continue;
@@ -244,7 +250,9 @@
                 const rs = this.roomSystem;
                 if (night > 0.01) {
                     const LH = REFLECT.LAMP_H;
-                    for (const l of this.lamps || []) {
+                    for (const entry of this._queryLampCandidates({ left: v.x - hw - LH * 2, right: v.x + hw + LH * 2,
+                        top: v.y - hh - LH * 2 - 160, bottom: v.y + hh + LH * 2 }, 'lampReflections')) {
+                        const l = entry.item;
                         if (!near(l.x, l.y, LH * 2)) continue;
                         const k = (rs && rs.active ? rs.lampLight(l) : 1) * lampFlicker(l) * night;
                         if (k < 0.02) continue;
@@ -256,7 +264,7 @@
                         rc.beginPath(); rc.moveTo(l.x, l.y + 4); rc.lineTo(l.x, l.y + LH * 0.9); rc.stroke();
                     }
                 }
-                const cars = this.traffic && this.traffic.vehicles ? (this.isDriving && this.car ? [this.car, ...this.traffic.vehicles] : this.traffic.vehicles) : [];
+                const cars = this._reflCars(this._reflLightCars || (this._reflLightCars = []));
                 if (night > 0.01) for (const c of cars) {
                     if (!c || c.dead || c.visible === false || !near(c.x, c.y, 60)) continue;
                     const ca = Math.cos(c.angle), sa = Math.sin(c.angle), h = (c.length || 40) / 2, wd = (c.width || 20) / 3, f = (c.fade ?? 1) * night;
@@ -282,11 +290,12 @@
                 for (const pj of this.projectiles || []) if (pj.active !== false) glow(pj.x, pj.y + 12, /^#[0-9a-f]{6}$/i.test(pj.color || '') ? pj.color : '#ffffff', 12, 26, 0.6);
                 // Whoever stands between a light and its reflection blocks it: their mirrored shape
                 rc.globalCompositeOperation = 'destination-out';
-                for (const m of this._reflMovers(near)) this._reflShape(rc, m, 0.85);
+                const movers = this._reflMovers(near, this._reflPrepareMovers || (this._reflPrepareMovers = { list: [], records: [], cars: [] }), cars);
+                for (const m of movers) this._reflShape(rc, m, 0.85);
                 rc.globalCompositeOperation = 'source-over';
                 // A mirror floor gives back colour too: whoever stands on it, and the things set on it
                 if (surf && surf.mirror) {
-                    for (const m of this._reflMovers(near)) { rc.fillStyle = m.col && /^#[0-9a-f]{6}$/i.test(m.col) ? m.col : '#b48cff'; this._reflShape(rc, m, 0.5); }
+                    for (const m of movers) { rc.fillStyle = m.col && /^#[0-9a-f]{6}$/i.test(m.col) ? m.col : '#b48cff'; this._reflShape(rc, m, 0.5); }
                     for (const pr of this.props || []) {
                         if (!near(pr.x, pr.y, 200)) continue;
                         rc.globalAlpha = 0.42; rc.fillStyle = pr.color || '#6a3aa0';
@@ -303,18 +312,45 @@
                 this._refl = { R, q, wet };
             },
 
-            /** Everyone and everything that stands on the street near the view, for reflections and splashes */
-            _reflMovers(near) {
-                const out = [];
-                const walker = (e, col) => { if (e && !e.dead && e.visible !== false && !e.inCar && near(e.x, e.y, 40)) out.push({ e, x: e.x, y: e.y, kind: 'walker', col }); };
+            /** Reflection car order: the driven car first, then traffic, including any duplicate. */
+            _reflCars(out) {
+                const vehicles = this.traffic && this.traffic.vehicles;
+                if (!vehicles || !this.isDriving || !this.car) {
+                    if (out) out.length = 0;
+                    return vehicles || out || [];
+                }
+                const cars = out || [];
+                cars.length = 0; cars.push(this.car);
+                for (const c of vehicles) cars.push(c);
+                return cars;
+            },
+
+            /**
+             * Everyone near the view, in the original actor order. Default calls own fresh results.
+             * A caller-owned buffer reuses records until its next fill; every fill refreshes all fields.
+             * Separate prepare, ground, and update buffers keep their distinct visibility bounds apart.
+             */
+            _reflMovers(near, buffer, cars) {
+                const out = buffer ? buffer.list : [], pool = buffer && buffer.records;
+                const previous = out.length;
+                let count = 0;
+                const add = (e, kind, col) => {
+                    const m = pool ? (pool[count] || (pool[count] = {})) : {};
+                    m.e = e; m.x = e.x; m.y = e.y; m.kind = kind; m.col = col;
+                    out[count++] = m;
+                };
+                const walker = (e, col) => { if (e && !e.dead && e.visible !== false && !e.inCar && near(e.x, e.y, 40)) add(e, 'walker', col); };
                 const lookCol = (e) => { const L = e.look || e.appearance; return (L && L.top && L.top.color) || null; };
                 if (!this.isDriving) walker(this.player, '#c9a6ff');
                 for (const t of this.teammates || []) if (t.recruited) walker(t, lookCol(t));
                 for (const n of this.npcs || []) walker(n, lookCol(n));
                 for (const e of this.enemies || []) walker(e, lookCol(e));
                 for (const p of (this.pedestrians && this.pedestrians.pedestrians) || []) walker(p, lookCol(p));
-                const cars = this.traffic && this.traffic.vehicles ? (this.isDriving && this.car ? [this.car, ...this.traffic.vehicles] : this.traffic.vehicles) : [];
-                for (const c of cars) if (c && !c.dead && c.visible !== false && near(c.x, c.y, 60)) out.push({ e: c, x: c.x, y: c.y, kind: 'car', col: c.bodyColor || c.color || null });
+                if (!cars) cars = this._reflCars(buffer && buffer.cars);
+                for (const c of cars) if (c && !c.dead && c.visible !== false && near(c.x, c.y, 60)) add(c, 'car', c.bodyColor || c.color || null);
+                // Retired pool slots must not retain actors from an old view or map.
+                if (pool) for (let i = count; i < previous; i++) { pool[i].e = null; pool[i].col = null; }
+                out.length = count;
                 return out;
             },
 
@@ -340,14 +376,19 @@
                 const wet = this._wetHere(), surf = this._surfaces();
                 if ((wet < 0.02 && !surf) || !this.reflectQuality()) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 80, hh = this.canvas.height / 2 / z + 80;
+                const near = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m - 60 && y < v.y + hh + m;
+                const buffer = this._reflGroundMovers || (this._reflGroundMovers = { list: [], records: [], cars: [] });
+                let movers = null;
                 if (surf) {
                     // people mirrored in polished floors (softer than in a puddle) and rings on the water
                     const fl = new Path2D();
                     for (const [x, y, w, h] of surf.rects) fl.rect(x, y, w, h);
                     for (const [x, y, r] of surf.water) { fl.moveTo(x + r, y); fl.arc(x, y, r, 0, Math.PI * 2); }
-                    const nearS = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m - 60 && y < v.y + hh + m;
                     ctx.save(); ctx.clip(fl);
-                    if (!surf.mirror) { ctx.fillStyle = 'rgba(2, 1, 6, 1)'; for (const m of this._reflMovers(nearS)) this._reflShape(ctx, m, 0.26); }
+                    if (!surf.mirror) {
+                        movers = this._reflMovers(near, buffer);
+                        ctx.fillStyle = 'rgba(2, 1, 6, 1)'; for (const m of movers) this._reflShape(ctx, m, 0.26);
+                    }
                     ctx.restore(); ctx.globalAlpha = 1;
                     if (wet < 0.02) { this._drawRipples(ctx, true); return; }
                 }
@@ -355,7 +396,9 @@
                 const clip = new Path2D(), rim = new Path2D();
                 let n = 0;
                 ctx.save();
-                for (const p of this.puddlesFor(this.activeMap)) {
+                for (const entry of this._queryPuddleCandidates({ left: v.x - hw, right: v.x + hw,
+                    top: v.y - hh, bottom: v.y + hh }, 'puddleGround')) {
+                    const p = entry.item;
                     if (p.x < v.x - hw - p.r || p.x > v.x + hw + p.r || p.y < v.y - hh - p.r || p.y > v.y + hh + p.r) continue;
                     const k = this._puddleK(p, wet); if (k <= 0) continue;
                     const g = 0.65 + 0.35 * k, c = Math.cos(p.ang), sn = Math.sin(p.ang);
@@ -373,10 +416,10 @@
                 if (n) {
                     // the mirrored shapes of whoever stands at the water, and the rings on it
                     ctx.save(); ctx.clip(clip);
-                    const near = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m - 60 && y < v.y + hh + m;
+                    if (!movers) movers = this._reflMovers(near, buffer);
                     ctx.fillStyle = night > 0.5 ? 'rgba(2, 1, 6, 1)' : 'rgba(26, 22, 36, 1)';
-                    for (const m of this._reflMovers(near)) this._reflShape(ctx, m, 0.42 + 0.2 * day);
-                    for (const m of this._reflMovers(near)) if (m.col && /^#[0-9a-f]{6}$/i.test(m.col)) { ctx.fillStyle = m.col; this._reflShape(ctx, m, 0.12); }
+                    for (const m of movers) this._reflShape(ctx, m, 0.42 + 0.2 * day);
+                    for (const m of movers) if (m.col && /^#[0-9a-f]{6}$/i.test(m.col)) { ctx.fillStyle = m.col; this._reflShape(ctx, m, 0.12); }
                     this._drawRipples(ctx, night > 0.5);
                     ctx.restore();
                     ctx.globalAlpha = 1;
@@ -414,11 +457,21 @@
                 }
                 if (wet < 0.05) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 40, hh = this.canvas.height / 2 / z + 40;
-                const vis = [];
-                for (const p of this.puddlesFor(this.activeMap)) {
+                const visible = this._reflVisiblePuddles || (this._reflVisiblePuddles = { list: [], records: [] });
+                const vis = visible.list, previous = vis.length;
+                let count = 0;
+                for (const entry of this._queryPuddleCandidates({ left: v.x - hw, right: v.x + hw,
+                    top: v.y - hh, bottom: v.y + hh }, 'puddleUpdate')) {
+                    const p = entry.item;
                     if (p.x < v.x - hw || p.x > v.x + hw || p.y < v.y - hh || p.y > v.y + hh) continue;
-                    const k = this._puddleK(p, wet); if (k > 0.2) vis.push([p, k]);
+                    const k = this._puddleK(p, wet);
+                    if (k > 0.2) {
+                        const entry = visible.records[count] || (visible.records[count] = [null, 0]);
+                        entry[0] = p; entry[1] = k; vis[count++] = entry;
+                    }
                 }
+                for (let i = count; i < previous; i++) visible.records[i][0] = null;
+                vis.length = count;
                 if (!vis.length) return;
                 const W = this.weather, rain = W && W.isRaining ? W.intensity : 0;
                 // raindrops
@@ -436,7 +489,8 @@
                     return p.lobes.some(L => ((lx - L.dx) / (L.rx * g)) ** 2 + ((ly - L.dy) / (L.ry * g)) ** 2 <= 1);
                 };
                 const near = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m && y < v.y + hh + m;
-                for (const m of this._reflMovers(near)) {
+                const movers = this._reflMovers(near, this._reflUpdateMovers || (this._reflUpdateMovers = { list: [], records: [], cars: [] }));
+                for (const m of movers) {
                     const e = m.e, px = e._splX ?? e.x, py = e._splY ?? e.y, sp = Math.hypot(e.x - px, e.y - py);
                     e._splX = e.x; e._splY = e.y;
                     const every = m.kind === 'car' ? 3 : 15;

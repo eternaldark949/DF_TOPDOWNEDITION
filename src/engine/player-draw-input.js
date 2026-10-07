@@ -1,6 +1,33 @@
         // GameEngine — Drawing the player, emotes, pausable timers, sidebar portrait, joysticks.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /** An unanimated ivory diamond below the player, sized in CSS pixels rather than world units. */
+            drawPlayerMarker(ctx) {
+                const p = this.player;
+                if (!this.running || !p || !p.visible || p.isHidden || p.dead || this.isDriving || p.inCar ||
+                    (this.scenes && this.scenes.running) || (this.cutscene && this.cutscene.active) ||
+                    this.cineCam || this.finisher || this.finCam) return;
+                const v = this.view;
+                if (!v) return;
+                const scale = this._renderScale || 1, z = v.zoom;
+                const x = this.canvas.width / 2 + (p.x - v.x + (v.shakeX || 0)) * z;
+                const y = this.canvas.height / 2 + (p.y - v.y + (v.shakeY || 0)) * z + Math.max(16 * z, 10 * scale) + 5 * scale;
+                const r = 3.5 * scale, guard = r + scale;
+                if (!Number.isFinite(x) || !Number.isFinite(y) || x < -guard || x > this.canvas.width + guard ||
+                    y < -guard || y > this.canvas.height + guard) return;
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.globalAlpha = 0.95;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+                ctx.filter = 'none';
+                ctx.beginPath();
+                ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath();
+                ctx.fillStyle = '#fff3d8'; ctx.fill();
+                ctx.strokeStyle = '#251229'; ctx.lineWidth = 1.5 * scale; ctx.lineJoin = 'round'; ctx.stroke();
+                ctx.restore();
+            },
+
             drawPlayer() {
                 this.ctx.save(); 
                 this.ctx.translate(this.player.x, this.player.y); 
@@ -261,9 +288,9 @@
             /* =========================================================
                TOUCH STICKS — the move stick (left) and the fire stick (right).
                Flitting without letting go of the trigger:
-                 • Flit Ring (setting, on): push the move stick past its walking
-                   radius into the outer ring → flit that way; the ring re-arms
-                   once the thumb comes back inside. The ring shows the flit charge.
+                 • Flit Ring (setting, on): a deliberate fast outward flick into the
+                   outer ring → flit that way, including from a held walking position.
+                   Slow pushes only move. Return inside to re-arm; the ring shows charge.
                  • Flick to Flit (setting): a fast flick of the move stick flits.
                  • Two-Finger Flit (setting): while firing, tap another finger on
                    the right half of the screen.
@@ -272,14 +299,49 @@
                ========================================================= */
             initJoystick() {
                 const inputZone = document.getElementById('input-zone-left'), visualZone = document.getElementById('joystick-zone'), knob = document.getElementById('joystick-knob');
-                const J = this.joystick, WALK = 35, RING_IN = 82, RING_OUT = 65, EDGE = 100;   // ring: flit past 82 px, re-arm inside 65
+                const J = this.joystick, WALK = 35, RING_IN = 82, RING_OUT = 65, EDGE = 100;
+                // CSS-pixel radial travel: at least 24 px at 500 px/sec within 120 ms.
+                // A fixed ring buffer retains recent raw movement, independent of Flick to Flit.
+                const RING_WINDOW = 120, RING_TRAVEL = 24, RING_SPEED = 0.5;
+                const ringTimes = new Float64Array(64), ringRadii = new Float64Array(64);
+                let ringHead = 0, ringCount = 0;
+                const ringTime = e => Number.isFinite(e.timeStamp) && e.timeStamp >= 0 ? e.timeStamp : performance.now();
+                const seedRing = (radius, time) => { ringHead = 0; ringCount = 1; ringTimes[0] = time; ringRadii[0] = radius; };
                 const gameUI = document.getElementById('game-ui');
                 const canFlit = () => !this.isDriving && !(gameUI && gameUI.classList.contains('emote-active'));   // not at the wheel or holstered
                 const ringFlit = (dx, dy) => {
-                    if (!GameSettings.flitRing || !J.armed || !canFlit()) return;
-                    J.armed = false;
-                    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
-                    this.triggerFlit(Math.atan2(dy, dx), 'ring');
+                    if (!GameSettings.flitRing || !J.ringArmed || !J.armed || !canFlit()) return;
+                    J.ringArmed = false; J.armed = false;
+                    if (this.triggerFlit(Math.atan2(dy, dx), 'ring')) {
+                        try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no haptics */ }
+                    } else { J.ringArmed = true; J.armed = true; }   // blocked: still armed, a fresh flick tries again
+                };
+                const sampleRing = (e, dx, dy, radius) => {
+                    if (!J.ringArmed && radius <= RING_OUT) { J.ringArmed = true; ringCount = 0; }
+                    if (!GameSettings.flitRing || !canFlit() || !Number.isFinite(radius)) { ringCount = 0; return; }
+                    if (!J.ringArmed || !J.armed) { ringCount = 0; return; }
+                    const now = ringTime(e), last = (ringHead + ringCount - 1) % ringTimes.length;
+                    // Long held touches have no move events: require fresh motion evidence.
+                    // Same/reversed timestamps cannot establish speed, nor can a stale event gap.
+                    if (!ringCount || now <= ringTimes[last]) { seedRing(radius, now); return; }
+                    // A rested thumb sends no move events, so a flick out of a rest arrives as one big jump.
+                    // Measure it from the resting radius, as if it took the whole window (a slow phone's
+                    // sparse events then still need a real flick: about 60 px in a single event)
+                    if (now - ringTimes[last] > RING_WINDOW) seedRing(ringRadii[last], now - RING_WINDOW);
+                    const prev = (ringHead + ringCount - 1) % ringTimes.length, movingOut = radius > ringRadii[prev];
+                    while (ringCount && now - ringTimes[ringHead] > RING_WINDOW) { ringHead = (ringHead + 1) % ringTimes.length; ringCount--; }
+                    if (radius >= RING_IN && movingOut) {
+                        for (let i = 0; i < ringCount; i++) {
+                            const index = (ringHead + i) % ringTimes.length;
+                            const dt = now - ringTimes[index], travel = radius - ringRadii[index];
+                            if (dt > 0 && travel >= RING_TRAVEL && travel >= RING_SPEED * dt) {
+                                ringFlit(dx, dy); ringCount = 0; return;
+                            }
+                        }
+                    }
+                    if (ringCount === ringTimes.length) { ringHead = (ringHead + 1) % ringTimes.length; ringCount--; }
+                    const next = (ringHead + ringCount++) % ringTimes.length;
+                    ringTimes[next] = now; ringRadii[next] = radius;
                 };
                 inputZone.addEventListener('touchstart', (e) => {
                     e.preventDefault(); if (J.active) return;
@@ -289,6 +351,8 @@
                     J.id = touch.identifier; J.active = true; J.originX = ox; J.originY = oy; J.dx = 0; J.dy = 0; J.armed = true;
                     J.landX = touch.clientX; J.landY = touch.clientY;      // drags count from where the thumb landed
                     J.trail = [{ x: 0, y: 0, t: performance.now() }];
+                    J.ringArmed = true; ringCount = 0;
+                    if (GameSettings.flitRing) seedRing(0, ringTime(e));
                     visualZone.style.display = 'block'; visualZone.style.left = (ox - 40) + 'px'; visualZone.style.top = (oy - 40) + 'px';
                     knob.style.transform = `translate(-50%, -50%)`;
                     if (this.flitRingEl) this.flitRingEl.classList.toggle('off', !GameSettings.flitRing || !canFlit());
@@ -303,20 +367,21 @@
                         const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
                         knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
                         J.dx = moveX / WALK; J.dy = moveY / WALK;
-                        // The ring: past the walking radius → flit; back inside → re-armed
-                        if (far >= RING_IN) ringFlit(deltaX, deltaY);
-                        else if (far <= RING_OUT) J.armed = true;
+                        // A held-touch ring flick needs fresh, substantial outward speed.
+                        // Keep the standalone flick's existing shared latch/re-arm behavior.
+                        if (far <= RING_OUT) J.armed = true;
+                        sampleRing(e, deltaX, deltaY, far);
                         // A flick: from near the centre to well out, fast
                         if (GameSettings.flitFlick && J.armed) {
                             const now = performance.now(); J.trail.push({ x: deltaX, y: deltaY, t: now });
                             while (J.trail.length > 2 && now - J.trail[0].t > 150) J.trail.shift();
                             const t0 = J.trail[0];
-                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; this.triggerFlit(angle, 'flick'); }
+                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; if (!this.triggerFlit(angle, 'flick')) J.armed = true; }
                         }
                         break;
                     }
                 }, { passive: false });
-                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === J.id) { J.active = false; J.dx = 0; J.dy = 0; J.armed = true; visualZone.style.display = 'none'; break; } } };
+                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === J.id) { J.active = false; J.dx = 0; J.dy = 0; J.armed = true; J.ringArmed = true; ringCount = 0; visualZone.style.display = 'none'; break; } } };
                 inputZone.addEventListener('touchend', endHandler); inputZone.addEventListener('touchcancel', endHandler);
                 // Two-Finger Flit: while the fire stick is held, a tap on the right half (not on a button)
                 document.addEventListener('touchstart', (e) => {

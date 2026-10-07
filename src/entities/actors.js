@@ -462,7 +462,8 @@
                 }
                 
                 // Use ActorEntity's damage system
-                const damaged = super.takeDamage(amount, knockbackX, knockbackY);
+                const kbScale = g && g.resonance ? g.resonance.stat('knockbackTaken', 1) : 1;
+                const damaged = super.takeDamage(amount, knockbackX * kbScale, knockbackY * kbScale);
                 if (lastStood) this.invincibleTimer = 60;                 // a moment's grace after Last Stand
                 
                 if (damaged && this._game) {

@@ -828,6 +828,7 @@
             for (const name of names) {
                 const fn = obj[name];
                 obj[name] = function (...args) {
+                    if (!_profileSampling) return fn.apply(this, args);
                     const t0 = performance.now();
                     try { return fn.apply(this, args); }
                     finally {

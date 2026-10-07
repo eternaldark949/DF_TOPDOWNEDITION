@@ -29,6 +29,7 @@
 
             /** Show or hide the pill and the layer panel to match the settings */
             sync(game) {
+                game._syncProfiler();
                 const mode = game.showProfiler ? (GameSettings.profilerMode && GameSettings.profilerMode !== 'off' ? GameSettings.profilerMode : 'compact') : 'off';
                 if (mode !== 'off') this._ensureProf();
                 if (this._prof) {
@@ -155,6 +156,7 @@
                     `<span>browser/GPU <b>${other.toFixed(1)}</b> ms</span>`,
                     `<span>ticks/frame <b>${RenderStats.ticks}</b></span>`,
                     `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span>`,
+                    `<span>live <b>${RenderStats.liveBodies}</b> / sprites <b>${RenderStats.cachedBodies}</b> / bake poses <b>${RenderStats.bakedBodies}</b></span>`,
                     `<span>cars <b>${T ? T.vehicles.length : 0}</b>/${GameSettings.getMaxTraffic()}</span>`,
                     `<span>peds <b>${P ? P.pedestrians.length : 0}</b>/${GameSettings.getMaxPedestrians()}</span>`,
                     `<span>crowd <b>${GameSettings.crowdQuality || 'high'}</b></span>`

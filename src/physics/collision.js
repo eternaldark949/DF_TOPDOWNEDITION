@@ -14,6 +14,36 @@
         class CollisionSystem {
             static spatialGrid = new SpatialHashGrid(200);
             static enabled = true;
+            static _staticGrid = new SpatialHashGrid(200);
+            static _staticRows = [];
+            static _staticMembers = [];
+            static _layers = { projectile: [], vehicle: [], actor: [], dynamic: [] };
+
+            static _prepareStaticGrid(items) {
+                const rows = this._staticRows;
+                if (this._staticGrid.cellSize !== this.spatialGrid.cellSize) { this._staticGrid = new SpatialHashGrid(this.spatialGrid.cellSize); rows.length = 0; }
+                let changed = rows.length !== items.length;
+                if (!changed) for (let i = 0; i < items.length; i++) {
+                    const e = items[i], r = rows[i];
+                    if (r.e !== e || !Object.is(r.x, e.x) || !Object.is(r.y, e.y) || !Object.is(r.w, e.width) || !Object.is(r.h, e.height) || !Object.is(r.r, e.radius) || !Object.is(r.a, e.angle) || r.shape !== e.collisionShape) { changed = true; break; }
+                }
+                if (changed) {
+                    this._staticGrid.clear(); rows.length = items.length;
+                    for (let i = 0; i < items.length; i++) {
+                        const e = items[i], r = rows[i] || (rows[i] = {});
+                        r.e = e; r.x = e.x; r.y = e.y; r.w = e.width; r.h = e.height; r.r = e.radius; r.a = e.angle; r.shape = e.collisionShape;
+                        this._staticGrid.insert(e);
+                    }
+                }
+                this.spatialGrid._staticCells = this._staticGrid.cells;
+            }
+
+            static _activeLayer(items) {
+                let n = 0;
+                for (let i = 0; i < items.length; i++) if (items[i].active) items[n++] = items[i];
+                items.length = n;
+                return items;
+            }
             
             // Math helper: distance from a point (circle center) to a line segment (bullet path)
             static distToSegmentSquared(px, py, l1x, l1y, l2x, l2y) {
@@ -29,6 +59,11 @@
              */
             static clearSpatialGrid() {
                 this.spatialGrid.clear();
+                this.spatialGrid._staticCells = null;
+                this._staticGrid = new SpatialHashGrid(this.spatialGrid.cellSize);
+                this._staticRows.length = 0; this._staticMembers.length = 0;
+                const L = this._layers;
+                L.projectile.length = L.vehicle.length = L.actor.length = L.dynamic.length = 0;
             }
             
             static stats = {
@@ -85,16 +120,29 @@
                     e._cpx = e.x; e._cpy = e.y;
                 }
                 
-                // 3. Insert into spatial grid
-                for (let entity of onScreen) {
-                    this.spatialGrid.insert(entity);
+                // 3. Refresh moving cells; unchanged standard static bodies keep their
+                // cell coverage. Bucket layers once, in the same onScreen order.
+                const L = this._layers, fixed = this._staticMembers;
+                L.projectile.length = L.vehicle.length = L.actor.length = L.dynamic.length = fixed.length = 0;
+                for (let i = 0; i < onScreen.length; i++) {
+                    const entity = onScreen[i];
+                    entity._collisionOrder = i;
+                    if (entity instanceof StaticEntity && entity.getBoundingBox === GameEntity.prototype.getBoundingBox) fixed.push(entity);
+                    else this.spatialGrid.insert(entity);
+                    switch (entity.collisionLayer) {
+                        case GameEntity.LAYER.PROJECTILE: L.projectile.push(entity); break;
+                        case GameEntity.LAYER.VEHICLE: L.vehicle.push(entity); break;
+                        case GameEntity.LAYER.ACTOR: L.actor.push(entity); break;
+                        case GameEntity.LAYER.DYNAMIC: L.dynamic.push(entity); break;
+                    }
                 }
+                this._prepareStaticGrid(fixed);
                 
                 // 4. Process collisions by layer
-                this._processProjectiles(onScreen, game);
-                this._processVehicles(onScreen, game);
-                this._processActors(onScreen, game);
-                this._processDynamics(onScreen, game);
+                this._processProjectiles(onScreen, game, L.projectile);
+                this._processVehicles(onScreen, game, L.vehicle);
+                this._processActors(onScreen, game, L.actor);
+                this._processDynamics(onScreen, game, L.dynamic);
                 
                 // 5. Cleanup destroyed entities
                 GameEntity.cleanup();
@@ -104,8 +152,8 @@
             //  LAYER PROCESSORS
             // =====================
             
-            static _processProjectiles(onScreen, game) {
-                const projectiles = onScreen.filter(e => 
+            static _processProjectiles(onScreen, game, candidates = null) {
+                const projectiles = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.PROJECTILE && e.active
                 );
                 
@@ -223,8 +271,8 @@
                 }
             }
             
-            static _processVehicles(onScreen, game) {
-                const vehicles = onScreen.filter(e => 
+            static _processVehicles(onScreen, game, candidates = null) {
+                const vehicles = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.VEHICLE && e.active
                 );
                 
@@ -271,8 +319,8 @@
                 }
             }
             
-            static _processActors(onScreen, game) {
-                const actors = onScreen.filter(e => 
+            static _processActors(onScreen, game, candidates = null) {
+                const actors = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.ACTOR && e.active
                 );
                 
@@ -362,8 +410,8 @@
                 }
             }
             
-            static _processDynamics(onScreen, game) {
-                const dynamics = onScreen.filter(e => 
+            static _processDynamics(onScreen, game, candidates = null) {
+                const dynamics = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.DYNAMIC && e.active
                 );
                 if (!dynamics.length) return;

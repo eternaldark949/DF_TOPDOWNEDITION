@@ -37,6 +37,12 @@
              * Resets: inventory, quest progress, health, currency, driving, entities.
              */
             resetGameState() {
+                this._cancelMapTextureWarmup(true);
+                this._clearRenderSpatial();
+                this._releaseReflectionScratch();
+                this._effectSpatial = this._effectCandidateBuffers = null;
+                _physicsSpatial.clear();
+                CollisionSystem.clearSpatialGrid();
                 if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
                 if (this.scenes) this.scenes.abort();                       // a scene left playing doesn't run on into the next game
                 if (this._rideState && this._rideState.on) { this._rideEl.classList.remove('show'); this._rideState.on = false; }   // the ride tag goes with the run
@@ -212,9 +218,10 @@
             },
             loop() {
                 if (!this.running) return;
-                const _a0 = performance.now();
+                this._syncProfiler();
+                const _a0 = this.profiler.enabled ? performance.now() : 0;
                 ambience.update(this);                                   // the beds, the music, the motor (Audio:Ambience in the profiler)
-                if (this.profiler) this.profiler.add('Audio:Ambience', performance.now() - _a0);
+                if (this.profiler.enabled) this.profiler.add('Audio:Ambience', performance.now() - _a0);
                 
                 /* FPS LIMITER — skip frame if too soon.
                    Scheduled against a running due-time rather than the last

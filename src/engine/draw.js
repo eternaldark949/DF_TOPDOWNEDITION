@@ -1,6 +1,14 @@
         // GameEngine — The frame renderer (draw).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            /** Keep diagnostics available on demand without timing normal gameplay. */
+            _syncProfiler() {
+                _profileSampling = !!(this.showProfiler || PerfBench.active);
+                this.profiler.setEnabled(_profileSampling);
+                PeopleProfiler.sync(!!(this.showProfiler && GameSettings.profilerMode === 'full'));
+                WorldRenderProfiler.sync(!!(this.showProfiler && GameSettings.profilerMode === 'full'));
+            },
+
             /* THE VIEW — where the camera actually is this frame (draw() resolves it once:
                the cutscene camera, or her position plus the scope lean and the drive
                look-ahead). Everything that maps world <-> screen reads it — the world, both
@@ -37,9 +45,13 @@
             draw() {
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
+                this._renderDrawId = (this._renderDrawId || 0) + 1;
                 // --- PROFILER START ---
+                this._syncProfiler();
                 this.profiler.beginFrame();
-                RenderStats.bodies = 0; RenderStats.culled = 0; RenderStats.peopleMs = 0; RenderStats.bldBase = 0; RenderStats.bldTops = 0;
+                RenderStats.bodies = 0; RenderStats.liveBodies = 0; RenderStats.cachedBodies = 0; RenderStats.bakedBodies = 0;
+                RenderStats.culled = 0; RenderStats.peopleMs = 0; RenderStats.bldBase = 0; RenderStats.bldTops = 0;
+                RenderStats.peopleScope = false; RenderStats.peopleDepth = 0; RenderStats.peoplePart = null; RenderStats.peopleOpaque = false;
                 RenderStats.timed = !!(this.showProfiler && GameSettings.profilerMode === 'full');
                 this.profiler.start('Render:Total');
                 this.profiler.markWrapper('Render:Total');
@@ -183,7 +195,7 @@
                 // Floor Zones (Grass, Industrial ground - drawn UNDER roads)
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (this._renderGridFloorZones && !bakedGround) {
-                    const visibleZones = this._renderGridFloorZones.query(cullBounds.world);
+                    const visibleZones = this._renderGridFloorZones.query(cullBounds.world, this._renderGridFloorZones._drawResults || (this._renderGridFloorZones._drawResults = new Set()));
                     for (const z of visibleZones) {
                         this.ctx.fillStyle = z.color;
                         this.ctx.fillRect(z.x, z.y, z.w, z.h);
@@ -236,26 +248,21 @@
                 if (!_baseline) {   // ── to the end of Render:Entities
                 // Buildings - BASE LAYER (shadows, ground floor) - drawn before entities
                 this.profiler.start('Render:Buildings');
-                // PERFORMANCE: AABB viewport culling
+                if (RenderStats.timed) {
+                    this._buildingPeopleBase = RenderStats.peopleMs;
+                    WorldRenderProfiler.begin('Buildings', this.profiler, 'Render:Buildings');
+                }
+                // One ordered visibility list shared by base, roofs, signs and emissive details.
+                const renderBuildings = this._prepareRenderBuildingLists(cullBounds);
                 if (this.activeMap.buildings) {
-                    const cb = cullBounds.buildings, V = cullBounds.view, cam = this.camera;
-                    this.activeMap.buildings.forEach(b => {
-                        // Leaning buildings: anything of them that could reach the screen (BuildingV2.inView);
-                        // the rest by the wide rect
-                        if (b.isV2 && b.inView) { if (!b.inView(V, cam)) return; }
-                        else {
-                            const bRight = b.x + (b.w || 200);
-                            const bBottom = b.y + (b.h || 200);
-                            if (bRight < cb.left || b.x > cb.right || bBottom < cb.top || b.y > cb.bottom) return;
-                        }
+                    const V = cullBounds.view, cam = this.camera;
+                    for (const entry of renderBuildings.base) {
+                        const b = entry.item;
+                        if (!entry.standardV2 && b.isV2 && b.inView && !b.inView(V, cam)) continue;
                         RenderStats.bldBase++;
-                        
-                        if (b.drawBase) {
-                            b.drawBase(this.ctx);
-                        } else {
-                            b.draw(this.ctx);
-                        }
-                    });
+                        if (b.drawBase) b.drawBase(this.ctx);
+                        else b.draw(this.ctx);
+                    }
                 }
                 
                 // BuildingV3 — Ground layer (beneath player: facade, sidewalk)
@@ -316,7 +323,7 @@
                 // Pavements
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (this._renderGridPavements && !bakedGround) {
-                    const visiblePavements = this._renderGridPavements.query(cullBounds.world);
+                    const visiblePavements = this._renderGridPavements.query(cullBounds.world, this._renderGridPavements._drawResults || (this._renderGridPavements._drawResults = new Set()));
                     for (const p of visiblePavements) {
                         p.draw(this.ctx);
                     }
@@ -325,7 +332,7 @@
                 // Crosswalks
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (this._renderGridCrosswalks && !bakedGround) {
-                    const visibleCrosswalks = this._renderGridCrosswalks.query(cullBounds.world);
+                    const visibleCrosswalks = this._renderGridCrosswalks.query(cullBounds.world, this._renderGridCrosswalks._drawResults || (this._renderGridCrosswalks._drawResults = new Set()));
                     for (const cw of visibleCrosswalks) {
                         this.ctx.fillStyle = '#1a1a20';
                         this.ctx.fillRect(cw.x, cw.y, cw.w, cw.h);
@@ -356,7 +363,10 @@
                 // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)
                 if (this.activeMap.buildings && this.activeMap.type === 'outdoor') {
                     const cbW = cullBounds.world;
-                    for (const b of this.activeMap.buildings) {
+                    const candidates = this._queryRenderBuildings({ left: cbW.left - 60, right: cbW.right + 60, top: cbW.top - 480, bottom: cbW.bottom },
+                        this._forecourtCandidates || (this._forecourtCandidates = []));
+                    for (const entry of candidates) {
+                        const b = entry.item;
                         const ground = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : b.style === 'moon_city' ? b._mcDrawGround : null;
                         if (!ground) continue;
                         if (b.x + b.w + 60 < cbW.left || b.x - 60 > cbW.right || b.y > cbW.bottom || b.y + b.h + 480 < cbW.top) continue;
@@ -368,11 +378,17 @@
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day
                 this.drawCastShadows(this.ctx, cullBounds.world);
                 
+                if (RenderStats.timed) this.profiler.add('Buildings: People', RenderStats.peopleMs - this._buildingPeopleBase, true);
                 this.profiler.stop('Render:Buildings');
+                if (RenderStats.timed) WorldRenderProfiler.end(this.profiler);
                 
                 // Entrance Markers (Holo-Zones) - Periwinkle/Lavender Glow
                 this.profiler.start('Render:Entities');
-                if (RenderStats.timed) { this._lapT = performance.now(); this._lapP = RenderStats.peopleMs; }   // the laps below split Entities into rows
+                if (RenderStats.timed) {
+                    this._entityPeopleBase = RenderStats.peopleMs;
+                    PeopleProfiler.beginEntities();
+                    this._lapT = performance.now(); this._lapP = RenderStats.peopleMs;
+                }   // the laps below split only the Entities pass into rows
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.transitions) {
                     const cbW = cullBounds.world;
@@ -601,7 +617,7 @@
                 // Map Walls
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 {
-                    const visibleWalls = this._renderGridWalls.query(cullBounds.world);
+                    const visibleWalls = this._renderGridWalls.query(cullBounds.world, this._renderGridWalls._drawResults || (this._renderGridWalls._drawResults = new Set()));
                     const ws = this.activeMap.wallStyle;                 // a map may dress its walls (the House: black marble, gold)
                     for (const w of visibleWalls) {
                         this.ctx.fillStyle = ws ? ws.fill : '#222'; 
@@ -929,8 +945,9 @@
                 }
                 
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
+                if (RenderStats.timed) WorldRenderProfiler.begin('World tops', this.profiler, 'Entities: World tops');
                 // Ferris Wheel BASE (legs/shadow — under building roofs)
-                if (this.activeMap.ferrisWheel) {
+                if (this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, false)) {
                     this.activeMap.ferrisWheel.drawBase(this.ctx);
                 }
                 
@@ -938,13 +955,14 @@
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
-                    this.activeMap.buildings.forEach(b => {
+                    for (const entry of renderBuildings.v2) {
+                        const b = entry.item;
                         if (b.isV2 && b.drawTop) {
-                            if (!b.inView(V, cam)) return;
+                            if (!entry.standardV2 && !b.inView(V, cam)) continue;
                             RenderStats.bldTops++;
                             b.drawTop(this.ctx, this.worldMinutes);
                         }
-                    });
+                    }
                 }
                 
                 // Billboards — tilted panels standing up from the ground, drawn over the player like roofs
@@ -963,13 +981,13 @@
                 // PERFORMANCE: AABB viewport culling
                 if (this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
-                    this.activeMap.buildings.forEach(b => {
+                    for (const entry of renderBuildings.v2) {
+                        const b = entry.item;
                         if (b.isV2 && b.drawSign) {
-                            if (!b.inView(V, cam)) return;
-                            
+                            if (!entry.standardV2 && !b.inView(V, cam)) continue;
                             b.drawSign(this.ctx);
                         }
-                    });
+                    }
                 }
                 
                 // Foliage (trees and bushes) - drawn AFTER player so canopy appears overhead
@@ -979,12 +997,21 @@
                     const windDir = this.weather ? this.weather.windDirection : 1;
                     const cb = cullBounds.foliage;
                     const foliageScale = GameSettings.getFoliageScale();
-                    this.activeMap.foliage.forEach((f, idx) => {
-                        // Density culling: skip foliage based on setting (uses stable index so same trees always hidden)
-                        if (foliageScale < 1.0 && (idx % Math.round(1 / foliageScale)) !== 0) return;
-                        if (f.x < cb.left || f.x > cb.right || f.y < cb.top || f.y > cb.bottom) return;
-                        f.draw(this.ctx, wind, windDir, _gameTimeSec);  // smooth game time (was sampled once per tick)
-                    });
+                    const foliageStride = foliageScale < 1.0 ? Math.round(1 / foliageScale) : 1;
+                    const candidates = this._queryRenderFoliage(cb, this._foliageCandidates || (this._foliageCandidates = []));
+                    for (const entry of candidates) {
+                        const f = entry.item, idx = entry.index;
+                        // Original array index keeps exactly the same density selection, even after spatial culling.
+                        if (foliageScale < 1.0 && (idx % foliageStride) !== 0) continue;
+                        if (f.x < cb.left || f.x > cb.right || f.y < cb.top || f.y > cb.bottom) continue;
+                        if (foliagePaintInView(f, this.ctx, cullBounds.view, viewZoom, wind, windDir, _gameTimeSec)) {
+                            f.draw(this.ctx, wind, windDir, _gameTimeSec);
+                        } else {
+                            // Preserve draw-seeded and caller paint state when skipping hidden pixels.
+                            if (f._variant === undefined) f._variant = Math.floor(f.phaseOffset * 0.637) % 4;
+                            if (!_sunShadow.on) this.ctx.fillStyle = 'rgba(0,0,0,0.22)';
+                        }
+                    }
                 }
                 
                 // Floating leaf particles - drawn after foliage, before weather
@@ -993,7 +1020,7 @@
                 }
                 
                 // Ferris Wheel TOP (rims, gondolas, hub — above buildings, trees, everything)
-                if (this.activeMap.ferrisWheel) {
+                if (this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, true)) {
                     this.activeMap.ferrisWheel.drawTop(this.ctx);
                 }
                 
@@ -1013,8 +1040,9 @@
                 // PERFORMANCE: AABB viewport culling
                 const cbLamps = cullBounds.lamps;
                 const rsys = this.roomSystem;
-                this.lamps.forEach(l => {
-                    if (l.x < cbLamps.left || l.x > cbLamps.right || l.y < cbLamps.top || l.y > cbLamps.bottom) return;
+                for (const entry of this._queryLampCandidates(cbLamps, 'lampBodies')) {
+                    const l = entry.item;
+                    if (l.x < cbLamps.left || l.x > cbLamps.right || l.y < cbLamps.top || l.y > cbLamps.bottom) continue;
                     // Room light switches fade the lamp (and a faulty one flickers)
                     // Under the open sky each lamp wakes at its own minute of dusk (lampWake)
                     const wake = this.activeMap.type === 'outdoor' ? lampWake(l) : 1;
@@ -1022,10 +1050,12 @@
                     l._forcedOff = l._lightK < 0.02;
                     const lr = rsys.active && l._roomId ? rsys.rooms[l._roomId] : null;
                     const outdoorRoom = !!lr && lr.type === 'outdoor';
-                    l.draw(this.ctx, this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight);
-                }); 
+                    const lampDay = this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight;
+                    if (lampPaintInView(l, this.ctx, cullBounds.view, viewZoom, lampDay)) l.draw(this.ctx, lampDay);
+                }
             
                 if (RenderStats.timed) this._entLap('Entities: World tops');   // roofs, signs, foliage, lamps
+                if (RenderStats.timed) WorldRenderProfiler.end(this.profiler);
                 // 3. Draw projectiles and weather effects
                 this.projectiles.forEach(p => p.draw(this.ctx));
                 
@@ -1099,7 +1129,7 @@
                 }
                 
                 if (RenderStats.timed) this._entLap('Entities: Effects');
-                this.weather.draw(this.ctx);
+                this.weather.draw(this.ctx, cullBounds.view, viewZoom);
                 if (RenderStats.timed) this._entLap('Entities: Weather');
                 
                 // Graveyard humanoid ghosts
@@ -1107,10 +1137,16 @@
                 
                 if (RenderStats.timed) {
                     this._entLap('Entities: Effects');
-                    this.profiler.add('Entities: People', RenderStats.peopleMs, true);           // every body drawn
+                    PeopleProfiler.endEntities(this.profiler, RenderStats.peopleMs - this._entityPeopleBase); // bodies drawn in this pass only
                 }
                 this.profiler.stop('Render:Entities');
-                } else if (this.player.visible) this.drawPlayer();   // (baseline: her alone)
+                } else if (this.player.visible) {                         // baseline: her alone
+                    this.profiler.start('Render:Entities');
+                    if (RenderStats.timed) { this._entityPeopleBase = RenderStats.peopleMs; PeopleProfiler.beginEntities(); }
+                    this.drawPlayer();
+                    if (RenderStats.timed) PeopleProfiler.endEntities(this.profiler, RenderStats.peopleMs - this._entityPeopleBase);
+                    this.profiler.stop('Render:Entities');
+                }
                 
                 // 4. LIGHTING SYSTEM & DEBUG
                 this.profiler.start('Render:Lighting');
@@ -1153,8 +1189,13 @@
                 
                 // Rain on screen: outdoors, or fading in as she steps out onto a veranda
                 const rainK = this.activeMap.type === 'outdoor' ? 1 : (this.roomSystem.active ? this.roomSystem.outdoorness : 0);
-                if (rainK > 0.01) {
-                    const rainLamps = this.activeMap._interiorLights ? [...this.lamps, ...this.activeMap._interiorLights] : this.lamps;
+                if (rainK > 0.01 && this.weather.isRaining) {
+                    const IL = this.activeMap._interiorLights;
+                    // one joined list per map's lamps (a fresh array each frame would rebuild the rain's lamp grid every frame)
+                    if (IL && (this._rainLampsSrc !== this.lamps || this._rainLampsIL !== IL || this._rainLamps.length !== this.lamps.length + IL.length)) {
+                        this._rainLamps = [...this.lamps, ...IL]; this._rainLampsSrc = this.lamps; this._rainLampsIL = IL;
+                    }
+                    const rainLamps = IL ? this._rainLamps : this.lamps;
                     this.ctx.save(); this.ctx.globalAlpha = rainK;
                     this.weather.drawRainOverlay(this.ctx, this.view, rainLamps);   // the view, so Cinematic View's pan carries the rain too
                     this.ctx.restore();
@@ -1165,6 +1206,9 @@
                     this.bokeh.update(this.deltaTime || 16);
                     this.bokeh.draw(this.ctx, this.canvas.width, this.canvas.height, _frameTime);
                 }
+
+                // A small player cue stays legible above the light, refraction and weather.
+                this.drawPlayerMarker(this.ctx);
                 
                 // Mission waypoint marker (screen-space indicator)
                 if (this.missions.activeMission && this.missions.activeMission.status === 'active' 

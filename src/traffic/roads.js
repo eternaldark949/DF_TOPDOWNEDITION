@@ -1705,6 +1705,101 @@
              *   - GATE_EXIT: Exiting an intersection
              *   - DESTINATION: Final target
              */
+            // Driving routes must follow directed lane links from the actual car lane.
+            // The map's pedestrian route may choose a different lane or a drawing-only
+            // fallback curve, neither of which an occupied car can safely follow.
+            /** A lane a car can leave: a straight link onward or a turn that starts from it (map-edge lanes have neither) */
+            laneHasExit(lane) {
+                if (!lane) return false;
+                if (lane.connections && lane.connections.length) return true;
+                return !!(lane.turnPaths && lane.turnPaths.some(tp => tp.fromLane === lane && tp.toLane));
+            }
+
+            buildDrivePath(startLane, startX, startY, endX, endY) {
+                if (!startLane || !this.allLanes.includes(startLane)) return null;
+                const project = (lane, x, y) => {
+                    const along = clamp(lane.getDistanceAlong(x, y), 0, lane.length);
+                    const x0 = lane.start.x + lane.ux * along, y0 = lane.start.y + lane.uy * along;
+                    return { along, x: x0, y: y0, distance: Math.hypot(x - x0, y - y0) };
+                };
+                const origin = project(startLane, startX, startY);
+                const targets = new Map();
+                let nearest = Infinity;
+                for (const lane of this.allLanes) {
+                    const point = project(lane, endX, endY);
+                    targets.set(lane, point); nearest = Math.min(nearest, point.distance);
+                }
+                for (const [lane, point] of targets) {
+                    if (point.distance > nearest + (lane.road.laneWidth || 60) + 0.01) targets.delete(lane);
+                }
+                const distances = new Map(), previous = new Map(), settled = new Set();
+                const relax = (fromLane, cost, source = false) => {
+                    const links = (fromLane.connections || []).map(toLane => ({ fromLane, toLane, turnPath: null }));
+                    for (const turnPath of fromLane.turnPaths || []) {
+                        if (turnPath.fromLane === fromLane && turnPath.toLane) links.push({ fromLane, toLane: turnPath.toLane, turnPath });
+                    }
+                    for (const link of links) {
+                        if (!targets.has(link.toLane) && !this.allLanes.includes(link.toLane)) continue;
+                        const cp = link.turnPath?.controlPoints;
+                        const length = cp ? cp.slice(1).reduce((sum, point, i) => sum + Math.hypot(point.x - cp[i].x, point.y - cp[i].y), 0)
+                            : Math.hypot(fromLane.end.x - link.toLane.start.x, fromLane.end.y - link.toLane.start.y);
+                        const nextCost = cost + length;
+                        if (nextCost < (distances.get(link.toLane) ?? Infinity)) {
+                            distances.set(link.toLane, nextCost);
+                            previous.set(link.toLane, { link, from: source ? null : fromLane });
+                        }
+                    }
+                };
+                relax(startLane, startLane.length - origin.along, true);
+                let best = null, bestCost = Infinity;
+                const direct = targets.get(startLane);
+                if (direct && direct.along >= origin.along - 1) {
+                    best = { lane: startLane, point: direct, direct: true };
+                    bestCost = Math.max(0, direct.along - origin.along) + direct.distance * 4;
+                }
+                while (true) {
+                    let lane = null, cost = Infinity;
+                    for (const [candidate, value] of distances) {
+                        if (!settled.has(candidate) && value < cost) { lane = candidate; cost = value; }
+                    }
+                    if (!lane) break;
+                    settled.add(lane);
+                    const point = targets.get(lane);
+                    const finalCost = point ? cost + point.along + point.distance * 4 : Infinity;
+                    if (finalCost < bestCost) { best = { lane, point, direct: false }; bestCost = finalCost; }
+                    relax(lane, cost + lane.length);
+                }
+                if (!best) return null;
+                const transitions = [];
+                if (!best.direct) {
+                    let lane = best.lane;
+                    while (lane) {
+                        const step = previous.get(lane);
+                        if (!step) return null;
+                        transitions.push(step.link); lane = step.from;
+                    }
+                    transitions.reverse();
+                }
+                const lanePoint = (type, lane, point) => ({ type, x: point.x, y: point.y,
+                    lane, laneId: lane.id, segment: lane.segment, segmentId: lane.segmentId,
+                    road: lane.road, roadId: lane.roadId });
+                const waypoints = [lanePoint('LANE_START', startLane, { x: startX, y: startY })];
+                for (const link of transitions) {
+                    waypoints.push(lanePoint('LANE_END', link.fromLane, link.fromLane.end));
+                    const tp = link.turnPath;
+                    if (tp) {
+                        waypoints.push({ type: 'TURN_PATH', x: tp.controlPoints[0].x, y: tp.controlPoints[0].y,
+                            turnPath: tp, turnPathId: tp.id, controlPoints: tp.controlPoints,
+                            fromLaneId: tp.fromLaneId, toLaneId: tp.toLaneId, toSegmentId: tp.toSegmentId,
+                            intersection: tp.fromGate.intersection, intersectionId: tp.fromGate.intersectionId });
+                    }
+                    waypoints.push(lanePoint('GATE_EXIT', link.toLane, link.toLane.start));
+                }
+                waypoints.push(lanePoint('DESTINATION', best.lane, best.point));
+                return { startLane, transitions, index: 0, waypoints,
+                    target: { x: endX, y: endY }, destination: { x: best.point.x, y: best.point.y }, endLane: best.lane };
+            }
+
             buildPrecisePath(startX, startY, endX, endY) {
                 const path = [];
                 

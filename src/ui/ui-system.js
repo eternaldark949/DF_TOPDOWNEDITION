@@ -75,6 +75,7 @@
                 const handleMarkerPlacement = (clientX, clientY) => {
                     // Only place markers on outdoor maps with road networks
                     if (this.game.activeMap.type === 'indoor') return;
+                    if (this.game.zibSystem?.isPassenger) return;
                     
                     const rect = canvas.getBoundingClientRect();
                     const canvasX = clientX - rect.left;
@@ -92,6 +93,11 @@
                             this.navPath = [];
                             this.roadLevelPath = [];
                             this.game.navDestination = null;
+                            if (this.game.isDriving && this.game.car?.controlMode === 'AI') {
+                                this.game.car.disableAutoDrive();
+                                this.game.car.clearNavWaypoints();
+                                this.game.autodriveBtn.classList.remove('engaged');
+                            }
                             showMessage("NAVIGATION CANCELLED");
                             this.renderGoldenMap();
                             return;
@@ -101,8 +107,16 @@
                     // Set new marker
                     this.navMarker = { x: worldCoords.x, y: worldCoords.y };
                     this.navPathDirty = true;
-                    this.calculateNavPath();
                     this.game.navDestination = this.navMarker; // Share with game engine for AutoDrive
+                    if (this.game.isDriving && this.game.car?.controlMode === 'AI') this.game.car.navDestination = null;
+                    if (this.game.isDriving && this.game.car?.controlMode === 'AI' && !this.game.car.currentTurnPath) {
+                        if (!this.game._refreshAutoDriveRoute()) {
+                            this.game.car.disableAutoDrive();
+                            this.game.car.clearNavWaypoints();
+                            this.game.autodriveBtn.classList.remove('engaged');
+                        }
+                    }
+                    this.calculateNavPath();
                     showMessage("DESTINATION SET");
                     this.renderGoldenMap();
                 };
@@ -265,7 +279,9 @@
                 
                 // === V2 PRECISE PATHFINDING ===
                 if (network.buildPrecisePath) {
-                    this.precisePath = network.buildPrecisePath(
+                    const drivingRoute = this.game.isDriving && this.game.car?.controlMode === 'AI'
+                        ? this.game.car._driveRoute : null;
+                    this.precisePath = drivingRoute ? drivingRoute.waypoints : network.buildPrecisePath(
                         player.x, player.y,
                         this.navMarker.x, this.navMarker.y
                     );

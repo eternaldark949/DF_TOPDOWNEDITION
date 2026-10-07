@@ -85,7 +85,7 @@
                 L.push({ x0: this.x, y0: this.y, x1: tx, y1: ty, t0: _gameTimeSec, a: this.angle, look: this.look, boss: !!this.bossName, seed: Math.random() * 100 });
                 if (L.length > 12) L.shift();
                 this.x = tx; this.y = ty;
-                g.emitNoise(tx, ty, 220, 'dash', false);
+                g.emitNoise(tx, ty, 220, 'dash', false, { src: this });
                 return true;
             }
         }

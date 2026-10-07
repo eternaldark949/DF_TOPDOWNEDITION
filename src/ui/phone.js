@@ -1216,8 +1216,7 @@
                     const cy = lane.start.y + lane.uy * t;
                     const dist = Math.hypot(px - cx, py - cy);
                     // Must be within reasonable range and not a dead-end
-                    const hasExit = (lane.connections && lane.connections.length > 0) || 
-                                   (lane.turnPaths && lane.turnPaths.length > 0);
+                    const hasExit = game.traffic.network.laneHasExit(lane);
                     if (dist < bestDist && hasExit) {
                         bestDist = dist;
                         bestLane = lane;
@@ -1236,7 +1235,8 @@
                 zib.glowColor = ZIB_CONFIG.underglowColor;
                 zib.headlightColor = ZIB_CONFIG.headlightColor;
                 zib.isZib = true;
-                zib.driverType = 'zib';
+                zib.driverType = 'traffic';
+                zib.hasDriver = false;
                 
                 // Position Zib on the lane near the player
                 const lx = px - bestLane.start.x;

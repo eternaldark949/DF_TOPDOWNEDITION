@@ -21,12 +21,19 @@
             _bakedFrame: -1, _bakes: 0,
 
             /** What a bake depends on: the look as drawn, the pose, the stride, rain on them */
-            _sig(e, c) {
+            _sig(e, c, baked) {
                 const g = e._gait, sp = g ? Math.round(Math.min(3, g.speed) * 2) / 2 : 0;
                 const held = c.held ? c.held.type + (c.held.open ?? '') : '';
                 const hat = c.hat ? c.hat.type : '', hair = c.hair ? c.hair.type : '';
                 const W = typeof weatherAt === 'function' ? weatherAt(e) : null, wet = W && W.rain > 0.05 ? 'r' : '';
-                return (c.pose || '') + '|' + held + '|' + hat + '|' + hair + '|' + (sp > 0.3 ? Math.max(1, sp) : 0) + '|' + wet;
+                const stride = sp > 0.3 ? Math.max(1, sp) : 0, parts = baked && baked.parts;
+                // Reuse the existing key while its components match. Configs are often rebuilt
+                // by their callers, so compare values rather than the config object's identity.
+                // An unusual component containing "|" keeps the original concatenation rules.
+                if (parts && parts.length === 6 && parts[0] === String(c.pose || '') &&
+                    parts[1] === String(held) && parts[2] === String(hat) &&
+                    parts[3] === String(hair) && parts[4] === String(stride) && parts[5] === wet) return baked.sig;
+                return (c.pose || '') + '|' + held + '|' + hat + '|' + hair + '|' + stride + '|' + wet;
             },
 
             /** Bake the strip: frame 0 standing, 1..FRAMES the walk cycle, in the body's own frame (facing +x) */
@@ -34,12 +41,12 @@
                 const F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R, Q = CROWD_BAKE.Q, cell = Math.ceil(R * 2 * Q);
                 const cv = document.createElement('canvas'); cv.width = cell * (F + 1); cv.height = cell;
                 const g = cv.getContext('2d'); if (!g) return null;
-                const sp = +sig.split('|')[4] || 0;
+                const parts = sig.split('|'), sp = +parts[4] || 0;
                 // a stand-in body: same look and place, its gait pinned (no ticks pass, so syncHumanoidGait keeps it)
                 const B = { x: e.x, y: e.y, angle: 0, look: e.look, walkPhase: 0 };
                 syncHumanoidGait(B);
                 const G = B._gait;
-                const cfg = Object.assign({}, c, { lerpSpeed: 1, noShadow: true, poseInstant: true });
+                const cfg = Object.assign({}, c, { lerpSpeed: 1, noShadow: true, poseInstant: true, _crowdBake: true });
                 const wm = _worldMatrix, wc = _worldCanvas, lite = _crowdLite;
                 _crowdLite = true;                                              // at rest, flat: the bake is lit the same whichever way they turn
                 try {
@@ -52,15 +59,15 @@
                     }
                 } catch (err) { return null; }
                 finally { _crowdLite = lite; _worldMatrix = wm; _worldCanvas = wc; }
-                return { sig, cv, cell, used: _frameTime };
+                return { sig, parts, stride: sp, cv, cell, used: _frameTime };
             },
 
             /** Draw from the bake if there is one (true), else false (the caller draws it live) */
             draw(ctx, e, c) {
                 if (c.pose === 'dance' || c.pose === 'die') return false;          // poses that keep moving: live
                 syncHumanoidGait(e);                                                // the walk (and its footsteps) as the live draw would
-                const sig = this._sig(e, c);
                 let b = this.cache.get(e);
+                const sig = this._sig(e, c, b);
                 if (!b || b.sig !== sig) {
                     if (this._bakedFrame !== _frameTime) { this._bakedFrame = _frameTime; this._bakes = 0; }
                     if (this._bakes >= CROWD_BAKE.PER_FRAME) return false;          // one look a frame; live until then
@@ -77,13 +84,13 @@
                 }
                 b.used = _frameTime;
                 const g = e._gait, F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R;
-                const walking = g && g.speed > CONFIG.GAIT.STOP_SPEED && +b.sig.split('|')[4] > 0;
+                const walking = g && g.speed > CONFIG.GAIT.STOP_SPEED && b.stride > 0;
                 const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
                 const f = walking ? 1 + (Math.round(ph / (Math.PI * 2) * F) % F) : 0;
                 // the contact shadow, live (it follows the sun and their facing)
                 if (!c.noShadow && !c.isDriving && _zoomLOD < 2) { const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a); drawHumanContactShadow(ctx); }
                 ctx.drawImage(b.cv, b.cell * f, 0, b.cell, b.cell, -R, -R, R * 2, R * 2);
-                RenderStats.bodies++;
+                RenderStats.bodies++; RenderStats.cachedBodies++;
                 return true;
             },
 

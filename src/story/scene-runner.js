@@ -69,8 +69,15 @@
             draw(ctx) {
                 if (!this.visible) return;
                 syncHumanoidGait(this);
+                const look = { stance: 'idle', ...this.look, pose: this.path ? undefined : (this.pose || undefined) };
+                // Scene movement, facing and script waits tick independently. Only known
+                // body/prop paint is skipped; preserve gait, weather, pose and RNG seeds.
+                if ((!this.prop || this.prop === 'notepad') && !decorativeBodyInView(this.x, this.y, look)) {
+                    tickHiddenDecorativeBody(this, look);
+                    return;
+                }
                 ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
-                drawProceduralHumanoid(ctx, this, { stance: 'idle', ...this.look, pose: this.path ? undefined : (this.pose || undefined) });
+                drawProceduralHumanoid(ctx, this, look);
                 if (this.prop === 'notepad') {                     // a small leather notebook in both hands, open
                     ctx.fillStyle = '#3a2418'; ctx.fillRect(7, -4.5, 6, 9);
                     ctx.fillStyle = '#efe6d2'; ctx.fillRect(7.6, -4, 4.8, 8); ctx.strokeStyle = 'rgba(60,40,30,0.5)'; ctx.lineWidth = 0.4;

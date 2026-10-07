@@ -16,6 +16,7 @@
                 this.dropOffRegistry = {};   // Zib taxi drop-off points per landmarkId
                 
                 this.profiler = new Profiler(); // Initialize the performance tracker
+                this.profiler.setEnabled(false);
                 
                 // Unified Entity System feature flag
                 this.useNewCollisionSystem = true;

@@ -40,8 +40,124 @@
                 return Math.floor(cost);
             },
 
-            /** Flit. `angleOverride` (radians) comes from the move stick's ring or a flick; otherwise
-             *  the way she's moving (keys, stick) or facing. Returns true if she flitted. */
+            /** Event-only landing search: teleport through obstacles, but finish with a clear player circle. */
+            findFlitLanding(angle, distance) {
+                const p = this.player, map = this.activeMap, margin = 20, minTravel = 1;
+                if (!p || !map || ![p.x, p.y, angle, distance, map.width, map.height].every(Number.isFinite) || distance < minTravel || map.width < margin * 2 || map.height < margin * 2) return null;
+                const sx = p.x, sy = p.y, ux = Math.cos(angle), uy = Math.sin(angle);
+                const radius = Number.isFinite(p.radius) && p.radius > 0 ? p.radius : 12;
+                const rects = [], leaves = [];
+                const addRect = r => {
+                    if (r && [r.x, r.y, r.w, r.h].every(Number.isFinite) && r.w > 0 && r.h > 0) rects.push(r);
+                };
+                for (const r of map.walls || []) addRect(r);
+                if (Array.isArray(map.buildingColliders)) for (const r of map.buildingColliders) addRect(r);
+                else for (const b of map.buildings || []) {
+                    if (b.isV2 && typeof b.getCollisionShapes === 'function') for (const r of b.getCollisionShapes()) addRect(r);
+                    else addRect(b);
+                }
+                if (this.useNewCollisionSystem) for (const e of this._staticBillboardEntities || []) {
+                    if (e.active && e.hasCollision && !e.markedForDestroy) addRect(e.getBoundingBox());
+                }
+                const rooms = this.roomSystem;
+                if (rooms && rooms.active) for (const door of rooms.doors || []) {
+                    // Sliding panels and arches do not push actors; hinged leaves do.
+                    if (door.type !== 'hinged') continue;
+                    const half = door.halfThick;
+                    if (!Number.isFinite(half) || half < 0) continue;
+                    for (const s of door.leaves()) if (s.length === 4 && s.every(Number.isFinite)) leaves.push({ s, r: radius + half });
+                }
+                const clear = (x, y) => {
+                    for (const r of rects) {
+                        const dx = x - Math.max(r.x, Math.min(r.x + r.w, x)), dy = y - Math.max(r.y, Math.min(r.y + r.h, y));
+                        if (Math.hypot(dx, dy) < radius) return false;
+                    }
+                    for (const leaf of leaves) {
+                        const [ax, ay, bx, by] = leaf.s, dx = bx - ax, dy = by - ay, n = dx * dx + dy * dy;
+                        const t = n ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / n)) : 0;
+                        if (Math.hypot(x - ax - dx * t, y - ay - dy * t) < leaf.r) return false;
+                    }
+                    return true;
+                };
+                // Keep the original map-clamped endpoint exactly when it is already safe.
+                const tx = Math.max(margin, Math.min(map.width - margin, sx + ux * distance));
+                const ty = Math.max(margin, Math.min(map.height - margin, sy + uy * distance));
+                if ((tx - sx) * ux + (ty - sy) * uy >= minTravel && Math.hypot(tx - sx, ty - sy) >= minTravel && clear(tx, ty)) return { x: tx, y: ty };
+
+                // A blocked endpoint searches only along the requested ray, inside the same map margin.
+                let lo = minTravel, hi = distance;
+                const trim = (s, u, a, b) => {
+                    if (u === 0) return s >= a && s <= b;
+                    let t0 = (a - s) / u, t1 = (b - s) / u;
+                    if (t0 > t1) [t0, t1] = [t1, t0];
+                    lo = Math.max(lo, t0); hi = Math.min(hi, t1); return lo <= hi;
+                };
+                if (!trim(sx, ux, margin, map.width - margin) || !trim(sy, uy, margin, map.height - margin)) return null;
+                const intervals = [];
+                const add = (a, b) => { a = Math.max(lo, a); b = Math.min(hi, b); if (a < b) intervals.push([a, b]); };
+                const box = (x, y, dx, dy, left, top, right, bottom) => {
+                    let a = lo, b = hi;
+                    for (const [s, u, min, max] of [[x, dx, left, right], [y, dy, top, bottom]]) {
+                        if (u === 0) { if (s <= min || s >= max) return; }
+                        else {
+                            let t0 = (min - s) / u, t1 = (max - s) / u;
+                            if (t0 > t1) [t0, t1] = [t1, t0];
+                            a = Math.max(a, t0); b = Math.min(b, t1); if (a >= b) return;
+                        }
+                    }
+                    add(a, b);
+                };
+                const disc = (cx, cy, r) => {
+                    const dx = sx - cx, dy = sy - cy, n = ux * ux + uy * uy;
+                    const center = -(dx * ux + dy * uy) / n, cross = dx * uy - dy * ux;
+                    const span2 = (r * r - cross * cross / n) / n;
+                    if (span2 > 0) { const span = Math.sqrt(span2); add(center - span, center + span); }
+                };
+                const rayMinX = Math.min(sx + ux * lo, sx + ux * hi), rayMaxX = Math.max(sx + ux * lo, sx + ux * hi);
+                const rayMinY = Math.min(sy + uy * lo, sy + uy * hi), rayMaxY = Math.max(sy + uy * lo, sy + uy * hi);
+                for (const r of rects) {
+                    const left = r.x, top = r.y, right = left + r.w, bottom = top + r.h;
+                    if (right + radius < rayMinX || left - radius > rayMaxX || bottom + radius < rayMinY || top - radius > rayMaxY) continue;
+                    // Rounded AABB: two strips and four corner discs, rather than an oversized square.
+                    box(sx, sy, ux, uy, left - radius, top, right + radius, bottom);
+                    box(sx, sy, ux, uy, left, top - radius, right, bottom + radius);
+                    disc(left, top, radius); disc(right, top, radius); disc(left, bottom, radius); disc(right, bottom, radius);
+                }
+                for (const leaf of leaves) {
+                    const [ax, ay, bx, by] = leaf.s, dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+                    if (len) {
+                        const vx = dx / len, vy = dy / len;
+                        box((sx - ax) * vx + (sy - ay) * vy, -(sx - ax) * vy + (sy - ay) * vx,
+                            ux * vx + uy * vy, -ux * vy + uy * vx, 0, -leaf.r, len, leaf.r);
+                    }
+                    disc(ax, ay, leaf.r); disc(bx, by, leaf.r);
+                }
+                intervals.sort((a, b) => a[0] - b[0]);
+                const merged = [];
+                for (const interval of intervals) {
+                    const last = merged[merged.length - 1];
+                    // Touching intervals retain their shared safe tangent point.
+                    if (last && interval[0] < last[1]) last[1] = Math.max(last[1], interval[1]);
+                    else merged.push(interval);
+                }
+                const epsilon = Math.max(1e-7, Number.EPSILON * Math.max(1, Math.abs(sx), Math.abs(sy), map.width, map.height) * 64);
+                let t = hi;
+                const landing = () => {
+                    const x = sx + ux * t, y = sy + uy * t;
+                    return t >= lo && x >= margin && x <= map.width - margin && y >= margin && y <= map.height - margin && clear(x, y) ? { x, y } : null;
+                };
+                let result = landing();
+                if (result) return result;
+                t = hi - epsilon; result = landing(); if (result) return result;
+                for (let i = merged.length - 1; i >= 0; i--) {
+                    const [a, b] = merged[i];
+                    if (t < a || t > b + epsilon) continue;
+                    t = a; result = landing(); if (result) return result;
+                    t = a - epsilon; result = landing(); if (result) return result;
+                }
+                return null;
+            },
+
             triggerFlit(angleOverride, source) {
                 if (this.isDriving || this.paused) return false;
                 if (this.hud && !this.hud.has('flit')) return false;   // not introduced yet (ui/hud-reveal.js)
@@ -50,14 +166,6 @@
                 
                 // Check attunement pool
                 if (this.flitState.attunement < cost) return false;
-                if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }
-                
-                // Spend attunement
-                this.flitState.attunement -= cost;
-                this.flitState.active = true; 
-                this.flitState.duration = this.flitState.maxDuration;
-                if (this.flitState.attunement < cost) this.flitBtn.classList.add('cooldown');
-                
                 // --- Capture start state for VFX ---
                 const startX = this.player.x;
                 const startY = this.player.y;
@@ -66,10 +174,6 @@
                 let flitDist = this.player.buffSystem.getStat('flitDistance', 120);
                 if (this.augments && this.augments.isEquipped('flit_ext')) flitDist *= 1.3; // 30% more range
                 if (this.resonance) flitDist = this.resonance.stat('flitDistance', flitDist);   // Flit: Reach
-                this.flitState.lastFlitAt = _gameTimeSec;
-                // Flit: Afterimage — gangers keep seeing you where you left
-                const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
-                this._afterimage = ai ? { x: this.player.x, y: this.player.y, until: _gameTimeSec + 0.5 * ai } : null;
 
                 // Flit direction: use movement keys (WASD) or joystick if active, otherwise fall back to facing angle
                 let flitAngle = this.player.angle;
@@ -87,15 +191,32 @@
                 }
                 if (typeof angleOverride === 'number') flitAngle = angleOverride;
 
-                let targetX = this.player.x + Math.cos(flitAngle) * flitDist; let targetY = this.player.y + Math.sin(flitAngle) * flitDist;
-                let hitWall = false; for(let w of this.activeMap.walls) { if (targetX > w.x && targetX < w.x + w.w && targetY > w.y && targetY < w.y + w.h) { hitWall = true; break; } }
-                if (hitWall) { targetX = this.player.x + Math.cos(flitAngle) * 20; targetY = this.player.y + Math.sin(flitAngle) * 20; }
+                const landing = this.findFlitLanding(flitAngle, flitDist);
+                if (!landing) {
+                    // No clear landing that way (the map's edge, a solid run of wall): no charge spent, and she
+                    // feels it — the ring shudders crimson with a soft knock (at most every 0.4 s)
+                    if (!(this._flitBlockedAt > _gameTimeSec - 0.4)) {
+                        this._flitBlockedAt = _gameTimeSec;
+                        if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('blocked'); void r.offsetWidth; r.classList.add('blocked'); }
+                        audioSys.sfx('knock');
+                    }
+                    return false;
+                }
+                const targetX = landing.x, targetY = landing.y;
+
+                if (this.flitRingEl) { const r = this.flitRingEl; r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }
                 
-                // Clamp target within map bounds
-                const margin = 20;
-                targetX = Math.max(margin, Math.min(this.activeMap.width - margin, targetX));
-                targetY = Math.max(margin, Math.min(this.activeMap.height - margin, targetY));
+                // Spend attunement
+                this.flitState.attunement -= cost;
+                this.flitState.active = true;
+                this.flitState.duration = this.flitState.maxDuration;
+                if (this.flitState.attunement < cost) this.flitBtn.classList.add('cooldown');
                 
+                this.flitState.lastFlitAt = _gameTimeSec;
+                // Flit: Afterimage — gangers keep seeing you where you left
+                const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
+                this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + 0.5 * ai } : null;
+
                 this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player); showMessage("FLIT!"); this.triggerShake(4);
 
                 // --- Spawn Flit VFX ---
@@ -287,88 +408,90 @@
 
                     // === 2. GHOST AFTERIMAGE at start point ===
                     if (vfx.ghostAlpha > 0) {
-                        ctx.save();
-                        ctx.translate(vfx.startX, vfx.startY);
-                        ctx.rotate(vfx.startAngle);
+                        const ghostLook = { ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
+                            { skin: '#c8a0ff', hair: '#d8c0ff', top: '#b88aee', bottom: '#9a70d4', shoes: '#8060b8' }), stance: vfx.stance, isDriving: false };
+                        const originVisible = decorativeBodyInView(vfx.startX, vfx.startY, ghostLook, 1.04, 40);
+                        if (originVisible) {
+                            ctx.save();
+                            ctx.translate(vfx.startX, vfx.startY);
+                            ctx.rotate(vfx.startAngle);
 
-                        // Pulsing violet-white glow behind the ghost
-                        const glowPulse = 0.7 + Math.sin(Date.now() * 0.008) * 0.3;
-                        const glowRadius = 25 + vfx.ghostAlpha * 15;
-                        ctx.save();
-                        ctx.globalAlpha = vfx.ghostAlpha * 0.4 * glowPulse;
-                        const ghostGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
-                        ghostGlow.addColorStop(0, 'rgba(200, 170, 255, 0.8)');
-                        ghostGlow.addColorStop(0.5, 'rgba(164, 105, 255, 0.3)');
-                        ghostGlow.addColorStop(1, 'rgba(164, 105, 255, 0)');
-                        ctx.fillStyle = ghostGlow;
-                        ctx.beginPath();
-                        ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.restore();
+                            // Pulsing violet-white glow behind the ghost
+                            const glowPulse = 0.7 + Math.sin(Date.now() * 0.008) * 0.3;
+                            const glowRadius = 25 + vfx.ghostAlpha * 15;
+                            ctx.save();
+                            ctx.globalAlpha = vfx.ghostAlpha * 0.4 * glowPulse;
+                            const ghostGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
+                            ghostGlow.addColorStop(0, 'rgba(200, 170, 255, 0.8)');
+                            ghostGlow.addColorStop(0.5, 'rgba(164, 105, 255, 0.3)');
+                            ghostGlow.addColorStop(1, 'rgba(164, 105, 255, 0)');
+                            ctx.fillStyle = ghostGlow;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.restore();
 
-                        // Draw the player silhouette with violet-white tint
-                        ctx.globalAlpha = vfx.ghostAlpha * 0.75;
-                        // Vertical flicker/distortion — slight scale wobble
-                        const flicker = 1.0 + (Math.random() - 0.5) * 0.04 * vfx.ghostAlpha;
-                        ctx.scale(flicker, 1.0 + (1.0 - flicker) * 0.5);
+                            // Draw the player silhouette with violet-white tint
+                            ctx.globalAlpha = vfx.ghostAlpha * 0.75;
+                            // Vertical flicker/distortion — slight scale wobble
+                            const flicker = 1.0 + (Math.random() - 0.5) * 0.04 * vfx.ghostAlpha;
+                            ctx.scale(flicker, 1.0 + (1.0 - flicker) * 0.5);
 
-                        drawProceduralHumanoid(ctx, {
-                            walkPhase: 0, animState: 'idle',
-                            velocityX: 0, velocityY: 0, speed: 0
-                        }, {
-                            // Her own cut, in violet light
-                            ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
-                                { skin: '#c8a0ff', hair: '#d8c0ff', top: '#b88aee', bottom: '#9a70d4', shoes: '#8060b8' }),
-                            stance: vfx.stance,
-                            isDriving: false
-                        });
+                            drawProceduralHumanoid(ctx, {
+                                walkPhase: 0, animState: 'idle',
+                                velocityX: 0, velocityY: 0, speed: 0
+                            }, ghostLook);
 
-                        ctx.restore();
+                            ctx.restore();
+                        } else {
+                            Math.random(); // original ghost flicker, before body pose/blink/glass seeds
+                            tickHiddenDecorativeBody({ walkPhase: 0, animState: 'idle', velocityX: 0, velocityY: 0, speed: 0 }, ghostLook);
+                        }
                     }
 
                     // === 3. ARRIVAL GLOW + AFTERIMAGE at destination ===
                     if (vfx.arrivalGlow > 0) {
                         const ag = vfx.arrivalGlow;
+                        const arrivalLook = { ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
+                            { skin: '#e0d0ff', hair: '#f0e8ff', top: '#d4c0f8', bottom: '#c0aaee', shoes: '#b098e0' }), stance: vfx.stance, isDriving: false };
+                        if (decorativeBodyInView(vfx.endX, vfx.endY, arrivalLook, 1.08, 55)) {
 
-                        // Radial bloom
-                        ctx.save();
-                        const expandRadius = 30 + (1.0 - ag) * 25;
-                        ctx.globalAlpha = ag * 0.6;
-                        ctx.translate(vfx.endX, vfx.endY);
-                        const arrGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, expandRadius);
-                        arrGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-                        arrGrad.addColorStop(0.3, 'rgba(200, 170, 255, 0.6)');
-                        arrGrad.addColorStop(0.7, 'rgba(164, 105, 255, 0.2)');
-                        arrGrad.addColorStop(1, 'rgba(164, 105, 255, 0)');
-                        ctx.fillStyle = arrGrad;
-                        ctx.shadowColor = '#c8a0ff';
-                        ctx.shadowBlur = 20 * ag;
-                        ctx.beginPath();
-                        ctx.arc(0, 0, expandRadius, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.restore();
+                            // Radial bloom
+                            ctx.save();
+                            const expandRadius = 30 + (1.0 - ag) * 25;
+                            ctx.globalAlpha = ag * 0.6;
+                            ctx.translate(vfx.endX, vfx.endY);
+                            const arrGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, expandRadius);
+                            arrGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+                            arrGrad.addColorStop(0.3, 'rgba(200, 170, 255, 0.6)');
+                            arrGrad.addColorStop(0.7, 'rgba(164, 105, 255, 0.2)');
+                            arrGrad.addColorStop(1, 'rgba(164, 105, 255, 0)');
+                            ctx.fillStyle = arrGrad;
+                            ctx.shadowColor = '#c8a0ff';
+                            ctx.shadowBlur = 20 * ag;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, expandRadius, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.restore();
 
-                        // Arrival afterimage — bright white-violet silhouette that
-                        // rapidly fades as the real player "solidifies" in place
-                        ctx.save();
-                        ctx.translate(vfx.endX, vfx.endY);
-                        ctx.rotate(vfx.startAngle);
-                        ctx.globalAlpha = ag * 0.6;
-                        // Slight vertical stretch that settles — materializing effect
-                        const settle = 1.0 + ag * 0.08;
-                        ctx.scale(1.0, settle);
+                            // Arrival afterimage — bright white-violet silhouette that
+                            // rapidly fades as the real player "solidifies" in place
+                            ctx.save();
+                            ctx.translate(vfx.endX, vfx.endY);
+                            ctx.rotate(vfx.startAngle);
+                            ctx.globalAlpha = ag * 0.6;
+                            // Slight vertical stretch that settles — materializing effect
+                            const settle = 1.0 + ag * 0.08;
+                            ctx.scale(1.0, settle);
 
-                        drawProceduralHumanoid(ctx, {
-                            walkPhase: 0, animState: 'idle',
-                            velocityX: 0, velocityY: 0, speed: 0
-                        }, {
-                            // Her own cut, in violet light
-                            ...tintLook({ ...vfx.cosmeticConfig.outfit, hair: vfx.cosmeticConfig.hair, hat: vfx.cosmeticConfig.hat, gender: APPEARANCES['949'].gender },
-                                { skin: '#e0d0ff', hair: '#f0e8ff', top: '#d4c0f8', bottom: '#c0aaee', shoes: '#b098e0' }),
-                            stance: vfx.stance,
-                            isDriving: false
-                        });
-                        ctx.restore();
+                            drawProceduralHumanoid(ctx, {
+                                walkPhase: 0, animState: 'idle',
+                                velocityX: 0, velocityY: 0, speed: 0
+                            }, arrivalLook);
+                            ctx.restore();
+                        } else {
+                            tickHiddenDecorativeBody({ walkPhase: 0, animState: 'idle', velocityX: 0, velocityY: 0, speed: 0 }, arrivalLook);
+                        }
                     }
 
                     // === 4. ORIGIN BURST — small particles at start ===
@@ -388,6 +511,13 @@
             drawGraveyardGhosts(ctx) {
                 for (const g of this.graveyardGhosts) {
                     if (g.life <= 0) continue;
+                    const look = { ...g.look, stance: 'idle' };
+                    // Include the maximum flicker stretch and life-scaled halo. Ghosts
+                    // keep wandering/fading in update.js while their hidden paint pauses.
+                    if (g.life <= 1 && !decorativeBodyInView(g.x, g.y, look, 1.02, 28 + g.life * 12)) {
+                        tickHiddenDecorativeBody(g, look);
+                        continue;
+                    }
                     ctx.save();
                     ctx.translate(g.x, g.y);
 
@@ -416,7 +546,7 @@
 
                     // Pass the ghost itself so the shared gait controller can track it
                     // (the old throwaway object used velocityX/Y, which the renderer never read)
-                    drawProceduralHumanoid(ctx, g, { ...g.look, stance: 'idle' });
+                    drawProceduralHumanoid(ctx, g, look);
 
                     ctx.restore();
                     ctx.restore();

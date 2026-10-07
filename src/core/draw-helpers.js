@@ -68,15 +68,19 @@
 
         /** Check if a line segment is blocked by any rect in the obstacle arrays. */
         function isLineBlocked(x1, y1, x2, y2, walls, buildings) {
-            if (walls) { for (let i = 0; i < walls.length; i++) { const w = walls[i]; if (segCrossesRect(x1, y1, x2, y2, w.x, w.y, w.w, w.h)) return true; } }
-            if (buildings) { for (let i = 0; i < buildings.length; i++) { const b = buildings[i]; if (segCrossesRect(x1, y1, x2, y2, b.x, b.y, b.w, b.h)) return true; } }
+            const bounds = { left: Math.min(x1, x2), right: Math.max(x1, x2), top: Math.min(y1, y2), bottom: Math.max(y1, y2) };
+            const wc = _physicsSpatial.query(walls, bounds);
+            if (wc) { for (let i = 0; i < wc.length; i++) { const w = wc[i]; if (segCrossesRect(x1, y1, x2, y2, w.x, w.y, w.w, w.h)) return true; } }
+            const bc = _physicsSpatial.query(buildings, bounds);
+            if (bc) { for (let i = 0; i < bc.length; i++) { const b = bc[i]; if (segCrossesRect(x1, y1, x2, y2, b.x, b.y, b.w, b.h)) return true; } }
             return false;
         }
         
         /** Raycast: find nearest hit distance along a line through obstacle rects. Returns maxDist if no hit. */
         function raycastNearest(x1, y1, x2, y2, obstacles, maxDist) {
             let nearest = maxDist;
-            for (let i = 0; i < obstacles.length; i++) { const o = obstacles[i]; nearest = segRectNearest(x1, y1, x2, y2, o.x, o.y, o.w, o.h, nearest, -Infinity); }
+            const candidates = _physicsSpatial.query(obstacles, { left: Math.min(x1, x2), right: Math.max(x1, x2), top: Math.min(y1, y2), bottom: Math.max(y1, y2) });
+            for (let i = 0; i < candidates.length; i++) { const o = candidates[i]; nearest = segRectNearest(x1, y1, x2, y2, o.x, o.y, o.w, o.h, nearest, -Infinity); }
             return nearest;
         }
         
@@ -88,8 +92,9 @@
             if (!map) return [];
             const cols = getColliders(map), walls = map.walls || [];
             const c = map._occluderCache;
-            if (c && c.walls === walls && c.cols === cols && c.nw === walls.length && c.nc === cols.length) return c.list;
+            if (c && c.walls === walls && c.cols === cols && c.nw === walls.length && c.nc === cols.length) { _physicsSpatial.track(c.list); return c.list; }
             const list = walls.concat(cols);
+            _physicsSpatial.track(list);
             map._occluderCache = { walls, cols, nw: walls.length, nc: cols.length, list };
             return list;
         }

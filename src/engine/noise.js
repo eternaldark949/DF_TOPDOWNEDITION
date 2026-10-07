@@ -29,17 +29,45 @@
                     if (L.length < 24) L.push({ x, y, reach, kind, t: _gameTimeSec, heard: (this._dbgHeard || []).map(e => ({ x: e.x, y: e.y })) });
                     this._dbgHeard = null;
                 }
-                const R = this.noiseRipples || (this.noiseRipples = []);
                 if (fromPlayer) {
                     if (heard) this._lastContactAt = _gameTimeSec;
                     // opts.ring === false: no ripple (her footsteps; a puddle step keeps one, small)
-                    if (opts.ring !== false && R.filter(r => !r.enemy).length < 12) R.push({ x, y, reach, t: 0, seed: Math.random() * 100 });
+                    if (opts.ring !== false) this._spawnRing(x, y, reach, false, opts.src);
                 } else if (opts.ring !== false && GameSettings.enemyRings !== false && this.player
-                           && Math.hypot(this.player.x - x, this.player.y - y) <= reach && R.filter(r => r.enemy).length < 6) {
+                           && Math.hypot(this.player.x - x, this.player.y - y) <= reach) {
                     // theirs, in ember, when it reaches her: gunfire, a dash, a guard's hard steps
-                    R.push({ x, y, reach: Math.min(reach, 260), t: 0, seed: Math.random() * 100, enemy: true });
+                    this._spawnRing(x, y, Math.min(reach, 260), true, opts.src);
                 }
                 return heard;
+            },
+
+            /**
+             * A ring for a sound, limited per source so a burst of fire reads as one rich pulse,
+             * not a stack of glass: the source is `src` (an enemy), her (a sound at her feet), or
+             * else a 90 px patch of map (glass, a door). A sound within RING_GAP of that source's
+             * last ring swells it instead (`boost`); each source keeps at most RING_PER_SRC rings.
+             */
+            _spawnRing(x, y, reach, enemy, src) {
+                const R = this.noiseRipples || (this.noiseRipples = []);
+                const P = this.player, RING_GAP = 0.18, RING_PER_SRC = 2;
+                const key = src || (!enemy && P && Math.abs(x - P.x) + Math.abs(y - P.y) < 60 ? P : null);
+                const patch = key ? null : ((x / 90) | 0) * 100003 + ((y / 90) | 0);
+                let young = null, mine = 0, oldest = -1, side = 0;
+                for (let i = 0; i < R.length; i++) {
+                    const r = R[i]; if (!r.enemy !== !enemy) continue;
+                    side++;
+                    if (key ? r.src !== key : r.patch !== patch) continue;
+                    mine++; if (oldest < 0) oldest = i;
+                    if (!young || r.born > young.born) young = r;
+                }
+                if (young && _gameTimeSec - young.born < RING_GAP) {
+                    young.boost = Math.min(0.6, (young.boost || 0) + 0.25);       // a pulse train swells one ring
+                    young.reach = Math.max(young.reach, reach);
+                    return;
+                }
+                if (mine >= RING_PER_SRC) { R.splice(oldest, 1); side--; }
+                if (side >= (enemy ? 6 : 12)) return;                                // the overall caps, as before
+                R.push({ x, y, reach, t: 0, seed: Math.random() * 100, enemy, src: key, patch, born: _gameTimeSec, boost: 0 });
             },
 
             /** Ripples grow to their reach and fade over half a second. */
@@ -69,8 +97,8 @@
 
             /**
              * Mirage rings (the default): each sound is a thick band with a jagged, rippling
-             * edge that bends the lit scene beneath it, like heat shimmer, plus a faint violet
-             * rim. Screen space, after the lighting. The frame is copied once (quarter size) when
+             * edge that bends the lit scene beneath it, like heat shimmer, with a faint violet
+             * tint and no outline. Screen space, after the lighting. The frame is copied once (quarter size) when
              * any ring is alive; each band is a clip of that copy, scaled out from its centre.
              */
             drawMirageRings(ctx) {
@@ -86,28 +114,35 @@
                 const N = 72, TAU = Math.PI * 2;
                 ctx.save();
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
-                // the newest few bend the light; older, fainter ones are a rim only
-                let bends = 0;
+                // Four rings bend the light: hers first (newest first), then theirs nearest her; the rest keep only the tinted band
+                const B = this._ringBend || (this._ringBend = []); B.length = 0;
+                const P = this.player;
+                for (let ri = R.length - 1; ri >= 0; ri--) if (this._ringT(R[ri]) < 0.6) B.push(R[ri]);
+                if (B.length > 4) {
+                    const rank = r => r.enemy ? 1e7 + (P ? Math.hypot(r.x - P.x, r.y - P.y) : 0) : 0;   // (drawing never writes to the rings)
+                    B.sort((a, b) => rank(a) - rank(b)); B.length = 4;
+                }
                 for (let ri = R.length - 1; ri >= 0; ri--) {
                     const r = R[ri];
                     const t = this._ringT(r), e = 1 - Math.pow(1 - t, 2);
                     const rad = (12 + (r.reach - 12) * e) * z;
                     const cx = (r.x - v.x + (v.shakeX || 0)) * z + W / 2, cy = (r.y - v.y + (v.shakeY || 0)) * z + H / 2;
-                    const th = Math.max(4, 11 * z) * (1 - 0.55 * t);
+                    const taper = 1 - 0.82 * e;                                // narrow with radial expansion, retaining 18% at full reach
+                    const th = Math.max(4, 11 * z) * taper * 1.015 * 2;
+                    const amp = th * 0.7, pad = rad + th + amp;
                     // off screen: wholly outside it, or grown past its farthest corner
                     if (rad - th > Math.hypot(Math.max(cx, W - cx), Math.max(cy, H - cy))) continue;
-                    if (rad + th < 0 || cx + rad + th < 0 || cx - rad - th > W || cy + rad + th < 0 || cy - rad - th > H) continue;
-                    const bend = bends < 4 && t < 0.6; if (bend) bends++;
+                    if (pad < 0 || cx + pad < 0 || cx - pad > W || cy + pad < 0 || cy - pad > H) continue;
+                    const bend = B.includes(r);
                     if (bend && !copied) { this._mirageCtx.drawImage(this.canvas, 0, 0, sw, sh); copied = true; }
                     const seed = r.seed ?? (r.seed = Math.random() * 100), ph = _gameTimeSec;
-                    const amp = th * 0.7;
                     // a rolling swell, a ripple, and fine teeth that flicker: the jagged edge
                     const jag = (a, i) => amp * (0.42 * Math.sin(3 * a + seed + ph * 5) + 0.26 * Math.sin(7 * a - seed * 1.7 - ph * 8)
                         + 0.16 * Math.sin(17 * a + seed * 0.6 + ph * 13) + 0.3 * ((i & 1) ? 1 : -1) * (0.6 + 0.4 * Math.sin(ph * 20 + i)));
                     const outer = new Path2D(), inner = [];
                     for (let i = 0; i <= N; i++) {
                         const a = i / N * TAU, j = jag(a, i % N);
-                        const ro = rad + th / 2 + j, ri = Math.max(0, rad - th / 2 + j * 0.55);
+                        const ro = Math.max(0, rad + th / 2 + j), ri = Math.max(0, rad - th / 2 + j * 0.55);
                         const c = Math.cos(a), s = Math.sin(a);
                         if (i === 0) outer.moveTo(cx + c * ro, cy + s * ro); else outer.lineTo(cx + c * ro, cy + s * ro);
                         inner.push(cx + c * ri, cy + s * ri);
@@ -117,29 +152,28 @@
                     band.moveTo(inner[0], inner[1]);
                     for (let i = 2; i < inner.length; i += 2) band.lineTo(inner[i], inner[i + 1]);
                     band.closePath();
-                    const k = (1 - t) * (1 - t);                                  // a soft presence that fades early, at full width
+                    const k = (1 - t) * (1 - t) * (1 + (r.boost || 0));          // opacity fades independently of the narrowing band; a pulse train swells it
+                    const spawn = Math.max(0, 1 - t * 4);
+                    const glowK = k * (1 + 0.2 * spawn * spawn);                    // 20% more visible at spawn, original fade from quarter-life
                     if (bend) {
                         // the bend: the scene under the band, pushed outward from the sound and nudged along it.
                         // Only the band's box is copied back (clamped to the screen), not the whole frame.
-                        const pad = rad + th + amp, x0 = Math.max(0, cx - pad), y0 = Math.max(0, cy - pad);
+                        const x0 = Math.max(0, cx - pad), y0 = Math.max(0, cy - pad);
                         const x1 = Math.min(W, cx + pad), y1 = Math.min(H, cy + pad);
                         if (x1 > x0 && y1 > y0) {
-                            const sc = 1 + (0.034 + 4.5 / Math.max(40, rad)) * k;
+                            const sc = 1 + (0.051 + 6.75 / Math.max(40, rad)) * k;
                             // the source box that lands on [x0,x1]×[y0,y1] once scaled about (cx, cy)
                             const u0 = cx + (x0 - cx) / sc, v0 = cy + (y0 - cy) / sc, u1 = cx + (x1 - cx) / sc, v1 = cy + (y1 - cy) / sc;
                             ctx.save();
                             ctx.clip(band, 'evenodd');
-                            ctx.globalAlpha = 0.75 * k;
-                            ctx.drawImage(cv, u0 / 4, v0 / 4, (u1 - u0) / 4, (v1 - v0) / 4, x0 + 1.2 * k, y0, x1 - x0, y1 - y0);
+                            ctx.globalAlpha = Math.min(1, 0.90 * k);
+                            ctx.drawImage(cv, u0 / 4, v0 / 4, (u1 - u0) / 4, (v1 - v0) / 4, x0 + 1.8 * k, y0, x1 - x0, y1 - y0);
                             ctx.restore();
                         }
                     }
-                    // a whisper of light on the outer edge, brighter where the ripple crests
-                    ctx.globalAlpha = (r.enemy ? 0.32 : 0.14) * k;
-                    ctx.strokeStyle = r.enemy ? '#ff7a4a' : '#d8c6ff'; ctx.lineWidth = r.enemy ? 1.4 : 1;
-                    ctx.stroke(outer);
-                    ctx.globalAlpha = 0.04 * k;
-                    ctx.fillStyle = r.enemy ? '#ffb08a' : '#efe4ff'; ctx.fill(band, 'evenodd');
+                    // the glass's tint: hers a cool lavender whisper, theirs a warm ember (no outline either way)
+                    ctx.globalAlpha = (r.enemy ? 0.09 : 0.04) * glowK;
+                    ctx.fillStyle = r.enemy ? '#ff9a62' : '#efe4ff'; ctx.fill(band, 'evenodd');
                     ctx.globalAlpha = 1;
                 }
                 ctx.restore();

@@ -20,9 +20,11 @@
                 if (!el || !this.resonance) return;
                 const R = this.resonance;
                 const de = this.darkElement > 0 ? ` <span style="color:#b98cff">◆ ${this.darkElement}</span>` : '';
-                el.innerHTML = `<span style="color:#c9a6ff">◈ Lv ${R.level}</span>${R.unsettled > 0 ? ` · ${R.unsettled} unsettled` : ''}${de}`;
+                const html = `<span style="color:#c9a6ff">◈ Lv ${R.level}</span>${R.unsettled > 0 ? ` · ${R.unsettled} unsettled` : ''}${de}`;
+                if (el._resHudHTML !== html) { el._resHudHTML = html; el.innerHTML = html; }
                 const glow = Math.min(1, R.unsettled / Math.max(1, R.toNext() === Infinity ? 500 : R.toNext()));
-                el.style.textShadow = `0 0 ${4 + glow * 10}px rgba(185, 140, 255, ${0.3 + glow * 0.6})`;
+                const shadow = `0 0 ${4 + glow * 10}px rgba(185, 140, 255, ${0.3 + glow * 0.6})`;
+                if (el._resHudShadow !== shadow) { el._resHudShadow = shadow; el.style.textShadow = shadow; }
             },
 
             /** Dr. Yin offers a choice: tune Resonance or browse augments. */
@@ -34,7 +36,7 @@
                 const R = this.resonance;
                 body.innerHTML = `
                     <div class="tun-quote">"Hold still, Stella. Let's see what the fighting did to you."</div>
-                    <div class="tun-choice" data-act="tune"><b>TUNE RESONANCE</b><span>${R.unsettled > 0 ? R.unsettled + ' unsettled to settle' : 'Spend Tuning points, review your trees'}</span></div>
+                    <div class="tun-choice" data-act="tune"><b>TUNE RESONANCE</b><span>${R.unsettled > 0 ? R.unsettled + ' unsettled to settle' : 'Spend Tuning points, review your trees'}${R.level >= RESONANCE.CAP ? ` · ${RESONANCE.POST_CAP_XP_PER_PP} Resonance = 1 PP` : ''}</span></div>
                     <div class="tun-choice" data-act="aug"><b>AUGMENTS</b><span>Browse and install augments</span></div>`;
                 body.querySelector('[data-act="tune"]').onclick = () => this.openTuning();
                 body.querySelector('[data-act="aug"]').onclick = () => { this.closeTuning(); this.openAugmentShop(); };
@@ -45,10 +47,12 @@
                 const R = this.resonance;
                 const before = R.level, carried = R.unsettled;
                 const gained = R.tune();
+                const pp = R.cashOut();
+                this.currency += pp;
                 this.applyResonanceStats();
                 this.updateUI();
-                if (gained > 0) audioSys.sfx('ui');
-                this._tuneReveal = carried > 0 ? { carried, gained, from: before } : null;
+                if (gained > 0 || pp > 0) audioSys.sfx('ui');
+                this._tuneReveal = carried > 0 || pp > 0 ? { carried, gained, from: before, pp } : null;
                 this.renderTuning();
             },
 
@@ -60,21 +64,22 @@
                 let html = `<div class="tun-head">
                         <div><span class="tun-lv">◈ LEVEL ${R.level}</span>${R.level >= RESONANCE.CAP ? ' <span class="tun-dim">(tuned to the limit)</span>' : ''}</div>
                         <div class="tun-bar"><div style="width:${pct}%"></div></div>
-                        <div class="tun-dim">${next === Infinity ? '' : `${R.xp} / ${next} to the next level`} · <b style="color:#e8c27a">${R.points} Tuning point${R.points === 1 ? '' : 's'}</b></div>
+                        <div class="tun-dim">${next === Infinity ? `${RESONANCE.POST_CAP_XP_PER_PP} Resonance = 1 PP · ${R.xp} / ${RESONANCE.POST_CAP_XP_PER_PP} saved toward the next PP` : `${R.xp} / ${next} to the next level`} · <b style="color:#e8c27a">${R.points} Tuning point${R.points === 1 ? '' : 's'}</b></div>
                     </div>`;
                 if (rv) html += `<div class="tun-quote">${rv.gained > 0
                         ? `"There. ${rv.carried} settled — you're ${rv.gained > 1 ? rv.gained + ' levels' : 'a level'} stronger. Choose where it goes."`
-                        : R.level >= RESONANCE.CAP ? `"${rv.carried} settled. You're tuned as far as I can take you — for now."`
-                        : `"${rv.carried} settled. Not enough to rise yet — keep moving, keep flitting."`}</div>`;
+                        : R.level >= RESONANCE.CAP ? `"${rv.carried} settled. You're fully tuned; I can exchange the surplus for PP."`
+                        : `"${rv.carried} settled. Not enough to rise yet — keep moving, keep flitting."`}${rv.pp > 0 ? ` <b>+${rv.pp} PP</b> from surplus Resonance.` : ''}</div>`;
                 html += `<div class="tun-trees">`;
                 for (const tree of RESONANCE_TREES) {
                     html += `<div class="tun-tree" style="--c:${tree.color}"><div class="tun-tree-name">${tree.name.toUpperCase()}</div><div class="tun-dim">${tree.blurb}</div>`;
                     tree.nodes.forEach((n, i) => {
-                        const r = R.rank(n.id), can = R.canRaise(tree.id, i), locked = i > 0 && R.rank(tree.nodes[i - 1].id) === 0;
+                        const r = R.rank(n.id), can = R.canRaise(tree.id, i), levelLocked = R.level < (n.unlockLevel || 0);
+                        const locked = levelLocked || (i > 0 && R.rank(tree.nodes[i - 1].id) === 0);
                         const pips = [1, 2, 3].map(k => `<i class="${k <= r ? 'on' : ''}"></i>`).join('');
                         html += `<div class="tun-node${can ? ' can' : ''}${locked ? ' locked' : ''}" data-tree="${tree.id}" data-i="${i}">
                             <div class="tun-node-top"><b>${n.name}</b><span class="tun-pips">${pips}</span></div>
-                            <div class="tun-dim">${n.desc(Math.max(1, Math.min(3, r + (r < 3 ? 1 : 0))))}${r > 0 && r < 3 ? ' <span class="tun-next">(next rank)</span>' : ''}</div></div>`;
+                            <div class="tun-dim">${n.desc(Math.max(1, Math.min(3, r + (r < 3 ? 1 : 0))), R)}${r > 0 && r < 3 ? ' <span class="tun-next">(next rank)</span>' : ''}${levelLocked ? ` <span class="tun-next">(requires Level ${n.unlockLevel})</span>` : ''}</div></div>`;
                     });
                     html += `</div>`;
                 }
@@ -106,18 +111,19 @@
                 const pct = next === Infinity ? 100 : Math.max(0, Math.min(100, Math.round(R.xp / next * 100)));
                 let html = `<div class="df-section"><span><span class="glint">◆</span>Resonance</span><span class="count">Level ${R.level}</span></div>`;
                 html += `<div class="df-card"><div class="df-head"><div class="grow"><div class="title script">Level ${R.level}</div>`;
-                html += `<div class="eyebrow" style="margin-top:2px;">${next === Infinity ? 'Tuned to the limit' : `${R.xp} / ${next} to the next level`}</div></div>`;
+                html += `<div class="eyebrow" style="margin-top:2px;">${next === Infinity ? `Tuned to the limit · ${R.xp} / ${RESONANCE.POST_CAP_XP_PER_PP} saved toward the next PP` : `${R.xp} / ${next} to the next level`}</div></div>`;
                 html += `<div class="df-chips" style="justify-content:flex-end;"><span class="df-chip active">${R.points} Tuning point${R.points === 1 ? '' : 's'}</span>`;
                 html += `<span class="df-chip gold">${R.unsettled} unsettled</span><span class="df-chip info">Dark Element ◆ ${this.darkElement || 0}</span></div></div>`;
                 html += `<div class="df-bar${pct ? '' : ' zero'}" style="margin-top:12px;"><i style="--v:${pct}%"></i></div>`;
                 html += `<div class="df-hint" style="margin-top:12px;">Visit Dr. Yin at the medbay to tune. Unsettled Resonance is lost by half if you fall before you get there.</div></div>`;
+                if (R.level >= RESONANCE.CAP) html += `<div class="df-hint" style="margin-bottom:12px;">Dr. Yin exchanges surplus Resonance at ${RESONANCE.POST_CAP_XP_PER_PP} Resonance per PP. Settled remainders carry forward.</div>`;
                 html += `<div class="df-grid" style="margin-top:14px;">`;
                 for (const tree of RESONANCE_TREES) {
                     const spent = tree.nodes.reduce((a, n) => a + R.rank(n.id), 0);
                     html += `<div class="df-card accent" style="--acc:${tree.color}"><div class="df-head"><div class="title" style="color:${tree.color}">${tree.name}</div><span class="count df-chip info">${spent} / ${tree.nodes.length * 3}</span></div>`;
                     for (const n of tree.nodes) {
                         const r = R.rank(n.id);
-                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r))}</span></div>`;
+                        html += `<div class="df-node${r ? ' on' : ''}"><span class="df-pips">${'<i class="on"></i>'.repeat(r)}${'<i></i>'.repeat(3 - r)}</span><span><b>${n.name}</b> — ${n.desc(Math.max(1, r), R)}${n.unlockLevel && R.level < n.unlockLevel ? ` <span class="df-hint">(requires Level ${n.unlockLevel})</span>` : ''}</span></div>`;
                     }
                     html += `</div>`;
                 }

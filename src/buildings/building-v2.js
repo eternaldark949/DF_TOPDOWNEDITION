@@ -7,6 +7,8 @@
            - Detailed facades with windows, balconies, architectural details
            - Procedural window lighting based on time of day
            ===================================================================== */
+        const _FW_CAMERA_MOTION = { camera: null, drawId: 0, x: 0, y: 0, zoom: 0, moving: true };
+        const _FW_GEOMETRY = new WeakMap(); // owner -> weak face map; latest projection, at most two visible path sets
         const _FW_SHEEN = [];   // _drawFaceWindows: the sun sheen's windows, reused every face
         class BuildingV2 {
             constructor(config) {
@@ -754,9 +756,29 @@
 
             /** A section's roof outline, with its rounded corners (world coordinates). */
             _roofPath(section, si, inset = 0) {
-                const r = this._roundSec && this._roundSec[si], p = new Path2D(), x = this.x + section.x + inset, y = this.y + section.y + inset;
+                const r = this._roundSec && this._roundSec[si];
+                // Keep the three inset variants used by the renderer; unusual caller insets remain uncached.
+                const cacheable = inset === 0 || inset === 2.5 || inset === 6;
+                let cached, bySection;
+                if (cacheable) {
+                    bySection = this._roofOutlines || (this._roofOutlines = new WeakMap());
+                    cached = bySection.get(section);
+                    let same = cached && cached.si === si && cached.x === this.x && cached.y === this.y &&
+                        cached.sx === section.x && cached.sy === section.y && cached.w === section.w && cached.h === section.h &&
+                        cached.rounds === this._roundSec && cached.r === r && (!r || cached.radii.length === r.length);
+                    if (same && r) for (let i = 0; i < r.length; i++) if (cached.radii[i] !== r[i]) { same = false; break; }
+                    if (!same) {
+                        cached = { si, x: this.x, y: this.y, sx: section.x, sy: section.y, w: section.w, h: section.h,
+                            rounds: this._roundSec, r, radii: r ? r.slice() : null, paths: new Map() };
+                        bySection.set(section, cached);
+                    }
+                    const hit = cached.paths.get(inset);
+                    if (hit) return hit;
+                }
+                const p = new Path2D(), x = this.x + section.x + inset, y = this.y + section.y + inset;
                 const w = section.w - inset * 2, h = section.h - inset * 2;
                 if (r) p.roundRect(x, y, w, h, r.map(v => Math.max(0, v - inset))); else p.rect(x, y, w, h);
+                if (cacheable) cached.paths.set(inset, p);
                 return p;
             },
 
@@ -782,10 +804,29 @@
 
             /** Faces the camera can see (outward side toward the camera). */
             _visibleFaces(cam) {
-                return this._leanFaces().filter(f =>
+                const all = this._leanFaces();
+                // A four-sided building is cheaper to filter directly than to validate a geometry snapshot.
+                if (all.length <= 4) return all.filter(f =>
                     (f.side === 'S' && cam.y > f.y1) || (f.side === 'N' && cam.y < f.y1) ||
                     (f.side === 'E' && cam.x > f.x1) || (f.side === 'W' && cam.x < f.x1) ||
                     (f.side === 'C' && (cam.x - (f.x1 + f.x2) / 2) * f.nx + (cam.y - (f.y1 + f.y2) / 2) * f.ny > 0));
+                const cached = this._visibleFaceCache;
+                // Faces are mutable world geometry: check their identity and fields before sharing a result.
+                let same = cached && cached.all === all && cached.geometry.length === all.length;
+                if (same) for (let i = 0; i < all.length; i++) {
+                    const f = all[i], g = cached.geometry[i];
+                    if (g.face !== f || g.side !== f.side || g.x1 !== f.x1 || g.y1 !== f.y1 ||
+                        g.x2 !== f.x2 || g.y2 !== f.y2 || g.nx !== f.nx || g.ny !== f.ny) { same = false; break; }
+                }
+                if (same && cached.x === cam.x && cached.y === cam.y) return cached.visible;
+                const geometry = same ? cached.geometry : all.map(f => ({ face: f, side: f.side,
+                    x1: f.x1, y1: f.y1, x2: f.x2, y2: f.y2, nx: f.nx, ny: f.ny }));
+                const visible = all.filter(f =>
+                    (f.side === 'S' && cam.y > f.y1) || (f.side === 'N' && cam.y < f.y1) ||
+                    (f.side === 'E' && cam.x > f.x1) || (f.side === 'W' && cam.x < f.x1) ||
+                    (f.side === 'C' && (cam.x - (f.x1 + f.x2) / 2) * f.nx + (cam.y - (f.y1 + f.y2) / 2) * f.ny > 0));
+                this._visibleFaceCache = { all, geometry, x: cam.x, y: cam.y, visible };
+                return visible;
             },
 
             _drawLeanTop(ctx) {
@@ -901,6 +942,237 @@
              * at night the lips catch the building's lamp colour (LandmarkKit.rim).
              */
             _drawFaceWindows(ctx, f, P, emissive) {
+                // Moving cameras use the original one-loop renderer. Building vector caches
+                // become useful after a consecutive stationary frame; same-frame repeated passes
+                // never count as stability. Standalone draws without a frame stamp retain caching.
+                const drawId = typeof game !== 'undefined' ? game._renderDrawId : 0;
+                if (Number.isSafeInteger(drawId) && drawId > 0 && game.camera) {
+                    const camera = game.camera, motion = _FW_CAMERA_MOTION;
+                    if (motion.drawId !== drawId || motion.camera !== camera || motion.x !== camera.x || motion.y !== camera.y || motion.zoom !== camera.zoom) {
+                        const stable = motion.drawId + 1 === drawId && motion.camera === camera && motion.x === camera.x && motion.y === camera.y && motion.zoom === camera.zoom;
+                        motion.camera = camera; motion.drawId = drawId; motion.x = camera.x; motion.y = camera.y; motion.zoom = camera.zoom; motion.moving = !stable;
+                    }
+                    if (motion.moving) return this._drawFaceWindowsUncached(ctx, f, P, emissive);
+                }
+                if (f.side === 'C' || this.style === 'moon_city') return;
+                // An overridden mask can carry arbitrary callbacks/state. Keep that path unchanged.
+                if (this.facadeFeature === 'silver_queen' && this._sqWindowMask !== _FW_DEFAULT_WINDOW_MASK)
+                    return this._drawFaceWindowsUncached(ctx, f, P, emissive);
+                const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS);
+                if (!Number.isInteger(floors) || floors < 1) return this._drawFaceWindowsUncached(ctx, f, P, emissive);
+                const ax = f.x1, ay = f.y1, bx = f.x2, by = f.y2;
+                const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
+                const depth = Math.hypot(dx - ax, dy - ay);
+                if (depth < floors * 1.6) return;
+                const len = Math.hypot(bx - ax, by - ay);
+                const cols = Math.max(1, Math.floor(len / (this.style === 'silver_queen' ? 30 : 26)));
+                // Authoring/custom geometry may exceed normal maps: do not retain unbounded window records.
+                // P was already sampled at both endpoints; pass those exact samples to the fallback.
+                if (!Number.isFinite(cols) || floors * cols > 4096) {
+                    let sample = 0;
+                    return this._drawFaceWindowsUncached(ctx, f, () => sample++ === 0 ? [cx, cy] : [dx, dy], emissive);
+                }
+                const ex = bx - ax, ey = by - ay, tx = cx - dx, ty = cy - dy, ux = dx - ax, uy = dy - ay;
+                const seed = this._seed || Math.round(this.x + this.y);
+                const t = Math.floor(_gameTimeSec / 7);
+                let lightHashes = null;
+                if (emissive) {
+                    const byFace = this._windowLightHashes || (this._windowLightHashes = new WeakMap());
+                    lightHashes = byFace.get(f);
+                    if (!lightHashes || lightHashes.seed !== seed || lightHashes.section !== f.section || lightHashes.side !== f.side ||
+                        lightHashes.floors !== floors || lightHashes.cols !== cols || lightHashes.t !== t) {
+                        lightHashes = { seed, section: f.section, side: f.side, floors, cols, t, values: [] };
+                        byFace.set(f, lightHashes);
+                    }
+                }
+                const lit = this.colors.windowLit || '#ffe2a8';
+                const mask = this.facadeFeature === 'silver_queen' ? this._sqWindowMask(f) : null;
+                const sun = emissive ? null : sunNow(), day = sun ? sun.day : 0;
+                let skyA = 0, sheenA = 0, uc = 0.5;
+                if (day > 0.03) {
+                    const nx = f.side === 'E' ? 1 : f.side === 'W' ? -1 : 0, ny = f.side === 'S' ? 1 : f.side === 'N' ? -1 : 0;
+                    const facing = Math.max(0, nx * sun.dx + ny * sun.dy);
+                    skyA = day * (0.3 + 0.34 * facing); sheenA = day * (0.18 + 0.6 * facing);
+                    uc = 0.5 + 0.55 * (ny ? sun.dx : sun.dy);
+                }
+                const sq = this.style === 'silver_queen', glassRGB = sq ? '176, 158, 236' : '168, 172, 226';
+                const sills = !!(this.sills && _zoomLOD < 2 && depth > floors * 2.4);
+                const rim = sills && emissive ? LandmarkKit.rim(this, this._sqDark != null ? this._sqDark : 0.6) : null;
+                const nxo = f.side === 'E' ? 1 : f.side === 'W' ? -1 : 0, nyo = f.side === 'S' ? 1 : f.side === 'N' ? -1 : 0;
+                // Compare mask results, rather than a newly allocated mask closure: entrance/portico
+                // edits remain live, and nothing assumes an immutable building configuration.
+                let maskBits = '';
+                if (mask) for (let fl = 0; fl < floors; fl++) for (let c = 0; c < cols; c++) maskBits += mask(fl, (c + 0.5) / cols) ? '1' : '0';
+                const view = paintViewBounds(ctx, 16);
+                let faceBounds = null;
+                if (view) {
+                    // Full face hull, including first-floor sills below the wall's base. The 2.5
+                    // world-unit guard covers their outward offset and the 1.2-wide sill stroke.
+                    const lowV = sills ? -0.22 / floors : 0;
+                    const lax = ax + ux * lowV, lay = ay + uy * lowV;
+                    const lbx = ax + ex + (ux + tx - ex) * lowV, lby = ay + ey + (uy + ty - ey) * lowV;
+                    const guard = 2.5 + 1e-7 * Math.max(1, Math.abs(ax), Math.abs(ay), Math.abs(bx), Math.abs(by), Math.abs(cx), Math.abs(cy), Math.abs(dx), Math.abs(dy));
+                    faceBounds = { left: Math.min(ax, bx, cx, dx, lax, lbx) - guard, right: Math.max(ax, bx, cx, dx, lax, lbx) + guard,
+                        top: Math.min(ay, by, cy, dy, lay, lby) - guard, bottom: Math.max(ay, by, cy, dy, lay, lby) + guard };
+                    if (!paintBoundsIntersect(view, faceBounds)) {
+                        // Suppress only paint/geometry. Keep hash membership and the final Canvas
+                        // state/current path exactly as the original fully offscreen pass left them.
+                        if (emissive) {
+                            for (let fl = 0; fl < floors; fl++) for (let c = 0; c < cols; c++) {
+                                const index = fl * cols + c;
+                                if (maskBits && maskBits[index] === '1') continue;
+                                if (lightHashes.values[index] === undefined) lightHashes.values[index] = _bldHash(seed + f.section * 31 + f.side.charCodeAt(0), fl * 57 + c * 13 + (_bldHash(seed, fl + c) > 0.93 ? t : 0));
+                            }
+                            ctx.fillStyle = '#6f9fe8';
+                            if (rim && rim.a > 0.01) { ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${rim.rgb}, ${0.5 * rim.a})`; }
+                        } else {
+                            ctx.fillStyle = sq ? 'rgba(23,0,92,0.9)' : 'rgba(20,28,48,0.9)';
+                            if (skyA > 0) {
+                                ctx.fillStyle = `rgba(${glassRGB}, ${skyA})`;
+                                lastSheen: for (let fl = floors - 1; fl >= 0; fl--) for (let c = cols - 1; c >= 0; c--) {
+                                    if (maskBits && maskBits[fl * cols + c] === '1') continue;
+                                    const u0 = (c + 0.25) / cols, u1 = (c + 0.75) / cols;
+                                    const du = Math.abs((u0 + u1) / 2 - uc), sh = sheenA * Math.max(0, 1 - du / 0.16) * (0.7 + 0.3 * (fl % 2));
+                                    if (!(sh > 0.01)) continue;
+                                    const v0 = (fl + 0.28) / floors, v1 = (fl + 0.78) / floors;
+                                    ctx.beginPath();
+                                    ctx.moveTo(ax + ex * u0 + (ux + tx * u0 - ex * u0) * v0, ay + ey * u0 + (uy + ty * u0 - ey * u0) * v0);
+                                    ctx.lineTo(ax + ex * u1 + (ux + tx * u1 - ex * u1) * v0, ay + ey * u1 + (uy + ty * u1 - ey * u1) * v0);
+                                    ctx.lineTo(ax + ex * u1 + (ux + tx * u1 - ex * u1) * v1, ay + ey * u1 + (uy + ty * u1 - ey * u1) * v1);
+                                    ctx.lineTo(ax + ex * u0 + (ux + tx * u0 - ex * u0) * v1, ay + ey * u0 + (uy + ty * u0 - ey * u0) * v1); ctx.closePath();
+                                    ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; break lastSheen;
+                                }
+                            }
+                            if (sills) { ctx.lineWidth = 1; ctx.strokeStyle = this.sills.lip; }
+                        }
+                        return;
+                    }
+                }
+                let faces = _FW_GEOMETRY.get(this);
+                if (!faces) { faces = new WeakMap(); _FW_GEOMETRY.set(this, faces); }
+                let geom = faces.get(f);
+                if (!geom || geom.ax !== ax || geom.ay !== ay || geom.bx !== bx || geom.by !== by ||
+                    geom.cx !== cx || geom.cy !== cy || geom.dx !== dx || geom.dy !== dy || geom.floors !== floors ||
+                    geom.cols !== cols || geom.sills !== sills || geom.nxo !== nxo || geom.nyo !== nyo || geom.maskBits !== maskBits) {
+                    if (!geom) geom = { windows: [], pool: [], paths: [], bounds: { left: 0, right: 0, top: 0, bottom: 0 } };
+                    Object.assign(geom, { ax, ay, bx, by, cx, cy, dx, dy, floors, cols, sills, nxo, nyo, maskBits });
+                    geom.windows.length = 0; geom.paths.length = 0; geom.boundsReady = false;
+                    const sOut = 1.6, sLo = 0.2 / floors, sSh = 0.5 / floors;
+                    for (let fl = 0; fl < floors; fl++) {
+                        const v0 = (fl + 0.28) / floors, v1 = (fl + 0.78) / floors;
+                        for (let c = 0; c < cols; c++) {
+                            if (maskBits && maskBits[fl * cols + c] === '1') continue;
+                            const u0 = (c + 0.25) / cols, u1 = (c + 0.75) / cols;
+                            const index = geom.windows.length;
+                            const w = geom.pool[index] || (geom.pool[index] = { points: [], lip: [], shade: [], bounds: {} });
+                            geom.windows.push(w);
+                            w.fl = fl; w.c = c; w.u0 = u0; w.u1 = u1; w.v0 = v0; w.v1 = v1;
+                            const points = w.points, lip = w.lip, shade = w.shade;
+                            points[0] = ax + ex * u0 + (ux + tx * u0 - ex * u0) * v0; points[1] = ay + ey * u0 + (uy + ty * u0 - ey * u0) * v0;
+                            points[2] = ax + ex * u1 + (ux + tx * u1 - ex * u1) * v0; points[3] = ay + ey * u1 + (uy + ty * u1 - ey * u1) * v0;
+                            points[4] = ax + ex * u1 + (ux + tx * u1 - ex * u1) * v1; points[5] = ay + ey * u1 + (uy + ty * u1 - ey * u1) * v1;
+                            points[6] = ax + ex * u0 + (ux + tx * u0 - ex * u0) * v1; points[7] = ay + ey * u0 + (uy + ty * u0 - ey * u0) * v1;
+                            if (sills) {
+                                const w0 = u0 - 0.06 / cols, w1 = u1 + 0.06 / cols, vl = v0 - sLo, vs = v0 - sSh;
+                                lip[0] = ax + ex * w0 + (ux + tx * w0 - ex * w0) * vl + nxo * sOut; lip[1] = ay + ey * w0 + (uy + ty * w0 - ey * w0) * vl + nyo * sOut;
+                                lip[2] = ax + ex * w1 + (ux + tx * w1 - ex * w1) * vl + nxo * sOut; lip[3] = ay + ey * w1 + (uy + ty * w1 - ey * w1) * vl + nyo * sOut;
+                                shade[0] = ax + ex * w0 + (ux + tx * w0 - ex * w0) * vs + nxo * sOut; shade[1] = ay + ey * w0 + (uy + ty * w0 - ey * w0) * vs + nyo * sOut;
+                                shade[2] = ax + ex * w1 + (ux + tx * w1 - ex * w1) * vs + nxo * sOut; shade[3] = ay + ey * w1 + (uy + ty * w1 - ey * w1) * vs + nyo * sOut;
+                            }
+                        }
+                    }
+                    geom.pool.length = geom.windows.length;
+                    faces.set(f, geom);
+                }
+                // Fully contained faces do not pay per-window bounds calculations. Partial faces
+                // build those bounds once per projection; both normal and reflected passes share them.
+                const all = !view || (faceBounds.left >= view.left && faceBounds.right <= view.right && faceBounds.top >= view.top && faceBounds.bottom <= view.bottom);
+                let visibleBits = all ? '*' : '';
+                if (!all) {
+                    if (!geom.boundsReady) {
+                        for (const w of geom.windows) {
+                            const p = w.points, lip = w.lip, shade = w.shade;
+                            let left = Math.min(p[0], p[2], p[4], p[6]), right = Math.max(p[0], p[2], p[4], p[6]);
+                            let top = Math.min(p[1], p[3], p[5], p[7]), bottom = Math.max(p[1], p[3], p[5], p[7]);
+                            if (sills) {
+                                left = Math.min(left, lip[0], lip[2], shade[0], shade[2]); right = Math.max(right, lip[0], lip[2], shade[0], shade[2]);
+                                top = Math.min(top, lip[1], lip[3], shade[1], shade[3]); bottom = Math.max(bottom, lip[1], lip[3], shade[1], shade[3]);
+                            }
+                            w.bounds.left = left - 1; w.bounds.right = right + 1; w.bounds.top = top - 1; w.bounds.bottom = bottom + 1;
+                        }
+                        geom.boundsReady = true;
+                    }
+                    for (const w of geom.windows) visibleBits += paintBoundsIntersect(view, w.bounds) ? '1' : '0';
+                }
+                let paths = geom.paths.find(p => p.visibleBits === visibleBits);
+                if (!paths) {
+                    paths = { visibleBits, visible: [], glass: null, lip: null, shade: null, lighting: null, tvBits: null };
+                    for (let i = 0; i < geom.windows.length; i++) if (all || visibleBits[i] === '1') paths.visible.push(geom.windows[i]);
+                    if (geom.paths.length === 2) geom.paths.shift();
+                    geom.paths.push(paths);
+                }
+                const quad = (path, w) => { const p = w.points; path.moveTo(p[0], p[1]); path.lineTo(p[2], p[3]); path.lineTo(p[4], p[5]); path.lineTo(p[6], p[7]); path.closePath(); };
+                const lines = (key, part) => {
+                    if (paths[key]) return paths[key];
+                    const p = paths[key] = new Path2D();
+                    for (const w of paths.visible) { const v = w[part]; p.moveTo(v[0], v[1]); p.lineTo(v[2], v[3]); }
+                    return p;
+                };
+                if (emissive) {
+                    const threshold = this.style ? 0.5 : 0.3, lavender = this.facadeFeature === 'silver_queen';
+                    if (!paths.lighting || paths.lighting.hashes !== lightHashes || paths.lighting.threshold !== threshold || paths.lighting.lavender !== lavender) {
+                        const lighting = paths.lighting = { hashes: lightHashes, threshold, lavender, lit: new Path2D(), lav: new Path2D(), tvWindows: [] };
+                        // Seed every unmasked window, including culled ones, as in the original pass.
+                        for (const w of geom.windows) {
+                            const index = w.fl * cols + w.c;
+                            if (lightHashes.values[index] === undefined) lightHashes.values[index] = _bldHash(seed + f.section * 31 + f.side.charCodeAt(0), w.fl * 57 + w.c * 13 + (_bldHash(seed, w.fl + w.c) > 0.93 ? t : 0));
+                        }
+                        for (const w of paths.visible) {
+                            const h = lightHashes.values[w.fl * cols + w.c];
+                            if (!(h < threshold)) continue;
+                            if (h < 0.06) lighting.tvWindows.push(w);
+                            else quad(lavender && h > 0.36 ? lighting.lav : lighting.lit, w);
+                        }
+                        paths.tvBits = null;
+                    }
+                    const lighting = paths.lighting;
+                    let tvBits = '';
+                    for (const w of lighting.tvWindows) tvBits += Math.sin(_gameTimeSec * 9 + w.c) > 0 ? '1' : '0';
+                    if (paths.tvBits !== tvBits) {
+                        paths.tvBits = tvBits; paths.tvA = new Path2D(); paths.tvB = new Path2D();
+                        for (let i = 0; i < lighting.tvWindows.length; i++) quad(tvBits[i] === '1' ? paths.tvA : paths.tvB, lighting.tvWindows[i]);
+                    }
+                    ctx.fillStyle = lit; ctx.fill(lighting.lit);
+                    ctx.fillStyle = '#d9c2ff'; ctx.fill(lighting.lav);
+                    ctx.fillStyle = '#9ec8ff'; ctx.fill(paths.tvA);
+                    ctx.fillStyle = '#6f9fe8'; ctx.fill(paths.tvB);
+                    if (rim && rim.a > 0.01) {
+                        const op = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
+                        ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${rim.rgb}, ${0.5 * rim.a})`; ctx.stroke(lines('lip', 'lip'));
+                        ctx.globalCompositeOperation = op;
+                    }
+                    return;
+                }
+                if (!paths.glass) { paths.glass = new Path2D(); for (const w of paths.visible) quad(paths.glass, w); }
+                ctx.fillStyle = sq ? 'rgba(23,0,92,0.9)' : 'rgba(20,28,48,0.9)'; ctx.fill(paths.glass);
+                if (skyA > 0) {
+                    ctx.fillStyle = `rgba(${glassRGB}, ${skyA})`; ctx.fill(paths.glass);
+                    // Sun color, direction, band position and alternating floor sheen stay live.
+                    // Retain paint order and the final Canvas state even for offscreen sheen windows.
+                    for (let i = 0; i < geom.windows.length; i++) {
+                        const w = geom.windows[i], du = Math.abs((w.u0 + w.u1) / 2 - uc), sh = sheenA * Math.max(0, 1 - du / 0.16) * (0.7 + 0.3 * (w.fl % 2));
+                        if (!(sh > 0.01)) continue;
+                        ctx.beginPath(); quad(ctx, w); ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`;
+                        if (all || visibleBits[i] === '1') ctx.fill();
+                    }
+                }
+                if (sills) {
+                    ctx.lineWidth = 1.2; ctx.strokeStyle = this.sills.shade; ctx.stroke(lines('shade', 'shade'));
+                    ctx.lineWidth = 1; ctx.strokeStyle = this.sills.lip; ctx.stroke(lines('lip', 'lip'));
+                }
+            },
+
+            _drawFaceWindowsUncached(ctx, f, P, emissive) {
                 if (f.side === 'C' || this.style === 'moon_city') return;             // (Moon City: no windows, its fins and smoked glass are _mcFace)                          // rounded corners: no windows on the curve
                 const floors = Math.min(this.floors, CONFIG.BUILDINGS.MAX_FLOORS);
                 const ax = f.x1, ay = f.y1, bx = f.x2, by = f.y2;
@@ -913,6 +1185,17 @@
                 const ex = bx - ax, ey = by - ay, tx = cx - dx, ty = cy - dy, ux = dx - ax, uy = dy - ay;
                 const seed = this._seed || Math.round(this.x + this.y);
                 const t = Math.floor(_gameTimeSec / 7);             // lights change every few seconds
+                // A face retains only its latest seven-second lighting bucket. TV flicker stays live below.
+                let lightHashes = null;
+                if (emissive) {
+                    const byFace = this._windowLightHashes || (this._windowLightHashes = new WeakMap());
+                    lightHashes = byFace.get(f);
+                    if (!lightHashes || lightHashes.seed !== seed || lightHashes.section !== f.section || lightHashes.side !== f.side ||
+                        lightHashes.floors !== floors || lightHashes.cols !== cols || lightHashes.t !== t) {
+                        lightHashes = { seed, section: f.section, side: f.side, floors, cols, t, values: [] };
+                        byFace.set(f, lightHashes);
+                    }
+                }
                 const lit = this.colors.windowLit || '#ffe2a8';
                 const mask = this.facadeFeature === 'silver_queen' ? this._sqWindowMask(f) : null;
                 // By day the glass holds the sky, brightest on faces turned to the sun, a sheen sliding along with it
@@ -928,7 +1211,10 @@
                 const sills = this.sills && _zoomLOD < 2 && depth > floors * 2.4;
                 const rim = sills && emissive ? LandmarkKit.rim(this, this._sqDark != null ? this._sqDark : 0.6) : null;
                 const nxo = f.side === 'E' ? 1 : f.side === 'W' ? -1 : 0, nyo = f.side === 'S' ? 1 : f.side === 'N' ? -1 : 0;
-                const glass = new Path2D(), litP = new Path2D(), lavP = new Path2D(), tvA = new Path2D(), tvB = new Path2D();
+                // Each pass creates only the paths it fills; window lighting hashes are emissive-only.
+                const glass = emissive ? null : new Path2D();
+                const litP = emissive ? new Path2D() : null, lavP = emissive ? new Path2D() : null;
+                const tvA = emissive ? new Path2D() : null, tvB = emissive ? new Path2D() : null;
                 const lipP = sills ? new Path2D() : null, shP = sills && !emissive ? new Path2D() : null, sheen = _FW_SHEEN;
                 sheen.length = 0;                                   // [u0, u1, v0, v1, a] × n, reused
                 const sOut = 1.6, sLo = 0.2 / floors, sSh = 0.5 / floors;
@@ -943,7 +1229,15 @@
                     for (let c = 0; c < cols; c++) {
                         if (mask && mask(fl, (c + 0.5) / cols)) continue;
                         const u0 = (c + 0.25) / cols, u1 = (c + 0.75) / cols;
-                        const h = _bldHash(seed + f.section * 31 + (f.side.charCodeAt(0)), fl * 57 + c * 13 + (_bldHash(seed, fl + c) > 0.93 ? t : 0));
+                        let h = 0;
+                        if (emissive) {
+                            const index = fl * cols + c;
+                            h = lightHashes.values[index];
+                            if (h === undefined) {
+                                h = _bldHash(seed + f.section * 31 + (f.side.charCodeAt(0)), fl * 57 + c * 13 + (_bldHash(seed, fl + c) > 0.93 ? t : 0));
+                                lightHashes.values[index] = h;
+                            }
+                        }
                         const isLit = h < (this.style ? 0.5 : 0.3);
                         if (sills && (!emissive || rim.a > 0.01)) {                 // the sill: a lip just under the glass, a shadow under it
                             const w0 = u0 - 0.06 / cols, w1 = u1 + 0.06 / cols;

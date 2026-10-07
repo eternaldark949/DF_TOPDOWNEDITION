@@ -243,7 +243,7 @@
             _sources(game) {
                 const w = game.weather, L = game.leafParticles, m = game.activeMap;
                 const out = [];
-                if (w) out.push({ items: w.particles, pos: true, angles: ['angle'], scalars: ['life'] });
+                if (w) out.push({ items: w.particles, pos: true, angles: ['angle'], scalars: ['life'], drawOnly: true });
                 // (Rain drops and splashes are too numerous to swap cheaply; their draw
                 //  code steps them back by lagTicks() instead — see drawRainOverlay.)
                 if (L) out.push({ items: L.leaves, pos: true, scalars: ['rotation', 'tumble'] });
@@ -341,6 +341,7 @@
             },
 
             apply(game, alpha) {
+                this._drawActive = true;
                 this.stepAdvanced = _simTick > this._tickAtSnap;
                 this.alpha = alpha;
                 this._swapped.length = 0;
@@ -366,7 +367,8 @@
                 }
                 for (const src of this._sources(game)) {
                     const items = src.items;
-                    if (!items) continue;
+                    // Generic effects blend exact prior poses in their draw pass, after visibility.
+                    if (!items || src.drawOnly) continue;
                     for (let i = 0; i < items.length; i++) {
                         const o = items[i];
                         if (!o || o._ipGen !== gen) continue;
@@ -395,6 +397,7 @@
             },
 
             restore(game) {
+                this._drawActive = false;
                 const list = this._swapped;
                 for (let i = 0; i < list.length; i++) this._restoreObj(list[i]);
                 list.length = 0;

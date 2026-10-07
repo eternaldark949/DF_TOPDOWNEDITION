@@ -20,6 +20,7 @@
         // ============================================================================
         let _frameTime = performance.now();
         let _frameTimeSec = _frameTime / 1000;
+        let _profileSampling = false;   // detailed clocks are idle when the profiler and benchmark are off
         let _zoomLOD = 0; // 0 = full quality, 1 = reduced, 2 = minimal (updated per frame)
         
         const CONFIG = Object.freeze({

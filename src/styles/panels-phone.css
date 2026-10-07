@@ -1017,6 +1017,9 @@
         #joystick-ring.off { display: none; }
         #joystick-ring.pulse { animation: flitRingPulse 0.45s ease-out; }
         #joystick-ring.flash { animation: flitRingFlash 0.35s ease-out; }
+        #joystick-ring.blocked { animation: flitRingBlocked 0.32s ease-out; }   /* no clear landing: a crimson shudder */
+        @keyframes flitRingBlocked { 0%, 100% { transform: translate(-50%, -50%); } 20% { transform: translate(calc(-50% - 4px), -50%); filter: drop-shadow(0 0 10px rgba(255, 70, 100, 0.95)) hue-rotate(-60deg); }
+            45% { transform: translate(calc(-50% + 3px), -50%); } 70% { transform: translate(calc(-50% - 2px), -50%); } }
         @keyframes flitRingPulse { 0% { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.08); } 100% { transform: translate(-50%, -50%) scale(1); } }
         @keyframes flitRingFlash { 0% { filter: drop-shadow(0 0 14px rgba(232, 194, 122, 1)) brightness(1.8); } 100% { filter: drop-shadow(0 0 6px rgba(190, 140, 255, 0.6)); } }
         #btn-flit.hidden-by-setting { display: none !important; }

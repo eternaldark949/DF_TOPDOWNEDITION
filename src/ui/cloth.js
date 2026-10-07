@@ -66,30 +66,68 @@
             return steps;
         }
 
-        function _clothRest(spec) {
-            const n = spec.segs || 3;
-            return spec.chains.map(ch => {
-                const pts = [];
+        // Specs can be rebuilt by clothing pieces or edited in place. Keep exact copies
+        // of the geometric inputs per owner/panel, and only rebuild their immutable
+        // lengths and rest spacing when one of those inputs changes.
+        const _clothOwnerShapes = new WeakMap(), _clothPreviewShapes = new WeakMap();
+        function _clothShape(owner, key, spec) {
+            let store;
+            if (owner) {
+                store = _clothOwnerShapes.get(owner);
+                if (!store) _clothOwnerShapes.set(owner, store = new Map());
+            }
+            const old = owner ? store.get(key) : _clothPreviewShapes.get(spec);
+            const n = spec.segs || 3, chains = spec.chains, m = chains.length;
+            let same = old && old.n === n && old.coords.length === m * 4;
+            if (same) for (let ci = 0; ci < m; ci++) {
+                const ch = chains[ci], j = ci * 4, v = old.coords;
+                if (!Object.is(v[j], ch.a.x) || !Object.is(v[j + 1], ch.a.y) ||
+                    !Object.is(v[j + 2], ch.t.x) || !Object.is(v[j + 3], ch.t.y)) { same = false; break; }
+            }
+            if (same) return old;
+            const shape = { n, coords: [], lengths: [], spacing: [], rest: [] };
+            for (let ci = 0; ci < m; ci++) {
+                const ch = chains[ci], pts = [];
+                shape.coords.push(ch.a.x, ch.a.y, ch.t.x, ch.t.y);
+                shape.lengths.push(Math.hypot(ch.t.x - ch.a.x, ch.t.y - ch.a.y) / n);
+                // Keep the original rest-pose evaluation order: delta * i / n.
                 for (let i = 0; i <= n; i++) pts.push({ x: ch.a.x + (ch.t.x - ch.a.x) * i / n, y: ch.a.y + (ch.t.y - ch.a.y) * i / n });
-                return pts;
-            });
+                shape.rest.push(pts);
+                if (ci) {
+                    const ra = chains[ci - 1], rb = ch, spacing = [];
+                    for (let i = 1; i <= n; i++) {
+                        const u = i / n;
+                        spacing[i] = Math.hypot((ra.a.x + (ra.t.x - ra.a.x) * u) - (rb.a.x + (rb.t.x - rb.a.x) * u),
+                                               (ra.a.y + (ra.t.y - ra.a.y) * u) - (rb.a.y + (rb.t.y - rb.a.y) * u));
+                    }
+                    shape.spacing[ci] = spacing;
+                }
+            }
+            if (owner) store.set(key, shape); else _clothPreviewShapes.set(spec, shape);
+            return shape;
         }
+
+        function _clothRest(spec, shape) { return (shape || _clothShape(null, null, spec)).rest; }
 
         /**
          * Simulate one cloth panel for `owner` and return its chains as points in the
          * current ctx frame: [[anchor, ..., hem], ...]. `key` names the panel on the owner.
          */
         function clothGeometry(ctx, owner, key, spec, dyn) {
+            const shape = _clothShape(owner, key, spec);
             const T = owner && !_crowdLite && (typeof _zoomLOD === 'undefined' || _zoomLOD < 2) ? _simTransform(ctx) : null;
-            if (!T) return _clothRest(spec);
-            const { toW, toLInto, sc, ang: baseAngle, M } = T;
+            if (!T) return _clothRest(spec, shape);
+            const { toLInto, sc, ang: baseAngle, M } = T;
             const n = spec.segs || 3, chains = spec.chains;
             const store = owner._cloth || (owner._cloth = {});
             let sim = store[key];
             const originX = M.e, originY = M.f;
             if (!sim || sim.count !== chains.length * (n + 1) || Math.hypot(sim.ox - originX, sim.oy - originY) > CLOTH_SIM.SNAP * sc) {
                 sim = store[key] = { t: _gameTimeSec, acc: 0, ox: originX, oy: originY, ang: baseAngle, count: chains.length * (n + 1),
-                                     chains: _clothRest(spec).map(pts => pts.map(p => { const w = toW(p.x, p.y); return { x: w.x, y: w.y, px: w.x, py: w.y }; })) };
+                                     chains: _clothRest(spec, shape).map(pts => pts.map(p => {
+                                         const x = M.a * p.x + M.c * p.y + M.e, y = M.b * p.x + M.d * p.y + M.f;
+                                         return { x, y, px: x, py: y };
+                                     })) };
             }
 
             const steps = _simSteps(sim, CLOTH_SIM.STEP, CLOTH_SIM.MAX_STEPS);
@@ -101,7 +139,8 @@
             if (steps === 0) {
                 // Between slices: carry the cloth rigidly with the body so it stays attached
                 for (let ci = 0; ci < chains.length; ci++) {
-                    const pts = sim.chains[ci], root = toW(chains[ci].a.x, chains[ci].a.y);
+                    const pts = sim.chains[ci], a = chains[ci].a, root = _CL_ROOT;
+                    root.x = M.a * a.x + M.c * a.y + M.e; root.y = M.b * a.x + M.d * a.y + M.f;
                     const rx = root.x - pts[0].x, ry = root.y - pts[0].y;
                     for (const p of pts) { p.x += rx; p.y += ry; p.px += rx; p.py += ry; }
                 }
@@ -120,7 +159,7 @@
                     root.x = fx + (c * ch.a.x - s * ch.a.y) * sc; root.y = fy + (s * ch.a.x + c * ch.a.y) * sc;
                     pts[0].px = pts[0].x; pts[0].py = pts[0].y; pts[0].x = root.x; pts[0].y = root.y;
                     hem.x = fx + (c * ch.t.x - s * ch.t.y) * sc; hem.y = fy + (s * ch.t.x + c * ch.t.y) * sc;
-                    const L = Math.hypot(ch.t.x - ch.a.x, ch.t.y - ch.a.y) / n * sc;
+                    const L = shape.lengths[ci] * sc;
                     for (let i = 1; i <= n; i++) {
                         const p = pts[i], u = i / n;
                         const vx = (p.x - p.px) * damp, vy = (p.y - p.py) * damp;
@@ -153,11 +192,9 @@
                 // further apart than 1.4x or closer than 0.5x their rest spacing
                 for (let ci = 1; ci < chains.length; ci++) {
                     const A = sim.chains[ci - 1], B = sim.chains[ci];
-                    const ra = chains[ci - 1], rb = chains[ci];
+                    const spacing = shape.spacing[ci];
                     for (let i = 1; i <= n; i++) {
-                        const u = i / n;
-                        const rest = Math.hypot((ra.a.x + (ra.t.x - ra.a.x) * u) - (rb.a.x + (rb.t.x - rb.a.x) * u),
-                                                (ra.a.y + (ra.t.y - ra.a.y) * u) - (rb.a.y + (rb.t.y - rb.a.y) * u)) * sc;
+                        const rest = spacing[i] * sc;
                         const p = A[i], q = B[i], dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || 1;
                         const target = Math.max(rest * 0.5, Math.min(rest * 1.4, d));
                         if (target !== d) {

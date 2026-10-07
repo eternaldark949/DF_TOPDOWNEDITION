@@ -28,6 +28,157 @@
                 return this._laserGeom;
             },
 
+            /** Editors changing static effects within the same tick/draw invalidate once after their batch. */
+            invalidateEffectSpatial() {
+                this._effectSpatialEpoch = (this._effectSpatialEpoch || 0) + 1;
+            },
+
+            _effectCandidateBuffer(key) {
+                const buffers = this._effectCandidateBuffers || (this._effectCandidateBuffers = new Map());
+                let out = buffers.get(key);
+                if (!out) { out = []; buffers.set(key, out); }
+                return out;
+            },
+
+            _queryEffectCandidates(kind, items, bounds, bufferKey = kind) {
+                let spatial = this._effectSpatial;
+                if (!spatial || spatial.map !== this.activeMap) spatial = this._effectSpatial = { map: this.activeMap, grids: new Map() };
+                let grid = spatial.grids.get(kind);
+                if (!grid) { grid = new EffectRenderGrid(); spatial.grids.set(kind, grid); }
+                grid.refresh(items, kind, _simTick, this._renderDrawId, _frameTime, this._effectSpatialEpoch || 0);
+                return grid.query(bounds, this._effectCandidateBuffer(bufferKey));
+            },
+
+            _queryLampCandidates(bounds, bufferKey) {
+                return this._queryEffectCandidates('lamps', this.lamps, bounds, bufferKey);
+            },
+
+            _queryPuddleCandidates(bounds, bufferKey) {
+                return this._queryEffectCandidates('puddles', this.puddlesFor(this.activeMap), bounds, bufferKey);
+            },
+
+            // Buildings/foliage are authored on loadMap and static during play. Editors/runtime
+            // geometry edits (including same-length replacements/reorders) must invalidate once
+            // AFTER their batch of changes. Array identity/length changes are also detected below.
+            invalidateRenderSpatial(map = this.activeMap) {
+                if (map) map._renderSpatialRevision = (map._renderSpatialRevision || 0) + 1;
+                if (map === this.activeMap) { this.invalidateEffectSpatial(); this.invalidatePhysicsSpatial(); }
+                this._renderBuildingLists = null;
+            },
+
+            _clearRenderSpatial() {
+                this._renderSpatialMap = null; this._renderSpatialRevision = -1;
+                this._renderBuildingSource = null; this._renderFoliageSource = null;
+                this._orderedBuildings = null; this._orderedFoliage = null;
+                this._renderBuildingLists = null; this._renderBuildingListsStorage = null;
+                this._forecourtCandidates = null; this._foliageCandidates = null;
+                this._sunBuildingCandidates = null; this._sunFoliageCandidates = null;
+            },
+
+            _ensureRenderSpatial() {
+                const map = this.activeMap, revision = map._renderSpatialRevision || 0;
+                const buildings = map.buildings, foliage = map.foliage;
+                if (this._renderSpatialMap === map && this._renderSpatialRevision === revision &&
+                    this._renderBuildingSource === buildings && this._renderBuildingLength === (buildings ? buildings.length : 0) &&
+                    this._renderFoliageSource === foliage && this._renderFoliageLength === (foliage ? foliage.length : 0)) return;
+                this._renderSpatialMap = map; this._renderSpatialRevision = revision;
+                this._renderBuildingSource = buildings; this._renderBuildingLength = buildings ? buildings.length : 0;
+                this._renderFoliageSource = foliage; this._renderFoliageLength = foliage ? foliage.length : 0;
+                this._renderBuildingLists = null;
+                const bg = this._orderedBuildings || (this._orderedBuildings = new OrderedRenderGrid());
+                const fg = this._orderedFoliage || (this._orderedFoliage = new OrderedRenderGrid());
+                this._renderBuildingMaxFloors = 0; this._renderBuildingMaxReach = 0;
+                bg.build(buildings, (b, entry) => {
+                    entry.standardV2 = !!(b.isV2 && b.inView === BuildingV2.prototype.inView && b._leanScale === BuildingV2.prototype._leanScale);
+                    // Missing/nonfinite dimensions can pass the legacy shadow/forecourt
+                    // predicates differently from the base pass's 200px fallback; keep them live.
+                    if (![b.x, b.y, b.w, b.h].every(Number.isFinite)) return null;
+                    // Unknown visibility implementations retain their original per-pass checks.
+                    if (b.isV2 && (!entry.standardV2 || !Number.isFinite(b.floors) || b.floors < 0 ||
+                        !Number.isFinite(b.emissiveReach || 0))) return null;
+                    if (entry.standardV2) {
+                        this._renderBuildingMaxFloors = Math.max(this._renderBuildingMaxFloors, b.floors);
+                        this._renderBuildingMaxReach = Math.max(this._renderBuildingMaxReach, b.emissiveReach || 0);
+                    }
+                    return { left: b.x, right: b.x + (b.w || 200), top: b.y, bottom: b.y + (b.h || 200) };
+                });
+                fg.build(foliage, f => {
+                    // Include the anchor as well as a generous canopy envelope. The original
+                    // anchor predicate remains final, including for oversized editor trees.
+                    const s = Math.abs(f.size || 1), r = 80 * Math.max(1, s), cy = foliageCanopyY(f);
+                    return { left: f.x - r, right: f.x + r, top: Math.min(f.y, cy - r), bottom: Math.max(f.y, cy + r) };
+                });
+            },
+
+            _queryRenderBuildings(bounds, results) {
+                this._ensureRenderSpatial();
+                return this._orderedBuildings.query(bounds, results);
+            },
+
+            _queryRenderFoliage(bounds, results) {
+                this._ensureRenderSpatial();
+                return this._orderedFoliage.query(bounds, results);
+            },
+
+            _prepareRenderBuildingLists(bounds) {
+                this._ensureRenderSpatial();
+                const cam = this.camera, B = CONFIG.BUILDINGS, C = CONFIG.CULLING;
+                let lists = this._renderBuildingLists;
+                // Cache only this draw's view. Subsequent calls also catch explicit geometry
+                // invalidation and map/collection replacements through _ensureRenderSpatial.
+                if (lists && lists.frame === this._renderDrawId && lists.bounds === bounds &&
+                    lists.camX === cam.x && lists.camY === cam.y && lists.zoom === cam.zoom &&
+                    lists.lean === B.LEAN && lists.camHeight === B.CAM_HEIGHT && lists.refZoom === B.REF_ZOOM &&
+                    lists.floorHeight === B.FLOOR_HEIGHT && lists.maxFloors === B.MAX_FLOORS &&
+                    lists.extra === C.LEAN_EXTRA && lists.margin === C.BUILDINGS_VIEW) return lists;
+                lists = this._renderBuildingListsStorage || (this._renderBuildingListsStorage = { base: [], v2: [], candidates: [] });
+                lists.base.length = 0; lists.v2.length = 0;
+                lists.frame = this._renderDrawId; lists.bounds = bounds; lists.camX = cam.x; lists.camY = cam.y; lists.zoom = cam.zoom;
+                lists.lean = B.LEAN; lists.camHeight = B.CAM_HEIGHT; lists.refZoom = B.REF_ZOOM;
+                lists.floorHeight = B.FLOOR_HEIGHT; lists.maxFloors = B.MAX_FLOORS; lists.extra = C.LEAN_EXTRA; lists.margin = C.BUILDINGS_VIEW;
+                const V = bounds.view, cb = bounds.buildings;
+                let query = null, k = 1;
+                const pad = Math.max(0, this._renderBuildingMaxReach + C.BUILDINGS_VIEW);
+                let safe = [cam.x, cam.y, V.left, V.right, V.top, V.bottom, pad].every(Number.isFinite);
+                if (B.LEAN) {
+                    const h = (Math.min(this._renderBuildingMaxFloors, B.MAX_FLOORS) + C.LEAN_EXTRA) * B.FLOOR_HEIGHT;
+                    const cameraHeight = leanCamHeight();
+                    safe = safe && Number.isFinite(h) && h >= 0 && Number.isFinite(cameraHeight) && cameraHeight > h &&
+                        Number.isFinite(B.MAX_FLOORS) && B.MAX_FLOORS >= 0 && Number.isFinite(C.LEAN_EXTRA) && C.LEAN_EXTRA >= 0 &&
+                        Number.isFinite(B.FLOOR_HEIGHT) && B.FLOOR_HEIGHT >= 0;
+                    if (safe) k = 1 + h / (cameraHeight - h);
+                }
+                if (safe) {
+                    // A projected roof is cam + (footprint - cam) * k. Inverse-project the
+                    // padded view at the largest k and union it with k=1 and legacy bounds.
+                    // Every intermediate roof/wall scale is covered, even when V is offset
+                    // by cinematic pan, shake or a finisher independently of the lean camera.
+                    const left = V.left - pad, right = V.right + pad, top = V.top - pad, bottom = V.bottom + pad;
+                    query = { left: Math.min(cb.left, left, cam.x + (left - cam.x) / k),
+                        right: Math.max(cb.right, right, cam.x + (right - cam.x) / k),
+                        top: Math.min(cb.top, top, cam.y + (top - cam.y) / k),
+                        bottom: Math.max(cb.bottom, bottom, cam.y + (bottom - cam.y) / k) };
+                    // Broadphase roundoff may only add candidates, including at cell boundaries.
+                    const guard = 32 * Number.EPSILON * Math.max(1, Math.abs(cam.x), Math.abs(cam.y),
+                        Math.abs(query.left), Math.abs(query.right), Math.abs(query.top), Math.abs(query.bottom));
+                    query.left -= guard; query.right += guard; query.top -= guard; query.bottom += guard;
+                }
+                // A singular/unusual projection takes the original full candidate scan.
+                const candidates = this._orderedBuildings.query(query, lists.candidates);
+                for (const entry of candidates) {
+                    const b = entry.item;
+                    if (entry.standardV2) {
+                        if (b.inView(V, cam)) { lists.base.push(entry); lists.v2.push(entry); }
+                    } else {
+                        if (b.isV2) lists.v2.push(entry);
+                        if (b.isV2 && b.inView) lists.base.push(entry); // custom predicate runs at its original base pass
+                        else if (!(b.x + (b.w || 200) < cb.left || b.x > cb.right || b.y + (b.h || 200) < cb.top || b.y > cb.bottom)) lists.base.push(entry);
+                    }
+                }
+                this._renderBuildingLists = lists;
+                return lists;
+            },
+
             /** After lighting: building windows/neon/rooftop lights, then the sky layer. */
             drawEmissivePass(ctx) {
                 const dark = this.getAmbientDarkness();
@@ -37,14 +188,22 @@
                     const V = this._cullBounds && this._cullBounds.view;
                     const z = this.camera.zoom || 1;
                     const hw = this.canvas.width / 2 / z + 200, hh = this.canvas.height / 2 / z + 200;
-                    for (const b of this.activeMap.buildings) {
-                        if (!b.isV2 || !b.drawEmissive) continue;
-                        if (V) { if (!b.inView(V, this.camera)) continue; }               // what could reach the screen (BuildingV2.inView)
-                        else {
+                    if (V) {
+                        const visible = this._prepareRenderBuildingLists(this._cullBounds).v2;
+                        for (const entry of visible) {
+                            const b = entry.item;
+                            if (!b.isV2 || !b.drawEmissive) continue;
+                            if (!entry.standardV2 && !b.inView(V, this.camera)) continue;
+                            b.drawEmissive(ctx, dark);
+                        }
+                    } else {
+                        // Standalone calls without a draw view retain their original fallback predicate.
+                        for (const b of this.activeMap.buildings) {
+                            if (!b.isV2 || !b.drawEmissive) continue;
                             const m = b.emissiveReach || 0;
                             if (b.x + b.w < this.camera.x - hw - m || b.x > this.camera.x + hw + m || b.y + b.h < this.camera.y - hh - m || b.y > this.camera.y + hh + m) continue;
+                            b.drawEmissive(ctx, dark);
                         }
-                        b.drawEmissive(ctx, dark);
                     }
                 }
                 // Car lamps in the dark: tail and brake lights, headlights, signals (traffic/car-art.js)
@@ -351,8 +510,41 @@
             },
             
             // Inside GameEngine class
+            _refreshAutoDriveRoute() {
+                const car = this.car, target = this.navDestination;
+                if (!car || !target || !car.currentLane || car.currentTurnPath) return false;
+                car._gpsCheckTimer = 0;
+                const route = this.traffic.network.buildDrivePath(car.currentLane, car.x, car.y, target.x, target.y);
+                car.plannedTurn = null;
+                car.clearNavWaypoints();
+                if (!route) { car.manualGas = -Math.abs(car.speed) / Math.max(1, car.maxSpeed); return false; }
+                // Stop clear of a road boundary or intersection gate, with the body
+                // fully on the final lane rather than hanging over its endpoint.
+                const endLane = route.endLane, margin = Math.min(endLane.length / 2, car.length / 2 + 10);
+                const along = clamp(endLane.getDistanceAlong(route.destination.x, route.destination.y), margin, endLane.length - margin);
+                route.destination.x = endLane.start.x + endLane.ux * along;
+                route.destination.y = endLane.start.y + endLane.uy * along;
+                Object.assign(route.waypoints[route.waypoints.length - 1], route.destination);
+                car.setNavWaypoints(route.waypoints.slice(1));
+                car._driveRoute = route;
+                car.navDestination = route.destination;
+                if (this.zibSystem?.passengerRide?.zib === car) {
+                    this.zibSystem.passengerRide.destinationX = route.destination.x;
+                    this.zibSystem.passengerRide.destinationY = route.destination.y;
+                }
+                if (this.ui) {
+                    this.ui.precisePath = route.waypoints;
+                    this.ui.navPath = route.waypoints;
+                    this.ui.drawablePathSegments = this.traffic.network.getDrawablePath(route.waypoints);
+                    this.ui.roadLevelPath = this.ui._buildRoadLevelPath(car, this.traffic.network);
+                    this.ui.lastPlayerNavPos = { x: car.x, y: car.y };
+                }
+                return true;
+            },
+
             toggleAutoDrive() {
                 if (!this.car || !this.isDriving) return;
+                if (this.zibSystem && this.zibSystem.isPassenger) return;
                 
                 if (this.car.controlMode === 'AI') {
                     // Switch back to manual control
@@ -369,6 +561,14 @@
                         return;
                     }
                     
+                    // A dead end to the map's edge has no way on: say so rather than fail
+                    const net = this.traffic && this.traffic.network;
+                    if (net && net.laneHasExit && this.car.currentLane && !this.car.currentTurnPath && !net.laneHasExit(this.car.currentLane)) {
+                        showMessage("DEAD END AHEAD — TURN AROUND TO ENGAGE AUTO-DRIVE");
+                        audioSys.sfx('ui');
+                        return;
+                    }
+                    const pinned = this.navDestination;
                     // Try to enable auto-drive
                     const success = this.car.enableAutoDrive(this.traffic.network, this.activeMap.walls);
                     
@@ -388,17 +588,13 @@
                         this.navDestination = driveTarget;
                         this.car.navDestination = driveTarget;
                         
-                        if (this.ui) {
-                            // Use car's current position as path origin
-                            const savedPX = this.player.x, savedPY = this.player.y;
-                            this.player.x = this.car.x;
-                            this.player.y = this.car.y;
-                            this.ui.calculateNavPath();
-                            this.player.x = savedPX;
-                            this.player.y = savedPY;
-                            if (this.ui.navPath && this.ui.navPath.length > 1) {
-                                this.car.setNavWaypoints(this.ui.navPath.slice(1));
-                            }
+                        if (!this._refreshAutoDriveRoute()) {
+                            this.car.disableAutoDrive();
+                            this.car.clearNavWaypoints();
+                            this.navDestination = pinned; this.car.navDestination = null;   // her pin stays where she put it
+                            this.autodriveBtn.classList.remove('engaged');
+                            showMessage("AUTO-DRIVE FAILED - NO DRIVABLE ROUTE");
+                            return;
                         }
                         showMessage("AUTO-DRIVE: FOLLOWING NAVIGATION");
                         audioSys.sfx('ui');
@@ -408,16 +604,40 @@
                 }
             },
             
+            /** A final stop passed on its lane is reached while lateral proximity still applies. */
+            _hasReachedDriveDestination(car, x, y, radius) {
+                if (!car || car.currentTurnPath) return false;
+                const route = car._driveRoute;
+                if (route && (route.index < route.transitions.length || car.currentLane !== route.endLane)) return false;
+                const dx = x - car.x, dy = y - car.y;
+                if (Math.hypot(dx, dy) < radius) return true;
+                if (!route) return false;
+                // Endpoint clearance can move the safe stop behind an already-nearby car.
+                // Forward-only autodrive cannot return to it, so accept passing that stop
+                // on the final lane without accepting a car on another road or mid-turn.
+                const lane = route.endLane;
+                if (dx * lane.ux + dy * lane.uy <= 0 && Math.abs(dx * lane.uy - dy * lane.ux) < radius) return true;
+                // Stopped beside the stop on the final lane (too far off its centre to count above, with the
+                // speed cap at zero so it can't creep closer): half a second still there is arrival
+                if (Math.abs(car.speed || 0) < 0.15 && Math.hypot(dx, dy) < radius * 2) {
+                    if ((car._stillAtStop = (car._stillAtStop || 0) + 1) > 30) { car._stillAtStop = 0; return true; }
+                } else car._stillAtStop = 0;
+                return false;
+            },
+
             // Check if player has reached navigation destination
             checkNavArrival() {
+                if (this.zibSystem && this.zibSystem.isPassenger) return;
                 if (!this.navDestination) return;
                 
-                const dist = Math.hypot(
-                    this.player.x - this.navDestination.x,
-                    this.player.y - this.navDestination.y
-                );
-                
-                if (dist < this.navCheckDistance) {
+                const driving = this.isDriving && this.car;
+                const target = driving && this.car.controlMode === 'AI' && this.car.navDestination
+                    ? this.car.navDestination : this.navDestination;
+                const actor = driving ? this.car : this.player;
+                const autoDriving = driving && this.car.controlMode === 'AI';
+                const reached = autoDriving ? this._hasReachedDriveDestination(this.car, target.x, target.y, 35)
+                    : Math.hypot(actor.x - target.x, actor.y - target.y) < this.navCheckDistance;
+                if (reached) {
                     // Arrived at destination
                     showMessage("DESTINATION REACHED");
                     audioSys.sfx('ui');
@@ -438,6 +658,7 @@
                     
                     // Disable autodrive if it was following nav
                     if (this.isDriving && this.car && this.car.controlMode === 'AI') {
+                        this.car.vx = this.car.vy = this.car.speed = 0;
                         this.car.disableAutoDrive();
                         this.autodriveBtn.classList.remove('engaged');
                     }
@@ -545,7 +766,8 @@
                 let visibility = 1.0 - (this.getAmbientDarkness() * 1.3);
                 
                 // 2. STATIC LIGHTS (Lamps)
-                for (let lamp of this.lamps) {
+                for (const entry of this._queryLampCandidates({ left: this.player.x, right: this.player.x, top: this.player.y, bottom: this.player.y }, 'lampVisibility')) {
+                    const lamp = entry.item;
                     // Skip lamps in rooms with lights switched off
                     if (this.roomSystem.isLampRoomDark(lamp)) continue;
                     

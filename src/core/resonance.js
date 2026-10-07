@@ -7,15 +7,17 @@
            does it become levels and Tuning points she can install. Die first and
            half of the unsettled Resonance scatters on the way back to her.
 
-           Three trees of five nodes, three ranks each; a node opens once the one
-           above it has a rank. `stat(key, base)` gives any stat with the installed
+           Three trees of six nodes, three ranks each; a node opens once the one
+           above it has a rank. The sixth nodes also require level 30.
+           `stat(key, base)` gives any stat with the installed
            ranks applied — the game asks it wherever a number could be tuned.
            ===================================================================== */
         const RESONANCE = {
-            CAP: 30,
+            CAP: 50,
             nextLevel: level => 120 + 70 * level,                 // Resonance from `level` to the next
             DEATH_LOSS: 0.5,
             RESPEC_COST: 200,
+            POST_CAP_XP_PER_PP: 100,                            // Dr. Yin exchanges settled surplus; fractions carry forward
             // Kill awards: base by toughness, then style multipliers (they stack)
             BASE: { Ganger: 20, Drone: 30, GatlingGunner: 80 },
             USUAL_HP: { Ganger: 40, Drone: 60, GatlingGunner: 200 },
@@ -27,9 +29,10 @@
             { id: 'flit', name: 'Flit', color: '#b89cff', blurb: 'Tune the jump between dimensions.', nodes: [
                 { id: 'reach',        name: 'Reach',        desc: r => `+${10 * r}% flit distance` },
                 { id: 'quick_return', name: 'Quick Return', desc: r => `−${10 * r}% attunement per flit` },
-                { id: 'flit_strike',  name: 'Flit-Strike',  desc: r => `Shots within 1 s after a flit deal +${20 * r}%` },
+                { id: 'flit_strike',  name: 'Flit-Strike',  desc: (r, R) => `Shots within ${R ? R.stat('flitStrikeWindow', 1) : 1} s after a flit deal +${20 * r}%` },
                 { id: 'afterimage',   name: 'Afterimage',   desc: r => `Your flit ghost draws gangers' eyes for ${(0.5 * r).toFixed(1)} s` },
                 { id: 'double_step',  name: 'Double Step',  desc: r => `+${20 * r} max attunement${r >= 3 ? '; a second flit within 0.6 s costs half' : ''}` },
+                { id: 'long_echo',    name: 'Long Echo',    unlockLevel: 30, desc: r => `Flit-Strike lasts ${(1 + 0.25 * r).toFixed(2)} s; its damage bonus stays the same` },
             ] },
             { id: 'frame', name: 'Frame', color: '#c4566e', blurb: 'What Dr. Yin builds into you.', nodes: [
                 { id: 'reinforced',   name: 'Reinforced',   desc: r => `+${10 * r} max health` },
@@ -37,6 +40,7 @@
                 { id: 'stim_potency', name: 'Stim Potency', desc: r => `Stims heal +${15 * r}` },
                 { id: 'idle_mend',    name: 'Idle Mend',    desc: r => `Regen starts ${2 * r} s sooner, +${r} HP/s` },
                 { id: 'last_stand',   name: 'Last Stand',   desc: r => `Survive a lethal hit at 1 HP (every ${[0, 120, 90, 60][r]} s)` },
+                { id: 'grounded',     name: 'Grounded',     unlockLevel: 30, desc: r => `−${15 * r}% knockback from damage` },
             ] },
             { id: 'arms', name: 'Arms', color: '#e8c27a', blurb: 'Steadier hands, heavier hits.', nodes: [
                 { id: 'steady',       name: 'Steady',       desc: r => `−${12 * r}% spread` },
@@ -44,6 +48,7 @@
                 { id: 'hollow_points',name: 'Hollow Points',desc: r => `+${8 * r}% gun damage` },
                 { id: 'heavy_hands',  name: 'Heavy Hands',  desc: r => `+${25 * r}% punch damage and knockback` },
                 { id: 'quick_draw',   name: 'Quick-Draw',   desc: r => `First shot within 0.8 s of drawing: +${25 * r}%` },
+                { id: 'low_signature',name: 'Low Signature',unlockLevel: 30, desc: r => `Gunshots carry ${10 * r}% less far to enemies` },
             ] },
         ];
 
@@ -63,15 +68,18 @@
                 switch (key) {
                     case 'flitDistance':   return base * (1 + 0.10 * r('reach'));
                     case 'flitCost':       return base * (1 - 0.10 * r('quick_return'));
+                    case 'flitStrikeWindow': return base + 0.25 * r('long_echo');
                     case 'maxAttunement':  return base + 20 * r('double_step');
                     case 'maxHealth':      return base + 10 * r('reinforced');
                     case 'damageTaken':    return base * (1 - 0.06 * r('plating'));
+                    case 'knockbackTaken': return base * (1 - 0.15 * r('grounded'));
                     case 'stimHeal':       return base + 15 * r('stim_potency');
                     case 'regenDelay':     return Math.max(60, base - 120 * r('idle_mend'));   // frames
                     case 'regenAmount':    return base + r('idle_mend');                        // HP per second
                     case 'spread':         return base * (1 - 0.12 * r('steady'));
                     case 'fireCooldown':   return base * (1 - 0.08 * r('quick_hands'));
                     case 'gunDamage':      return base * (1 + 0.08 * r('hollow_points'));
+                    case 'gunNoise':       return base * (1 - 0.10 * r('low_signature'));
                     case 'punchDamage':    return base * (1 + 0.25 * r('heavy_hands'));
                     default: return base;
                 }
@@ -111,8 +119,15 @@
                 while (this.level < RESONANCE.CAP && this.xp >= this.toNext()) {
                     this.xp -= this.toNext(); this.level++; this.points++; gained++;
                 }
-                if (this.level >= RESONANCE.CAP) this.xp = 0;
                 return gained;
+            }
+
+            /** Exchange settled surplus only at the cap. The saved xp field retains the remainder. */
+            cashOut() {
+                if (this.level < RESONANCE.CAP) return 0;
+                const pp = Math.floor(this.xp / RESONANCE.POST_CAP_XP_PER_PP);
+                this.xp -= pp * RESONANCE.POST_CAP_XP_PER_PP;
+                return pp;
             }
 
             /** Returning to Dr. Yin after dying: part of the unsettled Resonance scatters. Returns what was lost. */
@@ -127,7 +142,7 @@
                 const tree = RESONANCE_TREES.find(t => t.id === treeId);
                 if (!tree || this.points < 1) return false;
                 const node = tree.nodes[nodeIndex];
-                if (!node || this.rank(node.id) >= 3) return false;
+                if (!node || this.rank(node.id) >= 3 || this.level < (node.unlockLevel || 0)) return false;
                 return nodeIndex === 0 || this.rank(tree.nodes[nodeIndex - 1].id) > 0;
             }
 
@@ -160,7 +175,9 @@
             deserialize(d) {
                 this.reset();
                 if (!d) return;
-                this.level = Math.min(RESONANCE.CAP, d.level | 0); this.xp = +d.xp || 0; this.unsettled = +d.unsettled || 0;
+                this.level = Math.max(0, Math.min(RESONANCE.CAP, d.level | 0));
+                this.xp = Number.isFinite(+d.xp) ? Math.max(0, Math.floor(+d.xp)) : 0;
+                this.unsettled = Number.isFinite(+d.unsettled) ? Math.max(0, Math.floor(+d.unsettled)) : 0;
                 this.points = d.points | 0;
                 const known = new Set(RESONANCE_TREES.flatMap(t => t.nodes.map(n => n.id)));
                 for (const [k, v] of Object.entries(d.ranks || {})) if (known.has(k)) this.ranks[k] = Math.max(0, Math.min(3, v | 0));

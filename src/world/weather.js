@@ -946,31 +946,85 @@
                     this.lightningCooldown--;
                 }
             }
-            draw(ctx) {
-                this.particles.forEach(p => {
+            /** Return all map effects to their pool before switching maps. */
+            clearParticles() {
+                for (let i = this.particles.length - 1; i >= 0; i--) this._particlePool.release(this.particles[i]);
+                this.particles.length = 0;
+            }
+
+            draw(ctx, bounds, zoom = 1) {
+                const ip = RenderInterp, alpha = ip.alpha, snap = CONFIG.LOOP.INTERP_SNAP_DIST;
+                const scale = zoom > 0 ? zoom : 1;
+                // Shadows use backing-store pixels; keep four blur radii plus antialias reach.
+                const blur = Math.max(0, ctx.shadowBlur || 0);
+                const offsetX = Math.abs(ctx.shadowOffsetX || 0) / scale, offsetY = Math.abs(ctx.shadowOffsetY || 0) / scale;
+                const pad = (2 + blur * 4) / scale;
+                // Filters have unknown extent; masking/copy composites can affect pixels outside
+                // a source's bounds, so preserve those draws even when their shape is offscreen.
+                const composite = ctx.globalCompositeOperation;
+                const cull = bounds && (!ctx.filter || ctx.filter === 'none') &&
+                    (composite === 'source-over' || composite === 'lighter');
+                for (let i = 0; i < this.particles.length; i++) {
+                    const p = this.particles[i], previous = p._ipP;
+                    let x = p.x, y = p.y;
+                    const blend = ip._drawActive && alpha < 1 && previous && p._ipGen === ip.gen &&
+                        !(Math.abs(x - previous.x) > snap || Math.abs(y - previous.y) > snap);
+                    if (blend && (x !== previous.x || y !== previous.y)) {
+                        x = previous.x + (x - previous.x) * alpha;
+                        y = previous.y + (y - previous.y) * alpha;
+                    }
+                    if (cull) {
+                        let left, right, top, bottom;
+                        if (p.type === 'spark') {
+                            const tx = x - p.vx * 2, ty = y - p.vy * 2, reach = 1 + pad;
+                            left = Math.min(x, tx) - reach - offsetX; right = Math.max(x, tx) + reach + offsetX;
+                            top = Math.min(y, ty) - reach - offsetY; bottom = Math.max(y, ty) + reach + offsetY;
+                        } else {
+                            // The ghost's Bezier control hull [-10,10] × [-10,15] fits this
+                            // radius at every rotation; its own shadowBlur is always 10.
+                            const reach = p.type === 'ghost' ? 19 + 42 / scale : p.size + pad;
+                            left = x - reach - offsetX; right = x + reach + offsetX;
+                            top = y - reach - offsetY; bottom = y + reach + offsetY;
+                        }
+                        if (right < bounds.left || left > bounds.right || bottom < bounds.top || top > bounds.bottom) continue;
+                    }
+                    // Match RenderInterp._applyObj exactly, including wrap and fresh/teleport guards.
+                    // Invisible effects never build swap records or blend unused facing/life values.
+                    let angle = p.angle, life = p.life;
+                    if (blend) {
+                        if (typeof angle === 'number' && typeof previous.angle === 'number' && angle !== previous.angle) {
+                            let d = angle - previous.angle;
+                            while (d > Math.PI) d -= Math.PI * 2;
+                            while (d < -Math.PI) d += Math.PI * 2;
+                            angle = previous.angle + d * alpha;
+                        }
+                        if (typeof life === 'number' && typeof previous.life === 'number' && life !== previous.life && isFinite(life) && isFinite(previous.life)) {
+                            life = previous.life + (life - previous.life) * alpha;
+                        }
+                    }
                     ctx.save();
                     if (p.type === 'ghost') {
-                        ctx.translate(p.x, p.y); ctx.rotate(p.angle); ctx.fillStyle = `rgba(164, 255, 255, ${p.life * 0.6})`; 
+                        ctx.translate(x, y); ctx.rotate(angle); ctx.fillStyle = `rgba(164, 255, 255, ${life * 0.6})`;
                         ctx.shadowColor = '#fff'; ctx.shadowBlur = 10;
                         ctx.beginPath(); ctx.moveTo(0, -10); ctx.bezierCurveTo(10, -10, 10, 10, 0, 15); ctx.bezierCurveTo(-10, 10, -10, -10, 0, -10); ctx.fill();
                         ctx.shadowBlur = 0;
                     }
                     else if (p.type === 'spark') {
-                                ctx.strokeStyle = `rgba(255, 220, 100, ${p.life})`;
+                                ctx.strokeStyle = `rgba(255, 220, 100, ${life})`;
                                 ctx.lineWidth = 2;
                                 ctx.beginPath();
-                                ctx.moveTo(p.x, p.y);
-                                ctx.lineTo(p.x - p.vx * 2, p.y - p.vy * 2); // Trail effect
+                                ctx.moveTo(x, y);
+                                ctx.lineTo(x - p.vx * 2, y - p.vy * 2); // Trail effect
                                 ctx.stroke();
                     } else {
                         // Its colour's alpha follows its life (as the old per-frame string edit did), folded into globalAlpha
-                        const st = _particleStyle(p.color), L = Math.min(1, p.life);
-                        if (st) { ctx.fillStyle = st.fill; ctx.globalAlpha = L * (st.mode === 1 ? L : st.mode === 0.5 ? Math.min(1, p.life * 0.5) : 1); }
-                        else { ctx.fillStyle = p.color.replace('1)', `${p.life})`).replace('0.5)', `${p.life * 0.5})`); ctx.globalAlpha = p.life; }
-                        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+                        const st = _particleStyle(p.color), L = Math.min(1, life);
+                        if (st) { ctx.fillStyle = st.fill; ctx.globalAlpha = L * (st.mode === 1 ? L : st.mode === 0.5 ? Math.min(1, life * 0.5) : 1); }
+                        else { ctx.fillStyle = p.color.replace('1)', `${life})`).replace('0.5)', `${life * 0.5})`); ctx.globalAlpha = life; }
+                        ctx.beginPath(); ctx.arc(x, y, p.size, 0, Math.PI*2); ctx.fill();
                     }
                     ctx.restore();
-                });
+                }
                 ctx.globalAlpha = 1.0;
             }
             /**
@@ -1049,7 +1103,12 @@
                 let screenLamps = null, nLamps = 0;
                 if (lamps && lamps.length > 0) {
                     screenLamps = S.lamps;
-                    for (const l of lamps) {
+                    const candidates = typeof game !== 'undefined' && game.weather === this && game._queryEffectCandidates
+                        ? game._queryEffectCandidates(lamps === game.lamps ? 'lamps' : 'rainLamps', lamps,
+                            { left: camX - hw / zoom, right: camX + (this.width - hw) / zoom,
+                              top: camY - hh / zoom, bottom: camY + (this.height - hh) / zoom }, 'lampRain') : null;
+                    for (const entry of candidates || lamps) {
+                        const l = candidates ? entry.item : entry;
                         const lsx = (l.x - camX) * zoom + hw;
                         const lsy = (l.y - camY) * zoom + hh;
                         const lsr = (l.radius || 200) * zoom * 0.6;

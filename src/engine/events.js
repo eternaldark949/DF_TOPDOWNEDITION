@@ -121,7 +121,7 @@
                     if ((e.key === 'c' || e.key === 'C') && this.running && !this.paused && !e.ctrlKey && !e.metaKey) this.toggleSneak();   // engine/sneak.js
                     
                     // AUTO-DRIVE TOGGLE (only while driving)
-                    if ((e.key === 'q' || e.key === 'Q') && this.isDriving && this.running && !this.paused) {
+                    if ((e.key === 'q' || e.key === 'Q') && !e.repeat && this.isDriving && this.running && !this.paused) {
                         this.toggleAutoDrive();
                     }
                     
