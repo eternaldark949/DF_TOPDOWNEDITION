@@ -71,45 +71,50 @@
             };
             switch (p.decorType) {
                 case 'apt_craft': {                                        // the workbench: walnut on steel, a pegboard lip, vise, schematic tablet, iron
-                    rr(x + 3, y + 4, w, h, 3, 'rgba(0,0,0,0.34)');
-                    for (const [lx, ly] of [[x + 1, y + 1], [x + w - 5, y + 1], [x + 1, y + h - 5], [x + w - 5, y + h - 5]]) rr(lx, ly, 4, 4, 1, '#5a5e6a');
-                    rr(x, y, w, h, 3, A.walnut, '#2a201a', 1);
-                    ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 0.6; ctx.beginPath();          // grain
-                    for (let gy = y + 11; gy < y + h - 3; gy += 4.5) { ctx.moveTo(x + 2, gy); ctx.bezierCurveTo(x + w * 0.3, gy - 1.2, x + w * 0.6, gy + 1.2, x + w - 2, gy); }
-                    ctx.stroke();
-                    ctx.fillStyle = 'rgba(255,220,180,0.08)'; ctx.fillRect(x + 2, y + 9, w - 4, 2);
-                    rr(x, y + h - 3, w, 3, 1, '#8a8e9a'); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x + 1, y + h - 3, w - 2, 0.8);   // steel edge band
-                    // Pegboard lip along the back, tools hung on it
-                    rr(x - 1, y - 1, w + 2, 8, 1.5, '#2c2a34', '#4a4656', 0.8);
-                    ctx.fillStyle = 'rgba(0,0,0,0.6)'; for (let px = x + 3; px < x + w - 1; px += 4) for (const py of [y + 1.5, y + 4.5]) ctx.fillRect(px, py, 1, 1);
-                    ctx.strokeStyle = '#b8bcc8'; ctx.lineWidth = 1.3; ctx.lineCap = 'round'; ctx.beginPath();
-                    ctx.moveTo(x + 6, y + 1); ctx.lineTo(x + 6, y + 6);                             // screwdriver
-                    ctx.moveTo(x + 12, y + 1); ctx.lineTo(x + 14, y + 6); ctx.moveTo(x + 16, y + 1); ctx.lineTo(x + 14, y + 6);   // pliers
-                    ctx.stroke();
-                    ctx.fillStyle = A.wineLt; ctx.fillRect(x + 5, y + 5, 2, 2.5);
-                    circ(x + 21, y + 2.5, 1.8, null, '#b8bcc8', 1); ctx.beginPath(); ctx.moveTo(x + 21, y + 4); ctx.lineTo(x + 21, y + 7); ctx.stroke();   // wrench
-                    ctx.lineCap = 'butt';
-                    // Bench vise on the front-left corner
-                    rr(x + 3, y + h - 13, 11, 9, 1.5, '#4a5060', '#2a2e38', 0.8);
-                    rr(x + 5, y + h - 16, 7, 4, 1, '#6a7080'); ctx.fillStyle = '#c9ccd6'; ctx.fillRect(x + 1, y + h - 9, 15, 1.2);
-                    // Holo-schematic tablet, a scanline drifting down it
                     const tx = x + w * 0.44, ty = y + 11, tw = w * 0.3, th = h * 0.42;
-                    rr(tx - 1, ty - 1, tw + 2, th + 2, 2, '#15101e');
-                    rr(tx, ty, tw, th, 1.5, '#2a1a48');
-                    ctx.strokeStyle = 'rgba(200,160,255,0.75)'; ctx.lineWidth = 0.6; ctx.beginPath();
-                    ctx.rect(tx + 2, ty + 2, tw * 0.45, th * 0.5); ctx.arc(tx + tw * 0.72, ty + th * 0.35, th * 0.2, 0, Math.PI * 2);
-                    ctx.moveTo(tx + 2, ty + th - 3); ctx.lineTo(tx + tw - 2, ty + th - 3); ctx.moveTo(tx + tw * 0.25, ty + th * 0.5 + 2); ctx.lineTo(tx + tw * 0.25, ty + th - 3);
-                    ctx.stroke();
-                    ctx.fillStyle = 'rgba(232,210,255,0.55)'; ctx.fillRect(tx + 0.5, ty + ((t * 6) % th), tw - 1, 0.8);
-                    // Parts tray, a coil of copper wire
-                    rr(x + 17, y + h - 13, 12, 8, 1, '#3a3844', '#5a5866', 0.6);
-                    for (let i = 0; i < 6; i++) circ(x + 19.5 + (i % 3) * 3.5, y + h - 11 + (i / 3 | 0) * 3.5, 0.9, i % 2 ? A.brass : '#9aa0b0');
-                    ctx.strokeStyle = '#c47a4a'; ctx.lineWidth = 0.9; for (const r of [4, 2.8, 1.6]) { ctx.beginPath(); ctx.arc(x + w - 9, y + 16, r, 0, Math.PI * 2); ctx.stroke(); }
-                    // Soldering iron in its stand, the tip an ember
-                    circ(x + w - 10, y + h - 9, 3.5, '#2a2a30', '#5a5e6a', 0.8);
-                    ctx.strokeStyle = '#1a1a1e'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + w - 10, y + h - 9); ctx.lineTo(x + w - 24, y + h - 13); ctx.stroke();
-                    ctx.strokeStyle = '#a0a4b0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w - 24, y + h - 13); ctx.lineTo(x + w - 29, y + h - 14.5); ctx.stroke(); ctx.lineCap = 'butt';
-                    circ(x + w - 29, y + h - 14.5, 1.2, `rgba(255,${140 + 60 * Math.sin(t * 7) | 0},70,1)`);
+                    // (PropPass segments, entities/prop-sprites.js: the still runs are painted once, the scanline and the ember stay live)
+                    if (PropPass.seg(false)) {
+                        rr(x + 3, y + 4, w, h, 3, 'rgba(0,0,0,0.34)');
+                        for (const [lx, ly] of [[x + 1, y + 1], [x + w - 5, y + 1], [x + 1, y + h - 5], [x + w - 5, y + h - 5]]) rr(lx, ly, 4, 4, 1, '#5a5e6a');
+                        rr(x, y, w, h, 3, A.walnut, '#2a201a', 1);
+                        ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 0.6; ctx.beginPath();          // grain
+                        for (let gy = y + 11; gy < y + h - 3; gy += 4.5) { ctx.moveTo(x + 2, gy); ctx.bezierCurveTo(x + w * 0.3, gy - 1.2, x + w * 0.6, gy + 1.2, x + w - 2, gy); }
+                        ctx.stroke();
+                        ctx.fillStyle = 'rgba(255,220,180,0.08)'; ctx.fillRect(x + 2, y + 9, w - 4, 2);
+                        rr(x, y + h - 3, w, 3, 1, '#8a8e9a'); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x + 1, y + h - 3, w - 2, 0.8);   // steel edge band
+                        // Pegboard lip along the back, tools hung on it
+                        rr(x - 1, y - 1, w + 2, 8, 1.5, '#2c2a34', '#4a4656', 0.8);
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)'; for (let px = x + 3; px < x + w - 1; px += 4) for (const py of [y + 1.5, y + 4.5]) ctx.fillRect(px, py, 1, 1);
+                        ctx.strokeStyle = '#b8bcc8'; ctx.lineWidth = 1.3; ctx.lineCap = 'round'; ctx.beginPath();
+                        ctx.moveTo(x + 6, y + 1); ctx.lineTo(x + 6, y + 6);                             // screwdriver
+                        ctx.moveTo(x + 12, y + 1); ctx.lineTo(x + 14, y + 6); ctx.moveTo(x + 16, y + 1); ctx.lineTo(x + 14, y + 6);   // pliers
+                        ctx.stroke();
+                        ctx.fillStyle = A.wineLt; ctx.fillRect(x + 5, y + 5, 2, 2.5);
+                        circ(x + 21, y + 2.5, 1.8, null, '#b8bcc8', 1); ctx.beginPath(); ctx.moveTo(x + 21, y + 4); ctx.lineTo(x + 21, y + 7); ctx.stroke();   // wrench
+                        ctx.lineCap = 'butt';
+                        // Bench vise on the front-left corner
+                        rr(x + 3, y + h - 13, 11, 9, 1.5, '#4a5060', '#2a2e38', 0.8);
+                        rr(x + 5, y + h - 16, 7, 4, 1, '#6a7080'); ctx.fillStyle = '#c9ccd6'; ctx.fillRect(x + 1, y + h - 9, 15, 1.2);
+                        // Holo-schematic tablet, a scanline drifting down it
+                        rr(tx - 1, ty - 1, tw + 2, th + 2, 2, '#15101e');
+                        rr(tx, ty, tw, th, 1.5, '#2a1a48');
+                        ctx.strokeStyle = 'rgba(200,160,255,0.75)'; ctx.lineWidth = 0.6; ctx.beginPath();
+                        ctx.rect(tx + 2, ty + 2, tw * 0.45, th * 0.5); ctx.arc(tx + tw * 0.72, ty + th * 0.35, th * 0.2, 0, Math.PI * 2);
+                        ctx.moveTo(tx + 2, ty + th - 3); ctx.lineTo(tx + tw - 2, ty + th - 3); ctx.moveTo(tx + tw * 0.25, ty + th * 0.5 + 2); ctx.lineTo(tx + tw * 0.25, ty + th - 3);
+                        ctx.stroke();
+                    }
+                    if (PropPass.seg(true)) { ctx.fillStyle = 'rgba(232,210,255,0.55)'; ctx.fillRect(tx + 0.5, ty + ((t * 6) % th), tw - 1, 0.8); }
+                    if (PropPass.seg(false)) {
+                        // Parts tray, a coil of copper wire
+                        rr(x + 17, y + h - 13, 12, 8, 1, '#3a3844', '#5a5866', 0.6);
+                        for (let i = 0; i < 6; i++) circ(x + 19.5 + (i % 3) * 3.5, y + h - 11 + (i / 3 | 0) * 3.5, 0.9, i % 2 ? A.brass : '#9aa0b0');
+                        ctx.strokeStyle = '#c47a4a'; ctx.lineWidth = 0.9; for (const r of [4, 2.8, 1.6]) { ctx.beginPath(); ctx.arc(x + w - 9, y + 16, r, 0, Math.PI * 2); ctx.stroke(); }
+                        // Soldering iron in its stand, the tip an ember
+                        circ(x + w - 10, y + h - 9, 3.5, '#2a2a30', '#5a5e6a', 0.8);
+                        ctx.strokeStyle = '#1a1a1e'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + w - 10, y + h - 9); ctx.lineTo(x + w - 24, y + h - 13); ctx.stroke();
+                        ctx.strokeStyle = '#a0a4b0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w - 24, y + h - 13); ctx.lineTo(x + w - 29, y + h - 14.5); ctx.stroke(); ctx.lineCap = 'butt';
+                    }
+                    if (PropPass.seg(true)) circ(x + w - 29, y + h - 14.5, 1.2, `rgba(255,${140 + 60 * Math.sin(t * 7) | 0},70,1)`);
                     break;
                 }
                 case 'apt_sofa': {                                         // faces north: back along the bottom edge
@@ -127,9 +132,8 @@
                     break;
                 }
                 case 'apt_fireplace': {                                    // linear glass fireplace set into a stone slab
-                    rr(x - 6, y - 4, w + 12, h + 8, 3, '#2b2224', 'rgba(239,230,220,0.35)', 1);
-                    rr(x, y + 3, w, h - 6, 2, '#120c0c');
-                    for (let i = 0; i < 6; i++) {
+                    if (PropPass.seg(false)) { rr(x - 6, y - 4, w + 12, h + 8, 3, '#2b2224', 'rgba(239,230,220,0.35)', 1); rr(x, y + 3, w, h - 6, 2, '#120c0c'); }
+                    if (PropPass.seg(true)) for (let i = 0; i < 6; i++) {
                         const fx = x + 5 + i * (w - 10) / 5, fl = 0.6 + 0.4 * Math.sin(t * 7 + i * 1.9);
                         ctx.fillStyle = `rgba(255,${140 + 60 * fl | 0},60,${0.55 + 0.35 * fl})`;
                         ctx.beginPath(); ctx.ellipse(fx, y + h / 2, 3.5, (h - 10) / 2 * fl, 0, 0, Math.PI * 2); ctx.fill();
@@ -166,13 +170,15 @@
                     break;
                 }
                 case 'apt_console': {
-                    shadow(); rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
-                    ctx.fillStyle = '#2a2020'; ctx.fillRect(x + 6, y + 4, 26, h - 8); ctx.fillRect(x + w - 32, y + 4, 26, h - 8);   // speakers
-                    ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 4; i++) { ctx.fillRect(x + 8, y + 6 + i * 3.5, 22, 1); ctx.fillRect(x + w - 30, y + 6 + i * 3.5, 22, 1); }
                     const cx = x + w / 2 - 6, cy = y + h / 2;                                           // turntable
-                    circ(cx, cy, 9, A.ink); circ(cx, cy, 3, A.wineLt);
-                    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(cx, cy, 6, t * 3.5, t * 3.5 + 1.2); ctx.stroke();
-                    ctx.strokeStyle = A.brass; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx + 14, cy - 7); ctx.lineTo(cx + 5, cy + 2); ctx.stroke();
+                    if (PropPass.seg(false)) {
+                        shadow(); rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
+                        ctx.fillStyle = '#2a2020'; ctx.fillRect(x + 6, y + 4, 26, h - 8); ctx.fillRect(x + w - 32, y + 4, 26, h - 8);   // speakers
+                        ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 4; i++) { ctx.fillRect(x + 8, y + 6 + i * 3.5, 22, 1); ctx.fillRect(x + w - 30, y + 6 + i * 3.5, 22, 1); }
+                        circ(cx, cy, 9, A.ink); circ(cx, cy, 3, A.wineLt);
+                    }
+                    if (PropPass.seg(true)) { ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, 6, t * 3.5, t * 3.5 + 1.2); ctx.stroke(); }   // the record's sheen turns
+                    if (PropPass.seg(false)) { ctx.strokeStyle = A.brass; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx + 14, cy - 7); ctx.lineTo(cx + 5, cy + 2); ctx.stroke(); }
                     break;
                 }
                 case 'apt_plant': {
@@ -267,12 +273,16 @@
                     break;
                 }
                 case 'apt_tub': {                                          // freestanding oval tub with petals
-                    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 3, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = '#f7f4f0'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = '#cfe0e6'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 7, h / 2 - 7, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 14 + Math.sin(t) * 2, h / 2 - 14, 0, 0, Math.PI * 2); ctx.stroke();
-                    for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 3 ? A.blushLt : A.blush; ctx.beginPath(); ctx.ellipse(x + w * (0.25 + ((i * 37) % 50) / 100), y + h * (0.3 + ((i * 23) % 40) / 100), 2.6, 1.6, i, 0, Math.PI * 2); ctx.fill(); }
-                    ctx.strokeStyle = A.brass; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x + w - 2, y + h / 2); ctx.lineTo(x + w - 12, y + h / 2); ctx.stroke();
+                    if (PropPass.seg(false)) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 3, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#f7f4f0'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#cfe0e6'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 7, h / 2 - 7, 0, 0, Math.PI * 2); ctx.fill();
+                    }
+                    if (PropPass.seg(true)) { ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 14 + Math.sin(t) * 2, h / 2 - 14, 0, 0, Math.PI * 2); ctx.stroke(); }
+                    if (PropPass.seg(false)) {                             // petals and the spout, over the ripple
+                        for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 3 ? A.blushLt : A.blush; ctx.beginPath(); ctx.ellipse(x + w * (0.25 + ((i * 37) % 50) / 100), y + h * (0.3 + ((i * 23) % 40) / 100), 2.6, 1.6, i, 0, Math.PI * 2); ctx.fill(); }
+                        ctx.strokeStyle = A.brass; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x + w - 2, y + h / 2); ctx.lineTo(x + w - 12, y + h / 2); ctx.stroke();
+                    }
                     break;
                 }
                 case 'apt_bath_vanity': {                                  // double marble vanity against the south wall
@@ -649,73 +659,92 @@
            MiniSpree — the city's vending brand: glossy black, a lit window of cans, a pink-and-cyan
            marquee; and the health station — Dr. Yin's refill cabinet: white and wine, a green cross,
            a rack of stim vials, a vitals readout. */
+        // (PropPass segments, entities/prop-sprites.js: the still runs are painted once; the neon's hum,
+        //  the window's light, and the station's cross, vials and trace stay live, each at its own depth)
         function drawMiniSpree(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const hum = 0.85 + 0.15 * Math.sin(t * 7) * Math.sin(t * 2.3);
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
-            ctx.fillStyle = '#0d0d12'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
-            ctx.shadowColor = '#3ef0ff'; ctx.shadowBlur = 8 * hum;                               // neon edge
-            ctx.strokeStyle = `rgba(62,240,255,${0.55 * hum})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 4); ctx.stroke();
-            ctx.shadowBlur = 0;
-            // Marquee
-            const g = ctx.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#ff4fa3'); g.addColorStop(1, '#3ef0ff');
-            ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + 2, y + 2, w - 4, 9, 2); ctx.fill();
-            ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.max(5, Math.floor(w * 0.16))}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText('MiniSpree', x + w / 2 + 2, y + 6.8);
-            ctx.fillStyle = '#fff6b0'; ctx.beginPath(); const sx = x + 6, sy = y + 6.5;                // the little spark
-            for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 1 : 2.6; ctx[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
-            // The window of cans: bubble tea, Jean soda, stellar lemonade
             const wx = x + 4, wy = y + 13, ww = w - 8, wh = h * 0.5;
-            ctx.fillStyle = '#10141e'; ctx.fillRect(wx, wy, ww, wh);
-            const cans = ['#c89a6a', '#3a6ad0', '#ffe45a'], cw = (ww - 8) / 3;
-            for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) {
-                const cx = wx + 2 + i * (cw + 2), cy = wy + 2 + row * (wh - 4) / 3;
-                ctx.fillStyle = cans[i]; ctx.beginPath(); ctx.roundRect(cx, cy, cw, (wh - 4) / 3 - 2, 1.5); ctx.fill();
-                ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx + 1, cy + 1, 1, (wh - 4) / 3 - 4);
+            ctx.save();
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+                ctx.fillStyle = '#0d0d12'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
             }
-            ctx.fillStyle = `rgba(190,240,255,${0.10 * hum})`; ctx.fillRect(wx, wy, ww, wh);        // the window's light
-            ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + ww * 0.2, wy + wh); ctx.lineTo(wx + ww * 0.75, wy); ctx.stroke();   // glass glint
-            // Keypad, card slot, pickup tray
-            const ky = wy + wh + 3;
-            ctx.fillStyle = '#3ef0ff'; for (let i = 0; i < 6; i++) ctx.fillRect(x + 6 + (i % 3) * 4, ky + Math.floor(i / 3) * 4, 2, 2);
-            ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w - 12, ky, 6, 2);
-            ctx.fillStyle = '#ff4fa3'; ctx.fillRect(x + w - 12, ky + 4, 6, 1);
-            ctx.fillStyle = '#050508'; ctx.beginPath(); ctx.roundRect(x + 5, y + h - 9, w - 10, 5, 1.5); ctx.fill();
+            if (PropPass.seg(true)) {
+                ctx.shadowColor = '#3ef0ff'; ctx.shadowBlur = 8 * hum;                               // neon edge
+                ctx.strokeStyle = `rgba(62,240,255,${0.55 * hum})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 4); ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+            if (PropPass.seg(false)) {
+                // Marquee
+                const g = ctx.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#ff4fa3'); g.addColorStop(1, '#3ef0ff');
+                ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + 2, y + 2, w - 4, 9, 2); ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.max(5, Math.floor(w * 0.16))}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('MiniSpree', x + w / 2 + 2, y + 6.8);
+                ctx.fillStyle = '#fff6b0'; ctx.beginPath(); const sx = x + 6, sy = y + 6.5;                // the little spark
+                for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 1 : 2.6; ctx[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
+                // The window of cans: bubble tea, Jean soda, stellar lemonade
+                ctx.fillStyle = '#10141e'; ctx.fillRect(wx, wy, ww, wh);
+                const cans = ['#c89a6a', '#3a6ad0', '#ffe45a'], cw = (ww - 8) / 3;
+                for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) {
+                    const cx = wx + 2 + i * (cw + 2), cy = wy + 2 + row * (wh - 4) / 3;
+                    ctx.fillStyle = cans[i]; ctx.beginPath(); ctx.roundRect(cx, cy, cw, (wh - 4) / 3 - 2, 1.5); ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx + 1, cy + 1, 1, (wh - 4) / 3 - 4);
+                }
+            }
+            if (PropPass.seg(true)) { ctx.fillStyle = `rgba(190,240,255,${0.10 * hum})`; ctx.fillRect(wx, wy, ww, wh); }   // the window's light
+            if (PropPass.seg(false)) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + ww * 0.2, wy + wh); ctx.lineTo(wx + ww * 0.75, wy); ctx.stroke();   // glass glint
+                // Keypad, card slot, pickup tray
+                const ky = wy + wh + 3;
+                ctx.fillStyle = '#3ef0ff'; for (let i = 0; i < 6; i++) ctx.fillRect(x + 6 + (i % 3) * 4, ky + Math.floor(i / 3) * 4, 2, 2);
+                ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w - 12, ky, 6, 2);
+                ctx.fillStyle = '#ff4fa3'; ctx.fillRect(x + w - 12, ky + 4, 6, 1);
+                ctx.fillStyle = '#050508'; ctx.beginPath(); ctx.roundRect(x + 5, y + h - 9, w - 10, 5, 1.5); ctx.fill();
+            }
             ctx.restore();
         }
 
         function drawHealthStation(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const pulse = 0.7 + 0.3 * Math.sin(t * 2.5);
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
-            ctx.fillStyle = '#eceef2'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
-            ctx.strokeStyle = '#6a1a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 4); ctx.stroke();
-            // The green cross, glowing
             const cx = x + w / 2, cy = y + 11, s = 5;
-            ctx.shadowColor = '#00ff66'; ctx.shadowBlur = 10 * pulse;
-            ctx.fillStyle = '#12c85a'; ctx.fillRect(cx - s, cy - s * 0.35, s * 2, s * 0.7); ctx.fillRect(cx - s * 0.35, cy - s, s * 0.7, s * 2);
-            ctx.shadowBlur = 0;
-            // A rack of stim vials, refilling
             const ry = y + 20, rh = h * 0.34, n = 5, vw = (w - 10) / n;
-            ctx.fillStyle = '#d4d8de'; ctx.fillRect(x + 4, ry, w - 8, rh);
-            for (let i = 0; i < n; i++) {
-                const vx = x + 5 + i * vw, lvl = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.3));
-                ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(vx + 0.5, ry + 2, vw - 2, rh - 4);
-                ctx.fillStyle = '#19d46a'; ctx.fillRect(vx + 0.5, ry + 2 + (rh - 4) * (1 - lvl), vw - 2, (rh - 4) * lvl);
-                ctx.fillStyle = '#6a1a2a'; ctx.fillRect(vx + 0.5, ry + 1, vw - 2, 1.5);
-            }
-            // Vitals readout: a trace running across a dark screen
             const sy = ry + rh + 3, sh = h - (sy - y) - 5;
-            ctx.fillStyle = '#0a1410'; ctx.beginPath(); ctx.roundRect(x + 4, sy, w - 8, sh, 2); ctx.fill();
-            ctx.strokeStyle = '#3cff8a'; ctx.lineWidth = 1; ctx.beginPath();
-            const mid = sy + sh / 2, ph = (t * 30) % (w - 8);
-            for (let i = 0; i <= w - 8; i += 1) {
-                const k = (i + ph) % 24, beat = k > 8 && k < 11 ? -sh * 0.35 : k > 11 && k < 13 ? sh * 0.25 : 0;
-                ctx[i ? 'lineTo' : 'moveTo'](x + 4 + i, mid + beat);
+            ctx.save();
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+                ctx.fillStyle = '#eceef2'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
+                ctx.strokeStyle = '#6a1a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 4); ctx.stroke();
             }
-            ctx.stroke();
+            if (PropPass.seg(true)) {                                                                // the green cross, glowing
+                ctx.shadowColor = '#00ff66'; ctx.shadowBlur = 10 * pulse;
+                ctx.fillStyle = '#12c85a'; ctx.fillRect(cx - s, cy - s * 0.35, s * 2, s * 0.7); ctx.fillRect(cx - s * 0.35, cy - s, s * 0.7, s * 2);
+                ctx.shadowBlur = 0;
+            }
+            // A rack of stim vials, refilling (glass, then levels, then caps: the vials never overlap, so by pass is as by vial)
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = '#d4d8de'; ctx.fillRect(x + 4, ry, w - 8, rh);
+                ctx.fillStyle = 'rgba(255,255,255,0.8)'; for (let i = 0; i < n; i++) ctx.fillRect(x + 5 + i * vw + 0.5, ry + 2, vw - 2, rh - 4);
+            }
+            if (PropPass.seg(true)) {
+                ctx.fillStyle = '#19d46a';
+                for (let i = 0; i < n; i++) { const lvl = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.3)); ctx.fillRect(x + 5 + i * vw + 0.5, ry + 2 + (rh - 4) * (1 - lvl), vw - 2, (rh - 4) * lvl); }
+            }
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = '#6a1a2a'; for (let i = 0; i < n; i++) ctx.fillRect(x + 5 + i * vw + 0.5, ry + 1, vw - 2, 1.5);
+                // Vitals readout: a trace running across a dark screen
+                ctx.fillStyle = '#0a1410'; ctx.beginPath(); ctx.roundRect(x + 4, sy, w - 8, sh, 2); ctx.fill();
+            }
+            if (PropPass.seg(true)) {
+                ctx.strokeStyle = '#3cff8a'; ctx.lineWidth = 1; ctx.beginPath();
+                const mid = sy + sh / 2, ph = (t * 30) % (w - 8);
+                for (let i = 0; i <= w - 8; i += 1) {
+                    const k = (i + ph) % 24, beat = k > 8 && k < 11 ? -sh * 0.35 : k > 11 && k < 13 ? sh * 0.25 : 0;
+                    ctx[i ? 'lineTo' : 'moveTo'](x + 4 + i, mid + beat);
+                }
+                ctx.stroke();
+            }
             ctx.restore();
         }
 
@@ -1656,6 +1685,161 @@
             }
         }
 
+        // Enni Cole's display furniture. All coordinates stay in the prop's world-space rectangle;
+        // deterministic product arrangements make its normal and reflection passes identical.
+        function drawEnniDecorProp(ctx, p) {
+            const x = p.x, y = p.y, w = p.width, h = p.height, d = p.decor || {}, variant = d.variant | 0;
+            const C = { brass: '#c6a365', bright: '#ead5a6', rose: '#713f52', dark: '#262328',
+                walnut: '#493428', cream: '#e8ddd0', ivory: '#f4eadc', glass: '#9faeb2' };
+            const rr = (X,Y,W,H,r,col,stroke,lw=1) => {
+                ctx.beginPath(); ctx.roundRect(X,Y,W,H,r);
+                if(col){ctx.fillStyle=col;ctx.fill();} if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke();}
+            };
+            const dot = (X,Y,R,col,stroke) => {ctx.beginPath();ctx.arc(X,Y,R,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=.8;ctx.stroke();}};
+            const text = (str,X,Y,size=9,col=C.bright) => {ctx.save();ctx.font=`${size}px Georgia, serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=col;ctx.fillText(str,X,Y);ctx.restore();};
+            const shadow = () => rr(x+4,y+5,w,h,7,'rgba(20,13,14,.23)');
+            const plinth = (col=C.walnut) => {shadow();rr(x,y,w,h,7,col,C.brass,1.5);rr(x+5,y+5,w-10,h-10,4,'#201e21');};
+            const bottle = (X,Y,col) => {rr(X-3,Y-7,6,16,2,col);rr(X-1.3,Y-12,2.6,6,1,C.dark);rr(X-2.5,Y-3,5,5,.5,'#d6c3a2');ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(X-2,Y-6,1,12);};
+            const screen = (X,Y,W,H,variant=0) => {
+                rr(X,Y,W,H,3,C.dark,C.brass,1.2);
+                const g=ctx.createLinearGradient(X,Y,X+W,Y+H);
+                g.addColorStop(0,['#172f44','#421f4a','#1d383b'][variant%3]);g.addColorStop(1,['#79a1b5','#b888b7','#a6b5a3'][variant%3]);
+                rr(X+3,Y+3,W-6,H-6,1.5,g);
+                ctx.save();ctx.beginPath();ctx.rect(X+3,Y+3,W-6,H-6);ctx.clip();
+                ctx.fillStyle=['#e2c29e','#d5c2e4','#dfd5b3'][variant%3];ctx.globalAlpha=.45;
+                ctx.beginPath();ctx.moveTo(X+3,Y+H-3);ctx.bezierCurveTo(X+W*.32,Y-H*.2,X+W*.5,Y+H*1.4,X+W-3,Y+3);ctx.lineTo(X+W-3,Y+H-3);ctx.closePath();ctx.fill();
+                ctx.fillStyle='#fff4dc';ctx.globalAlpha=.28;ctx.beginPath();ctx.arc(X+W*.7,Y+H*.3,Math.min(W,H)*.15,0,Math.PI*2);ctx.fill();ctx.restore();
+                ctx.fillStyle='#efdeb5';ctx.fillRect(X+W/2-1,Y+H-1,2,1);
+            };
+            const turned = (fn) => {
+                const a={S:0,W:Math.PI/2,N:Math.PI,E:-Math.PI/2}[d.face]||0,side=Math.abs(Math.sin(a))>.5,LW=side?h:w,LH=side?w:h;
+                ctx.save();ctx.translate(x+w/2,y+h/2);ctx.rotate(a);fn(-LW/2,-LH/2,LW,LH);ctx.restore();
+            };
+            switch(p.decorType) {
+                case 'ec_column': {
+                    shadow();rr(x,y,w,h,3,C.brass,C.dark,1);rr(x+4,y+4,w-8,h-8,2,'#8a5362','#ad7b86',1);
+                    rr(x+8,y+8,w-16,h-16,2,'#663747');ctx.fillStyle='rgba(255,220,210,.15)';ctx.fillRect(x+6,y+6,2,h-12);break;
+                }
+                case 'ec_wine': {
+                    plinth();rr(x+7,y+7,w-14,h-14,3,'#553b2d');
+                    for(let i=0;i<Math.floor((w-24)/17);i++)for(let j=0;j<2;j++)bottle(x+15+i*17,y+19+j*25,['#44394a','#39553b','#71494c'][(i+j)%3]);
+                    ctx.strokeStyle='rgba(224,191,130,.65)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+8,y+h/2);ctx.lineTo(x+w-8,y+h/2);ctx.stroke();
+                    text('THE CELLAR',x+w/2,y+h-3,8);break;
+                }
+                case 'ec_produce': {
+                    plinth();rr(x+8,y+8,w-16,h-20,3,'#5c4230');
+                    for(let row=0;row<3;row++)for(let col=0;col<4;col++) {
+                        const bx=x+10+col*(w-20)/4,by=y+10+row*(h-24)/3,bw=(w-24)/4,bh=(h-28)/3;
+                        rr(bx,by,bw,bh,2,'#37291d','#886848',.8);
+                        const color=['#b74840','#d5aa40','#85a84e','#5e8650','#927899','#e8994e'][(col+row*2+variant*3)%6];
+                        for(let k=0;k<6;k++){const fx=bx+8+(k%3)*(bw-12)/3,fy=by+7+(k/3|0)*10;dot(fx,fy,4.2,color);dot(fx-1,fy-1,1,'rgba(255,244,192,.3)');ctx.fillStyle='#425234';ctx.fillRect(fx,fy-5,1,3);}
+                    }
+                    text(variant?'SEASONAL GREENS':'ORCHARD SELECTION',x+w/2,y+h-8,8);break;
+                }
+                case 'ec_grocery': {
+                    plinth();rr(x+8,y+7,w-16,h-17,2,'#72533e');
+                    const cols=Math.floor((w-24)/15);
+                    for(let i=0;i<cols;i++)for(let j=0;j<2;j++) {
+                        const X=x+13+i*15,Y=y+10+j*20,col=['#ae7154','#cfbd95','#779d8d','#955360'][(i+j+variant)%4];
+                        rr(X,Y,10,14,1,col,'#3d2c23',.5);ctx.fillStyle='#ecd9b5';ctx.fillRect(X+2,Y+4,6,4);ctx.fillStyle='rgba(255,255,255,.2)';ctx.fillRect(X+1,Y+1,1,11);
+                    }
+                    text(variant?'PANTRY & CONFECTIONS':'FINE FOODS',x+w/2,y+h-5,8);break;
+                }
+                case 'ec_cold': {
+                    plinth('#495458');rr(x+6,y+6,w-12,h-15,3,'#9aaeb0');
+                    const count=7,bw=(w-16)/count;
+                    for(let i=0;i<count;i++) {
+                        const X=x+8+i*bw;rr(X+2,y+11,bw-6,h-28,2,'#879f9f',C.brass,.8);
+                        for(let j=0;j<3;j++){const xx=X+10+j*11;rr(xx,y+20,8,16,1,['#ece3cf','#e1c97f','#c8b1a9'][j]);rr(xx,y+43,8,12,1,['#e5daca','#aa7b60','#c9d5b4'][(i+j)%3]);}
+                        ctx.fillStyle='rgba(232,250,255,.22)';ctx.fillRect(X+5,y+12,4,h-31);ctx.strokeStyle='rgba(245,255,255,.28)';ctx.beginPath();ctx.moveTo(X+6,y+12);ctx.lineTo(X+bw-10,y+h-18);ctx.stroke();
+                    }
+                    text('DAIRY • DELICATESSEN • CHILLED',x+w/2,y+h-5,8);break;
+                }
+                case 'ec_bakery': {
+                    plinth();rr(x+6,y+6,w-12,h-15,4,'#c4a782');
+                    for(let i=0;i<10;i++)for(let j=0;j<2;j++) {
+                        const X=x+17+i*23,Y=y+23+j*24;ctx.fillStyle=(i+j)%2?'#d6ac6c':'#a36b42';ctx.beginPath();ctx.ellipse(X,Y,9,5,-.2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#efd4a4';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X-4,Y-2);ctx.lineTo(X-2,Y+2);ctx.moveTo(X+1,Y-2);ctx.lineTo(X+3,Y+2);ctx.stroke();
+                    }
+                    rr(x+5,y+5,w-10,h-14,4,'rgba(222,244,245,.08)','rgba(255,248,225,.55)',1);text('BAKERY & PATISSERIE',x+w/2,y+h-4,8);break;
+                }
+                case 'ec_sofa': case 'ec_armchair': {
+                    shadow();turned((X,Y,W,H)=>{
+                        rr(X,Y,W,H,10,'#695549',C.brass,1.5);rr(X+5,Y+5,W-10,H-10,8,C.cream);
+                        rr(X+6,Y+4,W-12,14,5,'#cdb8a6','#af9279',.6);
+                        const n=p.decorType==='ec_sofa'?3:1,cw=(W-26)/n;
+                        for(let k=0;k<n;k++)rr(X+13+k*cw,Y+22,cw-2,H-30,6,'#e9dbca','#c5b2a0',.8);
+                        rr(X+4,Y+8,9,H-15,5,'#d5c2b1');rr(X+W-13,Y+8,9,H-15,5,'#d5c2b1');
+                        if(n>1){rr(X+22,Y+25,19,16,4,C.rose,'#9b6579');rr(X+W-43,Y+24,19,16,4,'#b7a88c');}
+                    });break;
+                }
+                case 'ec_lowtable': {
+                    shadow();rr(x,y,w,h,12,C.brass,C.dark,1.2);rr(x+3,y+3,w-6,h-6,10,'#efded0');
+                    ctx.strokeStyle='rgba(143,104,98,.18)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+11,y+h-10);ctx.bezierCurveTo(x+w*.4,y-2,x+w*.52,y+h,x+w-8,y+8);ctx.stroke();
+                    rr(x+16,y+16,25,20,1,'#765963',C.brass,.6);rr(x+20,y+13,25,20,1,'#b39a83');dot(x+w-25,y+h/2,9,'#d4bd9a',C.brass);dot(x+w-25,y+h/2,4,'#4f5c41');break;
+                }
+                case 'ec_side': {
+                    shadow();rr(x,y,w,h,5,C.walnut,C.brass,1);rr(x+3,y+3,w-6,h-6,4,'#70523d');
+                    dot(x+w/2,y+h/2,Math.min(w,h)*.24,'#eee2c7',C.brass);dot(x+w/2,y+h/2,Math.min(w,h)*.15,'#d8c8a9',C.brass);dot(x+w/2,y+h/2,3,'#fff2cb');break;
+                }
+                case 'ec_bed': {
+                    shadow();rr(x,y,w,h,9,'#65404b',C.brass,1.5);rr(x+5,y+7,w-10,h-13,7,C.ivory);
+                    rr(x+3,y+3,w-6,23,8,'#875768','#b17d89');
+                    rr(x+15,y+35,w/2-22,33,7,'#ece2d7','#c1ad9b',.7);rr(x+w/2+7,y+35,w/2-22,33,7,'#ece2d7','#c1ad9b',.7);
+                    rr(x+9,y+79,w-18,h-89,4,'#c5b4a5');rr(x+9,y+h*.6,w-18,h*.24,2,'#714555');
+                    ctx.strokeStyle='rgba(241,223,191,.5)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+10,y+h*.64);ctx.lineTo(x+w-10,y+h*.64);ctx.moveTo(x+10,y+h*.8);ctx.lineTo(x+w-10,y+h*.8);ctx.stroke();
+                    ctx.strokeStyle='rgba(97,74,56,.16)';ctx.beginPath();for(let X=x+18;X<x+w-10;X+=15){ctx.moveTo(X,y+87);ctx.lineTo(X+2,y+h-10);}ctx.stroke();break;
+                }
+                case 'ec_dining': {
+                    // Every chair is inside the collision footprint, so guests route around the full set.
+                    shadow();for(let i=0;i<3;i++){rr(x+14+i*55,y,33,24,6,C.rose,C.brass);rr(x+14+i*55,y+h-24,33,24,6,C.rose,C.brass);}
+                    rr(x+4,y+22,w-8,h-44,18,C.walnut,C.brass,1.3);rr(x+8,y+26,w-16,h-52,16,'#73503b');
+                    for(let i=0;i<3;i++)for(const Y of [y+37,y+h-37]){const X=x+29+i*55;dot(X,Y,8,'#e8ddc7',C.brass);dot(X,Y,5,'#f4ead6');}
+                    dot(x+w/2,y+h/2,9,'#bda26b',C.brass);dot(x+w/2,y+h/2,5,'#627446');break;
+                }
+                case 'ec_tvwall': {
+                    plinth();for(let i=0;i<3;i++)screen(x+12+i*122,y+9,112,42,i);text('HOME CINEMA',x+w/2,y+h-4,8);break;
+                }
+                case 'ec_laptop': {
+                    plinth('#594235');rr(x+5,y+5,w-10,h-10,4,'#ddcbb2');
+                    for(let i=0;i<3;i++){const X=x+13+i*52;screen(X,y+12,42,24,i);rr(X-2,y+37,46,31,3,'#969ca0','#54585a',.7);ctx.fillStyle='#3b4045';for(let j=0;j<4;j++)for(let k=0;k<6;k++)ctx.fillRect(X+3+k*6,y+41+j*4,4,2);rr(X+12,y+59,15,6,1,'#afb2b3','#74787c',.5);}
+                    text('COMPUTING',x+w/2,y+h-5,8,C.dark);break;
+                }
+                case 'ec_tablet': {
+                    plinth('#594235');rr(x+5,y+5,w-10,h-10,4,'#ddcbb2');
+                    for(let i=0;i<3;i++){const X=x+12+i*35;screen(X,y+14,27,43,i+variant);dot(X+13.5,y+54,1,'#eee1bf');}
+                    text(variant?'CONNECTED HOME':'PERSONAL DEVICES',x+w/2,y+h-10,7,C.dark);break;
+                }
+                case 'ec_audio': {
+                    plinth('#594235');rr(x+5,y+5,w-10,h-10,4,'#ddcbb2');
+                    for(let i=0;i<3;i++) {const X=x+15+i*53;rr(X,y+12,36,50,5,'#383238',C.brass,.9);dot(X+18,y+29,11,'#1b1c20','#635b5c');dot(X+18,y+49,6,'#1d2025','#827460');dot(X+18,y+29,3,'#887e72');}
+                    text('HIGH FIDELITY',x+w/2,y+h-8,8,C.dark);break;
+                }
+                case 'ec_appliances': {
+                    plinth('#594235');rr(x+5,y+5,w-10,h-10,4,'#ddcbb2');
+                    for(let i=0;i<4;i++){const X=x+17+i*93;rr(X,y+12,68,48,5,['#c4c6c5','#343537','#d2cec4','#949999'][i],C.dark,1);
+                        if(i===0||i===3){dot(X+34,y+37,16,'#242c31','#efddbd');dot(X+34,y+37,11,'#738289');}
+                        else if(i===1){for(let k=0;k<4;k++)dot(X+20+(k%2)*27,y+24+(k/2|0)*22,9,'#191c20','#86888a');}
+                        else{rr(X+8,y+19,52,25,2,'#2b343c','#a89f92');ctx.fillStyle='#88abc0';ctx.fillRect(X+49,y+24,6,4);}
+                    }text('DESIGNED FOR HOME',x+w/2,y+h-7,8,C.dark);break;
+                }
+                case 'ec_checkout': {
+                    shadow();rr(x,y,w,h,9,C.rose,C.brass,1.5);rr(x+5,y+5,w-10,h-15,6,'#eadccc','#c4ac91',.8);
+                    ctx.strokeStyle='rgba(157,105,110,.2)';ctx.beginPath();ctx.moveTo(x+12,y+15);ctx.lineTo(x+w-23,y+35);ctx.stroke();
+                    screen(x+22,y+12,32,20,2);rr(x+26,y+32,24,8,1,'#68615c');rr(x+w-40,y+18,17,25,3,'#35353a',C.brass);ctx.fillStyle='#8aa8a3';ctx.fillRect(x+w-37,y+22,11,7);dot(x+w/2,y+22,8,'#bfa470',C.brass);dot(x+w/2,y+22,5,'#4f6845');
+                    text(variant?'CUSTOMER SERVICES':'CHECKOUT',x+w/2,y+h-5,8);break;
+                }
+                case 'ec_plant': {
+                    shadow();dot(x+w/2,y+h/2,Math.min(w,h)*.43,'#a78a51',C.brass);dot(x+w/2,y+h/2,Math.min(w,h)*.34,'#3a3525');
+                    for(let i=0;i<9;i++){const a=i*Math.PI*2/9,rx=w*.24;ctx.save();ctx.translate(x+w/2+Math.cos(a)*rx*.35,y+h/2+Math.sin(a)*rx*.35);ctx.rotate(a);ctx.fillStyle=i%2?'#3b6140':'#537948';ctx.beginPath();ctx.ellipse(rx*.45,0,rx,.18*w,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(163,186,126,.35)';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(rx*1.3,0);ctx.stroke();ctx.restore();}break;
+                }
+                case 'ec_vending': {
+                    shadow();rr(x,y,w,h,4,'#4a353d',C.brass,1.2);rr(x+5,y+6,w-15,h-18,2,'#273032','#a4987f',.7);
+                    for(let i=0;i<3;i++)for(let j=0;j<3;j++)rr(x+8+i*8,y+12+j*12,6,8,1,['#ab8260','#92705a','#bfd0b0'][(i+j)%3]);
+                    rr(x+w-8,y+16,5,10,1,'#a5b6a5');ctx.fillStyle=C.brass;ctx.fillRect(x+w-8,y+31,5,3);rr(x+8,y+h-10,w-19,5,1,'#1b2021');break;
+                }
+            }
+        }
+
         function drawClinicDecorProp(ctx, p) {
             if (p.decorType.startsWith('apt_')) return drawApartmentDecorProp(ctx, p);
             if (p.decorType.startsWith('sc_')) return drawSanctumDecorProp(ctx, p);
@@ -1666,6 +1850,7 @@
             if (p.decorType.startsWith('hod_')) return drawHouseDecorProp(ctx, p);
             if (p.decorType.startsWith('dp_')) return drawPalaceDecorProp(ctx, p);
             if (p.decorType.startsWith('cc_')) return drawCafeDecorProp(ctx, p);
+            if (p.decorType.startsWith('ec_')) return drawEnniDecorProp(ctx, p);
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const rr = (X, Y, W, H, r, fill, stroke, lw = 1) => {
                 ctx.beginPath(); ctx.roundRect(X, Y, W, H, r);
@@ -1906,6 +2091,7 @@
             
             draw(ctx) {
                 if (!this.visible) return;
+                if (PropSprites.stamp(ctx, this)) return;      // painted once, stamped (entities/prop-sprites.js)
                 
                 ctx.save();
                 const center = this.getCenter();

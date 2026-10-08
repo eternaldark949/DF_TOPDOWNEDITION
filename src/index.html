@@ -348,6 +348,14 @@
                 <div id="flit-bar" style="width: 100%;"></div>
             </div>
             
+            <div id="ui-equipment" role="group" aria-label="Equipped item">
+                <canvas id="equipment-art" width="152" height="152" aria-hidden="true"></canvas>
+                <div id="equipment-ammo" aria-label="Ammo not applicable">--</div>
+                <div id="equipment-ammo-track" role="progressbar" aria-label="Loaded ammunition" hidden>
+                    <i id="equipment-ammo-fill"></i>
+                </div>
+            </div>
+
             <div id="btn-phone">M <div id="phone-notification-badge">1</div></div>
             
             <div id="audio-viz">
@@ -772,12 +780,11 @@
             </div>
             
             <div class="filter-list" id="inv-filter-list">
-                <div class="filter-item active" data-filter="all">ITEMS</div>
+                <div class="filter-item active" data-filter="items">ITEMS</div>
                 <div class="filter-item" data-filter="collectibles">COLLECTIBLES</div>
                 <div class="filter-item" data-filter="weapons">WEAPONS</div>
                 <div class="filter-item" data-filter="pets">PETS</div>
                 <div class="filter-item" data-filter="mounts">MOUNTS</div>
-                <div class="filter-item" data-filter="vehicles">VEHICLES</div>
             </div>
         </div>
     </div>
@@ -937,6 +944,10 @@
                     <span class="settings-value val-high" id="set-lighting" data-key="lightingQuality">HIGH</span>
                 </div>
                 <div class="settings-row">
+                    <span class="settings-label">Adaptive Lighting</span>
+                    <span class="settings-value val-on" id="set-adaptive-lighting" data-key="adaptiveLighting">ON</span>
+                </div>
+                <div class="settings-row">
                     <span class="settings-label">Flit Ring</span>
                     <span class="settings-value val-on" id="set-flitring" data-key="flitRing">ON</span>
                 </div>
@@ -1061,8 +1072,12 @@
                     <span class="settings-value" id="set-countcalls" data-key="countCalls">OFF</span>
                 </div>
                 <div class="settings-row">
-                    <span class="settings-label">Baseline: Skip World</span>
+                    <span class="settings-label">Baseline: Layers</span>
                     <span class="settings-value" id="set-baseline" data-key="baseline">OFF</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Prop Sprites</span>
+                    <span class="settings-value val-on" id="set-propsprites" data-key="propSprites">ON</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Debug View</span>
@@ -1087,8 +1102,8 @@
         </div>
     </div>
     <!-- Cinematic view (pause menu → Quick Access): the HUD hidden, the world held still -->
-    <div id="cinematic-hint">Drag to pan · pinch to zoom · tap to return</div>
-    <div id="cine-bar" aria-label="Cinematic view">
+    <div id="cinematic-hint">Drag to pan · pinch to zoom · ✕ to exit</div>
+    <div id="cine-bar" aria-label="Cinematic view" inert>
         <button data-cine="save" title="Save picture">📷 SAVE</button>
         <button data-cine="grade" title="Colour grade">🎨</button>
         <button data-cine="out" title="Zoom out">−</button>
@@ -1096,7 +1111,7 @@
         <button data-cine="reset" title="Recentre">⟲</button>
         <button data-cine="back" title="Back to the menu">✕</button>
     </div>
-    <div id="cine-grade" aria-label="Colour grade">
+    <div id="cine-grade" aria-label="Colour grade" inert>
         <div class="cg-head"><span>Colour grade</span><button data-cg="close" title="Close">✕</button></div>
         <div class="cg-presets"></div>
         <div class="cg-sliders"></div>

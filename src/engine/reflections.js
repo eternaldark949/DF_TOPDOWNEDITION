@@ -11,7 +11,7 @@
         // shimmering bands; and it lifts the night's darkness where it shines, so the dark
         // doesn't swallow it.
         //
-        // Settings → Reflections: High / Medium / Off. Cinematic View has its own toggle
+        // Settings → Reflections: Ultra / High / Medium / Off. Cinematic View has its own toggle
         // (GameSettings.photoReflections, on by default) so photos can always have them.
 
         const REFLECT = {
@@ -19,18 +19,48 @@
             PAVE: 0.28,             // and wet paving
             LAMP_H: 64,             // a street lamp's head, px above the ground
             SPACING: 210,           // puddle spacing along a road
-            BANDS: 30               // shimmer bands in the composite (High)
+            BANDS: 30,              // shimmer bands in the composite (High)
+            PUDDLE_SCALE: 1.25,      // a little broader, without increasing the number of puddles
+            FEATHER_SCALE: 1.08      // a narrow damp fringe outside the water's original contour
         };
 
         // Floors that mirror, per map (stage 3): rects [x, y, w, h, strength], cut-outs (rugs and
         // runners don't shine), water [x, y, r] (always mirrors, ripples), mirror = colour reflections of
         // what stands on it; glowShift: how far down the room's hanging lights (its INTERIOR_ART glow:
         // chandeliers, candles, portals, beams) appear in the floor
+        // Shared feathered ellipses: four tiny sprites for every puddle, with no live blur.
+        const _puddleEdgeSprites = new Map();
+        function _puddleEdgeSprite(kind = 'mask') {
+            let cv = _puddleEdgeSprites.get(kind);
+            if (cv) return cv;
+            const colors = { mask: '255,255,255', night: '6,4,18', day: '178,190,226', rim: '214,196,255' };
+            const rgb = colors[kind] || colors.mask;
+            cv = document.createElement('canvas'); cv.width = cv.height = 96;
+            const c = cv.getContext('2d'), g = c.createRadialGradient(48, 48, 0, 48, 48, 48);
+            const stops = kind === 'rim'
+                ? [[0,0],[.74,0],[.84,.12],[.9,1],[.95,.3],[1,0]]
+                : [[0,1],[.72,1],[.83,.96],[.93,.5],[1,0]];
+            for (const [at,a] of stops) g.addColorStop(at, `rgba(${rgb},${a})`);
+            c.fillStyle = g; c.fillRect(0, 0, 96, 96);
+            _puddleEdgeSprites.set(kind, cv); return cv;
+        }
+
+        function _paintPuddleLobes(ctx, p, growth, sprite, alpha) {
+            if (!(alpha > 0)) return;
+            ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang); ctx.globalAlpha *= alpha;
+            for (const L of p.lobes) {
+                const rx = L.rx * growth * REFLECT.FEATHER_SCALE, ry = L.ry * growth * REFLECT.FEATHER_SCALE;
+                ctx.drawImage(sprite, L.dx - rx, L.dy - ry, rx * 2, ry * 2);
+            }
+            ctx.restore();
+        }
+
         const REFLECT_SURFACES = {
             hotel_lobby: { rects: [[50, 50, 900, 1100, 0.55]], cuts: [[440, 612, 120, 538]], water: [[500, 320, 82]], glowShift: 64 },
             house_of_death: { rects: [[574, 1014, 652, 486, 0.42], [574, 444, 652, 556, 0.58], [1574, 14, 212, 416, 0.38]],
                               cutCircles: [[900, 720, 152]], cuts: [[840, 1014, 120, 486]], waterProps: 'hod_fountain', glowShift: 58 },
             moon_city_nightclub: { rects: [[590, 310, 420, 380, 0.55]], glowShift: 40 },
+            enni_cole_interior: { rects: [[50, 50, 1900, 1300, 0.3]], cuts: [[870, 1000, 260, 350], [650, 120, 450, 290], [1105, 100, 290, 320], [1120, 435, 270, 200]], mirror: true, glowShift: 42 },
             ethereal_plane: { rects: [[100, 100, 1000, 1000, 0.85]], mirror: true, glowShift: 70 },
             demoness_palace: { rects: [[600, 380, 600, 606, 0.6], [600, 1000, 600, 386, 0.5], [900, 14, 486, 352, 0.4]],
                                cuts: [[860, 760, 80, 226], [860, 1000, 80, 386]], water: [[900, 695, 70], [450, 190, 34]], glowShift: 60 }
@@ -74,9 +104,9 @@
                 ctx.restore();
             },
 
-            /** Which quality reflections run at right now: 'high' | 'medium' | null */
+            /** Ultra redraws detailed art; High/Medium keep the existing light and silhouette passes. */
             reflectQuality() {
-                if (this.cineCam) return GameSettings.photoReflections === false ? null : 'high';
+                if (this.cineCam) return GameSettings.photoReflections === false ? null : (GameSettings.reflections === 'ultra' ? 'ultra' : 'high');
                 const q = GameSettings.reflections || 'high';
                 return q === 'off' ? null : q;
             },
@@ -90,10 +120,13 @@
                 if (map._puddles) return map._puddles;
                 const P = [], rnd = seededRandom(String(map.id).split('').reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 949));
                 const add = (x, y, ang, size) => {
+                    size *= REFLECT.PUDDLE_SCALE;
                     const lobes = [], n = 2 + (rnd() < 0.5 ? 1 : 0);
                     for (let i = 0; i < n; i++) lobes.push({ dx: (rnd() - 0.5) * size * 1.1, dy: (rnd() - 0.5) * size * 0.4,
                         rx: size * (0.45 + rnd() * 0.45), ry: size * (0.22 + rnd() * 0.22) });
-                    const r = size * 1.3;
+                    // Offset lobes and the damp fringe must fit the spatial/culling envelope.
+                    const r = Math.max(...lobes.map(L => Math.hypot(L.dx, L.dy)
+                        + Math.max(L.rx, L.ry) * REFLECT.FEATHER_SCALE));
                     P.push({ x, y, ang, lobes, d: 0.25 + rnd() * 0.75, r });
                 };
                 const net = this.traffic && this.traffic.network;
@@ -112,7 +145,8 @@
                 // Water gathers under the street lamps (most of them): the puddle that catches the lamp
                 for (const l of map.lamps || []) {
                     if (rnd() < 0.3) continue;
-                    add(l.x + (rnd() - 0.5) * 30, l.y + REFLECT.LAMP_H * (0.7 + rnd() * 0.6), (rnd() - 0.5) * 0.6, 26 + rnd() * 26);
+                    const postScale = LAMP_TYPE_STYLE[l.lampType] ? LAMP_POST_SCALE : 1;
+                    add(l.x + (rnd() - 0.5) * 30, l.y + REFLECT.LAMP_H * postScale * (0.7 + rnd() * 0.6), (rnd() - 0.5) * 0.6, 26 + rnd() * 26);
                 }
                 for (const p of map.pavements || []) {
                     const n = Math.floor(p.w * p.h / 90000 + rnd() * 1.2);
@@ -153,8 +187,10 @@
                 this._refl = null;
                 const q = this.reflectQuality(), wet = this._wetHere();
                 const surf = this._surfaces();
+                // Out of Ultra: its full-screen detail layer and scratch canvases go (they're rebuilt on the way back in)
+                if (q !== 'ultra' && this._reflDetailCv) this._reflDetailCv = this._ultraWalkerCanvas = this._ultraCarScratch = null;
                 if (!q || !this.view || (wet < 0.02 && !surf)) return;
-                const W = this.canvas.width, H = this.canvas.height, s = q === 'high' ? 0.5 : 0.25;
+                const W = this.canvas.width, H = this.canvas.height, s = q === 'ultra' ? 1 : q === 'high' ? 0.5 : 0.25;
                 const rw = Math.max(1, Math.round(W * s)), rh = Math.max(1, Math.round(H * s));
                 let R = this._reflCv, M = this._reflMask;
                 if (!R) { R = this._reflCv = document.createElement('canvas'); M = this._reflMask = document.createElement('canvas'); }
@@ -198,14 +234,7 @@
                     const k = this._puddleK(p, wet); if (k <= 0) continue;
                     any = true;
                     const g = 0.65 + 0.35 * k;
-                    mc.save(); mc.translate(p.x, p.y); mc.rotate(p.ang);
-                    for (const L of p.lobes) {
-                        mc.globalAlpha = k * 0.45; mc.fillStyle = '#fff';                      // a soft rim, then the body
-                        mc.beginPath(); mc.ellipse(L.dx, L.dy, L.rx * g * 1.15, L.ry * g * 1.2, 0, 0, Math.PI * 2); mc.fill();
-                        mc.globalAlpha = k;
-                        mc.beginPath(); mc.ellipse(L.dx, L.dy, L.rx * g, L.ry * g, 0, 0, Math.PI * 2); mc.fill();
-                    }
-                    mc.restore();
+                    _paintPuddleLobes(mc, p, g, _puddleEdgeSprite('mask'), k);
                 }
                 mc.globalAlpha = 1;
                 if (!any) return;
@@ -222,7 +251,7 @@
                 // Lit windows, neon and signs: each building's facade mirrored about the line where it
                 // meets the street (foreshortened), billboards about their front edge
                 const dark = this.getAmbientDarkness();
-                if (night > 0.01 && q === 'high' && CONFIG.BUILDINGS.LEAN) {
+                if (night > 0.01 && (q === 'high' || q === 'ultra') && CONFIG.BUILDINGS.LEAN) {
                     const reflectedBuildings = this._queryRenderBuildings({ left: v.x - hw, right: v.x + hw,
                         top: v.y - hh - 40, bottom: v.y + hh + 260 }, this._effectCandidateBuffer('reflectedBuildings'));
                     for (const entry of reflectedBuildings) {
@@ -249,19 +278,19 @@
                 }
                 const rs = this.roomSystem;
                 if (night > 0.01) {
-                    const LH = REFLECT.LAMP_H;
-                    for (const entry of this._queryLampCandidates({ left: v.x - hw - LH * 2, right: v.x + hw + LH * 2,
-                        top: v.y - hh - LH * 2 - 160, bottom: v.y + hh + LH * 2 }, 'lampReflections')) {
-                        const l = entry.item;
-                        if (!near(l.x, l.y, LH * 2)) continue;
+                    const LH = REFLECT.LAMP_H, maxLampReach = LH * Math.max(1, LAMP_POST_SCALE) * 2;
+                    for (const entry of this._queryLampCandidates({ left: v.x - hw - maxLampReach, right: v.x + hw + maxLampReach,
+                        top: v.y - hh - maxLampReach - 160, bottom: v.y + hh + maxLampReach }, 'lampReflections')) {
+                        const l = entry.item, scale = LAMP_TYPE_STYLE[l.lampType] ? LAMP_POST_SCALE : 1, height = LH * scale;
+                        if (!near(l.x, l.y, height * 2)) continue;
                         const k = (rs && rs.active ? rs.lampLight(l) : 1) * lampFlicker(l) * night;
                         if (k < 0.02) continue;
                         const col = /^#[0-9a-f]{6}$/i.test(l.color || '') ? l.color : '#ffeebb';
-                        glow(l.x, l.y + LH * 1.05, col, 54, 70, 1.0 * k);                // the head, upside down below the lamp
-                        glow(l.x, l.y + LH * 1.05, '#ffffff', 16, 22, 0.8 * k);           // its hot core
-                        glow(l.x, l.y + LH * 0.95, col, 24, LH * 2.6, 0.7 * k);           // the long smear down the wet street
-                        rc.globalAlpha = 0.18 * k; rc.strokeStyle = col; rc.lineWidth = 2;   // the pole, faint
-                        rc.beginPath(); rc.moveTo(l.x, l.y + 4); rc.lineTo(l.x, l.y + LH * 0.9); rc.stroke();
+                        glow(l.x, l.y + height * 1.05, col, 54 * scale, 70 * scale, 1.0 * k); // the head, upside down below the lamp
+                        glow(l.x, l.y + height * 1.05, '#ffffff', 16 * scale, 22 * scale, 0.8 * k); // its hot core
+                        glow(l.x, l.y + height * 0.95, col, 24 * scale, height * 2.6, 0.7 * k); // the long smear down the wet street
+                        rc.globalAlpha = 0.18 * k; rc.strokeStyle = col; rc.lineWidth = 2 * scale; // the pole, faint
+                        rc.beginPath(); rc.moveTo(l.x, l.y + 4 * scale); rc.lineTo(l.x, l.y + height * 0.9); rc.stroke();
                     }
                 }
                 const cars = this._reflCars(this._reflLightCars || (this._reflLightCars = []));
@@ -291,11 +320,11 @@
                 // Whoever stands between a light and its reflection blocks it: their mirrored shape
                 rc.globalCompositeOperation = 'destination-out';
                 const movers = this._reflMovers(near, this._reflPrepareMovers || (this._reflPrepareMovers = { list: [], records: [], cars: [] }), cars);
-                for (const m of movers) this._reflShape(rc, m, 0.85);
+                if (q !== 'ultra') for (const m of movers) this._reflShape(rc, m, 0.85);
                 rc.globalCompositeOperation = 'source-over';
                 // A mirror floor gives back colour too: whoever stands on it, and the things set on it
                 if (surf && surf.mirror) {
-                    for (const m of movers) { rc.fillStyle = m.col && /^#[0-9a-f]{6}$/i.test(m.col) ? m.col : '#b48cff'; this._reflShape(rc, m, 0.5); }
+                    if (q !== 'ultra') for (const m of movers) { rc.fillStyle = m.col && /^#[0-9a-f]{6}$/i.test(m.col) ? m.col : '#b48cff'; this._reflShape(rc, m, 0.5); }
                     for (const pr of this.props || []) {
                         if (!near(pr.x, pr.y, 200)) continue;
                         rc.globalAlpha = 0.42; rc.fillStyle = pr.color || '#6a3aa0';
@@ -304,12 +333,330 @@
                 }
                 rc.globalAlpha = 1;
 
+                // Ultra's ordinary colours stay separate from emitted light: colour reflects
+                // with source-over and never punches a bright hole in the darkness layer.
+                let D = null;
+                if (q === 'ultra') {
+                    D = this._reflDetailCv || (this._reflDetailCv = document.createElement('canvas'));
+                    if (D.width !== rw || D.height !== rh) { D.width = rw; D.height = rh; }
+                    const dc = D.getContext('2d');
+                    dc.setTransform(1, 0, 0, 1, 0, 0); dc.clearRect(0, 0, rw, rh);
+                    dc.globalAlpha = 1; dc.globalCompositeOperation = 'source-over'; toView(dc);
+                    this._drawUltraReflectionFoliage(dc, near, {
+                        left: v.x - hw - 260, right: v.x + hw + 260,
+                        top: v.y - hh - 360, bottom: v.y + hh + 260
+                    });
+                    for (const m of this._ultraReflectionMovers(near)) {
+                        if (m.kind === 'car') this._drawUltraReflectionCar(dc, m.e);
+                        else if (!this._drawUltraReflectionWalker(dc, m.e)) {
+                            // no reflected art (drones, automata): their silhouette still blocks the reflected lights
+                            rc.globalCompositeOperation = 'destination-out'; this._reflShape(rc, m, 0.85);
+                            rc.globalCompositeOperation = 'source-over';
+                        }
+                    }
+                    // A reflected body interrupts the reflected lights through its actual art,
+                    // including gaps between limbs and leaves, rather than the cheap silhouette.
+                    rc.setTransform(1, 0, 0, 1, 0, 0);
+                    rc.globalCompositeOperation = 'destination-out'; rc.globalAlpha = 0.85;
+                    rc.drawImage(D, 0, 0); rc.globalAlpha = 1;
+                    dc.setTransform(1, 0, 0, 1, 0, 0);
+                    dc.globalCompositeOperation = 'destination-in'; dc.drawImage(M, 0, 0);
+                    dc.globalCompositeOperation = 'source-over';
+                }
+
                 // 3. Only where the ground is wet enough to mirror
                 rc.setTransform(1, 0, 0, 1, 0, 0);
                 rc.globalCompositeOperation = 'destination-in';
                 rc.drawImage(M, 0, 0);
                 rc.globalCompositeOperation = 'source-over';
-                this._refl = { R, q, wet };
+                this._refl = { R, D, q, wet };
+            },
+
+
+            /** Ultra uses the actual visible cast, including indoor guests and scene actors. */
+            _ultraReflectionMovers(near) {
+                const buffer = this._ultraMoverBuffer || (this._ultraMoverBuffer = { list: [], records: [], cars: [] });
+                const out = buffer.list, previous = out.length;
+                const seen = this._ultraActorSeen || (this._ultraActorSeen = new Set());
+                seen.clear();
+                let count = 0;
+                const add = (e, kind = 'walker') => {
+                    if (!e || seen.has(e) || e.dead || e.visible === false || e.inCar || !near(e.x, e.y, 80)) return;
+                    seen.add(e);
+                    const record = buffer.records[count] || (buffer.records[count] = {});
+                    record.e = e; record.x = e.x; record.y = e.y; record.kind = kind; record.col = null;
+                    out[count++] = record;
+                };
+                if (!this.isDriving) add(this.player);
+                if (!(this.scenes && this.scenes.crewOffstage))
+                    for (const e of this.teammates || []) if (e.recruited) add(e);
+                for (const e of this.npcs || []) add(e);
+                for (const e of this.enemies || []) add(e);
+                for (const e of (this.pedestrians && this.pedestrians.pedestrians) || []) add(e);
+                for (const life of [this.lobbyLife, this.clubLife, this.cafeLife])
+                    for (const e of (life && life.walkers) || []) add(e);
+                for (const e of (this.scenes && this.scenes.actors) || []) add(e);
+                for (const e of this._ultraReflectionCars(buffer.cars)) add(e, 'car');
+                for (let i = count; i < previous; i++) buffer.records[i].e = null;
+                out.length = count;
+                // Detailed reflections cost a full body draw each: the ULTRA_MAX nearest her (she's always first)
+                const P = this.player, MAX = 12;
+                if (count > MAX && P) {
+                    const px = P.x, py = P.y;
+                    out.sort((a, b) => ((a.x - px) ** 2 + (a.y - py) ** 2) - ((b.x - px) ** 2 + (b.y - py) ** 2));
+                    out.length = MAX;
+                }
+                seen.clear();
+                return out;
+            },
+            // Detailed Ultra scenery, painted only: no labels, ground-shadow pass or simulation.
+            _ultraReflectionCars(out) {
+                const cars = out || (this._ultraCars || (this._ultraCars = []));
+                const seen = this._ultraCarSeen || (this._ultraCarSeen = new Set());
+                cars.length = 0; seen.clear();
+                const add = car => { if (car && !seen.has(car)) { seen.add(car); cars.push(car); } };
+                add(this.car); add(this.ownedCar); add(this.deliveryVehicle);
+                for (const car of (this.traffic && this.traffic.vehicles) || []) add(car);
+                // The returned list owns its references; the dedup set must not retain old maps.
+                seen.clear();
+                return cars;
+            },
+
+            _drawUltraReflectionCar(ctx, e, alpha = 0.58) {
+                if (!e || e.dead || e.visible === false || !(alpha > 0)) return;
+                if (![e.x, e.y, e.length, e.width].every(Number.isFinite) || e.length <= 0 || e.width <= 0) return;
+                const fade = Math.max(0, Math.min(1, e.fade ?? 1));
+                if (!(fade > 0)) return;
+                // Car art sets its own alpha for rims and lamps. Group it in a reusable small
+                // canvas so those settings cannot override the reflected body's overall opacity.
+                const scale = CAR_ART.SCALE || 2, pad = CAR_ART.PAD + 16;
+                const rw = Math.ceil((e.length + pad * 2) * scale);
+                const rh = Math.ceil((e.width + pad * 2) * scale);
+                let cv = this._ultraCarScratch;
+                if (!cv) cv = this._ultraCarScratch = document.createElement('canvas');
+                if (cv.width < rw) cv.width = rw;
+                if (cv.height < rh) cv.height = rh;
+                const c = cv.getContext('2d');
+                c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height);
+                c.save();
+                c.setTransform(scale, 0, 0, scale, rw / 2, rh / 2);
+                c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+                c.shadowBlur = 0; c.filter = 'none';
+                drawCarBody(c, e, false);
+                drawCarLamps(c, e, false);
+                c.restore();
+                const groundY = e.y + (e.width || 20) * 0.55;
+                ctx.save();
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha *= Math.min(1, alpha) * fade;
+                ctx.translate(0, groundY); ctx.scale(1, -0.8); ctx.translate(0, -groundY);
+                ctx.translate(e.x, e.y); ctx.rotate(-(e.angle || 0));
+                ctx.scale(1, -1);
+                ctx.drawImage(cv, 0, 0, rw, rh, -rw / scale / 2, -rh / scale / 2, rw / scale, rh / scale);
+                ctx.restore();
+            },
+
+            _drawUltraReflectionFoliage(ctx, near, bounds) {
+                if (!this.activeMap || !this.activeMap.foliage) return;
+                const wind = this.weather && Number.isFinite(this.weather.wind) ? this.weather.wind : 0.3;
+                const windDir = this.weather && Number.isFinite(this.weather.windDirection) ? this.weather.windDirection : 1;
+                const density = GameSettings.getFoliageScale();
+                const stride = density < 1 ? Math.round(1 / density) : 1;
+                const out = this._ultraFoliageCandidates || (this._ultraFoliageCandidates = []);
+                const candidates = this._queryRenderFoliage(bounds, out);
+                for (const entry of candidates) {
+                    const f = entry.item;
+                    if (!f || f.dead || f.visible === false || (density < 1 && entry.index % stride !== 0)) continue;
+                    if (![f.x, f.y, f.size, f.phaseOffset, f.swayMultiplier].every(Number.isFinite) || f.size <= 0) continue;
+                    const bush = f.type === 'bush', palm = f.type === 'palm';
+                    const sway = Math.sin(_gameTimeSec * 2 + f.phaseOffset) * wind * 8 * f.swayMultiplier * windDir;
+                    const cx = f.x + sway * (bush ? 0.6 : palm ? 0.3 : 1), cy = foliageCanopyY(f);
+                    const variant = f._variant === undefined ? Math.floor(f.phaseOffset * 0.637) % 4 : f._variant;
+                    const spr = floraSprite(f.type, f.size, variant);
+                    const reflectedY = f.y - 0.8 * (cy - f.y);
+                    // Use the reflected canopy centre, with its full uncompressed sprite radius,
+                    // so foliage outside the view can still cast a reflection into it.
+                    if (near && !near(cx, reflectedY, spr.w * 0.72)) continue;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha *= 0.52;
+                    ctx.translate(0, f.y); ctx.scale(1, -0.8); ctx.translate(0, -f.y);
+                    if (palm) {
+                        ctx.translate(cx, cy); ctx.rotate(sway * 0.012);
+                        ctx.drawImage(spr.cv, -spr.w / 2, -spr.w / 2);
+                    } else ctx.drawImage(spr.cv, cx - spr.w / 2, cy - spr.w / 2);
+                    ctx.restore();
+                }
+            },
+            /** Scratch owners keep reflection paint from changing live animation or shot origins. */
+            _ultraReflectionWalkerProxy(e) {
+                const proxies = this._ultraWalkerProxies || (this._ultraWalkerProxies = new WeakMap());
+                let record = proxies.get(e);
+                if (!record) {
+                    record = { proxy: Object.create(Object.getPrototypeOf(e)), states: Object.create(null), game: null };
+                    proxies.set(e, record);
+                }
+                const proxy = record.proxy;
+                Object.assign(proxy, e);
+                proxy._reflectionProxy = true;
+                proxy._reflectionSource = e;
+                for (const key of ['_gait', '_animState', '_pose', '_glassSlosh']) {
+                    if (e[key]) {
+                        const state = record.states[key] || (record.states[key] = {});
+                        for (const k of Object.keys(state)) if (!(k in e[key])) delete state[k];
+                        Object.assign(state, e[key]);
+                        proxy[key] = state;
+                    } else delete proxy[key];
+                }
+                // Hair/cloth physics use rest geometry off the world canvas. Never share their owners.
+                delete proxy._hairSim;
+                delete proxy._clothSim;
+                delete proxy._cloth;
+                if (e._game) {
+                    if (!record.game || Object.getPrototypeOf(record.game) !== e._game) record.game = Object.create(e._game);
+                    // The player body advances these during weapon paint; the reflection has its own copy.
+                    record.game.holsterAnim = e._game.holsterAnim;
+                    record.game._holsterT = e._game._holsterT;
+                    proxy._game = record.game;
+                }
+                return proxy;
+            },
+
+            /** The same body configuration used by the ordinary actor passes, without their UI. */
+            _ultraReflectionWalkerConfig(e, proxy) {
+                if (e === this.player) {
+                    const cosmetic = this.cosmetics.getRenderConfig(), outfit = cosmetic.outfit;
+                    const armed = (this.weaponMode === 'normal' || this.weaponMode === 'sniper') && !this.weaponHolstered;
+                    let stance = armed
+                        ? (this.currentWeapon ? stanceForWeapon(this.currentWeapon.id) : (this.weaponMode === 'sniper' ? 'sniper' : 'pistol'))
+                        : this.weaponMode === 'none' && this.shootCooldown > 0 ? 'punch' : 'idle';
+                    const pushing = this.furniture && this.furniture.holding;
+                    if (pushing) stance = 'idle';
+                    let kick = 0;
+                    if (armed && this.currentWeapon && this.shootCooldown > 0) {
+                        const stats = this.currentWeapon.stats || {}, fireRate = stats.fireRate || 20;
+                        const heavy = Math.max(0.4, Math.min(2, (stats.recoil || 10) / 10));
+                        const interp = RenderInterp.stepAdvanced ? RenderInterp.alpha : 1;
+                        const since = Math.max(0, fireRate - this.shootCooldown - 1 + interp);
+                        kick = Math.max(0, 1 - since / (4 + 4 * heavy)) * heavy;
+                    }
+                    const wx = weatherAt(proxy), rainOn = !!(wx && wx.rain > 0.05);
+                    return {
+                        skinColor: cosmetic.skinColor, hair: cosmetic.hair, gender: APPEARANCES['949'].gender,
+                        stance, scopeK: stance === 'sniper' ? (this.scopeK || 0) : 0,
+                        isDriving: false, isShootingFromCar: false, carAngle: this.car ? this.car.angle : 0,
+                        recoil: stance === 'punch' && this.shootCooldown > 0 ? this.shootCooldown / 10 : 0,
+                        kick, punchTicks: stance === 'punch'
+                            ? Math.max(0, CONFIG.PUNCH.DURATION_TICKS - this.shootCooldown - 1 + RenderInterp.alpha) : undefined,
+                        top: outfit.top, bottom: outfit.bottom, shoes: outfit.shoes, train: outfit.train || null,
+                        hat: cosmetic.hat || (rainOn && outfit.top && outfit.top.type === 'hoodie'
+                            ? { type: 'hood_up', color: outfit.top.color } : null),
+                        jewelry: withFieldMask(this, cosmetic.jewelry),
+                        pose: pushing ? 'push' : typeof phoneSystem !== 'undefined' && phoneSystem.isOpen ? 'phone' : this.sneaking ? 'sneak' : undefined,
+                        poseWhileMoving: pushing || this.sneaking,
+                        held: armed && cosmetic.held && cosmetic.held.type === 'umbrella' ? null : (cosmetic.held || outfit.held || null),
+                        noShadow: true
+                    };
+                }
+                if (typeof Ganger !== 'undefined' && e instanceof Ganger) {
+                    const aiming = e.state === 'ALERT' || e.state === 'SUPPRESSING';
+                    const id = e.equippedWeaponId || 'pistol_ganger';
+                    const look = e.look || Ganger.makeLook(seededRandom('reflection|' + (e.id || '') + '|' + e.x + ',' + e.y));
+                    return { ...look, stance: aiming ? stanceForWeapon(id) : 'idle', kick: aiming ? shotKick(proxy) : 0,
+                        weapon: { id, ready: aiming }, noShadow: true };
+                }
+                if (typeof Pedestrian !== 'undefined' && e instanceof Pedestrian) {
+                    const far = typeof _zoomLOD !== 'undefined' && _zoomLOD >= 1;
+                    const raining = e._raining();
+                    let look = far && e.look.hair ? { ...e.look, hair: { type: 'short', color: e.look.hair.color }, jewelry: null } : e.look;
+                    if (e.look.umbrella) look = { ...look, held: { type: 'umbrella', color: e.look.umbrella, hand: 'right' } };
+                    if (raining && e.look.rainHood && !look.hat && look.top && look.top.type === 'hoodie')
+                        look = { ...look, hat: { type: 'hood_up', color: look.top.color } };
+                    return { ...look, stance: 'idle', lerpSpeed: 0.15, noShadow: true };
+                }
+                if (typeof NPC !== 'undefined' && e instanceof NPC) {
+                    const app = lookFor(proxy) || {};
+                    if (e.role !== 'teammate') return { stance: 'idle', ...app, noShadow: true };
+                    const fighting = e.recruited && (e.cooldown > 0 || e.shotsLeftInBurst < e.burstSize);
+                    const id = e.recruited ? e.equippedWeaponId : null;
+                    const crouch = !!(e.recruited && this.crewSneaking && this.crewSneaking() && this.activeMap.id !== 'apt_949');
+                    return {
+                        ...app, skinColor: app.skinColor || '#c68642', gender: app.gender || 'female',
+                        stance: fighting ? stanceForWeapon(id) : 'idle',
+                        pose: e._idlePose || app.pose || (crouch ? 'sneak' : undefined),
+                        poseWhileMoving: crouch && !e._idlePose && !app.pose,
+                        kick: fighting ? shotKick(proxy) : 0, weapon: id ? { id, ready: fighting } : null,
+                        top: app.top || { type: 'suit', color: '#2a0a3a' }, bottom: app.bottom || { type: 'pants', color: '#1a0820' },
+                        shoes: app.shoes || { type: 'boots', color: '#333' }, hair: app.hair || { type: 'short', color: '#111' },
+                        hat: app.hat || null, noShadow: true
+                    };
+                }
+                if (e.look) {
+                    const sceneActor = typeof SceneActor !== 'undefined' && e instanceof SceneActor;
+                    return { stance: 'idle', ...e.look,
+                        ...(sceneActor ? { pose: e.path ? undefined : (e.pose || undefined) } : {}), noShadow: true };
+                }
+                // Drones and heavy automata have separate artwork; do not substitute human bodies.
+                return null;
+            },
+
+            /** Detailed actor art reflected about the ground beneath its body, at current facing. */
+            _drawUltraReflectionWalker(ctx, e, alpha = 0.58) {
+                if (!e || e.dead || e.visible === false || e.inCar || e === this.player && this.isDriving) return false;
+                if (e.invincibleTimer > 0 && e.invincibleTimer % 6 < 3) return false;
+                const proxy = this._ultraReflectionWalkerProxy(e);
+                const cfg = this._ultraReflectionWalkerConfig(e, proxy);
+                if (!cfg) return false;
+                const gait = syncHumanoidGait(proxy);
+                let angle = e.angle || 0, sx = 1, sy = 1, fade = e.life === undefined ? 1 : Math.max(0, Math.min(1, e.life));
+                if (typeof Pedestrian !== 'undefined' && e instanceof Pedestrian) {
+                    angle = e.facingAngle || 0;
+                    if (e.state === 'sprawled') { angle = e.sprawlAngle; sx = 1.1; sy = 0.55; fade *= 0.92; }
+                    else if (e.state === 'recovering') {
+                        const t = 1 - e.recoverTimer / 24;
+                        angle = e.sprawlAngle + (e.facingAngle - e.sprawlAngle) * t;
+                        sx = 1.1 - 0.1 * t; sy = 0.55 + 0.45 * t; fade *= 0.92 + 0.08 * t;
+                    }
+                } else if (typeof NPC !== 'undefined' && e instanceof NPC) {
+                    if (e.combatTargetTimer > 0 && e.combatTargetAngle !== undefined) angle = e.combatTargetAngle;
+                    else if (gait.speed > 0.1) angle = Math.atan2(gait.dirY, gait.dirX);
+                    else if (e.role === 'teammate' && (e.hired || e.recruited) && this.player)
+                        angle = Math.atan2(this.player.y - e.y, this.player.x - e.x);
+                    else angle = cfg.idleAngle !== undefined ? cfg.idleAngle : 0;
+                }
+                proxy.angle = angle;
+                if (e === this.player && (e.isHidden || this.flitState && this.flitState.active)) fade *= 0.5;
+                // Body parts sometimes set their own alpha (weapons, glow, jewellery). Render them
+                // once into shared scratch art, then apply reflection opacity to the complete result.
+                const radius = 96, quality = 2;
+                let canvas = this._ultraWalkerCanvas;
+                if (!canvas) {
+                    canvas = this._ultraWalkerCanvas = document.createElement('canvas');
+                    canvas.width = canvas.height = radius * 2 * quality;
+                }
+                const paint = canvas.getContext('2d');
+                paint.setTransform(1, 0, 0, 1, 0, 0);
+                paint.clearRect(0, 0, canvas.width, canvas.height);
+                paint.globalAlpha = 1; paint.globalCompositeOperation = 'source-over';
+                paint.filter = 'none'; paint.shadowBlur = 0;
+                paint.shadowOffsetX = paint.shadowOffsetY = 0;
+                paint.setLineDash([]);
+                paint.setTransform(quality, 0, 0, quality, radius * quality, radius * quality);
+                _drawProceduralHumanoid(paint, proxy, cfg);
+                ctx.save();
+                try {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.globalAlpha *= alpha * fade;
+                    // Mirror the body below its feet; compensate rotation so its world heading stays the same.
+                    ctx.translate(e.x, e.y + 12);
+                    ctx.scale(1, -0.8);
+                    ctx.translate(0, -12);
+                    ctx.rotate(-angle);
+                    // Flip the sideways artwork while preserving its forward facing.
+                    ctx.scale(1, -1);
+                    if (sx !== 1 || sy !== 1) ctx.scale(sx, sy);
+                    ctx.drawImage(canvas, -radius, -radius, radius * 2, radius * 2);
+                    return true;
+                } finally { ctx.restore(); }
             },
 
             /** Reflection car order: the driven car first, then traffic, including any duplicate. */
@@ -373,7 +720,7 @@
              * raindrops and splashes; a faint rim.
              */
             drawPuddles(ctx) {
-                const wet = this._wetHere(), surf = this._surfaces();
+                const wet = this._wetHere(), surf = this._surfaces(), ultra = this.reflectQuality() === 'ultra';
                 if ((wet < 0.02 && !surf) || !this.reflectQuality()) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 80, hh = this.canvas.height / 2 / z + 80;
                 const near = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m - 60 && y < v.y + hh + m;
@@ -385,7 +732,7 @@
                     for (const [x, y, w, h] of surf.rects) fl.rect(x, y, w, h);
                     for (const [x, y, r] of surf.water) { fl.moveTo(x + r, y); fl.arc(x, y, r, 0, Math.PI * 2); }
                     ctx.save(); ctx.clip(fl);
-                    if (!surf.mirror) {
+                    if (!surf.mirror && !ultra) {
                         movers = this._reflMovers(near, buffer);
                         ctx.fillStyle = 'rgba(2, 1, 6, 1)'; for (const m of movers) this._reflShape(ctx, m, 0.26);
                     }
@@ -393,7 +740,7 @@
                     if (wet < 0.02) { this._drawRipples(ctx, true); return; }
                 }
                 const night = Math.min(1, Math.max(0, (this.getAmbientDarkness() - 0.15) / 0.35)), day = 1 - night;
-                const clip = new Path2D(), rim = new Path2D();
+                const clip = new Path2D();
                 let n = 0;
                 ctx.save();
                 for (const entry of this._queryPuddleCandidates({ left: v.x - hw, right: v.x + hw,
@@ -408,22 +755,27 @@
                         path.moveTo(lx + Math.cos(p.ang) * L.rx * g, ly + Math.sin(p.ang) * L.rx * g);
                         path.ellipse(lx, ly, L.rx * g, L.ry * g, p.ang, 0, Math.PI * 2);
                     }
-                    // night: a dark glossy pool; day: the pale sky in it
-                    ctx.fillStyle = `rgba(6, 4, 18, ${(0.55 * k * night).toFixed(3)})`; ctx.fill(path);
-                    if (day > 0.01) { ctx.fillStyle = `rgba(178, 190, 226, ${(0.3 * k * day).toFixed(3)})`; ctx.fill(path); }
-                    clip.addPath(path); rim.addPath(path); n++;
+                    // Water darkens its bed at night and catches the pale sky by day.
+                    // Both fade into damp pavement, with a faint meniscus instead of a hard outline.
+                    _paintPuddleLobes(ctx, p, g, _puddleEdgeSprite('night'), 0.55 * k * night);
+                    if (day > 0.01) _paintPuddleLobes(ctx, p, g, _puddleEdgeSprite('day'), 0.3 * k * day);
+                    _paintPuddleLobes(ctx, p, g, _puddleEdgeSprite('rim'), 0.045 * k * Math.min(1, wet * 1.5));
+                    clip.addPath(path); n++;
                 }
                 if (n) {
                     // the mirrored shapes of whoever stands at the water, and the rings on it
                     ctx.save(); ctx.clip(clip);
-                    if (!movers) movers = this._reflMovers(near, buffer);
-                    ctx.fillStyle = night > 0.5 ? 'rgba(2, 1, 6, 1)' : 'rgba(26, 22, 36, 1)';
-                    for (const m of movers) this._reflShape(ctx, m, 0.42 + 0.2 * day);
-                    for (const m of movers) if (m.col && /^#[0-9a-f]{6}$/i.test(m.col)) { ctx.fillStyle = m.col; this._reflShape(ctx, m, 0.12); }
+                    if (!ultra) {
+                        if (!movers) movers = this._reflMovers(near, buffer);
+                        ctx.fillStyle = night > 0.5 ? 'rgba(2, 1, 6, 1)' : 'rgba(26, 22, 36, 1)';
+                        for (const m of movers) this._reflShape(ctx, m, 0.42 + 0.2 * day);
+                        for (const m of movers) if (m.col && /^#[0-9a-f]{6}$/i.test(m.col)) { ctx.fillStyle = m.col; this._reflShape(ctx, m, 0.12); }
+                    }
                     this._drawRipples(ctx, night > 0.5);
                     ctx.restore();
                     ctx.globalAlpha = 1;
-                    ctx.strokeStyle = `rgba(214, 196, 255, ${(0.12 * Math.min(1, wet * 1.5)).toFixed(3)})`; ctx.lineWidth = 1; ctx.stroke(rim);
+                    // The feathered meniscus is already painted with the puddle.
+
                 }
                 ctx.restore();
             },
@@ -519,9 +871,15 @@
                 const W = this.canvas.width, H = this.canvas.height, R = F.R;
                 ctx.save();
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
+                if (F.q === 'ultra' && F.D) {
+                    // The same horizontal water movement is applied to colour and light.
+                    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 0.95;
+                    this._drawUltraReflectionBands(ctx, F.D, W, H);
+                }
                 ctx.globalCompositeOperation = 'lighter';
                 ctx.globalAlpha = 0.95;
-                if (F.q === 'high') {
+                if (F.q === 'ultra') this._drawUltraReflectionBands(ctx, R, W, H);
+                else if (F.q === 'high') {
                     const rain = this.weather && this.weather.isRaining ? this.weather.intensity : 0;
                     const n = REFLECT.BANDS, bh = R.height / n, t = _gameTimeSec, amp = (1.2 + rain * 3.2) * (W / R.width) * 0.5;
                     for (let i = 0; i < n; i++) {
@@ -530,6 +888,18 @@
                     }
                 } else ctx.drawImage(R, 0, 0, W, H);
                 ctx.restore();
+            },
+
+            /** Full-resolution detail stays sharp while a small water shimmer breaks its outline. */
+            _drawUltraReflectionBands(ctx, cv, W, H) {
+                const rain = this.weather && this.weather.isRaining ? this.weather.intensity : 0;
+                const n = Math.min(REFLECT.BANDS * 2, cv.height), t = _gameTimeSec, amp = 0.6 + rain * 1.6;
+                for (let i = 0; i < n; i++) {
+                    const sy = Math.floor(i * cv.height / n), bh = Math.floor((i + 1) * cv.height / n) - sy;
+                    const dx = Math.sin(t * 2.1 + i * 0.45) * amp
+                        + Math.sin(t * 5.3 + i * 1.35) * amp * 0.35 * rain;
+                    ctx.drawImage(cv, 0, sy, cv.width, bh, dx, sy * H / cv.height, W, bh * H / cv.height);
+                }
             },
 
             /** In the light layer: where a reflection shines, the dark lifts (screen space) */

@@ -96,7 +96,10 @@
              * @returns {boolean} - Whether damage was applied
              */
             takeDamage(amount, knockbackX = 0, knockbackY = 0, opts = null) {
-                if (this.dead || (this.invincibleTimer > 0 && !(opts && opts.type === 'bleed'))) return false;
+                // A bullet always lands: i-frames guard against a swing or a bump hitting twice, not against rapid fire
+                // (a fast gun used to lose ~4 of every 5 bullets to them). Bullets don't start i-frames either.
+                const shot = !!(opts && opts.shot);
+                if (this.dead || (this.invincibleTimer > 0 && !(opts && (opts.type === 'bleed' || shot)))) return false;
                 
                 this.hp -= amount;
                 // Damage number, health bar, blood, flinch (engine/combat-fx.js); opts.type: the kind of damage
@@ -109,7 +112,7 @@
                 }
                 
                 // Trigger invincibility frames
-                if (this.invincibleDuration > 0) {
+                if (this.invincibleDuration > 0 && !shot) {
                     this.invincibleTimer = this.invincibleDuration;
                 }
                 
@@ -595,6 +598,154 @@
          *       color: '#00f3ff'
          *   });
          */
+        // Round, living fire: baked flame animation keeps the live draw path to five stamps.
+        const FIREBALL_VISUAL_SCALE = 2;
+        const FIREBALL_LIGHT_RADIUS = 280;
+        const FIRE_TRAIL_LIGHT_RADIUS = 65;
+        const FIRE_TRAIL_SPACING = 12;
+        const FIRE_TRAIL_MAX = 640;
+        let _fireTrailSprites = null;
+        function _getFireTrailSprites() {
+            if (_fireTrailSprites) return _fireTrailSprites;
+            const K = 4, frames = 16, cols = 4, w = 32, h = 36, TAU = Math.PI * 2;
+            const atlas = document.createElement('canvas'); atlas.width = w * cols * K; atlas.height = h * cols * K;
+            const c = atlas.getContext('2d');
+            for (let i = 0; i < frames; i++) {
+                const p = i / frames * TAU, sway = Math.sin(p), curl = Math.cos(p);
+                c.setTransform(K, 0, 0, K, ((i % cols) * w + 22) * K, (Math.floor(i / cols) * h + 18) * K);
+                // Three curling flame tongues leave open, ragged gaps between their tips.
+                c.fillStyle = 'rgba(236,48,5,0.7)'; c.beginPath(); c.moveTo(4, 0);
+                c.bezierCurveTo(1, -7, -7, -12, -17, -8 + sway * 2);
+                c.bezierCurveTo(-7, -7, -13, -1, -21, -1 + curl * 2);
+                c.bezierCurveTo(-13, 2, -8, 8, -17, 11 + sway);
+                c.bezierCurveTo(-5, 13, 1, 6, 4, 0); c.closePath(); c.fill();
+                c.fillStyle = '#ff730c'; c.beginPath(); c.moveTo(3, 0);
+                c.bezierCurveTo(0, -5, -6, -9, -14, -8 + sway * 2);
+                c.bezierCurveTo(-7, -7, -7, -3, -18, -2 + curl * 2);
+                c.bezierCurveTo(-10, 1, -7, 4, -13, 8 + sway * 2);
+                c.bezierCurveTo(-4, 8, 1, 4, 3, 0); c.closePath(); c.fill();
+                c.fillStyle = '#ffb71e'; c.beginPath(); c.moveTo(2, 0);
+                c.bezierCurveTo(-1, -5, -5, -7, -10, -6 + curl);
+                c.bezierCurveTo(-4, -3, -7, -1, -15, sway * 2);
+                c.bezierCurveTo(-6, 0, -6, 4, -9, 6 + curl);
+                c.bezierCurveTo(-3, 4, 1, 4, 2, 0); c.closePath(); c.fill();
+                c.fillStyle = '#ffe469'; c.beginPath(); c.moveTo(1, 0);
+                c.bezierCurveTo(-2, -3, -4, -3, -8, -2 + sway);
+                c.bezierCurveTo(-3, -1, -5, 1, -10, 2 + curl);
+                c.bezierCurveTo(-3, 1, -2, 4, 1, 0); c.closePath(); c.fill();
+                c.globalAlpha = 0.55 + 0.3 * Math.cos(p);
+                c.fillStyle = '#ff9b20'; c.fillRect(-18 + sway * 2, -11 + curl, 0.9, 0.9);
+                c.fillStyle = '#ffdc61'; c.fillRect(-13 + curl * 3, 13 + sway, 0.65, 0.65);
+                c.globalAlpha = 1;
+            }
+            _fireTrailSprites = { atlas, K, frames, cols, w, h };
+            return _fireTrailSprites;
+        }
+
+        let _fieryFireballSprites = null;
+        function _getFieryFireballSprites() {
+            if (_fieryFireballSprites) return _fieryFireballSprites;
+            const K = 4, frames = 16, cols = 4, TAU = Math.PI * 2;
+            const atlas = (w, h) => {
+                const cv = document.createElement('canvas');
+                cv.width = w * cols * K; cv.height = h * Math.ceil(frames / cols) * K;
+                return { cv, c: cv.getContext('2d'), w, h };
+            };
+            const core = atlas(40, 40), tail = atlas(64, 36);
+            const tile = (a, i, ox, oy) => {
+                a.c.setTransform(K, 0, 0, K, ((i % cols) * a.w + ox) * K, (Math.floor(i / cols) * a.h + oy) * K);
+                return a.c;
+            };
+            const smoothShape = (c, pts, color) => {
+                c.fillStyle = color; c.beginPath();
+                c.moveTo((pts[0][0] + pts[pts.length - 1][0]) / 2, (pts[0][1] + pts[pts.length - 1][1]) / 2);
+                for (let j = 0; j < pts.length; j++) {
+                    const p = pts[j], n = pts[(j + 1) % pts.length];
+                    c.quadraticCurveTo(p[0], p[1], (p[0] + n[0]) / 2, (p[1] + n[1]) / 2);
+                }
+                c.closePath(); c.fill();
+            };
+            // Curved, tapering ribbons with sharp tips, rather than a straight triangular wake.
+            const ribbon = (c, length, width, offset, bend, phase, color) => {
+                const top = [], bottom = [];
+                for (let j = 0; j <= 24; j++) {
+                    const u = j / 24, x = -2 - length * u;
+                    const y = offset * (1 - u) + bend * Math.sin(Math.PI * u)
+                        + Math.sin(u * TAU * 1.35 + phase) * u * (1 - u) * 5;
+                    const w = width * Math.pow(1 - u, 0.8) * (0.9 + 0.18 * Math.sin(u * 9 - phase));
+                    top.push([x, y - w]); bottom.push([x, y + w]);
+                }
+                smoothShape(c, top.concat(bottom.reverse()), color);
+            };
+            for (let i = 0; i < frames; i++) {
+                const p = i / frames * TAU, t = tile(tail, i, 58, 18);
+                const flow = Math.sin(p), curl = Math.cos(p);
+                ribbon(t, 52, 5.8, 0, flow * 1.8, p, 'rgba(227,42,7,0.45)');
+                ribbon(t, 43, 3.9, -2.0, -5.4 + curl * 1.6, p + 1.2, '#f85a08');
+                ribbon(t, 49, 3.4, 2.0, 4.6 + flow * 1.8, p + 3.3, '#ed4108');
+                ribbon(t, 48, 3.9, 0, flow * 2.0, p + 0.4, '#ff8a0b');
+                ribbon(t, 39, 2.6, -1.2, -3.2 + flow * 1.3, p + 1.5, '#ffbf1c');
+                ribbon(t, 34, 2.5, 1.1, 3.0 + curl * 1.4, p + 3.8, '#ffcf2c');
+                ribbon(t, 39, 1.4, 0, flow * 1.3, p + 0.7, '#ffec83');
+                ribbon(t, 25, 0.7, 0, flow * 0.8, p + 0.7, '#fffbdc');
+                // Thin flames peel away on either side of the central stream.
+                ribbon(t, 31, 1.5, -3.2, -8.0 + curl * 1.5, p + 2, '#ff880c');
+                ribbon(t, 36, 1.3, 3.0, 7.0 + flow * 1.6, p + 4, '#ff720b');
+                ribbon(t, 25, 0.55, -3.0, -7.2 + curl * 1.3, p + 2, '#ffdb55');
+                for (let e = 0; e < 4; e++) {
+                    const q = (i / frames + e * 0.23) % 1;
+                    const x = -17 - q * 37, y = (e % 2 ? 1 : -1) * (6 + 4 * q) + Math.sin(q * TAU + e) * 2;
+                    const size = 0.6 + (e % 2) * 0.25;
+                    t.globalAlpha = Math.sin(q * Math.PI) * 0.85;
+                    t.fillStyle = e % 2 ? '#ffda4b' : '#ff810f'; t.beginPath();
+                    t.moveTo(x + size * 1.6, y); t.lineTo(x, y - size);
+                    t.lineTo(x - size * 1.6, y); t.lineTo(x, y + size); t.closePath(); t.fill();
+                }
+                t.globalAlpha = 1;
+
+                const c = tile(core, i, 20, 20);
+                // The central body is always circular and stays at the existing eight-unit radius.
+                c.fillStyle = '#ff6509'; c.beginPath(); c.arc(0, 0, 8, 0, TAU); c.fill();
+                for (let f = 0; f < 6; f++) {
+                    c.save(); c.rotate(f * TAU / 6 + p);
+                    const lick = 0.85 + 0.12 * Math.sin(p * 2 + f * 1.7);
+                    c.scale(lick, lick);
+                    c.fillStyle = f % 2 ? '#ff9c0a' : '#ff7807'; c.beginPath();
+                    c.moveTo(3.8, -3.8);
+                    c.bezierCurveTo(8.8, -5.4, 11.0, -2.3, 10.4, 1.8);
+                    c.bezierCurveTo(9.1, -0.6, 7.9, 0.9, 8.0, 3.4);
+                    c.bezierCurveTo(8.6, 6.0, 5.2, 7.7, 3.8, 5.1);
+                    c.bezierCurveTo(5.3, 3.1, 5.6, -0.5, 3.8, -3.8); c.fill();
+                    c.fillStyle = '#ffd32a'; c.beginPath();
+                    c.moveTo(3.2, -2.9);
+                    c.bezierCurveTo(6.7, -4.4, 8.7, -2.4, 8.5, 0.6);
+                    c.bezierCurveTo(7.7, -0.6, 6.5, 1.1, 6.6, 3.0);
+                    c.bezierCurveTo(7.2, 4.4, 4.8, 5.8, 3.0, 3.8); c.closePath(); c.fill();
+                    c.restore();
+                }
+                const heat = c.createRadialGradient(0, 0, 0, 0, 0, 7.2);
+                heat.addColorStop(0, '#ffffed'); heat.addColorStop(0.53, '#fffbc0');
+                heat.addColorStop(0.76, '#ffe849'); heat.addColorStop(1, '#ffb716');
+                c.fillStyle = heat; c.beginPath(); c.arc(0, 0, 6.6, 0, TAU); c.fill();
+                for (let f = 0; f < 3; f++) {
+                    c.save(); c.rotate(f * TAU / 3 - p);
+                    c.fillStyle = '#fff6a0'; c.beginPath(); c.moveTo(2, -2.6);
+                    c.bezierCurveTo(5.2, -4.0, 7.8, -0.8, 6.2, 2.3);
+                    c.bezierCurveTo(6.2, 0.2, 4.8, -0.2, 3.0, 2.8);
+                    c.closePath(); c.fill(); c.restore();
+                }
+                c.fillStyle = '#fffdeb'; c.beginPath(); c.arc(0, 0, 4.1, 0, TAU); c.fill();
+            }
+            const halo = document.createElement('canvas'); halo.width = halo.height = 48 * K;
+            const h = halo.getContext('2d'); h.setTransform(K, 0, 0, K, 24 * K, 24 * K);
+            const glow = h.createRadialGradient(0, 0, 3, 0, 0, 23);
+            glow.addColorStop(0, 'rgba(255,158,21,0.42)'); glow.addColorStop(0.35, 'rgba(255,97,10,0.23)');
+            glow.addColorStop(0.7, 'rgba(255,55,8,0.065)'); glow.addColorStop(1, 'rgba(255,55,8,0)');
+            h.fillStyle = glow; h.fillRect(-24, -24, 48, 48);
+            _fieryFireballSprites = { coreAtlas: core.cv, tailAtlas: tail.cv, halo, frames, K, cols };
+            return _fieryFireballSprites;
+        }
+
         class ProjectileEntity extends GameEntity {
             // Static pool for projectile reuse
             static _pool = [];
@@ -628,6 +779,7 @@
                 this.ownerType = config.ownerType || 'player';
                 this.speed = Math.hypot(this.vx, this.vy);
                 this.color = config.color || '#00f3ff';
+                this.isFireball = this.color === '#ff3300';
                 this.life = config.life || 60;
                 this.alliance = (config.ownerType === 'enemy' || config.isEnemy) ? 'hostile' : 'friendly';
                 this.active = true;
@@ -643,6 +795,7 @@
                 this.dotInterval = config.dotInterval || 10;
                 this.spawnTime = _gameTimeMs();                     // game time: a pause doesn't age it
                 this.fxTrail = null; this.trail = null; this._wispN = 0;
+                this._fireTrailStarted = false; this._fireTrailGap = 0;
             }
 
             constructor(config) {
@@ -723,6 +876,7 @@
                 // Hard age cap — prevents ghost projectiles from persisting
                 this.spawnTime = _gameTimeMs();                     // game time: a pause doesn't age it
                 this.fxTrail = null; this.trail = null; this._wispN = 0;
+                this._fireTrailStarted = false; this._fireTrailGap = 0;
             }
             
             /**
@@ -836,6 +990,7 @@
                 this.lastY = this.y;
             
                 super.update(dt);
+                if (this.isFireball && this.active && typeof game !== 'undefined') game.emitFireTrail(this, this.lastX, this.lastY, this.x, this.y);
                 this.life--;
                 // A signature trail (its gun's `fx`, engine/combat-effects.js weaponFx): the last 8 points it flew through
                 if (this.fxTrail && (this.vx || this.vy)) {
@@ -896,34 +1051,38 @@
                 ctx.save();
                 
                 if (this.isFireball) {
-                    // --- FIREBALL VISUALS ---
+                    const fireFx = _getFieryFireballSprites();
+                    const age = Math.max(0, _gameTimeMs() - this.spawnTime);
+                    const speed = Math.hypot(this.vx, this.vy);
+                    const heading = speed > 0 ? Math.atan2(this.vy, this.vx) : this.angle;
+                    const phase = (age / 960 % 1) * fireFx.frames;
+                    const frame = Math.floor(phase), blend = phase - frame;
+                    const next = (frame + 1) % fireFx.frames;
+                    const stretch = Math.min(1.8, Math.max(0.12, speed / 18));
+                    const wave = Math.sin(age * Math.PI * 2 / 960);
+                    const alpha = ctx.globalAlpha;
                     ctx.translate(this.x, this.y);
-                    ctx.rotate(this.angle);
-                    
-                    // Flickering flame trail
-                    const flicker = Math.random() * 0.5 + 0.5;
-                    ctx.fillStyle = `rgba(255, 100, 0, ${0.6 * flicker})`;
-                    ctx.beginPath();
-                    ctx.moveTo(0, 6);
-                    ctx.lineTo(-30 * flicker, 0);
-                    ctx.lineTo(0, -6);
-                    ctx.fill();
-                    
-                    // Glowing core
-                    ctx.shadowColor = '#ff0000';
-                    ctx.shadowBlur = 20;
-                    ctx.fillStyle = '#fff700';
-                    ctx.beginPath();
-                    ctx.arc(0, 0, 8, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Inner hot core
-                    ctx.fillStyle = '#ffffff';
-                    ctx.beginPath();
-                    ctx.arc(0, 0, 4, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    ctx.shadowBlur = 0;
+                    ctx.rotate(heading);
+                    ctx.scale(FIREBALL_VISUAL_SCALE, FIREBALL_VISUAL_SCALE);
+                    ctx.globalAlpha = alpha * (0.93 + wave * 0.05);
+                    ctx.drawImage(fireFx.halo, -24, -24, 48, 48);
+                    // Blend cached phases additively, so the white-hot center never dims between frames.
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.save();
+                    ctx.scale(stretch, 1 + wave * 0.04);
+                    ctx.globalAlpha = alpha * (1 - blend);
+                    ctx.drawImage(fireFx.tailAtlas, (frame % fireFx.cols) * 64 * fireFx.K,
+                        Math.floor(frame / fireFx.cols) * 36 * fireFx.K, 64 * fireFx.K, 36 * fireFx.K, -58, -18, 64, 36);
+                    ctx.globalAlpha = alpha * blend;
+                    ctx.drawImage(fireFx.tailAtlas, (next % fireFx.cols) * 64 * fireFx.K,
+                        Math.floor(next / fireFx.cols) * 36 * fireFx.K, 64 * fireFx.K, 36 * fireFx.K, -58, -18, 64, 36);
+                    ctx.restore();
+                    ctx.globalAlpha = alpha * (1 - blend);
+                    ctx.drawImage(fireFx.coreAtlas, (frame % fireFx.cols) * 40 * fireFx.K,
+                        Math.floor(frame / fireFx.cols) * 40 * fireFx.K, 40 * fireFx.K, 40 * fireFx.K, -20, -20, 40, 40);
+                    ctx.globalAlpha = alpha * blend;
+                    ctx.drawImage(fireFx.coreAtlas, (next % fireFx.cols) * 40 * fireFx.K,
+                        Math.floor(next / fireFx.cols) * 40 * fireFx.K, 40 * fireFx.K, 40 * fireFx.K, -20, -20, 40, 40);
                 } else if (this.sticky) {
                     // --- GOLDEN ORB VISUALS (Golden Child) ---
                     ctx.shadowColor = '#FFD700';

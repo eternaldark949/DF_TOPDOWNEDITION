@@ -1516,10 +1516,10 @@
         document.addEventListener('keydown', (e) => {
             // 1. Handle ESCAPE - Pause Menu Priority
             if (e.key === 'Escape') {
+                // Cinematic view owns Escape, even if she was holding furniture.
+                if (document.body.classList.contains('cinematic-view')) { pauseMenu.exitCinematic(); return; }
                 // Holding furniture / choosing a side: Esc lets go
                 if (game.furniture && game.furniture.busy()) { game.furniture.release(); return; }
-                // Cinematic view: Esc brings the pause menu back
-                if (document.body.classList.contains('cinematic-view')) { pauseMenu.exitCinematic(); return; }
                 // If pause menu is open, close it
                 if (pauseMenu && pauseMenu.isOpen) {
                     pauseMenu.close();
@@ -1556,12 +1556,16 @@
                 
                 // Otherwise, toggle pause menu (if game is running)
                 if (game.running && pauseMenu) {
-                    pauseMenu.toggle();
+                    pauseMenu.toggle(true); // intentional keyboard pause remains available during a story scene
                 }
             }
             
-            // Pause Menu Navigation (when pause menu is open)
+            // Editable menu controls retain their native keys; Escape was handled above.
+            if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+            // Consume a pause action before it can reach a scene, even if Resume
+            // releases the pause token while this same event is still bubbling.
             if (pauseMenu && pauseMenu.isOpen) {
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) e.stopPropagation();
                 if (e.key === 'ArrowUp') {
                     e.preventDefault();
                     pauseMenu.navigateUp();

@@ -380,42 +380,47 @@
                     break;
                 }
 
-                case 'enni_cole_interior':
+                case 'enni_cole_interior': {
+                    // Food hall west, furnished room sets north, electronics east; the central promenade
+                    // and chandelier medallion are open floor. Dedicated art: drawEnniDecorProp.
+                    const F = decorPropsIn('#3c2530');
                     e.props = [
-                        new PropEntity({ x: 920, y: 580, width: 160, height: 60, color: '#1a1a1a' }), new PropEntity({ x: 920, y: 700, width: 160, height: 60, color: '#1a1a1a' }),
-                        new PropEntity({ x: 860, y: 630, width: 60, height: 80, color: '#2a1520' }), new PropEntity({ x: 1080, y: 630, width: 60, height: 80, color: '#2a1520' }),
-                        new PropEntity({ x: 930, y: 860, width: 140, height: 40, color: '#3a1028' }), new PropEntity({ x: 930, y: 460, width: 140, height: 40, color: '#3a1028' }),
-                        new PropEntity({ x: 120, y: 350, width: 200, height: 30, color: '#222' }), new PropEntity({ x: 120, y: 520, width: 200, height: 30, color: '#222' }),
-                        new PropEntity({ x: 120, y: 690, width: 200, height: 30, color: '#222' }), new PropEntity({ x: 120, y: 860, width: 200, height: 30, color: '#222' }),
-                        new PropEntity({ x: 120, y: 1030, width: 200, height: 30, color: '#222' }), new PropEntity({ x: 80, y: 250, width: 10, height: 900, color: '#3a3a42' }),
-                        new PropEntity({ x: 380, y: 800, width: 20, height: 180, color: '#1a1a1a' }), new PropEntity({ x: 380, y: 450, width: 20, height: 180, color: '#1a1a1a' }),
-                        new PropEntity({ x: 1680, y: 350, width: 120, height: 50, color: '#151518' }), new PropEntity({ x: 1680, y: 500, width: 120, height: 50, color: '#151518' }),
-                        new PropEntity({ x: 1680, y: 650, width: 120, height: 50, color: '#151518' }), new PropEntity({ x: 1680, y: 800, width: 120, height: 50, color: '#151518' }),
-                        new PropEntity({ x: 1680, y: 950, width: 120, height: 50, color: '#151518' }),
-                        new PropEntity({ x: 1550, y: 400, width: 50, height: 50, color: '#2a1520' }), new PropEntity({ x: 1550, y: 600, width: 50, height: 50, color: '#2a1520' }), new PropEntity({ x: 1550, y: 800, width: 50, height: 50, color: '#2a1520' }),
-                        new PropEntity({ x: 1900, y: 250, width: 10, height: 900, color: '#3a3a42' }),
-                        new PropEntity({ x: 300, y: 100, width: 80, height: 60, color: '#2a1a25' }), new PropEntity({ x: 550, y: 100, width: 80, height: 60, color: '#2a1a25' }),
-                        new PropEntity({ x: 800, y: 100, width: 80, height: 60, color: '#2a1a25' }), new PropEntity({ x: 1050, y: 100, width: 80, height: 60, color: '#2a1a25' }),
-                        new PropEntity({ x: 1300, y: 100, width: 80, height: 60, color: '#2a1a25' }), new PropEntity({ x: 1550, y: 100, width: 80, height: 60, color: '#2a1a25' }),
-                        new PropEntity({ x: 700, y: 200, width: 100, height: 35, color: '#3a1028' }), new PropEntity({ x: 1100, y: 200, width: 100, height: 35, color: '#3a1028' }),
-                        new PropEntity({ x: 850, y: 1200, width: 300, height: 50, color: '#1a1a1a' }), new PropEntity({ x: 1300, y: 1280, width: 40, height: 60, mass: 1e7, color: '#00f3ff', interactionType: 'vending_machine' }),
+                        F(95, 130, 395, 64, 'ec_wine'),
+                        F(95, 330, 160, 110, 'ec_produce'), F(330, 330, 160, 110, 'ec_produce', { variant: 1 }),
+                        F(95, 625, 160, 64, 'ec_grocery'), F(330, 625, 160, 64, 'ec_grocery', { variant: 1 }),
+                        F(95, 855, 395, 80, 'ec_cold'), F(95, 1060, 260, 78, 'ec_bakery'),
+                        // The furniture gallery: a living room, a dressed bedroom, a dining vignette.
+                        F(680, 165, 220, 70, 'ec_sofa'), F(1020, 175, 70, 70, 'ec_armchair', { face: 'W' }),
+                        F(840, 310, 130, 65, 'ec_lowtable'), F(692, 325, 60, 60, 'ec_side'),
+                        F(1160, 140, 160, 228, 'ec_bed'), F(1100, 155, 43, 50, 'ec_side'), F(1337, 155, 43, 50, 'ec_side'),
+                        F(1170, 485, 175, 105, 'ec_dining'),
+                        // Demo screens along the wall, then generous walk-around device islands.
+                        F(1510, 130, 380, 65, 'ec_tvwall'),
+                        F(1510, 355, 175, 88, 'ec_laptop'), F(1760, 355, 130, 88, 'ec_tablet'),
+                        F(1510, 695, 175, 88, 'ec_audio'), F(1760, 695, 130, 88, 'ec_tablet', { variant: 1 }),
+                        F(1510, 985, 380, 78, 'ec_appliances'),
+                        // Brass-framed, rose-stone structural piers leave wide, open department aisles.
+                        ...[260, 650, 1050].flatMap(y => [F(548, y, 40, 40, 'ec_column'), F(1412, y, 40, 40, 'ec_column')]),
+                        F(640, 1170, 190, 60, 'ec_checkout'), F(1170, 1170, 190, 60, 'ec_checkout', { variant: 1 }),
+                        F(80, 1210, 60, 60, 'ec_plant'), F(1860, 1210, 60, 60, 'ec_plant'),
+                        F(700, 1020, 45, 45, 'ec_plant'), F(1255, 1020, 45, 45, 'ec_plant'),
+                        F(1810, 1148, 44, 64, 'ec_vending', { interactionType: 'vending_machine' })
                     ];
-                    e.npcs = [ new NPC(1000, 1220, "Valentina", 'vip'), new NPC(200, 500, "Model Kira", 'dancer'), new NPC(1750, 600, "Model Sienne", 'dancer'), new NPC(1000, 650, "Concierge Lux", 'robot_gold') ];
-                    e.lamps = [
-                        new LampEntity({ x: 1000, y: 500, lampType: 4, color: '#ff69b4', lightRadius: 550 }), new LampEntity({ x: 1000, y: 750, lampType: 4, color: '#ff69b4', lightRadius: 550 }),
-                        new LampEntity({ x: 700, y: 400, lampType: 3, color: '#ff8ec4', lightRadius: 300 }), new LampEntity({ x: 1300, y: 400, lampType: 3, color: '#ff8ec4', lightRadius: 300 }),
-                        new LampEntity({ x: 700, y: 900, lampType: 3, color: '#ff8ec4', lightRadius: 300 }), new LampEntity({ x: 1300, y: 900, lampType: 3, color: '#ff8ec4', lightRadius: 300 }),
-                        new LampEntity({ x: 250, y: 300, lampType: 3, color: '#ff5ca8', lightRadius: 250 }), new LampEntity({ x: 250, y: 550, lampType: 3, color: '#ff5ca8', lightRadius: 250 }),
-                        new LampEntity({ x: 250, y: 800, lampType: 3, color: '#ff5ca8', lightRadius: 250 }), new LampEntity({ x: 250, y: 1000, lampType: 3, color: '#ff5ca8', lightRadius: 200 }),
-                        new LampEntity({ x: 1750, y: 300, lampType: 3, color: '#ffb4d6', lightRadius: 250 }), new LampEntity({ x: 1750, y: 550, lampType: 3, color: '#ffb4d6', lightRadius: 250 }),
-                        new LampEntity({ x: 1750, y: 800, lampType: 3, color: '#ffb4d6', lightRadius: 250 }), new LampEntity({ x: 1750, y: 1000, lampType: 3, color: '#ffb4d6', lightRadius: 200 }),
-                        new LampEntity({ x: 350, y: 130, lampType: 3, color: '#ffd0e8', lightRadius: 200 }), new LampEntity({ x: 600, y: 130, lampType: 3, color: '#ffd0e8', lightRadius: 200 }),
-                        new LampEntity({ x: 850, y: 130, lampType: 3, color: '#ffd0e8', lightRadius: 200 }), new LampEntity({ x: 1100, y: 130, lampType: 3, color: '#ffd0e8', lightRadius: 200 }),
-                        new LampEntity({ x: 1350, y: 130, lampType: 3, color: '#ffd0e8', lightRadius: 200 }), new LampEntity({ x: 1600, y: 130, lampType: 3, color: '#ffd0e8', lightRadius: 200 }),
-                        new LampEntity({ x: 850, y: 1250, lampType: 3, color: '#ff69b4', lightRadius: 250 }), new LampEntity({ x: 1150, y: 1250, lampType: 3, color: '#ff69b4', lightRadius: 250 }),
-                        new LampEntity({ x: 1000, y: 1100, lampType: 4, color: '#ff8ec4', lightRadius: 400 }),
+                    e.npcs = [ new NPC(750, 1250, "Valentina", 'vip'), new NPC(275, 500, "Model Kira", 'dancer'),
+                        new NPC(1740, 585, "Model Sienne", 'dancer'), new NPC(1100, 950, "Concierge Lux", 'robot_gold') ];
+                    e.npcs[0].angle = -Math.PI / 2; e.npcs[1].angle = Math.PI; e.npcs[2].angle = Math.PI; e.npcs[3].angle = Math.PI / 2;
+                    const L = hiddenLamp, S = softLight, A = areaLight;
+                    e.lamps = [ L(285, 520, '#ffe4b3', 450),
+                        L(1720, 520, '#e2ebff', 410), L(1000, 250, '#ffe2a9', 440), L(1000, 1180, '#ffdcaa', 360) ];
+                    e.softLights = [
+                        A(1000, 725, 1760, 1150, '#ffdcb3', 0.09),
+                        S(1000, 780, 285, '#ffe3a8', 0.18), S(1000, 250, 280, '#ffe2b2', 0.3),
+                        S(285, 280, 260, '#ffe3b2', 0.3), S(285, 920, 260, '#ffe6c2', 0.3),
+                        S(1710, 285, 260, '#e1eaff', 0.24), S(1710, 905, 280, '#ffe5ba', 0.22),
+                        S(740, 1190, 150, '#ffdaa0', 0.38), S(1265, 1190, 150, '#ffdaa0', 0.38)
                     ];
                     break;
+                }
 
                 case 'cozy_cafe_interior': {
                     // Cozy Cafe: the furniture art in drawCafeDecorProp (cc_*), the floor in drawCafeInterior,

@@ -87,7 +87,7 @@
                 this._renderBuildingLists = null;
                 const bg = this._orderedBuildings || (this._orderedBuildings = new OrderedRenderGrid());
                 const fg = this._orderedFoliage || (this._orderedFoliage = new OrderedRenderGrid());
-                this._renderBuildingMaxFloors = 0; this._renderBuildingMaxReach = 0;
+                this._renderBuildingMaxFloors = 0; this._renderBuildingMaxReach = 0; this._renderBuildingMaxCrown = 0;
                 bg.build(buildings, (b, entry) => {
                     entry.standardV2 = !!(b.isV2 && b.inView === BuildingV2.prototype.inView && b._leanScale === BuildingV2.prototype._leanScale);
                     // Missing/nonfinite dimensions can pass the legacy shadow/forecourt
@@ -99,6 +99,7 @@
                     if (entry.standardV2) {
                         this._renderBuildingMaxFloors = Math.max(this._renderBuildingMaxFloors, b.floors);
                         this._renderBuildingMaxReach = Math.max(this._renderBuildingMaxReach, b.emissiveReach || 0);
+                        this._renderBuildingMaxCrown = Math.max(this._renderBuildingMaxCrown, b.crownZ || 0);
                     }
                     return { left: b.x, right: b.x + (b.w || 200), top: b.y, bottom: b.y + (b.h || 200) };
                 });
@@ -146,7 +147,8 @@
                     safe = safe && Number.isFinite(h) && h >= 0 && Number.isFinite(cameraHeight) && cameraHeight > h &&
                         Number.isFinite(B.MAX_FLOORS) && B.MAX_FLOORS >= 0 && Number.isFinite(C.LEAN_EXTRA) && C.LEAN_EXTRA >= 0 &&
                         Number.isFinite(B.FLOOR_HEIGHT) && B.FLOOR_HEIGHT >= 0;
-                    if (safe) k = 1 + h / (cameraHeight - h);
+                    if (safe) k = Math.max(1 + h / (cameraHeight - h),                   // (a crown higher than that: as _hullK leans it)
+                        cameraHeight / (cameraHeight - Math.min(this._renderBuildingMaxCrown, cameraHeight * 0.86)));
                 }
                 if (safe) {
                     // A projected roof is cam + (footprint - cam) * k. Inverse-project the
@@ -168,7 +170,13 @@
                 for (const entry of candidates) {
                     const b = entry.item;
                     if (entry.standardV2) {
-                        if (b.inView(V, cam)) { lists.base.push(entry); lists.v2.push(entry); }
+                        // In the glow pass's reach; topIn: in the base and roof passes' too, glowIn: in reach of the rest of
+                        // its glow (a landmark just off screen still throws its beams on, but draws nothing else)
+                        if (b.inView(V, cam)) {
+                            entry.topIn = b.topReach === undefined || b.inView(V, cam, b.topReach);
+                            entry.glowIn = b.glowReach === undefined || b.inView(V, cam, b.glowReach);
+                            lists.base.push(entry); lists.v2.push(entry);
+                        }
                     } else {
                         if (b.isV2) lists.v2.push(entry);
                         if (b.isV2 && b.inView) lists.base.push(entry); // custom predicate runs at its original base pass
@@ -177,6 +185,32 @@
                 }
                 this._renderBuildingLists = lists;
                 return lists;
+            },
+
+            /** Sample once after all vehicles have moved and collisions have resolved. */
+            updateCarLightTrails() {
+                const z = this.camera.zoom || 1, pad = CAR_TAIL_TRAIL.VIEW_PAD;
+                const hw = this.canvas.width / 2 / z + pad, hh = this.canvas.height / 2 / z + pad;
+                // (one view box and one set, reused every tick)
+                const view = this._trailView || (this._trailView = { left: 0, right: 0, top: 0, bottom: 0 });
+                view.left = this.camera.x - hw; view.right = this.camera.x + hw; view.top = this.camera.y - hh; view.bottom = this.camera.y + hh;
+                const cars = this._trailCars || (this._trailCars = new Set());
+                cars.clear();
+                if (this.traffic) for (const v of this.traffic.vehicles) cars.add(v);
+                if (this.car instanceof TrafficVehicle) cars.add(this.car);
+                if (this.ownedCar instanceof TrafficVehicle) cars.add(this.ownedCar);
+                if (this.deliveryVehicle instanceof TrafficVehicle) cars.add(this.deliveryVehicle);
+                for (const v of cars) updateCarTailTrail(v, this.activeMap, view, _simTick);
+                cars.clear();   // (no references held past the tick)
+            },
+
+            /** Ordinary gunners' hot metal emits its own light after the darkness pass. */
+            drawGunnerHeat(ctx, cull) {
+                for (const e of this.enemies) {
+                    if (!(e instanceof GatlingGunner) || e.persona || e.dead || e._barrelHeat <= 0.02) continue;
+                    if (cull && (e.x < cull.left || e.x > cull.right || e.y < cull.top || e.y > cull.bottom)) continue;
+                    e.drawHeat(ctx);
+                }
             },
 
             /** After lighting: building windows/neon/rooftop lights, then the sky layer. */
@@ -194,7 +228,7 @@
                             const b = entry.item;
                             if (!b.isV2 || !b.drawEmissive) continue;
                             if (!entry.standardV2 && !b.inView(V, this.camera)) continue;
-                            b.drawEmissive(ctx, dark);
+                            b.drawEmissive(ctx, dark, entry.standardV2 && !entry.glowIn);   // off screen but for its beams: just those
                         }
                     } else {
                         // Standalone calls without a draw view retain their original fallback predicate.
@@ -206,14 +240,25 @@
                         }
                     }
                 }
-                // Car lamps in the dark: tail and brake lights, headlights, signals (traffic/car-art.js)
-                if (dark > 0.04) {
+                // Street bulbs remain luminous above the ambient darkness. Reuse the body's on/fade state.
+                if (this._cullBounds) {
+                    const cb = this._cullBounds, z = this.camera.zoom || 1;
+                    for (const entry of this._queryLampCandidates(cb.lamps, 'lampEmission')) {
+                        const l = entry.item;
+                        if (l._bulbPaintFrame !== this._renderDrawId || !LAMP_TYPE_STYLE[l.lampType] || typeof l.drawEmissive !== 'function') continue;
+                        if (lampPaintInView(l, ctx, cb.view, z, l._bulbDay)) l.drawEmissive(ctx, l._bulbDay);
+                    }
+                }
+                // Motion trails and car lamps remain luminous above the ambient darkness.
+                {
                     const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z + 60, hh = this.canvas.height / 2 / z + 60, c = this.camera;
+                    const view = this._cullBounds && this._cullBounds.view || { left: c.x - hw, right: c.x + hw, top: c.y - hh, bottom: c.y + hh };
                     const cars = new Set(this.traffic ? this.traffic.vehicles : []);
                     for (const v of [this.car, this.ownedCar, this.deliveryVehicle]) if (v && v.draw === TrafficVehicle.prototype.draw) cars.add(v);
                     for (const v of cars) {
-                        if (!v.visible || v.dead || v.x < c.x - hw || v.x > c.x + hw || v.y < c.y - hh || v.y > c.y + hh) continue;
-                        drawCarGlow(ctx, v, dark);
+                        if (!v.visible || v.dead) continue;
+                        drawCarTailTrail(ctx, v, dark, view, this.activeMap);
+                        if (dark > 0.04 && !(v.x < c.x - hw || v.x > c.x + hw || v.y < c.y - hh || v.y > c.y + hh)) drawCarGlow(ctx, v, dark);
                     }
                 }
                 if (this.activeMap.billboards) {

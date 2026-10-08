@@ -32,6 +32,7 @@
             onMapLoaded(game) {
                 this.release(true);
                 if (!game.activeMap || game.activeMap.id !== FURNITURE_GRAB.MAP) return;
+                if (game.questState) game.questState.aptVisited = true;          // she's been home: the furniture is hers (Inventory → Items)
                 const L = (game.questState && game.questState.aptLayout) || {};
                 game.activeMap.props.forEach((p, i) => {
                     p._aptIdx = i;

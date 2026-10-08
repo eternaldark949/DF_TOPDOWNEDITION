@@ -49,6 +49,8 @@
                     if (shieldBuff) set('shieldW', ((shieldBuff.shield / shieldBuff.maxShield) * 100).toFixed(1), v => { U.shieldFill.style.width = `${v}%`; });
                 }
                 
+                this.updateEquipmentHUD();
+
                 // --- 6. AUDIO VISUALIZER (Cosmetic) ---
                 // Random bar heights create a "playing music" effect (about 10 times a second is plenty)
                 if (++U.vizT >= 6) {
@@ -58,6 +60,57 @@
                 }
             },
             
+            updateEquipmentHUD() {
+                const U = this._equipmentHUD || (this._equipmentHUD = {
+                    root: document.getElementById('ui-equipment'), art: document.getElementById('equipment-art'),
+                    count: document.getElementById('equipment-ammo'), track: document.getElementById('equipment-ammo-track'),
+                    fill: document.getElementById('equipment-ammo-fill'), last: {}
+                });
+                if (!U.root) return;
+                const W = this.weaponMode !== 'none' ? this.currentWeapon : null;
+                const id = W ? W.id : '', L = U.last;
+                if (L.id !== id) {
+                    L.id = id;
+                    const c = U.art.getContext('2d'), size = U.art.width;
+                    c.clearRect(0, 0, size, size);
+                    if (W && WEAPON_MODELS[id]) {
+                        // Reuse the in-game weapon sprite, including its approved material finishes.
+                        const sp = bakeWeapon(weaponModel(id), false), scale = Math.min(120 / sp.w, 104 / sp.h);
+                        c.drawImage(sp.cv, (size - sp.w * scale) / 2, (size - sp.h * scale) / 2, sp.w * scale, sp.h * scale);
+                    } else {
+                        c.fillStyle = '#bcb0a6'; c.font = '32px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+                        c.fillText('—', size / 2, size / 2);
+                    }
+                    U.root.setAttribute('aria-label', W ? `Equipped item: ${W.name}` : 'Unarmed');
+                    U.root.title = W ? W.name : 'Unarmed';
+                }
+                const applicable = !!W && this.weaponMode !== 'melee';
+                // Presentation only: no ammo is consumed and no reload rules are introduced in this build.
+                // Future magazine data can provide ammoLoaded and stats.magazineCapacity to this readout.
+                const capacity = W && W.stats && W.stats.magazineCapacity;
+                const finite = applicable && Number.isFinite(W.ammoLoaded) && Number.isFinite(capacity) && capacity > 0;
+                const loaded = finite ? Math.max(0, Math.min(capacity, Math.floor(W.ammoLoaded))) : null;
+                const count = applicable ? (finite ? String(loaded) : '∞') : '--';
+                const fraction = finite ? loaded / capacity : 1;
+                const state = `${count}:${finite ? capacity : ''}:${applicable}:${!!this.weaponHolstered}`;
+                if (L.state !== state) {
+                    L.state = state;
+                    U.count.textContent = count;
+                    U.count.setAttribute('aria-label', applicable ? (finite ? `${loaded} rounds loaded` : 'Unlimited ammunition') : 'Ammo not applicable');
+                    U.track.hidden = !applicable;
+                    U.fill.style.transform = `scaleX(${fraction})`;
+                    U.root.classList.toggle('unlimited', applicable && !finite);
+                    U.root.classList.toggle('low-ammo', finite && fraction <= 0.2);
+                    U.root.classList.toggle('holstered', !!this.weaponHolstered && !!W);
+                    U.track.setAttribute('aria-valuetext', applicable ? (finite ? `${loaded} of ${capacity} rounds loaded` : 'Unlimited ammunition') : 'Ammo not applicable');
+                    for (const attr of ['aria-valuemin', 'aria-valuemax', 'aria-valuenow']) U.track.removeAttribute(attr);
+                    if (finite) {
+                        U.track.setAttribute('aria-valuemin', '0'); U.track.setAttribute('aria-valuemax', String(capacity));
+                        U.track.setAttribute('aria-valuenow', String(loaded));
+                    }
+                }
+            },
+
             /* =========================================================
                LOOT SPAWNING
                ---------------------------------------------------------

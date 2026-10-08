@@ -275,6 +275,93 @@
         /** Whether the car's lamps are burning (someone at the wheel). */
         const carLampsOn = v => v.hasDriver || v.controlMode === 'PLAYER' || (typeof game !== 'undefined' && game.car === v && game.isDriving);
 
+        // Rear-lamp motion streaks: short world-space histories, recorded only by simulation.
+        const CAR_TAIL_TRAIL = {
+            MAX_POINTS: 20, SAMPLE_TICKS: 2, MAX_LENGTH: 180, VIEW_PAD: 240,
+            COLORS: ['#ff2848', '#ff2244', '#fff4f8'],
+            CORES: ['#ff7288', '#ff788b', '#ffffff']
+        };
+
+        function updateCarTailTrail(v, map, view, tick) {
+            if (!v || v._reflectionProxy || !v.visible || v.dead || v.markedForDestroy ||
+                (view && (v.x < view.left || v.x > view.right || v.y < view.top || v.y > view.bottom))) {
+                if (v && !v._reflectionProxy) v._tailTrail = null;
+                return;
+            }
+            let h = v._tailTrail;
+            const jump = Math.max(64, (v.maxSpeed || 12) * 3);
+            if (!h || h.map !== map || tick < h.tick || Math.hypot(v.x - h.x, v.y - h.y) > jump) {
+                v._tailTrail = { map, points: [], x: v.x, y: v.y, tick, sampleTick: tick, moving: false };
+                return;
+            }
+            if (tick === h.tick) return;
+            // Displacement after collision resolution, rather than engine speed while pinned against a wall.
+            const speed = Math.hypot(v.x - h.x, v.y - h.y) / Math.max(1, tick - h.tick);
+            h.x = v.x; h.y = v.y; h.tick = tick;
+            h.moving = carLampsOn(v) && speed > 0.6;
+            const pts = h.points;
+            while (pts.length && tick - pts[0].tick >= pts[0].life) pts.shift();
+            if (!h.moving || tick - h.sampleTick < CAR_TAIL_TRAIL.SAMPLE_TICKS) return;
+            h.sampleTick = tick;
+            const strength = Math.max(0, Math.min(1, (speed - 0.6) / Math.max(1, (v.maxSpeed || 12) * 0.65 - 0.6)));
+            const life = Math.min(8 + strength * 16, CAR_TAIL_TRAIL.MAX_LENGTH / speed);
+            const ca = Math.cos(v.angle), sa = Math.sin(v.angle), rx = -v.length / 2 + 1;
+            const ry = Math.max(1, v.width / 2 - 6), rev = v.state === 'REVERSING';
+            pts.push({
+                x1: v.x + rx * ca + ry * sa, y1: v.y + rx * sa - ry * ca,
+                x2: v.x + rx * ca - ry * sa, y2: v.y + rx * sa + ry * ca,
+                tick, life, strength, color: rev ? 2 : v.speed < 0.5 ? 1 : 0
+            });
+            if (pts.length > CAR_TAIL_TRAIL.MAX_POINTS) pts.shift();
+        }
+
+        /** Emissive twin trails, binned into four fade bands to keep draw calls bounded. */
+        function drawCarTailTrail(ctx, v, dark, view, map) {
+            const h = v._tailTrail;
+            if (!h || h.map !== map || !h.points.length || v._reflectionProxy || !v.visible || v.dead) return;
+            if (Math.hypot(v.x - h.x, v.y - h.y) > Math.max(64, (v.maxSpeed || 12) * 3)) return;
+            const interpolated = RenderInterp._drawActive && RenderInterp.stepAdvanced;
+            const now = _simTick - (interpolated ? 1 - RenderInterp.alpha : 0);
+            const pts = h.points;
+            let count = pts.length;
+            while (count && pts[count - 1].tick > now) count--;
+            if (!count) return;
+            const ca = Math.cos(v.angle), sa = Math.sin(v.angle), rx = -v.length / 2 + 1;
+            const ry = Math.max(1, v.width / 2 - 6), last = pts[count - 1];
+            // Attach to the interpolated lamp position without writing a point during drawing.
+            const head = h.moving ? {
+                x1: v.x + rx * ca + ry * sa, y1: v.y + rx * sa - ry * ca,
+                x2: v.x + rx * ca - ry * sa, y2: v.y + rx * sa + ry * ca,
+                tick: now, life: last.life, strength: last.strength, color: last.color
+            } : null;
+            const alpha = ctx.globalAlpha, dayScale = 0.42 + Math.max(0, Math.min(1, dark * 1.6)) * 0.58;
+            ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            // Usually just one lamp colour; brake/reverse transitions retain their sampled colours.
+            for (let band = 0; band < 4; band++) for (let color = 0; color < 3; color++) {
+                let drawn = false;
+                for (let i = 1; i < count + (head ? 1 : 0); i++) {
+                    const a = pts[i - 1], b = i < count ? pts[i] : head;
+                    if (b.color !== color) continue;
+                    const remaining = Math.max(0, 1 - (now - (a.tick + b.tick) / 2) / Math.min(a.life, b.life));
+                    const weight = remaining * remaining * (a.strength + b.strength) / 2;
+                    if (weight < 0.015 || Math.min(3, Math.floor(weight * 4)) !== band) continue;
+                    if (Math.hypot(b.x1 - a.x1, b.y1 - a.y1) > 48 || Math.hypot(b.x2 - a.x2, b.y2 - a.y2) > 48) continue;
+                    if (view && (Math.max(a.x1, b.x1, a.x2, b.x2) < view.left - 8 || Math.min(a.x1, b.x1, a.x2, b.x2) > view.right + 8 ||
+                        Math.max(a.y1, b.y1, a.y2, b.y2) < view.top - 8 || Math.min(a.y1, b.y1, a.y2, b.y2) > view.bottom + 8)) continue;
+                    if (!drawn) { ctx.beginPath(); drawn = true; }
+                    ctx.moveTo(a.x1, a.y1); ctx.lineTo(b.x1, b.y1);
+                    ctx.moveTo(a.x2, a.y2); ctx.lineTo(b.x2, b.y2);
+                }
+                if (!drawn) continue;
+                const fade = (band + 0.5) / 4;
+                ctx.strokeStyle = CAR_TAIL_TRAIL.COLORS[color]; ctx.lineWidth = 6;
+                ctx.globalAlpha = alpha * dayScale * fade * 0.17; ctx.stroke();
+                ctx.strokeStyle = CAR_TAIL_TRAIL.CORES[color]; ctx.lineWidth = 1.6;
+                ctx.globalAlpha = alpha * dayScale * fade * 0.7; ctx.stroke();
+            }
+            ctx.restore();
+        }
+
         /** Lamps: turn signals, tail and brake lights, headlights (in the car's frame). */
         function drawCarLamps(ctx, v, farLOD) {
             const g = carGeo(v), L = g.L, W = g.W, on = carLampsOn(v);

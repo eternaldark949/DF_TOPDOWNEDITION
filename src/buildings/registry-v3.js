@@ -528,13 +528,13 @@
                 { x: 0, y: 280, w: 250, h: 420 },
                 { x: 650, y: 280, w: 250, h: 420 }
             ],
-            accentColor: '#ff69b4',
+            accentColor: '#d0ac72',
             label: 'Enni Cole',
             type: 'shopping',
             category: 'shopping',
             floors: 6,
-            sign: { text: 'Enni Cole', color: '#ff69b4', size: 36 },
-            door: { target: 'enni_cole_interior', label: 'Enter Store', lightColor: '#ff69b4' }
+            sign: { text: 'Enni Cole', color: '#f3ddb0', size: 38 },
+            door: { target: 'enni_cole_interior', label: 'Enter Store', lightColor: '#ffd392' }
         });
         
         BuildingV2Registry.register('cozy_cafe', {

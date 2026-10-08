@@ -317,6 +317,16 @@
                 if (cam.x > g.x1) fascia([P3(g.x1, g.yf, zf), P3(g.x1, g.yb, zf), P3(g.x1, g.yb, zc), P3(g.x1, g.yf, zc)]);
                 const k = this._sqK(zc), w = g.x1 - g.x0, d = SQ_PORTICO.depth;
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
+                // The portico's roof in its plane: painted once (PlaneSprites) while it's whole; faded, a flat image
+                // would show its layers through each other, so then it draws as vector
+                if (this._sqFade > 0.999) PlaneSprites.draw(ctx, this, 'portico', k, c => this._sqPorticoPlane(c, g, w, d, lod), { x: g.x0, y: g.yf, w, h: d });
+                else this._sqPorticoPlane(ctx, g, w, d, lod);
+                ctx.restore();
+            },
+
+            /** The portico's roof (in its plane, world coordinates): slab, marble inlay, balustrade, winged hexes, housings */
+            _sqPorticoPlane(ctx, g, w, d, lod) {
+                const T = SQ_THEME;
                 ctx.fillStyle = T.plum; ctx.fillRect(g.x0, g.yf, w, d);
                 ctx.fillStyle = T.terrace; ctx.fillRect(g.x0 + 5, g.yf + 4, w - 10, d - 9);
                 if (lod === 0) {                                                                             // marble inlay
@@ -335,7 +345,6 @@
                 // Uplight housings at the pilaster feet, against the wall
                 ctx.fillStyle = '#7d75a0';
                 for (const o of SQ_PORTICO.pilasters) ctx.fillRect(g.dx + o - 5, g.yf + 1, 10, 3);
-                ctx.restore();
             },
 
             /** Lantern columns: hexagonal plinth, silver shaft, a gilt collar under the lantern, hexagon lantern on top.
@@ -368,17 +377,23 @@
                 ctx.lineWidth = r * 0.7; ctx.strokeStyle = T.silverHi; ctx.stroke(hiL); ctx.strokeStyle = T.silverDk; ctx.lineWidth = r * 0.45; ctx.stroke(loL);
                 ctx.strokeStyle = '#d9bf86'; ctx.lineWidth = 1.6; ctx.stroke(collars);
                 ctx.fillStyle = '#e4e0f2'; ctx.fill(lanO); ctx.fillStyle = '#5b4d86'; ctx.fill(lanI);
-                for (const [ox, oy] of SQ_ENTRY.posts) {                                                    // triple-globe lamp posts
-                    const x = g.dx + ox, y = g.yf + oy, top = P3(x, y, 26), kk = this._sqK(26);
-                    ctx.strokeStyle = '#3a2a6e'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(top[0], top[1]); ctx.stroke();
-                    const l = P3(x - 9, y, 26), rr = P3(x + 9, y, 26);
-                    ctx.strokeStyle = T.gold; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(l[0], l[1]); ctx.lineTo(rr[0], rr[1]); ctx.stroke();
+                // Triple-globe lamp posts, LAMP_POST_SCALE about each base (applied to the points and widths here,
+                // so the four posts go out as one path a style: poles, crossbars, globes; none of them touch)
+                const S = LAMP_POST_SCALE, poles = new Path2D(), bars = new Path2D(), globes = new Path2D();
+                for (const [ox, oy] of SQ_ENTRY.posts) {
+                    const x = g.dx + ox, y = g.yf + oy, kk = this._sqK(26), sp = (q) => [x + (q[0] - x) * S, y + (q[1] - y) * S];
+                    const top = sp(P3(x, y, 26)), l = sp(P3(x - 9, y, 26)), rr = sp(P3(x + 9, y, 26));
+                    poles.moveTo(x, y); poles.lineTo(top[0], top[1]);
+                    bars.moveTo(l[0], l[1]); bars.lineTo(rr[0], rr[1]);
                     for (const gx of [-9, 0, 9]) {
-                        const q = P3(x + gx, y, gx ? 26 : 30);
-                        ctx.fillStyle = '#f4ecff'; ctx.beginPath(); ctx.arc(q[0], q[1], 3.3 * kk, 0, Math.PI * 2); ctx.fill();
-                        ctx.strokeStyle = 'rgba(189,168,238,0.9)'; ctx.lineWidth = 0.7; ctx.stroke();
+                        const q = sp(P3(x + gx, y, gx ? 26 : 30)), gr = 3.3 * kk * S;
+                        globes.moveTo(q[0] + gr, q[1]); globes.arc(q[0], q[1], gr, 0, Math.PI * 2);
                     }
                 }
+                ctx.strokeStyle = '#3a2a6e'; ctx.lineWidth = 2.2 * S; ctx.stroke(poles);
+                ctx.strokeStyle = T.gold; ctx.lineWidth = 1.2 * S; ctx.stroke(bars);
+                ctx.fillStyle = '#f4ecff'; ctx.fill(globes);
+                ctx.strokeStyle = 'rgba(189,168,238,0.9)'; ctx.lineWidth = 0.7 * S; ctx.stroke(globes);
                 ctx.restore();
             },
 
@@ -446,14 +461,17 @@
                 const cam = game.camera, t = _gameTimeSec, lod = _zoomLOD, fade = this._sqFade == null ? 1 : this._sqFade;
                 const P3 = (x, y, z) => this._sqP(x, y, z), a = Math.min(1, glow * 1.4);
                 const line = (p, q) => { ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
+                // All of it adds ('lighter'), so what shares a style goes out in one fill, in any order
                 ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1;
+                const dots = new Path2D();
                 for (const c of g.cols) {                                                                    // hot stripe up each shaft
                     const t0 = P3(c.x, c.y, g.zCol);
                     const gr = ctx.createLinearGradient(c.x, c.y + 2, t0[0], t0[1]);
                     gr.addColorStop(0, `rgba(240,222,255,${0.85 * a})`); gr.addColorStop(1, 'rgba(164,105,255,0)');
                     ctx.strokeStyle = gr; ctx.lineWidth = 2.2; line([c.x, c.y + 2], t0);
-                    ctx.fillStyle = `rgba(236,220,255,${0.9 * a})`; ctx.beginPath(); ctx.arc(c.x, c.y + SQ_PORTICO.colR + 3.5, 1.5, 0, Math.PI * 2); ctx.fill();
+                    const dy = c.y + SQ_PORTICO.colR + 3.5; dots.moveTo(c.x + 1.5, dy); dots.arc(c.x, dy, 1.5, 0, Math.PI * 2);
                 }
+                ctx.fillStyle = `rgba(236,220,255,${0.9 * a})`; ctx.fill(dots);
                 if (!lod) {                                                                                  // glitter on the wet marble and carpet
                     const wet = game.weather && game.weather.isRaining ? 1 : 0.6, pl = game.player;
                     for (let i = 0; i < 34; i++) {
@@ -472,13 +490,14 @@
                 ctx.globalAlpha = fade;
                 if (cam.y > g.yb - 2) {                                                                      // marquee bulbs chasing along the fascia
                     const zb = g.z - 2, n = Math.floor((g.x1 - g.x0 - 8) / (lod ? 14 : 9));
+                    const odd = lod ? LandmarkKit.bulb(ctx, '214,186,255', 1, 1.5) : LandmarkKit.bulb(ctx, '214,186,255', 1, 1.5, '200,168,255', 0.22, 4.5);
+                    const even = lod ? LandmarkKit.bulb(ctx, '255,238,214', 1, 1.5) : LandmarkKit.bulb(ctx, '255,238,214', 1, 1.5, '200,168,255', 0.22, 4.5), br = odd.r;
                     for (let i = 0; i <= n; i++) {
                         const p = P3(g.x0 + 4 + (g.x1 - g.x0 - 8) * i / n, g.yb, zb);
                         const on = 0.35 + 0.65 * Math.pow(Math.max(0, Math.cos(i * 0.55 - t * 4.2)), 3);
-                        ctx.fillStyle = i % 2 ? `rgba(214,186,255,${on * a})` : `rgba(255,238,214,${on * a})`;
-                        ctx.beginPath(); ctx.arc(p[0], p[1], 1.5, 0, Math.PI * 2); ctx.fill();
-                        if (!lod) { ctx.fillStyle = `rgba(200,168,255,${on * a * 0.22})`; ctx.beginPath(); ctx.arc(p[0], p[1], 4.5, 0, Math.PI * 2); ctx.fill(); }
+                        ctx.globalAlpha = fade * on * a; ctx.drawImage(i % 2 ? odd : even, p[0] - br, p[1] - br, br * 2, br * 2);
                     }
+                    ctx.globalAlpha = fade;
                     ctx.strokeStyle = `rgba(190,150,255,${0.75 * a})`; ctx.lineWidth = 1.2;
                     line(P3(g.x0, g.yb, g.z - 4.5), P3(g.x1, g.yb, g.z - 4.5));
                 }
@@ -491,22 +510,28 @@
                 ctx.restore();
                 // Hexagon lanterns crowning the columns (the pair at the door burns warmest)
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                const kT = this._sqK(g.zCol);
+                const kT = this._sqK(g.zCol), hexes = [new Path2D(), new Path2D()], a1 = ctx.globalAlpha;   // far, near
                 for (const c of g.cols) {
                     const p = P3(c.x, c.y, g.zCol), near = Math.abs(c.x - g.dx) < 100, flick = 0.92 + 0.08 * Math.sin(t * 2.7 + c.x);
                     const rr = (near ? 20 : 15) * kT, a0 = ctx.globalAlpha;                                      // glow sprites, violet halo round a warm core
                     ctx.globalAlpha = a0 * 0.3 * a * flick; drawGlow(ctx, p[0], p[1], rr, '180, 130, 255', 0);
                     ctx.globalAlpha = a0 * (near ? 0.75 : 0.6) * a * flick; drawGlow(ctx, p[0], p[1], rr * 0.4, near ? '255, 236, 220' : '214, 186, 255', 0);
                     ctx.globalAlpha = a0;
-                    ctx.beginPath(); for (let i = 0; i < 6; i++) { const an = i * Math.PI / 3; ctx[i ? 'lineTo' : 'moveTo'](p[0] + Math.cos(an) * 5.6 * kT, p[1] + Math.sin(an) * 5.6 * kT); } ctx.closePath();
-                    ctx.fillStyle = near ? `rgba(255,244,236,${0.95 * a})` : `rgba(232,218,255,${0.9 * a})`; ctx.fill();
+                    const h = hexes[+near]; for (let i = 0; i < 6; i++) { const an = i * Math.PI / 3; h[i ? 'lineTo' : 'moveTo'](p[0] + Math.cos(an) * 5.6 * kT, p[1] + Math.sin(an) * 5.6 * kT); } h.closePath();
                 }
-                for (const [ox, oy] of SQ_ENTRY.posts) for (const gx of [-9, 0, 9]) {                         // glitter globes on the lamp posts
-                    const q = P3(g.dx + ox + gx, g.yf + oy, gx ? 26 : 30), f = 0.9 + 0.1 * Math.sin(t * 3.1 + gx + oy);
-                    sqGlow(ctx, q[0], q[1], 13, `rgba(255,220,170,${0.55 * a * f})`, 'rgba(255,200,150,0)');
-                    ctx.fillStyle = `rgba(255,248,235,${0.95 * a})`; ctx.beginPath(); ctx.arc(q[0], q[1], 2.8, 0, Math.PI * 2); ctx.fill();
-                    const tw = lod ? 0 : Math.pow(Math.max(0, Math.sin(t * 4.3 + gx * 0.7 + oy)), 8);
-                    if (tw > 0.05) { ctx.fillStyle = `rgba(255,255,255,${tw * a})`; sqGlint(ctx, q[0] + 1.5, q[1] - 1.5, 2 + tw * 4); }
+                ctx.globalAlpha = a1;
+                ctx.fillStyle = `rgba(232,218,255,${0.9 * a})`; ctx.fill(hexes[0]);
+                ctx.fillStyle = `rgba(255,244,236,${0.95 * a})`; ctx.fill(hexes[1]);
+                // The whole globe burns bright, with a warm corona and soft bloom baked once.
+                const postBulb = _lampBulbEmissionSprite('#ffdcaa', 3.2, 'globe');
+                const postGlowSpan = 48 * this._sqK(26), L = LAMP_POST_SCALE, span = postGlowSpan * L;
+                for (const [ox, oy] of SQ_ENTRY.posts) {
+                    const x = g.dx + ox, y = g.yf + oy;                                                      // scaled LAMP_POST_SCALE about the post's foot
+                    for (const gx of [-9, 0, 9]) {
+                        const q = P3(x + gx, y, gx ? 26 : 30), f = 0.96 + 0.04 * Math.sin(t * 3.1 + gx + oy);
+                        ctx.globalAlpha = a * f;
+                        ctx.drawImage(postBulb, x + (q[0] - postGlowSpan / 2 - x) * L, y + (q[1] - postGlowSpan / 2 - y) * L, span, span);
+                    }
                 }
                 ctx.restore();
             },
@@ -650,6 +675,7 @@
                 const box = (s) => [mx + s[0] * main.w, my + s[1] * main.h, s[2] * main.w, s[3] * main.h];
                 this._sqGarden(ctx, box(SQ_ROOF.garden), emissive);
                 this._sqPool(ctx, box(SQ_ROOF.pool), emissive);
+                if (!emissive) PropPass.seg(true);                          // (nothing live here: a break, so the pool and the pad are two small sprites, not one wide one)
                 const wing = this.sections[1];
                 if (wing) this._sqEclipsePad(ctx, this.x + wing.x, this.y + wing.y, wing.w, wing.h, emissive);
             },
@@ -660,6 +686,7 @@
                 const y0 = y + h * 0.43, y1 = y + h * 0.57, ribs = 7, ribX = (i) => x + w * (0.08 + i * 0.66 / (ribs - 1));
                 const cabs = [[x + w * 0.86, y + h * 0.22], [x + w * 0.86, y + h * 0.78]];
                 if (!emissive) {
+                    if (PropPass.seg(false)) {                                                                 // (still: painted once with the roof)
                     ctx.fillStyle = '#2e2266'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
                     ctx.strokeStyle = 'rgba(217,191,134,0.55)'; ctx.lineWidth = 1.2; ctx.stroke();
                     ctx.fillStyle = 'rgba(214,202,240,0.22)'; ctx.fillRect(x + w * 0.05, y0, w * 0.9, y1 - y0);      // pale stone walk
@@ -686,16 +713,19 @@
                             ctx.arc(ribX(0) + span * r(i + 60), y0 - 6 + (y1 - y0 + 12) * r(i + 90), 1.5 + r(i + 120) * 2, 0, Math.PI * 2); ctx.fill();
                         }
                     }
-                    const wind = game.weather ? game.weather.windVec : { x: 1, y: 0.5 };
-                    cabs.forEach(([cx, cy], i) => this._sqCabana(ctx, cx, cy, 15, i, wind, t));
+                    }
+                    if (PropPass.seg(true)) {                                                                  // the cabanas stir: live
+                        const wind = game.weather ? game.weather.windVec : { x: 1, y: 0.5 };
+                        cabs.forEach(([cx, cy], i) => this._sqCabana(ctx, cx, cy, 15, i, wind, t));
+                    }
                 } else {
                     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                    const a = ctx.globalAlpha;
-                    for (let i = 0; i < ribs; i++) for (const py of [y0 - 4, y1 + 4]) {                   // gold lanterns on the pergola
+                    const a = ctx.globalAlpha, bulb = lod === 0 ? LandmarkKit.bulb(ctx, '255,240,210', 0.95, 1.5, '255,214,150', 0.5, 10, true) : LandmarkKit.bulb(ctx, '255,240,210', 0.95, 1.5), br = bulb.r;
+                    for (let i = 0; i < ribs; i++) for (const py of [y0 - 4, y1 + 4]) {                   // gold lanterns on the pergola, glow and all in one stamp
                         const rx = ribX(i), f = 0.8 + 0.2 * Math.sin(t * 2.1 + i * 1.3 + py);
-                        if (lod === 0) sqGlow(ctx, rx, py, 10, `rgba(255,214,150,${0.5 * f})`, 'rgba(255,214,150,0)');
-                        ctx.fillStyle = `rgba(255,240,210,${0.95 * f})`; ctx.beginPath(); ctx.arc(rx, py, 1.5, 0, Math.PI * 2); ctx.fill();
+                        ctx.globalAlpha = a * f; ctx.drawImage(bulb, rx - br, py - br, br * 2, br * 2);
                     }
+                    ctx.globalAlpha = a;
                     ctx.globalAlpha = a * (0.7 + 0.3 * Math.sin(t * 0.6));                                  // wisteria breathing over the walk
                     const g = ctx.createLinearGradient(0, y0 - 10, 0, y1 + 10);
                     g.addColorStop(0, 'rgba(180,150,255,0)'); g.addColorStop(0.5, 'rgba(180,150,255,0.24)'); g.addColorStop(1, 'rgba(180,150,255,0)');
@@ -709,16 +739,17 @@
             /** A cabana from above: folded canopy, sheer curtains billowing out on the downwind sides. */
             _sqCabana(ctx, cx, cy, s, seed, wind, t) {
                 const wl = Math.hypot(wind.x, wind.y) || 1, wx = wind.x / wl, wy = wind.y / wl, gust = Math.min(1, wl / 4);
-                ctx.fillStyle = 'rgba(185,162,245,0.55)';
+                const curtains = new Path2D();                                      // (the four only meet at the canopy's corners: one fill)
                 [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([nx, ny], k) => {
                     const push = Math.max(0, nx * wx + ny * wy), tx = -ny, ty = nx, ex = cx + nx * s, ey = cy + ny * s;
-                    ctx.beginPath(); ctx.moveTo(ex - tx * s, ey - ty * s);
+                    curtains.moveTo(ex - tx * s, ey - ty * s);
                     for (let j = 0; j <= 6; j++) {
                         const u = j / 3 - 1, billow = (1.5 + push * gust * (3 + 2.5 * Math.sin(t * 1.8 + seed * 2 + k + j * 0.9))) * Math.sin(j / 6 * Math.PI);
-                        ctx.lineTo(ex + tx * s * u + nx * billow, ey + ty * s * u + ny * billow);
+                        curtains.lineTo(ex + tx * s * u + nx * billow, ey + ty * s * u + ny * billow);
                     }
-                    ctx.closePath(); ctx.fill();
+                    curtains.closePath();
                 });
+                ctx.fillStyle = 'rgba(185,162,245,0.55)'; ctx.fill(curtains);
                 ctx.fillStyle = '#efe9ff'; ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
                 ctx.strokeStyle = '#c9bdf2'; ctx.lineWidth = 0.8; ctx.beginPath();
                 ctx.moveTo(cx - s, cy - s); ctx.lineTo(cx + s, cy + s); ctx.moveTo(cx + s, cy - s); ctx.lineTo(cx - s, cy + s); ctx.stroke();
@@ -731,16 +762,23 @@
                 const lotus = [];
                 for (let i = 0; i < 9; i++) lotus.push([x + w * (0.08 + r(i) * 0.84), y + h * (0.14 + r(i + 20) * 0.72), 5 + r(i + 40) * 3, r(i + 60) * 6.28]);
                 if (!emissive) {
+                    if (PropPass.seg(false)) {
                     ctx.fillStyle = '#b8acdc'; ctx.beginPath(); ctx.roundRect(x - 9, y - 9, w + 18, h + 18, 6); ctx.fill();   // pearl marble deck
                     ctx.strokeStyle = 'rgba(217,191,134,0.6)'; ctx.lineWidth = 1; ctx.stroke();
                     ctx.strokeStyle = 'rgba(118,100,206,0.4)'; ctx.lineWidth = 1; ctx.strokeRect(x - 4.5, y - 4.5, w + 9, h + 9);
                     ctx.fillStyle = LandmarkKit.grad(this, 'pool', () => { const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#3b2c9e'); g.addColorStop(0.55, '#1f0f70'); g.addColorStop(1, T.glass); return g; });
                     ctx.fillRect(x, y, w, h);
-                    ctx.strokeStyle = 'rgba(210,200,255,0.16)'; ctx.lineWidth = 1;                           // slow ripples of sky
-                    for (let i = 0; i < 3; i++) {
-                        const yy = y + h * (0.25 + i * 0.25) + Math.sin(t * 0.8 + i) * 2;
-                        ctx.beginPath(); ctx.moveTo(x + 8, yy); ctx.quadraticCurveTo(x + w / 2, yy + Math.sin(t + i) * 3, x + w - 8, yy); ctx.stroke();
                     }
+                    if (PropPass.seg(true)) {                                                                  // slow ripples of sky: live
+                        ctx.strokeStyle = 'rgba(210,200,255,0.16)'; ctx.lineWidth = 1;
+                        const ripples = new Path2D();                                                          // (they never cross: one stroke)
+                        for (let i = 0; i < 3; i++) {
+                            const yy = y + h * (0.25 + i * 0.25) + Math.sin(t * 0.8 + i) * 2;
+                            ripples.moveTo(x + 8, yy); ripples.quadraticCurveTo(x + w / 2, yy + Math.sin(t + i) * 3, x + w - 8, yy);
+                        }
+                        ctx.stroke(ripples);
+                    }
+                    if (PropPass.seg(false)) {
                     lotus.forEach(([lx, ly, lr, rot], i) => {
                         ctx.fillStyle = '#2e6b5c'; ctx.beginPath(); ctx.moveTo(lx, ly); ctx.arc(lx, ly, lr, rot + 0.35, rot + Math.PI * 2 - 0.35); ctx.closePath(); ctx.fill();
                         if (i % 2 === 0 && lod < 2) this._sqLotus(ctx, lx, ly, lr * 0.8, rot);
@@ -754,6 +792,7 @@
                         const cx = x + w * u, cy = y - 36;
                         for (let j = 0; j < 8; j++) { ctx.fillStyle = j % 2 ? '#b8a6ee' : '#f7f4ff'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, 12, j * Math.PI / 4, (j + 1) * Math.PI / 4); ctx.closePath(); ctx.fill(); }
                         ctx.fillStyle = T.gold; ctx.beginPath(); ctx.arc(cx, cy, 1.8, 0, Math.PI * 2); ctx.fill();
+                    }
                     }
                 } else {
                     ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
@@ -793,6 +832,7 @@
                 const cx = sx + sw / 2, cy = sy + sh / 2, R = Math.min(sw, sh) * 0.34, E = R * 0.52, t = _gameTimeSec, T = SQ_THEME;
                 const rot = -0.8, corners = [[sx + 34, sy + 34], [sx + sw - 34, sy + 34], [sx + 34, sy + sh - 34], [sx + sw - 34, sy + sh - 34]];
                 if (!emissive) {
+                    if (!PropPass.seg(false)) return;                                                           // (still: painted with the roof)
                     for (const [px, py] of corners) {                                                        // wisteria in round planters
                         ctx.fillStyle = '#8f86b0'; ctx.beginPath(); ctx.arc(px, py, 16, 0, Math.PI * 2); ctx.fill();
                         ctx.fillStyle = '#6a4fb8'; ctx.beginPath(); ctx.arc(px, py, 13, 0, Math.PI * 2); ctx.fill();
@@ -874,15 +914,17 @@
                 const T = SQ_THEME, n = 8, t = _gameTimeSec;
                 const tip = (i) => { const an = spin + i * Math.PI * 2 / n, hh = R * (i % 2 ? 0.16 : 0.27); return [an, cx + Math.cos(an) * (R + hh), cy + Math.sin(an) * (R + hh)]; };
                 if (!emissive) {
-                    ctx.fillStyle = T.silverHi;
+                    const points = new Path2D(), dotsA = new Path2D(), dotsB = new Path2D(), dr = 1 + R * 0.035;   // (the points never touch: one fill)
                     for (let i = 0; i < n; i++) {                                                            // crown points
                         const [an, tx, ty] = tip(i), bw = 0.14;
-                        ctx.beginPath(); ctx.moveTo(cx + Math.cos(an - bw) * R, cy + Math.sin(an - bw) * R); ctx.lineTo(tx, ty);
-                        ctx.lineTo(cx + Math.cos(an + bw) * R, cy + Math.sin(an + bw) * R); ctx.closePath(); ctx.fill();
+                        points.moveTo(cx + Math.cos(an - bw) * R, cy + Math.sin(an - bw) * R); points.lineTo(tx, ty);
+                        points.lineTo(cx + Math.cos(an + bw) * R, cy + Math.sin(an + bw) * R); points.closePath();
+                        const d = i % 2 ? dotsB : dotsA; d.moveTo(tx + dr, ty); d.arc(tx, ty, dr, 0, Math.PI * 2);
                     }
+                    ctx.fillStyle = T.silverHi; ctx.fill(points);
                     ctx.strokeStyle = T.silverHi; ctx.lineWidth = Math.max(1.5, R * 0.07); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
                     ctx.strokeStyle = T.gold; ctx.lineWidth = Math.max(0.8, R * 0.03); ctx.beginPath(); ctx.arc(cx, cy, R * 0.93, 0, Math.PI * 2); ctx.stroke();
-                    for (let i = 0; i < n; i++) { const [, tx, ty] = tip(i); ctx.fillStyle = i % 2 ? '#b89cff' : T.gold; ctx.beginPath(); ctx.arc(tx, ty, 1 + R * 0.035, 0, Math.PI * 2); ctx.fill(); }
+                    ctx.fillStyle = T.gold; ctx.fill(dotsA); ctx.fillStyle = '#b89cff'; ctx.fill(dotsB);
                 } else {
                     ctx.strokeStyle = 'rgba(180,140,255,0.35)'; ctx.lineWidth = R * 0.22; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
                     ctx.strokeStyle = 'rgba(255,236,200,0.75)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, R * 0.93, 0, Math.PI * 2); ctx.stroke();
@@ -947,10 +989,9 @@
                     for (let bi = 0; bi < 8; bi++) {
                         const pts = bands[bi];
                         if (!pts.length) continue;
-                        const on = 0.55 + 0.45 * ((bi % 4) + 0.5) / 4;
-                        ctx.beginPath();
-                        for (let j = 0; j < pts.length; j += 2) { ctx.moveTo(pts[j] + 1.5, pts[j + 1]); ctx.arc(pts[j], pts[j + 1], 1.5, 0, Math.PI * 2); }
-                        ctx.globalAlpha = a0 * on; ctx.fillStyle = bi < 4 ? 'rgb(255,236,205)' : 'rgb(236,224,255)'; ctx.fill();
+                        const on = 0.55 + 0.45 * ((bi % 4) + 0.5) / 4, path = new Path2D();   // (built off the context: one call, not two a bulb)
+                        for (let j = 0; j < pts.length; j += 2) { path.moveTo(pts[j] + 1.5, pts[j + 1]); path.arc(pts[j], pts[j + 1], 1.5, 0, Math.PI * 2); }
+                        ctx.globalAlpha = a0 * on; ctx.fillStyle = bi < 4 ? 'rgb(255,236,205)' : 'rgb(236,224,255)'; ctx.fill(path);
                     }
                     ctx.globalAlpha = a0;
                 }

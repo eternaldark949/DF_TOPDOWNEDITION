@@ -1003,6 +1003,51 @@
         .node-btn.drop-btn { background: var(--df-violet-mid); color: #fff; }
         .node-btn:hover { filter: brightness(1.15); }
 
+        /* Inventory ownership views use the existing capsule design. */
+        #inventory-list .inventory-section-title {
+            font: 600 0.7rem var(--font-ui); letter-spacing: 2px;
+            color: var(--df-champagne); text-transform: uppercase;
+            margin: 8px 8px 18px;
+        }
+        #inventory-list .inventory-entry-body { flex: 1; min-width: 0; }
+        #inventory-list .inventory-entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+        #inventory-list .pill-name { min-width: 0; overflow-wrap: anywhere; }
+        #inventory-list .inventory-entry-detail {
+            color: var(--df-lavender); font: 500 0.58rem/1.5 var(--font-ui);
+            letter-spacing: 0.5px; margin-top: 5px;
+        }
+        #inventory-list .active-item .inventory-entry-detail { color: var(--df-violet-ink); }
+        #inventory-list .active-item.type-collectible .pill-name { color: #5b2fc4; }
+        #inventory-list .inventory-registry-tag {
+            color: var(--df-champagne); border: 1px solid rgba(216,198,162,.35);
+            border-radius: 8px; padding: 2px 6px;
+            font: 600 0.5rem var(--font-ui); letter-spacing: 1px;
+        }
+        #inventory-list .inventory-registry-readonly { cursor: default; padding-right: 22px; }
+        #inventory-list .inventory-empty { color: var(--df-lavender); text-align: center; margin: 50px 12px; font-size: .75rem; }
+        #inventory-list .control-node {
+            width: 44px; height: 44px; right: 5px; padding: 0; border: 0;
+            background: transparent; box-shadow: none;
+            transform: translateY(-50%); border-radius: 12px;
+        }
+        #inventory-list .control-node::before {
+            content: ''; position: absolute; left: 17px; top: 17px;
+            width: 10px; height: 10px; background: #fffdfa;
+            transform: rotate(45deg); transition: transform .3s;
+            box-shadow: 0 0 8px rgba(255,194,72,.8), 0 0 18px rgba(202,176,250,.5);
+        }
+        #inventory-list .control-node:hover, #inventory-list .expanded .control-node { transform: translateY(-50%); }
+        #inventory-list .expanded .control-node::before { transform: rotate(225deg); }
+        #inventory-list .control-node:focus-visible { outline: 2px solid var(--df-champagne); outline-offset: 1px; }
+        #inventory-list .node-menu { z-index: 101; right: 50px; }
+        #inventory-list .node-btn { min-height: 36px; }
+        @media (max-width: 700px), (max-height: 540px) {
+            #inventory-list .pill-icon { width: 42px; height: 42px; margin-right: 10px; }
+            #inventory-list .ui-pill { padding-left: 14px; min-height: 88px; }
+            #inventory-list .pill-name { font-size: .7rem; letter-spacing: 1px; }
+            #inventory-list .node-btn { min-height: 40px; }
+        }
+
         /* The flit ring round the move stick: fill = flit charge (initJoystick / updateFlitRing) */
         #joystick-ring {
             position: absolute; left: 50%; top: 50%; width: 192px; height: 192px; transform: translate(-50%, -50%);

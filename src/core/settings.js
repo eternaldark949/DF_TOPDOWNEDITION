@@ -145,11 +145,12 @@
             
             // --- VISUAL ---
             lightingQuality: 'high',        // 'low' | 'medium' | 'high'
+            adaptiveLighting: true,         // measured outdoor soft-light trials; character and HUD resolution stay fixed
             filmGrain: true,                // Film grain overlay
             softShadows: true,              // Soft shadow edges: the light layer at half resolution, blurred (on for high quality)
             bloom: true,                    // Post-process light bleed
             wetReflections: true,           // (old saves) false → reflections 'off'
-            reflections: 'high',            // 'high' | 'medium' | 'off': puddles and the wet street mirror the lights (engine/reflections.js)
+            reflections: 'high',            // 'ultra' | 'high' | 'medium' | 'off': puddles and the wet street mirror the lights (engine/reflections.js)
             photoReflections: true,         // Cinematic View's own toggle
             atmosphereTint: '',             // Color wash: '' | 'amber' | 'violet' | 'crimson' | 'teal'
             colorGrade: 'none',             // 'none' | 'amber_night' | 'violet_noir' | 'crimson' | 'cold_teal' | 'dreampunk' | 'custom'
@@ -163,8 +164,9 @@
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
-            baseline: false,                // the ground and Stella only: the most this device can give the game (not kept)
+            baseline: false,                // Baseline's layer panel (ui/render-layers.js): each render layer on a chip, with its calls (not kept)
             countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
+            propSprites: true,              // furniture painted once and stamped (entities/prop-sprites.js); off draws it as vector (not kept)
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.

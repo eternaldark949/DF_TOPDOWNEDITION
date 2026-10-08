@@ -15,7 +15,8 @@
         
             start() {
                 this.active = true;
-                
+                this.game.scenes?.ui?.showPause(true);
+                window.pauseMenuController?._syncCutsceneMenu();
                 // 1. Letterbox Effect
                 if (this.bars) this.bars.classList.add('active'); 
                 
@@ -23,7 +24,7 @@
                 
                 // 3. Hide HUD
                 const ui = document.getElementById('game-ui');
-                if (ui) ui.style.opacity = '0'; 
+                if (ui) { ui.style.opacity = '0'; syncHudInput(this.game); } 
                 
                 // 4. Take initial control of camera logic
                 // We sync the target to the camera's current spot so it doesn't "jump"
@@ -34,14 +35,15 @@
         
             end() {
                 this.active = false;
-                
+                if (!this.game.scenes?.running) this.game.scenes?.ui?.showPause(false);   // a cutscene ending inside a scene (a boss intro) keeps the scene's pause and skip
+                window.pauseMenuController?._syncCutsceneMenu();
                 // 1. Remove Letterbox
                 if (this.bars) this.bars.classList.remove('active');
                 
                 
                 // 3. Show HUD
                 const ui = document.getElementById('game-ui');
-                if (ui) ui.style.opacity = '1';
+                if (ui) { ui.style.opacity = '1'; syncHudInput(this.game); }
                 
                 // 4. Ensure Title Text is gone
                 if (this.overlay) this.overlay.style.opacity = '0'; 

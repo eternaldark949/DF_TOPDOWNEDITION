@@ -35,12 +35,13 @@
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
                     this._prof.classList.toggle('full', mode === 'full');
-                    if (mode !== 'full' || !GameSettings.countCalls) this._countCalls(false);   // the call counter: Full, and only when asked for
                     this._report = null;
                 }
+                this._countCalls(this._wantCalls(game));
                 if (game.debugMode) this._ensureDbg();
                 if (this._dbg) this._dbg.style.display = game.debugMode ? '' : 'none';
                 document.body.classList.toggle('dev-debug', !!game.debugMode);
+                document.body.classList.toggle('dev-prof-full', mode === 'full');   // (in portrait it shares the column with the dock)
             },
 
             _ensureProf() {
@@ -55,6 +56,19 @@
                 document.body.appendChild(el);
                 this._prof = el; this._spark = el.querySelector('.dp-spark'); this._sctx = this._spark.getContext('2d');
                 this._fpsEl = el.querySelector('.dp-fps'); this._msEl = el.querySelector('.dp-ms'); this._rowsEl = el.querySelector('.dp-rows');
+            },
+
+            /** The call counter: the Full profiler with Count Canvas Calls, or Baseline's layer panel */
+            _wantCalls(game) {
+                return !!(game.showProfiler && GameSettings.profilerMode === 'full' && GameSettings.countCalls)
+                    || (typeof RenderLayers !== 'undefined' && RenderLayers.active);
+            },
+
+            /** One column for the dev panels (Baseline's layers over the Debug chips), so both can be open */
+            dock() {
+                let d = document.getElementById('dev-dock');
+                if (!d) { d = document.createElement('div'); d.id = 'dev-dock'; document.body.appendChild(d); }
+                return d;
             },
 
             _ensureDbg() {
@@ -72,7 +86,7 @@
                     if (L.has(k)) L.delete(k); else L.add(k);
                     b.classList.toggle('on', L.has(k)); this._saveLayers();
                 });
-                document.body.appendChild(el);
+                this.dock().appendChild(el);
                 this._dbg = el; this._countsEl = el.querySelector('.dl-counts');
             },
 
@@ -80,9 +94,11 @@
             frame(game) {
                 const now = performance.now(), dt = this._last ? now - this._last : 16.7;
                 this._last = now;
+                if (this._calls) {                        // (a running count: Baseline's layer panel bills from it too)
+                    this._callTotal += RenderStats.calls - this._callMark; this._callMark = RenderStats.calls; this._callFrames++;
+                }
                 if (!game.showProfiler && !game.debugMode) return;
                 this._times[this._ti] = dt; this._ti = (this._ti + 1) % this._times.length;
-                if (this._calls) { this._callTotal += RenderStats.calls; this._callFrames++; RenderStats.calls = 0; }
                 this._n++;
                 if (game.showProfiler && this._prof) {
                     if (this._n % 3 === 0) this._sparkStep(dt);
@@ -143,8 +159,8 @@
              */
             /** Bodies drawn / culled this frame, and canvas calls a frame (counted only while Full is open) */
             _renderLine(game, workMs) {
-                const counting = !!GameSettings.countCalls;
-                this._countCalls(counting);
+                this._countCalls(this._wantCalls(game));
+                const counting = !!this._calls;
                 const n = this._callFrames ? Math.round(this._callTotal / this._callFrames) : 0;
                 this._callTotal = 0; this._callFrames = 0;
                 // frame time (last 30 frames) minus the game's own measured work: raster in the browser's GPU process, GC, the compositor
@@ -167,12 +183,13 @@
                 if (nb) parts.push(`<span>buildings <b>${RenderStats.bldBase}</b>/${RenderStats.bldTops} of ${nb}</span>`);
                 const mem = this._canvasMB(game);
                 if (mem.groundN) parts.push(`<span>ground <b>${mem.groundN}</b> tiles (${mem.ground.toFixed(0)} MB)</span>`);
+                if (mem.props) parts.push(`<span>furniture sprites <b>${mem.props.toFixed(1)}</b> MB</span>`);
                 parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB</span>`);
                 return parts.join('');
             },
 
             /** Pixel memory held by the game's big canvas caches (4 bytes a pixel): ground tiles, painted floors,
-                car sprites, the baked crowd. Recounted every half second. */
+                car sprites, the baked crowd, furniture sprites. Recounted every half second. */
             _canvasMB(game) {
                 const now = performance.now();
                 if (this._memAt && now - this._memAt < 500) return this._mem;
@@ -183,16 +200,17 @@
                 if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
                 if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
                 if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv);
-                this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, total: (ground + floors + cars + crowd) * MB };
+                const props = typeof PropSprites !== 'undefined' ? PropSprites.bytes / 4 : 0;
+                this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
                 this._memAt = now;
                 return this._mem;
             },
 
-            /** A counting shim on the 2D context's methods (Full profiler only; removed when it closes) */
+            /** A counting shim on the 2D context's methods (the Full profiler's count, or Baseline's panel; removed when both close) */
             _countCalls(on) {
                 const P = CanvasRenderingContext2D.prototype;
                 if (on && !this._calls) {
-                    this._calls = {}; this._callTotal = 0; this._callFrames = 0;
+                    this._calls = {}; this._callTotal = 0; this._callFrames = 0; this._callMark = RenderStats.calls;
                     for (const k of Object.getOwnPropertyNames(P)) {
                         const d = Object.getOwnPropertyDescriptor(P, k);
                         if (!d || typeof d.value !== 'function' || k === 'constructor') continue;

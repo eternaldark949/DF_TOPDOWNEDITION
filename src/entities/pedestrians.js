@@ -255,7 +255,7 @@
                 this._setQuip(this._pickQuip(cat));
             }
             
-            update(player, trafficVehicles = [], otherPedestrians = []) {
+            update(player, trafficVehicles = [], otherPedestrians = [], searches = null) {
                 if (this.dead) return;
                 
                 // Tick quip bubble animation/lifetime
@@ -289,22 +289,22 @@
                     this.vehicleCheckCooldown--;
                 } else if (this.state === 'walking' || this.state === 'crossing') {
                     this.vehicleCheckCooldown = 8;
-                    this._checkVehicleThreat(trafficVehicles);
+                    this._checkVehicleThreat(trafficVehicles, searches && searches.vehicles);
                 }
                 
                 // State machine
                 switch (this.state) {
                     case 'walking':
-                        this._updateWalking(player, trafficVehicles, otherPedestrians);
+                        this._updateWalking(player, trafficVehicles, otherPedestrians, searches);
                         break;
                     case 'waiting':
-                        this._updateWaiting(trafficVehicles);
+                        this._updateWaiting(trafficVehicles, searches && searches.vehicles);
                         break;
                     case 'crossing':
                         this._updateCrossing(player, otherPedestrians);
                         break;
                     case 'dodging':
-                        this._updateDodging(trafficVehicles);
+                        this._updateDodging(trafficVehicles, searches && searches.vehicles);
                         break;
                     case 'sprawled':
                         this._updateSprawled();
@@ -326,14 +326,15 @@
              * The world philosophy: a car "could have killed me" must
              * register on the body. This function is what makes that real.
              */
-            _checkVehicleThreat(trafficVehicles) {
+            _checkVehicleThreat(trafficVehicles, carSearch = null) {
                 if (!trafficVehicles || trafficVehicles.length === 0) return;
                 
                 const PREDICT_FRAMES = 60;             // ~1 second lookahead
                 const REACT_RADIUS = 90;               // peds notice cars within this range
                 const CONTACT_RADIUS = 18;             // overlap = sprawl
+                const candidates = carSearch ? carSearch.query(this.x, this.y, REACT_RADIUS) : trafficVehicles;
                 
-                for (const car of trafficVehicles) {
+                for (const car of candidates) {
                     if (!car || car.dead) continue;
                     
                     const dx = car.x - this.x;
@@ -439,7 +440,7 @@
                 }
             }
             
-            _updateDodging(trafficVehicles) {
+            _updateDodging(trafficVehicles, carSearch = null) {
                 if (this.dodgeTimer <= 0) {
                     this.state = 'walking';
                     return;
@@ -458,7 +459,8 @@
                 
                 // If a car is now on top of us mid-dodge, sprawl
                 if (trafficVehicles) {
-                    for (const car of trafficVehicles) {
+                    const candidates = carSearch ? carSearch.query(this.x, this.y, 18) : trafficVehicles;
+                    for (const car of candidates) {
                         if (!car || car.dead) continue;
                         const dx = car.x - this.x, dy = car.y - this.y;
                         if (Math.abs(dx) >= 18 || Math.abs(dy) >= 18) continue;
@@ -490,7 +492,7 @@
                 }
             }
             
-            _updateWalking(player, trafficVehicles, otherPedestrians) {
+            _updateWalking(player, trafficVehicles, otherPedestrians, searches = null) {
                 const targetNode = this._getNode(this.targetNodeId);
                 if (!targetNode) {
                     this._findNearestNode();
@@ -508,7 +510,7 @@
                 // Check if approaching a crosswalk
                 if (targetNode.isCrosswalk && dist < 50 && !currentNode.isCrosswalk) {
                     // Check for traffic before crossing
-                    if (this._isTrafficClear(targetNode.crosswalkData, trafficVehicles)) {
+                    if (this._isTrafficClear(targetNode.crosswalkData, trafficVehicles, searches && searches.vehicles)) {
                         this.state = 'crossing';
                         this.crossingTimer = 0;
                     } else {
@@ -532,8 +534,9 @@
                         if (pd < 60 && pd > 0.1) { moveX += (this.x - p.x) / pd * 1.5; moveY += (this.y - p.y) / pd * 1.5; }
                     }
                     
-                    // Avoid other pedestrians
-                    for (let other of otherPedestrians) {
+                    // Avoid other pedestrians, in the same source-array order as the full scan.
+                    const neighbours = searches ? searches.pedestrians.query(this.x, this.y, 30) : otherPedestrians;
+                    for (let other of neighbours) {
                         if (other === this || other.dead) continue;
                         const odx = other.x - this.x, ody = other.y - this.y;
                         if (Math.abs(odx) >= 30 || Math.abs(ody) >= 30) continue;
@@ -563,7 +566,7 @@
                 }
             }
             
-            _updateWaiting(trafficVehicles) {
+            _updateWaiting(trafficVehicles, carSearch = null) {
                 this.waitTimer++;
                 
                 const targetNode = this._getNode(this.targetNodeId);
@@ -574,7 +577,7 @@
                 
                 // Check traffic periodically
                 if (this.waitTimer % 30 === 0) {
-                    if (this._isTrafficClear(targetNode.crosswalkData, trafficVehicles)) {
+                    if (this._isTrafficClear(targetNode.crosswalkData, trafficVehicles, carSearch)) {
                         this.state = 'crossing';
                         this.crossingTimer = 0;
                     }
@@ -627,14 +630,15 @@
                 }
             }
             
-            _isTrafficClear(crosswalkData, trafficVehicles) {
+            _isTrafficClear(crosswalkData, trafficVehicles, carSearch = null) {
                 if (!crosswalkData) return true;
                 
                 const checkDist = 250; // How far to check for oncoming traffic
                 const cwCenterX = crosswalkData.x + crosswalkData.w / 2;
                 const cwCenterY = crosswalkData.y + crosswalkData.h / 2;
+                const candidates = carSearch ? carSearch.query(cwCenterX, cwCenterY, checkDist) : trafficVehicles;
                 
-                for (let vehicle of trafficVehicles) {
+                for (let vehicle of candidates) {
                     if (!vehicle || vehicle.dead) continue;
                     
                     const dx = vehicle.x - cwCenterX, dy = vehicle.y - cwCenterY;
@@ -830,6 +834,94 @@
             }
         }
         
+        // Local crowd searches retain source-array order. Each moved pedestrian updates
+        // its cell immediately, so the original reverse-order simulation sees live neighbours.
+        const _crowdPointOrder = (a, b) => a.index - b.index;
+        class OrderedCrowdPointGrid {
+            constructor(cellSize) {
+                this.cellSize = cellSize; this.columns = new Map(); this.used = [];
+                this.records = []; this.count = 0; this.epoch = 0; this.seen = new Set(); this.duplicates = false;
+                this.loose = { items: [], epoch: -1 }; this.hits = []; this.results = [];
+            }
+
+            clear(resetCells = false) {
+                for (const cell of this.used) cell.items.length = 0;
+                this.used.length = this.hits.length = this.results.length = 0;
+                for (let i = 0; i < this.count; i++) { this.records[i].item = null; this.records[i].active = false; }
+                this.count = 0; this.seen.clear(); this.duplicates = false;
+                if (resetCells) this.columns.clear();
+            }
+
+            _cell(item) {
+                if (!item || !Number.isFinite(item.x) || !Number.isFinite(item.y)) return this.loose;
+                const col = Math.floor(item.x / this.cellSize), row = Math.floor(item.y / this.cellSize);
+                let rows = this.columns.get(col);
+                if (!rows) this.columns.set(col, rows = new Map());
+                let cell = rows.get(row);
+                if (!cell) rows.set(row, cell = { items: [], epoch: -1 });
+                return cell;
+            }
+
+            _insert(record, cell) {
+                if (cell.epoch !== this.epoch) { cell.epoch = this.epoch; this.used.push(cell); }
+                cell.items.push(record); record.cell = cell;
+            }
+
+            build(items) {
+                this.clear(); this.epoch++; this.count = items.length;
+                for (let i = 0; i < items.length; i++) {
+                    const record = this.records[i] || (this.records[i] = {});
+                    record.item = items[i]; record.index = i; record.active = true;
+                    // A repeated body can move through either entry in the same pass. A full scan
+                    // preserves that unusual source's repeated contributions and first-hit order.
+                    if (this.seen.has(record.item)) this.duplicates = true; else this.seen.add(record.item);
+                    this._insert(record, this._cell(record.item));
+                }
+            }
+
+            update(index) {
+                const record = this.records[index];
+                if (!record || !record.active) return;
+                const cell = this._cell(record.item);
+                if (cell === record.cell) return;
+                const old = record.cell.items, slot = old.indexOf(record);
+                if (slot >= 0) old.splice(slot, 1);
+                this._insert(record, cell);
+            }
+
+            remove(index) {
+                const record = this.records[index];
+                if (!record || !record.active) return;
+                const old = record.cell.items, slot = old.indexOf(record);
+                if (slot >= 0) old.splice(slot, 1);
+                record.item = null; record.active = false;
+            }
+
+            // Conservative cell candidates; all original radius, heading and state checks stay below.
+            // Unusual nonfinite points retain the old full-scan behaviour rather than disappearing.
+            query(x, y, radius) {
+                const hits = this.hits, out = this.results; hits.length = out.length = 0;
+                if (this.duplicates || this.count <= 8 || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(radius) || radius < 0) {
+                    for (let i = 0; i < this.count; i++) if (this.records[i].active) out.push(this.records[i].item);
+                    return out;
+                }
+                const S = this.cellSize;
+                const c0 = Math.floor((x - radius) / S), c1 = Math.floor((x + radius) / S);
+                const r0 = Math.floor((y - radius) / S), r1 = Math.floor((y + radius) / S);
+                for (let col = c0; col <= c1; col++) {
+                    const rows = this.columns.get(col); if (!rows) continue;
+                    for (let row = r0; row <= r1; row++) {
+                        const cell = rows.get(row); if (!cell) continue;
+                        for (const record of cell.items) hits.push(record);
+                    }
+                }
+                for (const record of this.loose.items) hits.push(record);
+                hits.sort(_crowdPointOrder);
+                for (const record of hits) out.push(record.item);
+                return out;
+            }
+        }
+
         /**
          * =====================================================================
          *  PEDESTRIAN MANAGER
@@ -843,6 +935,7 @@
                 this.network = null; // Sidewalk network from CityLayout
                 this.spawnTimer = 0;
                 this.maxPedestrians = 40;
+                this._localSearches = { pedestrians: new OrderedCrowdPointGrid(64), vehicles: new OrderedCrowdPointGrid(128) };
                 this.spawnRadius = { min: CONFIG.CULLING.PEDESTRIAN_SPAWN_MIN, max: CONFIG.CULLING.PEDESTRIAN_SPAWN_MAX }; // Spawn distance from player
                 this.despawnRadius = CONFIG.CULLING.PEDESTRIAN_DESPAWN;
             }
@@ -863,6 +956,7 @@
                 }
                 this.pedestrians = [];
                 this.network = null;
+                this._localSearches.pedestrians.clear(true); this._localSearches.vehicles.clear(true);
             }
             
             /**
@@ -877,6 +971,9 @@
                 // Only in outdoor maps with a network
                 if (map.type === 'indoor' || !this.network || !this.network.nodes) return;
                 
+                // Car centers do not move during this pass; speed changes from impacts stay live.
+                const searches = this._localSearches;
+                searches.pedestrians.build(this.pedestrians); searches.vehicles.build(trafficVehicles);
                 // Update existing pedestrians
                 for (let i = this.pedestrians.length - 1; i >= 0; i--) {
                     const ped = this.pedestrians[i];
@@ -886,8 +983,10 @@
                     if (ped.dead || distToPlayer > this.despawnRadius) {
                         if (!ped.markedForDestroy) ped.destroy();
                         this.pedestrians.splice(i, 1);
+                        searches.pedestrians.remove(i);
                     } else {
-                        ped.update(player, trafficVehicles, this.pedestrians);
+                        ped.update(player, trafficVehicles, this.pedestrians, searches);
+                        searches.pedestrians.update(i); // later pedestrians see this one's new position, even across a cell edge
                         // Ambient quip rolls — runs every frame but cheap due to the
                         // early-exit on cooldown / active quip inside tryQuip.
                         ped.tryQuip(player, weaponOut, enemies);

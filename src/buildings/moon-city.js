@@ -144,7 +144,9 @@
                 return { n, beat, bar, kick: Math.pow(1 - beat, 3) };
             },
 
-            /** A wall: lacquer between violet neon fins, smoked-glass bands, gold cornices. */
+            /** A wall: lacquer between violet neon fins, smoked-glass bands, gold cornices. Each kind on a face goes out
+                as one path (panes, fins; nothing of one kind touches), the fins at night one stroke a fin (each breathes
+                on its own). */
             _mcFace(ctx, f, P, emissive) {
                 if (f.side === 'C') return;
                 const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
@@ -152,36 +154,33 @@
                 if (Math.hypot(dx - ax, dy - ay) < 4) return;
                 const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
                 const len = Math.hypot(bx - ax, by - ay), n = Math.max(2, Math.round(len / MCX.FIN)), C = MCX.C;
-                const quad = (u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); };
-                const line = (u0, v0, u1, v1) => { const a = at(u0, v0), b = at(u1, v1); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); };
+                const quad = (path, u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); path.lineTo(c[0], c[1]); path.lineTo(d[0], d[1]); path.closePath(); return path; };
+                const seg = (path, u0, v0, u1, v1) => { const a = at(u0, v0), b = at(u1, v1); path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); return path; };
+                const panes = new Path2D();
+                for (let i = 0; i < n; i++) quad(panes, (i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
                 if (!emissive) {
                     // smoked glass between the fins
                     const sun = sunNow(), day = sun ? sun.day : 0;
-                    for (let i = 0; i < n; i++) {
-                        quad((i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
-                        ctx.fillStyle = 'rgba(12, 6, 20, 0.92)'; ctx.fill();
-                        if (day > 0.05) { ctx.fillStyle = `rgba(168, 160, 220, ${0.22 * day})`; ctx.fill(); }
-                    }
-                    ctx.lineWidth = 2.2; ctx.strokeStyle = C.fin;                                  // the fins
-                    for (let i = 0; i <= n; i++) line(i / n, 0.06, i / n, 0.96);
-                    ctx.lineWidth = 1.4; ctx.strokeStyle = C.goldDk;                               // gold cornice and plinth
-                    line(0, 0.97, 1, 0.97); ctx.lineWidth = 0.8; line(0, 0.06, 1, 0.06);
-                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.25)'; line(0, 0.8, 1, 0.8);
+                    ctx.fillStyle = 'rgba(12, 6, 20, 0.92)'; ctx.fill(panes);
+                    if (day > 0.05) { ctx.fillStyle = `rgba(168, 160, 220, ${0.22 * day})`; ctx.fill(panes); }
+                    const fins = new Path2D();
+                    for (let i = 0; i <= n; i++) seg(fins, i / n, 0.06, i / n, 0.96);
+                    ctx.lineWidth = 2.2; ctx.strokeStyle = C.fin; ctx.stroke(fins);                                   // the fins
+                    ctx.lineWidth = 1.4; ctx.strokeStyle = C.goldDk; ctx.stroke(seg(new Path2D(), 0, 0.97, 1, 0.97));   // gold cornice and plinth
+                    ctx.lineWidth = 0.8; ctx.stroke(seg(new Path2D(), 0, 0.06, 1, 0.06));
+                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.25)'; ctx.stroke(seg(new Path2D(), 0, 0.8, 1, 0.8));
                     return;
                 }
                 // At night: the fins breathe violet and lavender, pumping on the kick
                 const B = this._mcBeat(), t = _gameTimeSec, op = ctx.globalCompositeOperation;
                 ctx.globalCompositeOperation = 'lighter';
-                for (let i = 0; i < n; i++) {                                                     // a lavender glow behind the glass
-                    quad((i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
-                    ctx.fillStyle = `rgba(200, 168, 255, ${0.07 + 0.05 * B.kick})`; ctx.fill();
-                }
+                ctx.fillStyle = `rgba(200, 168, 255, ${0.07 + 0.05 * B.kick})`; ctx.fill(panes);                    // a lavender glow behind the glass
                 for (let i = 0; i <= n; i++) {
-                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick;
-                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.7})`; line(i / n, 0.08, i / n, 0.94);
-                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; line(i / n, 0.08, i / n, 0.94);
+                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick, fin = seg(new Path2D(), i / n, 0.08, i / n, 0.94);
+                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.7})`; ctx.stroke(fin);
+                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; ctx.stroke(fin);
                 }
-                ctx.lineWidth = 1; ctx.strokeStyle = `rgba(255, 241, 194, 0.55)`; line(0, 0.97, 1, 0.97);   // the cornice catches gold
+                ctx.lineWidth = 1; ctx.strokeStyle = `rgba(255, 241, 194, 0.55)`; ctx.stroke(seg(new Path2D(), 0, 0.97, 1, 0.97));   // the cornice catches gold
                 ctx.globalCompositeOperation = op;
             },
 
@@ -189,6 +188,10 @@
             _mcDrawRoof(ctx, emissive) {
                 const G = this._mcGeo(), C = MCX.C, S = G.sky;
                 if (!emissive) {
+                    // (Painted once with the roof, PlaneSprites; only the sky in the skylight is live, by day. Each
+                    // segment makes its own skylight path: a painted run starts with no current path.)
+                    const sky = (c) => { c.beginPath(); c.ellipse(S.cx, S.cy, S.rx, S.ry, 0, 0, Math.PI * 2); };
+                    if (PropPass.seg(false)) {
                     for (const s of [G.hall, G.wing]) {
                         ctx.fillStyle = LandmarkKit.grad(this, 'mcroof' + s.y, () => { const g = ctx.createLinearGradient(s.x, s.y, s.x + s.w, s.y + s.h); g.addColorStop(0, '#171020'); g.addColorStop(1, C.lacquer); return g; });
                         ctx.fillRect(s.x, s.y, s.w, s.h);
@@ -198,14 +201,15 @@
                         ctx.strokeStyle = 'rgba(255, 241, 194, 0.35)'; ctx.lineWidth = 0.8; ctx.strokeRect(s.x + 6, s.y + 6, s.w - 12, s.h - 12);
                     }
                     // The skylight over the dance floor: smoked glass in a gold ring, its leading in rays
-                    ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx, S.ry, 0, 0, Math.PI * 2);
-                    ctx.fillStyle = '#0d0814'; ctx.fill();
-                    const sun = sunNow(), day = sun ? sun.day : 0;
-                    if (day > 0.05) {                                                               // by day it holds the sky
-                        ctx.fillStyle = LandmarkKit.grad(this, 'mcsky', () => { const g = ctx.createLinearGradient(S.cx - S.rx, S.cy - S.ry, S.cx + S.rx, S.cy + S.ry); g.addColorStop(0, 'rgba(190, 186, 236, 1)'); g.addColorStop(0.5, 'rgba(120, 110, 180, 1)'); g.addColorStop(1, 'rgba(60, 40, 100, 1)'); return g; });
-                        ctx.globalAlpha = 0.35 * day; ctx.fill(); ctx.globalAlpha = 1;
+                    sky(ctx); ctx.fillStyle = '#0d0814'; ctx.fill();
                     }
-                    ctx.save(); ctx.clip();
+                    const sun = sunNow(), day = sun ? sun.day : 0;
+                    if (PropPass.seg(true) && day > 0.05) {                                         // by day it holds the sky (marked live day or night: the runs stay the same)
+                        ctx.fillStyle = LandmarkKit.grad(this, 'mcsky', () => { const g = ctx.createLinearGradient(S.cx - S.rx, S.cy - S.ry, S.cx + S.rx, S.cy + S.ry); g.addColorStop(0, 'rgba(190, 186, 236, 1)'); g.addColorStop(0.5, 'rgba(120, 110, 180, 1)'); g.addColorStop(1, 'rgba(60, 40, 100, 1)'); return g; });
+                        sky(ctx); ctx.globalAlpha = 0.35 * day; ctx.fill(); ctx.globalAlpha = 1;
+                    }
+                    if (!PropPass.seg(false)) return;
+                    ctx.save(); sky(ctx); ctx.clip();
                     ctx.strokeStyle = 'rgba(232, 194, 122, 0.35)'; ctx.lineWidth = 1;
                     for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(S.cx, S.cy); ctx.lineTo(S.cx + Math.cos(a) * S.rx * 1.2, S.cy + Math.sin(a) * S.ry * 1.2); ctx.stroke(); }
                     ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx * 0.55, S.ry * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
@@ -283,28 +287,33 @@
                     for (const x of [x0 + 6, x1 - 6]) { const [px, py] = Pk(x, y1 - 4); ctx.beginPath(); ctx.moveTo(x, y1 - 4); ctx.lineTo(px, py); ctx.stroke(); }
                     ctx.restore();
                 }
-                LandmarkKit.flat(ctx, k, (c) => {
-                    if (!emissive) {
-                        c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x0 + 4, y0 + 6, x1 - x0, y1 - y0);
-                        const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, C.velvet); g.addColorStop(0.6, C.velvetLt); g.addColorStop(1, C.velvet);
-                        c.fillStyle = g; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y0); c.lineTo(x1, y1 - 6);
-                        for (let x = x1; x > x0; x -= 12) c.quadraticCurveTo(x - 6, y1 + 4, x - 12, y1 - 6);     // scalloped valance
-                        c.closePath(); c.fill();
-                        c.strokeStyle = C.gold; c.lineWidth = 1.4; c.stroke();
-                        c.strokeStyle = 'rgba(255, 241, 194, 0.25)'; c.lineWidth = 0.8;                       // velvet pleats
-                        for (let x = x0 + 10; x < x1; x += 10) { c.beginPath(); c.moveTo(x, y0 + 2); c.lineTo(x, y1 - 8); c.stroke(); }
-                        c.fillStyle = C.gold; _mcCrescent(c, G.door.x, (y0 + y1) / 2 - 2, 9); c.fill();          // the crescent on the canopy
-                    } else {
-                        const t = _frameTime / 1000;                                                    // marquee bulbs along the valance
+                LandmarkKit.flat(ctx, k, (cf) => {
+                    if (!emissive) PlaneSprites.draw(cf, this, 'canopy', k, (c) => this._mcCanopyPlane(c), { x: x0, y: y0, w: x1 - x0 + 4, h: y1 - y0 + 10 });   // (painted once in its plane)
+                    else {
+                        const c = cf, t = _frameTime / 1000;                                            // marquee bulbs along the valance
                         c.globalCompositeOperation = 'lighter';
-                        for (let x = x0 + 6, i = 0; x < x1; x += 12, i++) {
-                            const tw = 0.55 + 0.45 * Math.sin(t * 3 + i * 1.3);
-                            c.globalAlpha = tw; c.fillStyle = '#ffe8f0'; c.beginPath(); c.arc(x, y1 - 3, 1.6, 0, Math.PI * 2); c.fill();
-                            if (_zoomLOD < 1) { c.globalAlpha = tw * 0.35; drawGlow(c, x, y1 - 3, 7, '255, 180, 210', 0); }
+                        const bulb = _zoomLOD < 1 ? LandmarkKit.bulb(c, '255,232,240', 1, 1.6, '255,180,210', 0.35, 7, true) : LandmarkKit.bulb(c, '255,232,240', 1, 1.6), br = bulb.r;
+                        for (let x = x0 + 6, i = 0; x < x1; x += 12, i++) {                                   // (core and glow in one stamp)
+                            c.globalAlpha = 0.55 + 0.45 * Math.sin(t * 3 + i * 1.3); c.drawImage(bulb, x - br, y1 - 3 - br, br * 2, br * 2);
                         }
                         c.globalAlpha = 0.9; c.fillStyle = 'rgba(255, 241, 194, 0.8)'; _mcCrescent(c, G.door.x, (y0 + y1) / 2 - 2, 9); c.fill();
                     }
                 });
+            },
+
+            /** The canopy's velvet, valance, pleats and crescent, in its own plane (still: PlaneSprites paints it once) */
+            _mcCanopyPlane(c) {
+                const G = this._mcGeo(), C = MCX.C;
+                const x0 = G.door.x - 62, x1 = G.door.x + 62, y0 = G.door.y - 4, y1 = G.door.y + 44;
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x0 + 4, y0 + 6, x1 - x0, y1 - y0);
+                const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, C.velvet); g.addColorStop(0.6, C.velvetLt); g.addColorStop(1, C.velvet);
+                c.fillStyle = g; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y0); c.lineTo(x1, y1 - 6);
+                for (let x = x1; x > x0; x -= 12) c.quadraticCurveTo(x - 6, y1 + 4, x - 12, y1 - 6);     // scalloped valance
+                c.closePath(); c.fill();
+                c.strokeStyle = C.gold; c.lineWidth = 1.4; c.stroke();
+                c.strokeStyle = 'rgba(255, 241, 194, 0.25)'; c.lineWidth = 0.8;                       // velvet pleats
+                for (let x = x0 + 10; x < x1; x += 10) { c.beginPath(); c.moveTo(x, y0 + 2); c.lineTo(x, y1 - 8); c.stroke(); }
+                c.fillStyle = C.gold; _mcCrescent(c, G.door.x, (y0 + y1) / 2 - 2, 9); c.fill();          // the crescent on the canopy
             },
 
             /** "Moon City" in script neon on the hall's front, the crescent beside it, NIGHTCLUB in gold beneath. */

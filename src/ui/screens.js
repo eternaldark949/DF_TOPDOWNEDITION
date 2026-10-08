@@ -45,6 +45,7 @@
                     sub[2]();
                 }
                 this.current = name;
+                syncHudInput(game);
                 if (typeof invSidebar !== 'undefined') invSidebar.setActiveNav(name);
                 if (typeof mapSidebar !== 'undefined') mapSidebar.setActiveNav(name);
             },
@@ -72,5 +73,6 @@
                     game.pauseSystem.release('inventory_menu');
                     document.querySelectorAll('#inventory-list .ui-pill.expanded').forEach(p => p.classList.remove('expanded'));
                 }
+                syncHudInput(game);
             }
         };

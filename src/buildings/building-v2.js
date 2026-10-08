@@ -10,6 +10,13 @@
         const _FW_CAMERA_MOTION = { camera: null, drawId: 0, x: 0, y: 0, zoom: 0, moving: true };
         const _FW_GEOMETRY = new WeakMap(); // owner -> weak face map; latest projection, at most two visible path sets
         const _FW_SHEEN = [];   // _drawFaceWindows: the sun sheen's windows, reused every face
+        const _FW_SHEEN_GROUPS = new Map();   // _drawFaceWindows: sheen alpha -> the windows sharing it (one fill each)
+        // How far a landmark's base and roof passes draw past its leaned outline (world px, measured at every
+        // angle and zoom, plus a margin): the glow pass's emissiveReach is for the beams alone
+        const SQ_TOP_REACH = 200, DN_TOP_REACH = 190, MC_TOP_REACH = 100;
+        // ...and how far the glow pass draws past it without the beams (lamp halos, portico mist, the crown):
+        // past this, only the beams can reach the screen (drawEmissive's beamsOnly)
+        const SQ_GLOW_REACH = 240, MC_GLOW_REACH = 100;
         class BuildingV2 {
             constructor(config) {
                 this.isV2 = true;
@@ -163,7 +170,7 @@
             }
             
             _setupSign(signConfig) {
-                if (this.style === 'double_nights' || this.style === 'moon_city') { this.attachedSign = null; return; }   // their own script signs (_dnDrawSign, _mcDrawSign)
+                if (this.style === 'double_nights' || this.style === 'moon_city' || this.style === 'enni_cole') { this.attachedSign = null; return; }   // these landmarks draw their own script signs
                 const mainSection = this.sections[0];
                 const titleCase = (str) => str.replace(/\w\S*/g, (txt) => 
                     txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
@@ -274,6 +281,7 @@
              */
             drawBase(ctx) {
                 if (this.style === 'double_nights') { this._dnDrawBase(ctx); return; }   // buildings/double-nights.js
+                if (this.style === 'enni_cole') { this._ecDrawBase(ctx); return; }
                 ctx.save();
                 
                 // Draw shadow for each section
@@ -305,6 +313,7 @@
              */
             drawTop(ctx, worldMinutes = 1260) {
                 if (this.style === 'double_nights' && typeof game !== 'undefined' && game.camera) { this._dnDrawTop(ctx); return; }
+                if (this.style === 'enni_cole' && typeof game !== 'undefined' && game.camera) { this._ecDrawTop(ctx); return; }
                 if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) { this._drawLeanTop(ctx); return; }
                 ctx.save();
                 
@@ -637,14 +646,20 @@
                     this.facadeFeature = r(4) < 0.55 ? 'balconies' : 'fire_escape';
                 } else if (this.style === 'double_nights') {
                     this.floors = DN.FLOORS; this.roofFeatures = []; this.emissiveReach = 950;   // crowns, beams (buildings/double-nights.js)
+                    this.topReach = DN_TOP_REACH;                           // base and roof passes: the canopy and court in front
                 } else if (this.style === 'moon_city') {
                     this.roofFeatures = []; this.facadeFeature = 'moon_city'; this.emissiveReach = 600;   // fins, skylight, searchlights (buildings/moon-city.js)
+                    this.topReach = MC_TOP_REACH;                           // base and roof passes: the canopy and sign
+                    this.glowReach = MC_GLOW_REACH;                         // glow pass, all but the searchlights
                 } else if (this.style === 'silver_queen') {
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
                     this.sills = { lip: 'rgba(236, 232, 250, 0.75)', shade: 'rgba(20, 10, 48, 0.55)' };   // window sills (_drawFaceWindows)
                     this.roundR = CONFIG.BUILDINGS.SQ_CORNER_R;                  // rounded outer corners (_roundCorners)
                     this.emissiveReach = 700;                              // searchlight beams reach well past the footprint
+                    this.crownZ = SQ_ROOF.ringZ;                           // the crown ring leans from 256 px up
+                    this.topReach = SQ_TOP_REACH;                          // base and roof passes: the ring's radius, the portico and posts
+                    this.glowReach = SQ_GLOW_REACH;                        // glow pass, all but the beams
                 }
             },
 
@@ -654,6 +669,7 @@
                 if (this.style === 'silver_queen' && t) { this._sqLights(); return; }
                 if (this.style === 'double_nights') { this._dnLights(); return; }
                 if (this.style === 'moon_city') { this._mcLights(); return; }
+                if (this.style === 'enni_cole') { this._ecLights(); return; }
                 if (t) {
                     const cx = t.x + t.w / 2, cy = t.y - 10;
                     // Entrance pair, warm pool at the door — purposeful light instead of a bulb grid
@@ -783,17 +799,28 @@
             },
 
             /** Could any of it be on screen? Its footprint, its leaned walls and roof (reckoned a few floors
-                higher, for crowns, spires and signs) and its reach (beams, plazas), against the real view rect V. */
-            inView(V, cam) {
-                const C = CONFIG.CULLING, r = (this.emissiveReach || 0) + C.BUILDINGS_VIEW;
+                higher, or to its crown's height, for crowns, spires and signs) and a reach past that, against the
+                real view rect V. The reach defaults to emissiveReach (the glow pass: beams, plazas); the base and
+                roof passes ask with topReach (what they draw in front of the footprint: porticos, canopies). */
+            inView(V, cam, reach) {
+                const C = CONFIG.CULLING, r = (reach === undefined ? (this.emissiveReach || 0) : reach) + C.BUILDINGS_VIEW;
                 const x0 = this.x, y0 = this.y, x1 = this.x + (this.w || 200), y1 = this.y + (this.h || 200);
                 let L = x0, R = x1, T = y0, Bt = y1;
                 if (CONFIG.BUILDINGS.LEAN) {
-                    const k = 1 + this._leanScale(C.LEAN_EXTRA);                // roof = cam + (p - cam) * k
+                    const k = this._hullK();                                    // roof = cam + (p - cam) * k
                     const rx0 = cam.x + (x0 - cam.x) * k, rx1 = cam.x + (x1 - cam.x) * k, ry0 = cam.y + (y0 - cam.y) * k, ry1 = cam.y + (y1 - cam.y) * k;
                     L = Math.min(L, rx0, rx1); R = Math.max(R, rx0, rx1); T = Math.min(T, ry0, ry1); Bt = Math.max(Bt, ry0, ry1);
                 }
                 return !(R + r < V.left || L - r > V.right || Bt + r < V.top || T - r > V.bottom);
+            },
+
+            /** The lean of the highest thing it draws: LEAN_EXTRA floors over the roof, or its crown (crownZ, world px
+                up, leaned as LandmarkKit.k / _sqK lean it) if that's higher */
+            _hullK() {
+                const k = 1 + this._leanScale(CONFIG.CULLING.LEAN_EXTRA);
+                if (!this.crownZ) return k;
+                const C = leanCamHeight();
+                return Math.max(k, C / (C - Math.min(this.crownZ, C * 0.86)));
             },
 
             _leanScale(extraFloors = 0) {
@@ -855,8 +882,18 @@
                 // --- Roofs (drawn in world coords under the scale-about-camera transform) ---
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const sq = this.style === 'silver_queen';
-                if (this.style === 'moon_city') { this._mcDrawRoof(ctx, false); ctx.restore(); return; }
-                this.sections.forEach((section, si) => {
+                // The landmarks' roofs are painted once (PlaneSprites, entities/prop-sprites.js): what moves on them
+                // (cabanas, ripples, the sky in the skylight) and the penthouse walls stay live, at their depth
+                if (this.style === 'moon_city') { PlaneSprites.draw(ctx, this, 'roof', k, c => this._mcDrawRoof(c, false)); ctx.restore(); return; }
+                if (sq) PlaneSprites.draw(ctx, this, 'roof', k, c => this._leanRoof(c, true));
+                else this._leanRoof(ctx, false);
+                ctx.restore();
+                if (sq) this._sqDrawCrown(ctx, false);
+            },
+
+            /** The roof in the roof plane (ctx already scaled about the camera): sections, seams, parapets, features */
+            _leanRoof(ctx, sq) {
+                if (PropPass.seg(false)) this.sections.forEach((section, si) => {
                     const sx = this.x + section.x, sy = this.y + section.y;
                     if (sq) {                                                                  // lavender slab with a soft sheen (world-space gradients, made once)
                         ctx.fillStyle = LandmarkKit.grad(this, 'roof' + si, () => { const g = ctx.createLinearGradient(sx, sy, sx + section.w, sy + section.h); g.addColorStop(0, SQ_THEME.roof); g.addColorStop(1, SQ_THEME.roofLo); return g; });
@@ -869,24 +906,47 @@
                             pg.addColorStop(0, 'rgba(214,200,255,0.18)'); pg.addColorStop(1, 'rgba(214,200,255,0)'); return pg; });
                         ctx.fillRect(sx, sy, section.w, section.h);
                     }
-                    ctx.strokeStyle = sq ? 'rgba(217,191,134,0.08)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;          // tar seams
-                    for (let gx = 36; gx < section.w; gx += 36) { ctx.beginPath(); ctx.moveTo(sx + gx, sy); ctx.lineTo(sx + gx, sy + section.h); ctx.stroke(); }
+                    ctx.strokeStyle = sq ? 'rgba(217,191,134,0.08)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;          // tar seams (one world path a section)
+                    ctx.stroke(this._seamPath(section, sx, sy));
                     if (outline) ctx.restore();
                     ctx.strokeStyle = sq ? SQ_THEME.trim : lightenHex(this.colors.roof, 22); ctx.lineWidth = sq ? 4 : 5;       // parapet
                     if (outline) ctx.stroke(this._roofPath(section, si, 2.5)); else ctx.strokeRect(sx + 2.5, sy + 2.5, section.w - 5, section.h - 5);
                     if (sq) { ctx.strokeStyle = 'rgba(45,29,89,0.45)'; ctx.lineWidth = 1; if (outline) ctx.stroke(this._roofPath(section, si, 6)); else ctx.strokeRect(sx + 6, sy + 6, section.w - 12, section.h - 12); }
                 });
-                if (sq) this._sqRoofEdgeLights(ctx, false);
+                if (sq && PropPass.seg(false)) this._sqRoofEdgeLights(ctx, false);
                 if (this.style) this._drawRoofFeatures(ctx, false);
                 else this._drawRoofProps(ctx);
-                ctx.restore();
-                if (sq) this._sqDrawCrown(ctx, false);
+            },
+
+            /** A roof prop's disc (fan hub, tank): one world path, made once and kept on the prop */
+            _roofPropDisc(p, x, y, r, key = 'disc') {
+                const k = '_' + key;
+                if (!p[k] || p[k + 'x'] !== x || p[k + 'y'] !== y || p[k + 'r'] !== r) { const d = new Path2D(); d.arc(x, y, r, 0, Math.PI * 2); p[k] = d; p[k + 'x'] = x; p[k + 'y'] = y; p[k + 'r'] = r; }
+                return p[k];
+            },
+
+            /** A roof section's tar seams, every 36 px: one world-space path, made once */
+            _seamPath(section, sx, sy) {
+                const m = this._seams || (this._seams = new WeakMap());
+                let e = m.get(section);
+                if (!e || e.sx !== sx || e.sy !== sy || e.w !== section.w || e.h !== section.h) {
+                    const p = new Path2D();
+                    for (let gx = 36; gx < section.w; gx += 36) { p.moveTo(sx + gx, sy); p.lineTo(sx + gx, sy + section.h); }
+                    m.set(section, e = { sx, sy, w: section.w, h: section.h, p });
+                }
+                return e.p;
             },
 
             /** Emissive layer (after lighting): lit windows, neon trim, rooftop lights. dark = ambient darkness 0..1 */
-            drawEmissive(ctx, dark) {
+            drawEmissive(ctx, dark, beamsOnly) {
+                if (this.style === 'enni_cole' && typeof game !== 'undefined' && game.camera) { this._ecDrawEmissive(ctx, dark); return; }
                 if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
                 if (this.style === 'double_nights') { this._dnDrawEmissive(ctx, dark); return; }
+                if (beamsOnly) {   // all but the beams is past glowReach, off screen (world-state.js drawEmissivePass)
+                    if (this.style === 'silver_queen') { this._sqDark = dark; this._sqDrawBeams(ctx, dark); }
+                    if (this.style === 'moon_city') this._mcBeams(ctx, dark);
+                    return;
+                }
                 const cam = game.camera, s = this._leanScale(), k = 1 + s;
                 const P = (x, y) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
                 const glow = Math.max(0.15, Math.min(1, dark * 1.1));
@@ -1159,12 +1219,16 @@
                     ctx.fillStyle = `rgba(${glassRGB}, ${skyA})`; ctx.fill(paths.glass);
                     // Sun color, direction, band position and alternating floor sheen stay live.
                     // Retain paint order and the final Canvas state even for offscreen sheen windows.
+                    // Windows of one column and floor parity share the sheen's alpha: one fill a group (they never overlap)
+                    const groups = _FW_SHEEN_GROUPS; groups.clear();
                     for (let i = 0; i < geom.windows.length; i++) {
                         const w = geom.windows[i], du = Math.abs((w.u0 + w.u1) / 2 - uc), sh = sheenA * Math.max(0, 1 - du / 0.16) * (0.7 + 0.3 * (w.fl % 2));
-                        if (!(sh > 0.01)) continue;
-                        ctx.beginPath(); quad(ctx, w); ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`;
-                        if (all || visibleBits[i] === '1') ctx.fill();
+                        if (!(sh > 0.01) || !(all || visibleBits[i] === '1')) continue;
+                        let g = groups.get(sh); if (!g) groups.set(sh, g = new Path2D());
+                        quad(g, w);
                     }
+                    for (const [sh, g] of groups) { ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; ctx.fill(g); }
+                    groups.clear();
                 }
                 if (sills) {
                     ctx.lineWidth = 1.2; ctx.strokeStyle = this.sills.shade; ctx.stroke(lines('shade', 'shade'));
@@ -1271,13 +1335,15 @@
                 ctx.fillStyle = sq ? 'rgba(23,0,92,0.9)' : 'rgba(20,28,48,0.9)'; ctx.fill(glass);
                 if (skyA > 0) {
                     ctx.fillStyle = `rgba(${glassRGB}, ${skyA})`; ctx.fill(glass);
+                    const groups = _FW_SHEEN_GROUPS; groups.clear();                         // (one fill a shared alpha, as above)
                     for (let i = 0; i < sheen.length; i += 5) {
                         const u0 = sheen[i], u1 = sheen[i + 1], v0 = sheen[i + 2], v1 = sheen[i + 3], sh = sheen[i + 4];
-                        ctx.beginPath();
-                        ctx.moveTo(ax + ex * u0 + (ux + tx * u0 - ex * u0) * v0, ay + ey * u0 + (uy + ty * u0 - ey * u0) * v0);
-                        q(ctx, u1, v0); q(ctx, u1, v1); q(ctx, u0, v1); ctx.closePath();
-                        ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; ctx.fill();
+                        let g = groups.get(sh); if (!g) groups.set(sh, g = new Path2D());
+                        g.moveTo(ax + ex * u0 + (ux + tx * u0 - ex * u0) * v0, ay + ey * u0 + (uy + ty * u0 - ey * u0) * v0);
+                        q(g, u1, v0); q(g, u1, v1); q(g, u0, v1); g.closePath();
                     }
+                    for (const [sh, g] of groups) { ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; ctx.fill(g); }
+                    groups.clear();
                 }
                 if (sills) {
                     ctx.lineWidth = 1.2; ctx.strokeStyle = this.sills.shade; ctx.stroke(shP);
@@ -1295,24 +1361,28 @@
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
                 if (Math.hypot(dx - ax, dy - ay) < 6) return;
                 const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
-                const line = (p, q) => { ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
                 const acc = this.colors.accent;
+                const seg = (path, p, q) => { path.moveTo(p[0], p[1]); path.lineTo(q[0], q[1]); };
                 if (this.facadeFeature === 'balconies' && f.side === 'S') {
+                    const path = new Path2D();                          // (one path: the rails never touch, nor the lights)
                     for (let fl = 1; fl < floors; fl += 2) {
                         const v = fl / floors;
-                        if (!emissive) { ctx.strokeStyle = 'rgba(200,210,225,0.55)'; ctx.lineWidth = 1.4; line(at(0.08, v), at(0.92, v)); }
-                        else {                                          // little string of balcony lights
-                            ctx.fillStyle = acc;
-                            for (let u = 0.12; u < 0.9; u += 0.19) { const p = at(u, v); ctx.beginPath(); ctx.arc(p[0], p[1], 1.1, 0, Math.PI * 2); ctx.fill(); }
-                        }
+                        if (!emissive) seg(path, at(0.08, v), at(0.92, v));
+                        else for (let u = 0.12; u < 0.9; u += 0.19) { const p = at(u, v); path.moveTo(p[0] + 1.1, p[1]); path.arc(p[0], p[1], 1.1, 0, Math.PI * 2); }   // little string of balcony lights
                     }
+                    if (!emissive) { ctx.strokeStyle = 'rgba(200,210,225,0.55)'; ctx.lineWidth = 1.4; ctx.stroke(path); }
+                    else { ctx.fillStyle = acc; ctx.fill(path); }
                 } else if (this.facadeFeature === 'fire_escape' && (f.side === 'E' || f.side === 'W') && !emissive) {
-                    ctx.strokeStyle = 'rgba(150,120,110,0.7)'; ctx.lineWidth = 1;
+                    // Landings, odd stairs, even stairs: three paths, none touching itself, so every joint still takes
+                    // its two (or three) coats of the 0.7 alpha, as line by line did
+                    const landings = new Path2D(), odd = new Path2D(), even = new Path2D();
                     for (let fl = 1; fl < floors; fl++) {
                         const v = fl / floors, u0 = fl % 2 ? 0.3 : 0.6, u1 = fl % 2 ? 0.6 : 0.3;
-                        line(at(0.25, v), at(0.65, v));               // landing
-                        line(at(u0, v), at(u1, (fl + 1) / floors));   // stair
+                        seg(landings, at(0.25, v), at(0.65, v));
+                        seg(fl % 2 ? odd : even, at(u0, v), at(u1, (fl + 1) / floors));
                     }
+                    ctx.strokeStyle = 'rgba(150,120,110,0.7)'; ctx.lineWidth = 1;
+                    ctx.stroke(landings); ctx.stroke(odd); ctx.stroke(even);
                 }
             },
 
@@ -1322,15 +1392,20 @@
                     const sec = this.sections[p.section] || this.sections[0];
                     const x = this.x + sec.x + p.x, y = this.y + sec.y + p.y;
                     if (p.type === 'ac_unit') { ctx.fillStyle = '#3a3f48'; ctx.fillRect(x, y, p.w, p.h); ctx.strokeStyle = '#555c66'; ctx.strokeRect(x + 3, y + 3, p.w - 6, p.h - 6); }
-                    else if (p.type === 'water_tank') { ctx.fillStyle = '#4a4238'; ctx.beginPath(); ctx.arc(x, y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#6a5e50'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, p.r * 0.7, 0, Math.PI * 2); ctx.stroke(); }
+                    else if (p.type === 'water_tank') { ctx.fillStyle = '#4a4238'; ctx.fill(this._roofPropDisc(p, x, y, p.r)); ctx.strokeStyle = '#6a5e50'; ctx.lineWidth = 2; ctx.stroke(this._roofPropDisc(p, x, y, p.r * 0.7, 'in')); }
                     else if (p.type === 'vent') { ctx.fillStyle = '#2e333a'; ctx.fillRect(x, y, p.w, p.h); }
-                    else if (p.type === 'roof_fan') { ctx.fillStyle = '#333841'; ctx.beginPath(); ctx.arc(x, y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#4b525c'; ctx.lineWidth = 1; for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + _gameTimeSec * 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * p.r * 0.8, y + Math.sin(a) * p.r * 0.8); ctx.stroke(); } }
+                    else if (p.type === 'roof_fan') {                   // the hub, then its four blades turning (one opaque stroke: they only meet at the hub)
+                        ctx.fillStyle = '#333841'; ctx.fill(this._roofPropDisc(p, x, y, p.r));
+                        const blades = new Path2D();
+                        for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + _gameTimeSec * 2; blades.moveTo(x, y); blades.lineTo(x + Math.cos(a) * p.r * 0.8, y + Math.sin(a) * p.r * 0.8); }
+                        ctx.strokeStyle = '#4b525c'; ctx.lineWidth = 1; ctx.stroke(blades);
+                    }
                 }
             },
 
             /** Styled rooftops. Coordinates are world coords (caller has applied the roof transform). */
             _drawRoofFeatures(ctx, emissive) {
-                if (this.style === 'silver_queen') { this._sqDrawRoof(ctx, emissive); this._drawPenthouse(ctx, emissive); return; }
+                if (this.style === 'silver_queen') { this._sqDrawRoof(ctx, emissive); if (emissive || PropPass.seg(true)) this._drawPenthouse(ctx, emissive); return; }   // (its walls lean with the camera: live)
                 const main = this.sections[0], mx = this.x + main.x, my = this.y + main.y, mw = main.w, mh = main.h;
                 const r = (i) => _bldHash(this._seed || 1, 100 + i);
                 const acc = this.colors.accent, t = _gameTimeSec;
@@ -1358,19 +1433,23 @@
                                 const a0 = ctx.globalAlpha;
                                 const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#2bb8d8'); g.addColorStop(1, '#0f4f8a');
                                 ctx.globalAlpha = a0 * 0.8; ctx.fillStyle = g; ctx.fillRect(x, y, w, h); ctx.globalAlpha = a0;
-                                ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;   // caustic shimmer
-                                for (let i = 0; i < 4; i++) { const yy = y + h * (0.2 + i * 0.2) + Math.sin(t * 1.5 + i) * 2; ctx.beginPath(); ctx.moveTo(x + 4, yy); ctx.quadraticCurveTo(x + w / 2, yy + Math.sin(t * 2 + i) * 3, x + w - 4, yy); ctx.stroke(); }
+                                ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;   // caustic shimmer (one path: the curves stay apart)
+                                const caustics = new Path2D();
+                                for (let i = 0; i < 4; i++) { const yy = y + h * (0.2 + i * 0.2) + Math.sin(t * 1.5 + i) * 2; caustics.moveTo(x + 4, yy); caustics.quadraticCurveTo(x + w / 2, yy + Math.sin(t * 2 + i) * 3, x + w - 4, yy); }
+                                ctx.stroke(caustics);
                             }
                             break;
                         }
                         case 'garden': {
                             if (!emissive) {
                                 ctx.fillStyle = '#3b2e24'; ctx.fillRect(x, y, w, h);
-                                const greens = ['#2f7d3a', '#3c9b47', '#27643a'];
-                                for (let i = 0; i < 9; i++) { ctx.fillStyle = greens[i % 3]; ctx.beginPath(); ctx.arc(x + w * (0.12 + (i % 3) * 0.38), y + h * (0.2 + Math.floor(i / 3) * 0.3), Math.min(w, h) * 0.14, 0, Math.PI * 2); ctx.fill(); }
+                                const greens = ['#2f7d3a', '#3c9b47', '#27643a'], beds = [new Path2D(), new Path2D(), new Path2D()], rr = Math.min(w, h) * 0.14;   // (a path a green: the planters never touch)
+                                for (let i = 0; i < 9; i++) { const px = x + w * (0.12 + (i % 3) * 0.38), py = y + h * (0.2 + Math.floor(i / 3) * 0.3); beds[i % 3].moveTo(px + rr, py); beds[i % 3].arc(px, py, rr, 0, Math.PI * 2); }
+                                for (let k = 0; k < 3; k++) { ctx.fillStyle = greens[k]; ctx.fill(beds[k]); }
                             } else {                                        // lanterns between the planters
-                                ctx.fillStyle = '#ffcf7a';
-                                for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(x + w * (0.3 + (i % 2) * 0.4), y + h * (0.35 + Math.floor(i / 2) * 0.3), 1.6, 0, Math.PI * 2); ctx.fill(); }
+                                const lanterns = new Path2D();
+                                for (let i = 0; i < 4; i++) { const px = x + w * (0.3 + (i % 2) * 0.4), py = y + h * (0.35 + Math.floor(i / 2) * 0.3); lanterns.moveTo(px + 1.6, py); lanterns.arc(px, py, 1.6, 0, Math.PI * 2); }
+                                ctx.fillStyle = '#ffcf7a'; ctx.fill(lanterns);
                             }
                             break;
                         }
@@ -1399,24 +1478,26 @@
                         }
                         case 'solar': {
                             if (emissive) break;
-                            for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
-                                const px = x + i * w / 3 + 2, py = y + j * h / 2 + 2;
-                                ctx.fillStyle = '#1c2a4a'; ctx.fillRect(px, py, w / 3 - 4, h / 2 - 4);
-                                ctx.strokeStyle = 'rgba(120,160,255,0.35)'; ctx.lineWidth = 0.6; ctx.strokeRect(px, py, w / 3 - 4, h / 2 - 4);
-                            }
+                            const panels = new Path2D();                    // (one path: the six panels stand apart)
+                            for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) panels.rect(x + i * w / 3 + 2, y + j * h / 2 + 2, w / 3 - 4, h / 2 - 4);
+                            ctx.fillStyle = '#1c2a4a'; ctx.fill(panels);
+                            ctx.strokeStyle = 'rgba(120,160,255,0.35)'; ctx.lineWidth = 0.6; ctx.stroke(panels);
                             break;
                         }
                         case 'lights': {                                    // festoon string lights zig-zagging across
                             if (!emissive) break;
-                            const cols = ['#ffd27a', acc, '#ffd27a', '#ff9ecf'];
+                            // Every bulb at its own shimmer of the string's brightness. Bulbs at the same i + z share colour and
+                            // shimmer: one fill each (the string's 39 bulbs in 15)
+                            const cols = ['#ffd27a', acc, '#ffd27a', '#ff9ecf'], a0 = ctx.globalAlpha, rows = [];
                             for (let z = 0; z < 3; z++) {
                                 const y0 = y + h * (0.15 + z * 0.35), y1 = y0 + h * 0.18;
                                 for (let i = 0; i <= 12; i++) {
-                                    const px = x + w * i / 12, py = (i % 2 ? y1 : y0) + Math.sin(i * 0.9) * 2;
-                                    ctx.fillStyle = cols[(i + z) % cols.length];
-                                    ctx.globalAlpha = Math.min(1, ctx.globalAlpha + 0) * (0.75 + 0.25 * Math.sin(t * 3 + i + z));
-                                    ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI * 2); ctx.fill();
+                                    const px = x + w * i / 12, py = (i % 2 ? y1 : y0) + Math.sin(i * 0.9) * 2, s = i + z;
+                                    const path = rows[s] || (rows[s] = new Path2D()); path.moveTo(px + 1.5, py); path.arc(px, py, 1.5, 0, Math.PI * 2);
                                 }
+                            }
+                            for (let s = 0; s < rows.length; s++) {
+                                ctx.fillStyle = cols[s % cols.length]; ctx.globalAlpha = a0 * (0.75 + 0.25 * Math.sin(t * 3 + s)); ctx.fill(rows[s]);
                             }
                             ctx.globalAlpha = Math.max(0.15, Math.min(1, (typeof game !== 'undefined' ? game.getAmbientDarkness() : 1) * 1.1));
                             break;

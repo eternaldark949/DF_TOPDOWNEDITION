@@ -28,6 +28,8 @@
             molten:     ['#ff6418', '#a03008', '#ffd09a'],
             gold:       ['#d2a038', '#7a5414', '#fff0b0'],
             champagne:  ['#eddcb2', '#8e7446', '#fffaea'],
+            silver:     ['#c4ccd9', '#626d86', '#f4f7ff'],      // polished silver
+            diamond:    ['#e1f5ff', '#7ca8c5', '#ffffff'],      // icy crystal-white grip
             pink:       ['#e81c84', '#8a0a4a', '#ffa0d0'],
             violet:     ['#4a24a0', '#24105e', '#b596ff']
         };
@@ -110,10 +112,10 @@
                     _c(6, 3.8, 1.3, 'bronze'),                                                  // the side knob
                     _r(14.6, 18.6, 0.5, 4.8, 'bronze', 0.4), ..._slots(15.2, 18, 0.5, '#ff7a24'),
                     _r(19.2, 23.2, 0.5, 4.8, 'bronze', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff7a24'),
-                    _cap(23.2, 51.4, 0.5, 2.8, 'abyss'),
+                    _cap(23.2, 51.4, 0.5, 2.8, 'silver'),
                     _e(24.5, 50, 0.5, 0.5, '#ff5a12'), _g(24, 50.6, 0.5, 1.6),                  // the barrel's heat line, under glass
                     _r(51, 55.2, 0.5, 4, 'bronze', 0.8),                                        // the brake
-                    _r(52.1, 52.7, 0.5, 4, 'abyss'), _r(53.5, 54.1, 0.5, 4, 'abyss'),
+                    _r(52.1, 52.7, 0.5, 4, 'champagne'), _r(53.5, 54.1, 0.5, 4, 'champagne'),
                     _cap(0.4, 13.6, 0.5, 3, 'abyss'),                                           // the scope, on top
                     _r(3.4, 4.6, 0.5, 3.6, 'bronze'), _r(9.4, 10.6, 0.5, 3.6, 'bronze'),
                     _ce(13, 0.5, 0.95, '#ffb060')
@@ -156,11 +158,12 @@
                 stance: 'knife', muzzle: [19, 1.6], rail: [8, 0], brass: null, melee: true,
                 parts: [
                     _c(-5.2, 0, 1.9, 'gold'), _hole(-5.2, 0, 0.85),                             // the ring pommel
-                    _r(-4, 3, 0, 2.6, 'abyss', 1.1),                                            // the grip, wrapped dark
+                    _r(-4, 3, 0, 2.6, 'diamond', 1.1),                                          // the icy diamond grip
                     _r(-2.6, -2, 0, 2.8, 'gold', 0.3), _r(0.4, 1, 0, 2.8, 'gold', 0.3),         // gold bands on it
                     _r(3, 4.2, 0, 4.6, 'gold', 0.5),                                            // the guard
                     { poly: [[4, -1.3], [8.5, -1.7], [12.5, -1.3], [16, -0.2], [18.6, 1.4], [19.4, 2.6], [17.2, 2.6], [13.6, 2.1], [9.4, 1.6], [4, 1.1]], m: 'gold' },   // the forward-curved blade
                     { poly: [[5, 0.4], [9.5, 0.9], [13.8, 1.4], [17.4, 2.2], [13.6, 1.8], [9.4, 1.3], [5, 0.9]], m: 'champagne' },   // its bright edge
+                    { poly: [[5, -0.05], [9.5, 0.08], [13.5, 0.62], [16.7, 1.52], [18.35, 2.2], [16.55, 1.8], [13.4, 0.9], [9.4, 0.32], [5, 0.17]], m: 'silver' }, // a slender silver inlay along the blade
                     _ce(3.6, 0, 0.6, '#ffe7a0')                                                 // a gem in the guard
                 ],
                 glow: [[3.6, 0, 1.6, '#ffd76a'], [18, 2, 1.4, '#fff1c4']],

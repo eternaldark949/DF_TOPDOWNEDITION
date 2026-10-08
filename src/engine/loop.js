@@ -45,11 +45,20 @@
                 CollisionSystem.clearSpatialGrid();
                 if (this.pausableTimers) this.pausableTimers.length = 0;   // nothing scheduled by the last run fires in this one
                 if (this.scenes) this.scenes.abort();                       // a scene left playing doesn't run on into the next game
+                if (this.cutscene) this.cutscene.end();
+                if (this._bossIntroSkip) {
+                    window.removeEventListener('pointerdown', this._bossIntroSkip);
+                    window.removeEventListener('keydown', this._bossIntroSkip);
+                    this._bossIntroSkip = null;
+                }
+                this._bossIntros = []; this._bossIntro = null;
+                document.getElementById('boss-title')?.classList.remove('show');
                 if (this._rideState && this._rideState.on) { this._rideEl.classList.remove('show'); this._rideState.on = false; }   // the ride tag goes with the run
                 // The big canvases go with the run: painted floors, the city's ground tiles, the baked crowd
                 if (this._releaseMapBakes) this._releaseMapBakes(null);
                 if (this.groundBaker) { this.groundBaker.invalidate(); this.groundBaker.mapId = null; }
                 if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
+                if (typeof PropSprites !== 'undefined') { PropSprites.clear(this.props); PlaneSprites.clear(this.activeMap && this.activeMap.buildings); }
                 if (this.coach) { this.coach.dismiss(); this.coach.deserialize([]); }   // a story New Game then calls hud.startFresh()
                 if (this.hud) this.hud.revealAll();
                 // --- PLAYER STATE ---
@@ -181,6 +190,7 @@
                 this.projectiles = [];
                 this.stickyOrbs = [];
                 this.muzzleFlashes = []; this.casings = []; this.shotFx = [];
+                this._fireTrail = []; this._fireTrailSerial = 0;
                 this.loot = [];
                 this.npcs = []; this.props = []; this.lamps = []; this.enemies = []; this.corpses = [];   // the last map's (loading a map sets them)
                 this.lastKnownMarkers = []; this.noiseRipples = []; this.flitVFX = [];
@@ -269,6 +279,7 @@
                 const nowMs = performance.now();
                 if (this._lastLoopTime === undefined) this._lastLoopTime = nowMs;
                 let elapsed = nowMs - this._lastLoopTime;
+                this._renderFrameMs = elapsed;   // raw render cadence; never changes the fixed simulation step
                 this._lastLoopTime = nowMs;
 
                 // Clamp so a stall (alt-tab, GC pause, debugger) doesn't queue a

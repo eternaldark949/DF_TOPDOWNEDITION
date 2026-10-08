@@ -49,9 +49,35 @@
             const coatRight = (back, front, len) => coatSpec(back, front, len, 1);
             const hoodSpec = h => ({ segs: 2, stiffness: 0.22, damping: 0.8,
                 chains: [{ a: { x: h - 4, y: 0 }, t: { x: h - 8, y: 0 } }] });
-            const skirtSpec = x => ({ segs: 2, stiffness: 0.2, damping: 0.84, chains: [
-                { a: { x: x + 1, y: -10 }, t: { x: x - 1.5, y: -12 } }, { a: { x: x, y: -4 }, t: { x: x - 3, y: -4.5 } },
-                { a: { x: x, y: 4 }, t: { x: x - 3, y: 4.5 } },         { a: { x: x + 1, y: 10 }, t: { x: x - 1.5, y: 12 } } ] });
+            // A narrow circular hem, with the Academy skirt's radial cloth response.
+            const skirtSpec = (cx, width) => {
+                const radius = Math.max(10.5, width / 2 + 3.5), chains = [];
+                for (let i = 0; i < 16; i++) {
+                    const angle = i / 16 * Math.PI * 2, ca = Math.cos(angle), sa = Math.sin(angle);
+                    chains.push({ a: { x: cx + ca * radius, y: sa * radius },
+                                  t: { x: cx + ca * (radius + 3), y: sa * (radius + 3) } });
+                }
+                return { segs: 2, stiffness: 0.16, damping: 0.85, keepOut: 7, closed: true, chains };
+            };
+            const crimsonTrainSpec = back => ({ segs: 6, stiffness: 0.055, damping: 0.89, chains: [
+                { a: { x: back, y: -9 },   t: { x: -38, y: -16 } },
+                { a: { x: back, y: -4.5 }, t: { x: -45, y: -9 } },
+                { a: { x: back, y: 0 },    t: { x: -48, y: 0 } },
+                { a: { x: back, y: 4.5 },  t: { x: -45, y: 9 } },
+                { a: { x: back, y: 9 },    t: { x: -38, y: 16 } } ] });
+            // Rounded, closed contour through a radial seam or hem, without per-draw point arrays.
+            const ringContour = (ctx, chains, hem) => {
+                const N = chains.length, at = i => {
+                    const ch = chains[i % N]; return ch[hem ? ch.length - 1 : 0];
+                };
+                const last = at(N - 1), first = at(0);
+                ctx.moveTo((last.x + first.x) / 2, (last.y + first.y) / 2);
+                for (let i = 0; i < N; i++) {
+                    const p = at(i), q = at(i + 1);
+                    ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
+                }
+                ctx.closePath();
+            };
             const pleatedSpec = cx => {
                 const N = 16, chains = [];
                 for (let i = 0; i < N; i++) {
@@ -341,9 +367,48 @@
                 } },
                 shorts:   { legs: 'thigh', detail(ctx, g, c) { ctx.fillStyle = g.darken(c.color, 0.5); for (const [x, y] of g.knees) { ctx.beginPath(); ctx.arc(x + 1.5, y, 3.2, 0, Math.PI * 2); ctx.fill(); } } },
                 skirt:    { legs: 'bare', hips(ctx, g, c) {
-                    const x = g.hip.x;                                    // a short flare at the back that flips as you move
-                    drawClothPanel(ctx, g.cloth('skirt', pieceSpec('skirt', x, 0, 0, skirtSpec)),
-                        g.darken(c.color, 0.26));
+                    if (c.hem !== 'none') {
+                        const cx = g.hip.x + g.hip.w / 2;
+                        const hem = g.cloth('skirt', pieceSpec('skirt', cx, g.hip.w, 0, skirtSpec));
+                        const N = hem.length, tip = i => { const ch = hem[i % N]; return ch[ch.length - 1]; };
+                        // A filled, softly fluted skirt follows the existing cloth perimeter.
+                        // Every other drawing control dips inward; simulation chains/spec stay unchanged.
+                        const point = k => {
+                            const i = (k >> 1) % N, p = tip(i), q = tip(i + 1), valley = k % 2;
+                            const x = valley ? (p.x + q.x) / 2 : p.x, y = valley ? (p.y + q.y) / 2 : p.y;
+                            const dx = x - cx, length = Math.hypot(dx, y) || 1, flute = valley ? -0.95 : 0.25;
+                            return { x: x + dx / length * flute, y: y + y / length * flute };
+                        };
+                        const contour = () => {
+                            const first = point(0), last = point(N * 2 - 1);
+                            ctx.moveTo((last.x + first.x) / 2, (last.y + first.y) / 2);
+                            for (let k = 0; k < N * 2; k++) {
+                                const p = point(k), q = point((k + 1) % (N * 2));
+                                ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
+                            }
+                            ctx.closePath();
+                        };
+                        let reach = 1;
+                        for (let i = 0; i < N; i++) { const p = tip(i); reach = Math.max(reach, Math.hypot(p.x - cx, p.y)); }
+                        const fabric = ctx.createRadialGradient(cx - 3, -4, 0, cx, 0, reach + 0.6);
+                        fabric.addColorStop(0, c.color); fabric.addColorStop(0.48, g.darken(c.color, 0.06));
+                        fabric.addColorStop(1, g.darken(c.color, 0.19));
+                        ctx.save(); ctx.beginPath(); contour(); ctx.clip();
+                        ctx.fillStyle = fabric; ctx.fill();
+                        // Fine curved fold valleys and soft ridge highlights give the filled cloth depth.
+                        // The small highlights keep the midnight-colour version visibly folded too.
+                        ctx.lineCap = 'round';
+                        for (let i = 0; i < N; i++) {
+                            const root = hem[i][0], crest = tip(i), valley = point(i * 2 + 1);
+                            const sx = cx + (root.x - cx) * 0.38, sy = root.y * 0.38;
+                            ctx.strokeStyle = 'rgba(0,0,0,0.13)'; ctx.lineWidth = 0.75; ctx.beginPath();
+                            ctx.moveTo(sx, sy); ctx.quadraticCurveTo(cx + (valley.x - cx) * 0.65, valley.y * 0.65, valley.x, valley.y); ctx.stroke();
+                            ctx.strokeStyle = 'rgba(234,229,248,0.11)'; ctx.lineWidth = 0.45; ctx.beginPath();
+                            ctx.moveTo(sx, sy); ctx.quadraticCurveTo(cx + (crest.x - cx) * 0.62, crest.y * 0.62, crest.x, crest.y); ctx.stroke();
+                        }
+                        ctx.restore(); ctx.beginPath(); contour();
+                        ctx.strokeStyle = g.darken(c.color, 0.3); ctx.lineWidth = 0.4; ctx.stroke();
+                    }
                     rr(ctx, g.hip.x, -11, g.hip.w, 23, [8, 3, 3, 8], g.darken(c.color, 0.2));
                 } },
                 // Form-fitting: no cloth, it moves with her. Hugs the hips and the tops of the thighs; a back slit
@@ -479,7 +544,7 @@
             };
 
             const jewelry = {
-                hoops: { at: 'head', draw(ctx, g, c) { ctx.strokeStyle = c.color || '#e8c27a'; ctx.lineWidth = 0.9; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(g.headX + 0.5, s * 8.6, 1.9, 0, Math.PI * 2); ctx.stroke(); } },
+                hoops: { at: 'head', underHair: true, draw(ctx, g, c) { ctx.strokeStyle = c.color || '#e8c27a'; ctx.lineWidth = 0.9; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(g.headX + 0.5, s * 8.6, 1.9, 0, Math.PI * 2); ctx.stroke(); } },
                     portrait(ctx, P, c) { const { cx, cy, fw, fh } = P; ctx.strokeStyle = c.color || '#e8c27a'; ctx.lineWidth = fw * 0.05; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + s * fw * 1.02, cy + fh * 0.35, fw * 0.16, 0, Math.PI * 2); ctx.stroke(); } } },
                 sunglasses: { at: 'head', draw(ctx, g, c) { ctx.fillStyle = c.color || '#141414'; ctx.beginPath(); ctx.roundRect(g.headX + 3.6, -5.5, 2.8, 11, 1.2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(g.headX + 4.2, -4.5, 0.8, 2.5); },
                     portrait(ctx, P, c) { const { cx, fw, eyeY, eyeSpacing } = P; ctx.fillStyle = c.color || '#141414'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + s * eyeSpacing, eyeY, fw * 0.33, fw * 0.22, 0, 0, Math.PI * 2); ctx.fill(); } ctx.strokeStyle = c.color || '#141414'; ctx.lineWidth = fw * 0.06; ctx.beginPath(); ctx.moveTo(cx - eyeSpacing + fw * 0.3, eyeY - fw * 0.05); ctx.lineTo(cx + eyeSpacing - fw * 0.3, eyeY - fw * 0.05); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + s * eyeSpacing - fw * 0.1, eyeY - fw * 0.07, fw * 0.08, fw * 0.04, -0.4, 0, Math.PI * 2); ctx.fill(); } } },
@@ -555,6 +620,36 @@
                 }, portrait() {} }
             };
 
-            return { tops, bottoms, shoes, hats, jewelry };
+            // A soft fabric outline through the simulated nodes, including the long side chains.
+            const clothCurve = (ctx, count, point) => {
+                if (count === 2) { const p = point(1); ctx.lineTo(p.x, p.y); return; }
+                for (let i = 1; i < count - 1; i++) {
+                    const p = point(i), q = point(i + 1);
+                    ctx.quadraticCurveTo(p.x, p.y, i === count - 2 ? q.x : (p.x + q.x) / 2,
+                                                   i === count - 2 ? q.y : (p.y + q.y) / 2);
+                }
+            };
+            const trains = {
+                crimson_train: { overWaist: true, draw(ctx, g, c) {
+                    const panel = g.cloth('train_crimson', pieceSpec('train_crimson', g.hip.x + 1, 0, 0, crimsonTrainSpec));
+                    const first = panel[0], last = panel[panel.length - 1], tip = i => panel[i][panel[i].length - 1];
+                    ctx.beginPath(); ctx.moveTo(first[0].x, first[0].y);
+                    clothCurve(ctx, first.length, i => first[i]);
+                    clothCurve(ctx, panel.length, tip);
+                    clothCurve(ctx, last.length, i => last[last.length - 1 - i]);
+                    for (let i = panel.length - 2; i > 0; i--) ctx.lineTo(panel[i][0].x, panel[i][0].y);
+                    ctx.closePath(); ctx.fillStyle = g.darken(c.color, 0.1); ctx.fill();
+                    ctx.strokeStyle = g.darken(c.color, 0.34); ctx.lineWidth = 0.65; ctx.stroke();
+                    // Long seams expose the bends of the dragging fabric, with no added light or blur.
+                    ctx.strokeStyle = g.darken(c.color, 0.26); ctx.lineWidth = 0.65;
+                    ctx.beginPath();
+                    for (const ci of [1, 3]) {
+                        const chain = panel[ci]; ctx.moveTo(chain[0].x, chain[0].y);
+                        clothCurve(ctx, chain.length, i => chain[i]);
+                    }
+                    ctx.stroke();
+                } }
+            };
+            return { tops, bottoms, shoes, hats, jewelry, trains };
         })();
 

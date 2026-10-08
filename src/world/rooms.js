@@ -1209,19 +1209,12 @@
                     { x: 880, y: 790, w: 20, h: 80, type: 'hinged', orientation: 'V', rooms: ['bay', 'parts'], color: '#555a60', hingeSide: 'left', triggerRadius: 60 },
                 ]
             },
-            // Enni Cole: couture (west) and accessories (east) wings off the atrium — glass doors
-            // midway, and wide open at the front by the checkout.
+            // Enni Cole is an open luxury department hall: no sealed wings or hidden aisles.
             'enni_cole_interior': {
-                rooms: {
-                    couture:     { x: 0,    y: 0, w: 440, h: 1400, type: 'indoor', label: 'Couture' },
-                    atrium:      { x: 460,  y: 0, w: 1080, h: 1400, type: 'indoor', label: 'Atrium' },
-                    accessories: { x: 1560, y: 0, w: 440, h: 1400, type: 'indoor', label: 'Accessories' }
-                },
-                doors: [
-                    { x: 440, y: 640, w: 20, h: 120, type: 'sliding', orientation: 'V', rooms: ['couture', 'atrium'], color: 'rgba(230, 200, 255, 0.25)', speed: 0.06, triggerRadius: 100 },
-                    { x: 1540, y: 640, w: 20, h: 120, type: 'sliding', orientation: 'V', rooms: ['atrium', 'accessories'], color: 'rgba(230, 200, 255, 0.25)', speed: 0.06, triggerRadius: 100 },
-                    { x: 440, y: 1160, w: 20, h: 190, type: 'arch', orientation: 'V', rooms: ['couture', 'atrium'] },
-                    { x: 1540, y: 1160, w: 20, h: 190, type: 'arch', orientation: 'V', rooms: ['atrium', 'accessories'] },
+                rooms: { atrium: { x: 50, y: 50, w: 1900, h: 1300, type: 'indoor', label: 'Enni Cole' } },
+                windows: [
+                    { x: 80, y: 1334, w: 690, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' },
+                    { x: 1230, y: 1334, w: 690, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' }
                 ]
             },
             // Neural Systems: the showroom, a small foyer at the door, the consultation and server rooms off it.

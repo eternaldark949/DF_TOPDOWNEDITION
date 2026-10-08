@@ -78,14 +78,14 @@
             }
             const old = owner ? store.get(key) : _clothPreviewShapes.get(spec);
             const n = spec.segs || 3, chains = spec.chains, m = chains.length;
-            let same = old && old.n === n && old.coords.length === m * 4;
+            let same = old && old.n === n && old.closed === !!spec.closed && old.coords.length === m * 4;
             if (same) for (let ci = 0; ci < m; ci++) {
                 const ch = chains[ci], j = ci * 4, v = old.coords;
                 if (!Object.is(v[j], ch.a.x) || !Object.is(v[j + 1], ch.a.y) ||
                     !Object.is(v[j + 2], ch.t.x) || !Object.is(v[j + 3], ch.t.y)) { same = false; break; }
             }
             if (same) return old;
-            const shape = { n, coords: [], lengths: [], spacing: [], rest: [] };
+            const shape = { n, closed: !!spec.closed, coords: [], lengths: [], spacing: [], rest: [] };
             for (let ci = 0; ci < m; ci++) {
                 const ch = chains[ci], pts = [];
                 shape.coords.push(ch.a.x, ch.a.y, ch.t.x, ch.t.y);
@@ -93,8 +93,8 @@
                 // Keep the original rest-pose evaluation order: delta * i / n.
                 for (let i = 0; i <= n; i++) pts.push({ x: ch.a.x + (ch.t.x - ch.a.x) * i / n, y: ch.a.y + (ch.t.y - ch.a.y) * i / n });
                 shape.rest.push(pts);
-                if (ci) {
-                    const ra = chains[ci - 1], rb = ch, spacing = [];
+                if (ci || spec.closed) {
+                    const ra = chains[(ci + m - 1) % m], rb = ch, spacing = [];
                     for (let i = 1; i <= n; i++) {
                         const u = i / n;
                         spacing[i] = Math.hypot((ra.a.x + (ra.t.x - ra.a.x) * u) - (rb.a.x + (rb.t.x - rb.a.x) * u),
@@ -122,8 +122,8 @@
             const store = owner._cloth || (owner._cloth = {});
             let sim = store[key];
             const originX = M.e, originY = M.f;
-            if (!sim || sim.count !== chains.length * (n + 1) || Math.hypot(sim.ox - originX, sim.oy - originY) > CLOTH_SIM.SNAP * sc) {
-                sim = store[key] = { t: _gameTimeSec, acc: 0, ox: originX, oy: originY, ang: baseAngle, count: chains.length * (n + 1),
+            if (!sim || sim.shape !== shape || sim.count !== chains.length * (n + 1) || Math.hypot(sim.ox - originX, sim.oy - originY) > CLOTH_SIM.SNAP * sc) {
+                sim = store[key] = { shape, t: _gameTimeSec, acc: 0, ox: originX, oy: originY, ang: baseAngle, count: chains.length * (n + 1),
                                      chains: _clothRest(spec, shape).map(pts => pts.map(p => {
                                          const x = M.a * p.x + M.c * p.y + M.e, y = M.b * p.x + M.d * p.y + M.f;
                                          return { x, y, px: x, py: y };
@@ -190,8 +190,8 @@
                 }
                 // Neighbouring chains hold the panel together: their hems can't drift
                 // further apart than 1.4x or closer than 0.5x their rest spacing
-                for (let ci = 1; ci < chains.length; ci++) {
-                    const A = sim.chains[ci - 1], B = sim.chains[ci];
+                for (let ci = spec.closed ? 0 : 1; ci < chains.length; ci++) {
+                    const A = sim.chains[(ci + chains.length - 1) % chains.length], B = sim.chains[ci];
                     const spacing = shape.spacing[ci];
                     for (let i = 1; i <= n; i++) {
                         const rest = spacing[i] * sc;

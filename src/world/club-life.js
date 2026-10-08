@@ -206,10 +206,11 @@
                             const od = Math.hypot(ox, oy);
                             if (od < 20 && od > 0.1) { vx += (ox / od) * 0.35; vy += (oy / od) * 0.35; }
                         }
-                        if (nav && !nav.walkable(w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }
+                        if (nav && !nav.lineWalkable(w.x, w.y, w.x + vx, w.y + vy)) { vx = s.x; vy = s.y; }
                         gaitCommand(w, vx, vy); w.x += vx; w.y += vy;
                         if (Math.abs(vx) + Math.abs(vy) > 0.05) w.angle = Math.atan2(vy, vx);
-                        if (d < w.lastD - 0.2) { w.lastD = d; w.stuck = 0; }
+                        const remaining = s.remaining;                                     // (from this tick's steer: no second route walk)
+                        if (remaining < w.lastD - 0.2) { w.lastD = remaining; w.stuck = 0; }
                         else if (++w.stuck > 360) { w.steps.shift(); this._releaseStep(w, step); w.stuck = 0; w.lastD = Infinity; }
                         w.look.pose = undefined;
                         continue;

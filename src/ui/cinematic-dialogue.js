@@ -42,11 +42,29 @@
                 this.choicesEl = el('div', 'cine-choices');
                 this.cardEl = el('div', 'cine-card');
                 this.markerEl = el('div', 'cine-marker');
-                this.skipEl = el('div', 'cine-skip'); this.skipEl.innerHTML = '<span>HOLD TO SKIP</span><i></i>';
+                this.controlsEl = el('div', 'cine-controls');
+                this.pauseEl = el('button', 'cine-pause', null, this.controlsEl);
+                this.pauseEl.type = 'button'; this.pauseEl.textContent = '⏸';
+                this.pauseEl.title = 'Pause cutscene'; this.pauseEl.setAttribute('aria-label', 'Pause cutscene');
+                this.pauseEl.hidden = true; this.pauseEl.inert = true;
+                // Global intro skip/dialogue listeners must not hear a pause gesture.
+                this.pauseEl.addEventListener('pointerdown', e => e.stopPropagation());
+                this.pauseEl.addEventListener('keydown', e => {
+                    if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+                });
+                this.pauseEl.addEventListener('click', e => {
+                    e.preventDefault(); e.stopPropagation();
+                    const g = this.game;
+                    if (!g.running || g.paused || (!g.cutscene?.active && !g.scenes?.running)) return;
+                    this.tapped = false; this.skipHeld = false; this.skipHold = 0;
+                    this.skipEl.style.setProperty('--k', 0);
+                    pauseMenu.open(true);
+                });
+                this.skipEl = el('div', 'cine-skip', null, this.controlsEl); this.skipEl.innerHTML = '<span>HOLD TO SKIP</span><i></i>';
                 const tap = e => { e.preventDefault(); e.stopPropagation(); this.tapped = true; };
                 this.tapEl.addEventListener('pointerdown', tap); this.cardEl.addEventListener('pointerdown', tap); this.sub.addEventListener('pointerdown', tap);
                 window.addEventListener('keydown', e => {
-                    if (!this.game.scenes || !this.game.scenes.running) return;
+                    if (!this.game.scenes || !this.game.scenes.running || this.game.paused) return;
                     if (this.choice && /^[1-9]$/.test(e.key)) { this._pick(+e.key - 1); return; }
                     if (e.key === ' ' || e.key === 'Enter' || e.key === 'e' || e.key === 'E') this.tapped = true;
                 });
@@ -198,6 +216,12 @@
 
             /** The next tap anywhere. */
             waitTap() { this._build(); this.tapped = false; this.tapEl.classList.add('on'); return { done: () => { if (this.tapped) { this.tapped = false; return true; } return false; } }; }
+
+            showPause(on) {
+                this._build();
+                this.controlsEl.classList.toggle('show', !!on);
+                this.pauseEl.hidden = !on; this.pauseEl.inert = !on;
+            }
 
             showSkip(on, cb) { this._build(); this.skipEl.classList.toggle('show', !!on); this.onSkip = cb || null; this.skipHold = 0; this.skipHeld = false; }
 
