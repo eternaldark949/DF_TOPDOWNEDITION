@@ -494,6 +494,47 @@ test('Adaptive lighting survives zoom lamp-budget steps and lightning', env => {
   equal([r.afterZoom, r.afterFlash, r.same, r.flashing], [0.8, 0.8, true, true]);
 });
 
+test('Baseline layer panel: each layer gated and billed; with Baseline off nothing is gated or counted', env => {
+  const r = value(env, `
+    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+    game.showProfiler=false; GameSettings.profilerMode='off'; game.worldMinutes=22*60;
+    const W=game.weather; W.triggerLightning=()=>{}; W.lockSchedule&&W.lockSchedule('storm'); W.setCondition('storm',null,true);
+    const spy={}, wrap=(o,k,name)=>{const f=o[k];o[k]=function(...a){spy[name]=(spy[name]||0)+1;return f.apply(this,a);};};
+    wrap(game,'drawPlayer','stella'); wrap(game,'drawLightingSystem','lighting'); wrap(game,'drawEmissivePass','glow');
+    wrap(game,'drawBloomPass','bloom'); wrap(W,'drawRainOverlay','rain');
+    const frame=()=>{for(const k in spy)delete spy[k];game.worldMinutes=22*60;game.update();game.draw();return Object.assign({bld:RenderStats.bldBase},spy);};
+    const P=CanvasRenderingContext2D.prototype, fillRect0=P.fillRect;
+    const off=frame(), offShim=P.fillRect!==fillRect0, offAt=RenderLayers.at('lighting'), offTally=Object.keys(RenderLayers._tally).length;
+    GameSettings.baseline=true; RenderLayers.sync(game);
+    const firstUse=[...RenderLayers.layers()].sort(), onShim=P.fillRect!==fillRect0;
+    const base=frame();
+    RenderLayers.preset('none'); const none=frame();
+    RenderLayers.toggle('lighting'); const solo=frame(), kept=JSON.parse(localStorage.getItem('dfab_render_layers'));
+    RenderLayers.preset('all'); do frame(); while(RenderLayers._frames!==0);   // (to the start of a 30-frame window)
+    const c0=RenderStats.calls; for(let i=0;i<30;i++)frame(); const c1=RenderStats.calls;
+    const L=RenderLayers.last, sum=Object.values(L.avg).reduce((a,b)=>a+b,0);
+    GameSettings.baseline=false; RenderLayers.sync(game);
+    const after=frame();
+    return {off, offShim, offAt, offTally, firstUse, onShim, base, none, solo, kept, all:{total:Math.round(L.total*30), counted:c1-c0, sum:Math.round(sum*30),
+      stella:L.avg.stella>0, ground:L.avg.ground>0, lighting:L.avg.lighting>0, roofs:L.avg.roofs>0},
+      restored:P.fillRect===fillRect0, active:RenderLayers.active, after};
+  `);
+  ok(r.off.stella && r.off.lighting && r.off.glow && r.off.rain && r.off.bloom && r.off.bld > 0, 'Baseline off: every layer draws');
+  equal([r.offShim, r.offAt, r.offTally], [false, true, 0], 'Baseline off: no counter, no gates, nothing billed');
+  equal(r.firstUse, ['atmosphere','bloom','bokeh','ground','hud','rain','rings','stella'], 'first use: what Baseline drew before');
+  ok(r.onShim, 'the panel runs the call counter');
+  ok(r.base.stella && r.base.rain && r.base.bloom, 'Base: Stella, rain and bloom draw');
+  equal([r.base.lighting, r.base.glow, r.base.bld], [undefined, undefined, 0], 'Base: no lighting, glow or buildings');
+  equal([r.none.stella, r.none.rain, r.none.bloom, r.none.lighting, r.none.bld], [undefined, undefined, undefined, undefined, 0], 'None draws no layer');
+  equal([r.solo.lighting, r.solo.stella], [1, undefined], 'a chip switches its layer alone');
+  equal(r.kept, ['lighting'], 'the chip set is kept');
+  equal(r.all.total, r.all.counted, 'the layers bill every canvas call of the window');
+  equal(r.all.sum, r.all.total);
+  ok(r.all.stella && r.all.ground && r.all.lighting && r.all.roofs, 'All: the hub bills Stella, ground, lighting and roofs');
+  equal([r.restored, r.active], [true, false], 'Baseline off again: the counter is gone');
+  ok(r.after.stella && r.after.lighting && r.after.bld > 0, 'and every layer draws again');
+});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');

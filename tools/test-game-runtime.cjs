@@ -61,6 +61,7 @@ function runtime(file,options={}) {
     removeChild(n){this.children=this.children.filter(x=>x!==n);n.parentNode=null;n.parentElement=null;return n;}
     replaceChildren(...ns){for(const c of this.children){c.parentNode=null;c.parentElement=null;}this.children.length=0;for(const n of ns)this.appendChild(typeof n==='string'?Object.assign(new Node(),{textContent:n}):n);}
     append(...ns){for(const n of ns)this.appendChild(typeof n==='string'?Object.assign(new Node(),{textContent:n}):n);}
+    prepend(...ns){const was=this.children.slice();this.children.length=0;this.append(...ns);for(const c of was)this.children.push(c);}
     addEventListener(k,f){if(options.events){this._events ||= new Map();if(!this._events.has(k))this._events.set(k,[]);this._events.get(k).push(f);}} removeEventListener(){} dispatchEvent(e){for(const f of this._events?.get(e.type)||[])f(e);return true;}
   }
   class Element extends Node {
@@ -110,7 +111,7 @@ function runtime(file,options={}) {
   scope.window=scope;scope.self=scope;scope.globalThis=scope;
   vm.createContext(scope);
   const html=fs.readFileSync(file,'utf8');const scripts=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
-  vm.runInContext(scripts.join('\n')+'\n;globalThis.__probe={game,GameSettings,MAPS:MAP_DATA,PerfBench,DevOverlay,RenderStats};',scope,{filename:file,timeout:30000});
+  vm.runInContext(scripts.join('\n')+'\n;globalThis.__probe={game,GameSettings,MAPS:MAP_DATA,PerfBench,DevOverlay,RenderStats,RenderLayers};',scope,{filename:file,timeout:30000});
   return {scope,probe:scope.__probe,counters,logs,warnings,errors,trace,pendingTimers,dispatchWindow(e){for(const f of windowEvents.get(e.type)||[])f(e);},setTrace(on){traceEnabled=on;trace.length=0;},run(source){return vm.runInContext(source,scope,{timeout:30000});}};
 }
 module.exports={runtime};

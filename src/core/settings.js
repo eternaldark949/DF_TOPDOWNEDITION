@@ -164,7 +164,7 @@
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
-            baseline: false,                // the ground and Stella only: the most this device can give the game (not kept)
+            baseline: false,                // Baseline's layer panel (ui/render-layers.js): each render layer on a chip, with its calls (not kept)
             countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
             
             // --- AUDIO ---

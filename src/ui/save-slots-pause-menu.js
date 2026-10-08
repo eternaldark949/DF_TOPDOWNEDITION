@@ -1177,6 +1177,7 @@
 
                 } else if (key === 'baseline') {
                     GameSettings.baseline = !GameSettings.baseline;
+                    if (typeof RenderLayers !== 'undefined') RenderLayers.sync(game);   // the layer panel (ui/render-layers.js)
                     this._updateValueEl(el.id, GameSettings.baseline ? 'on' : 'off');
 
                 } else if (key === 'debugView') {

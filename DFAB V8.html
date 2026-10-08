@@ -1508,35 +1508,69 @@
         #dev-prof .dp-counts, #dev-layers .dl-counts { display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(202, 176, 250, 0.18); font-size: 0.55rem; color: var(--df-lilac-grey); }
         #dev-prof .dp-counts b, #dev-layers .dl-counts b { color: var(--df-lavender-pale); font-weight: 600; }
 
-        #dev-layers {
-            position: fixed; z-index: 2500; top: calc(160px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); width: 178px;
-            padding: 8px 10px; border-radius: 16px; user-select: none; font-family: var(--font-ui);
+        /* The dev panels share one column (ui/dev-overlay.js dock()): Baseline's layers over the Debug chips */
+        #dev-dock {
+            position: fixed; z-index: 2500; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain;
+            bottom: calc(118px + env(safe-area-inset-bottom, 0px)); left: calc(14px + env(safe-area-inset-left, 0px));
+            max-height: calc(100vh - 128px - 118px - 16px); scrollbar-width: none;
+        }
+        #dev-dock:empty { display: none; }
+        #dev-layers, #dev-render {
+            flex: none; padding: 8px 10px; border-radius: 16px; user-select: none; font-family: var(--font-ui);
             background: linear-gradient(100deg, rgba(4, 1, 6, 0.8), rgba(22, 6, 46, 0.74)); border: 1px solid rgba(202, 176, 250, 0.35);
             backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
         }
+        #dev-layers { width: 178px; }
         #dev-layers .dl-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.58rem; letter-spacing: 4px; text-transform: uppercase; color: var(--df-cream); margin-bottom: 6px; }
-        #dev-layers .dl-fold { background: none; border: none; color: var(--df-lilac-grey); cursor: pointer; font-size: 0.8rem; transition: transform 0.2s; }
-        #dev-layers.folded .dl-fold { transform: rotate(-90deg); }
-        #dev-layers.folded .dl-chips, #dev-layers.folded .dl-counts { display: none; }
+        #dev-layers .dl-fold, #dev-render .rl-fold { background: none; border: none; color: var(--df-lilac-grey); cursor: pointer; font-size: 0.8rem; transition: transform 0.2s; }
+        #dev-layers.folded .dl-fold, #dev-render.folded .rl-fold { transform: rotate(-90deg); }
+        #dev-layers.folded .dl-chips, #dev-layers.folded .dl-counts, #dev-render.folded .rl-body { display: none; }
         #dev-layers .dl-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-        #dev-layers .dl-chip { padding: 3px 9px; border-radius: 999px; cursor: pointer; font: 600 0.52rem var(--font-ui); letter-spacing: 1.5px; text-transform: uppercase;
+        #dev-layers .dl-chip, #dev-render .rl-chip { padding: 3px 9px; border-radius: 999px; cursor: pointer; font: 600 0.52rem var(--font-ui); letter-spacing: 1.5px; text-transform: uppercase;
             background: rgba(20, 8, 34, 0.5); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); color: color-mix(in srgb, var(--c) 70%, #8a7f99); }
-        #dev-layers .dl-chip.on { background: color-mix(in srgb, var(--c) 22%, rgba(20, 8, 34, 0.6)); border-color: var(--c); color: #fff; box-shadow: 0 0 8px color-mix(in srgb, var(--c) 45%, transparent); }
+        #dev-layers .dl-chip.on, #dev-render .rl-chip.on { background: color-mix(in srgb, var(--c) 22%, rgba(20, 8, 34, 0.6)); border-color: var(--c); color: #fff; box-shadow: 0 0 8px color-mix(in srgb, var(--c) 45%, transparent); }
+        /* Baseline's layer panel (ui/render-layers.js): calls a frame on every chip, the three heaviest in gold */
+        #dev-render { width: 252px; }
+        #dev-render .rl-head { display: flex; align-items: baseline; gap: 4px; font-family: ui-monospace, Consolas, monospace; }
+        #dev-render .rl-title { flex: 1; font: 600 0.58rem var(--font-ui); letter-spacing: 4px; text-transform: uppercase; color: var(--df-cream); }
+        #dev-render .rl-head b { font-size: 0.85rem; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
+        #dev-render .rl-head span:not(.rl-title) { font-size: 0.48rem; letter-spacing: 2px; text-transform: uppercase; color: var(--df-lilac-grey); margin-right: 4px; }
+        #dev-render .rl-fold { align-self: center; }
+        #dev-render .rl-presets { display: flex; gap: 5px; margin: 5px 0 3px; }
+        #dev-render .rl-presets button { flex: 1; padding: 2px 0; border-radius: 999px; cursor: pointer; font: 600 0.5rem var(--font-ui); letter-spacing: 2px; text-transform: uppercase;
+            background: rgba(232, 194, 122, 0.08); border: 1px solid rgba(232, 194, 122, 0.4); color: var(--df-cream); }
+        #dev-render .rl-presets button:active { background: rgba(232, 194, 122, 0.3); }
+        #dev-render .rl-group { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 2px 0 3px; border-top: 1px solid rgba(202, 176, 250, 0.1); }
+        #dev-render .rl-group i { flex: 0 0 100%; font: 600 0.42rem var(--font-ui); font-style: normal; letter-spacing: 2.5px; text-transform: uppercase; color: var(--df-lilac-grey); line-height: 1.3; }
+        #dev-render .rl-chip { display: inline-flex; gap: 4px; align-items: baseline; padding: 2px 6px; letter-spacing: 0.6px; }
+        #dev-render .rl-chip b { font: 600 0.55rem ui-monospace, Consolas, monospace; letter-spacing: 0; color: color-mix(in srgb, var(--c) 60%, #fff); font-variant-numeric: tabular-nums; }
+        #dev-render .rl-chip b:empty { display: none; }
+        #dev-render .rl-chip.hot { border-color: var(--df-gold); box-shadow: 0 0 9px rgba(255, 194, 72, 0.6); }
+        #dev-render .rl-chip.hot b { color: var(--df-gold); }
+        #dev-render .rl-foot { display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 4px; padding-top: 5px; border-top: 1px solid rgba(202, 176, 250, 0.18); font-size: 0.55rem; color: var(--df-lilac-grey); }
+        #dev-render .rl-foot b { color: var(--df-lavender-pale); font-weight: 600; font-family: ui-monospace, Consolas, monospace; }
         body.landscape #dev-prof { top: calc(146px + env(safe-area-inset-top, 0px)); left: calc(22px + env(safe-area-inset-left, 0px)); }
         body.landscape #dev-prof.full { max-height: calc(100vh - 160px); }
-        /* Portrait: the layer panel sits low on the left, clear of the controls; the full profiler stops above it */
-        #dev-layers { top: auto; right: auto; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); left: calc(14px + env(safe-area-inset-left, 0px)); }
-        body.dev-debug #dev-prof.full { max-height: calc(100vh - 128px - 118px - 190px); }
-        /* Landscape: the layer panel tucks in beside the pause button, under the wave readout when there is one */
-        body.landscape #dev-layers { bottom: auto; left: auto; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(140px + env(safe-area-inset-right, 0px)); width: 320px; }
-        body.landscape.wave-hud #dev-layers { top: calc(58px + env(safe-area-inset-top, 0px)); }
-        body.landscape.dev-debug #dev-prof.full { max-height: calc(100vh - 160px); }
+        /* Portrait: the dock sits low on the left, clear of the controls; the full profiler stops above it */
+        /* With the dock open as well, the column between the bars and the controls is shared: the profiler 45%, the dock the rest */
+        @media (max-width: 899px), (max-height: 599px) {
+            body.dev-prof-full.dev-render:not(.landscape) #dev-dock, body.dev-prof-full.dev-debug:not(.landscape) #dev-dock { max-height: calc((100vh - 128px - 118px) * 0.55 - 8px); }
+            body.dev-prof-full.dev-render:not(.landscape) #dev-prof.full, body.dev-prof-full.dev-debug:not(.landscape) #dev-prof.full { max-height: calc((100vh - 128px - 118px) * 0.45 - 8px); }
+        }
+        /* Landscape: the dock tucks in beside the pause button, under the wave readout when there is one */
+        body.landscape #dev-dock { bottom: auto; left: auto; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(140px + env(safe-area-inset-right, 0px));
+            max-height: calc(100vh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+        body.landscape #dev-dock { align-items: flex-end; }
+        body.landscape #dev-layers { width: 320px; }
+        body.landscape #dev-render { width: 400px; }
+        body.landscape.wave-hud #dev-dock { top: calc(58px + env(safe-area-inset-top, 0px)); max-height: calc(100vh - 70px); }
+        body.landscape.dev-debug #dev-prof.full, body.landscape.dev-render #dev-prof.full { max-height: calc(100vh - 160px); }
         @media (min-width: 900px) and (min-height: 600px) {
-            body:not(.landscape) #dev-layers { bottom: auto; left: auto; top: calc(160px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); }
-            body.dev-debug:not(.landscape) #dev-prof.full { max-height: calc(100vh - 160px); }
+            body:not(.landscape) #dev-dock { bottom: auto; left: auto; top: calc(160px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); max-height: calc(100vh - 176px); }
+            body.dev-debug:not(.landscape) #dev-prof.full, body.dev-render:not(.landscape) #dev-prof.full { max-height: calc(100vh - 160px); }
         }
         @media (max-width: 360px) { #dev-prof .dp-spark { display: none; } }
-        body.cinematic-view #dev-prof, body.cinematic-view #dev-layers { display: none !important; }
+        body.cinematic-view #dev-prof, body.cinematic-view #dev-dock { display: none !important; }
 
         /* The resolution bench's card (PerfBench.draw): progress with Cancel, then the verdict with OK */
         #bench-card {
@@ -4422,7 +4456,7 @@
                     <span class="settings-value" id="set-countcalls" data-key="countCalls">OFF</span>
                 </div>
                 <div class="settings-row">
-                    <span class="settings-label">Baseline: Skip World</span>
+                    <span class="settings-label">Baseline: Layers</span>
                     <span class="settings-value" id="set-baseline" data-key="baseline">OFF</span>
                 </div>
                 <div class="settings-row">
@@ -7968,7 +8002,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
-            baseline: false,                // the ground and Stella only: the most this device can give the game (not kept)
+            baseline: false,                // Baseline's layer panel (ui/render-layers.js): each render layer on a chip, with its calls (not kept)
             countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
             
             // --- AUDIO ---
@@ -55016,12 +55050,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
                     this._prof.classList.toggle('full', mode === 'full');
-                    if (mode !== 'full' || !GameSettings.countCalls) this._countCalls(false);   // the call counter: Full, and only when asked for
                     this._report = null;
                 }
+                this._countCalls(this._wantCalls(game));
                 if (game.debugMode) this._ensureDbg();
                 if (this._dbg) this._dbg.style.display = game.debugMode ? '' : 'none';
                 document.body.classList.toggle('dev-debug', !!game.debugMode);
+                document.body.classList.toggle('dev-prof-full', mode === 'full');   // (in portrait it shares the column with the dock)
             },
 
             _ensureProf() {
@@ -55036,6 +55071,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 document.body.appendChild(el);
                 this._prof = el; this._spark = el.querySelector('.dp-spark'); this._sctx = this._spark.getContext('2d');
                 this._fpsEl = el.querySelector('.dp-fps'); this._msEl = el.querySelector('.dp-ms'); this._rowsEl = el.querySelector('.dp-rows');
+            },
+
+            /** The call counter: the Full profiler with Count Canvas Calls, or Baseline's layer panel */
+            _wantCalls(game) {
+                return !!(game.showProfiler && GameSettings.profilerMode === 'full' && GameSettings.countCalls)
+                    || (typeof RenderLayers !== 'undefined' && RenderLayers.active);
+            },
+
+            /** One column for the dev panels (Baseline's layers over the Debug chips), so both can be open */
+            dock() {
+                let d = document.getElementById('dev-dock');
+                if (!d) { d = document.createElement('div'); d.id = 'dev-dock'; document.body.appendChild(d); }
+                return d;
             },
 
             _ensureDbg() {
@@ -55053,7 +55101,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (L.has(k)) L.delete(k); else L.add(k);
                     b.classList.toggle('on', L.has(k)); this._saveLayers();
                 });
-                document.body.appendChild(el);
+                this.dock().appendChild(el);
                 this._dbg = el; this._countsEl = el.querySelector('.dl-counts');
             },
 
@@ -55061,9 +55109,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             frame(game) {
                 const now = performance.now(), dt = this._last ? now - this._last : 16.7;
                 this._last = now;
+                if (this._calls) {                        // (a running count: Baseline's layer panel bills from it too)
+                    this._callTotal += RenderStats.calls - this._callMark; this._callMark = RenderStats.calls; this._callFrames++;
+                }
                 if (!game.showProfiler && !game.debugMode) return;
                 this._times[this._ti] = dt; this._ti = (this._ti + 1) % this._times.length;
-                if (this._calls) { this._callTotal += RenderStats.calls; this._callFrames++; RenderStats.calls = 0; }
                 this._n++;
                 if (game.showProfiler && this._prof) {
                     if (this._n % 3 === 0) this._sparkStep(dt);
@@ -55124,8 +55174,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             /** Bodies drawn / culled this frame, and canvas calls a frame (counted only while Full is open) */
             _renderLine(game, workMs) {
-                const counting = !!GameSettings.countCalls;
-                this._countCalls(counting);
+                this._countCalls(this._wantCalls(game));
+                const counting = !!this._calls;
                 const n = this._callFrames ? Math.round(this._callTotal / this._callFrames) : 0;
                 this._callTotal = 0; this._callFrames = 0;
                 // frame time (last 30 frames) minus the game's own measured work: raster in the browser's GPU process, GC, the compositor
@@ -55169,11 +55219,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return this._mem;
             },
 
-            /** A counting shim on the 2D context's methods (Full profiler only; removed when it closes) */
+            /** A counting shim on the 2D context's methods (the Full profiler's count, or Baseline's panel; removed when both close) */
             _countCalls(on) {
                 const P = CanvasRenderingContext2D.prototype;
                 if (on && !this._calls) {
-                    this._calls = {}; this._callTotal = 0; this._callFrames = 0;
+                    this._calls = {}; this._callTotal = 0; this._callFrames = 0; this._callMark = RenderStats.calls;
                     for (const k of Object.getOwnPropertyNames(P)) {
                         const d = Object.getOwnPropertyDescriptor(P, k);
                         if (!d || typeof d.value !== 'function' || k === 'constructor') continue;
@@ -55322,6 +55372,171 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             }
         });
+        // ═══ RENDER LAYERS — Baseline's panel: every layer of the frame on a chip, with its canvas calls ═══
+        // Settings → Developer → Baseline: Layers. While it's on, draw() asks RenderLayers.at(key) before
+        // each layer: the answer is whether that layer draws, and the canvas calls since the last ask are
+        // billed to the layer before it. With Baseline off, at() is true and bills nothing.
+        // The chips show calls a frame (averaged over 30 frames, the top three lit gold); the header the
+        // frame's total and its ms, so switching a layer off shows what it costs in calls and in time.
+
+        // [key, chip, group], in draw order (engine/draw.js)
+        const RENDER_LAYERS = [
+            ['ground', 'Ground', 'World'], ['floors', 'Floors', 'World'], ['walls', 'Walls', 'World'],
+            ['reflections', 'Reflections', 'World'], ['decals', 'Decals', 'World'], ['shadows', 'Sun shadows', 'World'],
+            ['buildings', 'Buildings', 'World'], ['roofs', 'Roofs', 'World'], ['neon', 'Neon', 'World'],
+            ['trees', 'Trees', 'World'], ['lamps', 'Lamps', 'World'],
+            ['props', 'Props', 'Things'], ['cars', 'Cars', 'Things'], ['markers', 'Markers', 'Things'],
+            ['crowd', 'Crowd', 'People'], ['characters', 'Characters', 'People'], ['stella', 'Stella', 'People'],
+            ['combat', 'Combat FX', 'Effects'], ['particles', 'Particles', 'Effects'], ['rings', 'Sound rings', 'Effects'],
+            ['lighting', 'Lighting', 'Light'], ['glow', 'Glow', 'Light'], ['edge', 'Map edge', 'Light'],
+            ['bloom', 'Bloom', 'Screen'], ['atmosphere', 'Atmosphere', 'Screen'], ['rain', 'Rain', 'Screen'],
+            ['bokeh', 'Bokeh', 'Screen'], ['hud', 'HUD', 'Screen']
+        ];
+        const RENDER_GROUP_COLOUR = { World: '#cab0fa', Things: '#ffc248', People: '#ff8ab8', Effects: '#9be8dc', Light: '#f4e6c8', Screen: '#8fb4ff' };
+        // What Baseline drew before it had layers: the ground, Stella, and the screen passes
+        const RENDER_BASE = ['ground', 'stella', 'rings', 'bloom', 'atmosphere', 'rain', 'bokeh', 'hud'];
+        // Billed but never switched off: the clear and transforms, Debug view's layers, and calls between frames
+        const RENDER_BUCKETS = ['frame', 'debug', 'outside'];
+
+        const RenderLayers = {
+            active: false, cur: 'outside', mark: 0,
+            _on: null, _tally: Object.create(null), _frames: 0, _ms: 0, _msN: 0, _endT: 0,
+            _el: null, _chips: null, _shown: Object.create(null), last: null,
+
+            /** The layers she has on (kept per device; Base the first time) */
+            layers() {
+                if (!this._on) {
+                    let saved = null;
+                    try { saved = JSON.parse(localStorage.getItem('dfab_render_layers')); } catch (e) { /* private mode */ }
+                    this._on = new Set(Array.isArray(saved) ? saved : RENDER_BASE);
+                }
+                return this._on;
+            },
+            _save() { try { localStorage.setItem('dfab_render_layers', JSON.stringify([...this._on])); } catch (e) { /* private mode */ } },
+
+            /** From here the frame's calls are `key`'s; true when that layer draws (always outside Baseline,
+                and always for the frame's own calls and Debug view's) */
+            at(key) {
+                if (!this.active) return true;
+                const c = RenderStats.calls;
+                this._tally[this.cur] = (this._tally[this.cur] || 0) + c - this.mark;
+                this.mark = c; this.cur = key;
+                return this._on.has(key) || key === 'frame' || key === 'debug';
+            },
+
+            /** Top of draw(): after a pause, what the menus drew between frames isn't the game's */
+            beginFrame() {
+                if (!this.active) return;
+                if (this._endT && performance.now() - this._endT > 250) this.mark = RenderStats.calls;
+                this.at('frame');
+            },
+
+            /** End of draw(): bill the last layer, time the frame, and refresh the panel every 30 frames */
+            endFrame() {
+                if (!this.active) return;
+                this.at('outside');
+                const now = performance.now(), dt = this._endT ? now - this._endT : 0;
+                if (dt > 0 && dt < 250) { this._ms += dt; this._msN++; }
+                this._endT = now;
+                if (++this._frames >= 30) this._show();
+            },
+
+            /** Show or hide the panel to match Settings → Baseline, and with it the call counter */
+            sync(game) {
+                const want = !!GameSettings.baseline;
+                if (want && !this.active) this._reset();
+                this.active = want;
+                this.layers();
+                if (want) this._ensure();
+                if (this._el) this._el.style.display = want ? '' : 'none';
+                document.body.classList.toggle('dev-render', want);
+                if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);   // the counter runs while the panel is open
+                if (want) this.mark = RenderStats.calls;
+            },
+
+            _reset() {
+                this._tally = Object.create(null); this._frames = 0; this._ms = 0; this._msN = 0; this._endT = 0;
+                this.cur = 'outside'; this.mark = RenderStats.calls;
+            },
+
+            /** Switch to a preset: everything, what Baseline drew before, or nothing */
+            preset(name) {
+                const L = this.layers(); L.clear();
+                for (const [k] of RENDER_LAYERS) if (name === 'all' || (name === 'base' && RENDER_BASE.includes(k))) L.add(k);
+                this._save(); this._paintOn();
+            },
+
+            toggle(key) {
+                const L = this.layers();
+                if (L.has(key)) L.delete(key); else L.add(key);
+                this._save(); this._paintOn();
+            },
+
+            _ensure() {
+                if (this._el) return;
+                const el = document.createElement('div'); el.id = 'dev-render';
+                const groups = [];
+                for (const [k, name, g] of RENDER_LAYERS) {
+                    let grp = groups.find(x => x.g === g);
+                    if (!grp) groups.push(grp = { g, chips: [] });
+                    grp.chips.push(`<button class="rl-chip" data-layer="${k}" style="--c:${RENDER_GROUP_COLOUR[g]}"><span>${name}</span><b></b></button>`);
+                }
+                el.innerHTML = '<div class="rl-head"><span class="rl-title">Baseline</span><b class="rl-total">--</b><span>calls</span><b class="rl-ms">--</b><span>ms</span>'
+                    + '<button class="rl-fold" title="Fold">▾</button></div>'
+                    + '<div class="rl-body"><div class="rl-presets"><button data-preset="all">All</button><button data-preset="base">Base</button><button data-preset="none">None</button></div>'
+                    + groups.map(x => `<div class="rl-group"><i>${x.g}</i>${x.chips.join('')}</div>`).join('')
+                    + '<div class="rl-foot"></div></div>';
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (e.target.closest('.rl-fold')) { el.classList.toggle('folded'); return; }
+                    const p = e.target.closest('[data-preset]'); if (p) { this.preset(p.dataset.preset); return; }
+                    const b = e.target.closest('[data-layer]'); if (b) this.toggle(b.dataset.layer);
+                });
+                DevOverlay.dock().prepend(el);
+                this._el = el;
+                this._chips = Object.fromEntries([...el.querySelectorAll('[data-layer]')].map(b => [b.dataset.layer, { el: b, n: b.querySelector('b') }]));
+                this._totalEl = el.querySelector('.rl-total'); this._msEl = el.querySelector('.rl-ms'); this._footEl = el.querySelector('.rl-foot');
+                this._shown = Object.create(null);
+                this._paintOn();
+            },
+
+            /** Light the chips that draw; the ones that don't lose their number */
+            _paintOn() {
+                if (!this._chips) return;
+                const L = this.layers();
+                for (const k in this._chips) {
+                    const c = this._chips[k], on = L.has(k);
+                    c.el.classList.toggle('on', on);
+                    if (!on) { c.el.classList.remove('hot'); c.n.textContent = ''; this._shown[k] = undefined; }
+                }
+            },
+
+            /** Calls a frame for each layer over the last 30 frames; the three heaviest lit */
+            _show() {
+                const T = this._tally, F = this._frames, avg = Object.create(null);
+                let total = 0;
+                for (const k in T) { avg[k] = T[k] / F; total += avg[k]; }
+                const ms = this._msN ? this._ms / this._msN : 0;
+                this._tally = Object.create(null); this._frames = 0; this._ms = 0; this._msN = 0;
+                this.last = { avg, total, ms };
+                if (!this._el) return;
+                const L = this.layers();
+                const hot = RENDER_LAYERS.map(([k]) => k).filter(k => L.has(k) && (avg[k] || 0) >= 1)
+                    .sort((a, b) => avg[b] - avg[a]).slice(0, 3);
+                for (const k in this._chips) {
+                    if (!L.has(k)) continue;
+                    const c = this._chips[k], n = Math.round(avg[k] || 0);
+                    if (this._shown[k] !== n) { c.n.textContent = n.toLocaleString(); this._shown[k] = n; }
+                    c.el.classList.toggle('hot', hot.includes(k));
+                }
+                const tt = Math.round(total).toLocaleString(), mt = ms ? ms.toFixed(1) : '--';
+                if (this._totalEl.textContent !== tt) this._totalEl.textContent = tt;
+                if (this._msEl.textContent !== mt) this._msEl.textContent = mt;
+                const foot = RENDER_BUCKETS.filter(k => k !== 'debug' || (avg.debug || 0) >= 1)
+                    .map(k => `<span>${k} <b>${Math.round(avg[k] || 0).toLocaleString()}</b></span>`).join('');
+                if (this._footHtml !== foot) { this._footEl.innerHTML = foot; this._footHtml = foot; }
+            }
+        };
         // GameEngine — Scope view: with a sniper up to her eye, the world darkens and only a soft
         // lane about her width stays lit along her line of fire, out to where the shot would
         // land. Eases in and out; the lane sways a little, then steadies (the cue to take the
@@ -63118,6 +63333,10 @@ engineMixin({
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
+                // Baseline's layer panel (ui/render-layers.js): RL.at(layer) says whether a layer draws, and
+                // bills the canvas calls since the last ask to the layer before. Outside Baseline it's always true.
+                const RL = RenderLayers;
+                RL.beginFrame();
                 // --- PROFILER START ---
                 this._syncProfiler();
                 this.profiler.beginFrame();
@@ -63257,13 +63476,14 @@ engineMixin({
                 const floorBottom = Math.min(this.activeMap.height, camY + viewHalfH + 50);
                 // The city: ground, zones, roads, pavements and crossings come baked in tiles (world/ground-baker.js)
                 const bakedGround = !!(this.groundBaker && this.groundBaker.activeFor(this.activeMap));
+                if (RL.at('ground')) {
                 if (bakedGround) {
                     this.groundBaker.draw(this.ctx, { left: floorLeft, top: floorTop, right: floorRight, bottom: floorBottom });
                 } else {
                     this.ctx.fillStyle = this.activeMap.floorColor;
                     this.ctx.fillRect(floorLeft, floorTop, floorRight - floorLeft, floorBottom - floorTop);
                 }
-                
+
                 // Floor Zones (Grass, Industrial ground - drawn UNDER roads)
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (this._renderGridFloorZones && !bakedGround) {
@@ -63273,9 +63493,10 @@ engineMixin({
                         this.ctx.fillRect(z.x, z.y, z.w, z.h);
                     }
                 }
-                
+                }
+
                 // Restricted Zone — in-world crimson hazard border
-                if (this.restrictedZone && this.activeMap.id === 'hub_949') {
+                if (RL.at('markers') && this.restrictedZone && this.activeMap.id === 'hub_949') {
                     const rz = this.restrictedZone;
                     const wb = cullBounds.world;
                     // Only draw if zone is visible in viewport
@@ -63310,15 +63531,11 @@ engineMixin({
                 }
                 
                 // Roads (Asphalt) — baked with the ground in the city; the debug overlay still draws live
-                if (!bakedGround || this.dbg('traffic')) this.traffic.drawNetwork(this.ctx, this.dbg('traffic'));
-                
-            
+                if (RL.at('ground') && (!bakedGround || this.dbg('traffic'))) this.traffic.drawNetwork(this.ctx, this.dbg('traffic'));
+
+
                 this.profiler.stop('Render:World');
-                
-                // Baseline (Settings → Developer): the ground and Stella only, to see the most this device
-                // can give the game. Everything from the buildings to the world's top layers is skipped.
-                const _baseline = !!GameSettings.baseline;
-                if (!_baseline) {   // ── to the end of Render:Entities
+
                 // Buildings - BASE LAYER (shadows, ground floor) - drawn before entities
                 this.profiler.start('Render:Buildings');
                 if (RenderStats.timed) {
@@ -63327,7 +63544,7 @@ engineMixin({
                 }
                 // One ordered visibility list shared by base, roofs, signs and emissive details.
                 const renderBuildings = this._prepareRenderBuildingLists(cullBounds);
-                if (this.activeMap.buildings) {
+                if (RL.at('buildings') && this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
                     for (const entry of renderBuildings.base) {
                         const b = entry.item;
@@ -63337,23 +63554,23 @@ engineMixin({
                         else b.draw(this.ctx);
                     }
                 }
-                
+
                 // BuildingV3 — Ground layer (beneath player: facade, sidewalk)
-                if (this.activeMap._v3Buildings) {
+                if (RL.at('buildings') && this.activeMap._v3Buildings) {
                     this.activeMap._v3Buildings.forEach(b => {
                         b.drawGround(this.ctx, performance.now());
                     });
                 }
-                
+
                 // Neon Signs on buildings - PERFORMANCE: AABB culling + cached frameTime
                 const cbNeonMain = cullBounds.neonSigns;
-                this.neonSigns.forEach(s => {
+                if (RL.at('neon')) this.neonSigns.forEach(s => {
                     if (s.x < cbNeonMain.left || s.x > cbNeonMain.right || s.y < cbNeonMain.top || s.y > cbNeonMain.bottom) return;
                     s.draw(this.ctx, _frameTime);  // per-frame real time (was sampled once per tick)
                 });
-            
+
                 // Walls & Indoor Zones (WITH BAKED TEXTURES)
-                if (this.activeMap.zones) { 
+                if (RL.at('floors') && this.activeMap.zones) {
                     this.activeMap.zones.forEach(z => { 
                         // Base color fill
                         this.ctx.fillStyle = z.color; 
@@ -63384,18 +63601,18 @@ engineMixin({
                 
                 // Painted interiors (after the zones, so e.g. the apartment's city backdrop covers its veranda zone)
                 const art = INTERIOR_ART[this.activeMap.id];
-                if (art && art.floor) art.floor(this, this.ctx);
-                
+                if (RL.at('floors') && art && art.floor) art.floor(this, this.ctx);
+
                 // Indoor V2: Room floors, windows, and doors
                 if (this.roomSystem.active) {
-                    this.roomSystem.drawFloors(this.ctx);
-                    this.roomSystem.drawWindows(this.ctx, windowDaylight);
+                    if (RL.at('floors')) this.roomSystem.drawFloors(this.ctx);
+                    if (RL.at('walls')) this.roomSystem.drawWindows(this.ctx, windowDaylight);
                     // Doors drawn AFTER walls (see below) so they render on top
                 }
-                
+
                 // Pavements
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
-                if (this._renderGridPavements && !bakedGround) {
+                if (RL.at('floors') && this._renderGridPavements && !bakedGround) {
                     const visiblePavements = this._renderGridPavements.query(cullBounds.world, this._renderGridPavements._drawResults || (this._renderGridPavements._drawResults = new Set()));
                     for (const p of visiblePavements) {
                         p.draw(this.ctx);
@@ -63404,7 +63621,7 @@ engineMixin({
                 
                 // Crosswalks
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
-                if (this._renderGridCrosswalks && !bakedGround) {
+                if (RL.at('floors') && this._renderGridCrosswalks && !bakedGround) {
                     const visibleCrosswalks = this._renderGridCrosswalks.query(cullBounds.world, this._renderGridCrosswalks._drawResults || (this._renderGridCrosswalks._drawResults = new Set()));
                     for (const cw of visibleCrosswalks) {
                         this.ctx.fillStyle = '#1a1a20';
@@ -63429,12 +63646,14 @@ engineMixin({
 
                 // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
                 // the wet asphalt, on the ground and the floors (after the painted interiors) before buildings and people so they walk over it
-                this.prepareReflections();
-                this.drawPuddles(this.ctx);
-                this.drawReflections(this.ctx);
-                
+                if (RL.at('reflections')) {
+                    this.prepareReflections();
+                    this.drawPuddles(this.ctx);
+                    this.drawReflections(this.ctx);
+                } else this._refl = null;                                 // (so the light layer lifts no stale one)
+
                 // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)
-                if (this.activeMap.buildings && this.activeMap.type === 'outdoor') {
+                if (RL.at('buildings') && this.activeMap.buildings && this.activeMap.type === 'outdoor') {
                     const cbW = cullBounds.world;
                     const candidates = this._queryRenderBuildings({ left: cbW.left - 60, right: cbW.right + 60, top: cbW.top - 480, bottom: cbW.bottom },
                         this._forecourtCandidates || (this._forecourtCandidates = []));
@@ -63446,10 +63665,12 @@ engineMixin({
                         ground.call(b, this.ctx);
                     }
                 }
-                this.decals.draw(this.ctx, cullBounds.world);
-                this.drawCasings(this.ctx, cullBounds.world);                 // spent brass (engine/combat-effects.js)
+                if (RL.at('decals')) {
+                    this.decals.draw(this.ctx, cullBounds.world);
+                    this.drawCasings(this.ctx, cullBounds.world);             // spent brass (engine/combat-effects.js)
+                }
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day
-                this.drawCastShadows(this.ctx, cullBounds.world);
+                if (RL.at('shadows')) this.drawCastShadows(this.ctx, cullBounds.world);
                 
                 if (RenderStats.timed) this.profiler.add('Buildings: People', RenderStats.peopleMs - this._buildingPeopleBase, true);
                 this.profiler.stop('Render:Buildings');
@@ -63463,7 +63684,7 @@ engineMixin({
                     this._lapT = performance.now(); this._lapP = RenderStats.peopleMs;
                 }   // the laps below split only the Entities pass into rows
                 // PERFORMANCE: AABB viewport culling
-                if (this.activeMap.transitions) {
+                if (RL.at('markers') && this.activeMap.transitions) {
                     const cbW = cullBounds.world;
                     const pulse = (Math.sin(_frameTime / 200) + 1) / 2;
                     this.ctx.save();
@@ -63550,7 +63771,8 @@ engineMixin({
                 }
                 
                 // --- DELIVERY DROP-OFF MARKER (world-space spinning amber coffee cup) ---
-                if (this.missions.activeMission && this.missions.activeMission.status === 'active'
+                const markers = RL.at('markers');
+                if (markers && this.missions.activeMission && this.missions.activeMission.status === 'active'
                     && this.missions.activeMission.type === MISSION_TYPES.DELIVERY
                     && this.missions.activeMission.pickedUp && this.activeMap.id === 'hub_949') {
                     const m = this.missions.activeMission;
@@ -63627,7 +63849,7 @@ engineMixin({
                 }
                 
                 // --- BOUNTY TARGET MARKER (world-space red skull indicator) ---
-                if (this.missions.activeMission && this.missions.activeMission.status === 'active'
+                if (markers && this.missions.activeMission && this.missions.activeMission.status === 'active'
                     && this.missions.activeMission.type === MISSION_TYPES.BOUNTY
                     && this.missions.activeMission.targetEntity
                     && !this.missions.activeMission.targetEntity.dead
@@ -63662,7 +63884,7 @@ engineMixin({
             
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Grid (Faint) - WITH VIEWPORT CULLING (not in the city: its ground is painted)
-                if (!bakedGround) {
+                if (RL.at('floors') && !bakedGround) {
                 this.ctx.strokeStyle = 'rgba(164, 105, 255, 0.1)'; 
                 this.ctx.lineWidth = 1;
                 const gridSize = 100; 
@@ -63689,7 +63911,7 @@ engineMixin({
                 
                 // Map Walls
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
-                {
+                if (RL.at('walls')) {
                     const visibleWalls = this._renderGridWalls.query(cullBounds.world, this._renderGridWalls._drawResults || (this._renderGridWalls._drawResults = new Set()));
                     const ws = this.activeMap.wallStyle;                 // a map may dress its walls (the House: black marble, gold)
                     for (const w of visibleWalls) {
@@ -63701,14 +63923,14 @@ engineMixin({
                 }
             
                 // Indoor V2: Doors (drawn OVER walls so they're visible in wall gaps)
-                if (this.roomSystem.active) {
+                if (RL.at('walls') && this.roomSystem.active) {
                     this.roomSystem.drawDoors(this.ctx);
                 }
             
                 if (RenderStats.timed) this._entLap('Entities: Ground');
                 // 3. DYNAMIC ENTITIES & CARS
                 // PERFORMANCE: AABB viewport culling for props
-                {
+                if (RL.at('props')) {
                     const cbP = cullBounds.props;
                     this.props.forEach(p => {
                         const px = p.x + (p.w || 0) / 2;
@@ -63721,7 +63943,7 @@ engineMixin({
                 if (RenderStats.timed) this._entLap('Entities: Props');
                 // Draw Traffic Cars
                 // PERFORMANCE: AABB viewport culling + distance LOD
-                {
+                if (RL.at('cars')) {
                     const cbV = cullBounds.cars;
                     this.traffic.vehicles.forEach(v => {
                         if (!v.visible) return;
@@ -63738,12 +63960,12 @@ engineMixin({
                 }
                 
                 // Draw Owned Car (if parked/separate)
-                if (this.ownedCar && this.ownedCar !== this.car && this.ownedCar.visible) {
+                if (RL.at('cars') && this.ownedCar && this.ownedCar !== this.car && this.ownedCar.visible) {
                     this.ownedCar.draw(this.ctx);
                 }
                 
                 // Draw Delivery Vehicle (persistent, never despawns)
-                if (this.deliveryVehicle && this.deliveryVehicle.visible) {
+                if (RL.at('cars') && this.deliveryVehicle && this.deliveryVehicle.visible) {
                     const cbV = cullBounds.vehicles;
                     const dv = this.deliveryVehicle;
                     if (!(dv.x < cbV.left || dv.x > cbV.right || dv.y < cbV.top || dv.y > cbV.bottom)) {
@@ -63787,47 +64009,51 @@ engineMixin({
                 }
             
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
-                this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
-                this.drawNoiseRipples(this.ctx);
-                this.drawCorpses(this.ctx, cullBounds.bodies);           // the fallen, under the living (engine/finisher.js)
-                this.drawHunterDashes(this.ctx);                         // crimson flits (engine/palace-art.js)
-                this.drawExecuteCue(this.ctx);                           // a gold reticle under an unaware back (engine/executions.js)
+                if (RL.at('markers')) this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
+                if (RL.at('rings')) this.drawNoiseRipples(this.ctx);
+                if (RL.at('characters')) this.drawCorpses(this.ctx, cullBounds.bodies);   // the fallen, under the living (engine/finisher.js)
+                if (RL.at('combat')) this.drawHunterDashes(this.ctx);   // crimson flits (engine/palace-art.js)
+                if (RL.at('markers')) this.drawExecuteCue(this.ctx);    // a gold reticle under an unaware back (engine/executions.js)
                 
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // PERFORMANCE: AABB viewport culling for entities
                 {
                     const cbE = cullBounds.entities;
-                    this.loot.forEach(l => {
+                    if (RL.at('props')) this.loot.forEach(l => {
                         if (l.x < cbE.left || l.x > cbE.right || l.y < cbE.top || l.y > cbE.bottom) return;
                         l.draw(this.ctx);
                     });
                     // People: only those in view are drawn; the rest still tick what their draw did (gait, quips)
-                    const cbB = cullBounds.bodies;
+                    // (with Characters off in Baseline's panel, all of them tick as if out of view)
+                    const cbB = cullBounds.bodies, chars = RL.at('characters');
                     for (const n of this.npcs) {
-                        if (n.x < cbB.left || n.x > cbB.right || n.y < cbB.top || n.y > cbB.bottom) { if (n.tickHidden) n.tickHidden(); continue; }
+                        if (!chars || n.x < cbB.left || n.x > cbB.right || n.y < cbB.top || n.y > cbB.bottom) { if (n.tickHidden) n.tickHidden(); continue; }
                         n.draw(this.ctx);
                     }
-                    if (this.scenes && this.scenes.actors.length) this.scenes.drawActors(this.ctx);   // a scene's cast
-                    this.pedestrians.draw(this.ctx, cbB); // Roaming civilians
-                    this.lobbyLife.draw(this.ctx, cbB);    // Double Nights guests and staff
-                    this.clubLife.draw(this.ctx, cbB);     // Moon City's crowd
-                    this.cafeLife.draw(this.ctx, cbB);     // the Cozy Cafe's guests
-                    if (this.furniture) this.furniture.draw(this.ctx);   // the hand's outline and side handles (engine/furniture.js)
+                    if (chars && this.scenes && this.scenes.actors.length) this.scenes.drawActors(this.ctx);   // a scene's cast
+                    if (RL.at('crowd')) {
+                        this.pedestrians.draw(this.ctx, cbB); // Roaming civilians
+                        this.lobbyLife.draw(this.ctx, cbB);    // Double Nights guests and staff
+                        this.clubLife.draw(this.ctx, cbB);     // Moon City's crowd
+                        this.cafeLife.draw(this.ctx, cbB);     // the Cozy Cafe's guests
+                    }
+                    if (RL.at('props') && this.furniture) this.furniture.draw(this.ctx);   // the hand's outline and side handles (engine/furniture.js)
+                    RL.at('characters');
                     if (!(this.scenes && this.scenes.crewOffstage)) for (const tm of this.teammates) {
-                        if (tm.x < cbB.left || tm.x > cbB.right || tm.y < cbB.top || tm.y > cbB.bottom) { if (tm.tickHidden) tm.tickHidden(); continue; }
+                        if (!chars || tm.x < cbB.left || tm.x > cbB.right || tm.y < cbB.top || tm.y > cbB.bottom) { if (tm.tickHidden) tm.tickHidden(); continue; }
                         tm.draw(this.ctx, this.player);
                     }
                     // Velvet Cat
-                    if (this.velvetCat && this.velvetCat.visible && !this.velvetCat.inCar) {
+                    if (chars && this.velvetCat && this.velvetCat.visible && !this.velvetCat.inCar) {
                         this.velvetCat.draw(this.ctx);
                     }
-                    this.enemies.forEach(e => {
+                    if (chars) this.enemies.forEach(e => {
                         if (e.x < cbE.left || e.x > cbE.right || e.y < cbE.top || e.y > cbE.bottom) return;
                         e.draw(this.ctx);
                     });
-                    
+
                     // Sticky Orbs (Golden Child DOT — rendered on top of enemies)
-                    for (const orb of this.stickyOrbs) {
+                    if (RL.at('combat')) for (const orb of this.stickyOrbs) {
                         if (!orb.target || orb.target.dead) continue;
                         const ox = orb.target.x + orb.offsetX;
                         const oy = orb.target.y + orb.offsetY;
@@ -63861,26 +64087,26 @@ engineMixin({
                 
                 if (RenderStats.timed) this._entLap('Entities: People extras');
                 // Active Car (The one player is driving)
-                if (this.car.visible) this.car.draw(this.ctx);
+                if (RL.at('cars') && this.car.visible) this.car.draw(this.ctx);
                 
                 // Bumper Car Minigame — draw all bumper cars
-                if (this.bumperMinigame && this.bumperMinigame.active) {
+                if (RL.at('cars') && this.bumperMinigame && this.bumperMinigame.active) {
                     this.bumperMinigame.draw(this.ctx, this.camera);
                 }
                 
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 // Rooms she isn't in sit in a soft violet shadow (RoomSystem.drawVeil). On a dark map
                 // the light layer carries the veil (lighting.js); in bright light it goes on the scene.
-                if (this.roomSystem.active && this.getAmbientDarkness() < 0.5) {
+                if (RL.at('walls') && this.roomSystem.active && this.getAmbientDarkness() < 0.5) {
                     this.roomSystem.drawVeil(this.ctx);
                 }
                 
                 // Flit VFX (ghost afterimage, lightning trails — drawn behind player)
-                if (this.flitVFX.length > 0) this.drawFlitVFX(this.ctx);
+                if (RL.at('stella') && this.flitVFX.length > 0) this.drawFlitVFX(this.ctx);
 
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Player
-                if (this.player.visible) { 
+                if (RL.at('stella') && this.player.visible) { 
                     if (this.flitState.active) this.ctx.globalAlpha = 0.5; 
                     this.drawPlayer(); 
                     this.ctx.globalAlpha = 1.0; 
@@ -63898,14 +64124,14 @@ engineMixin({
                 // roof when you're standing outside.
                 {
                     const cbE = cullBounds.entities;
-                    for (const n of this.npcs) {
+                    if (RL.at('characters')) for (const n of this.npcs) {
                         if (!n.quipText) continue;
                         if (n.x < cbE.left || n.x > cbE.right || n.y < cbE.top || n.y > cbE.bottom) continue;
                         n.drawQuipBubble(this.ctx);
                     }
-                    this.pedestrians.drawQuipBubbles(this.ctx, cbE);
+                    if (RL.at('crowd')) this.pedestrians.drawQuipBubbles(this.ctx, cbE);
                     // Teammates can theoretically have quipText too (shared NPC class)
-                    for (const tm of this.teammates) {
+                    if (RL.at('characters')) for (const tm of this.teammates) {
                         if (!tm.quipText) continue;
                         if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) continue;
                         tm.drawQuipBubble(this.ctx);
@@ -63914,7 +64140,7 @@ engineMixin({
                 
                 // Laser Sight beam (drawn after player, in world space) — from the gun's muzzle
                 // along the exact line the next shot takes (see getLaserSight / fireWeapon)
-                const laser = (this.scopeK || 0) < 0.5 ? this.getLaserSight() : null;   // scoped, the hairline in the lane takes over
+                const laser = RL.at('combat') && (this.scopeK || 0) < 0.5 ? this.getLaserSight() : null;   // scoped, the hairline in the lane takes over
                 if (laser) {
                     const muzzleX = laser.x0, muzzleY = laser.y0, hitX = laser.x1, hitY = laser.y1;
                     
@@ -63941,15 +64167,17 @@ engineMixin({
                     this.ctx.restore();
                 }
                 
-                this.drawMuzzleStars(this.ctx);                              // the flash's star at each muzzle
-                this.drawShotFx(this.ctx, cullBounds.world);                 // barrel smoke, embers, golden wisps (engine/combat-effects.js)
-                this.drawSlashes(this.ctx);                                  // a blade's gold arc (engine/status-effects.js)
+                if (RL.at('combat')) {
+                    this.drawMuzzleStars(this.ctx);                          // the flash's star at each muzzle
+                    this.drawShotFx(this.ctx, cullBounds.world);             // barrel smoke, embers, golden wisps (engine/combat-effects.js)
+                    this.drawSlashes(this.ctx);                              // a blade's gold arc (engine/status-effects.js)
+                }
 
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Passenger lean-out rendering — draw in-car companions at their seat positions
                 // Uses drawProceduralHumanoid with isDriving flag for unified lean-out animation
                 // Drawn BEFORE the car overlay so the car body partially covers them
-                if (this.isDriving && this.car && this.car.seatLayout) {
+                if (RL.at('characters') && this.isDriving && this.car && this.car.seatLayout) {
                     for (let i = 1; i < this.car.seatLayout.length; i++) {
                         const occ = this.car.seatOccupants[i];
                         if (!occ || occ === true || !occ.inCar) continue;
@@ -63991,12 +64219,12 @@ engineMixin({
                 
                 // Car Door Frame Overlay (creates "leaning out" illusion)
                 // Drawn AFTER player/occupants to make them appear INSIDE the car
-                if (this.isDriving && this.car.visible && this.car.drawOccupantOverlay) {
+                if (RL.at('cars') && this.isDriving && this.car.visible && this.car.drawOccupantOverlay) {
                     this.car.drawOccupantOverlay(this.ctx);
                 }
                 
                 // DEBUG: Draw red center dots for in-car occupants ON TOP of the car overlay
-                if (this.dbg('traffic') && this.isDriving && this.car && this.car.seatLayout) {
+                if (RL.at('debug') && this.dbg('traffic') && this.isDriving && this.car && this.car.seatLayout) {
                     for (let i = 1; i < this.car.seatLayout.length; i++) {
                         const occ = this.car.seatOccupants[i];
                         if (!occ || occ === true || !occ.inCar) continue;
@@ -64020,13 +64248,14 @@ engineMixin({
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 if (RenderStats.timed) WorldRenderProfiler.begin('World tops', this.profiler, 'Entities: World tops');
                 // Ferris Wheel BASE (legs/shadow — under building roofs)
-                if (this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, false)) {
+                if (RL.at('roofs') && this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, false)) {
                     this.activeMap.ferrisWheel.drawBase(this.ctx);
                 }
                 
                 // Buildings - TOP LAYER (roofs, upper floors) - drawn OVER player for occlusion
                 // PERFORMANCE: AABB viewport culling
-                if (this.activeMap.buildings) {
+                const roofs = RL.at('roofs');
+                if (roofs && this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
                     for (const entry of renderBuildings.v2) {
                         const b = entry.item;
@@ -64039,12 +64268,12 @@ engineMixin({
                 }
                 
                 // Billboards — tilted panels standing up from the ground, drawn over the player like roofs
-                if (this.activeMap.billboards) {
+                if (roofs && this.activeMap.billboards) {
                     for (const bb of this.activeMap.billboards) if (bb.inView(cullBounds.buildingTops)) bb.drawTop(this.ctx);
                 }
 
                 // BuildingV3 — Editor-exported buildings (full render with details)
-                if (this.activeMap._v3Buildings) {
+                if (roofs && this.activeMap._v3Buildings) {
                     this.activeMap._v3Buildings.forEach(b => {
                         b.draw(this.ctx, performance.now());
                     });
@@ -64052,7 +64281,7 @@ engineMixin({
                 
                 // Buildings - SIGN LAYER (neon signs above entrance) - drawn OVER building tops
                 // PERFORMANCE: AABB viewport culling
-                if (this.activeMap.buildings) {
+                if (roofs && this.activeMap.buildings) {
                     const V = cullBounds.view, cam = this.camera;
                     for (const entry of renderBuildings.v2) {
                         const b = entry.item;
@@ -64065,6 +64294,7 @@ engineMixin({
                 
                 // Foliage (trees and bushes) - drawn AFTER player so canopy appears overhead
                 // PERFORMANCE: AABB viewport culling + cached frameTime
+                const trees = RL.at('trees');
                 if (this.activeMap.foliage) {
                     const wind = this.weather ? this.weather.wind : 0.3;
                     const windDir = this.weather ? this.weather.windDirection : 1;
@@ -64077,7 +64307,7 @@ engineMixin({
                         // Original array index keeps exactly the same density selection, even after spatial culling.
                         if (foliageScale < 1.0 && (idx % foliageStride) !== 0) continue;
                         if (f.x < cb.left || f.x > cb.right || f.y < cb.top || f.y > cb.bottom) continue;
-                        if (foliagePaintInView(f, this.ctx, cullBounds.view, viewZoom, wind, windDir, _gameTimeSec)) {
+                        if (trees && foliagePaintInView(f, this.ctx, cullBounds.view, viewZoom, wind, windDir, _gameTimeSec)) {
                             f.draw(this.ctx, wind, windDir, _gameTimeSec);
                         } else {
                             // Preserve draw-seeded and caller paint state when skipping hidden pixels.
@@ -64088,17 +64318,17 @@ engineMixin({
                 }
                 
                 // Floating leaf particles - drawn after foliage, before weather
-                if (this.leafParticles) {
+                if (trees && this.leafParticles) {
                     this.leafParticles.draw(this.ctx);
                 }
                 
                 // Ferris Wheel TOP (rims, gondolas, hub — above buildings, trees, everything)
-                if (this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, true)) {
+                if (RL.at('roofs') && this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, true)) {
                     this.activeMap.ferrisWheel.drawTop(this.ctx);
                 }
                 
                 // Indoor V2: Silk linens (atmospheric cloth with pooled light)
-                if (this.roomSystem.active && this.roomSystem.linens.length > 0) {
+                if (RL.at('walls') && this.roomSystem.active && this.roomSystem.linens.length > 0) {
                     const wind = this.weather ? this.weather.wind : 0.3;
                     const windDir = this.weather ? this.weather.windDirection : 1;
                     this.roomSystem.drawLinens(this.ctx, wind, windDir, _gameTimeSec);
@@ -64112,7 +64342,7 @@ engineMixin({
                 // 2. Draw lamps passing the calculated daylight factor
                 // PERFORMANCE: AABB viewport culling
                 const cbLamps = cullBounds.lamps;
-                const rsys = this.roomSystem;
+                const rsys = this.roomSystem, lampBodies = RL.at('lamps');   // (off, the lamps still wake and fade: the light reads them)
                 for (const entry of this._queryLampCandidates(cbLamps, 'lampBodies')) {
                     const l = entry.item;
                     if (l.x < cbLamps.left || l.x > cbLamps.right || l.y < cbLamps.top || l.y > cbLamps.bottom) continue;
@@ -64124,7 +64354,7 @@ engineMixin({
                     const lr = rsys.active && l._roomId ? rsys.rooms[l._roomId] : null;
                     const outdoorRoom = !!lr && lr.type === 'outdoor';
                     const lampDay = this.activeMap.type === 'outdoor' ? (wake > 0 ? 0 : 1) : outdoorRoom ? skyLampDay : daylight;
-                    if (lampPaintInView(l, this.ctx, cullBounds.view, viewZoom, lampDay)) {
+                    if (lampBodies && lampPaintInView(l, this.ctx, cullBounds.view, viewZoom, lampDay)) {
                         l.draw(this.ctx, lampDay);
                         l._bulbDay = lampDay; l._bulbPaintFrame = this._renderDrawId;
                     }
@@ -64133,10 +64363,11 @@ engineMixin({
                 if (RenderStats.timed) this._entLap('Entities: World tops');   // roofs, signs, foliage, lamps
                 if (RenderStats.timed) WorldRenderProfiler.end(this.profiler);
                 // 3. Draw projectiles and weather effects
-                this.projectiles.forEach(p => { if (!p.isFireball) p.draw(this.ctx); });
+                if (RL.at('combat')) this.projectiles.forEach(p => { if (!p.isFireball) p.draw(this.ctx); });
                 
                 // Debug: nav grid, companion paths and eyeline spots
                 // (with the debug overlay, or on its own via `game.navDebug = true`)
+                RL.at('debug');
                 if (this.dbg('nav') || this.navDebug) this.drawNavDebug(this.ctx);
 
                 // Debug: visualize ALL projectile positions (catches invisible ghosts)
@@ -64205,53 +64436,51 @@ engineMixin({
                 }
                 
                 if (RenderStats.timed) this._entLap('Entities: Effects');
-                this.weather.draw(this.ctx, cullBounds.view, viewZoom);
+                if (RL.at('particles')) this.weather.draw(this.ctx, cullBounds.view, viewZoom);
                 if (RenderStats.timed) this._entLap('Entities: Weather');
                 
                 // Graveyard humanoid ghosts
-                if (this.graveyardGhosts.length > 0) this.drawGraveyardGhosts(this.ctx);
+                if (RL.at('characters') && this.graveyardGhosts.length > 0) this.drawGraveyardGhosts(this.ctx);
                 
                 if (RenderStats.timed) {
                     this._entLap('Entities: Effects');
                     PeopleProfiler.endEntities(this.profiler, RenderStats.peopleMs - this._entityPeopleBase); // bodies drawn in this pass only
                 }
                 this.profiler.stop('Render:Entities');
-                } else if (this.player.visible) {                         // baseline: her alone
-                    this.profiler.start('Render:Entities');
-                    if (RenderStats.timed) { this._entityPeopleBase = RenderStats.peopleMs; PeopleProfiler.beginEntities(); }
-                    this.drawPlayer();
-                    if (RenderStats.timed) PeopleProfiler.endEntities(this.profiler, RenderStats.peopleMs - this._entityPeopleBase);
-                    this.profiler.stop('Render:Entities');
-                }
                 
                 // 4. LIGHTING SYSTEM & DEBUG
                 this.profiler.start('Render:Lighting');
-                if (!_baseline) {   // ── to the debug view
-                this.drawLightingSystem(this.ctx);
-                // By day, the sun's warmth over the frame (engine/daylight.js)
-                this.drawDaylight(this.ctx);
-                this.drawFireLightGlow(this.ctx);
+                if (RL.at('lighting')) {
+                    this.drawLightingSystem(this.ctx);
+                    // By day, the sun's warmth over the frame (engine/daylight.js)
+                    this.drawDaylight(this.ctx);
+                    this.drawFireLightGlow(this.ctx);
+                }
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
-                this.drawEmissivePass(this.ctx);
-                this.drawGunnerHeat(this.ctx, cullBounds.entities);
-                this.drawFireTrail(this.ctx, cullBounds.view);
-                for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
+                if (RL.at('glow')) this.drawEmissivePass(this.ctx);
+                if (RL.at('combat')) {
+                    this.drawGunnerHeat(this.ctx, cullBounds.entities);
+                    this.drawFireTrail(this.ctx, cullBounds.view);
+                    for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
+                }
                 // The veil at the edge of an outdoor map (world/map-edge.js), above the darkness
-                this.drawMapEdge(this.ctx);
+                if (RL.at('edge')) this.drawMapEdge(this.ctx);
                 // Looking down a sniper's sight: the world narrows to her line
-                this.drawScopeView(this.ctx);
+                if (RL.at('hud')) this.drawScopeView(this.ctx);
                 // Health bars and damage numbers, above the darkness so they read at night
-                this.drawCombatOverlays(this.ctx, cullBounds.entities);
-                this.drawStatusMarks(this.ctx, cullBounds.entities);
-                this.drawHunterEyes(this.ctx);
+                if (RL.at('combat')) {
+                    this.drawCombatOverlays(this.ctx, cullBounds.entities);
+                    this.drawStatusMarks(this.ctx, cullBounds.entities);
+                    this.drawHunterEyes(this.ctx);
+                }
                 
                 // Debug view (ui/dev-overlay.js): lamp rays, then rooms, vision, hearing, colliders, labels
-                if (this.debugMode) {
+                if (RL.at('debug') && this.debugMode) {
                     if (this.dbg('lights')) this.drawDebugLighting(this.ctx);
                     this.drawDebugLayers(this.ctx);
                 }
-                }   // (baseline)
             
+                RL.at('frame');
                 this.ctx.restore();
                 
                 this.profiler.stop('Render:Lighting');
@@ -64260,16 +64489,16 @@ engineMixin({
                 this.profiler.start('Render:PostFX');
                 
                 // Sound rings as a mirage over the lit scene (engine/noise.js)
-                this.drawMirageRings(this.ctx);
+                if (RL.at('rings')) this.drawMirageRings(this.ctx);
 
                 // Wet-world post-processing (after lighting, before rain)
                 const ambient = this.getAmbientDarkness();
-                if (ambient > 0.2) this.drawBloomPass(this.ctx);
-                this.drawAtmospherePass(this.ctx);
+                if (RL.at('bloom') && ambient > 0.2) this.drawBloomPass(this.ctx);
+                if (RL.at('atmosphere')) this.drawAtmospherePass(this.ctx);
                 
                 // Rain on screen: outdoors, or fading in as she steps out onto a veranda
                 const rainK = this.activeMap.type === 'outdoor' ? 1 : (this.roomSystem.active ? this.roomSystem.outdoorness : 0);
-                if (rainK > 0.01 && this.weather.isRaining) {
+                if (RL.at('rain') && rainK > 0.01 && this.weather.isRaining) {
                     const IL = this.activeMap._interiorLights;
                     // one joined list per map's lamps (a fresh array each frame would rebuild the rain's lamp grid every frame)
                     if (IL && (this._rainLampsSrc !== this.lamps || this._rainLampsIL !== IL || this._rainLamps.length !== this.lamps.length + IL.length)) {
@@ -64284,20 +64513,21 @@ engineMixin({
                 // Dynamic Bokeh (Screen-space dreampunk depth-of-field)
                 if (this.bokeh) {
                     this.bokeh.update(this.deltaTime || 16);
-                    this.bokeh.draw(this.ctx, this.canvas.width, this.canvas.height, _frameTime);
+                    if (RL.at('bokeh')) this.bokeh.draw(this.ctx, this.canvas.width, this.canvas.height, _frameTime);
                 }
 
                 // A small player cue stays legible above the light, refraction and weather.
-                this.drawPlayerMarker(this.ctx);
+                const hud = RL.at('hud');
+                if (hud) this.drawPlayerMarker(this.ctx);
                 
                 // Mission waypoint marker (screen-space indicator)
-                if (this.missions.activeMission && this.missions.activeMission.status === 'active' 
+                if (hud && this.missions.activeMission && this.missions.activeMission.status === 'active' 
                     && this.activeMap && this.activeMap.id === 'hub_949') {
                     this.drawMissionMarker();
                 }
                 
                 // HUD mission objective text (top of screen)
-                if (this.missions.activeMission && this.missions.activeMission.status === 'active') {
+                if (hud && this.missions.activeMission && this.missions.activeMission.status === 'active') {
                     this.ctx.save();
                     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
                     const objText = this.missions.getObjectiveText();
@@ -64367,7 +64597,7 @@ engineMixin({
                 }
                 
                 // ── ECHO PULSE TACTICAL RADAR ──
-                if (this.augments && this.augments.isEquipped('radar_ext') && !this.paused) {
+                if (hud && this.augments && this.augments.isEquipped('radar_ext') && !this.paused) {
                     this.ctx.save();
                     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
                     
@@ -64492,7 +64722,9 @@ engineMixin({
                 if (PerfBench.active) PerfBench.sample(this.profiler.frameDeltas());
                 // Bench overlay draws regardless of the profiler panel state, so a
                 // sweep is always visible while it runs.
+                RL.at('frame');
                 PerfBench.draw(this.ctx, 20, this.canvas.height - 110);
+                RL.endFrame();                            // Baseline's layer panel: the frame's calls billed
                 this.profiler.tick(); 
                 DevOverlay.frame(this);                   // the profiler pill and debug counts (DOM)
             },
@@ -71919,6 +72151,7 @@ engineMixin({
 
                 } else if (key === 'baseline') {
                     GameSettings.baseline = !GameSettings.baseline;
+                    if (typeof RenderLayers !== 'undefined') RenderLayers.sync(game);   // the layer panel (ui/render-layers.js)
                     this._updateValueEl(el.id, GameSettings.baseline ? 'on' : 'off');
 
                 } else if (key === 'debugView') {
