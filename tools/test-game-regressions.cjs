@@ -637,6 +637,32 @@ test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill
   ok(alphas.slice(0, 15).every(a => a >= 0.8 * 0.5 - 1e-9 && a <= 0.8 + 1e-9), 'each at 0.5–1 of the string brightness, never fading down the string');
 }, {affine: true});
 
+test('Landmark roofs: every painted run draws the same at any time and in any wind', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
+  const paint = { silver_queen: 'b._leanRoof(game.ctx, true)', moon_city: 'b._mcDrawRoof(game.ctx, false)',
+    portico: "(() => { const g = b._sqPortico(); b._sqPorticoPlane(game.ctx, g, g.x1 - g.x0, SQ_PORTICO.depth, 0); PropPass.idx = Math.max(PropPass.idx, 0); })()" };   // (one run: it has no live parts)
+  const owner = { silver_queen: 'silver_queen', moon_city: 'moon_city', portico: 'silver_queen' };
+  const tr = (style, run, T, wind) => {
+    env.setTrace(true);
+    env.run(`(() => { const b = game.activeMap.buildings.find(x => x.style === '${owner[style]}'); _gameTimeSec = ${T}; _frameTime = ${T * 1000};
+      if (game.weather) game.weather.windVec = { x: ${wind}, y: ${wind / 2} };
+      PropPass._begin(1, ${run}); try { ${paint[style]}; } finally { PropPass.mode = 0; } })()`);
+    // (the mock's restore() records the state it puts back as sets: that's the last paint's leftovers, not this one's)
+    const ops = []; let inRestore = false;
+    for (const op of env.trace) { if (op[1] === 'restore') inRestore = true; else if (op[1] !== 'set') inRestore = false; if (!(inRestore && op[1] === 'set')) ops.push(op.slice(1)); }
+    const t = JSON.stringify(ops, (k, v) => typeof v === 'number' ? Math.round(v * 1e5) / 1e5 : v);
+    env.setTrace(false); return t;
+  };
+  for (const style of Object.keys(paint)) {
+    tr(style, 0, 1, 1); const runs = value(env, 'return PropPass.idx + 1;');
+    for (let r = 1; r < runs; r++) tr(style, r, 1, 1);      // (a first paint of each run makes its lazy outlines and gradients)
+    const first = tr(style, 0, 5, 1);
+    ok(runs >= (style === 'portico' ? 1 : 2), `${style}: still runs round its live parts (${runs})`);
+    equal(first, tr(style, 0, 777.25, 6), `${style}: run 0 never changes with time or wind`);
+    for (let r = 1; r < runs; r++) equal(tr(style, r, 5, 1), tr(style, r, 777.25, 6), `${style}: run ${r}`);
+  }
+}, {affine: true});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');

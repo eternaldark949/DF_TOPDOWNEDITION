@@ -232,7 +232,7 @@ engineMixin({
                     if (this.player && this.player._walk) Walker._end(this.player._walk, 'cancelled');
                 }
                 if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
-                if (typeof PropSprites !== 'undefined') PropSprites.clear(this.props);   // the old map's furniture sprites
+                if (typeof PropSprites !== 'undefined') { PropSprites.clear(this.props); PlaneSprites.clear(this.activeMap && this.activeMap.buildings); }   // the old map's furniture and roof sprites
                 // caches keyed by the old map (each rebuilds on its next use)
                 this.skyLayer = null;
                 if (typeof ambience !== 'undefined') { ambience._areaMap = null; ambience._areas = {}; }

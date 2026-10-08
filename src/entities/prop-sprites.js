@@ -60,7 +60,11 @@
                 if (live) { this.still = false; this.live = true; return this.mode === 2; }
                 if (!this.still) {
                     this.still = true; this.idx++;
-                    if (this.mode === 2) { const cv = this.runs[this.idx]; if (cv) this.ctx.drawImage(cv, this.x - this.pad, this.y - this.pad, this.dw, this.dh); }
+                    if (this.mode === 2) {                                   // a prop's run (its box) or a plane's (trimmed to its own rect)
+                        const r = this.runs[this.idx];
+                        if (r && r.cv) this.ctx.drawImage(r.cv, r.x, r.y, r.w, r.h);
+                        else if (r) this.ctx.drawImage(r, this.x - this.pad, this.y - this.pad, this.dw, this.dh);
+                    }
                 }
                 return this.mode === 1 && this.idx === this.run;
             },
@@ -214,5 +218,82 @@
                     else if (!s.ready) this._paint(p, s);
                 }
                 this.density = d;
+            }
+        };
+
+        /* ── Plane sprites: art drawn in a plane's world coordinates (a roof under its scale-about-the-camera
+           transform) painted once. The drawer marks its live parts with PropPass.seg(true); each still run
+           between them is painted into its own sprite, trimmed to its ink, and stamped in its place, so the
+           live parts keep their depth. One run is painted a frame (the frame budget allowing), the vector art
+           drawing meanwhile, and again when zoomed in past what the sprite keeps sharp. Keyed by _zoomLOD (the
+           art changes with it); released with its building. ── */
+        const PLANE_SPRITE = {
+            S: 1.5,                     // sprite px per world px: about the screen's density on foot (zoom ~1.2 × the roof's lean)
+            DENSITY_MAX: 1.7,           // zoom × the plane's scale above this: vector (close-ups, photo zoom)
+            PAD: 24                     // world px round the building's bounds (parapets, decks, loungers past the edge)
+        };
+        const PlaneSprites = {
+            /** Draw paint(ctx) (world coordinates in a plane at scale k; ctx already in it) from sprites where it can.
+                rect: the world rect it paints in (default: the owner's bounds) */
+            draw(ctx, owner, key, k, paint, rect) {
+                const zoom = typeof game !== 'undefined' && game.view ? game.view.zoom : 1;
+                if (GameSettings.propSprites === false || PropPass.mode !== 0 || zoom * k > PLANE_SPRITE.DENSITY_MAX) { paint(ctx); return; }
+                const store = owner._planeSpr || (owner._planeSpr = {});
+                let s = store[key];
+                if (!s || s.lod !== _zoomLOD) {
+                    if (s) PropSprites.bytes -= s.bytes;
+                    s = store[key] = { lod: _zoomLOD, runs: [], n: 0, done: false, never: false, bytes: 0, density: zoom * k };
+                }
+                if (s.never) { paint(ctx); return; }
+                if (!s.done) {
+                    if (PropSprites._spent < PROP_SPRITE.BUDGET_MS && !(s.retryAt && performance.now() < s.retryAt)) this._paintRun(owner, s, paint, zoom * k, rect);
+                    if (!s.done) { paint(ctx); return; }
+                }
+                const PP = PropPass;
+                PP._begin(2, 0); PP.runs = s.runs; PP.ctx = ctx;
+                try { paint(ctx); } finally { PP.mode = 0; PP.runs = null; PP.ctx = null; }
+            },
+
+            /** Paint the next still run into a sprite of the building's bounds, then trim it to its ink */
+            _paintRun(owner, s, paint, density, rect) {
+                const t0 = performance.now(), B = PropSprites._bake, S = PLANE_SPRITE.S, b = rect || owner.getBounds(), P = PLANE_SPRITE.PAD;
+                const x = b.x - P, y = b.y - P, w = b.w + 2 * P, h = b.h + 2 * P, W = Math.ceil(w * S), H = Math.ceil(h * S);
+                if (PropSprites.bytes + W * H * 4 > PROP_SPRITE.MAX_BYTES) { s.never = true; return; }
+                const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+                const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, -x * S, -y * S);
+                B.k = S / Math.max(0.5, density); B.blur = false; B.bad = false; B.retry = false;
+                const run = s.runs.length;
+                PropPass._begin(1, run);
+                try { paint(PropSprites._proxy(c)); }
+                catch (e) { B.bad = true; }
+                finally { PropPass.mode = 0; }
+                if (run === 0) s.n = Math.max(1, PropPass.idx + 1);          // how many still runs the drawer marked
+                PropSprites._spent += performance.now() - t0;
+                if (B.bad) { s.never = true; return; }
+                if (B.retry) { s.retryAt = performance.now() + PROP_SPRITE.RETRY_MS; return; }
+                const r = this._trim(cv, x, y, S);
+                s.runs.push(r);
+                if (r) { const bytes = r.cv.width * r.cv.height * 4; s.bytes += bytes; PropSprites.bytes += bytes; }
+                if (s.runs.length >= s.n) s.done = true;
+            },
+
+            /** The run's sprite cut down to where it has ink (one readback, at paint time); null when it has none */
+            _trim(cv, x, y, S) {
+                const W = cv.width, H = cv.height, d = cv.getContext('2d').getImageData(0, 0, W, H).data;
+                let x0 = W, y0 = H, x1 = -1, y1 = -1;
+                for (let yy = 0; yy < H; yy++) {
+                    const row = yy * W * 4;
+                    for (let xx = 0; xx < W; xx++) if (d[row + xx * 4 + 3]) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; y1 = yy; }
+                }
+                if (x1 < 0) return null;
+                const tw = x1 - x0 + 1, th = y1 - y0 + 1, t = document.createElement('canvas'); t.width = tw; t.height = th;
+                t.getContext('2d').drawImage(cv, x0, y0, tw, th, 0, 0, tw, th);
+                return { cv: t, x: x + x0 / S, y: y + y0 / S, w: tw / S, h: th / S };
+            },
+
+            /** Let a building's plane sprites go (a map change, the setting turned off) */
+            clear(buildings) {
+                if (buildings) for (const b of buildings) if (b && b._planeSpr) { for (const k in b._planeSpr) PropSprites.bytes -= b._planeSpr[k].bytes; b._planeSpr = null; }
+                if (PropSprites.bytes < 0) PropSprites.bytes = 0;
             }
         };

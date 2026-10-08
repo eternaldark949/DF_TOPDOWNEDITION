@@ -1184,7 +1184,7 @@
                 } else if (key === 'propSprites') {
                     // Furniture painted once and stamped (entities/prop-sprites.js); off, it draws as vector again
                     GameSettings.propSprites = GameSettings.propSprites === false;
-                    if (!GameSettings.propSprites && typeof PropSprites !== 'undefined') PropSprites.clear(game.props);
+                    if (!GameSettings.propSprites && typeof PropSprites !== 'undefined') { PropSprites.clear(game.props); PlaneSprites.clear(game.activeMap && game.activeMap.buildings); }
                     this._updateValueEl(el.id, GameSettings.propSprites ? 'on' : 'off');
 
                 } else if (key === 'debugView') {

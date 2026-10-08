@@ -317,6 +317,16 @@
                 if (cam.x > g.x1) fascia([P3(g.x1, g.yf, zf), P3(g.x1, g.yb, zf), P3(g.x1, g.yb, zc), P3(g.x1, g.yf, zc)]);
                 const k = this._sqK(zc), w = g.x1 - g.x0, d = SQ_PORTICO.depth;
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
+                // The portico's roof in its plane: painted once (PlaneSprites) while it's whole; faded, a flat image
+                // would show its layers through each other, so then it draws as vector
+                if (this._sqFade > 0.999) PlaneSprites.draw(ctx, this, 'portico', k, c => this._sqPorticoPlane(c, g, w, d, lod), { x: g.x0, y: g.yf, w, h: d });
+                else this._sqPorticoPlane(ctx, g, w, d, lod);
+                ctx.restore();
+            },
+
+            /** The portico's roof (in its plane, world coordinates): slab, marble inlay, balustrade, winged hexes, housings */
+            _sqPorticoPlane(ctx, g, w, d, lod) {
+                const T = SQ_THEME;
                 ctx.fillStyle = T.plum; ctx.fillRect(g.x0, g.yf, w, d);
                 ctx.fillStyle = T.terrace; ctx.fillRect(g.x0 + 5, g.yf + 4, w - 10, d - 9);
                 if (lod === 0) {                                                                             // marble inlay
@@ -335,7 +345,6 @@
                 // Uplight housings at the pilaster feet, against the wall
                 ctx.fillStyle = '#7d75a0';
                 for (const o of SQ_PORTICO.pilasters) ctx.fillRect(g.dx + o - 5, g.yf + 1, 10, 3);
-                ctx.restore();
             },
 
             /** Lantern columns: hexagonal plinth, silver shaft, a gilt collar under the lantern, hexagon lantern on top.
@@ -662,6 +671,7 @@
                 const box = (s) => [mx + s[0] * main.w, my + s[1] * main.h, s[2] * main.w, s[3] * main.h];
                 this._sqGarden(ctx, box(SQ_ROOF.garden), emissive);
                 this._sqPool(ctx, box(SQ_ROOF.pool), emissive);
+                if (!emissive) PropPass.seg(true);                          // (nothing live here: a break, so the pool and the pad are two small sprites, not one wide one)
                 const wing = this.sections[1];
                 if (wing) this._sqEclipsePad(ctx, this.x + wing.x, this.y + wing.y, wing.w, wing.h, emissive);
             },
@@ -672,6 +682,7 @@
                 const y0 = y + h * 0.43, y1 = y + h * 0.57, ribs = 7, ribX = (i) => x + w * (0.08 + i * 0.66 / (ribs - 1));
                 const cabs = [[x + w * 0.86, y + h * 0.22], [x + w * 0.86, y + h * 0.78]];
                 if (!emissive) {
+                    if (PropPass.seg(false)) {                                                                 // (still: painted once with the roof)
                     ctx.fillStyle = '#2e2266'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
                     ctx.strokeStyle = 'rgba(217,191,134,0.55)'; ctx.lineWidth = 1.2; ctx.stroke();
                     ctx.fillStyle = 'rgba(214,202,240,0.22)'; ctx.fillRect(x + w * 0.05, y0, w * 0.9, y1 - y0);      // pale stone walk
@@ -698,8 +709,11 @@
                             ctx.arc(ribX(0) + span * r(i + 60), y0 - 6 + (y1 - y0 + 12) * r(i + 90), 1.5 + r(i + 120) * 2, 0, Math.PI * 2); ctx.fill();
                         }
                     }
-                    const wind = game.weather ? game.weather.windVec : { x: 1, y: 0.5 };
-                    cabs.forEach(([cx, cy], i) => this._sqCabana(ctx, cx, cy, 15, i, wind, t));
+                    }
+                    if (PropPass.seg(true)) {                                                                  // the cabanas stir: live
+                        const wind = game.weather ? game.weather.windVec : { x: 1, y: 0.5 };
+                        cabs.forEach(([cx, cy], i) => this._sqCabana(ctx, cx, cy, 15, i, wind, t));
+                    }
                 } else {
                     ctx.save(); ctx.globalCompositeOperation = 'lighter';
                     const a = ctx.globalAlpha;
@@ -744,16 +758,23 @@
                 const lotus = [];
                 for (let i = 0; i < 9; i++) lotus.push([x + w * (0.08 + r(i) * 0.84), y + h * (0.14 + r(i + 20) * 0.72), 5 + r(i + 40) * 3, r(i + 60) * 6.28]);
                 if (!emissive) {
+                    if (PropPass.seg(false)) {
                     ctx.fillStyle = '#b8acdc'; ctx.beginPath(); ctx.roundRect(x - 9, y - 9, w + 18, h + 18, 6); ctx.fill();   // pearl marble deck
                     ctx.strokeStyle = 'rgba(217,191,134,0.6)'; ctx.lineWidth = 1; ctx.stroke();
                     ctx.strokeStyle = 'rgba(118,100,206,0.4)'; ctx.lineWidth = 1; ctx.strokeRect(x - 4.5, y - 4.5, w + 9, h + 9);
                     ctx.fillStyle = LandmarkKit.grad(this, 'pool', () => { const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#3b2c9e'); g.addColorStop(0.55, '#1f0f70'); g.addColorStop(1, T.glass); return g; });
                     ctx.fillRect(x, y, w, h);
-                    ctx.strokeStyle = 'rgba(210,200,255,0.16)'; ctx.lineWidth = 1;                           // slow ripples of sky
-                    for (let i = 0; i < 3; i++) {
-                        const yy = y + h * (0.25 + i * 0.25) + Math.sin(t * 0.8 + i) * 2;
-                        ctx.beginPath(); ctx.moveTo(x + 8, yy); ctx.quadraticCurveTo(x + w / 2, yy + Math.sin(t + i) * 3, x + w - 8, yy); ctx.stroke();
                     }
+                    if (PropPass.seg(true)) {                                                                  // slow ripples of sky: live
+                        ctx.strokeStyle = 'rgba(210,200,255,0.16)'; ctx.lineWidth = 1;
+                        const ripples = new Path2D();                                                          // (they never cross: one stroke)
+                        for (let i = 0; i < 3; i++) {
+                            const yy = y + h * (0.25 + i * 0.25) + Math.sin(t * 0.8 + i) * 2;
+                            ripples.moveTo(x + 8, yy); ripples.quadraticCurveTo(x + w / 2, yy + Math.sin(t + i) * 3, x + w - 8, yy);
+                        }
+                        ctx.stroke(ripples);
+                    }
+                    if (PropPass.seg(false)) {
                     lotus.forEach(([lx, ly, lr, rot], i) => {
                         ctx.fillStyle = '#2e6b5c'; ctx.beginPath(); ctx.moveTo(lx, ly); ctx.arc(lx, ly, lr, rot + 0.35, rot + Math.PI * 2 - 0.35); ctx.closePath(); ctx.fill();
                         if (i % 2 === 0 && lod < 2) this._sqLotus(ctx, lx, ly, lr * 0.8, rot);
@@ -767,6 +788,7 @@
                         const cx = x + w * u, cy = y - 36;
                         for (let j = 0; j < 8; j++) { ctx.fillStyle = j % 2 ? '#b8a6ee' : '#f7f4ff'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, 12, j * Math.PI / 4, (j + 1) * Math.PI / 4); ctx.closePath(); ctx.fill(); }
                         ctx.fillStyle = T.gold; ctx.beginPath(); ctx.arc(cx, cy, 1.8, 0, Math.PI * 2); ctx.fill();
+                    }
                     }
                 } else {
                     ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
@@ -806,6 +828,7 @@
                 const cx = sx + sw / 2, cy = sy + sh / 2, R = Math.min(sw, sh) * 0.34, E = R * 0.52, t = _gameTimeSec, T = SQ_THEME;
                 const rot = -0.8, corners = [[sx + 34, sy + 34], [sx + sw - 34, sy + 34], [sx + 34, sy + sh - 34], [sx + sw - 34, sy + sh - 34]];
                 if (!emissive) {
+                    if (!PropPass.seg(false)) return;                                                           // (still: painted with the roof)
                     for (const [px, py] of corners) {                                                        // wisteria in round planters
                         ctx.fillStyle = '#8f86b0'; ctx.beginPath(); ctx.arc(px, py, 16, 0, Math.PI * 2); ctx.fill();
                         ctx.fillStyle = '#6a4fb8'; ctx.beginPath(); ctx.arc(px, py, 13, 0, Math.PI * 2); ctx.fill();

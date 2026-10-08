@@ -877,8 +877,18 @@
                 // --- Roofs (drawn in world coords under the scale-about-camera transform) ---
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const sq = this.style === 'silver_queen';
-                if (this.style === 'moon_city') { this._mcDrawRoof(ctx, false); ctx.restore(); return; }
-                this.sections.forEach((section, si) => {
+                // The landmarks' roofs are painted once (PlaneSprites, entities/prop-sprites.js): what moves on them
+                // (cabanas, ripples, the sky in the skylight) and the penthouse walls stay live, at their depth
+                if (this.style === 'moon_city') { PlaneSprites.draw(ctx, this, 'roof', k, c => this._mcDrawRoof(c, false)); ctx.restore(); return; }
+                if (sq) PlaneSprites.draw(ctx, this, 'roof', k, c => this._leanRoof(c, true));
+                else this._leanRoof(ctx, false);
+                ctx.restore();
+                if (sq) this._sqDrawCrown(ctx, false);
+            },
+
+            /** The roof in the roof plane (ctx already scaled about the camera): sections, seams, parapets, features */
+            _leanRoof(ctx, sq) {
+                if (PropPass.seg(false)) this.sections.forEach((section, si) => {
                     const sx = this.x + section.x, sy = this.y + section.y;
                     if (sq) {                                                                  // lavender slab with a soft sheen (world-space gradients, made once)
                         ctx.fillStyle = LandmarkKit.grad(this, 'roof' + si, () => { const g = ctx.createLinearGradient(sx, sy, sx + section.w, sy + section.h); g.addColorStop(0, SQ_THEME.roof); g.addColorStop(1, SQ_THEME.roofLo); return g; });
@@ -898,11 +908,9 @@
                     if (outline) ctx.stroke(this._roofPath(section, si, 2.5)); else ctx.strokeRect(sx + 2.5, sy + 2.5, section.w - 5, section.h - 5);
                     if (sq) { ctx.strokeStyle = 'rgba(45,29,89,0.45)'; ctx.lineWidth = 1; if (outline) ctx.stroke(this._roofPath(section, si, 6)); else ctx.strokeRect(sx + 6, sy + 6, section.w - 12, section.h - 12); }
                 });
-                if (sq) this._sqRoofEdgeLights(ctx, false);
+                if (sq && PropPass.seg(false)) this._sqRoofEdgeLights(ctx, false);
                 if (this.style) this._drawRoofFeatures(ctx, false);
                 else this._drawRoofProps(ctx);
-                ctx.restore();
-                if (sq) this._sqDrawCrown(ctx, false);
             },
 
             /** A roof prop's disc (fan hub, tank): one world path, made once and kept on the prop */
@@ -1387,7 +1395,7 @@
 
             /** Styled rooftops. Coordinates are world coords (caller has applied the roof transform). */
             _drawRoofFeatures(ctx, emissive) {
-                if (this.style === 'silver_queen') { this._sqDrawRoof(ctx, emissive); this._drawPenthouse(ctx, emissive); return; }
+                if (this.style === 'silver_queen') { this._sqDrawRoof(ctx, emissive); if (emissive || PropPass.seg(true)) this._drawPenthouse(ctx, emissive); return; }   // (its walls lean with the camera: live)
                 const main = this.sections[0], mx = this.x + main.x, my = this.y + main.y, mw = main.w, mh = main.h;
                 const r = (i) => _bldHash(this._seed || 1, 100 + i);
                 const acc = this.colors.accent, t = _gameTimeSec;

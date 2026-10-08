@@ -188,6 +188,10 @@
             _mcDrawRoof(ctx, emissive) {
                 const G = this._mcGeo(), C = MCX.C, S = G.sky;
                 if (!emissive) {
+                    // (Painted once with the roof, PlaneSprites; only the sky in the skylight is live, by day. Each
+                    // segment makes its own skylight path: a painted run starts with no current path.)
+                    const sky = (c) => { c.beginPath(); c.ellipse(S.cx, S.cy, S.rx, S.ry, 0, 0, Math.PI * 2); };
+                    if (PropPass.seg(false)) {
                     for (const s of [G.hall, G.wing]) {
                         ctx.fillStyle = LandmarkKit.grad(this, 'mcroof' + s.y, () => { const g = ctx.createLinearGradient(s.x, s.y, s.x + s.w, s.y + s.h); g.addColorStop(0, '#171020'); g.addColorStop(1, C.lacquer); return g; });
                         ctx.fillRect(s.x, s.y, s.w, s.h);
@@ -197,14 +201,15 @@
                         ctx.strokeStyle = 'rgba(255, 241, 194, 0.35)'; ctx.lineWidth = 0.8; ctx.strokeRect(s.x + 6, s.y + 6, s.w - 12, s.h - 12);
                     }
                     // The skylight over the dance floor: smoked glass in a gold ring, its leading in rays
-                    ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx, S.ry, 0, 0, Math.PI * 2);
-                    ctx.fillStyle = '#0d0814'; ctx.fill();
-                    const sun = sunNow(), day = sun ? sun.day : 0;
-                    if (day > 0.05) {                                                               // by day it holds the sky
-                        ctx.fillStyle = LandmarkKit.grad(this, 'mcsky', () => { const g = ctx.createLinearGradient(S.cx - S.rx, S.cy - S.ry, S.cx + S.rx, S.cy + S.ry); g.addColorStop(0, 'rgba(190, 186, 236, 1)'); g.addColorStop(0.5, 'rgba(120, 110, 180, 1)'); g.addColorStop(1, 'rgba(60, 40, 100, 1)'); return g; });
-                        ctx.globalAlpha = 0.35 * day; ctx.fill(); ctx.globalAlpha = 1;
+                    sky(ctx); ctx.fillStyle = '#0d0814'; ctx.fill();
                     }
-                    ctx.save(); ctx.clip();
+                    const sun = sunNow(), day = sun ? sun.day : 0;
+                    if (PropPass.seg(true) && day > 0.05) {                                         // by day it holds the sky (marked live day or night: the runs stay the same)
+                        ctx.fillStyle = LandmarkKit.grad(this, 'mcsky', () => { const g = ctx.createLinearGradient(S.cx - S.rx, S.cy - S.ry, S.cx + S.rx, S.cy + S.ry); g.addColorStop(0, 'rgba(190, 186, 236, 1)'); g.addColorStop(0.5, 'rgba(120, 110, 180, 1)'); g.addColorStop(1, 'rgba(60, 40, 100, 1)'); return g; });
+                        sky(ctx); ctx.globalAlpha = 0.35 * day; ctx.fill(); ctx.globalAlpha = 1;
+                    }
+                    if (!PropPass.seg(false)) return;
+                    ctx.save(); sky(ctx); ctx.clip();
                     ctx.strokeStyle = 'rgba(232, 194, 122, 0.35)'; ctx.lineWidth = 1;
                     for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(S.cx, S.cy); ctx.lineTo(S.cx + Math.cos(a) * S.rx * 1.2, S.cy + Math.sin(a) * S.ry * 1.2); ctx.stroke(); }
                     ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx * 0.55, S.ry * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
@@ -282,8 +287,8 @@
                     for (const x of [x0 + 6, x1 - 6]) { const [px, py] = Pk(x, y1 - 4); ctx.beginPath(); ctx.moveTo(x, y1 - 4); ctx.lineTo(px, py); ctx.stroke(); }
                     ctx.restore();
                 }
-                LandmarkKit.flat(ctx, k, (c) => {
-                    if (!emissive) {
+                LandmarkKit.flat(ctx, k, (cf) => {
+                    if (!emissive) PlaneSprites.draw(cf, this, 'canopy', k, (c) => {                          // (painted once in its plane: PlaneSprites)
                         c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x0 + 4, y0 + 6, x1 - x0, y1 - y0);
                         const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, C.velvet); g.addColorStop(0.6, C.velvetLt); g.addColorStop(1, C.velvet);
                         c.fillStyle = g; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y0); c.lineTo(x1, y1 - 6);
@@ -293,8 +298,9 @@
                         c.strokeStyle = 'rgba(255, 241, 194, 0.25)'; c.lineWidth = 0.8;                       // velvet pleats
                         for (let x = x0 + 10; x < x1; x += 10) { c.beginPath(); c.moveTo(x, y0 + 2); c.lineTo(x, y1 - 8); c.stroke(); }
                         c.fillStyle = C.gold; _mcCrescent(c, G.door.x, (y0 + y1) / 2 - 2, 9); c.fill();          // the crescent on the canopy
-                    } else {
-                        const t = _frameTime / 1000;                                                    // marquee bulbs along the valance
+                    }, { x: x0, y: y0, w: x1 - x0 + 4, h: y1 - y0 + 10 });
+                    else {
+                        const c = cf, t = _frameTime / 1000;                                            // marquee bulbs along the valance
                         c.globalCompositeOperation = 'lighter';
                         for (let x = x0 + 6, i = 0; x < x1; x += 12, i++) {
                             const tw = 0.55 + 0.45 * Math.sin(t * 3 + i * 1.3);

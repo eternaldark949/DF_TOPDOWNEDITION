@@ -18660,7 +18660,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (live) { this.still = false; this.live = true; return this.mode === 2; }
                 if (!this.still) {
                     this.still = true; this.idx++;
-                    if (this.mode === 2) { const cv = this.runs[this.idx]; if (cv) this.ctx.drawImage(cv, this.x - this.pad, this.y - this.pad, this.dw, this.dh); }
+                    if (this.mode === 2) {                                   // a prop's run (its box) or a plane's (trimmed to its own rect)
+                        const r = this.runs[this.idx];
+                        if (r && r.cv) this.ctx.drawImage(r.cv, r.x, r.y, r.w, r.h);
+                        else if (r) this.ctx.drawImage(r, this.x - this.pad, this.y - this.pad, this.dw, this.dh);
+                    }
                 }
                 return this.mode === 1 && this.idx === this.run;
             },
@@ -18814,6 +18818,83 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     else if (!s.ready) this._paint(p, s);
                 }
                 this.density = d;
+            }
+        };
+
+        /* ── Plane sprites: art drawn in a plane's world coordinates (a roof under its scale-about-the-camera
+           transform) painted once. The drawer marks its live parts with PropPass.seg(true); each still run
+           between them is painted into its own sprite, trimmed to its ink, and stamped in its place, so the
+           live parts keep their depth. One run is painted a frame (the frame budget allowing), the vector art
+           drawing meanwhile, and again when zoomed in past what the sprite keeps sharp. Keyed by _zoomLOD (the
+           art changes with it); released with its building. ── */
+        const PLANE_SPRITE = {
+            S: 1.5,                     // sprite px per world px: about the screen's density on foot (zoom ~1.2 × the roof's lean)
+            DENSITY_MAX: 1.7,           // zoom × the plane's scale above this: vector (close-ups, photo zoom)
+            PAD: 24                     // world px round the building's bounds (parapets, decks, loungers past the edge)
+        };
+        const PlaneSprites = {
+            /** Draw paint(ctx) (world coordinates in a plane at scale k; ctx already in it) from sprites where it can.
+                rect: the world rect it paints in (default: the owner's bounds) */
+            draw(ctx, owner, key, k, paint, rect) {
+                const zoom = typeof game !== 'undefined' && game.view ? game.view.zoom : 1;
+                if (GameSettings.propSprites === false || PropPass.mode !== 0 || zoom * k > PLANE_SPRITE.DENSITY_MAX) { paint(ctx); return; }
+                const store = owner._planeSpr || (owner._planeSpr = {});
+                let s = store[key];
+                if (!s || s.lod !== _zoomLOD) {
+                    if (s) PropSprites.bytes -= s.bytes;
+                    s = store[key] = { lod: _zoomLOD, runs: [], n: 0, done: false, never: false, bytes: 0, density: zoom * k };
+                }
+                if (s.never) { paint(ctx); return; }
+                if (!s.done) {
+                    if (PropSprites._spent < PROP_SPRITE.BUDGET_MS && !(s.retryAt && performance.now() < s.retryAt)) this._paintRun(owner, s, paint, zoom * k, rect);
+                    if (!s.done) { paint(ctx); return; }
+                }
+                const PP = PropPass;
+                PP._begin(2, 0); PP.runs = s.runs; PP.ctx = ctx;
+                try { paint(ctx); } finally { PP.mode = 0; PP.runs = null; PP.ctx = null; }
+            },
+
+            /** Paint the next still run into a sprite of the building's bounds, then trim it to its ink */
+            _paintRun(owner, s, paint, density, rect) {
+                const t0 = performance.now(), B = PropSprites._bake, S = PLANE_SPRITE.S, b = rect || owner.getBounds(), P = PLANE_SPRITE.PAD;
+                const x = b.x - P, y = b.y - P, w = b.w + 2 * P, h = b.h + 2 * P, W = Math.ceil(w * S), H = Math.ceil(h * S);
+                if (PropSprites.bytes + W * H * 4 > PROP_SPRITE.MAX_BYTES) { s.never = true; return; }
+                const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+                const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, -x * S, -y * S);
+                B.k = S / Math.max(0.5, density); B.blur = false; B.bad = false; B.retry = false;
+                const run = s.runs.length;
+                PropPass._begin(1, run);
+                try { paint(PropSprites._proxy(c)); }
+                catch (e) { B.bad = true; }
+                finally { PropPass.mode = 0; }
+                if (run === 0) s.n = Math.max(1, PropPass.idx + 1);          // how many still runs the drawer marked
+                PropSprites._spent += performance.now() - t0;
+                if (B.bad) { s.never = true; return; }
+                if (B.retry) { s.retryAt = performance.now() + PROP_SPRITE.RETRY_MS; return; }
+                const r = this._trim(cv, x, y, S);
+                s.runs.push(r);
+                if (r) { const bytes = r.cv.width * r.cv.height * 4; s.bytes += bytes; PropSprites.bytes += bytes; }
+                if (s.runs.length >= s.n) s.done = true;
+            },
+
+            /** The run's sprite cut down to where it has ink (one readback, at paint time); null when it has none */
+            _trim(cv, x, y, S) {
+                const W = cv.width, H = cv.height, d = cv.getContext('2d').getImageData(0, 0, W, H).data;
+                let x0 = W, y0 = H, x1 = -1, y1 = -1;
+                for (let yy = 0; yy < H; yy++) {
+                    const row = yy * W * 4;
+                    for (let xx = 0; xx < W; xx++) if (d[row + xx * 4 + 3]) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; y1 = yy; }
+                }
+                if (x1 < 0) return null;
+                const tw = x1 - x0 + 1, th = y1 - y0 + 1, t = document.createElement('canvas'); t.width = tw; t.height = th;
+                t.getContext('2d').drawImage(cv, x0, y0, tw, th, 0, 0, tw, th);
+                return { cv: t, x: x + x0 / S, y: y + y0 / S, w: tw / S, h: th / S };
+            },
+
+            /** Let a building's plane sprites go (a map change, the setting turned off) */
+            clear(buildings) {
+                if (buildings) for (const b of buildings) if (b && b._planeSpr) { for (const k in b._planeSpr) PropSprites.bytes -= b._planeSpr[k].bytes; b._planeSpr = null; }
+                if (PropSprites.bytes < 0) PropSprites.bytes = 0;
             }
         };
         /**
@@ -29299,8 +29380,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // --- Roofs (drawn in world coords under the scale-about-camera transform) ---
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
                 const sq = this.style === 'silver_queen';
-                if (this.style === 'moon_city') { this._mcDrawRoof(ctx, false); ctx.restore(); return; }
-                this.sections.forEach((section, si) => {
+                // The landmarks' roofs are painted once (PlaneSprites, entities/prop-sprites.js): what moves on them
+                // (cabanas, ripples, the sky in the skylight) and the penthouse walls stay live, at their depth
+                if (this.style === 'moon_city') { PlaneSprites.draw(ctx, this, 'roof', k, c => this._mcDrawRoof(c, false)); ctx.restore(); return; }
+                if (sq) PlaneSprites.draw(ctx, this, 'roof', k, c => this._leanRoof(c, true));
+                else this._leanRoof(ctx, false);
+                ctx.restore();
+                if (sq) this._sqDrawCrown(ctx, false);
+            },
+
+            /** The roof in the roof plane (ctx already scaled about the camera): sections, seams, parapets, features */
+            _leanRoof(ctx, sq) {
+                if (PropPass.seg(false)) this.sections.forEach((section, si) => {
                     const sx = this.x + section.x, sy = this.y + section.y;
                     if (sq) {                                                                  // lavender slab with a soft sheen (world-space gradients, made once)
                         ctx.fillStyle = LandmarkKit.grad(this, 'roof' + si, () => { const g = ctx.createLinearGradient(sx, sy, sx + section.w, sy + section.h); g.addColorStop(0, SQ_THEME.roof); g.addColorStop(1, SQ_THEME.roofLo); return g; });
@@ -29320,11 +29411,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (outline) ctx.stroke(this._roofPath(section, si, 2.5)); else ctx.strokeRect(sx + 2.5, sy + 2.5, section.w - 5, section.h - 5);
                     if (sq) { ctx.strokeStyle = 'rgba(45,29,89,0.45)'; ctx.lineWidth = 1; if (outline) ctx.stroke(this._roofPath(section, si, 6)); else ctx.strokeRect(sx + 6, sy + 6, section.w - 12, section.h - 12); }
                 });
-                if (sq) this._sqRoofEdgeLights(ctx, false);
+                if (sq && PropPass.seg(false)) this._sqRoofEdgeLights(ctx, false);
                 if (this.style) this._drawRoofFeatures(ctx, false);
                 else this._drawRoofProps(ctx);
-                ctx.restore();
-                if (sq) this._sqDrawCrown(ctx, false);
             },
 
             /** A roof prop's disc (fan hub, tank): one world path, made once and kept on the prop */
@@ -29809,7 +29898,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /** Styled rooftops. Coordinates are world coords (caller has applied the roof transform). */
             _drawRoofFeatures(ctx, emissive) {
-                if (this.style === 'silver_queen') { this._sqDrawRoof(ctx, emissive); this._drawPenthouse(ctx, emissive); return; }
+                if (this.style === 'silver_queen') { this._sqDrawRoof(ctx, emissive); if (emissive || PropPass.seg(true)) this._drawPenthouse(ctx, emissive); return; }   // (its walls lean with the camera: live)
                 const main = this.sections[0], mx = this.x + main.x, my = this.y + main.y, mw = main.w, mh = main.h;
                 const r = (i) => _bldHash(this._seed || 1, 100 + i);
                 const acc = this.colors.accent, t = _gameTimeSec;
@@ -30492,6 +30581,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (cam.x > g.x1) fascia([P3(g.x1, g.yf, zf), P3(g.x1, g.yb, zf), P3(g.x1, g.yb, zc), P3(g.x1, g.yf, zc)]);
                 const k = this._sqK(zc), w = g.x1 - g.x0, d = SQ_PORTICO.depth;
                 ctx.translate(cam.x, cam.y); ctx.scale(k, k); ctx.translate(-cam.x, -cam.y);
+                // The portico's roof in its plane: painted once (PlaneSprites) while it's whole; faded, a flat image
+                // would show its layers through each other, so then it draws as vector
+                if (this._sqFade > 0.999) PlaneSprites.draw(ctx, this, 'portico', k, c => this._sqPorticoPlane(c, g, w, d, lod), { x: g.x0, y: g.yf, w, h: d });
+                else this._sqPorticoPlane(ctx, g, w, d, lod);
+                ctx.restore();
+            },
+
+            /** The portico's roof (in its plane, world coordinates): slab, marble inlay, balustrade, winged hexes, housings */
+            _sqPorticoPlane(ctx, g, w, d, lod) {
+                const T = SQ_THEME;
                 ctx.fillStyle = T.plum; ctx.fillRect(g.x0, g.yf, w, d);
                 ctx.fillStyle = T.terrace; ctx.fillRect(g.x0 + 5, g.yf + 4, w - 10, d - 9);
                 if (lod === 0) {                                                                             // marble inlay
@@ -30510,7 +30609,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Uplight housings at the pilaster feet, against the wall
                 ctx.fillStyle = '#7d75a0';
                 for (const o of SQ_PORTICO.pilasters) ctx.fillRect(g.dx + o - 5, g.yf + 1, 10, 3);
-                ctx.restore();
             },
 
             /** Lantern columns: hexagonal plinth, silver shaft, a gilt collar under the lantern, hexagon lantern on top.
@@ -30837,6 +30935,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const box = (s) => [mx + s[0] * main.w, my + s[1] * main.h, s[2] * main.w, s[3] * main.h];
                 this._sqGarden(ctx, box(SQ_ROOF.garden), emissive);
                 this._sqPool(ctx, box(SQ_ROOF.pool), emissive);
+                if (!emissive) PropPass.seg(true);                          // (nothing live here: a break, so the pool and the pad are two small sprites, not one wide one)
                 const wing = this.sections[1];
                 if (wing) this._sqEclipsePad(ctx, this.x + wing.x, this.y + wing.y, wing.w, wing.h, emissive);
             },
@@ -30847,6 +30946,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const y0 = y + h * 0.43, y1 = y + h * 0.57, ribs = 7, ribX = (i) => x + w * (0.08 + i * 0.66 / (ribs - 1));
                 const cabs = [[x + w * 0.86, y + h * 0.22], [x + w * 0.86, y + h * 0.78]];
                 if (!emissive) {
+                    if (PropPass.seg(false)) {                                                                 // (still: painted once with the roof)
                     ctx.fillStyle = '#2e2266'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
                     ctx.strokeStyle = 'rgba(217,191,134,0.55)'; ctx.lineWidth = 1.2; ctx.stroke();
                     ctx.fillStyle = 'rgba(214,202,240,0.22)'; ctx.fillRect(x + w * 0.05, y0, w * 0.9, y1 - y0);      // pale stone walk
@@ -30873,8 +30973,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             ctx.arc(ribX(0) + span * r(i + 60), y0 - 6 + (y1 - y0 + 12) * r(i + 90), 1.5 + r(i + 120) * 2, 0, Math.PI * 2); ctx.fill();
                         }
                     }
-                    const wind = game.weather ? game.weather.windVec : { x: 1, y: 0.5 };
-                    cabs.forEach(([cx, cy], i) => this._sqCabana(ctx, cx, cy, 15, i, wind, t));
+                    }
+                    if (PropPass.seg(true)) {                                                                  // the cabanas stir: live
+                        const wind = game.weather ? game.weather.windVec : { x: 1, y: 0.5 };
+                        cabs.forEach(([cx, cy], i) => this._sqCabana(ctx, cx, cy, 15, i, wind, t));
+                    }
                 } else {
                     ctx.save(); ctx.globalCompositeOperation = 'lighter';
                     const a = ctx.globalAlpha;
@@ -30919,16 +31022,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const lotus = [];
                 for (let i = 0; i < 9; i++) lotus.push([x + w * (0.08 + r(i) * 0.84), y + h * (0.14 + r(i + 20) * 0.72), 5 + r(i + 40) * 3, r(i + 60) * 6.28]);
                 if (!emissive) {
+                    if (PropPass.seg(false)) {
                     ctx.fillStyle = '#b8acdc'; ctx.beginPath(); ctx.roundRect(x - 9, y - 9, w + 18, h + 18, 6); ctx.fill();   // pearl marble deck
                     ctx.strokeStyle = 'rgba(217,191,134,0.6)'; ctx.lineWidth = 1; ctx.stroke();
                     ctx.strokeStyle = 'rgba(118,100,206,0.4)'; ctx.lineWidth = 1; ctx.strokeRect(x - 4.5, y - 4.5, w + 9, h + 9);
                     ctx.fillStyle = LandmarkKit.grad(this, 'pool', () => { const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#3b2c9e'); g.addColorStop(0.55, '#1f0f70'); g.addColorStop(1, T.glass); return g; });
                     ctx.fillRect(x, y, w, h);
-                    ctx.strokeStyle = 'rgba(210,200,255,0.16)'; ctx.lineWidth = 1;                           // slow ripples of sky
-                    for (let i = 0; i < 3; i++) {
-                        const yy = y + h * (0.25 + i * 0.25) + Math.sin(t * 0.8 + i) * 2;
-                        ctx.beginPath(); ctx.moveTo(x + 8, yy); ctx.quadraticCurveTo(x + w / 2, yy + Math.sin(t + i) * 3, x + w - 8, yy); ctx.stroke();
                     }
+                    if (PropPass.seg(true)) {                                                                  // slow ripples of sky: live
+                        ctx.strokeStyle = 'rgba(210,200,255,0.16)'; ctx.lineWidth = 1;
+                        const ripples = new Path2D();                                                          // (they never cross: one stroke)
+                        for (let i = 0; i < 3; i++) {
+                            const yy = y + h * (0.25 + i * 0.25) + Math.sin(t * 0.8 + i) * 2;
+                            ripples.moveTo(x + 8, yy); ripples.quadraticCurveTo(x + w / 2, yy + Math.sin(t + i) * 3, x + w - 8, yy);
+                        }
+                        ctx.stroke(ripples);
+                    }
+                    if (PropPass.seg(false)) {
                     lotus.forEach(([lx, ly, lr, rot], i) => {
                         ctx.fillStyle = '#2e6b5c'; ctx.beginPath(); ctx.moveTo(lx, ly); ctx.arc(lx, ly, lr, rot + 0.35, rot + Math.PI * 2 - 0.35); ctx.closePath(); ctx.fill();
                         if (i % 2 === 0 && lod < 2) this._sqLotus(ctx, lx, ly, lr * 0.8, rot);
@@ -30942,6 +31052,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const cx = x + w * u, cy = y - 36;
                         for (let j = 0; j < 8; j++) { ctx.fillStyle = j % 2 ? '#b8a6ee' : '#f7f4ff'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, 12, j * Math.PI / 4, (j + 1) * Math.PI / 4); ctx.closePath(); ctx.fill(); }
                         ctx.fillStyle = T.gold; ctx.beginPath(); ctx.arc(cx, cy, 1.8, 0, Math.PI * 2); ctx.fill();
+                    }
                     }
                 } else {
                     ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
@@ -30981,6 +31092,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const cx = sx + sw / 2, cy = sy + sh / 2, R = Math.min(sw, sh) * 0.34, E = R * 0.52, t = _gameTimeSec, T = SQ_THEME;
                 const rot = -0.8, corners = [[sx + 34, sy + 34], [sx + sw - 34, sy + 34], [sx + 34, sy + sh - 34], [sx + sw - 34, sy + sh - 34]];
                 if (!emissive) {
+                    if (!PropPass.seg(false)) return;                                                           // (still: painted with the roof)
                     for (const [px, py] of corners) {                                                        // wisteria in round planters
                         ctx.fillStyle = '#8f86b0'; ctx.beginPath(); ctx.arc(px, py, 16, 0, Math.PI * 2); ctx.fill();
                         ctx.fillStyle = '#6a4fb8'; ctx.beginPath(); ctx.arc(px, py, 13, 0, Math.PI * 2); ctx.fill();
@@ -31854,6 +31966,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _mcDrawRoof(ctx, emissive) {
                 const G = this._mcGeo(), C = MCX.C, S = G.sky;
                 if (!emissive) {
+                    // (Painted once with the roof, PlaneSprites; only the sky in the skylight is live, by day. Each
+                    // segment makes its own skylight path: a painted run starts with no current path.)
+                    const sky = (c) => { c.beginPath(); c.ellipse(S.cx, S.cy, S.rx, S.ry, 0, 0, Math.PI * 2); };
+                    if (PropPass.seg(false)) {
                     for (const s of [G.hall, G.wing]) {
                         ctx.fillStyle = LandmarkKit.grad(this, 'mcroof' + s.y, () => { const g = ctx.createLinearGradient(s.x, s.y, s.x + s.w, s.y + s.h); g.addColorStop(0, '#171020'); g.addColorStop(1, C.lacquer); return g; });
                         ctx.fillRect(s.x, s.y, s.w, s.h);
@@ -31863,14 +31979,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.strokeStyle = 'rgba(255, 241, 194, 0.35)'; ctx.lineWidth = 0.8; ctx.strokeRect(s.x + 6, s.y + 6, s.w - 12, s.h - 12);
                     }
                     // The skylight over the dance floor: smoked glass in a gold ring, its leading in rays
-                    ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx, S.ry, 0, 0, Math.PI * 2);
-                    ctx.fillStyle = '#0d0814'; ctx.fill();
-                    const sun = sunNow(), day = sun ? sun.day : 0;
-                    if (day > 0.05) {                                                               // by day it holds the sky
-                        ctx.fillStyle = LandmarkKit.grad(this, 'mcsky', () => { const g = ctx.createLinearGradient(S.cx - S.rx, S.cy - S.ry, S.cx + S.rx, S.cy + S.ry); g.addColorStop(0, 'rgba(190, 186, 236, 1)'); g.addColorStop(0.5, 'rgba(120, 110, 180, 1)'); g.addColorStop(1, 'rgba(60, 40, 100, 1)'); return g; });
-                        ctx.globalAlpha = 0.35 * day; ctx.fill(); ctx.globalAlpha = 1;
+                    sky(ctx); ctx.fillStyle = '#0d0814'; ctx.fill();
                     }
-                    ctx.save(); ctx.clip();
+                    const sun = sunNow(), day = sun ? sun.day : 0;
+                    if (PropPass.seg(true) && day > 0.05) {                                         // by day it holds the sky (marked live day or night: the runs stay the same)
+                        ctx.fillStyle = LandmarkKit.grad(this, 'mcsky', () => { const g = ctx.createLinearGradient(S.cx - S.rx, S.cy - S.ry, S.cx + S.rx, S.cy + S.ry); g.addColorStop(0, 'rgba(190, 186, 236, 1)'); g.addColorStop(0.5, 'rgba(120, 110, 180, 1)'); g.addColorStop(1, 'rgba(60, 40, 100, 1)'); return g; });
+                        sky(ctx); ctx.globalAlpha = 0.35 * day; ctx.fill(); ctx.globalAlpha = 1;
+                    }
+                    if (!PropPass.seg(false)) return;
+                    ctx.save(); sky(ctx); ctx.clip();
                     ctx.strokeStyle = 'rgba(232, 194, 122, 0.35)'; ctx.lineWidth = 1;
                     for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(S.cx, S.cy); ctx.lineTo(S.cx + Math.cos(a) * S.rx * 1.2, S.cy + Math.sin(a) * S.ry * 1.2); ctx.stroke(); }
                     ctx.beginPath(); ctx.ellipse(S.cx, S.cy, S.rx * 0.55, S.ry * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
@@ -31948,8 +32065,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     for (const x of [x0 + 6, x1 - 6]) { const [px, py] = Pk(x, y1 - 4); ctx.beginPath(); ctx.moveTo(x, y1 - 4); ctx.lineTo(px, py); ctx.stroke(); }
                     ctx.restore();
                 }
-                LandmarkKit.flat(ctx, k, (c) => {
-                    if (!emissive) {
+                LandmarkKit.flat(ctx, k, (cf) => {
+                    if (!emissive) PlaneSprites.draw(cf, this, 'canopy', k, (c) => {                          // (painted once in its plane: PlaneSprites)
                         c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x0 + 4, y0 + 6, x1 - x0, y1 - y0);
                         const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, C.velvet); g.addColorStop(0.6, C.velvetLt); g.addColorStop(1, C.velvet);
                         c.fillStyle = g; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y0); c.lineTo(x1, y1 - 6);
@@ -31959,8 +32076,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         c.strokeStyle = 'rgba(255, 241, 194, 0.25)'; c.lineWidth = 0.8;                       // velvet pleats
                         for (let x = x0 + 10; x < x1; x += 10) { c.beginPath(); c.moveTo(x, y0 + 2); c.lineTo(x, y1 - 8); c.stroke(); }
                         c.fillStyle = C.gold; _mcCrescent(c, G.door.x, (y0 + y1) / 2 - 2, 9); c.fill();          // the crescent on the canopy
-                    } else {
-                        const t = _frameTime / 1000;                                                    // marquee bulbs along the valance
+                    }, { x: x0, y: y0, w: x1 - x0 + 4, h: y1 - y0 + 10 });
+                    else {
+                        const c = cf, t = _frameTime / 1000;                                            // marquee bulbs along the valance
                         c.globalCompositeOperation = 'lighter';
                         for (let x = x0 + 6, i = 0; x < x1; x += 12, i++) {
                             const tw = 0.55 + 0.45 * Math.sin(t * 3 + i * 1.3);
@@ -59627,7 +59745,7 @@ engineMixin({
                     if (this.player && this.player._walk) Walker._end(this.player._walk, 'cancelled');
                 }
                 if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
-                if (typeof PropSprites !== 'undefined') PropSprites.clear(this.props);   // the old map's furniture sprites
+                if (typeof PropSprites !== 'undefined') { PropSprites.clear(this.props); PlaneSprites.clear(this.activeMap && this.activeMap.buildings); }   // the old map's furniture and roof sprites
                 // caches keyed by the old map (each rebuilds on its next use)
                 this.skyLayer = null;
                 if (typeof ambience !== 'undefined') { ambience._areaMap = null; ambience._areas = {}; }
@@ -69088,7 +69206,7 @@ engineMixin({
                 if (this._releaseMapBakes) this._releaseMapBakes(null);
                 if (this.groundBaker) { this.groundBaker.invalidate(); this.groundBaker.mapId = null; }
                 if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
-                if (typeof PropSprites !== 'undefined') PropSprites.clear(this.props);
+                if (typeof PropSprites !== 'undefined') { PropSprites.clear(this.props); PlaneSprites.clear(this.activeMap && this.activeMap.buildings); }
                 if (this.coach) { this.coach.dismiss(); this.coach.deserialize([]); }   // a story New Game then calls hud.startFresh()
                 if (this.hud) this.hud.revealAll();
                 // --- PLAYER STATE ---
@@ -72512,7 +72630,7 @@ engineMixin({
                 } else if (key === 'propSprites') {
                     // Furniture painted once and stamped (entities/prop-sprites.js); off, it draws as vector again
                     GameSettings.propSprites = GameSettings.propSprites === false;
-                    if (!GameSettings.propSprites && typeof PropSprites !== 'undefined') PropSprites.clear(game.props);
+                    if (!GameSettings.propSprites && typeof PropSprites !== 'undefined') { PropSprites.clear(game.props); PlaneSprites.clear(game.activeMap && game.activeMap.buildings); }
                     this._updateValueEl(el.id, GameSettings.propSprites ? 'on' : 'off');
 
                 } else if (key === 'debugView') {
