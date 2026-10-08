@@ -461,14 +461,17 @@
                 const cam = game.camera, t = _gameTimeSec, lod = _zoomLOD, fade = this._sqFade == null ? 1 : this._sqFade;
                 const P3 = (x, y, z) => this._sqP(x, y, z), a = Math.min(1, glow * 1.4);
                 const line = (p, q) => { ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
+                // All of it adds ('lighter'), so what shares a style goes out in one fill, in any order
                 ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1;
+                const dots = new Path2D();
                 for (const c of g.cols) {                                                                    // hot stripe up each shaft
                     const t0 = P3(c.x, c.y, g.zCol);
                     const gr = ctx.createLinearGradient(c.x, c.y + 2, t0[0], t0[1]);
                     gr.addColorStop(0, `rgba(240,222,255,${0.85 * a})`); gr.addColorStop(1, 'rgba(164,105,255,0)');
                     ctx.strokeStyle = gr; ctx.lineWidth = 2.2; line([c.x, c.y + 2], t0);
-                    ctx.fillStyle = `rgba(236,220,255,${0.9 * a})`; ctx.beginPath(); ctx.arc(c.x, c.y + SQ_PORTICO.colR + 3.5, 1.5, 0, Math.PI * 2); ctx.fill();
+                    const dy = c.y + SQ_PORTICO.colR + 3.5; dots.moveTo(c.x + 1.5, dy); dots.arc(c.x, dy, 1.5, 0, Math.PI * 2);
                 }
+                ctx.fillStyle = `rgba(236,220,255,${0.9 * a})`; ctx.fill(dots);
                 if (!lod) {                                                                                  // glitter on the wet marble and carpet
                     const wet = game.weather && game.weather.isRaining ? 1 : 0.6, pl = game.player;
                     for (let i = 0; i < 34; i++) {
@@ -487,13 +490,14 @@
                 ctx.globalAlpha = fade;
                 if (cam.y > g.yb - 2) {                                                                      // marquee bulbs chasing along the fascia
                     const zb = g.z - 2, n = Math.floor((g.x1 - g.x0 - 8) / (lod ? 14 : 9));
+                    const odd = lod ? LandmarkKit.bulb(ctx, '214,186,255', 1, 1.5) : LandmarkKit.bulb(ctx, '214,186,255', 1, 1.5, '200,168,255', 0.22, 4.5);
+                    const even = lod ? LandmarkKit.bulb(ctx, '255,238,214', 1, 1.5) : LandmarkKit.bulb(ctx, '255,238,214', 1, 1.5, '200,168,255', 0.22, 4.5), br = odd.r;
                     for (let i = 0; i <= n; i++) {
                         const p = P3(g.x0 + 4 + (g.x1 - g.x0 - 8) * i / n, g.yb, zb);
                         const on = 0.35 + 0.65 * Math.pow(Math.max(0, Math.cos(i * 0.55 - t * 4.2)), 3);
-                        ctx.fillStyle = i % 2 ? `rgba(214,186,255,${on * a})` : `rgba(255,238,214,${on * a})`;
-                        ctx.beginPath(); ctx.arc(p[0], p[1], 1.5, 0, Math.PI * 2); ctx.fill();
-                        if (!lod) { ctx.fillStyle = `rgba(200,168,255,${on * a * 0.22})`; ctx.beginPath(); ctx.arc(p[0], p[1], 4.5, 0, Math.PI * 2); ctx.fill(); }
+                        ctx.globalAlpha = fade * on * a; ctx.drawImage(i % 2 ? odd : even, p[0] - br, p[1] - br, br * 2, br * 2);
                     }
+                    ctx.globalAlpha = fade;
                     ctx.strokeStyle = `rgba(190,150,255,${0.75 * a})`; ctx.lineWidth = 1.2;
                     line(P3(g.x0, g.yb, g.z - 4.5), P3(g.x1, g.yb, g.z - 4.5));
                 }
@@ -506,28 +510,28 @@
                 ctx.restore();
                 // Hexagon lanterns crowning the columns (the pair at the door burns warmest)
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                const kT = this._sqK(g.zCol);
+                const kT = this._sqK(g.zCol), hexes = [new Path2D(), new Path2D()], a1 = ctx.globalAlpha;   // far, near
                 for (const c of g.cols) {
                     const p = P3(c.x, c.y, g.zCol), near = Math.abs(c.x - g.dx) < 100, flick = 0.92 + 0.08 * Math.sin(t * 2.7 + c.x);
                     const rr = (near ? 20 : 15) * kT, a0 = ctx.globalAlpha;                                      // glow sprites, violet halo round a warm core
                     ctx.globalAlpha = a0 * 0.3 * a * flick; drawGlow(ctx, p[0], p[1], rr, '180, 130, 255', 0);
                     ctx.globalAlpha = a0 * (near ? 0.75 : 0.6) * a * flick; drawGlow(ctx, p[0], p[1], rr * 0.4, near ? '255, 236, 220' : '214, 186, 255', 0);
                     ctx.globalAlpha = a0;
-                    ctx.beginPath(); for (let i = 0; i < 6; i++) { const an = i * Math.PI / 3; ctx[i ? 'lineTo' : 'moveTo'](p[0] + Math.cos(an) * 5.6 * kT, p[1] + Math.sin(an) * 5.6 * kT); } ctx.closePath();
-                    ctx.fillStyle = near ? `rgba(255,244,236,${0.95 * a})` : `rgba(232,218,255,${0.9 * a})`; ctx.fill();
+                    const h = hexes[+near]; for (let i = 0; i < 6; i++) { const an = i * Math.PI / 3; h[i ? 'lineTo' : 'moveTo'](p[0] + Math.cos(an) * 5.6 * kT, p[1] + Math.sin(an) * 5.6 * kT); } h.closePath();
                 }
+                ctx.globalAlpha = a1;
+                ctx.fillStyle = `rgba(232,218,255,${0.9 * a})`; ctx.fill(hexes[0]);
+                ctx.fillStyle = `rgba(255,244,236,${0.95 * a})`; ctx.fill(hexes[1]);
                 // The whole globe burns bright, with a warm corona and soft bloom baked once.
                 const postBulb = _lampBulbEmissionSprite('#ffdcaa', 3.2, 'globe');
-                const postGlowSpan = 48 * this._sqK(26);
+                const postGlowSpan = 48 * this._sqK(26), L = LAMP_POST_SCALE, span = postGlowSpan * L;
                 for (const [ox, oy] of SQ_ENTRY.posts) {
-                    const x = g.dx + ox, y = g.yf + oy;
-                    ctx.save(); ctx.translate(x, y); ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE); ctx.translate(-x, -y);
+                    const x = g.dx + ox, y = g.yf + oy;                                                      // scaled LAMP_POST_SCALE about the post's foot
                     for (const gx of [-9, 0, 9]) {
                         const q = P3(x + gx, y, gx ? 26 : 30), f = 0.96 + 0.04 * Math.sin(t * 3.1 + gx + oy);
                         ctx.globalAlpha = a * f;
-                        ctx.drawImage(postBulb, q[0] - postGlowSpan / 2, q[1] - postGlowSpan / 2, postGlowSpan, postGlowSpan);
+                        ctx.drawImage(postBulb, x + (q[0] - postGlowSpan / 2 - x) * L, y + (q[1] - postGlowSpan / 2 - y) * L, span, span);
                     }
-                    ctx.restore();
                 }
                 ctx.restore();
             },
@@ -716,12 +720,12 @@
                     }
                 } else {
                     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                    const a = ctx.globalAlpha;
-                    for (let i = 0; i < ribs; i++) for (const py of [y0 - 4, y1 + 4]) {                   // gold lanterns on the pergola
+                    const a = ctx.globalAlpha, bulb = lod === 0 ? LandmarkKit.bulb(ctx, '255,240,210', 0.95, 1.5, '255,214,150', 0.5, 10, true) : LandmarkKit.bulb(ctx, '255,240,210', 0.95, 1.5), br = bulb.r;
+                    for (let i = 0; i < ribs; i++) for (const py of [y0 - 4, y1 + 4]) {                   // gold lanterns on the pergola, glow and all in one stamp
                         const rx = ribX(i), f = 0.8 + 0.2 * Math.sin(t * 2.1 + i * 1.3 + py);
-                        if (lod === 0) sqGlow(ctx, rx, py, 10, `rgba(255,214,150,${0.5 * f})`, 'rgba(255,214,150,0)');
-                        ctx.fillStyle = `rgba(255,240,210,${0.95 * f})`; ctx.beginPath(); ctx.arc(rx, py, 1.5, 0, Math.PI * 2); ctx.fill();
+                        ctx.globalAlpha = a * f; ctx.drawImage(bulb, rx - br, py - br, br * 2, br * 2);
                     }
+                    ctx.globalAlpha = a;
                     ctx.globalAlpha = a * (0.7 + 0.3 * Math.sin(t * 0.6));                                  // wisteria breathing over the walk
                     const g = ctx.createLinearGradient(0, y0 - 10, 0, y1 + 10);
                     g.addColorStop(0, 'rgba(180,150,255,0)'); g.addColorStop(0.5, 'rgba(180,150,255,0.24)'); g.addColorStop(1, 'rgba(180,150,255,0)');
