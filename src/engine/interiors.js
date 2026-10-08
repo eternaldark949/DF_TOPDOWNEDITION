@@ -31,8 +31,20 @@
                Small buildings, neon glows, tiny car/pedestrian sprites for life.
                ===================================================================== */
             /** Clinic floor details: tiles, wayfinding stripe, scanner platform, curtain tracks. */
-            /** apt_949 floor art: veranda deck, living-room planks, kitchen tiles, rugs, bedroom boards, bathroom tiles. */
+            /** apt_949 floor art: veranda deck, living-room planks, kitchen tiles, rugs, bedroom boards, bathroom tiles —
+             *  painted once (released when she leaves: MAP_BAKES), like every other interior's floor. */
             drawApartmentInterior(ctx) {
+                if (!this._aptFloor) this._aptFloor = this._paintAptFloor();
+                ctx.drawImage(this._aptFloor, 0, 0);
+            },
+
+            _paintAptFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1400; cv.height = 900;
+                this._drawAptFloorArt(cv.getContext('2d'));
+                return cv;
+            },
+
+            _drawAptFloorArt(ctx) {
                 const lines = (x0, y0, x1, y1, step, vertical, color, lw = 1) => {
                     ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
                     if (vertical) for (let x = x0 + step; x < x1; x += step) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }

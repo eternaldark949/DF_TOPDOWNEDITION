@@ -58,6 +58,7 @@
                 if (this._releaseMapBakes) this._releaseMapBakes(null);
                 if (this.groundBaker) { this.groundBaker.invalidate(); this.groundBaker.mapId = null; }
                 if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
+                if (typeof PropSprites !== 'undefined') PropSprites.clear(this.props);
                 if (this.coach) { this.coach.dismiss(); this.coach.deserialize([]); }   // a story New Game then calls hud.startFresh()
                 if (this.hud) this.hud.revealAll();
                 // --- PLAYER STATE ---

@@ -71,45 +71,50 @@
             };
             switch (p.decorType) {
                 case 'apt_craft': {                                        // the workbench: walnut on steel, a pegboard lip, vise, schematic tablet, iron
-                    rr(x + 3, y + 4, w, h, 3, 'rgba(0,0,0,0.34)');
-                    for (const [lx, ly] of [[x + 1, y + 1], [x + w - 5, y + 1], [x + 1, y + h - 5], [x + w - 5, y + h - 5]]) rr(lx, ly, 4, 4, 1, '#5a5e6a');
-                    rr(x, y, w, h, 3, A.walnut, '#2a201a', 1);
-                    ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 0.6; ctx.beginPath();          // grain
-                    for (let gy = y + 11; gy < y + h - 3; gy += 4.5) { ctx.moveTo(x + 2, gy); ctx.bezierCurveTo(x + w * 0.3, gy - 1.2, x + w * 0.6, gy + 1.2, x + w - 2, gy); }
-                    ctx.stroke();
-                    ctx.fillStyle = 'rgba(255,220,180,0.08)'; ctx.fillRect(x + 2, y + 9, w - 4, 2);
-                    rr(x, y + h - 3, w, 3, 1, '#8a8e9a'); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x + 1, y + h - 3, w - 2, 0.8);   // steel edge band
-                    // Pegboard lip along the back, tools hung on it
-                    rr(x - 1, y - 1, w + 2, 8, 1.5, '#2c2a34', '#4a4656', 0.8);
-                    ctx.fillStyle = 'rgba(0,0,0,0.6)'; for (let px = x + 3; px < x + w - 1; px += 4) for (const py of [y + 1.5, y + 4.5]) ctx.fillRect(px, py, 1, 1);
-                    ctx.strokeStyle = '#b8bcc8'; ctx.lineWidth = 1.3; ctx.lineCap = 'round'; ctx.beginPath();
-                    ctx.moveTo(x + 6, y + 1); ctx.lineTo(x + 6, y + 6);                             // screwdriver
-                    ctx.moveTo(x + 12, y + 1); ctx.lineTo(x + 14, y + 6); ctx.moveTo(x + 16, y + 1); ctx.lineTo(x + 14, y + 6);   // pliers
-                    ctx.stroke();
-                    ctx.fillStyle = A.wineLt; ctx.fillRect(x + 5, y + 5, 2, 2.5);
-                    circ(x + 21, y + 2.5, 1.8, null, '#b8bcc8', 1); ctx.beginPath(); ctx.moveTo(x + 21, y + 4); ctx.lineTo(x + 21, y + 7); ctx.stroke();   // wrench
-                    ctx.lineCap = 'butt';
-                    // Bench vise on the front-left corner
-                    rr(x + 3, y + h - 13, 11, 9, 1.5, '#4a5060', '#2a2e38', 0.8);
-                    rr(x + 5, y + h - 16, 7, 4, 1, '#6a7080'); ctx.fillStyle = '#c9ccd6'; ctx.fillRect(x + 1, y + h - 9, 15, 1.2);
-                    // Holo-schematic tablet, a scanline drifting down it
                     const tx = x + w * 0.44, ty = y + 11, tw = w * 0.3, th = h * 0.42;
-                    rr(tx - 1, ty - 1, tw + 2, th + 2, 2, '#15101e');
-                    rr(tx, ty, tw, th, 1.5, '#2a1a48');
-                    ctx.strokeStyle = 'rgba(200,160,255,0.75)'; ctx.lineWidth = 0.6; ctx.beginPath();
-                    ctx.rect(tx + 2, ty + 2, tw * 0.45, th * 0.5); ctx.arc(tx + tw * 0.72, ty + th * 0.35, th * 0.2, 0, Math.PI * 2);
-                    ctx.moveTo(tx + 2, ty + th - 3); ctx.lineTo(tx + tw - 2, ty + th - 3); ctx.moveTo(tx + tw * 0.25, ty + th * 0.5 + 2); ctx.lineTo(tx + tw * 0.25, ty + th - 3);
-                    ctx.stroke();
-                    ctx.fillStyle = 'rgba(232,210,255,0.55)'; ctx.fillRect(tx + 0.5, ty + ((t * 6) % th), tw - 1, 0.8);
-                    // Parts tray, a coil of copper wire
-                    rr(x + 17, y + h - 13, 12, 8, 1, '#3a3844', '#5a5866', 0.6);
-                    for (let i = 0; i < 6; i++) circ(x + 19.5 + (i % 3) * 3.5, y + h - 11 + (i / 3 | 0) * 3.5, 0.9, i % 2 ? A.brass : '#9aa0b0');
-                    ctx.strokeStyle = '#c47a4a'; ctx.lineWidth = 0.9; for (const r of [4, 2.8, 1.6]) { ctx.beginPath(); ctx.arc(x + w - 9, y + 16, r, 0, Math.PI * 2); ctx.stroke(); }
-                    // Soldering iron in its stand, the tip an ember
-                    circ(x + w - 10, y + h - 9, 3.5, '#2a2a30', '#5a5e6a', 0.8);
-                    ctx.strokeStyle = '#1a1a1e'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + w - 10, y + h - 9); ctx.lineTo(x + w - 24, y + h - 13); ctx.stroke();
-                    ctx.strokeStyle = '#a0a4b0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w - 24, y + h - 13); ctx.lineTo(x + w - 29, y + h - 14.5); ctx.stroke(); ctx.lineCap = 'butt';
-                    circ(x + w - 29, y + h - 14.5, 1.2, `rgba(255,${140 + 60 * Math.sin(t * 7) | 0},70,1)`);
+                    // (PropPass segments, entities/prop-sprites.js: the still runs are painted once, the scanline and the ember stay live)
+                    if (PropPass.seg(false)) {
+                        rr(x + 3, y + 4, w, h, 3, 'rgba(0,0,0,0.34)');
+                        for (const [lx, ly] of [[x + 1, y + 1], [x + w - 5, y + 1], [x + 1, y + h - 5], [x + w - 5, y + h - 5]]) rr(lx, ly, 4, 4, 1, '#5a5e6a');
+                        rr(x, y, w, h, 3, A.walnut, '#2a201a', 1);
+                        ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 0.6; ctx.beginPath();          // grain
+                        for (let gy = y + 11; gy < y + h - 3; gy += 4.5) { ctx.moveTo(x + 2, gy); ctx.bezierCurveTo(x + w * 0.3, gy - 1.2, x + w * 0.6, gy + 1.2, x + w - 2, gy); }
+                        ctx.stroke();
+                        ctx.fillStyle = 'rgba(255,220,180,0.08)'; ctx.fillRect(x + 2, y + 9, w - 4, 2);
+                        rr(x, y + h - 3, w, 3, 1, '#8a8e9a'); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x + 1, y + h - 3, w - 2, 0.8);   // steel edge band
+                        // Pegboard lip along the back, tools hung on it
+                        rr(x - 1, y - 1, w + 2, 8, 1.5, '#2c2a34', '#4a4656', 0.8);
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)'; for (let px = x + 3; px < x + w - 1; px += 4) for (const py of [y + 1.5, y + 4.5]) ctx.fillRect(px, py, 1, 1);
+                        ctx.strokeStyle = '#b8bcc8'; ctx.lineWidth = 1.3; ctx.lineCap = 'round'; ctx.beginPath();
+                        ctx.moveTo(x + 6, y + 1); ctx.lineTo(x + 6, y + 6);                             // screwdriver
+                        ctx.moveTo(x + 12, y + 1); ctx.lineTo(x + 14, y + 6); ctx.moveTo(x + 16, y + 1); ctx.lineTo(x + 14, y + 6);   // pliers
+                        ctx.stroke();
+                        ctx.fillStyle = A.wineLt; ctx.fillRect(x + 5, y + 5, 2, 2.5);
+                        circ(x + 21, y + 2.5, 1.8, null, '#b8bcc8', 1); ctx.beginPath(); ctx.moveTo(x + 21, y + 4); ctx.lineTo(x + 21, y + 7); ctx.stroke();   // wrench
+                        ctx.lineCap = 'butt';
+                        // Bench vise on the front-left corner
+                        rr(x + 3, y + h - 13, 11, 9, 1.5, '#4a5060', '#2a2e38', 0.8);
+                        rr(x + 5, y + h - 16, 7, 4, 1, '#6a7080'); ctx.fillStyle = '#c9ccd6'; ctx.fillRect(x + 1, y + h - 9, 15, 1.2);
+                        // Holo-schematic tablet, a scanline drifting down it
+                        rr(tx - 1, ty - 1, tw + 2, th + 2, 2, '#15101e');
+                        rr(tx, ty, tw, th, 1.5, '#2a1a48');
+                        ctx.strokeStyle = 'rgba(200,160,255,0.75)'; ctx.lineWidth = 0.6; ctx.beginPath();
+                        ctx.rect(tx + 2, ty + 2, tw * 0.45, th * 0.5); ctx.arc(tx + tw * 0.72, ty + th * 0.35, th * 0.2, 0, Math.PI * 2);
+                        ctx.moveTo(tx + 2, ty + th - 3); ctx.lineTo(tx + tw - 2, ty + th - 3); ctx.moveTo(tx + tw * 0.25, ty + th * 0.5 + 2); ctx.lineTo(tx + tw * 0.25, ty + th - 3);
+                        ctx.stroke();
+                    }
+                    if (PropPass.seg(true)) { ctx.fillStyle = 'rgba(232,210,255,0.55)'; ctx.fillRect(tx + 0.5, ty + ((t * 6) % th), tw - 1, 0.8); }
+                    if (PropPass.seg(false)) {
+                        // Parts tray, a coil of copper wire
+                        rr(x + 17, y + h - 13, 12, 8, 1, '#3a3844', '#5a5866', 0.6);
+                        for (let i = 0; i < 6; i++) circ(x + 19.5 + (i % 3) * 3.5, y + h - 11 + (i / 3 | 0) * 3.5, 0.9, i % 2 ? A.brass : '#9aa0b0');
+                        ctx.strokeStyle = '#c47a4a'; ctx.lineWidth = 0.9; for (const r of [4, 2.8, 1.6]) { ctx.beginPath(); ctx.arc(x + w - 9, y + 16, r, 0, Math.PI * 2); ctx.stroke(); }
+                        // Soldering iron in its stand, the tip an ember
+                        circ(x + w - 10, y + h - 9, 3.5, '#2a2a30', '#5a5e6a', 0.8);
+                        ctx.strokeStyle = '#1a1a1e'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + w - 10, y + h - 9); ctx.lineTo(x + w - 24, y + h - 13); ctx.stroke();
+                        ctx.strokeStyle = '#a0a4b0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w - 24, y + h - 13); ctx.lineTo(x + w - 29, y + h - 14.5); ctx.stroke(); ctx.lineCap = 'butt';
+                    }
+                    if (PropPass.seg(true)) circ(x + w - 29, y + h - 14.5, 1.2, `rgba(255,${140 + 60 * Math.sin(t * 7) | 0},70,1)`);
                     break;
                 }
                 case 'apt_sofa': {                                         // faces north: back along the bottom edge
@@ -127,9 +132,8 @@
                     break;
                 }
                 case 'apt_fireplace': {                                    // linear glass fireplace set into a stone slab
-                    rr(x - 6, y - 4, w + 12, h + 8, 3, '#2b2224', 'rgba(239,230,220,0.35)', 1);
-                    rr(x, y + 3, w, h - 6, 2, '#120c0c');
-                    for (let i = 0; i < 6; i++) {
+                    if (PropPass.seg(false)) { rr(x - 6, y - 4, w + 12, h + 8, 3, '#2b2224', 'rgba(239,230,220,0.35)', 1); rr(x, y + 3, w, h - 6, 2, '#120c0c'); }
+                    if (PropPass.seg(true)) for (let i = 0; i < 6; i++) {
                         const fx = x + 5 + i * (w - 10) / 5, fl = 0.6 + 0.4 * Math.sin(t * 7 + i * 1.9);
                         ctx.fillStyle = `rgba(255,${140 + 60 * fl | 0},60,${0.55 + 0.35 * fl})`;
                         ctx.beginPath(); ctx.ellipse(fx, y + h / 2, 3.5, (h - 10) / 2 * fl, 0, 0, Math.PI * 2); ctx.fill();
@@ -166,13 +170,15 @@
                     break;
                 }
                 case 'apt_console': {
-                    shadow(); rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
-                    ctx.fillStyle = '#2a2020'; ctx.fillRect(x + 6, y + 4, 26, h - 8); ctx.fillRect(x + w - 32, y + 4, 26, h - 8);   // speakers
-                    ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 4; i++) { ctx.fillRect(x + 8, y + 6 + i * 3.5, 22, 1); ctx.fillRect(x + w - 30, y + 6 + i * 3.5, 22, 1); }
                     const cx = x + w / 2 - 6, cy = y + h / 2;                                           // turntable
-                    circ(cx, cy, 9, A.ink); circ(cx, cy, 3, A.wineLt);
-                    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(cx, cy, 6, t * 3.5, t * 3.5 + 1.2); ctx.stroke();
-                    ctx.strokeStyle = A.brass; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx + 14, cy - 7); ctx.lineTo(cx + 5, cy + 2); ctx.stroke();
+                    if (PropPass.seg(false)) {
+                        shadow(); rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
+                        ctx.fillStyle = '#2a2020'; ctx.fillRect(x + 6, y + 4, 26, h - 8); ctx.fillRect(x + w - 32, y + 4, 26, h - 8);   // speakers
+                        ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 4; i++) { ctx.fillRect(x + 8, y + 6 + i * 3.5, 22, 1); ctx.fillRect(x + w - 30, y + 6 + i * 3.5, 22, 1); }
+                        circ(cx, cy, 9, A.ink); circ(cx, cy, 3, A.wineLt);
+                    }
+                    if (PropPass.seg(true)) { ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, 6, t * 3.5, t * 3.5 + 1.2); ctx.stroke(); }   // the record's sheen turns
+                    if (PropPass.seg(false)) { ctx.strokeStyle = A.brass; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx + 14, cy - 7); ctx.lineTo(cx + 5, cy + 2); ctx.stroke(); }
                     break;
                 }
                 case 'apt_plant': {
@@ -267,12 +273,16 @@
                     break;
                 }
                 case 'apt_tub': {                                          // freestanding oval tub with petals
-                    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 3, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = '#f7f4f0'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = '#cfe0e6'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 7, h / 2 - 7, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 14 + Math.sin(t) * 2, h / 2 - 14, 0, 0, Math.PI * 2); ctx.stroke();
-                    for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 3 ? A.blushLt : A.blush; ctx.beginPath(); ctx.ellipse(x + w * (0.25 + ((i * 37) % 50) / 100), y + h * (0.3 + ((i * 23) % 40) / 100), 2.6, 1.6, i, 0, Math.PI * 2); ctx.fill(); }
-                    ctx.strokeStyle = A.brass; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x + w - 2, y + h / 2); ctx.lineTo(x + w - 12, y + h / 2); ctx.stroke();
+                    if (PropPass.seg(false)) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 3, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#f7f4f0'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#cfe0e6'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 7, h / 2 - 7, 0, 0, Math.PI * 2); ctx.fill();
+                    }
+                    if (PropPass.seg(true)) { ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 14 + Math.sin(t) * 2, h / 2 - 14, 0, 0, Math.PI * 2); ctx.stroke(); }
+                    if (PropPass.seg(false)) {                             // petals and the spout, over the ripple
+                        for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 3 ? A.blushLt : A.blush; ctx.beginPath(); ctx.ellipse(x + w * (0.25 + ((i * 37) % 50) / 100), y + h * (0.3 + ((i * 23) % 40) / 100), 2.6, 1.6, i, 0, Math.PI * 2); ctx.fill(); }
+                        ctx.strokeStyle = A.brass; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x + w - 2, y + h / 2); ctx.lineTo(x + w - 12, y + h / 2); ctx.stroke();
+                    }
                     break;
                 }
                 case 'apt_bath_vanity': {                                  // double marble vanity against the south wall
@@ -649,73 +659,92 @@
            MiniSpree — the city's vending brand: glossy black, a lit window of cans, a pink-and-cyan
            marquee; and the health station — Dr. Yin's refill cabinet: white and wine, a green cross,
            a rack of stim vials, a vitals readout. */
+        // (PropPass segments, entities/prop-sprites.js: the still runs are painted once; the neon's hum,
+        //  the window's light, and the station's cross, vials and trace stay live, each at its own depth)
         function drawMiniSpree(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const hum = 0.85 + 0.15 * Math.sin(t * 7) * Math.sin(t * 2.3);
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
-            ctx.fillStyle = '#0d0d12'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
-            ctx.shadowColor = '#3ef0ff'; ctx.shadowBlur = 8 * hum;                               // neon edge
-            ctx.strokeStyle = `rgba(62,240,255,${0.55 * hum})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 4); ctx.stroke();
-            ctx.shadowBlur = 0;
-            // Marquee
-            const g = ctx.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#ff4fa3'); g.addColorStop(1, '#3ef0ff');
-            ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + 2, y + 2, w - 4, 9, 2); ctx.fill();
-            ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.max(5, Math.floor(w * 0.16))}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText('MiniSpree', x + w / 2 + 2, y + 6.8);
-            ctx.fillStyle = '#fff6b0'; ctx.beginPath(); const sx = x + 6, sy = y + 6.5;                // the little spark
-            for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 1 : 2.6; ctx[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
-            // The window of cans: bubble tea, Jean soda, stellar lemonade
             const wx = x + 4, wy = y + 13, ww = w - 8, wh = h * 0.5;
-            ctx.fillStyle = '#10141e'; ctx.fillRect(wx, wy, ww, wh);
-            const cans = ['#c89a6a', '#3a6ad0', '#ffe45a'], cw = (ww - 8) / 3;
-            for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) {
-                const cx = wx + 2 + i * (cw + 2), cy = wy + 2 + row * (wh - 4) / 3;
-                ctx.fillStyle = cans[i]; ctx.beginPath(); ctx.roundRect(cx, cy, cw, (wh - 4) / 3 - 2, 1.5); ctx.fill();
-                ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx + 1, cy + 1, 1, (wh - 4) / 3 - 4);
+            ctx.save();
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+                ctx.fillStyle = '#0d0d12'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
             }
-            ctx.fillStyle = `rgba(190,240,255,${0.10 * hum})`; ctx.fillRect(wx, wy, ww, wh);        // the window's light
-            ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + ww * 0.2, wy + wh); ctx.lineTo(wx + ww * 0.75, wy); ctx.stroke();   // glass glint
-            // Keypad, card slot, pickup tray
-            const ky = wy + wh + 3;
-            ctx.fillStyle = '#3ef0ff'; for (let i = 0; i < 6; i++) ctx.fillRect(x + 6 + (i % 3) * 4, ky + Math.floor(i / 3) * 4, 2, 2);
-            ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w - 12, ky, 6, 2);
-            ctx.fillStyle = '#ff4fa3'; ctx.fillRect(x + w - 12, ky + 4, 6, 1);
-            ctx.fillStyle = '#050508'; ctx.beginPath(); ctx.roundRect(x + 5, y + h - 9, w - 10, 5, 1.5); ctx.fill();
+            if (PropPass.seg(true)) {
+                ctx.shadowColor = '#3ef0ff'; ctx.shadowBlur = 8 * hum;                               // neon edge
+                ctx.strokeStyle = `rgba(62,240,255,${0.55 * hum})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 4); ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+            if (PropPass.seg(false)) {
+                // Marquee
+                const g = ctx.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#ff4fa3'); g.addColorStop(1, '#3ef0ff');
+                ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + 2, y + 2, w - 4, 9, 2); ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.max(5, Math.floor(w * 0.16))}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('MiniSpree', x + w / 2 + 2, y + 6.8);
+                ctx.fillStyle = '#fff6b0'; ctx.beginPath(); const sx = x + 6, sy = y + 6.5;                // the little spark
+                for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 1 : 2.6; ctx[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
+                // The window of cans: bubble tea, Jean soda, stellar lemonade
+                ctx.fillStyle = '#10141e'; ctx.fillRect(wx, wy, ww, wh);
+                const cans = ['#c89a6a', '#3a6ad0', '#ffe45a'], cw = (ww - 8) / 3;
+                for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) {
+                    const cx = wx + 2 + i * (cw + 2), cy = wy + 2 + row * (wh - 4) / 3;
+                    ctx.fillStyle = cans[i]; ctx.beginPath(); ctx.roundRect(cx, cy, cw, (wh - 4) / 3 - 2, 1.5); ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx + 1, cy + 1, 1, (wh - 4) / 3 - 4);
+                }
+            }
+            if (PropPass.seg(true)) { ctx.fillStyle = `rgba(190,240,255,${0.10 * hum})`; ctx.fillRect(wx, wy, ww, wh); }   // the window's light
+            if (PropPass.seg(false)) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + ww * 0.2, wy + wh); ctx.lineTo(wx + ww * 0.75, wy); ctx.stroke();   // glass glint
+                // Keypad, card slot, pickup tray
+                const ky = wy + wh + 3;
+                ctx.fillStyle = '#3ef0ff'; for (let i = 0; i < 6; i++) ctx.fillRect(x + 6 + (i % 3) * 4, ky + Math.floor(i / 3) * 4, 2, 2);
+                ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w - 12, ky, 6, 2);
+                ctx.fillStyle = '#ff4fa3'; ctx.fillRect(x + w - 12, ky + 4, 6, 1);
+                ctx.fillStyle = '#050508'; ctx.beginPath(); ctx.roundRect(x + 5, y + h - 9, w - 10, 5, 1.5); ctx.fill();
+            }
             ctx.restore();
         }
 
         function drawHealthStation(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const pulse = 0.7 + 0.3 * Math.sin(t * 2.5);
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
-            ctx.fillStyle = '#eceef2'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
-            ctx.strokeStyle = '#6a1a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 4); ctx.stroke();
-            // The green cross, glowing
             const cx = x + w / 2, cy = y + 11, s = 5;
-            ctx.shadowColor = '#00ff66'; ctx.shadowBlur = 10 * pulse;
-            ctx.fillStyle = '#12c85a'; ctx.fillRect(cx - s, cy - s * 0.35, s * 2, s * 0.7); ctx.fillRect(cx - s * 0.35, cy - s, s * 0.7, s * 2);
-            ctx.shadowBlur = 0;
-            // A rack of stim vials, refilling
             const ry = y + 20, rh = h * 0.34, n = 5, vw = (w - 10) / n;
-            ctx.fillStyle = '#d4d8de'; ctx.fillRect(x + 4, ry, w - 8, rh);
-            for (let i = 0; i < n; i++) {
-                const vx = x + 5 + i * vw, lvl = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.3));
-                ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(vx + 0.5, ry + 2, vw - 2, rh - 4);
-                ctx.fillStyle = '#19d46a'; ctx.fillRect(vx + 0.5, ry + 2 + (rh - 4) * (1 - lvl), vw - 2, (rh - 4) * lvl);
-                ctx.fillStyle = '#6a1a2a'; ctx.fillRect(vx + 0.5, ry + 1, vw - 2, 1.5);
-            }
-            // Vitals readout: a trace running across a dark screen
             const sy = ry + rh + 3, sh = h - (sy - y) - 5;
-            ctx.fillStyle = '#0a1410'; ctx.beginPath(); ctx.roundRect(x + 4, sy, w - 8, sh, 2); ctx.fill();
-            ctx.strokeStyle = '#3cff8a'; ctx.lineWidth = 1; ctx.beginPath();
-            const mid = sy + sh / 2, ph = (t * 30) % (w - 8);
-            for (let i = 0; i <= w - 8; i += 1) {
-                const k = (i + ph) % 24, beat = k > 8 && k < 11 ? -sh * 0.35 : k > 11 && k < 13 ? sh * 0.25 : 0;
-                ctx[i ? 'lineTo' : 'moveTo'](x + 4 + i, mid + beat);
+            ctx.save();
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+                ctx.fillStyle = '#eceef2'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
+                ctx.strokeStyle = '#6a1a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 4); ctx.stroke();
             }
-            ctx.stroke();
+            if (PropPass.seg(true)) {                                                                // the green cross, glowing
+                ctx.shadowColor = '#00ff66'; ctx.shadowBlur = 10 * pulse;
+                ctx.fillStyle = '#12c85a'; ctx.fillRect(cx - s, cy - s * 0.35, s * 2, s * 0.7); ctx.fillRect(cx - s * 0.35, cy - s, s * 0.7, s * 2);
+                ctx.shadowBlur = 0;
+            }
+            // A rack of stim vials, refilling (glass, then levels, then caps: the vials never overlap, so by pass is as by vial)
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = '#d4d8de'; ctx.fillRect(x + 4, ry, w - 8, rh);
+                ctx.fillStyle = 'rgba(255,255,255,0.8)'; for (let i = 0; i < n; i++) ctx.fillRect(x + 5 + i * vw + 0.5, ry + 2, vw - 2, rh - 4);
+            }
+            if (PropPass.seg(true)) {
+                ctx.fillStyle = '#19d46a';
+                for (let i = 0; i < n; i++) { const lvl = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.3)); ctx.fillRect(x + 5 + i * vw + 0.5, ry + 2 + (rh - 4) * (1 - lvl), vw - 2, (rh - 4) * lvl); }
+            }
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = '#6a1a2a'; for (let i = 0; i < n; i++) ctx.fillRect(x + 5 + i * vw + 0.5, ry + 1, vw - 2, 1.5);
+                // Vitals readout: a trace running across a dark screen
+                ctx.fillStyle = '#0a1410'; ctx.beginPath(); ctx.roundRect(x + 4, sy, w - 8, sh, 2); ctx.fill();
+            }
+            if (PropPass.seg(true)) {
+                ctx.strokeStyle = '#3cff8a'; ctx.lineWidth = 1; ctx.beginPath();
+                const mid = sy + sh / 2, ph = (t * 30) % (w - 8);
+                for (let i = 0; i <= w - 8; i += 1) {
+                    const k = (i + ph) % 24, beat = k > 8 && k < 11 ? -sh * 0.35 : k > 11 && k < 13 ? sh * 0.25 : 0;
+                    ctx[i ? 'lineTo' : 'moveTo'](x + 4 + i, mid + beat);
+                }
+                ctx.stroke();
+            }
             ctx.restore();
         }
 
@@ -2062,6 +2091,7 @@
             
             draw(ctx) {
                 if (!this.visible) return;
+                if (PropSprites.stamp(ctx, this)) return;      // painted once, stamped (entities/prop-sprites.js)
                 
                 ctx.save();
                 const center = this.getCenter();

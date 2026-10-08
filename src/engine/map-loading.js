@@ -6,7 +6,7 @@
         const MAP_BAKES = {
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
-            apt_949: ['_backdropStatic'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
+            apt_949: ['_backdropStatic', '_aptFloor'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
             enni_cole_interior: ['_enniFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };
@@ -106,6 +106,7 @@ engineMixin({
                     hotel_suite: [['_suiteFloor', '_paintSuiteFloor']],
                     moon_city_nightclub: [['_clubFloor', '_paintClubFloor']],
                     cozy_cafe_interior: [['_cafeFloor', '_paintCafeFloor']],
+                    apt_949: [['_aptFloor', '_paintAptFloor']],
                     demoness_palace: [['_palaceFloor', '_paintPalaceFloor']],
                     keepers_hill: [['_keeperHill', '_paintKeeperHill'], ['_keeperHouse', '_paintKeeperHouse']],
                     keepers_parlor: [['_keeperParlor', '_paintKeeperParlor']],
@@ -114,6 +115,9 @@ engineMixin({
                 for (const [field, paint] of floors[map.id] || []) if (!this[field]) jobs.push(() => {
                     if (!this[field]) this[field] = this[paint]();
                 });
+                // The furniture's sprites (entities/prop-sprites.js), a handful a job, at the zoom the map opens at
+                const props = (this.props || []).filter(p => p && PropSprites.kindOf(p));
+                for (let i = 0; i < props.length; i += 8) jobs.push(() => PropSprites.prepare(props.slice(i, i + 8), this.camera.zoom));
                 // Ground labels use a downloaded font: speculative preparation must not freeze an
                 // earlier fallback face. The ordinary first draw remains responsible if it is not ready.
                 if (this.groundBaker && this.groundBaker.activeFor(map) &&
@@ -228,6 +232,7 @@ engineMixin({
                     if (this.player && this.player._walk) Walker._end(this.player._walk, 'cancelled');
                 }
                 if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
+                if (typeof PropSprites !== 'undefined') PropSprites.clear(this.props);   // the old map's furniture sprites
                 // caches keyed by the old map (each rebuilds on its next use)
                 this.skyLayer = null;
                 if (typeof ambience !== 'undefined') { ambience._areaMap = null; ambience._areas = {}; }

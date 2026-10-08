@@ -57,6 +57,7 @@ const SCRIPTS = [
     'physics/game-entity.js',
     'physics/collision.js',
     'entities/props-decor.js',
+    'entities/prop-sprites.js',
     'entities/vehicles-minigames.js',
     'entities/lamps.js',
     'entities/actors.js',

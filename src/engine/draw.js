@@ -645,6 +645,7 @@
                 // PERFORMANCE: AABB viewport culling for props
                 if (RL.at('props')) {
                     const cbP = cullBounds.props;
+                    PropSprites.frame(viewZoom);                         // furniture sprites: this view's density, a fresh paint budget
                     this.props.forEach(p => {
                         const px = p.x + (p.w || 0) / 2;
                         const py = p.y + (p.h || 0) / 2;

@@ -1042,6 +1042,7 @@
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
                 this._updateValueEl('set-countcalls', GameSettings.countCalls ? 'on' : 'off');
                 this._updateValueEl('set-baseline', GameSettings.baseline ? 'on' : 'off');
+                this._updateValueEl('set-propsprites', GameSettings.propSprites !== false ? 'on' : 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
                 this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
                 this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
@@ -1179,6 +1180,12 @@
                     GameSettings.baseline = !GameSettings.baseline;
                     if (typeof RenderLayers !== 'undefined') RenderLayers.sync(game);   // the layer panel (ui/render-layers.js)
                     this._updateValueEl(el.id, GameSettings.baseline ? 'on' : 'off');
+
+                } else if (key === 'propSprites') {
+                    // Furniture painted once and stamped (entities/prop-sprites.js); off, it draws as vector again
+                    GameSettings.propSprites = GameSettings.propSprites === false;
+                    if (!GameSettings.propSprites && typeof PropSprites !== 'undefined') PropSprites.clear(game.props);
+                    this._updateValueEl(el.id, GameSettings.propSprites ? 'on' : 'off');
 
                 } else if (key === 'debugView') {
                     game.debugMode = !game.debugMode;

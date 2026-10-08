@@ -4460,6 +4460,10 @@
                     <span class="settings-value" id="set-baseline" data-key="baseline">OFF</span>
                 </div>
                 <div class="settings-row">
+                    <span class="settings-label">Prop Sprites</span>
+                    <span class="settings-value val-on" id="set-propsprites" data-key="propSprites">ON</span>
+                </div>
+                <div class="settings-row">
                     <span class="settings-label">Debug View</span>
                     <span class="settings-value" id="set-debug" data-key="debugView">OFF</span>
                 </div>
@@ -8004,6 +8008,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
             baseline: false,                // Baseline's layer panel (ui/render-layers.js): each render layer on a chip, with its calls (not kept)
             countCalls: false,              // Full profiler: count canvas calls (a shim on every 2D call — it slows the frame it measures)
+            propSprites: true,              // furniture painted once and stamped (entities/prop-sprites.js); off draws it as vector (not kept)
             
             // --- AUDIO ---
             audioEnabled: true,             // Master audio toggle (SFX + music). false = silent.
@@ -16356,45 +16361,50 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             };
             switch (p.decorType) {
                 case 'apt_craft': {                                        // the workbench: walnut on steel, a pegboard lip, vise, schematic tablet, iron
-                    rr(x + 3, y + 4, w, h, 3, 'rgba(0,0,0,0.34)');
-                    for (const [lx, ly] of [[x + 1, y + 1], [x + w - 5, y + 1], [x + 1, y + h - 5], [x + w - 5, y + h - 5]]) rr(lx, ly, 4, 4, 1, '#5a5e6a');
-                    rr(x, y, w, h, 3, A.walnut, '#2a201a', 1);
-                    ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 0.6; ctx.beginPath();          // grain
-                    for (let gy = y + 11; gy < y + h - 3; gy += 4.5) { ctx.moveTo(x + 2, gy); ctx.bezierCurveTo(x + w * 0.3, gy - 1.2, x + w * 0.6, gy + 1.2, x + w - 2, gy); }
-                    ctx.stroke();
-                    ctx.fillStyle = 'rgba(255,220,180,0.08)'; ctx.fillRect(x + 2, y + 9, w - 4, 2);
-                    rr(x, y + h - 3, w, 3, 1, '#8a8e9a'); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x + 1, y + h - 3, w - 2, 0.8);   // steel edge band
-                    // Pegboard lip along the back, tools hung on it
-                    rr(x - 1, y - 1, w + 2, 8, 1.5, '#2c2a34', '#4a4656', 0.8);
-                    ctx.fillStyle = 'rgba(0,0,0,0.6)'; for (let px = x + 3; px < x + w - 1; px += 4) for (const py of [y + 1.5, y + 4.5]) ctx.fillRect(px, py, 1, 1);
-                    ctx.strokeStyle = '#b8bcc8'; ctx.lineWidth = 1.3; ctx.lineCap = 'round'; ctx.beginPath();
-                    ctx.moveTo(x + 6, y + 1); ctx.lineTo(x + 6, y + 6);                             // screwdriver
-                    ctx.moveTo(x + 12, y + 1); ctx.lineTo(x + 14, y + 6); ctx.moveTo(x + 16, y + 1); ctx.lineTo(x + 14, y + 6);   // pliers
-                    ctx.stroke();
-                    ctx.fillStyle = A.wineLt; ctx.fillRect(x + 5, y + 5, 2, 2.5);
-                    circ(x + 21, y + 2.5, 1.8, null, '#b8bcc8', 1); ctx.beginPath(); ctx.moveTo(x + 21, y + 4); ctx.lineTo(x + 21, y + 7); ctx.stroke();   // wrench
-                    ctx.lineCap = 'butt';
-                    // Bench vise on the front-left corner
-                    rr(x + 3, y + h - 13, 11, 9, 1.5, '#4a5060', '#2a2e38', 0.8);
-                    rr(x + 5, y + h - 16, 7, 4, 1, '#6a7080'); ctx.fillStyle = '#c9ccd6'; ctx.fillRect(x + 1, y + h - 9, 15, 1.2);
-                    // Holo-schematic tablet, a scanline drifting down it
                     const tx = x + w * 0.44, ty = y + 11, tw = w * 0.3, th = h * 0.42;
-                    rr(tx - 1, ty - 1, tw + 2, th + 2, 2, '#15101e');
-                    rr(tx, ty, tw, th, 1.5, '#2a1a48');
-                    ctx.strokeStyle = 'rgba(200,160,255,0.75)'; ctx.lineWidth = 0.6; ctx.beginPath();
-                    ctx.rect(tx + 2, ty + 2, tw * 0.45, th * 0.5); ctx.arc(tx + tw * 0.72, ty + th * 0.35, th * 0.2, 0, Math.PI * 2);
-                    ctx.moveTo(tx + 2, ty + th - 3); ctx.lineTo(tx + tw - 2, ty + th - 3); ctx.moveTo(tx + tw * 0.25, ty + th * 0.5 + 2); ctx.lineTo(tx + tw * 0.25, ty + th - 3);
-                    ctx.stroke();
-                    ctx.fillStyle = 'rgba(232,210,255,0.55)'; ctx.fillRect(tx + 0.5, ty + ((t * 6) % th), tw - 1, 0.8);
-                    // Parts tray, a coil of copper wire
-                    rr(x + 17, y + h - 13, 12, 8, 1, '#3a3844', '#5a5866', 0.6);
-                    for (let i = 0; i < 6; i++) circ(x + 19.5 + (i % 3) * 3.5, y + h - 11 + (i / 3 | 0) * 3.5, 0.9, i % 2 ? A.brass : '#9aa0b0');
-                    ctx.strokeStyle = '#c47a4a'; ctx.lineWidth = 0.9; for (const r of [4, 2.8, 1.6]) { ctx.beginPath(); ctx.arc(x + w - 9, y + 16, r, 0, Math.PI * 2); ctx.stroke(); }
-                    // Soldering iron in its stand, the tip an ember
-                    circ(x + w - 10, y + h - 9, 3.5, '#2a2a30', '#5a5e6a', 0.8);
-                    ctx.strokeStyle = '#1a1a1e'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + w - 10, y + h - 9); ctx.lineTo(x + w - 24, y + h - 13); ctx.stroke();
-                    ctx.strokeStyle = '#a0a4b0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w - 24, y + h - 13); ctx.lineTo(x + w - 29, y + h - 14.5); ctx.stroke(); ctx.lineCap = 'butt';
-                    circ(x + w - 29, y + h - 14.5, 1.2, `rgba(255,${140 + 60 * Math.sin(t * 7) | 0},70,1)`);
+                    // (PropPass segments, entities/prop-sprites.js: the still runs are painted once, the scanline and the ember stay live)
+                    if (PropPass.seg(false)) {
+                        rr(x + 3, y + 4, w, h, 3, 'rgba(0,0,0,0.34)');
+                        for (const [lx, ly] of [[x + 1, y + 1], [x + w - 5, y + 1], [x + 1, y + h - 5], [x + w - 5, y + h - 5]]) rr(lx, ly, 4, 4, 1, '#5a5e6a');
+                        rr(x, y, w, h, 3, A.walnut, '#2a201a', 1);
+                        ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 0.6; ctx.beginPath();          // grain
+                        for (let gy = y + 11; gy < y + h - 3; gy += 4.5) { ctx.moveTo(x + 2, gy); ctx.bezierCurveTo(x + w * 0.3, gy - 1.2, x + w * 0.6, gy + 1.2, x + w - 2, gy); }
+                        ctx.stroke();
+                        ctx.fillStyle = 'rgba(255,220,180,0.08)'; ctx.fillRect(x + 2, y + 9, w - 4, 2);
+                        rr(x, y + h - 3, w, 3, 1, '#8a8e9a'); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x + 1, y + h - 3, w - 2, 0.8);   // steel edge band
+                        // Pegboard lip along the back, tools hung on it
+                        rr(x - 1, y - 1, w + 2, 8, 1.5, '#2c2a34', '#4a4656', 0.8);
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)'; for (let px = x + 3; px < x + w - 1; px += 4) for (const py of [y + 1.5, y + 4.5]) ctx.fillRect(px, py, 1, 1);
+                        ctx.strokeStyle = '#b8bcc8'; ctx.lineWidth = 1.3; ctx.lineCap = 'round'; ctx.beginPath();
+                        ctx.moveTo(x + 6, y + 1); ctx.lineTo(x + 6, y + 6);                             // screwdriver
+                        ctx.moveTo(x + 12, y + 1); ctx.lineTo(x + 14, y + 6); ctx.moveTo(x + 16, y + 1); ctx.lineTo(x + 14, y + 6);   // pliers
+                        ctx.stroke();
+                        ctx.fillStyle = A.wineLt; ctx.fillRect(x + 5, y + 5, 2, 2.5);
+                        circ(x + 21, y + 2.5, 1.8, null, '#b8bcc8', 1); ctx.beginPath(); ctx.moveTo(x + 21, y + 4); ctx.lineTo(x + 21, y + 7); ctx.stroke();   // wrench
+                        ctx.lineCap = 'butt';
+                        // Bench vise on the front-left corner
+                        rr(x + 3, y + h - 13, 11, 9, 1.5, '#4a5060', '#2a2e38', 0.8);
+                        rr(x + 5, y + h - 16, 7, 4, 1, '#6a7080'); ctx.fillStyle = '#c9ccd6'; ctx.fillRect(x + 1, y + h - 9, 15, 1.2);
+                        // Holo-schematic tablet, a scanline drifting down it
+                        rr(tx - 1, ty - 1, tw + 2, th + 2, 2, '#15101e');
+                        rr(tx, ty, tw, th, 1.5, '#2a1a48');
+                        ctx.strokeStyle = 'rgba(200,160,255,0.75)'; ctx.lineWidth = 0.6; ctx.beginPath();
+                        ctx.rect(tx + 2, ty + 2, tw * 0.45, th * 0.5); ctx.arc(tx + tw * 0.72, ty + th * 0.35, th * 0.2, 0, Math.PI * 2);
+                        ctx.moveTo(tx + 2, ty + th - 3); ctx.lineTo(tx + tw - 2, ty + th - 3); ctx.moveTo(tx + tw * 0.25, ty + th * 0.5 + 2); ctx.lineTo(tx + tw * 0.25, ty + th - 3);
+                        ctx.stroke();
+                    }
+                    if (PropPass.seg(true)) { ctx.fillStyle = 'rgba(232,210,255,0.55)'; ctx.fillRect(tx + 0.5, ty + ((t * 6) % th), tw - 1, 0.8); }
+                    if (PropPass.seg(false)) {
+                        // Parts tray, a coil of copper wire
+                        rr(x + 17, y + h - 13, 12, 8, 1, '#3a3844', '#5a5866', 0.6);
+                        for (let i = 0; i < 6; i++) circ(x + 19.5 + (i % 3) * 3.5, y + h - 11 + (i / 3 | 0) * 3.5, 0.9, i % 2 ? A.brass : '#9aa0b0');
+                        ctx.strokeStyle = '#c47a4a'; ctx.lineWidth = 0.9; for (const r of [4, 2.8, 1.6]) { ctx.beginPath(); ctx.arc(x + w - 9, y + 16, r, 0, Math.PI * 2); ctx.stroke(); }
+                        // Soldering iron in its stand, the tip an ember
+                        circ(x + w - 10, y + h - 9, 3.5, '#2a2a30', '#5a5e6a', 0.8);
+                        ctx.strokeStyle = '#1a1a1e'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + w - 10, y + h - 9); ctx.lineTo(x + w - 24, y + h - 13); ctx.stroke();
+                        ctx.strokeStyle = '#a0a4b0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w - 24, y + h - 13); ctx.lineTo(x + w - 29, y + h - 14.5); ctx.stroke(); ctx.lineCap = 'butt';
+                    }
+                    if (PropPass.seg(true)) circ(x + w - 29, y + h - 14.5, 1.2, `rgba(255,${140 + 60 * Math.sin(t * 7) | 0},70,1)`);
                     break;
                 }
                 case 'apt_sofa': {                                         // faces north: back along the bottom edge
@@ -16412,9 +16422,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'apt_fireplace': {                                    // linear glass fireplace set into a stone slab
-                    rr(x - 6, y - 4, w + 12, h + 8, 3, '#2b2224', 'rgba(239,230,220,0.35)', 1);
-                    rr(x, y + 3, w, h - 6, 2, '#120c0c');
-                    for (let i = 0; i < 6; i++) {
+                    if (PropPass.seg(false)) { rr(x - 6, y - 4, w + 12, h + 8, 3, '#2b2224', 'rgba(239,230,220,0.35)', 1); rr(x, y + 3, w, h - 6, 2, '#120c0c'); }
+                    if (PropPass.seg(true)) for (let i = 0; i < 6; i++) {
                         const fx = x + 5 + i * (w - 10) / 5, fl = 0.6 + 0.4 * Math.sin(t * 7 + i * 1.9);
                         ctx.fillStyle = `rgba(255,${140 + 60 * fl | 0},60,${0.55 + 0.35 * fl})`;
                         ctx.beginPath(); ctx.ellipse(fx, y + h / 2, 3.5, (h - 10) / 2 * fl, 0, 0, Math.PI * 2); ctx.fill();
@@ -16451,13 +16460,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'apt_console': {
-                    shadow(); rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
-                    ctx.fillStyle = '#2a2020'; ctx.fillRect(x + 6, y + 4, 26, h - 8); ctx.fillRect(x + w - 32, y + 4, 26, h - 8);   // speakers
-                    ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 4; i++) { ctx.fillRect(x + 8, y + 6 + i * 3.5, 22, 1); ctx.fillRect(x + w - 30, y + 6 + i * 3.5, 22, 1); }
                     const cx = x + w / 2 - 6, cy = y + h / 2;                                           // turntable
-                    circ(cx, cy, 9, A.ink); circ(cx, cy, 3, A.wineLt);
-                    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(cx, cy, 6, t * 3.5, t * 3.5 + 1.2); ctx.stroke();
-                    ctx.strokeStyle = A.brass; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx + 14, cy - 7); ctx.lineTo(cx + 5, cy + 2); ctx.stroke();
+                    if (PropPass.seg(false)) {
+                        shadow(); rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
+                        ctx.fillStyle = '#2a2020'; ctx.fillRect(x + 6, y + 4, 26, h - 8); ctx.fillRect(x + w - 32, y + 4, 26, h - 8);   // speakers
+                        ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 4; i++) { ctx.fillRect(x + 8, y + 6 + i * 3.5, 22, 1); ctx.fillRect(x + w - 30, y + 6 + i * 3.5, 22, 1); }
+                        circ(cx, cy, 9, A.ink); circ(cx, cy, 3, A.wineLt);
+                    }
+                    if (PropPass.seg(true)) { ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, 6, t * 3.5, t * 3.5 + 1.2); ctx.stroke(); }   // the record's sheen turns
+                    if (PropPass.seg(false)) { ctx.strokeStyle = A.brass; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx + 14, cy - 7); ctx.lineTo(cx + 5, cy + 2); ctx.stroke(); }
                     break;
                 }
                 case 'apt_plant': {
@@ -16552,12 +16563,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'apt_tub': {                                          // freestanding oval tub with petals
-                    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 3, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = '#f7f4f0'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.fillStyle = '#cfe0e6'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 7, h / 2 - 7, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 14 + Math.sin(t) * 2, h / 2 - 14, 0, 0, Math.PI * 2); ctx.stroke();
-                    for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 3 ? A.blushLt : A.blush; ctx.beginPath(); ctx.ellipse(x + w * (0.25 + ((i * 37) % 50) / 100), y + h * (0.3 + ((i * 23) % 40) / 100), 2.6, 1.6, i, 0, Math.PI * 2); ctx.fill(); }
-                    ctx.strokeStyle = A.brass; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x + w - 2, y + h / 2); ctx.lineTo(x + w - 12, y + h / 2); ctx.stroke();
+                    if (PropPass.seg(false)) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 3, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#f7f4f0'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#cfe0e6'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 7, h / 2 - 7, 0, 0, Math.PI * 2); ctx.fill();
+                    }
+                    if (PropPass.seg(true)) { ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 14 + Math.sin(t) * 2, h / 2 - 14, 0, 0, Math.PI * 2); ctx.stroke(); }
+                    if (PropPass.seg(false)) {                             // petals and the spout, over the ripple
+                        for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 3 ? A.blushLt : A.blush; ctx.beginPath(); ctx.ellipse(x + w * (0.25 + ((i * 37) % 50) / 100), y + h * (0.3 + ((i * 23) % 40) / 100), 2.6, 1.6, i, 0, Math.PI * 2); ctx.fill(); }
+                        ctx.strokeStyle = A.brass; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x + w - 2, y + h / 2); ctx.lineTo(x + w - 12, y + h / 2); ctx.stroke();
+                    }
                     break;
                 }
                 case 'apt_bath_vanity': {                                  // double marble vanity against the south wall
@@ -16934,73 +16949,92 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            MiniSpree — the city's vending brand: glossy black, a lit window of cans, a pink-and-cyan
            marquee; and the health station — Dr. Yin's refill cabinet: white and wine, a green cross,
            a rack of stim vials, a vitals readout. */
+        // (PropPass segments, entities/prop-sprites.js: the still runs are painted once; the neon's hum,
+        //  the window's light, and the station's cross, vials and trace stay live, each at its own depth)
         function drawMiniSpree(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const hum = 0.85 + 0.15 * Math.sin(t * 7) * Math.sin(t * 2.3);
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
-            ctx.fillStyle = '#0d0d12'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
-            ctx.shadowColor = '#3ef0ff'; ctx.shadowBlur = 8 * hum;                               // neon edge
-            ctx.strokeStyle = `rgba(62,240,255,${0.55 * hum})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 4); ctx.stroke();
-            ctx.shadowBlur = 0;
-            // Marquee
-            const g = ctx.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#ff4fa3'); g.addColorStop(1, '#3ef0ff');
-            ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + 2, y + 2, w - 4, 9, 2); ctx.fill();
-            ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.max(5, Math.floor(w * 0.16))}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText('MiniSpree', x + w / 2 + 2, y + 6.8);
-            ctx.fillStyle = '#fff6b0'; ctx.beginPath(); const sx = x + 6, sy = y + 6.5;                // the little spark
-            for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 1 : 2.6; ctx[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
-            // The window of cans: bubble tea, Jean soda, stellar lemonade
             const wx = x + 4, wy = y + 13, ww = w - 8, wh = h * 0.5;
-            ctx.fillStyle = '#10141e'; ctx.fillRect(wx, wy, ww, wh);
-            const cans = ['#c89a6a', '#3a6ad0', '#ffe45a'], cw = (ww - 8) / 3;
-            for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) {
-                const cx = wx + 2 + i * (cw + 2), cy = wy + 2 + row * (wh - 4) / 3;
-                ctx.fillStyle = cans[i]; ctx.beginPath(); ctx.roundRect(cx, cy, cw, (wh - 4) / 3 - 2, 1.5); ctx.fill();
-                ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx + 1, cy + 1, 1, (wh - 4) / 3 - 4);
+            ctx.save();
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+                ctx.fillStyle = '#0d0d12'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
             }
-            ctx.fillStyle = `rgba(190,240,255,${0.10 * hum})`; ctx.fillRect(wx, wy, ww, wh);        // the window's light
-            ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + ww * 0.2, wy + wh); ctx.lineTo(wx + ww * 0.75, wy); ctx.stroke();   // glass glint
-            // Keypad, card slot, pickup tray
-            const ky = wy + wh + 3;
-            ctx.fillStyle = '#3ef0ff'; for (let i = 0; i < 6; i++) ctx.fillRect(x + 6 + (i % 3) * 4, ky + Math.floor(i / 3) * 4, 2, 2);
-            ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w - 12, ky, 6, 2);
-            ctx.fillStyle = '#ff4fa3'; ctx.fillRect(x + w - 12, ky + 4, 6, 1);
-            ctx.fillStyle = '#050508'; ctx.beginPath(); ctx.roundRect(x + 5, y + h - 9, w - 10, 5, 1.5); ctx.fill();
+            if (PropPass.seg(true)) {
+                ctx.shadowColor = '#3ef0ff'; ctx.shadowBlur = 8 * hum;                               // neon edge
+                ctx.strokeStyle = `rgba(62,240,255,${0.55 * hum})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 4); ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+            if (PropPass.seg(false)) {
+                // Marquee
+                const g = ctx.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#ff4fa3'); g.addColorStop(1, '#3ef0ff');
+                ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + 2, y + 2, w - 4, 9, 2); ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.max(5, Math.floor(w * 0.16))}px Montserrat, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('MiniSpree', x + w / 2 + 2, y + 6.8);
+                ctx.fillStyle = '#fff6b0'; ctx.beginPath(); const sx = x + 6, sy = y + 6.5;                // the little spark
+                for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 1 : 2.6; ctx[i ? 'lineTo' : 'moveTo'](sx + Math.cos(a) * r, sy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
+                // The window of cans: bubble tea, Jean soda, stellar lemonade
+                ctx.fillStyle = '#10141e'; ctx.fillRect(wx, wy, ww, wh);
+                const cans = ['#c89a6a', '#3a6ad0', '#ffe45a'], cw = (ww - 8) / 3;
+                for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) {
+                    const cx = wx + 2 + i * (cw + 2), cy = wy + 2 + row * (wh - 4) / 3;
+                    ctx.fillStyle = cans[i]; ctx.beginPath(); ctx.roundRect(cx, cy, cw, (wh - 4) / 3 - 2, 1.5); ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx + 1, cy + 1, 1, (wh - 4) / 3 - 4);
+                }
+            }
+            if (PropPass.seg(true)) { ctx.fillStyle = `rgba(190,240,255,${0.10 * hum})`; ctx.fillRect(wx, wy, ww, wh); }   // the window's light
+            if (PropPass.seg(false)) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx + ww * 0.2, wy + wh); ctx.lineTo(wx + ww * 0.75, wy); ctx.stroke();   // glass glint
+                // Keypad, card slot, pickup tray
+                const ky = wy + wh + 3;
+                ctx.fillStyle = '#3ef0ff'; for (let i = 0; i < 6; i++) ctx.fillRect(x + 6 + (i % 3) * 4, ky + Math.floor(i / 3) * 4, 2, 2);
+                ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w - 12, ky, 6, 2);
+                ctx.fillStyle = '#ff4fa3'; ctx.fillRect(x + w - 12, ky + 4, 6, 1);
+                ctx.fillStyle = '#050508'; ctx.beginPath(); ctx.roundRect(x + 5, y + h - 9, w - 10, 5, 1.5); ctx.fill();
+            }
             ctx.restore();
         }
 
         function drawHealthStation(ctx, p) {
             const x = p.x, y = p.y, w = p.width, h = p.height, t = _frameTime / 1000;
             const pulse = 0.7 + 0.3 * Math.sin(t * 2.5);
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
-            ctx.fillStyle = '#eceef2'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
-            ctx.strokeStyle = '#6a1a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 4); ctx.stroke();
-            // The green cross, glowing
             const cx = x + w / 2, cy = y + 11, s = 5;
-            ctx.shadowColor = '#00ff66'; ctx.shadowBlur = 10 * pulse;
-            ctx.fillStyle = '#12c85a'; ctx.fillRect(cx - s, cy - s * 0.35, s * 2, s * 0.7); ctx.fillRect(cx - s * 0.35, cy - s, s * 0.7, s * 2);
-            ctx.shadowBlur = 0;
-            // A rack of stim vials, refilling
             const ry = y + 20, rh = h * 0.34, n = 5, vw = (w - 10) / n;
-            ctx.fillStyle = '#d4d8de'; ctx.fillRect(x + 4, ry, w - 8, rh);
-            for (let i = 0; i < n; i++) {
-                const vx = x + 5 + i * vw, lvl = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.3));
-                ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(vx + 0.5, ry + 2, vw - 2, rh - 4);
-                ctx.fillStyle = '#19d46a'; ctx.fillRect(vx + 0.5, ry + 2 + (rh - 4) * (1 - lvl), vw - 2, (rh - 4) * lvl);
-                ctx.fillStyle = '#6a1a2a'; ctx.fillRect(vx + 0.5, ry + 1, vw - 2, 1.5);
-            }
-            // Vitals readout: a trace running across a dark screen
             const sy = ry + rh + 3, sh = h - (sy - y) - 5;
-            ctx.fillStyle = '#0a1410'; ctx.beginPath(); ctx.roundRect(x + 4, sy, w - 8, sh, 2); ctx.fill();
-            ctx.strokeStyle = '#3cff8a'; ctx.lineWidth = 1; ctx.beginPath();
-            const mid = sy + sh / 2, ph = (t * 30) % (w - 8);
-            for (let i = 0; i <= w - 8; i += 1) {
-                const k = (i + ph) % 24, beat = k > 8 && k < 11 ? -sh * 0.35 : k > 11 && k < 13 ? sh * 0.25 : 0;
-                ctx[i ? 'lineTo' : 'moveTo'](x + 4 + i, mid + beat);
+            ctx.save();
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+                ctx.fillStyle = '#eceef2'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
+                ctx.strokeStyle = '#6a1a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 4); ctx.stroke();
             }
-            ctx.stroke();
+            if (PropPass.seg(true)) {                                                                // the green cross, glowing
+                ctx.shadowColor = '#00ff66'; ctx.shadowBlur = 10 * pulse;
+                ctx.fillStyle = '#12c85a'; ctx.fillRect(cx - s, cy - s * 0.35, s * 2, s * 0.7); ctx.fillRect(cx - s * 0.35, cy - s, s * 0.7, s * 2);
+                ctx.shadowBlur = 0;
+            }
+            // A rack of stim vials, refilling (glass, then levels, then caps: the vials never overlap, so by pass is as by vial)
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = '#d4d8de'; ctx.fillRect(x + 4, ry, w - 8, rh);
+                ctx.fillStyle = 'rgba(255,255,255,0.8)'; for (let i = 0; i < n; i++) ctx.fillRect(x + 5 + i * vw + 0.5, ry + 2, vw - 2, rh - 4);
+            }
+            if (PropPass.seg(true)) {
+                ctx.fillStyle = '#19d46a';
+                for (let i = 0; i < n; i++) { const lvl = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.3)); ctx.fillRect(x + 5 + i * vw + 0.5, ry + 2 + (rh - 4) * (1 - lvl), vw - 2, (rh - 4) * lvl); }
+            }
+            if (PropPass.seg(false)) {
+                ctx.fillStyle = '#6a1a2a'; for (let i = 0; i < n; i++) ctx.fillRect(x + 5 + i * vw + 0.5, ry + 1, vw - 2, 1.5);
+                // Vitals readout: a trace running across a dark screen
+                ctx.fillStyle = '#0a1410'; ctx.beginPath(); ctx.roundRect(x + 4, sy, w - 8, sh, 2); ctx.fill();
+            }
+            if (PropPass.seg(true)) {
+                ctx.strokeStyle = '#3cff8a'; ctx.lineWidth = 1; ctx.beginPath();
+                const mid = sy + sh / 2, ph = (t * 30) % (w - 8);
+                for (let i = 0; i <= w - 8; i += 1) {
+                    const k = (i + ph) % 24, beat = k > 8 && k < 11 ? -sh * 0.35 : k > 11 && k < 13 ? sh * 0.25 : 0;
+                    ctx[i ? 'lineTo' : 'moveTo'](x + 4 + i, mid + beat);
+                }
+                ctx.stroke();
+            }
             ctx.restore();
         }
 
@@ -18347,6 +18381,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             draw(ctx) {
                 if (!this.visible) return;
+                if (PropSprites.stamp(ctx, this)) return;      // painted once, stamped (entities/prop-sprites.js)
                 
                 ctx.save();
                 const center = this.getCenter();
@@ -18563,6 +18598,224 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
 
+        // ═══ PROP SPRITES — furniture painted once, stamped every frame ═══
+        // A piece of furniture's vector art (entities/props-decor.js) is about 30 canvas calls; its sprite is one
+        // drawImage, five when it's turned. Each prop keeps its own sprite (p._spr), so art seeded from where it
+        // stands stays right, and a piece she drags keeps its look; it's repainted when what it shows changes
+        // (_searched, _switchState). The vector art still draws whenever a sprite would be wrong or soft: while
+        // one is pending, zoomed in past PROP_SPRITE.ZOOM_MAX (a finisher, photo zoom, a scene's close-up), with
+        // Settings → Developer → Prop Sprites off, and for the animated pieces in PROP_LIVE.
+        // Moving parts: PROP_LOOP pieces are painted as phase frames of their one period (each frame the first
+        // time it's due, so no one frame pays for them all); split pieces mark
+        // their drawer with PropPass.seg(live), and the still runs between the live parts become sprites,
+        // stamped in their place, so what moves keeps its depth among what doesn't.
+
+        const PROP_SPRITE = {
+            S: 2,                       // sprite pixels per world unit (the view is ~1–1.5 indoors in play)
+            PAD: 8,                     // world px round the box: the +3/+4 drop shadows, lips, line widths
+            ZOOM_MAX: 2.2,              // above this the vector art draws (sharp in a close-up)
+            BUDGET_MS: 3,               // painting a frame may spend; the rest wait (drawn as vector meanwhile)
+            MAX_BYTES: 48 * 1048576,    // past this no new sprites (vector instead)
+            BLUR_DRIFT: 0.25,           // a glow's blur is device px: repaint when the view's zoom drifts this far
+            RETRY_MS: 1000              // a webfont not loaded yet: try the paint again this much later
+        };
+        // Pieces that reach further past their box than PAD (world px)
+        const PROP_PAD = {
+            apt_vanity: 13, apt_planter: 11, apt_fireplace: 10, apt_bed: 9,
+            ps_suitcase: 27, ps_piano: 16, ps_wardrobe: 16, ps_telescope: 11, mc_coatcheck: 17, mc_lost_purse: 11, mc_dj: 9,
+            dn_lost_luggage: 14, dn_palm: 10, cc_fireplace: 13, cc_plant: 12, cc_sacks: 9, hod_chair: 10, sc_fallen: 11, sc_altar: 9,
+            dp_throne: 31, dp_pool: 9, dp_embers: 9, light_switch: 10, vending_machine: 12, medbay_refill: 14
+        };
+        // One period of the sway, painted as `frames` phase frames
+        const PROP_LOOP = {
+            apt_plant: { period: 2 * Math.PI / 0.8, frames: 10 }, plant: { period: 2 * Math.PI / 0.8, frames: 10 },
+            cc_plant: { period: 2 * Math.PI / 0.8, frames: 10 }, dn_palm: { period: 2 * Math.PI / 0.8, frames: 10 },
+            mc_rope: { period: 2 * Math.PI / 1.4, frames: 12 }, apt_telescope: { period: 2 * Math.PI / 0.2, frames: 48 }
+        };
+        // Animated pieces left as vector art (true, or true while the test holds); the comment says what moves
+        const PROP_LIVE = {
+            hod_candelabra: true, hod_altar: true, hod_console: true, hod_fountain: true, hod_coffin: true, hod_reliquary: true,   // flames, crystal, ripples, glow, bob
+            hod_table: p => !!(p.decor && p.decor.candles),                                                                      // candle flames
+            dn_float_chaise: true, dn_float_chair: true, dn_fountain: true,                                                      // hover bob, rings and rift
+            dn_lost_luggage: p => !p._searched,                                                                                  // the tag swings until opened
+            mc_stage: true, mc_dj: true, mc_speaker: true, mc_orb: true, mc_vanity: true,                                        // the beat, needles, bulbs, craters
+            mc_lost_clutch: p => !p._searched,                                                                                   // sequins
+            ps_fireplace: true, ps_tub: true, ps_pool: true,                                                                     // embers, petal ring, ripples
+            sc_altar: true, sc_candles: true, sc_brazier: true,                                                                  // flames and coals
+            cc_espresso: true, cc_fireplace: true, cc_record: true, cc_stove: true,                                              // gauge, embers, arc, flame
+            monitor: true,                                                                                                       // the trace
+            dp_pool: true, dp_pillar: true, dp_brazier: true, dp_fountain: true, dp_altar: true, dp_embers: true                 // ripples, arc, fire, jets, embers
+        };
+
+        /**
+         * The segments of a split piece's drawer. Every segment draws in the plain vector pass (mode 0). Painting
+         * (mode 1) draws only still run `run`; stamping (mode 2) puts each still run's sprite where the run starts
+         * and draws the live segments as vector.
+         */
+        const PropPass = {
+            mode: 0, run: 0, idx: -1, still: false, live: false, runs: null, ctx: null, x: 0, y: 0, pad: 0, dw: 0, dh: 0,
+            /** The next segment: `live` when it moves. True when it's to be drawn as vector now. */
+            seg(live) {
+                if (this.mode === 0) return true;
+                if (live) { this.still = false; this.live = true; return this.mode === 2; }
+                if (!this.still) {
+                    this.still = true; this.idx++;
+                    if (this.mode === 2) { const cv = this.runs[this.idx]; if (cv) this.ctx.drawImage(cv, this.x - this.pad, this.y - this.pad, this.dw, this.dh); }
+                }
+                return this.mode === 1 && this.idx === this.run;
+            },
+            _begin(mode, run) { this.mode = mode; this.run = run; this.idx = -1; this.still = false; this.live = false; }
+        };
+
+        const PropSprites = {
+            density: 1, bytes: 0, _spent: 0,
+            _bake: { k: 1, blur: false, bad: false, retry: false },
+
+            /** Once a frame, before the props: the view's zoom (backing px per world unit) and a fresh budget */
+            frame(zoom) { this.density = zoom || 1; this._spent = 0; },
+
+            /** Whether a piece is painted once, and how: 'still' (one sprite, or the runs of a split drawer), 'loop', or null (vector) */
+            kindOf(p) {
+                const k = p.decorType;
+                if (k) {
+                    if (k.startsWith('gy_')) return null;                 // gravestones keep their own sprite (_gySprite)
+                    const live = PROP_LIVE[k];
+                    if (live === true || (live && live(p))) return null;
+                    return PROP_LOOP[k] ? 'loop' : 'still';
+                }
+                const it = p.interactionType;
+                return it === 'light_switch' || it === 'vending_machine' || it === 'medbay_refill' ? 'still' : null;
+            },
+
+            /** Draw a prop from its sprite; false when its vector art should draw instead (PropEntity.draw) */
+            stamp(ctx, p) {
+                if (PropPass.mode !== 0 || GameSettings.propSprites === false) return false;
+                let s = p._spr;
+                if (!s || s.sw !== p._switchState || s.se !== p._searched) s = this._plan(p, s);
+                if (s.vector || s.never || this.density > PROP_SPRITE.ZOOM_MAX) return false;
+                if (s.loop) {                                            // the phase frame for now, painted the first time it's needed
+                    const L = s.loop, k = Math.round(((_frameTime / 1000) % L.period) / L.period * L.frames) % L.frames;
+                    const cv = (s.runs && s.runs[k]) || (this._spent < PROP_SPRITE.BUDGET_MS && !(s.retryAt && performance.now() < s.retryAt) ? this._paintFrame(p, s, k) : null);
+                    if (!cv) return false;
+                    this._stampOne(ctx, p, s, cv);
+                    return true;
+                }
+                const drift = s.blur && Math.abs(this.density / s.D - 1) > PROP_SPRITE.BLUR_DRIFT;
+                if (!s.ready || drift) {
+                    if (!(s.retryAt && performance.now() < s.retryAt) && this._spent < PROP_SPRITE.BUDGET_MS) this._paint(p, s);
+                    if (!s.ready) return false;
+                }
+                if (s.split) {                                           // its drawer, with the still runs stamped (PropPass)
+                    const PP = PropPass;
+                    PP._begin(2, 0); PP.runs = s.runs; PP.ctx = ctx; PP.x = p.x; PP.y = p.y; PP.pad = s.pad; PP.dw = s.dw; PP.dh = s.dh;
+                    try { p.draw(ctx); } finally { PP.mode = 0; PP.runs = null; PP.ctx = null; }
+                    return true;
+                }
+                this._stampOne(ctx, p, s, s.runs[0]);
+                return true;
+            },
+
+            _stampOne(ctx, p, s, cv) {
+                if (!p.angle) { ctx.drawImage(cv, p.x - s.pad, p.y - s.pad, s.dw, s.dh); return; }
+                ctx.save(); ctx.translate(p.x + p.width / 2, p.y + p.height / 2); ctx.rotate(p.angle);
+                ctx.drawImage(cv, -p.width / 2 - s.pad, -p.height / 2 - s.pad, s.dw, s.dh);
+                ctx.restore();
+            },
+
+            /** (Re)decide how a prop is drawn, after a change in what it shows */
+            _plan(p, old) {
+                if (old && old.runs) this.bytes -= old.bytes || 0;
+                const kind = this.kindOf(p), pad = PROP_PAD[p.decorType || p.interactionType] || PROP_SPRITE.PAD;
+                const S = PROP_SPRITE.S, W = Math.ceil((p.width + 2 * pad) * S), H = Math.ceil((p.height + 2 * pad) * S);
+                return p._spr = { vector: !kind, sw: p._switchState, se: p._searched, pad, W, H, dw: W / S, dh: H / S,
+                    loop: kind === 'loop' ? PROP_LOOP[p.decorType] : null, ready: false, never: false, split: false, runs: null, bytes: 0, blur: false, D: 1, retryAt: 0 };
+            },
+
+            /** Paint one phase frame of a loop; null when it can't be (memory, a composite, a webfont not in yet) */
+            _paintFrame(p, s, k) {
+                const t0 = performance.now(), B = this._bake, L = s.loop;
+                if (this.bytes + s.W * s.H * 4 > PROP_SPRITE.MAX_BYTES) return null;
+                B.k = PROP_SPRITE.S / Math.max(0.5, this.density); B.blur = false; B.bad = false; B.retry = false;
+                const cv = this._canvas(p, s, 0, k * L.period / L.frames * 1000);
+                this._spent += performance.now() - t0;
+                if (B.bad) { s.never = true; return null; }
+                if (B.retry) { s.retryAt = performance.now() + PROP_SPRITE.RETRY_MS; return null; }
+                if (!s.runs) s.runs = new Array(L.frames);
+                s.runs[k] = cv; s.bytes += s.W * s.H * 4; this.bytes += s.W * s.H * 4;
+                return cv;
+            },
+
+            /** Paint a prop's sprites (its still runs); the old ones stay until the new are whole */
+            _paint(p, s) {
+                const t0 = performance.now(), B = this._bake, S = PROP_SPRITE.S;
+                if (this.bytes - s.bytes + s.W * s.H * 4 > PROP_SPRITE.MAX_BYTES) { if (!s.ready) s.never = true; return; }
+                B.k = S / Math.max(0.5, this.density); B.blur = false; B.bad = false; B.retry = false;
+                const runs = [this._canvas(p, s, 0)];
+                const n = PropPass.idx + 1;                                 // still runs the drawer marked (none: it's all still)
+                const split = PropPass.live || n > 1;
+                for (let r = 1; r < n && !B.bad; r++) runs.push(this._canvas(p, s, r));
+                this._spent += performance.now() - t0;
+                if (B.bad) { s.never = true; return; }                       // a composite a sprite can't keep: vector it stays
+                if (B.retry) { s.retryAt = performance.now() + PROP_SPRITE.RETRY_MS; return; }   // its webfont isn't in yet
+                const bytes = runs.length * s.W * s.H * 4;
+                this.bytes += bytes - s.bytes;
+                s.runs = runs; s.bytes = bytes; s.split = split; s.ready = true; s.retryAt = 0; s.blur = B.blur; s.D = this.density;
+            },
+
+            /** One sprite: the prop unturned, world mapped onto the canvas round its box; `t` sets the clock for a loop frame */
+            _canvas(p, s, run, t) {
+                const S = PROP_SPRITE.S, cv = document.createElement('canvas'); cv.width = s.W; cv.height = s.H;
+                const c = cv.getContext('2d');
+                c.setTransform(S, 0, 0, S, (s.pad - p.x) * S, (s.pad - p.y) * S);
+                const angle = p.angle, clock = _frameTime;
+                PropPass._begin(1, run);
+                try { p.angle = 0; if (t !== undefined) _frameTime = t; p.draw(this._proxy(c)); }
+                catch (e) { this._bake.bad = true; }
+                finally { p.angle = angle; _frameTime = clock; PropPass.mode = 0; }
+                return cv;
+            },
+
+            /** The painting context: a glow's blur scaled to look as it does on screen, a composite a sprite can't
+                keep marks the piece, a webfont still loading asks for another try */
+            _proxy(c) {
+                const B = this._bake, bound = new Map();
+                return new Proxy(c, {
+                    get(o, k) {
+                        const v = o[k];
+                        if (typeof v !== 'function') return v;
+                        let f = bound.get(k); if (!f) bound.set(k, f = v.bind(o));
+                        return f;
+                    },
+                    set(o, k, v) {
+                        if (k === 'shadowBlur') { if (v > 0) B.blur = true; v *= B.k; }
+                        else if (k === 'globalCompositeOperation') { if (v !== 'source-over') B.bad = true; }
+                        else if (k === 'font' && typeof document !== 'undefined' && document.fonts && document.fonts.check && !document.fonts.check(v)) B.retry = true;
+                        o[k] = v;
+                        return true;
+                    }
+                });
+            },
+
+            /** Let go of every sprite (a map change, a reset, the setting turned off) */
+            clear(props) {
+                if (props) for (const p of props) if (p) p._spr = undefined;
+                this.bytes = 0;
+            },
+
+            /** Paint ahead (the map's fade): `props` now, ignoring the frame budget */
+            prepare(props, zoom) {
+                if (GameSettings.propSprites === false) return;
+                const d = this.density; this.density = zoom || 1;
+                for (const p of props) {
+                    if (!p || !p.visible) continue;
+                    const s = (!p._spr || p._spr.sw !== p._switchState || p._spr.se !== p._searched) ? this._plan(p, p._spr) : p._spr;
+                    if (s.vector || s.never) continue;
+                    if (s.loop) { for (let k = 0; k < s.loop.frames && !s.never; k++) if (!(s.runs && s.runs[k])) this._paintFrame(p, s, k); }
+                    else if (!s.ready) this._paint(p, s);
+                }
+                this.density = d;
+            }
+        };
         /**
          * =====================================================================
          *  VEHICLE ENTITY (Base Class for Traffic Vehicles)
@@ -55198,12 +55451,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (nb) parts.push(`<span>buildings <b>${RenderStats.bldBase}</b>/${RenderStats.bldTops} of ${nb}</span>`);
                 const mem = this._canvasMB(game);
                 if (mem.groundN) parts.push(`<span>ground <b>${mem.groundN}</b> tiles (${mem.ground.toFixed(0)} MB)</span>`);
+                if (mem.props) parts.push(`<span>furniture sprites <b>${mem.props.toFixed(1)}</b> MB</span>`);
                 parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB</span>`);
                 return parts.join('');
             },
 
             /** Pixel memory held by the game's big canvas caches (4 bytes a pixel): ground tiles, painted floors,
-                car sprites, the baked crowd. Recounted every half second. */
+                car sprites, the baked crowd, furniture sprites. Recounted every half second. */
             _canvasMB(game) {
                 const now = performance.now();
                 if (this._memAt && now - this._memAt < 500) return this._mem;
@@ -55214,7 +55468,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
                 if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
                 if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv);
-                this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, total: (ground + floors + cars + crowd) * MB };
+                const props = typeof PropSprites !== 'undefined' ? PropSprites.bytes / 4 : 0;
+                this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
                 this._memAt = now;
                 return this._mem;
             },
@@ -59070,7 +59325,7 @@ engineMixin({
         const MAP_BAKES = {
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
-            apt_949: ['_backdropStatic'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
+            apt_949: ['_backdropStatic', '_aptFloor'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
             enni_cole_interior: ['_enniFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };
@@ -59170,6 +59425,7 @@ engineMixin({
                     hotel_suite: [['_suiteFloor', '_paintSuiteFloor']],
                     moon_city_nightclub: [['_clubFloor', '_paintClubFloor']],
                     cozy_cafe_interior: [['_cafeFloor', '_paintCafeFloor']],
+                    apt_949: [['_aptFloor', '_paintAptFloor']],
                     demoness_palace: [['_palaceFloor', '_paintPalaceFloor']],
                     keepers_hill: [['_keeperHill', '_paintKeeperHill'], ['_keeperHouse', '_paintKeeperHouse']],
                     keepers_parlor: [['_keeperParlor', '_paintKeeperParlor']],
@@ -59178,6 +59434,9 @@ engineMixin({
                 for (const [field, paint] of floors[map.id] || []) if (!this[field]) jobs.push(() => {
                     if (!this[field]) this[field] = this[paint]();
                 });
+                // The furniture's sprites (entities/prop-sprites.js), a handful a job, at the zoom the map opens at
+                const props = (this.props || []).filter(p => p && PropSprites.kindOf(p));
+                for (let i = 0; i < props.length; i += 8) jobs.push(() => PropSprites.prepare(props.slice(i, i + 8), this.camera.zoom));
                 // Ground labels use a downloaded font: speculative preparation must not freeze an
                 // earlier fallback face. The ordinary first draw remains responsible if it is not ready.
                 if (this.groundBaker && this.groundBaker.activeFor(map) &&
@@ -59292,6 +59551,7 @@ engineMixin({
                     if (this.player && this.player._walk) Walker._end(this.player._walk, 'cancelled');
                 }
                 if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
+                if (typeof PropSprites !== 'undefined') PropSprites.clear(this.props);   // the old map's furniture sprites
                 // caches keyed by the old map (each rebuilds on its next use)
                 this.skyLayer = null;
                 if (typeof ambience !== 'undefined') { ambience._areaMap = null; ambience._areas = {}; }
@@ -63932,6 +64192,7 @@ engineMixin({
                 // PERFORMANCE: AABB viewport culling for props
                 if (RL.at('props')) {
                     const cbP = cullBounds.props;
+                    PropSprites.frame(viewZoom);                         // furniture sprites: this view's density, a fresh paint budget
                     this.props.forEach(p => {
                         const px = p.x + (p.w || 0) / 2;
                         const py = p.y + (p.h || 0) / 2;
@@ -64799,8 +65060,20 @@ engineMixin({
                Small buildings, neon glows, tiny car/pedestrian sprites for life.
                ===================================================================== */
             /** Clinic floor details: tiles, wayfinding stripe, scanner platform, curtain tracks. */
-            /** apt_949 floor art: veranda deck, living-room planks, kitchen tiles, rugs, bedroom boards, bathroom tiles. */
+            /** apt_949 floor art: veranda deck, living-room planks, kitchen tiles, rugs, bedroom boards, bathroom tiles —
+             *  painted once (released when she leaves: MAP_BAKES), like every other interior's floor. */
             drawApartmentInterior(ctx) {
+                if (!this._aptFloor) this._aptFloor = this._paintAptFloor();
+                ctx.drawImage(this._aptFloor, 0, 0);
+            },
+
+            _paintAptFloor() {
+                const cv = document.createElement('canvas'); cv.width = 1400; cv.height = 900;
+                this._drawAptFloorArt(cv.getContext('2d'));
+                return cv;
+            },
+
+            _drawAptFloorArt(ctx) {
                 const lines = (x0, y0, x1, y1, step, vertical, color, lw = 1) => {
                     ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
                     if (vertical) for (let x = x0 + step; x < x1; x += step) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
@@ -68735,6 +69008,7 @@ engineMixin({
                 if (this._releaseMapBakes) this._releaseMapBakes(null);
                 if (this.groundBaker) { this.groundBaker.invalidate(); this.groundBaker.mapId = null; }
                 if (typeof CrowdImpostors !== 'undefined') CrowdImpostors.clear();
+                if (typeof PropSprites !== 'undefined') PropSprites.clear(this.props);
                 if (this.coach) { this.coach.dismiss(); this.coach.deserialize([]); }   // a story New Game then calls hud.startFresh()
                 if (this.hud) this.hud.revealAll();
                 // --- PLAYER STATE ---
@@ -72016,6 +72290,7 @@ engineMixin({
                 this._updateValueEl('set-profiler', GameSettings.profilerMode || 'off');
                 this._updateValueEl('set-countcalls', GameSettings.countCalls ? 'on' : 'off');
                 this._updateValueEl('set-baseline', GameSettings.baseline ? 'on' : 'off');
+                this._updateValueEl('set-propsprites', GameSettings.propSprites !== false ? 'on' : 'off');
                 this._updateValueEl('set-debug', game.debugMode ? 'on' : 'off');
                 this._updateValueEl('set-weather', game.weather && game.weather.scheduleLocked ? game.weather.condition : 'auto');
                 this._updateValueEl('set-weaponmode', game.weaponMode === 'sniper' ? 'sniper' : 'normal');
@@ -72153,6 +72428,12 @@ engineMixin({
                     GameSettings.baseline = !GameSettings.baseline;
                     if (typeof RenderLayers !== 'undefined') RenderLayers.sync(game);   // the layer panel (ui/render-layers.js)
                     this._updateValueEl(el.id, GameSettings.baseline ? 'on' : 'off');
+
+                } else if (key === 'propSprites') {
+                    // Furniture painted once and stamped (entities/prop-sprites.js); off, it draws as vector again
+                    GameSettings.propSprites = GameSettings.propSprites === false;
+                    if (!GameSettings.propSprites && typeof PropSprites !== 'undefined') PropSprites.clear(game.props);
+                    this._updateValueEl(el.id, GameSettings.propSprites ? 'on' : 'off');
 
                 } else if (key === 'debugView') {
                     game.debugMode = !game.debugMode;

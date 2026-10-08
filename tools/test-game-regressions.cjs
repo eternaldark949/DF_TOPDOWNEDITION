@@ -535,6 +535,67 @@ test('Baseline layer panel: each layer gated and billed; with Baseline off nothi
   ok(r.after.stella && r.after.lighting && r.after.bld > 0, 'and every layer draws again');
 });
 
+test('Furniture sprites: painted runs never change over time, loops repeat per period, stamps follow state', env => {
+  env.run('game.story.update=()=>{};');
+  // Every painted-once run of every prop on every bundled map draws the same at any time (an animation left
+  // in a still run would freeze); every loop paints the same one period on; a live piece forced still varies.
+  const runTrace = (i, run, T) => { env.setTrace(true); env.run(`(() => { const p = game.props[${i}]; PropSprites._canvas(p, PropSprites._plan(p, null), ${run}, ${T}); })()`);
+    const t = JSON.stringify(env.trace.map(op => op.slice(1)), (k, v) => typeof v === 'number' ? Math.round(v * 1e5) / 1e5 : v); env.setTrace(false); return t; };
+  let checked = 0, loops = 0;
+  for (const id of Object.keys(env.probe.MAPS)) {
+    env.run(`game._doLoadMap(${JSON.stringify(id)});`);
+    const kinds = value(env, 'return game.props.map(p => [PropSprites.kindOf(p), p.decorType || p.interactionType]);');
+    kinds.forEach(([kind, type], i) => {
+      if (!kind) return;
+      if (kind === 'loop') {
+        const P = value(env, `return PROP_LOOP[${JSON.stringify(type)}].period;`) * 1000;
+        equal(runTrace(i, 0, 5000), runTrace(i, 0, 5000 + P), `${id} ${type}: one period on, the same frame`); loops++;
+        return;
+      }
+      const first = runTrace(i, 0, 5000), runs = value(env, 'return PropPass.idx + 1;') || 1;
+      equal(first, runTrace(i, 0, 987654.321), `${id} ${type}: its painted art never changes over time`);
+      for (let r = 1; r < runs; r++) equal(runTrace(i, r, 5000), runTrace(i, r, 987654.321), `${id} ${type} run ${r}`);
+      checked++;
+    });
+  }
+  ok(checked > 300 && loops > 15, `checked ${checked} painted props and ${loops} loops`);
+  env.run(`game._doLoadMap('house_of_death');`);
+  const candle = value(env, `return game.props.findIndex(p => p.decorType === 'hod_candelabra');`);
+  ok(runTrace(candle, 0, 5000) !== runTrace(candle, 0, 987654.321), 'control: a candelabra painted as if still would freeze its flames');
+
+  const r = value(env, `
+    game._doLoadMap('apt_949'); game.running=true; game.paused=false; game.worldMinutes=22*60;
+    const P = CanvasRenderingContext2D.prototype, ctx = game.ctx;
+    const sofa = game.props.find(p => p.decorType === 'apt_sofa'), sw = game.props.find(p => p.interactionType === 'light_switch');
+    const craft = game.props.find(p => p.decorType === 'apt_craft');
+    PropSprites.frame(1.4);
+    const calls = (p) => { const before = __calls.n; p.draw(ctx); return __calls.n - before; };
+    globalThis.__calls = { n: 0 }; for (const k of ['drawImage','fillRect','fill','stroke','save','restore','translate','rotate','arc','ellipse','roundRect','beginPath']) { const f = P[k]; P[k] = function () { __calls.n++; return f.apply(this, arguments); }; }
+    const firstSofa = calls(sofa), sofaCalls = calls(sofa);
+    sofa.angle = 0.3; const turned = calls(sofa); sofa.angle = 0;
+    calls(craft); const craftCalls = calls(craft), craftRuns = craft._spr.runs.length, craftSplit = craft._spr.split;
+    const swRuns = sw._spr || (calls(sw), sw._spr); const swBefore = sw._spr.runs[0];
+    sw._switchState = !sw._switchState; calls(sw); const swRepainted = sw._spr.runs[0] !== swBefore && sw._spr.sw === sw._switchState;
+    PropSprites.frame(2.6); const closeUp = calls(sofa) > 5; PropSprites.frame(1.4);
+    GameSettings.propSprites = false; const vectorOff = calls(sofa) > 5; GameSettings.propSprites = true;
+    game.draw(); const bytes = PropSprites.bytes, floor = !!game._aptFloor;
+    game._doLoadMap('hotel_suite');
+    const released = sofa._spr === undefined && PropSprites.bytes === 0 && !game._aptFloor;
+    const desk = game.props.find(p => p.decorType === 'ps_desk'); PropSprites.frame(1.4); calls(desk);
+    return {firstSofa, sofaCalls, turned, craftCalls, craftRuns, craftSplit, swRepainted, closeUp, vectorOff, bytes, floor, released, deskNever: !!(desk._spr && desk._spr.never)};
+  `);
+  equal([r.sofaCalls, r.turned], [1, 5], 'a still piece stamps in one call, five when turned');
+  ok(r.firstSofa > 5, 'the first draw paints it');
+  equal([r.craftRuns, r.craftSplit], [2, true], 'the workbench: two still runs round its live scanline and ember');
+  ok(r.craftCalls < 15, `the workbench stamps its runs and draws only what moves (${r.craftCalls} calls)`);
+  ok(r.swRepainted, 'flipping a light switch repaints its sprite');
+  ok(r.closeUp, 'zoomed past what a sprite keeps sharp, the vector art draws');
+  ok(r.vectorOff, 'Prop Sprites off: vector art');
+  ok(r.bytes > 0 && r.floor, 'sprites and the apartment floor are held while she is there');
+  ok(r.released, 'and let go when she leaves');
+  ok(r.deskNever, 'a piece that cuts with destination-out stays vector');
+}, {affine: true});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');
