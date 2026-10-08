@@ -249,6 +249,7 @@
                     if (PropSprites._spent < PROP_SPRITE.BUDGET_MS && !(s.retryAt && performance.now() < s.retryAt)) this._paintRun(owner, s, paint, zoom * k, rect);
                     if (!s.done) { paint(ctx); return; }
                 }
+                if (s.whole) { const r = s.runs[0]; if (r) ctx.drawImage(r.cv, r.x, r.y, r.w, r.h); return; }
                 const PP = PropPass;
                 PP._begin(2, 0); PP.runs = s.runs; PP.ctx = ctx;
                 try { paint(ctx); } finally { PP.mode = 0; PP.runs = null; PP.ctx = null; }
@@ -267,7 +268,7 @@
                 try { paint(PropSprites._proxy(c)); }
                 catch (e) { B.bad = true; }
                 finally { PropPass.mode = 0; }
-                if (run === 0) s.n = Math.max(1, PropPass.idx + 1);          // how many still runs the drawer marked
+                if (run === 0) { s.n = Math.max(1, PropPass.idx + 1); s.whole = PropPass.idx < 0; }   // how many still runs the drawer marked (none: it's all one)
                 PropSprites._spent += performance.now() - t0;
                 if (B.bad) { s.never = true; return; }
                 if (B.retry) { s.retryAt = performance.now() + PROP_SPRITE.RETRY_MS; return; }

@@ -640,8 +640,10 @@ test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill
 test('Landmark roofs: every painted run draws the same at any time and in any wind', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
   const paint = { silver_queen: 'b._leanRoof(game.ctx, true)', moon_city: 'b._mcDrawRoof(game.ctx, false)',
-    portico: "(() => { const g = b._sqPortico(); b._sqPorticoPlane(game.ctx, g, g.x1 - g.x0, SQ_PORTICO.depth, 0); PropPass.idx = Math.max(PropPass.idx, 0); })()" };   // (one run: it has no live parts)
-  const owner = { silver_queen: 'silver_queen', moon_city: 'moon_city', portico: 'silver_queen' };
+    portico: "(() => { const g = b._sqPortico(); b._sqPorticoPlane(game.ctx, g, g.x1 - g.x0, SQ_PORTICO.depth, 0); })()",   // (unmarked: one whole run)
+    canopy: 'b._mcCanopyPlane(game.ctx)' };
+  const owner = { silver_queen: 'silver_queen', moon_city: 'moon_city', portico: 'silver_queen', canopy: 'moon_city' };
+  const whole = { portico: true, canopy: true };
   const tr = (style, run, T, wind) => {
     env.setTrace(true);
     env.run(`(() => { const b = game.activeMap.buildings.find(x => x.style === '${owner[style]}'); _gameTimeSec = ${T}; _frameTime = ${T * 1000};
@@ -654,13 +656,24 @@ test('Landmark roofs: every painted run draws the same at any time and in any wi
     env.setTrace(false); return t;
   };
   for (const style of Object.keys(paint)) {
-    tr(style, 0, 1, 1); const runs = value(env, 'return PropPass.idx + 1;');
+    tr(style, 0, 1, 1); const runs = value(env, 'return Math.max(1, PropPass.idx + 1);');
     for (let r = 1; r < runs; r++) tr(style, r, 1, 1);      // (a first paint of each run makes its lazy outlines and gradients)
     const first = tr(style, 0, 5, 1);
-    ok(runs >= (style === 'portico' ? 1 : 2), `${style}: still runs round its live parts (${runs})`);
+    ok(whole[style] ? runs === 1 : runs >= 2, `${style}: still runs round its live parts (${runs})`);
     equal(first, tr(style, 0, 777.25, 6), `${style}: run 0 never changes with time or wind`);
     for (let r = 1; r < runs; r++) equal(tr(style, r, 5, 1), tr(style, r, 777.25, 6), `${style}: run ${r}`);
   }
+}, {affine: true});
+
+test('An unmarked plane (the Moon City canopy) stamps as one sprite instead of drawing its art', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
+  const B = "game.activeMap.buildings.find(x => x.style === 'moon_city')";
+  env.run(`${B}._planeSpr = { canopy: { lod: _zoomLOD, runs: [{ cv: document.createElement('canvas'), x: 1, y: 2, w: 30, h: 20 }], n: 1, done: true, never: false, whole: true, bytes: 0 } };`);
+  env.setTrace(true); env.run(`${B}._mcDrawCanopy(game.ctx, false)`);
+  const names = env.trace.map(op => op[1]); env.setTrace(false);
+  equal(names.filter(n => n === 'drawImage').length, 1, 'the canopy is one stamp');
+  equal(names.filter(n => n === 'quadraticCurveTo' || n === 'createLinearGradient' || n === 'fill').length, 0, 'its velvet and valance are not drawn as vector');
+  ok(names.includes('stroke'), 'the gold posts still draw live');
 }, {affine: true});
 
 test('Every bundled map loads, updates and draws without runtime errors', env => {

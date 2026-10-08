@@ -288,17 +288,7 @@
                     ctx.restore();
                 }
                 LandmarkKit.flat(ctx, k, (cf) => {
-                    if (!emissive) PlaneSprites.draw(cf, this, 'canopy', k, (c) => {                          // (painted once in its plane: PlaneSprites)
-                        c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x0 + 4, y0 + 6, x1 - x0, y1 - y0);
-                        const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, C.velvet); g.addColorStop(0.6, C.velvetLt); g.addColorStop(1, C.velvet);
-                        c.fillStyle = g; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y0); c.lineTo(x1, y1 - 6);
-                        for (let x = x1; x > x0; x -= 12) c.quadraticCurveTo(x - 6, y1 + 4, x - 12, y1 - 6);     // scalloped valance
-                        c.closePath(); c.fill();
-                        c.strokeStyle = C.gold; c.lineWidth = 1.4; c.stroke();
-                        c.strokeStyle = 'rgba(255, 241, 194, 0.25)'; c.lineWidth = 0.8;                       // velvet pleats
-                        for (let x = x0 + 10; x < x1; x += 10) { c.beginPath(); c.moveTo(x, y0 + 2); c.lineTo(x, y1 - 8); c.stroke(); }
-                        c.fillStyle = C.gold; _mcCrescent(c, G.door.x, (y0 + y1) / 2 - 2, 9); c.fill();          // the crescent on the canopy
-                    }, { x: x0, y: y0, w: x1 - x0 + 4, h: y1 - y0 + 10 });
+                    if (!emissive) PlaneSprites.draw(cf, this, 'canopy', k, (c) => this._mcCanopyPlane(c), { x: x0, y: y0, w: x1 - x0 + 4, h: y1 - y0 + 10 });   // (painted once in its plane)
                     else {
                         const c = cf, t = _frameTime / 1000;                                            // marquee bulbs along the valance
                         c.globalCompositeOperation = 'lighter';
@@ -310,6 +300,21 @@
                         c.globalAlpha = 0.9; c.fillStyle = 'rgba(255, 241, 194, 0.8)'; _mcCrescent(c, G.door.x, (y0 + y1) / 2 - 2, 9); c.fill();
                     }
                 });
+            },
+
+            /** The canopy's velvet, valance, pleats and crescent, in its own plane (still: PlaneSprites paints it once) */
+            _mcCanopyPlane(c) {
+                const G = this._mcGeo(), C = MCX.C;
+                const x0 = G.door.x - 62, x1 = G.door.x + 62, y0 = G.door.y - 4, y1 = G.door.y + 44;
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x0 + 4, y0 + 6, x1 - x0, y1 - y0);
+                const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, C.velvet); g.addColorStop(0.6, C.velvetLt); g.addColorStop(1, C.velvet);
+                c.fillStyle = g; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y0); c.lineTo(x1, y1 - 6);
+                for (let x = x1; x > x0; x -= 12) c.quadraticCurveTo(x - 6, y1 + 4, x - 12, y1 - 6);     // scalloped valance
+                c.closePath(); c.fill();
+                c.strokeStyle = C.gold; c.lineWidth = 1.4; c.stroke();
+                c.strokeStyle = 'rgba(255, 241, 194, 0.25)'; c.lineWidth = 0.8;                       // velvet pleats
+                for (let x = x0 + 10; x < x1; x += 10) { c.beginPath(); c.moveTo(x, y0 + 2); c.lineTo(x, y1 - 8); c.stroke(); }
+                c.fillStyle = C.gold; _mcCrescent(c, G.door.x, (y0 + y1) / 2 - 2, 9); c.fill();          // the crescent on the canopy
             },
 
             /** "Moon City" in script neon on the hall's front, the crescent beside it, NIGHTCLUB in gold beneath. */
