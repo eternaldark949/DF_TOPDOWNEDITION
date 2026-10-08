@@ -6,7 +6,7 @@
         const MAP_BAKES = {
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
-            apt_949: ['_backdropStatic', '_aptFloor'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
+            apt_949: ['_cityView', '_aptFloor'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
             enni_cole_interior: ['_enniFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };
@@ -115,6 +115,11 @@ engineMixin({
                 for (const [field, paint] of floors[map.id] || []) if (!this[field]) jobs.push(() => {
                     if (!this[field]) this[field] = this[paint]();
                 });
+                // The city below the veranda: laid out and painted once, its night lights in a second job
+                if (map.id === 'apt_949' && !this._cityView) jobs.push(() => {
+                    if (!this._cityView) this._cityView = this._makeAptCityView();
+                    if (!this._cityView.base) this._cityView.bakeBase();
+                }, () => { if (this._cityView && !this._cityView.glow) this._cityView.bakeGlow(); }, () => { if (this._cityView) this._cityView.warm(); });
                 // The furniture's sprites (entities/prop-sprites.js), a handful a job, at the zoom the map opens at
                 const props = (this.props || []).filter(p => p && PropSprites.kindOf(p));
                 for (let i = 0; i < props.length; i += 8) jobs.push(() => PropSprites.prepare(props.slice(i, i + 8), this.camera.zoom));

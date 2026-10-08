@@ -695,6 +695,25 @@ test('The window city draws nothing while its strip is off screen', env => {
   ok(on > 0, 'on the veranda: it draws');
 }, {affine: true});
 
+test('City view: the hub kit seen from a window; its bake leaves the camera as it found it, and each car is one stamp', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.worldMinutes=22*60;`);
+  const r = value(env, `
+    const cam = game.camera, lod = _zoomLOD, cv = new CityView({ x: 0, y: -394, w: 1400, h: 400, seed: 949 });
+    cv.bakeBase(); cv.bakeGlow();
+    game._cullBounds = { view: { left: -2000, right: 4000, top: -2000, bottom: 2000 } };
+    const t = _frameTime / 1000, cars = cv.cars.filter(c => cv._carAt(c, t).a > 0.02).length;
+    window.__cv = cv; cv.drawBase(game.ctx);   // (turns each car's stamp once)
+    return { same: game.camera === cam && _zoomLOD === lod, buildings: cv.buildings.length, cars, peds: cv.peds.length, kinds: [...new Set(cv.buildings.map(b => b.type))].sort() };`);
+  ok(r.same, 'the game camera and zoom LOD are back as they were');
+  ok(r.buildings >= 10, 'blocks filled with the hub\'s generic buildings');
+  equal(r.kinds, ['apartment', 'shop', 'warehouse'], 'in the hub\'s mix');
+  env.setTrace(true);
+  env.run(`window.__cv.drawBase(game.ctx)`);
+  const images = env.trace.filter(op => op[1] === 'drawImage').length;
+  env.setTrace(false);
+  equal(images, 1 + r.cars + r.peds, 'the still city, then one stamp per car and per person');
+}, {affine: true});
+
 test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
   const r = value(env, `
