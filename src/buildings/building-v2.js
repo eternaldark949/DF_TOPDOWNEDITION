@@ -10,6 +10,9 @@
         const _FW_CAMERA_MOTION = { camera: null, drawId: 0, x: 0, y: 0, zoom: 0, moving: true };
         const _FW_GEOMETRY = new WeakMap(); // owner -> weak face map; latest projection, at most two visible path sets
         const _FW_SHEEN = [];   // _drawFaceWindows: the sun sheen's windows, reused every face
+        // How far a landmark's base and roof passes draw past its leaned outline (world px, measured at every
+        // angle and zoom, plus a margin): the glow pass's emissiveReach is for the beams alone
+        const SQ_TOP_REACH = 200, DN_TOP_REACH = 190, MC_TOP_REACH = 100;
         class BuildingV2 {
             constructor(config) {
                 this.isV2 = true;
@@ -639,14 +642,18 @@
                     this.facadeFeature = r(4) < 0.55 ? 'balconies' : 'fire_escape';
                 } else if (this.style === 'double_nights') {
                     this.floors = DN.FLOORS; this.roofFeatures = []; this.emissiveReach = 950;   // crowns, beams (buildings/double-nights.js)
+                    this.topReach = DN_TOP_REACH;                           // base and roof passes: the canopy and court in front
                 } else if (this.style === 'moon_city') {
                     this.roofFeatures = []; this.facadeFeature = 'moon_city'; this.emissiveReach = 600;   // fins, skylight, searchlights (buildings/moon-city.js)
+                    this.topReach = MC_TOP_REACH;                           // base and roof passes: the canopy and sign
                 } else if (this.style === 'silver_queen') {
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
                     this.sills = { lip: 'rgba(236, 232, 250, 0.75)', shade: 'rgba(20, 10, 48, 0.55)' };   // window sills (_drawFaceWindows)
                     this.roundR = CONFIG.BUILDINGS.SQ_CORNER_R;                  // rounded outer corners (_roundCorners)
                     this.emissiveReach = 700;                              // searchlight beams reach well past the footprint
+                    this.crownZ = SQ_ROOF.ringZ;                           // the crown ring leans from 256 px up
+                    this.topReach = SQ_TOP_REACH;                          // base and roof passes: the ring's radius, the portico and posts
                 }
             },
 
@@ -786,17 +793,28 @@
             },
 
             /** Could any of it be on screen? Its footprint, its leaned walls and roof (reckoned a few floors
-                higher, for crowns, spires and signs) and its reach (beams, plazas), against the real view rect V. */
-            inView(V, cam) {
-                const C = CONFIG.CULLING, r = (this.emissiveReach || 0) + C.BUILDINGS_VIEW;
+                higher, or to its crown's height, for crowns, spires and signs) and a reach past that, against the
+                real view rect V. The reach defaults to emissiveReach (the glow pass: beams, plazas); the base and
+                roof passes ask with topReach (what they draw in front of the footprint: porticos, canopies). */
+            inView(V, cam, reach) {
+                const C = CONFIG.CULLING, r = (reach === undefined ? (this.emissiveReach || 0) : reach) + C.BUILDINGS_VIEW;
                 const x0 = this.x, y0 = this.y, x1 = this.x + (this.w || 200), y1 = this.y + (this.h || 200);
                 let L = x0, R = x1, T = y0, Bt = y1;
                 if (CONFIG.BUILDINGS.LEAN) {
-                    const k = 1 + this._leanScale(C.LEAN_EXTRA);                // roof = cam + (p - cam) * k
+                    const k = this._hullK();                                    // roof = cam + (p - cam) * k
                     const rx0 = cam.x + (x0 - cam.x) * k, rx1 = cam.x + (x1 - cam.x) * k, ry0 = cam.y + (y0 - cam.y) * k, ry1 = cam.y + (y1 - cam.y) * k;
                     L = Math.min(L, rx0, rx1); R = Math.max(R, rx0, rx1); T = Math.min(T, ry0, ry1); Bt = Math.max(Bt, ry0, ry1);
                 }
                 return !(R + r < V.left || L - r > V.right || Bt + r < V.top || T - r > V.bottom);
+            },
+
+            /** The lean of the highest thing it draws: LEAN_EXTRA floors over the roof, or its crown (crownZ, world px
+                up, leaned as LandmarkKit.k / _sqK lean it) if that's higher */
+            _hullK() {
+                const k = 1 + this._leanScale(CONFIG.CULLING.LEAN_EXTRA);
+                if (!this.crownZ) return k;
+                const C = leanCamHeight();
+                return Math.max(k, C / (C - Math.min(this.crownZ, C * 0.86)));
             },
 
             _leanScale(extraFloors = 0) {

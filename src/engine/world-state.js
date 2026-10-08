@@ -87,7 +87,7 @@
                 this._renderBuildingLists = null;
                 const bg = this._orderedBuildings || (this._orderedBuildings = new OrderedRenderGrid());
                 const fg = this._orderedFoliage || (this._orderedFoliage = new OrderedRenderGrid());
-                this._renderBuildingMaxFloors = 0; this._renderBuildingMaxReach = 0;
+                this._renderBuildingMaxFloors = 0; this._renderBuildingMaxReach = 0; this._renderBuildingMaxCrown = 0;
                 bg.build(buildings, (b, entry) => {
                     entry.standardV2 = !!(b.isV2 && b.inView === BuildingV2.prototype.inView && b._leanScale === BuildingV2.prototype._leanScale);
                     // Missing/nonfinite dimensions can pass the legacy shadow/forecourt
@@ -99,6 +99,7 @@
                     if (entry.standardV2) {
                         this._renderBuildingMaxFloors = Math.max(this._renderBuildingMaxFloors, b.floors);
                         this._renderBuildingMaxReach = Math.max(this._renderBuildingMaxReach, b.emissiveReach || 0);
+                        this._renderBuildingMaxCrown = Math.max(this._renderBuildingMaxCrown, b.crownZ || 0);
                     }
                     return { left: b.x, right: b.x + (b.w || 200), top: b.y, bottom: b.y + (b.h || 200) };
                 });
@@ -146,7 +147,8 @@
                     safe = safe && Number.isFinite(h) && h >= 0 && Number.isFinite(cameraHeight) && cameraHeight > h &&
                         Number.isFinite(B.MAX_FLOORS) && B.MAX_FLOORS >= 0 && Number.isFinite(C.LEAN_EXTRA) && C.LEAN_EXTRA >= 0 &&
                         Number.isFinite(B.FLOOR_HEIGHT) && B.FLOOR_HEIGHT >= 0;
-                    if (safe) k = 1 + h / (cameraHeight - h);
+                    if (safe) k = Math.max(1 + h / (cameraHeight - h),                   // (a crown higher than that: as _hullK leans it)
+                        cameraHeight / (cameraHeight - Math.min(this._renderBuildingMaxCrown, cameraHeight * 0.86)));
                 }
                 if (safe) {
                     // A projected roof is cam + (footprint - cam) * k. Inverse-project the
@@ -168,7 +170,9 @@
                 for (const entry of candidates) {
                     const b = entry.item;
                     if (entry.standardV2) {
-                        if (b.inView(V, cam)) { lists.base.push(entry); lists.v2.push(entry); }
+                        // In the glow pass's reach; topIn: in the base and roof passes' too (a landmark just off screen
+                        // still throws its beams on, but draws nothing else)
+                        if (b.inView(V, cam)) { entry.topIn = b.topReach === undefined || b.inView(V, cam, b.topReach); lists.base.push(entry); lists.v2.push(entry); }
                     } else {
                         if (b.isV2) lists.v2.push(entry);
                         if (b.isV2 && b.inView) lists.base.push(entry); // custom predicate runs at its original base pass

@@ -261,7 +261,7 @@
                     const V = cullBounds.view, cam = this.camera;
                     for (const entry of renderBuildings.base) {
                         const b = entry.item;
-                        if (!entry.standardV2 && b.isV2 && b.inView && !b.inView(V, cam)) continue;
+                        if (entry.standardV2 ? !entry.topIn : (b.isV2 && b.inView && !b.inView(V, cam))) continue;
                         RenderStats.bldBase++;
                         if (b.drawBase) b.drawBase(this.ctx);
                         else b.draw(this.ctx);
@@ -974,7 +974,7 @@
                     for (const entry of renderBuildings.v2) {
                         const b = entry.item;
                         if (b.isV2 && b.drawTop) {
-                            if (!entry.standardV2 && !b.inView(V, cam)) continue;
+                            if (entry.standardV2 ? !entry.topIn : !b.inView(V, cam)) continue;
                             RenderStats.bldTops++;
                             b.drawTop(this.ctx, this.worldMinutes);
                         }
@@ -1000,7 +1000,7 @@
                     for (const entry of renderBuildings.v2) {
                         const b = entry.item;
                         if (b.isV2 && b.drawSign) {
-                            if (!entry.standardV2 && !b.inView(V, cam)) continue;
+                            if (entry.standardV2 ? !entry.topIn : !b.inView(V, cam)) continue;
                             b.drawSign(this.ctx);
                         }
                     }

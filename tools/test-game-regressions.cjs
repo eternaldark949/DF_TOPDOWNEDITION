@@ -596,6 +596,31 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
   ok(r.deskNever, 'a piece that cuts with destination-out stays vector');
 }, {affine: true});
 
+test('A landmark just off screen still throws its beams but skips its roof pass', env => {
+  const r = value(env, `
+    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false; game.worldMinutes=22*60;
+    const out = [];
+    for (const style of ['silver_queen', 'double_nights', 'moon_city']) {
+      const b = game.activeMap.buildings.find(x => x.style === style);
+      let top = 0, glow = 0; const t0 = b.drawTop, e0 = b.drawEmissive;
+      b.drawTop = function (...a) { top++; return t0.apply(this, a); }; b.drawEmissive = function (...a) { glow++; return e0.apply(this, a); };
+      const rows = [];
+      for (let dx = 0; dx < 1800; dx += 60) {
+        const x = b.x + b.w + dx, y = b.y + b.h / 2;
+        game.player.x = x; game.player.y = y; game.update(); game.player.x = x; game.player.y = y;
+        top = 0; glow = 0; game.draw(); rows.push([dx, top, glow]);
+      }
+      delete b.drawTop; delete b.drawEmissive;
+      out.push({ style, beside: rows[0], glowOnly: rows.filter(([, t, g]) => t === 0 && g > 0).length, topWithoutGlow: rows.filter(([, t, g]) => t > 0 && g === 0).length });
+    }
+    return out;`);
+  for (const o of r) {
+    ok(o.beside[1] === 1 && o.beside[2] >= 1, `${o.style}: beside it, both passes draw it (the glow twice when the street reflects it)`);
+    ok(o.glowOnly > 0, `${o.style}: further off, only its glow pass (beams) draws`);
+    equal(o.topWithoutGlow, 0, `${o.style}: the roof pass never draws what the glow pass has dropped`);
+  }
+});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');
