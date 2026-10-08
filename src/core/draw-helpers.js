@@ -250,6 +250,12 @@
             return cv;
         }
         /** Stamp a glow of radius r at x, y (alpha from the context's globalAlpha). */
+        /** Could a world rect show this frame? Against the draw's view (the screen, with its zoom and shake): true when
+            there's no view yet (a standalone draw). For set pieces drawn every frame, so they cost nothing off screen. */
+        function viewHasRect(x, y, w, h) {
+            const V = typeof game !== 'undefined' && game && game._cullBounds && game._cullBounds.view;
+            return !V || !(x + w < V.left || x > V.right || y + h < V.top || y > V.bottom);
+        }
         function drawGlow(ctx, x, y, r, color, core) {
             ctx.drawImage(glowSprite(color, core), x - r, y - r, r * 2, r * 2);
         }

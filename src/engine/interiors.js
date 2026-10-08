@@ -1437,8 +1437,11 @@
                 }
 
                 // =================================================================
-                // PER-FRAME RENDER
+                // PER-FRAME RENDER (only while the strip is on screen; the moving things only where they show)
                 // =================================================================
+                if (!viewHasRect(0, backdropTop, mapW, backdropDepth)) return;
+                const V = this._cullBounds && this._cullBounds.view, vl = V ? V.left : -Infinity, vr = V ? V.right : Infinity;
+                const seen = (x0, x1) => x1 >= vl && x0 <= vr;
                 ctx.save();
                 ctx.beginPath();
                 ctx.rect(0, backdropTop, mapW, backdropDepth);
@@ -1450,6 +1453,7 @@
                 // 2. NEON PULSE on the near faces
                 ctx.globalCompositeOperation = 'lighter';
                 for (const s of city.signs) {
+                    if (!seen(s.x - 5, s.x + s.w + 5)) continue;
                     const pulse = 0.45 + 0.35 * Math.sin((t + s.phase) * s.rate);
                     ctx.globalAlpha = pulse * 0.75;
                     ctx.fillStyle = s.color;
@@ -1466,6 +1470,7 @@
                     if (car.axis === 'h') {
                         const span = mapW + 160;
                         cx = ((t * car.speed * car.dir + car.offset) % span + span) % span - 80;
+                        if (!seen(cx - 14, cx + car.len + 14)) continue;
                         cy = yAt(car.d) - car.wid / 2;
                         ctx.fillStyle = car.body;
                         ctx.globalAlpha = alpha;
@@ -1491,6 +1496,7 @@
                         alpha = Math.max(0, Math.min(1, edge / 14)) * 0.9;
                         if (alpha <= 0.02) continue;
                         cx = car.cx - car.wid / 2;
+                        if (!seen(cx - 1.5, cx + car.wid + 1.5)) continue;
                         cy = yAt(d);
                         ctx.globalAlpha = alpha;
                         ctx.fillStyle = car.body;
@@ -1514,6 +1520,7 @@
                 for (const ped of city.peds) {
                     const span = mapW + 40;
                     const px = ((t * ped.speed * ped.dir + ped.offset) % span + span) % span - 20;
+                    if (!seen(px, px + 3)) continue;
                     const py = yAt(ped.d) + Math.sin(t * 0.006 + ped.bob) * 0.7;
                     ctx.fillStyle = 'rgba(0,0,0,0.45)';
                     ctx.fillRect(px + 0.8, py + 0.8, 2.2, 2.2);
@@ -1525,6 +1532,7 @@
 
                 // 5. TRAFFIC SIGNALS at each junction, on a shared 11s cycle
                 for (const cs of city.cross) {
+                    if (!seen(cs.x - 5.5, cs.x + cs.w + 8)) continue;
                     const ph = ((t + cs.phase) % 11000) / 11000;
                     const col = ph < 0.46 ? '#00ff66' : (ph < 0.54 ? '#ffaa00' : '#ff2a2a');
                     ctx.globalCompositeOperation = 'lighter';
@@ -1542,7 +1550,7 @@
                 // 6. ROOFTOP AVIATION BEACONS
                 ctx.globalCompositeOperation = 'lighter';
                 for (const b of city.blocks) {
-                    if (!b.beacon) continue;
+                    if (!b.beacon || !seen(b.x + b.w * 0.5 - 4, b.x + b.w * 0.5 + 4)) continue;
                     const blink = Math.sin((t + b.beaconPhase) * 0.0016);
                     if (blink < 0.55) continue;
                     const bx = b.x + b.w * 0.5, by = yAt(b.d1) + 5;
@@ -1556,6 +1564,7 @@
 
                 // 7. FLICKERING WINDOWS
                 for (const f of city.flicker) {
+                    if (!seen(f.x, f.x + 3)) continue;
                     const v = Math.sin((t + f.phase) * f.rate);
                     if (v < 0.6) continue;
                     ctx.fillStyle = '#ffd080';

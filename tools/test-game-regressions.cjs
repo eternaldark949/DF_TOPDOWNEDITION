@@ -682,6 +682,19 @@ test('Apartment lights: each lamp shade and festoon bulb is one stamp, glow and 
   ok(ops.filter(o => o === 'drawImage').length >= 72 + 8, 'the 72 festoon bulbs and the lamp shades are stamped');
 }, {affine: true});
 
+test('The window city draws nothing while its strip is off screen', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.worldMinutes=22*60;
+    game._cullBounds = { view: { left: 0, right: 900, top: 300, bottom: 700 } }; game.drawApartmentBackdrop(game.ctx);`);   // (lays out and bakes)
+  env.setTrace(true);
+  env.run(`game.drawApartmentBackdrop(game.ctx)`);
+  const off = env.trace.length;
+  env.run(`game._cullBounds = { view: { left: 0, right: 900, top: -300, bottom: 100 } }; game.drawApartmentBackdrop(game.ctx)`);
+  const on = env.trace.length - off;
+  env.setTrace(false);
+  equal(off, 0, 'in the rooms: no calls at all');
+  ok(on > 0, 'on the veranda: it draws');
+}, {affine: true});
+
 test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
   const r = value(env, `
