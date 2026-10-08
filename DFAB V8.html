@@ -9979,8 +9979,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            ===================================================================== */
         // drawRainOverlay's per-frame tables, made once
         const _RAIN_SCRATCH = { bandPaths: new Array(4), corePaths: new Array(4), bandAlpha: new Float32Array(4), bandWidth: new Float32Array(4),
-                                coreAlpha: new Float32Array(4), coreWidth: new Float32Array(4), bandCount: new Int32Array(4), lamps: [], lit: [],
-                                lampGrid: { cells: [], active: [] } };
+                                coreAlpha: new Float32Array(4), coreWidth: new Float32Array(4), bandCount: new Int32Array(4), lamps: [],
+                                lampGrid: { cells: [], active: [] },
+                                litPaths: new Map(), litKeys: [], litCount: 0 };
+        // Lit drops are batched by lamp × band × closeness step: one stroke a bucket instead of one a drop
+        const RAIN_LIT_STEPS = 8;
         /** Reuse only the cells touched last frame; no per-drop candidate arrays. */
         function _clearRainGrid(grid) {
             for (const cell of grid.active) cell.length = 0;
@@ -11017,9 +11020,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (nLamps === 0) screenLamps = null;
                 }
                 
-                // Collect lit drop data for the colored pass: 9 numbers a drop (tail, head, rgb, alpha, width)
-                const litDrops = screenLamps ? S.lit : null;
-                if (litDrops) litDrops.length = 0;
+                // Lit drops (near a lamp) go into buckets: lamp × band × how close (RAIN_LIT_STEPS steps).
+                // A bucket shares one colour, alpha and width, so it's one stroke; ~400 lit drops become
+                // a few dozen strokes instead of four calls each.
+                const litPaths = S.litPaths, litKeys = S.litKeys;
+                litPaths.clear(); litKeys.length = 0; S.litCount = 0;
                 // The direct loop is cheaper for ordinary rain; build a grid only for busy, wide views.
                 const lampGrid = screenLamps && nLamps > 4 && nLamps * this.drops.length >= 32768
                     ? _rainLampGrid(S, nLamps) : null;
@@ -11084,8 +11089,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             const distSq = ddx * ddx + ddy * ddy;
                             if (distSq < sl.srSq) {
                                 const falloff = 1 - Math.sqrt(distSq) / sl.sr;
-                                litDrops.push(tailX, tailY, ax, ay, sl.r, sl.g, sl.b,
-                                    Math.min(0.5, 0.12 + falloff * 0.38) * sl.intensity, bandWidth[band] * (1 + falloff * 0.6));
+                                const q = Math.min(RAIN_LIT_STEPS - 1, (falloff * RAIN_LIT_STEPS) | 0);
+                                const key = ((lampGrid ? nearby[k] : k) * BANDS + band) * RAIN_LIT_STEPS + q;
+                                let path = litPaths.get(key);
+                                if (!path) { litPaths.set(key, path = new Path2D()); litKeys.push(key); }
+                                path.moveTo(tailX, tailY); path.lineTo(ax, ay); S.litCount++;
                                 break; // One lamp per drop
                             }
                         }
@@ -11108,18 +11116,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 }
                 
-                // --- LIT RAIN PASS (colored drops near lamps) ---
-                if (litDrops && litDrops.length > 0) {
-                    // Drawn one by one (each has its own alpha and width); the colour strings come from a cache
-                    for (let i = 0; i < litDrops.length; i += 9) {
-                        ctx.strokeStyle = _rainLitStyle(litDrops[i + 4], litDrops[i + 5], litDrops[i + 6], litDrops[i + 7]);
-                        ctx.lineWidth = litDrops[i + 8];
-                        ctx.beginPath();
-                        ctx.moveTo(litDrops[i], litDrops[i + 1]);
-                        ctx.lineTo(litDrops[i + 2], litDrops[i + 3]);
-                        ctx.stroke();
-                    }
+                // --- LIT RAIN PASS (colored drops near lamps): one stroke a bucket, at the step's middle ---
+                for (let i = 0; i < litKeys.length; i++) {
+                    const key = litKeys[i], q = key % RAIN_LIT_STEPS, rest = (key - q) / RAIN_LIT_STEPS;
+                    const band = rest % BANDS, sl = screenLamps[(rest - band) / BANDS], f = (q + 0.5) / RAIN_LIT_STEPS;
+                    ctx.strokeStyle = _rainLitStyle(sl.r, sl.g, sl.b, Math.min(0.5, 0.12 + f * 0.38) * sl.intensity);
+                    ctx.lineWidth = bandWidth[band] * (1 + f * 0.6);
+                    ctx.stroke(litPaths.get(key));
                 }
+                litPaths.clear();   // (no Path2Ds held past the frame)
                 
                 // --- BATCHED SPLASH RIPPLES ---
                 // Batch splash rings and fills
