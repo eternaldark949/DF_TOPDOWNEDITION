@@ -144,7 +144,9 @@
                 return { n, beat, bar, kick: Math.pow(1 - beat, 3) };
             },
 
-            /** A wall: lacquer between violet neon fins, smoked-glass bands, gold cornices. */
+            /** A wall: lacquer between violet neon fins, smoked-glass bands, gold cornices. Each kind on a face goes out
+                as one path (panes, fins; nothing of one kind touches), the fins at night one stroke a fin (each breathes
+                on its own). */
             _mcFace(ctx, f, P, emissive) {
                 if (f.side === 'C') return;
                 const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
@@ -152,36 +154,33 @@
                 if (Math.hypot(dx - ax, dy - ay) < 4) return;
                 const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
                 const len = Math.hypot(bx - ax, by - ay), n = Math.max(2, Math.round(len / MCX.FIN)), C = MCX.C;
-                const quad = (u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); };
-                const line = (u0, v0, u1, v1) => { const a = at(u0, v0), b = at(u1, v1); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); };
+                const quad = (path, u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); path.lineTo(c[0], c[1]); path.lineTo(d[0], d[1]); path.closePath(); return path; };
+                const seg = (path, u0, v0, u1, v1) => { const a = at(u0, v0), b = at(u1, v1); path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); return path; };
+                const panes = new Path2D();
+                for (let i = 0; i < n; i++) quad(panes, (i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
                 if (!emissive) {
                     // smoked glass between the fins
                     const sun = sunNow(), day = sun ? sun.day : 0;
-                    for (let i = 0; i < n; i++) {
-                        quad((i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
-                        ctx.fillStyle = 'rgba(12, 6, 20, 0.92)'; ctx.fill();
-                        if (day > 0.05) { ctx.fillStyle = `rgba(168, 160, 220, ${0.22 * day})`; ctx.fill(); }
-                    }
-                    ctx.lineWidth = 2.2; ctx.strokeStyle = C.fin;                                  // the fins
-                    for (let i = 0; i <= n; i++) line(i / n, 0.06, i / n, 0.96);
-                    ctx.lineWidth = 1.4; ctx.strokeStyle = C.goldDk;                               // gold cornice and plinth
-                    line(0, 0.97, 1, 0.97); ctx.lineWidth = 0.8; line(0, 0.06, 1, 0.06);
-                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.25)'; line(0, 0.8, 1, 0.8);
+                    ctx.fillStyle = 'rgba(12, 6, 20, 0.92)'; ctx.fill(panes);
+                    if (day > 0.05) { ctx.fillStyle = `rgba(168, 160, 220, ${0.22 * day})`; ctx.fill(panes); }
+                    const fins = new Path2D();
+                    for (let i = 0; i <= n; i++) seg(fins, i / n, 0.06, i / n, 0.96);
+                    ctx.lineWidth = 2.2; ctx.strokeStyle = C.fin; ctx.stroke(fins);                                   // the fins
+                    ctx.lineWidth = 1.4; ctx.strokeStyle = C.goldDk; ctx.stroke(seg(new Path2D(), 0, 0.97, 1, 0.97));   // gold cornice and plinth
+                    ctx.lineWidth = 0.8; ctx.stroke(seg(new Path2D(), 0, 0.06, 1, 0.06));
+                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.25)'; ctx.stroke(seg(new Path2D(), 0, 0.8, 1, 0.8));
                     return;
                 }
                 // At night: the fins breathe violet and lavender, pumping on the kick
                 const B = this._mcBeat(), t = _gameTimeSec, op = ctx.globalCompositeOperation;
                 ctx.globalCompositeOperation = 'lighter';
-                for (let i = 0; i < n; i++) {                                                     // a lavender glow behind the glass
-                    quad((i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
-                    ctx.fillStyle = `rgba(200, 168, 255, ${0.07 + 0.05 * B.kick})`; ctx.fill();
-                }
+                ctx.fillStyle = `rgba(200, 168, 255, ${0.07 + 0.05 * B.kick})`; ctx.fill(panes);                    // a lavender glow behind the glass
                 for (let i = 0; i <= n; i++) {
-                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick;
-                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.7})`; line(i / n, 0.08, i / n, 0.94);
-                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; line(i / n, 0.08, i / n, 0.94);
+                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick, fin = seg(new Path2D(), i / n, 0.08, i / n, 0.94);
+                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.7})`; ctx.stroke(fin);
+                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; ctx.stroke(fin);
                 }
-                ctx.lineWidth = 1; ctx.strokeStyle = `rgba(255, 241, 194, 0.55)`; line(0, 0.97, 1, 0.97);   // the cornice catches gold
+                ctx.lineWidth = 1; ctx.strokeStyle = `rgba(255, 241, 194, 0.55)`; ctx.stroke(seg(new Path2D(), 0, 0.97, 1, 0.97));   // the cornice catches gold
                 ctx.globalCompositeOperation = op;
             },
 

@@ -368,19 +368,23 @@
                 ctx.lineWidth = r * 0.7; ctx.strokeStyle = T.silverHi; ctx.stroke(hiL); ctx.strokeStyle = T.silverDk; ctx.lineWidth = r * 0.45; ctx.stroke(loL);
                 ctx.strokeStyle = '#d9bf86'; ctx.lineWidth = 1.6; ctx.stroke(collars);
                 ctx.fillStyle = '#e4e0f2'; ctx.fill(lanO); ctx.fillStyle = '#5b4d86'; ctx.fill(lanI);
-                for (const [ox, oy] of SQ_ENTRY.posts) {                                                    // triple-globe lamp posts
-                    const x = g.dx + ox, y = g.yf + oy, top = P3(x, y, 26), kk = this._sqK(26);
-                    ctx.save(); ctx.translate(x, y); ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE); ctx.translate(-x, -y);
-                    ctx.strokeStyle = '#3a2a6e'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(top[0], top[1]); ctx.stroke();
-                    const l = P3(x - 9, y, 26), rr = P3(x + 9, y, 26);
-                    ctx.strokeStyle = T.gold; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(l[0], l[1]); ctx.lineTo(rr[0], rr[1]); ctx.stroke();
+                // Triple-globe lamp posts, LAMP_POST_SCALE about each base (applied to the points and widths here,
+                // so the four posts go out as one path a style: poles, crossbars, globes; none of them touch)
+                const S = LAMP_POST_SCALE, poles = new Path2D(), bars = new Path2D(), globes = new Path2D();
+                for (const [ox, oy] of SQ_ENTRY.posts) {
+                    const x = g.dx + ox, y = g.yf + oy, kk = this._sqK(26), sp = (q) => [x + (q[0] - x) * S, y + (q[1] - y) * S];
+                    const top = sp(P3(x, y, 26)), l = sp(P3(x - 9, y, 26)), rr = sp(P3(x + 9, y, 26));
+                    poles.moveTo(x, y); poles.lineTo(top[0], top[1]);
+                    bars.moveTo(l[0], l[1]); bars.lineTo(rr[0], rr[1]);
                     for (const gx of [-9, 0, 9]) {
-                        const q = P3(x + gx, y, gx ? 26 : 30);
-                        ctx.fillStyle = '#f4ecff'; ctx.beginPath(); ctx.arc(q[0], q[1], 3.3 * kk, 0, Math.PI * 2); ctx.fill();
-                        ctx.strokeStyle = 'rgba(189,168,238,0.9)'; ctx.lineWidth = 0.7; ctx.stroke();
+                        const q = sp(P3(x + gx, y, gx ? 26 : 30)), gr = 3.3 * kk * S;
+                        globes.moveTo(q[0] + gr, q[1]); globes.arc(q[0], q[1], gr, 0, Math.PI * 2);
                     }
-                    ctx.restore();
                 }
+                ctx.strokeStyle = '#3a2a6e'; ctx.lineWidth = 2.2 * S; ctx.stroke(poles);
+                ctx.strokeStyle = T.gold; ctx.lineWidth = 1.2 * S; ctx.stroke(bars);
+                ctx.fillStyle = '#f4ecff'; ctx.fill(globes);
+                ctx.strokeStyle = 'rgba(189,168,238,0.9)'; ctx.lineWidth = 0.7 * S; ctx.stroke(globes);
                 ctx.restore();
             },
 
@@ -717,16 +721,17 @@
             /** A cabana from above: folded canopy, sheer curtains billowing out on the downwind sides. */
             _sqCabana(ctx, cx, cy, s, seed, wind, t) {
                 const wl = Math.hypot(wind.x, wind.y) || 1, wx = wind.x / wl, wy = wind.y / wl, gust = Math.min(1, wl / 4);
-                ctx.fillStyle = 'rgba(185,162,245,0.55)';
+                const curtains = new Path2D();                                      // (the four only meet at the canopy's corners: one fill)
                 [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([nx, ny], k) => {
                     const push = Math.max(0, nx * wx + ny * wy), tx = -ny, ty = nx, ex = cx + nx * s, ey = cy + ny * s;
-                    ctx.beginPath(); ctx.moveTo(ex - tx * s, ey - ty * s);
+                    curtains.moveTo(ex - tx * s, ey - ty * s);
                     for (let j = 0; j <= 6; j++) {
                         const u = j / 3 - 1, billow = (1.5 + push * gust * (3 + 2.5 * Math.sin(t * 1.8 + seed * 2 + k + j * 0.9))) * Math.sin(j / 6 * Math.PI);
-                        ctx.lineTo(ex + tx * s * u + nx * billow, ey + ty * s * u + ny * billow);
+                        curtains.lineTo(ex + tx * s * u + nx * billow, ey + ty * s * u + ny * billow);
                     }
-                    ctx.closePath(); ctx.fill();
+                    curtains.closePath();
                 });
+                ctx.fillStyle = 'rgba(185,162,245,0.55)'; ctx.fill(curtains);
                 ctx.fillStyle = '#efe9ff'; ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
                 ctx.strokeStyle = '#c9bdf2'; ctx.lineWidth = 0.8; ctx.beginPath();
                 ctx.moveTo(cx - s, cy - s); ctx.lineTo(cx + s, cy + s); ctx.moveTo(cx + s, cy - s); ctx.lineTo(cx - s, cy + s); ctx.stroke();
@@ -882,15 +887,17 @@
                 const T = SQ_THEME, n = 8, t = _gameTimeSec;
                 const tip = (i) => { const an = spin + i * Math.PI * 2 / n, hh = R * (i % 2 ? 0.16 : 0.27); return [an, cx + Math.cos(an) * (R + hh), cy + Math.sin(an) * (R + hh)]; };
                 if (!emissive) {
-                    ctx.fillStyle = T.silverHi;
+                    const points = new Path2D(), dotsA = new Path2D(), dotsB = new Path2D(), dr = 1 + R * 0.035;   // (the points never touch: one fill)
                     for (let i = 0; i < n; i++) {                                                            // crown points
                         const [an, tx, ty] = tip(i), bw = 0.14;
-                        ctx.beginPath(); ctx.moveTo(cx + Math.cos(an - bw) * R, cy + Math.sin(an - bw) * R); ctx.lineTo(tx, ty);
-                        ctx.lineTo(cx + Math.cos(an + bw) * R, cy + Math.sin(an + bw) * R); ctx.closePath(); ctx.fill();
+                        points.moveTo(cx + Math.cos(an - bw) * R, cy + Math.sin(an - bw) * R); points.lineTo(tx, ty);
+                        points.lineTo(cx + Math.cos(an + bw) * R, cy + Math.sin(an + bw) * R); points.closePath();
+                        const d = i % 2 ? dotsB : dotsA; d.moveTo(tx + dr, ty); d.arc(tx, ty, dr, 0, Math.PI * 2);
                     }
+                    ctx.fillStyle = T.silverHi; ctx.fill(points);
                     ctx.strokeStyle = T.silverHi; ctx.lineWidth = Math.max(1.5, R * 0.07); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
                     ctx.strokeStyle = T.gold; ctx.lineWidth = Math.max(0.8, R * 0.03); ctx.beginPath(); ctx.arc(cx, cy, R * 0.93, 0, Math.PI * 2); ctx.stroke();
-                    for (let i = 0; i < n; i++) { const [, tx, ty] = tip(i); ctx.fillStyle = i % 2 ? '#b89cff' : T.gold; ctx.beginPath(); ctx.arc(tx, ty, 1 + R * 0.035, 0, Math.PI * 2); ctx.fill(); }
+                    ctx.fillStyle = T.gold; ctx.fill(dotsA); ctx.fillStyle = '#b89cff'; ctx.fill(dotsB);
                 } else {
                     ctx.strokeStyle = 'rgba(180,140,255,0.35)'; ctx.lineWidth = R * 0.22; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
                     ctx.strokeStyle = 'rgba(255,236,200,0.75)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, R * 0.93, 0, Math.PI * 2); ctx.stroke();
@@ -955,10 +962,9 @@
                     for (let bi = 0; bi < 8; bi++) {
                         const pts = bands[bi];
                         if (!pts.length) continue;
-                        const on = 0.55 + 0.45 * ((bi % 4) + 0.5) / 4;
-                        ctx.beginPath();
-                        for (let j = 0; j < pts.length; j += 2) { ctx.moveTo(pts[j] + 1.5, pts[j + 1]); ctx.arc(pts[j], pts[j + 1], 1.5, 0, Math.PI * 2); }
-                        ctx.globalAlpha = a0 * on; ctx.fillStyle = bi < 4 ? 'rgb(255,236,205)' : 'rgb(236,224,255)'; ctx.fill();
+                        const on = 0.55 + 0.45 * ((bi % 4) + 0.5) / 4, path = new Path2D();   // (built off the context: one call, not two a bulb)
+                        for (let j = 0; j < pts.length; j += 2) { path.moveTo(pts[j] + 1.5, pts[j + 1]); path.arc(pts[j], pts[j + 1], 1.5, 0, Math.PI * 2); }
+                        ctx.globalAlpha = a0 * on; ctx.fillStyle = bi < 4 ? 'rgb(255,236,205)' : 'rgb(236,224,255)'; ctx.fill(path);
                     }
                     ctx.globalAlpha = a0;
                 }

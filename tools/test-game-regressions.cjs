@@ -621,6 +621,22 @@ test('A landmark just off screen still throws its beams but skips its roof pass'
   }
 });
 
+test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
+  const r = value(env, `
+    const b = game.activeMap.buildings.find(x => x.roofFeatures && x.roofFeatures.includes('lights'));
+    const saved = b.roofFeatures; b.roofFeatures = ['lights'];
+    return { found: !!b, id: game.activeMap.buildings.indexOf(b) };`);
+  ok(r.found, 'an apartment with festoons');
+  env.setTrace(true);
+  env.run(`(() => { const b = game.activeMap.buildings[${r.id}]; game.ctx.globalAlpha = 0.8; b._drawRoofFeatures(game.ctx, true); })()`);
+  const fills = env.trace.filter(op => op[1] === 'fill').length;
+  const alphas = env.trace.filter(op => op[1] === 'set' && op[2] === 'globalAlpha').map(op => op[3]);
+  env.setTrace(false);
+  equal(fills, 15, 'the 39 bulbs go out in 15 fills');
+  ok(alphas.slice(0, 15).every(a => a >= 0.8 * 0.5 - 1e-9 && a <= 0.8 + 1e-9), 'each at 0.5–1 of the string brightness, never fading down the string');
+}, {affine: true});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');

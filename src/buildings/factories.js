@@ -160,40 +160,52 @@
                     }
                 });
             },
+            /** One face of the curtain wall. Each style's shapes on a face are gathered into one path and filled
+                once (in the order they layer: stone, steel, frames, glass glow, mullions, transoms, glints, piers,
+                cornice, cap); shapes of one style never overlap on a face, so it draws exactly as quad by quad did. */
             _ecFace(ctx, f, emissive=false) {
                 const T=ENNI_EXTERIOR,H=this._ecH(),L=Math.hypot(f.x2-f.x1,f.y2-f.y1);
                 const P=(u,z)=>this._ecP(f.x1+(f.x2-f.x1)*u,f.y1+(f.y2-f.y1)*u,z);
-                const quad=(u0,u1,z0,z1,fill,stroke=null,width=1)=>{
+                const quad=(path,u0,u1,z0,z1)=>{
                     const a=P(u0,z0),b=P(u1,z0),d=P(u0,z1),e=P(u1,z1);
-                    ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.lineTo(...e);ctx.lineTo(...d);ctx.closePath();
-                    if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke();}
+                    path.moveTo(a[0],a[1]);path.lineTo(b[0],b[1]);path.lineTo(e[0],e[1]);path.lineTo(d[0],d[1]);path.closePath();
+                    return path;
                 };
+                const fill=(path,style)=>{ctx.fillStyle=style;ctx.fill(path);};
+                const stroke=(path,style,width)=>{ctx.strokeStyle=style;ctx.lineWidth=width;ctx.stroke(path);};
                 const entrance=f.side==='S'&&Math.abs(f.y1-(this.y+700))<1&&f.x1<this.x+250;
-                if(!emissive){quad(0,1,0,H*.55,T.stoneLo);quad(0,1,H*.55,H,T.steel);}
-                const n=Math.max(2,Math.round(L/77)),pad=8/L;
-                for(let i=0;i<n;i++){
-                    const u0=i/n+pad,u1=(i+1)/n-pad;
-                    for(const [z0,z1] of [[4,H*.48],[H*.59,H-4]]){
-                        if(!emissive){quad(u0,u1,z0,z1,'#6b4733','rgba(204,158,101,.62)',1.4);quad(u0+.018,u1-.018,z0+1,z1-1,'rgba(244,179,96,.12)');}
-                        else{
-                            quad(u0+.006,u1-.006,z0+1,z1-1,'rgba(255,192,108,.32)');
-                            const a=P((u0+u1)/2,z0+(z1-z0)*.57);
-                            ctx.fillStyle='rgba(255,237,180,.85)';ctx.beginPath();ctx.arc(...a,1.35,0,Math.PI*2);ctx.fill();
+                const n=Math.max(2,Math.round(L/77)),pad=8/L,bands=[[4,H*.48],[H*.59,H-4]];
+                if(!emissive){
+                    fill(quad(new Path2D(),0,1,0,H*.55),T.stoneLo);fill(quad(new Path2D(),0,1,H*.55,H),T.steel);
+                    const frames=new Path2D(),inner=new Path2D(),mull=new Path2D(),tran=new Path2D(),glint=new Path2D(),pierLo=new Path2D(),pierHi=new Path2D();
+                    for(let i=0;i<n;i++){
+                        const u0=i/n+pad,u1=(i+1)/n-pad;
+                        for(const [z0,z1] of bands){
+                            quad(frames,u0,u1,z0,z1);quad(inner,u0+.018,u1-.018,z0+1,z1-1);
+                            quad(mull,(u0+u1)/2-.002,(u0+u1)/2+.002,z0,z1);
+                            quad(tran,u0,u1,z0+(z1-z0)*.44,z0+(z1-z0)*.44+.65);
+                            quad(glint,u0+.025,u0+.039,z0+2,z1-1);
                         }
-                        if(!emissive){
-                            quad((u0+u1)/2-.002,(u0+u1)/2+.002,z0,z1,T.steel);
-                            quad(u0,u1,z0+(z1-z0)*.44,z0+(z1-z0)*.44+.65,'#252127');
-                            quad(u0+.025,u0+.039,z0+2,z1-1,'rgba(221,231,237,.19)');
+                        quad(pierLo,i/n,i/n+pad*.58,0,H*.54);quad(pierHi,i/n,i/n+pad*.35,H*.56,H);
+                    }
+                    fill(frames,'#6b4733');stroke(frames,'rgba(204,158,101,.62)',1.4);fill(inner,'rgba(244,179,96,.12)');
+                    fill(mull,T.steel);fill(tran,'#252127');fill(glint,'rgba(221,231,237,.19)');
+                    fill(pierLo,T.stone);fill(pierHi,'#24272f');
+                    const cornice=quad(new Path2D(),0,1,H*.51,H*.57);fill(cornice,'#5d303e');stroke(cornice,'rgba(211,166,112,.45)',1);
+                    const cap=quad(new Path2D(),0,1,H-2,H);fill(cap,'#303039');stroke(cap,'rgba(211,175,118,.55)',.9);
+                }else{
+                    const glow=new Path2D(),dots=new Path2D(),up=new Path2D();
+                    for(let i=0;i<n;i++){
+                        const u0=i/n+pad,u1=(i+1)/n-pad;
+                        for(const [z0,z1] of bands){
+                            quad(glow,u0+.006,u1-.006,z0+1,z1-1);
+                            const a=P((u0+u1)/2,z0+(z1-z0)*.57);dots.moveTo(a[0]+1.35,a[1]);dots.arc(a[0],a[1],1.35,0,Math.PI*2);
                         }
                     }
-                    if(!emissive){quad(i/n,i/n+pad*.58,0,H*.54,T.stone);quad(i/n,i/n+pad*.35,H*.56,H,'#24272f');}
-                }
-                if(!emissive){
-                    quad(0,1,H*.51,H*.57,'#5d303e','rgba(211,166,112,.45)',1);
-                    quad(0,1,H-2,H,'#303039','rgba(211,175,118,.55)',.9);
-                }else{
+                    fill(glow,'rgba(255,192,108,.32)');fill(dots,'rgba(255,237,180,.85)');
                     // Deliberate rose uplight on stone piers leaves the glass warm amber.
-                    for(let i=0;i<=n;i++){const u=i/n;quad(Math.max(0,u-.012),Math.min(1,u+.012),1,H*.50,'rgba(225,75,129,.16)');}
+                    for(let i=0;i<=n;i++){const u=i/n;quad(up,Math.max(0,u-.012),Math.min(1,u+.012),1,H*.50);}
+                    fill(up,'rgba(225,75,129,.16)');
                 }
                 if(entrance&&!emissive){
                     // Arched transom: use the wall's own u/z projection rather than screen-space decoration.

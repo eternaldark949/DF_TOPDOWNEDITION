@@ -28432,6 +28432,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const _FW_CAMERA_MOTION = { camera: null, drawId: 0, x: 0, y: 0, zoom: 0, moving: true };
         const _FW_GEOMETRY = new WeakMap(); // owner -> weak face map; latest projection, at most two visible path sets
         const _FW_SHEEN = [];   // _drawFaceWindows: the sun sheen's windows, reused every face
+        const _FW_SHEEN_GROUPS = new Map();   // _drawFaceWindows: sheen alpha -> the windows sharing it (one fill each)
         // How far a landmark's base and roof passes draw past its leaned outline (world px, measured at every
         // angle and zoom, plus a margin): the glow pass's emissiveReach is for the beams alone
         const SQ_TOP_REACH = 200, DN_TOP_REACH = 190, MC_TOP_REACH = 100;
@@ -29312,8 +29313,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             pg.addColorStop(0, 'rgba(214,200,255,0.18)'); pg.addColorStop(1, 'rgba(214,200,255,0)'); return pg; });
                         ctx.fillRect(sx, sy, section.w, section.h);
                     }
-                    ctx.strokeStyle = sq ? 'rgba(217,191,134,0.08)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;          // tar seams
-                    for (let gx = 36; gx < section.w; gx += 36) { ctx.beginPath(); ctx.moveTo(sx + gx, sy); ctx.lineTo(sx + gx, sy + section.h); ctx.stroke(); }
+                    ctx.strokeStyle = sq ? 'rgba(217,191,134,0.08)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;          // tar seams (one world path a section)
+                    ctx.stroke(this._seamPath(section, sx, sy));
                     if (outline) ctx.restore();
                     ctx.strokeStyle = sq ? SQ_THEME.trim : lightenHex(this.colors.roof, 22); ctx.lineWidth = sq ? 4 : 5;       // parapet
                     if (outline) ctx.stroke(this._roofPath(section, si, 2.5)); else ctx.strokeRect(sx + 2.5, sy + 2.5, section.w - 5, section.h - 5);
@@ -29324,6 +29325,25 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 else this._drawRoofProps(ctx);
                 ctx.restore();
                 if (sq) this._sqDrawCrown(ctx, false);
+            },
+
+            /** A roof prop's disc (fan hub, tank): one world path, made once and kept on the prop */
+            _roofPropDisc(p, x, y, r, key = 'disc') {
+                const k = '_' + key;
+                if (!p[k] || p[k + 'x'] !== x || p[k + 'y'] !== y || p[k + 'r'] !== r) { const d = new Path2D(); d.arc(x, y, r, 0, Math.PI * 2); p[k] = d; p[k + 'x'] = x; p[k + 'y'] = y; p[k + 'r'] = r; }
+                return p[k];
+            },
+
+            /** A roof section's tar seams, every 36 px: one world-space path, made once */
+            _seamPath(section, sx, sy) {
+                const m = this._seams || (this._seams = new WeakMap());
+                let e = m.get(section);
+                if (!e || e.sx !== sx || e.sy !== sy || e.w !== section.w || e.h !== section.h) {
+                    const p = new Path2D();
+                    for (let gx = 36; gx < section.w; gx += 36) { p.moveTo(sx + gx, sy); p.lineTo(sx + gx, sy + section.h); }
+                    m.set(section, e = { sx, sy, w: section.w, h: section.h, p });
+                }
+                return e.p;
             },
 
             /** Emissive layer (after lighting): lit windows, neon trim, rooftop lights. dark = ambient darkness 0..1 */
@@ -29603,12 +29623,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fillStyle = `rgba(${glassRGB}, ${skyA})`; ctx.fill(paths.glass);
                     // Sun color, direction, band position and alternating floor sheen stay live.
                     // Retain paint order and the final Canvas state even for offscreen sheen windows.
+                    // Windows of one column and floor parity share the sheen's alpha: one fill a group (they never overlap)
+                    const groups = _FW_SHEEN_GROUPS; groups.clear();
                     for (let i = 0; i < geom.windows.length; i++) {
                         const w = geom.windows[i], du = Math.abs((w.u0 + w.u1) / 2 - uc), sh = sheenA * Math.max(0, 1 - du / 0.16) * (0.7 + 0.3 * (w.fl % 2));
-                        if (!(sh > 0.01)) continue;
-                        ctx.beginPath(); quad(ctx, w); ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`;
-                        if (all || visibleBits[i] === '1') ctx.fill();
+                        if (!(sh > 0.01) || !(all || visibleBits[i] === '1')) continue;
+                        let g = groups.get(sh); if (!g) groups.set(sh, g = new Path2D());
+                        quad(g, w);
                     }
+                    for (const [sh, g] of groups) { ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; ctx.fill(g); }
+                    groups.clear();
                 }
                 if (sills) {
                     ctx.lineWidth = 1.2; ctx.strokeStyle = this.sills.shade; ctx.stroke(lines('shade', 'shade'));
@@ -29715,13 +29739,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.fillStyle = sq ? 'rgba(23,0,92,0.9)' : 'rgba(20,28,48,0.9)'; ctx.fill(glass);
                 if (skyA > 0) {
                     ctx.fillStyle = `rgba(${glassRGB}, ${skyA})`; ctx.fill(glass);
+                    const groups = _FW_SHEEN_GROUPS; groups.clear();                         // (one fill a shared alpha, as above)
                     for (let i = 0; i < sheen.length; i += 5) {
                         const u0 = sheen[i], u1 = sheen[i + 1], v0 = sheen[i + 2], v1 = sheen[i + 3], sh = sheen[i + 4];
-                        ctx.beginPath();
-                        ctx.moveTo(ax + ex * u0 + (ux + tx * u0 - ex * u0) * v0, ay + ey * u0 + (uy + ty * u0 - ey * u0) * v0);
-                        q(ctx, u1, v0); q(ctx, u1, v1); q(ctx, u0, v1); ctx.closePath();
-                        ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; ctx.fill();
+                        let g = groups.get(sh); if (!g) groups.set(sh, g = new Path2D());
+                        g.moveTo(ax + ex * u0 + (ux + tx * u0 - ex * u0) * v0, ay + ey * u0 + (uy + ty * u0 - ey * u0) * v0);
+                        q(g, u1, v0); q(g, u1, v1); q(g, u0, v1); g.closePath();
                     }
+                    for (const [sh, g] of groups) { ctx.fillStyle = `rgba(${sun.rgb}, ${sh})`; ctx.fill(g); }
+                    groups.clear();
                 }
                 if (sills) {
                     ctx.lineWidth = 1.2; ctx.strokeStyle = this.sills.shade; ctx.stroke(shP);
@@ -29739,24 +29765,28 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
                 if (Math.hypot(dx - ax, dy - ay) < 6) return;
                 const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
-                const line = (p, q) => { ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
                 const acc = this.colors.accent;
+                const seg = (path, p, q) => { path.moveTo(p[0], p[1]); path.lineTo(q[0], q[1]); };
                 if (this.facadeFeature === 'balconies' && f.side === 'S') {
+                    const path = new Path2D();                          // (one path: the rails never touch, nor the lights)
                     for (let fl = 1; fl < floors; fl += 2) {
                         const v = fl / floors;
-                        if (!emissive) { ctx.strokeStyle = 'rgba(200,210,225,0.55)'; ctx.lineWidth = 1.4; line(at(0.08, v), at(0.92, v)); }
-                        else {                                          // little string of balcony lights
-                            ctx.fillStyle = acc;
-                            for (let u = 0.12; u < 0.9; u += 0.19) { const p = at(u, v); ctx.beginPath(); ctx.arc(p[0], p[1], 1.1, 0, Math.PI * 2); ctx.fill(); }
-                        }
+                        if (!emissive) seg(path, at(0.08, v), at(0.92, v));
+                        else for (let u = 0.12; u < 0.9; u += 0.19) { const p = at(u, v); path.moveTo(p[0] + 1.1, p[1]); path.arc(p[0], p[1], 1.1, 0, Math.PI * 2); }   // little string of balcony lights
                     }
+                    if (!emissive) { ctx.strokeStyle = 'rgba(200,210,225,0.55)'; ctx.lineWidth = 1.4; ctx.stroke(path); }
+                    else { ctx.fillStyle = acc; ctx.fill(path); }
                 } else if (this.facadeFeature === 'fire_escape' && (f.side === 'E' || f.side === 'W') && !emissive) {
-                    ctx.strokeStyle = 'rgba(150,120,110,0.7)'; ctx.lineWidth = 1;
+                    // Landings, odd stairs, even stairs: three paths, none touching itself, so every joint still takes
+                    // its two (or three) coats of the 0.7 alpha, as line by line did
+                    const landings = new Path2D(), odd = new Path2D(), even = new Path2D();
                     for (let fl = 1; fl < floors; fl++) {
                         const v = fl / floors, u0 = fl % 2 ? 0.3 : 0.6, u1 = fl % 2 ? 0.6 : 0.3;
-                        line(at(0.25, v), at(0.65, v));               // landing
-                        line(at(u0, v), at(u1, (fl + 1) / floors));   // stair
+                        seg(landings, at(0.25, v), at(0.65, v));
+                        seg(fl % 2 ? odd : even, at(u0, v), at(u1, (fl + 1) / floors));
                     }
+                    ctx.strokeStyle = 'rgba(150,120,110,0.7)'; ctx.lineWidth = 1;
+                    ctx.stroke(landings); ctx.stroke(odd); ctx.stroke(even);
                 }
             },
 
@@ -29766,9 +29796,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const sec = this.sections[p.section] || this.sections[0];
                     const x = this.x + sec.x + p.x, y = this.y + sec.y + p.y;
                     if (p.type === 'ac_unit') { ctx.fillStyle = '#3a3f48'; ctx.fillRect(x, y, p.w, p.h); ctx.strokeStyle = '#555c66'; ctx.strokeRect(x + 3, y + 3, p.w - 6, p.h - 6); }
-                    else if (p.type === 'water_tank') { ctx.fillStyle = '#4a4238'; ctx.beginPath(); ctx.arc(x, y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#6a5e50'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, p.r * 0.7, 0, Math.PI * 2); ctx.stroke(); }
+                    else if (p.type === 'water_tank') { ctx.fillStyle = '#4a4238'; ctx.fill(this._roofPropDisc(p, x, y, p.r)); ctx.strokeStyle = '#6a5e50'; ctx.lineWidth = 2; ctx.stroke(this._roofPropDisc(p, x, y, p.r * 0.7, 'in')); }
                     else if (p.type === 'vent') { ctx.fillStyle = '#2e333a'; ctx.fillRect(x, y, p.w, p.h); }
-                    else if (p.type === 'roof_fan') { ctx.fillStyle = '#333841'; ctx.beginPath(); ctx.arc(x, y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#4b525c'; ctx.lineWidth = 1; for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + _gameTimeSec * 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * p.r * 0.8, y + Math.sin(a) * p.r * 0.8); ctx.stroke(); } }
+                    else if (p.type === 'roof_fan') {                   // the hub, then its four blades turning (one opaque stroke: they only meet at the hub)
+                        ctx.fillStyle = '#333841'; ctx.fill(this._roofPropDisc(p, x, y, p.r));
+                        const blades = new Path2D();
+                        for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + _gameTimeSec * 2; blades.moveTo(x, y); blades.lineTo(x + Math.cos(a) * p.r * 0.8, y + Math.sin(a) * p.r * 0.8); }
+                        ctx.strokeStyle = '#4b525c'; ctx.lineWidth = 1; ctx.stroke(blades);
+                    }
                 }
             },
 
@@ -29802,19 +29837,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                 const a0 = ctx.globalAlpha;
                                 const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#2bb8d8'); g.addColorStop(1, '#0f4f8a');
                                 ctx.globalAlpha = a0 * 0.8; ctx.fillStyle = g; ctx.fillRect(x, y, w, h); ctx.globalAlpha = a0;
-                                ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;   // caustic shimmer
-                                for (let i = 0; i < 4; i++) { const yy = y + h * (0.2 + i * 0.2) + Math.sin(t * 1.5 + i) * 2; ctx.beginPath(); ctx.moveTo(x + 4, yy); ctx.quadraticCurveTo(x + w / 2, yy + Math.sin(t * 2 + i) * 3, x + w - 4, yy); ctx.stroke(); }
+                                ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;   // caustic shimmer (one path: the curves stay apart)
+                                const caustics = new Path2D();
+                                for (let i = 0; i < 4; i++) { const yy = y + h * (0.2 + i * 0.2) + Math.sin(t * 1.5 + i) * 2; caustics.moveTo(x + 4, yy); caustics.quadraticCurveTo(x + w / 2, yy + Math.sin(t * 2 + i) * 3, x + w - 4, yy); }
+                                ctx.stroke(caustics);
                             }
                             break;
                         }
                         case 'garden': {
                             if (!emissive) {
                                 ctx.fillStyle = '#3b2e24'; ctx.fillRect(x, y, w, h);
-                                const greens = ['#2f7d3a', '#3c9b47', '#27643a'];
-                                for (let i = 0; i < 9; i++) { ctx.fillStyle = greens[i % 3]; ctx.beginPath(); ctx.arc(x + w * (0.12 + (i % 3) * 0.38), y + h * (0.2 + Math.floor(i / 3) * 0.3), Math.min(w, h) * 0.14, 0, Math.PI * 2); ctx.fill(); }
+                                const greens = ['#2f7d3a', '#3c9b47', '#27643a'], beds = [new Path2D(), new Path2D(), new Path2D()], rr = Math.min(w, h) * 0.14;   // (a path a green: the planters never touch)
+                                for (let i = 0; i < 9; i++) { const px = x + w * (0.12 + (i % 3) * 0.38), py = y + h * (0.2 + Math.floor(i / 3) * 0.3); beds[i % 3].moveTo(px + rr, py); beds[i % 3].arc(px, py, rr, 0, Math.PI * 2); }
+                                for (let k = 0; k < 3; k++) { ctx.fillStyle = greens[k]; ctx.fill(beds[k]); }
                             } else {                                        // lanterns between the planters
-                                ctx.fillStyle = '#ffcf7a';
-                                for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(x + w * (0.3 + (i % 2) * 0.4), y + h * (0.35 + Math.floor(i / 2) * 0.3), 1.6, 0, Math.PI * 2); ctx.fill(); }
+                                const lanterns = new Path2D();
+                                for (let i = 0; i < 4; i++) { const px = x + w * (0.3 + (i % 2) * 0.4), py = y + h * (0.35 + Math.floor(i / 2) * 0.3); lanterns.moveTo(px + 1.6, py); lanterns.arc(px, py, 1.6, 0, Math.PI * 2); }
+                                ctx.fillStyle = '#ffcf7a'; ctx.fill(lanterns);
                             }
                             break;
                         }
@@ -29843,24 +29882,26 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                         case 'solar': {
                             if (emissive) break;
-                            for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
-                                const px = x + i * w / 3 + 2, py = y + j * h / 2 + 2;
-                                ctx.fillStyle = '#1c2a4a'; ctx.fillRect(px, py, w / 3 - 4, h / 2 - 4);
-                                ctx.strokeStyle = 'rgba(120,160,255,0.35)'; ctx.lineWidth = 0.6; ctx.strokeRect(px, py, w / 3 - 4, h / 2 - 4);
-                            }
+                            const panels = new Path2D();                    // (one path: the six panels stand apart)
+                            for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) panels.rect(x + i * w / 3 + 2, y + j * h / 2 + 2, w / 3 - 4, h / 2 - 4);
+                            ctx.fillStyle = '#1c2a4a'; ctx.fill(panels);
+                            ctx.strokeStyle = 'rgba(120,160,255,0.35)'; ctx.lineWidth = 0.6; ctx.stroke(panels);
                             break;
                         }
                         case 'lights': {                                    // festoon string lights zig-zagging across
                             if (!emissive) break;
-                            const cols = ['#ffd27a', acc, '#ffd27a', '#ff9ecf'];
+                            // Every bulb at its own shimmer of the string's brightness. Bulbs at the same i + z share colour and
+                            // shimmer: one fill each (the string's 39 bulbs in 15)
+                            const cols = ['#ffd27a', acc, '#ffd27a', '#ff9ecf'], a0 = ctx.globalAlpha, rows = [];
                             for (let z = 0; z < 3; z++) {
                                 const y0 = y + h * (0.15 + z * 0.35), y1 = y0 + h * 0.18;
                                 for (let i = 0; i <= 12; i++) {
-                                    const px = x + w * i / 12, py = (i % 2 ? y1 : y0) + Math.sin(i * 0.9) * 2;
-                                    ctx.fillStyle = cols[(i + z) % cols.length];
-                                    ctx.globalAlpha = Math.min(1, ctx.globalAlpha + 0) * (0.75 + 0.25 * Math.sin(t * 3 + i + z));
-                                    ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI * 2); ctx.fill();
+                                    const px = x + w * i / 12, py = (i % 2 ? y1 : y0) + Math.sin(i * 0.9) * 2, s = i + z;
+                                    const path = rows[s] || (rows[s] = new Path2D()); path.moveTo(px + 1.5, py); path.arc(px, py, 1.5, 0, Math.PI * 2);
                                 }
+                            }
+                            for (let s = 0; s < rows.length; s++) {
+                                ctx.fillStyle = cols[s % cols.length]; ctx.globalAlpha = a0 * (0.75 + 0.25 * Math.sin(t * 3 + s)); ctx.fill(rows[s]);
                             }
                             ctx.globalAlpha = Math.max(0.15, Math.min(1, (typeof game !== 'undefined' ? game.getAmbientDarkness() : 1) * 1.1));
                             break;
@@ -30502,19 +30543,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.lineWidth = r * 0.7; ctx.strokeStyle = T.silverHi; ctx.stroke(hiL); ctx.strokeStyle = T.silverDk; ctx.lineWidth = r * 0.45; ctx.stroke(loL);
                 ctx.strokeStyle = '#d9bf86'; ctx.lineWidth = 1.6; ctx.stroke(collars);
                 ctx.fillStyle = '#e4e0f2'; ctx.fill(lanO); ctx.fillStyle = '#5b4d86'; ctx.fill(lanI);
-                for (const [ox, oy] of SQ_ENTRY.posts) {                                                    // triple-globe lamp posts
-                    const x = g.dx + ox, y = g.yf + oy, top = P3(x, y, 26), kk = this._sqK(26);
-                    ctx.save(); ctx.translate(x, y); ctx.scale(LAMP_POST_SCALE, LAMP_POST_SCALE); ctx.translate(-x, -y);
-                    ctx.strokeStyle = '#3a2a6e'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(top[0], top[1]); ctx.stroke();
-                    const l = P3(x - 9, y, 26), rr = P3(x + 9, y, 26);
-                    ctx.strokeStyle = T.gold; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(l[0], l[1]); ctx.lineTo(rr[0], rr[1]); ctx.stroke();
+                // Triple-globe lamp posts, LAMP_POST_SCALE about each base (applied to the points and widths here,
+                // so the four posts go out as one path a style: poles, crossbars, globes; none of them touch)
+                const S = LAMP_POST_SCALE, poles = new Path2D(), bars = new Path2D(), globes = new Path2D();
+                for (const [ox, oy] of SQ_ENTRY.posts) {
+                    const x = g.dx + ox, y = g.yf + oy, kk = this._sqK(26), sp = (q) => [x + (q[0] - x) * S, y + (q[1] - y) * S];
+                    const top = sp(P3(x, y, 26)), l = sp(P3(x - 9, y, 26)), rr = sp(P3(x + 9, y, 26));
+                    poles.moveTo(x, y); poles.lineTo(top[0], top[1]);
+                    bars.moveTo(l[0], l[1]); bars.lineTo(rr[0], rr[1]);
                     for (const gx of [-9, 0, 9]) {
-                        const q = P3(x + gx, y, gx ? 26 : 30);
-                        ctx.fillStyle = '#f4ecff'; ctx.beginPath(); ctx.arc(q[0], q[1], 3.3 * kk, 0, Math.PI * 2); ctx.fill();
-                        ctx.strokeStyle = 'rgba(189,168,238,0.9)'; ctx.lineWidth = 0.7; ctx.stroke();
+                        const q = sp(P3(x + gx, y, gx ? 26 : 30)), gr = 3.3 * kk * S;
+                        globes.moveTo(q[0] + gr, q[1]); globes.arc(q[0], q[1], gr, 0, Math.PI * 2);
                     }
-                    ctx.restore();
                 }
+                ctx.strokeStyle = '#3a2a6e'; ctx.lineWidth = 2.2 * S; ctx.stroke(poles);
+                ctx.strokeStyle = T.gold; ctx.lineWidth = 1.2 * S; ctx.stroke(bars);
+                ctx.fillStyle = '#f4ecff'; ctx.fill(globes);
+                ctx.strokeStyle = 'rgba(189,168,238,0.9)'; ctx.lineWidth = 0.7 * S; ctx.stroke(globes);
                 ctx.restore();
             },
 
@@ -30851,16 +30896,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** A cabana from above: folded canopy, sheer curtains billowing out on the downwind sides. */
             _sqCabana(ctx, cx, cy, s, seed, wind, t) {
                 const wl = Math.hypot(wind.x, wind.y) || 1, wx = wind.x / wl, wy = wind.y / wl, gust = Math.min(1, wl / 4);
-                ctx.fillStyle = 'rgba(185,162,245,0.55)';
+                const curtains = new Path2D();                                      // (the four only meet at the canopy's corners: one fill)
                 [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([nx, ny], k) => {
                     const push = Math.max(0, nx * wx + ny * wy), tx = -ny, ty = nx, ex = cx + nx * s, ey = cy + ny * s;
-                    ctx.beginPath(); ctx.moveTo(ex - tx * s, ey - ty * s);
+                    curtains.moveTo(ex - tx * s, ey - ty * s);
                     for (let j = 0; j <= 6; j++) {
                         const u = j / 3 - 1, billow = (1.5 + push * gust * (3 + 2.5 * Math.sin(t * 1.8 + seed * 2 + k + j * 0.9))) * Math.sin(j / 6 * Math.PI);
-                        ctx.lineTo(ex + tx * s * u + nx * billow, ey + ty * s * u + ny * billow);
+                        curtains.lineTo(ex + tx * s * u + nx * billow, ey + ty * s * u + ny * billow);
                     }
-                    ctx.closePath(); ctx.fill();
+                    curtains.closePath();
                 });
+                ctx.fillStyle = 'rgba(185,162,245,0.55)'; ctx.fill(curtains);
                 ctx.fillStyle = '#efe9ff'; ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
                 ctx.strokeStyle = '#c9bdf2'; ctx.lineWidth = 0.8; ctx.beginPath();
                 ctx.moveTo(cx - s, cy - s); ctx.lineTo(cx + s, cy + s); ctx.moveTo(cx + s, cy - s); ctx.lineTo(cx - s, cy + s); ctx.stroke();
@@ -31016,15 +31062,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const T = SQ_THEME, n = 8, t = _gameTimeSec;
                 const tip = (i) => { const an = spin + i * Math.PI * 2 / n, hh = R * (i % 2 ? 0.16 : 0.27); return [an, cx + Math.cos(an) * (R + hh), cy + Math.sin(an) * (R + hh)]; };
                 if (!emissive) {
-                    ctx.fillStyle = T.silverHi;
+                    const points = new Path2D(), dotsA = new Path2D(), dotsB = new Path2D(), dr = 1 + R * 0.035;   // (the points never touch: one fill)
                     for (let i = 0; i < n; i++) {                                                            // crown points
                         const [an, tx, ty] = tip(i), bw = 0.14;
-                        ctx.beginPath(); ctx.moveTo(cx + Math.cos(an - bw) * R, cy + Math.sin(an - bw) * R); ctx.lineTo(tx, ty);
-                        ctx.lineTo(cx + Math.cos(an + bw) * R, cy + Math.sin(an + bw) * R); ctx.closePath(); ctx.fill();
+                        points.moveTo(cx + Math.cos(an - bw) * R, cy + Math.sin(an - bw) * R); points.lineTo(tx, ty);
+                        points.lineTo(cx + Math.cos(an + bw) * R, cy + Math.sin(an + bw) * R); points.closePath();
+                        const d = i % 2 ? dotsB : dotsA; d.moveTo(tx + dr, ty); d.arc(tx, ty, dr, 0, Math.PI * 2);
                     }
+                    ctx.fillStyle = T.silverHi; ctx.fill(points);
                     ctx.strokeStyle = T.silverHi; ctx.lineWidth = Math.max(1.5, R * 0.07); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
                     ctx.strokeStyle = T.gold; ctx.lineWidth = Math.max(0.8, R * 0.03); ctx.beginPath(); ctx.arc(cx, cy, R * 0.93, 0, Math.PI * 2); ctx.stroke();
-                    for (let i = 0; i < n; i++) { const [, tx, ty] = tip(i); ctx.fillStyle = i % 2 ? '#b89cff' : T.gold; ctx.beginPath(); ctx.arc(tx, ty, 1 + R * 0.035, 0, Math.PI * 2); ctx.fill(); }
+                    ctx.fillStyle = T.gold; ctx.fill(dotsA); ctx.fillStyle = '#b89cff'; ctx.fill(dotsB);
                 } else {
                     ctx.strokeStyle = 'rgba(180,140,255,0.35)'; ctx.lineWidth = R * 0.22; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
                     ctx.strokeStyle = 'rgba(255,236,200,0.75)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, R * 0.93, 0, Math.PI * 2); ctx.stroke();
@@ -31089,10 +31137,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     for (let bi = 0; bi < 8; bi++) {
                         const pts = bands[bi];
                         if (!pts.length) continue;
-                        const on = 0.55 + 0.45 * ((bi % 4) + 0.5) / 4;
-                        ctx.beginPath();
-                        for (let j = 0; j < pts.length; j += 2) { ctx.moveTo(pts[j] + 1.5, pts[j + 1]); ctx.arc(pts[j], pts[j + 1], 1.5, 0, Math.PI * 2); }
-                        ctx.globalAlpha = a0 * on; ctx.fillStyle = bi < 4 ? 'rgb(255,236,205)' : 'rgb(236,224,255)'; ctx.fill();
+                        const on = 0.55 + 0.45 * ((bi % 4) + 0.5) / 4, path = new Path2D();   // (built off the context: one call, not two a bulb)
+                        for (let j = 0; j < pts.length; j += 2) { path.moveTo(pts[j] + 1.5, pts[j + 1]); path.arc(pts[j], pts[j + 1], 1.5, 0, Math.PI * 2); }
+                        ctx.globalAlpha = a0 * on; ctx.fillStyle = bi < 4 ? 'rgb(255,236,205)' : 'rgb(236,224,255)'; ctx.fill(path);
                     }
                     ctx.globalAlpha = a0;
                 }
@@ -31763,7 +31810,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return { n, beat, bar, kick: Math.pow(1 - beat, 3) };
             },
 
-            /** A wall: lacquer between violet neon fins, smoked-glass bands, gold cornices. */
+            /** A wall: lacquer between violet neon fins, smoked-glass bands, gold cornices. Each kind on a face goes out
+                as one path (panes, fins; nothing of one kind touches), the fins at night one stroke a fin (each breathes
+                on its own). */
             _mcFace(ctx, f, P, emissive) {
                 if (f.side === 'C') return;
                 const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
@@ -31771,36 +31820,33 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (Math.hypot(dx - ax, dy - ay) < 4) return;
                 const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
                 const len = Math.hypot(bx - ax, by - ay), n = Math.max(2, Math.round(len / MCX.FIN)), C = MCX.C;
-                const quad = (u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); };
-                const line = (u0, v0, u1, v1) => { const a = at(u0, v0), b = at(u1, v1); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); };
+                const quad = (path, u0, u1, v0, v1) => { const a = at(u0, v0), b = at(u1, v0), c = at(u1, v1), d = at(u0, v1); path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); path.lineTo(c[0], c[1]); path.lineTo(d[0], d[1]); path.closePath(); return path; };
+                const seg = (path, u0, v0, u1, v1) => { const a = at(u0, v0), b = at(u1, v1); path.moveTo(a[0], a[1]); path.lineTo(b[0], b[1]); return path; };
+                const panes = new Path2D();
+                for (let i = 0; i < n; i++) quad(panes, (i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
                 if (!emissive) {
                     // smoked glass between the fins
                     const sun = sunNow(), day = sun ? sun.day : 0;
-                    for (let i = 0; i < n; i++) {
-                        quad((i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
-                        ctx.fillStyle = 'rgba(12, 6, 20, 0.92)'; ctx.fill();
-                        if (day > 0.05) { ctx.fillStyle = `rgba(168, 160, 220, ${0.22 * day})`; ctx.fill(); }
-                    }
-                    ctx.lineWidth = 2.2; ctx.strokeStyle = C.fin;                                  // the fins
-                    for (let i = 0; i <= n; i++) line(i / n, 0.06, i / n, 0.96);
-                    ctx.lineWidth = 1.4; ctx.strokeStyle = C.goldDk;                               // gold cornice and plinth
-                    line(0, 0.97, 1, 0.97); ctx.lineWidth = 0.8; line(0, 0.06, 1, 0.06);
-                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.25)'; line(0, 0.8, 1, 0.8);
+                    ctx.fillStyle = 'rgba(12, 6, 20, 0.92)'; ctx.fill(panes);
+                    if (day > 0.05) { ctx.fillStyle = `rgba(168, 160, 220, ${0.22 * day})`; ctx.fill(panes); }
+                    const fins = new Path2D();
+                    for (let i = 0; i <= n; i++) seg(fins, i / n, 0.06, i / n, 0.96);
+                    ctx.lineWidth = 2.2; ctx.strokeStyle = C.fin; ctx.stroke(fins);                                   // the fins
+                    ctx.lineWidth = 1.4; ctx.strokeStyle = C.goldDk; ctx.stroke(seg(new Path2D(), 0, 0.97, 1, 0.97));   // gold cornice and plinth
+                    ctx.lineWidth = 0.8; ctx.stroke(seg(new Path2D(), 0, 0.06, 1, 0.06));
+                    ctx.strokeStyle = 'rgba(232, 194, 122, 0.25)'; ctx.stroke(seg(new Path2D(), 0, 0.8, 1, 0.8));
                     return;
                 }
                 // At night: the fins breathe violet and lavender, pumping on the kick
                 const B = this._mcBeat(), t = _gameTimeSec, op = ctx.globalCompositeOperation;
                 ctx.globalCompositeOperation = 'lighter';
-                for (let i = 0; i < n; i++) {                                                     // a lavender glow behind the glass
-                    quad((i + 0.18) / n, (i + 0.82) / n, 0.32, 0.72);
-                    ctx.fillStyle = `rgba(200, 168, 255, ${0.07 + 0.05 * B.kick})`; ctx.fill();
-                }
+                ctx.fillStyle = `rgba(200, 168, 255, ${0.07 + 0.05 * B.kick})`; ctx.fill(panes);                    // a lavender glow behind the glass
                 for (let i = 0; i <= n; i++) {
-                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick;
-                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.7})`; line(i / n, 0.08, i / n, 0.94);
-                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; line(i / n, 0.08, i / n, 0.94);
+                    const a = 0.32 + 0.22 * Math.sin(t * 0.9 + i * 0.8) + 0.35 * B.kick, fin = seg(new Path2D(), i / n, 0.08, i / n, 0.94);
+                    ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(138, 92, 255, ${Math.max(0, a) * 0.7})`; ctx.stroke(fin);
+                    ctx.lineWidth = 1; ctx.strokeStyle = `rgba(232, 216, 255, ${Math.max(0, a)})`; ctx.stroke(fin);
                 }
-                ctx.lineWidth = 1; ctx.strokeStyle = `rgba(255, 241, 194, 0.55)`; line(0, 0.97, 1, 0.97);   // the cornice catches gold
+                ctx.lineWidth = 1; ctx.strokeStyle = `rgba(255, 241, 194, 0.55)`; ctx.stroke(seg(new Path2D(), 0, 0.97, 1, 0.97));   // the cornice catches gold
                 ctx.globalCompositeOperation = op;
             },
 
@@ -32371,40 +32417,52 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 });
             },
+            /** One face of the curtain wall. Each style's shapes on a face are gathered into one path and filled
+                once (in the order they layer: stone, steel, frames, glass glow, mullions, transoms, glints, piers,
+                cornice, cap); shapes of one style never overlap on a face, so it draws exactly as quad by quad did. */
             _ecFace(ctx, f, emissive=false) {
                 const T=ENNI_EXTERIOR,H=this._ecH(),L=Math.hypot(f.x2-f.x1,f.y2-f.y1);
                 const P=(u,z)=>this._ecP(f.x1+(f.x2-f.x1)*u,f.y1+(f.y2-f.y1)*u,z);
-                const quad=(u0,u1,z0,z1,fill,stroke=null,width=1)=>{
+                const quad=(path,u0,u1,z0,z1)=>{
                     const a=P(u0,z0),b=P(u1,z0),d=P(u0,z1),e=P(u1,z1);
-                    ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.lineTo(...e);ctx.lineTo(...d);ctx.closePath();
-                    if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke();}
+                    path.moveTo(a[0],a[1]);path.lineTo(b[0],b[1]);path.lineTo(e[0],e[1]);path.lineTo(d[0],d[1]);path.closePath();
+                    return path;
                 };
+                const fill=(path,style)=>{ctx.fillStyle=style;ctx.fill(path);};
+                const stroke=(path,style,width)=>{ctx.strokeStyle=style;ctx.lineWidth=width;ctx.stroke(path);};
                 const entrance=f.side==='S'&&Math.abs(f.y1-(this.y+700))<1&&f.x1<this.x+250;
-                if(!emissive){quad(0,1,0,H*.55,T.stoneLo);quad(0,1,H*.55,H,T.steel);}
-                const n=Math.max(2,Math.round(L/77)),pad=8/L;
-                for(let i=0;i<n;i++){
-                    const u0=i/n+pad,u1=(i+1)/n-pad;
-                    for(const [z0,z1] of [[4,H*.48],[H*.59,H-4]]){
-                        if(!emissive){quad(u0,u1,z0,z1,'#6b4733','rgba(204,158,101,.62)',1.4);quad(u0+.018,u1-.018,z0+1,z1-1,'rgba(244,179,96,.12)');}
-                        else{
-                            quad(u0+.006,u1-.006,z0+1,z1-1,'rgba(255,192,108,.32)');
-                            const a=P((u0+u1)/2,z0+(z1-z0)*.57);
-                            ctx.fillStyle='rgba(255,237,180,.85)';ctx.beginPath();ctx.arc(...a,1.35,0,Math.PI*2);ctx.fill();
+                const n=Math.max(2,Math.round(L/77)),pad=8/L,bands=[[4,H*.48],[H*.59,H-4]];
+                if(!emissive){
+                    fill(quad(new Path2D(),0,1,0,H*.55),T.stoneLo);fill(quad(new Path2D(),0,1,H*.55,H),T.steel);
+                    const frames=new Path2D(),inner=new Path2D(),mull=new Path2D(),tran=new Path2D(),glint=new Path2D(),pierLo=new Path2D(),pierHi=new Path2D();
+                    for(let i=0;i<n;i++){
+                        const u0=i/n+pad,u1=(i+1)/n-pad;
+                        for(const [z0,z1] of bands){
+                            quad(frames,u0,u1,z0,z1);quad(inner,u0+.018,u1-.018,z0+1,z1-1);
+                            quad(mull,(u0+u1)/2-.002,(u0+u1)/2+.002,z0,z1);
+                            quad(tran,u0,u1,z0+(z1-z0)*.44,z0+(z1-z0)*.44+.65);
+                            quad(glint,u0+.025,u0+.039,z0+2,z1-1);
                         }
-                        if(!emissive){
-                            quad((u0+u1)/2-.002,(u0+u1)/2+.002,z0,z1,T.steel);
-                            quad(u0,u1,z0+(z1-z0)*.44,z0+(z1-z0)*.44+.65,'#252127');
-                            quad(u0+.025,u0+.039,z0+2,z1-1,'rgba(221,231,237,.19)');
+                        quad(pierLo,i/n,i/n+pad*.58,0,H*.54);quad(pierHi,i/n,i/n+pad*.35,H*.56,H);
+                    }
+                    fill(frames,'#6b4733');stroke(frames,'rgba(204,158,101,.62)',1.4);fill(inner,'rgba(244,179,96,.12)');
+                    fill(mull,T.steel);fill(tran,'#252127');fill(glint,'rgba(221,231,237,.19)');
+                    fill(pierLo,T.stone);fill(pierHi,'#24272f');
+                    const cornice=quad(new Path2D(),0,1,H*.51,H*.57);fill(cornice,'#5d303e');stroke(cornice,'rgba(211,166,112,.45)',1);
+                    const cap=quad(new Path2D(),0,1,H-2,H);fill(cap,'#303039');stroke(cap,'rgba(211,175,118,.55)',.9);
+                }else{
+                    const glow=new Path2D(),dots=new Path2D(),up=new Path2D();
+                    for(let i=0;i<n;i++){
+                        const u0=i/n+pad,u1=(i+1)/n-pad;
+                        for(const [z0,z1] of bands){
+                            quad(glow,u0+.006,u1-.006,z0+1,z1-1);
+                            const a=P((u0+u1)/2,z0+(z1-z0)*.57);dots.moveTo(a[0]+1.35,a[1]);dots.arc(a[0],a[1],1.35,0,Math.PI*2);
                         }
                     }
-                    if(!emissive){quad(i/n,i/n+pad*.58,0,H*.54,T.stone);quad(i/n,i/n+pad*.35,H*.56,H,'#24272f');}
-                }
-                if(!emissive){
-                    quad(0,1,H*.51,H*.57,'#5d303e','rgba(211,166,112,.45)',1);
-                    quad(0,1,H-2,H,'#303039','rgba(211,175,118,.55)',.9);
-                }else{
+                    fill(glow,'rgba(255,192,108,.32)');fill(dots,'rgba(255,237,180,.85)');
                     // Deliberate rose uplight on stone piers leaves the glass warm amber.
-                    for(let i=0;i<=n;i++){const u=i/n;quad(Math.max(0,u-.012),Math.min(1,u+.012),1,H*.50,'rgba(225,75,129,.16)');}
+                    for(let i=0;i<=n;i++){const u=i/n;quad(up,Math.max(0,u-.012),Math.min(1,u+.012),1,H*.50);}
+                    fill(up,'rgba(225,75,129,.16)');
                 }
                 if(entrance&&!emissive){
                     // Arched transom: use the wall's own u/z projection rather than screen-space decoration.
