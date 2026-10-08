@@ -66,30 +66,6 @@
              */
             flat(ctx, k, fn) { ctx.save(); LandmarkKit.plane(ctx, k); fn(ctx); ctx.restore(); },
 
-            /** A bulb for the additive ('lighter') glow pass: a core of radius cr (rgb, alpha ca) with its halo added over
-                it, as the arcs and glows were drawn one by one: a disc of radius hr (hrgb at ha), or with soft, a glow falling
-                off to nothing (drawGlow's). Baked once per size (the power of two at or over ctx's pixels a world px, so a
-                stamp never shrinks more than half), it's stamped at the bulb's own alpha: one draw where it was two or three.
-                Stamp it centred on (x, y), b.r world px each way: drawImage(b, x - b.r, y - b.r, b.r * 2, b.r * 2). */
-            bulb(ctx, rgb, ca, cr, hrgb, ha, hr, soft) {
-                const m = ctx.getTransform(), S = Math.min(8, Math.max(1, 2 ** Math.ceil(Math.log2(Math.hypot(m.a, m.b) || 1))));
-                const key = S + rgb + ca + cr + (hrgb ? hrgb + ha + hr + soft : '');
-                let cv = LandmarkKit._bulbs.get(key);
-                if (cv) return cv;
-                const R = (hrgb ? hr : cr) + 1, n = Math.ceil(R * 2 * S);   // (a pixel's pad for the edge's antialiasing)
-                cv = document.createElement('canvas'); cv.width = cv.height = n; cv.r = n / S / 2;
-                const c = cv.getContext('2d'); c.scale(S, S); c.globalCompositeOperation = 'lighter';
-                c.fillStyle = `rgba(${rgb},${ca})`; c.beginPath(); c.arc(cv.r, cv.r, cr, 0, Math.PI * 2); c.fill();
-                if (hrgb) {
-                    if (soft) { const g = c.createRadialGradient(cv.r, cv.r, 0, cv.r, cv.r, hr); g.addColorStop(0, `rgba(${hrgb},${ha})`); g.addColorStop(1, `rgba(${hrgb},0)`); c.fillStyle = g; }
-                    else c.fillStyle = `rgba(${hrgb},${ha})`;
-                    c.beginPath(); c.arc(cv.r, cv.r, hr, 0, Math.PI * 2); c.fill();
-                }
-                LandmarkKit._bulbs.set(key, cv);
-                return cv;
-            },
-            _bulbs: new Map(),
-
             /** A Path2D made once per owner and key (world coordinates). */
             path(owner, key, make) {
                 const p = owner._lkPaths || (owner._lkPaths = {});

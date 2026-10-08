@@ -964,18 +964,16 @@
                 const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these
                 // A glow sprite (core/draw-helpers.js) of colour `rgb`, alpha `a`
                 const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
-                const dot = (x, y, r, rgba) => { ctx.globalAlpha = 1; ctx.fillStyle = rgba; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // Lamp shades and bar pendants (they follow the room switches)
                 const shades = [[991, 232, 28], [1115, 232, 28], [307, 439, 34], [700, 700, 34], [109, 463, 34], [231, 759, 22], [350, 759, 22], [469, 759, 22]];
                 for (const p of this.props) if (p.light && p.decorType === 'apt_side') {   // table lamps travel with their tables
                     const c = p.getCenter(); shades.push([c.x - 2, c.y - 1, 30]);
                 }
-                for (const [x, y, r] of shades) {
+                for (const [x, y, r] of shades) {                                                  // (glow and bulb in one stamp)
                     const k = lightAt(x, y);
                     if (k < 0.01) continue;
-                    glow(x, y, r, '255, 210, 160', 0.26 * k);
-                    dot(x, y, 2.5, `rgba(255,236,210,${0.8 * k})`);
+                    drawBulb(ctx, bulbSprite(ctx, '255,236,210', 0.8, 2.5, '255,210,160', 0.26, r, true), x, y, k);
                 }
                 // Fireplace
                 const ff = 0.8 + 0.2 * Math.sin(t * 6.3) * Math.sin(t * 2.1);
@@ -998,14 +996,14 @@
                     glow(p.x + p.width * 0.59, p.y + 11 + p.height * 0.21, 22, '180, 130, 255', 0.3 + 0.06 * Math.sin(t * 2.4));
                     glow(p.x + p.width - 29, p.y + p.height - 14.5, 7, '255, 150, 70', 0.5 + 0.2 * Math.sin(t * 7));
                 }
-                // Festoon string lights swagged along the veranda railing
+                // Festoon string lights swagged along the veranda railing (glow and bulb in one stamp)
+                const bulb = bulbSprite(ctx, '255,240,215', 0.9, 1.6, '255,214,160', 0.45, 9, true);
                 for (let s = 0; s < 8; s++) {
                     const x0 = 20 + s * 170, x1 = x0 + 170;
                     for (let i = 0; i <= 8; i++) {
                         const u = i / 8, x = x0 + (x1 - x0) * u, y = 14 + Math.sin(u * Math.PI) * 12;
                         const f = 0.7 + 0.3 * Math.sin(t * 1.3 + s * 3 + i * 1.7);
-                        glow(x, y, 9, '255, 214, 160', 0.45 * f);
-                        dot(x, y, 1.6, `rgba(255,240,215,${0.9 * f})`);
+                        drawBulb(ctx, bulb, x, y, f);
                     }
                 }
                 ctx.restore();

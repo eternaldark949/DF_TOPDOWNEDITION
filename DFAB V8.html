@@ -7327,6 +7327,37 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         /**
+         * A bulb for an additive ('lighter') glow pass: a core of radius cr (rgb, alpha ca) with its halo added over it,
+         * as a dot and a glow drawn one by one would: a disc of radius hr (hrgb at ha), or with soft, a glow falling off
+         * to nothing (drawGlow's). Baked once per size (the power of two at or over ctx's pixels a world px, so a stamp
+         * never shrinks more than half) and stamped at the bulb's own alpha: one draw where it was two or three.
+         * Stamp it centred on (x, y), b.r world px each way: ctx.drawImage(b, x - b.r, y - b.r, b.r * 2, b.r * 2).
+         */
+        const _bulbSprites = new Map();
+        function bulbSprite(ctx, rgb, ca, cr, hrgb, ha, hr, soft) {
+            const m = ctx.getTransform(), S = Math.min(8, Math.max(1, 2 ** Math.ceil(Math.log2(Math.hypot(m.a, m.b) || 1))));
+            const key = S + rgb + ca + cr + (hrgb ? hrgb + ha + hr + soft : '');
+            let cv = _bulbSprites.get(key);
+            if (cv) return cv;
+            const R = (hrgb ? hr : cr) + 1, n = Math.ceil(R * 2 * S);   // (a pixel's pad for the edge's antialiasing)
+            cv = document.createElement('canvas'); cv.width = cv.height = n; cv.r = n / S / 2;
+            const c = cv.getContext('2d'); c.scale(S, S); c.globalCompositeOperation = 'lighter';
+            c.fillStyle = `rgba(${rgb},${ca})`; c.beginPath(); c.arc(cv.r, cv.r, cr, 0, Math.PI * 2); c.fill();
+            if (hrgb) {
+                if (soft) { const g = c.createRadialGradient(cv.r, cv.r, 0, cv.r, cv.r, hr); g.addColorStop(0, `rgba(${hrgb},${ha})`); g.addColorStop(1, `rgba(${hrgb},0)`); c.fillStyle = g; }
+                else c.fillStyle = `rgba(${hrgb},${ha})`;
+                c.beginPath(); c.arc(cv.r, cv.r, hr, 0, Math.PI * 2); c.fill();
+            }
+            _bulbSprites.set(key, cv);
+            return cv;
+        }
+        /** Stamp bulb sprite b centred on (x, y) at alpha a (skipped when it'd be invisible). Sets globalAlpha. */
+        function drawBulb(ctx, b, x, y, a) {
+            if (a <= 0.003) return;
+            ctx.globalAlpha = Math.min(1, a); ctx.drawImage(b, x - b.r, y - b.r, b.r * 2, b.r * 2);
+        }
+
+        /**
          * A faulty street lamp, now and then: about one outdoor lamp in ten stutters for
          * a moment every several seconds. Returns a light multiplier (1 = steady).
          */
@@ -30130,30 +30161,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              */
             flat(ctx, k, fn) { ctx.save(); LandmarkKit.plane(ctx, k); fn(ctx); ctx.restore(); },
 
-            /** A bulb for the additive ('lighter') glow pass: a core of radius cr (rgb, alpha ca) with its halo added over
-                it, as the arcs and glows were drawn one by one: a disc of radius hr (hrgb at ha), or with soft, a glow falling
-                off to nothing (drawGlow's). Baked once per size (the power of two at or over ctx's pixels a world px, so a
-                stamp never shrinks more than half), it's stamped at the bulb's own alpha: one draw where it was two or three.
-                Stamp it centred on (x, y), b.r world px each way: drawImage(b, x - b.r, y - b.r, b.r * 2, b.r * 2). */
-            bulb(ctx, rgb, ca, cr, hrgb, ha, hr, soft) {
-                const m = ctx.getTransform(), S = Math.min(8, Math.max(1, 2 ** Math.ceil(Math.log2(Math.hypot(m.a, m.b) || 1))));
-                const key = S + rgb + ca + cr + (hrgb ? hrgb + ha + hr + soft : '');
-                let cv = LandmarkKit._bulbs.get(key);
-                if (cv) return cv;
-                const R = (hrgb ? hr : cr) + 1, n = Math.ceil(R * 2 * S);   // (a pixel's pad for the edge's antialiasing)
-                cv = document.createElement('canvas'); cv.width = cv.height = n; cv.r = n / S / 2;
-                const c = cv.getContext('2d'); c.scale(S, S); c.globalCompositeOperation = 'lighter';
-                c.fillStyle = `rgba(${rgb},${ca})`; c.beginPath(); c.arc(cv.r, cv.r, cr, 0, Math.PI * 2); c.fill();
-                if (hrgb) {
-                    if (soft) { const g = c.createRadialGradient(cv.r, cv.r, 0, cv.r, cv.r, hr); g.addColorStop(0, `rgba(${hrgb},${ha})`); g.addColorStop(1, `rgba(${hrgb},0)`); c.fillStyle = g; }
-                    else c.fillStyle = `rgba(${hrgb},${ha})`;
-                    c.beginPath(); c.arc(cv.r, cv.r, hr, 0, Math.PI * 2); c.fill();
-                }
-                LandmarkKit._bulbs.set(key, cv);
-                return cv;
-            },
-            _bulbs: new Map(),
-
             /** A Path2D made once per owner and key (world coordinates). */
             path(owner, key, make) {
                 const p = owner._lkPaths || (owner._lkPaths = {});
@@ -30789,8 +30796,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.globalAlpha = fade;
                 if (cam.y > g.yb - 2) {                                                                      // marquee bulbs chasing along the fascia
                     const zb = g.z - 2, n = Math.floor((g.x1 - g.x0 - 8) / (lod ? 14 : 9));
-                    const odd = lod ? LandmarkKit.bulb(ctx, '214,186,255', 1, 1.5) : LandmarkKit.bulb(ctx, '214,186,255', 1, 1.5, '200,168,255', 0.22, 4.5);
-                    const even = lod ? LandmarkKit.bulb(ctx, '255,238,214', 1, 1.5) : LandmarkKit.bulb(ctx, '255,238,214', 1, 1.5, '200,168,255', 0.22, 4.5), br = odd.r;
+                    const odd = lod ? bulbSprite(ctx, '214,186,255', 1, 1.5) : bulbSprite(ctx, '214,186,255', 1, 1.5, '200,168,255', 0.22, 4.5);
+                    const even = lod ? bulbSprite(ctx, '255,238,214', 1, 1.5) : bulbSprite(ctx, '255,238,214', 1, 1.5, '200,168,255', 0.22, 4.5), br = odd.r;
                     for (let i = 0; i <= n; i++) {
                         const p = P3(g.x0 + 4 + (g.x1 - g.x0 - 8) * i / n, g.yb, zb);
                         const on = 0.35 + 0.65 * Math.pow(Math.max(0, Math.cos(i * 0.55 - t * 4.2)), 3);
@@ -31019,7 +31026,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 } else {
                     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                    const a = ctx.globalAlpha, bulb = lod === 0 ? LandmarkKit.bulb(ctx, '255,240,210', 0.95, 1.5, '255,214,150', 0.5, 10, true) : LandmarkKit.bulb(ctx, '255,240,210', 0.95, 1.5), br = bulb.r;
+                    const a = ctx.globalAlpha, bulb = lod === 0 ? bulbSprite(ctx, '255,240,210', 0.95, 1.5, '255,214,150', 0.5, 10, true) : bulbSprite(ctx, '255,240,210', 0.95, 1.5), br = bulb.r;
                     for (let i = 0; i < ribs; i++) for (const py of [y0 - 4, y1 + 4]) {                   // gold lanterns on the pergola, glow and all in one stamp
                         const rx = ribX(i), f = 0.8 + 0.2 * Math.sin(t * 2.1 + i * 1.3 + py);
                         ctx.globalAlpha = a * f; ctx.drawImage(bulb, rx - br, py - br, br * 2, br * 2);
@@ -32109,7 +32116,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     else {
                         const c = cf, t = _frameTime / 1000;                                            // marquee bulbs along the valance
                         c.globalCompositeOperation = 'lighter';
-                        const bulb = _zoomLOD < 1 ? LandmarkKit.bulb(c, '255,232,240', 1, 1.6, '255,180,210', 0.35, 7, true) : LandmarkKit.bulb(c, '255,232,240', 1, 1.6), br = bulb.r;
+                        const bulb = _zoomLOD < 1 ? bulbSprite(c, '255,232,240', 1, 1.6, '255,180,210', 0.35, 7, true) : bulbSprite(c, '255,232,240', 1, 1.6), br = bulb.r;
                         for (let x = x0 + 6, i = 0; x < x1; x += 12, i++) {                                   // (core and glow in one stamp)
                             c.globalAlpha = 0.55 + 0.45 * Math.sin(t * 3 + i * 1.3); c.drawImage(bulb, x - br, y1 - 3 - br, br * 2, br * 2);
                         }
@@ -66238,18 +66245,16 @@ engineMixin({
                 const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these
                 // A glow sprite (core/draw-helpers.js) of colour `rgb`, alpha `a`
                 const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
-                const dot = (x, y, r, rgba) => { ctx.globalAlpha = 1; ctx.fillStyle = rgba; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 // Lamp shades and bar pendants (they follow the room switches)
                 const shades = [[991, 232, 28], [1115, 232, 28], [307, 439, 34], [700, 700, 34], [109, 463, 34], [231, 759, 22], [350, 759, 22], [469, 759, 22]];
                 for (const p of this.props) if (p.light && p.decorType === 'apt_side') {   // table lamps travel with their tables
                     const c = p.getCenter(); shades.push([c.x - 2, c.y - 1, 30]);
                 }
-                for (const [x, y, r] of shades) {
+                for (const [x, y, r] of shades) {                                                  // (glow and bulb in one stamp)
                     const k = lightAt(x, y);
                     if (k < 0.01) continue;
-                    glow(x, y, r, '255, 210, 160', 0.26 * k);
-                    dot(x, y, 2.5, `rgba(255,236,210,${0.8 * k})`);
+                    drawBulb(ctx, bulbSprite(ctx, '255,236,210', 0.8, 2.5, '255,210,160', 0.26, r, true), x, y, k);
                 }
                 // Fireplace
                 const ff = 0.8 + 0.2 * Math.sin(t * 6.3) * Math.sin(t * 2.1);
@@ -66272,14 +66277,14 @@ engineMixin({
                     glow(p.x + p.width * 0.59, p.y + 11 + p.height * 0.21, 22, '180, 130, 255', 0.3 + 0.06 * Math.sin(t * 2.4));
                     glow(p.x + p.width - 29, p.y + p.height - 14.5, 7, '255, 150, 70', 0.5 + 0.2 * Math.sin(t * 7));
                 }
-                // Festoon string lights swagged along the veranda railing
+                // Festoon string lights swagged along the veranda railing (glow and bulb in one stamp)
+                const bulb = bulbSprite(ctx, '255,240,215', 0.9, 1.6, '255,214,160', 0.45, 9, true);
                 for (let s = 0; s < 8; s++) {
                     const x0 = 20 + s * 170, x1 = x0 + 170;
                     for (let i = 0; i <= 8; i++) {
                         const u = i / 8, x = x0 + (x1 - x0) * u, y = 14 + Math.sin(u * Math.PI) * 12;
                         const f = 0.7 + 0.3 * Math.sin(t * 1.3 + s * 3 + i * 1.7);
-                        glow(x, y, 9, '255, 214, 160', 0.45 * f);
-                        dot(x, y, 1.6, `rgba(255,240,215,${0.9 * f})`);
+                        drawBulb(ctx, bulb, x, y, f);
                     }
                 }
                 ctx.restore();

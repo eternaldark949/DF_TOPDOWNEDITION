@@ -666,10 +666,20 @@ test('Portico marquee: one stamp a bulb, from a sprite baked to the screen scale
   equal(ops.filter(o => o === 'arc').length, 0, 'no bulb, dot or lantern is an arc of its own');
   ok(ops.filter(o => o === 'drawImage').length >= r.n, `the ${r.n} marquee bulbs are stamped`);
   const s = value(env, `
-    const c = game.ctx, bulb = () => LandmarkKit.bulb(c, '1,2,3', 1, 1.5, '4,5,6', 0.22, 4.5);
+    const c = game.ctx, bulb = () => bulbSprite(c, '1,2,3', 1, 1.5, '4,5,6', 0.22, 4.5);
     c.setTransform(1, 0, 0, 1, 0, 0); const a = bulb(); c.setTransform(2.5, 0, 0, 2.5, 0, 0); const b = bulb(); c.setTransform(1, 0, 0, 1, 0, 0);
     return [a.width, a.r, b.width, b.r, a === bulb()];`);
   equal(s, [11, 5.5, 44, 5.5, true], 'baked once per scale (1 and 4 px a world px), stamped the same size in the world');
+}, {affine: true});
+
+test('Apartment lights: each lamp shade and festoon bulb is one stamp, glow and bulb together', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.worldMinutes=22*60; game.drawApartmentGlow(game.ctx);`);   // (bakes the sprites)
+  env.setTrace(true);
+  env.run(`game.drawApartmentGlow(game.ctx)`);
+  const ops = env.trace.map(op => op[1]);
+  env.setTrace(false);
+  equal(ops.filter(o => o === 'arc').length, 2, 'the only arcs left are the two gas-burner rings');
+  ok(ops.filter(o => o === 'drawImage').length >= 72 + 8, 'the 72 festoon bulbs and the lamp shades are stamped');
 }, {affine: true});
 
 test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {
