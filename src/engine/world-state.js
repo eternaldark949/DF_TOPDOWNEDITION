@@ -170,9 +170,13 @@
                 for (const entry of candidates) {
                     const b = entry.item;
                     if (entry.standardV2) {
-                        // In the glow pass's reach; topIn: in the base and roof passes' too (a landmark just off screen
-                        // still throws its beams on, but draws nothing else)
-                        if (b.inView(V, cam)) { entry.topIn = b.topReach === undefined || b.inView(V, cam, b.topReach); lists.base.push(entry); lists.v2.push(entry); }
+                        // In the glow pass's reach; topIn: in the base and roof passes' too, glowIn: in reach of the rest of
+                        // its glow (a landmark just off screen still throws its beams on, but draws nothing else)
+                        if (b.inView(V, cam)) {
+                            entry.topIn = b.topReach === undefined || b.inView(V, cam, b.topReach);
+                            entry.glowIn = b.glowReach === undefined || b.inView(V, cam, b.glowReach);
+                            lists.base.push(entry); lists.v2.push(entry);
+                        }
                     } else {
                         if (b.isV2) lists.v2.push(entry);
                         if (b.isV2 && b.inView) lists.base.push(entry); // custom predicate runs at its original base pass
@@ -224,7 +228,7 @@
                             const b = entry.item;
                             if (!b.isV2 || !b.drawEmissive) continue;
                             if (!entry.standardV2 && !b.inView(V, this.camera)) continue;
-                            b.drawEmissive(ctx, dark);
+                            b.drawEmissive(ctx, dark, entry.standardV2 && !entry.glowIn);   // off screen but for its beams: just those
                         }
                     } else {
                         // Standalone calls without a draw view retain their original fallback predicate.

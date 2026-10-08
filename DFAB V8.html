@@ -28518,6 +28518,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // How far a landmark's base and roof passes draw past its leaned outline (world px, measured at every
         // angle and zoom, plus a margin): the glow pass's emissiveReach is for the beams alone
         const SQ_TOP_REACH = 200, DN_TOP_REACH = 190, MC_TOP_REACH = 100;
+        // ...and how far the glow pass draws past it without the beams (lamp halos, portico mist, the crown):
+        // past this, only the beams can reach the screen (drawEmissive's beamsOnly)
+        const SQ_GLOW_REACH = 240, MC_GLOW_REACH = 100;
         class BuildingV2 {
             constructor(config) {
                 this.isV2 = true;
@@ -29151,6 +29154,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 } else if (this.style === 'moon_city') {
                     this.roofFeatures = []; this.facadeFeature = 'moon_city'; this.emissiveReach = 600;   // fins, skylight, searchlights (buildings/moon-city.js)
                     this.topReach = MC_TOP_REACH;                           // base and roof passes: the canopy and sign
+                    this.glowReach = MC_GLOW_REACH;                         // glow pass, all but the searchlights
                 } else if (this.style === 'silver_queen') {
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
@@ -29159,6 +29163,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.emissiveReach = 700;                              // searchlight beams reach well past the footprint
                     this.crownZ = SQ_ROOF.ringZ;                           // the crown ring leans from 256 px up
                     this.topReach = SQ_TOP_REACH;                          // base and roof passes: the ring's radius, the portico and posts
+                    this.glowReach = SQ_GLOW_REACH;                        // glow pass, all but the beams
                 }
             },
 
@@ -29437,10 +29442,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
 
             /** Emissive layer (after lighting): lit windows, neon trim, rooftop lights. dark = ambient darkness 0..1 */
-            drawEmissive(ctx, dark) {
+            drawEmissive(ctx, dark, beamsOnly) {
                 if (this.style === 'enni_cole' && typeof game !== 'undefined' && game.camera) { this._ecDrawEmissive(ctx, dark); return; }
                 if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
                 if (this.style === 'double_nights') { this._dnDrawEmissive(ctx, dark); return; }
+                if (beamsOnly) {   // all but the beams is past glowReach, off screen (world-state.js drawEmissivePass)
+                    if (this.style === 'silver_queen') { this._sqDark = dark; this._sqDrawBeams(ctx, dark); }
+                    if (this.style === 'moon_city') this._mcBeams(ctx, dark);
+                    return;
+                }
                 const cam = game.camera, s = this._leanScale(), k = 1 + s;
                 const P = (x, y) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
                 const glow = Math.max(0.15, Math.min(1, dark * 1.1));
@@ -61280,9 +61290,13 @@ engineMixin({
                 for (const entry of candidates) {
                     const b = entry.item;
                     if (entry.standardV2) {
-                        // In the glow pass's reach; topIn: in the base and roof passes' too (a landmark just off screen
-                        // still throws its beams on, but draws nothing else)
-                        if (b.inView(V, cam)) { entry.topIn = b.topReach === undefined || b.inView(V, cam, b.topReach); lists.base.push(entry); lists.v2.push(entry); }
+                        // In the glow pass's reach; topIn: in the base and roof passes' too, glowIn: in reach of the rest of
+                        // its glow (a landmark just off screen still throws its beams on, but draws nothing else)
+                        if (b.inView(V, cam)) {
+                            entry.topIn = b.topReach === undefined || b.inView(V, cam, b.topReach);
+                            entry.glowIn = b.glowReach === undefined || b.inView(V, cam, b.glowReach);
+                            lists.base.push(entry); lists.v2.push(entry);
+                        }
                     } else {
                         if (b.isV2) lists.v2.push(entry);
                         if (b.isV2 && b.inView) lists.base.push(entry); // custom predicate runs at its original base pass
@@ -61334,7 +61348,7 @@ engineMixin({
                             const b = entry.item;
                             if (!b.isV2 || !b.drawEmissive) continue;
                             if (!entry.standardV2 && !b.inView(V, this.camera)) continue;
-                            b.drawEmissive(ctx, dark);
+                            b.drawEmissive(ctx, dark, entry.standardV2 && !entry.glowIn);   // off screen but for its beams: just those
                         }
                     } else {
                         // Standalone calls without a draw view retain their original fallback predicate.

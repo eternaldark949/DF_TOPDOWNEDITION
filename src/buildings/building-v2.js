@@ -14,6 +14,9 @@
         // How far a landmark's base and roof passes draw past its leaned outline (world px, measured at every
         // angle and zoom, plus a margin): the glow pass's emissiveReach is for the beams alone
         const SQ_TOP_REACH = 200, DN_TOP_REACH = 190, MC_TOP_REACH = 100;
+        // ...and how far the glow pass draws past it without the beams (lamp halos, portico mist, the crown):
+        // past this, only the beams can reach the screen (drawEmissive's beamsOnly)
+        const SQ_GLOW_REACH = 240, MC_GLOW_REACH = 100;
         class BuildingV2 {
             constructor(config) {
                 this.isV2 = true;
@@ -647,6 +650,7 @@
                 } else if (this.style === 'moon_city') {
                     this.roofFeatures = []; this.facadeFeature = 'moon_city'; this.emissiveReach = 600;   // fins, skylight, searchlights (buildings/moon-city.js)
                     this.topReach = MC_TOP_REACH;                           // base and roof passes: the canopy and sign
+                    this.glowReach = MC_GLOW_REACH;                         // glow pass, all but the searchlights
                 } else if (this.style === 'silver_queen') {
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
@@ -655,6 +659,7 @@
                     this.emissiveReach = 700;                              // searchlight beams reach well past the footprint
                     this.crownZ = SQ_ROOF.ringZ;                           // the crown ring leans from 256 px up
                     this.topReach = SQ_TOP_REACH;                          // base and roof passes: the ring's radius, the portico and posts
+                    this.glowReach = SQ_GLOW_REACH;                        // glow pass, all but the beams
                 }
             },
 
@@ -933,10 +938,15 @@
             },
 
             /** Emissive layer (after lighting): lit windows, neon trim, rooftop lights. dark = ambient darkness 0..1 */
-            drawEmissive(ctx, dark) {
+            drawEmissive(ctx, dark, beamsOnly) {
                 if (this.style === 'enni_cole' && typeof game !== 'undefined' && game.camera) { this._ecDrawEmissive(ctx, dark); return; }
                 if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
                 if (this.style === 'double_nights') { this._dnDrawEmissive(ctx, dark); return; }
+                if (beamsOnly) {   // all but the beams is past glowReach, off screen (world-state.js drawEmissivePass)
+                    if (this.style === 'silver_queen') { this._sqDark = dark; this._sqDrawBeams(ctx, dark); }
+                    if (this.style === 'moon_city') this._mcBeams(ctx, dark);
+                    return;
+                }
                 const cam = game.camera, s = this._leanScale(), k = 1 + s;
                 const P = (x, y) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k];
                 const glow = Math.max(0.15, Math.min(1, dark * 1.1));

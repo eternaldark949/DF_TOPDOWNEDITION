@@ -621,6 +621,37 @@ test('A landmark just off screen still throws its beams but skips its roof pass'
   }
 });
 
+test('A landmark whose body is off screen draws only its beams in the glow pass', env => {
+  const r = value(env, `
+    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false; game.worldMinutes=22*60;
+    const out = [];
+    for (const style of ['silver_queen', 'moon_city']) {
+      const b = game.activeMap.buildings.find(x => x.style === style);
+      let top = 0, full = 0, beams = 0; const t0 = b.drawTop, e0 = b.drawEmissive;
+      b.drawTop = function (...a) { top++; return t0.apply(this, a); };
+      b.drawEmissive = function (...a) { if (a[2]) beams++; else full++; return e0.apply(this, a); };
+      const rows = [];
+      for (let dx = 0; dx < 1800; dx += 60) {
+        const x = b.x + b.w + dx, y = b.y + b.h / 2;
+        game.player.x = x; game.player.y = y; game.update(); game.player.x = x; game.player.y = y;
+        top = 0; full = 0; beams = 0; game.draw(); rows.push([top, full, beams]);
+      }
+      delete b.drawTop; delete b.drawEmissive;
+      out.push({ style, beside: rows[0], beamsOnly: rows.filter(([, f, bm]) => f === 0 && bm > 0).length, topWithoutBody: rows.filter(([t, f]) => t > 0 && f === 0).length,
+        id: game.activeMap.buildings.indexOf(b) });
+    }
+    return out;`);
+  for (const o of r) {
+    ok(o.beside[1] >= 1 && o.beside[2] === 0, `${o.style}: beside it, the glow pass draws all of it`);
+    ok(o.beamsOnly > 0, `${o.style}: further off, only its beams`);
+    equal(o.topWithoutBody, 0, `${o.style}: its glow body reaches at least as far as its roof pass`);
+  }
+  env.setTrace(true);
+  env.run(`(() => { for (const id of [${r.map(o => o.id)}]) { const b = game.activeMap.buildings[id]; b._sqDrawBeams = b._mcBeams = () => {}; b.drawEmissive(game.ctx, 1, true); delete b._sqDrawBeams; delete b._mcBeams; } })()`);
+  equal(env.trace.length, 0, 'beams only: nothing but the beams touches the canvas');
+  env.setTrace(false);
+});
+
 test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
   const r = value(env, `
