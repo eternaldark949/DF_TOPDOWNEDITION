@@ -1147,6 +1147,110 @@ test('Traffic goes round her parked car: a lane change, or a stop and an overtak
   ok(both.moved <= 10, `no shove (${both.moved} px)`);
 }, {events:true});
 
+// People in the road (traffic/traffic-people.js): a car coming down __lane at someone on foot, measured
+function folkScene(env) {
+  carsFixture(env);
+  env.run(`{
+    GameSettings.getMaxTraffic=()=>40; GameSettings.getMaxPedestrians=()=>10; game.pedestrians.spawnTimer=1e9;
+    game.pedestrians.pedestrians.forEach(p=>p.destroy()); game.pedestrians.pedestrians.length=0;
+    Object.assign(game.ownedCar,{x:-5000,y:-5000}); if(game.deliveryVehicle) Object.assign(game.deliveryVehicle,{x:-5000,y:-4000});
+    globalThis.__hits=0; game.damagePlayer=()=>{__hits++;};
+    globalThis.__horns=0; if(typeof ambience!=='undefined'){ ambience.ready=true; ambience._horn=()=>{__horns++;}; }
+    // who: 'her' or a street pedestrian (its own steps frozen); at: lateral offset; walk: px a tick across the lane;
+    // walled: parked cars in the lanes either side of her
+    globalThis.__folk=({temper='normal', who='her', at=0, walk=0, walled=false, ticks=900})=>{
+      game.traffic.vehicles.forEach(c=>c.destroy()); game.traffic.vehicles=[]; __hits=0; __horns=0;
+      game.pedestrians.pedestrians.forEach(p=>p.destroy()); game.pedestrians.pedestrians.length=0;
+      const lane=__lane, nx=-lane.uy, ny=lane.ux, P=game.player, spot=(d,l)=>({x:lane.start.x+lane.ux*d+nx*l, y:lane.start.y+lane.uy*d+ny*l});
+      const ai=new TrafficVehicle(lane,'Gelfash','sedan','AI'); ai.driverType='civilian'; ai.temper=temper; ai.maxSpeed=8.5;
+      Object.assign(ai,spot(150,0),{angle:lane.angle,speed:7,vx:lane.ux*7,vy:lane.uy*7,fade:1}); game.traffic.vehicles.push(ai);
+      if(walled) for(const side of [-60,60]) for(let k=-3;k<4;k++){ const c=new TrafficVehicle(lane,'Gelfash','sedan','AI'); Object.assign(c,spot(650+k*95,side),{angle:lane.angle,speed:0,vx:0,vy:0,fade:1,controlMode:'PARKED',hasDriver:false}); game.traffic.vehicles.push(c); }
+      let Q=P;
+      if(who==='her') Object.assign(P,spot(650,at)); else { Object.assign(P,spot(650,400)); Q=new Pedestrian(spot(650,at).x,spot(650,at).y,game.pedestrians.network); Q.update=()=>{}; Q.tryQuip=()=>{}; game.pedestrians.pedestrians.push(Q); }
+      let minClear=1e9, fastNear=0, stopped=0, passed=-1, backs=0, rev=0, slowest=1e9;
+      for(let i=0;i<ticks;i++){
+        Q.x+=nx*walk; Q.y+=ny*walk; game.update();
+        const dx=Q.x-ai.x, dy=Q.y-ai.y, c=Math.cos(ai.angle), s=Math.sin(ai.angle), lx=dx*c+dy*s, ly=-dx*s+dy*c;
+        const clear=Math.hypot(Math.max(0,Math.abs(lx)-ai.length/2),Math.max(0,Math.abs(ly)-ai.width/2))-15;
+        minClear=Math.min(minClear,clear); if(clear<6 && Math.abs(ai.speed)>4) fastNear++;
+        if(Math.abs(ai.speed)<0.3) stopped++; slowest=Math.min(slowest,Math.abs(ai.speed));
+        if((ai._reverseLeft||0)>rev) backs++; rev=ai._reverseLeft||0;
+        if(lx<-ai.length){ passed=i; break; }
+      }
+      return {minClear:Math.round(minClear), fastNear, stopped, passed, backs, slowest:+slowest.toFixed(1), hits:__hits, horns:__horns};
+    };
+  }`);
+}
+
+test('People in the road: someone crossing is let across, someone standing is stopped for and gone round at a walk; nobody is touched', env => {
+  folkScene(env);
+  const r=value(env, `return {stand:__folk({}), edge:__folk({at:26}), cross:__folk({at:-70, walk:1}), quick:__folk({at:-70, walk:2})};`);
+  for (const [k, o] of Object.entries(r)) {
+    ok(o.passed > 0, `${k}: it gets by (${o.passed} ticks)`);
+    ok(o.minClear >= 0 && o.fastNear === 0 && o.hits === 0, `${k}: never touches her, nor goes by close over 4 (clear ${o.minClear}, fast ${o.fastNear})`);
+  }
+  ok(r.stand.stopped > 0 && r.stand.minClear >= 12, `standing: it stops, then goes round with room (${r.stand.stopped} ticks stopped, ${r.stand.minClear} px)`);
+  ok(r.edge.stopped < 30, `at the edge of the lane: a step aside, barely a stop (${r.edge.stopped})`);
+  ok(r.cross.slowest < 3, `crossing slowly: it slows and lets her across (down to ${r.cross.slowest})`);
+}, {events:true});
+
+test('Tempers: the calm wait longer and give more room than the pushy; walled in, a car backs up and waits (the pushy on the horn), never pushes', env => {
+  folkScene(env);
+  const r=value(env, `return {calm:__folk({temper:'calm'}), pushy:__folk({temper:'pushy'}),
+    wallCalm:__folk({temper:'calm', walled:true, ticks:700}), wallPushy:__folk({temper:'pushy', walled:true, ticks:700})};`);
+  ok(r.calm.stopped > r.pushy.stopped, `calm waits longer (${r.calm.stopped} vs ${r.pushy.stopped} ticks)`);
+  ok(r.calm.minClear > r.pushy.minClear, `calm gives more room (${r.calm.minClear} vs ${r.pushy.minClear} px)`);
+  for (const k of ['wallCalm', 'wallPushy']) {
+    equal(r[k].passed, -1, `${k}: no way past`);
+    ok(r[k].minClear >= 20 && r[k].hits === 0, `${k}: stays back (${r[k].minClear} px)`);
+    ok(r[k].backs >= 1, `${k}: backs up to try again`);
+  }
+  ok(r.wallPushy.horns >= 3 && r.wallPushy.horns > r.wallCalm.horns, `the pushy lean on the horn (${r.wallPushy.horns} vs ${r.wallCalm.horns})`);
+}, {events:true});
+
+test('Street pedestrians: one standing in the lane is gone round; one on the pavement by the kerb never slows a car', env => {
+  folkScene(env);
+  const r=value(env, `
+    const inLane=__folk({who:'ped'});
+    __lane=game.traffic.network.allLanes.find(l=>l.id==='R0.S0.L3');          // the kerb lane: the pavement starts 30 px out
+    const pavement=__folk({who:'ped', at:52});
+    __lane=game.traffic.network.allLanes.find(l=>l.id==='R0.S0.L2');
+    return {inLane, pavement};
+  `);
+  ok(r.inLane.passed > 0 && r.inLane.stopped > 0 && r.inLane.minClear >= 12, `in the lane: stopped for, then gone round (${JSON.stringify(r.inLane)})`);
+  ok(r.pavement.passed > 0 && r.pavement.slowest > 6.5, `on the pavement: no slowing (${r.pavement.slowest})`);
+}, {events:true});
+
+test('Hit by a car: 10 once, then a moment of grace, not a hit every tick it touches', env => {
+  folkScene(env);
+  const hits=value(env, `
+    const c=__street(400); Object.assign(c,{speed:6,vx:__lane.ux*6,vy:__lane.uy*6,fade:1});
+    let n=0; game.damagePlayer=()=>{n++;};
+    for(let i=0;i<30;i++){ game.player.x=c.x+c.length/2+8; game.player.y=c.y; c.speed=6; game.traffic.grid.clear(); game.traffic.grid.add(c); game.resolveTrafficCollisions(); }
+    return n;
+  `);
+  equal(hits, 1, 'one hit in half a second of contact');
+}, {events:true});
+
+test('Parked on its nose: a car backs up off her car, then goes round it without a touch', env => {
+  carsFixture(env);
+  const r=value(env, `
+    GameSettings.getMaxTraffic=()=>40; const lane=__lane, nx=-lane.uy, ny=lane.ux;
+    const ai=new TrafficVehicle(lane,'Gelfash','sedan','AI'); ai.temper='normal';
+    Object.assign(ai,{x:lane.start.x+lane.ux*400,y:lane.start.y+lane.uy*400,angle:lane.angle,speed:0,vx:0,vy:0,fade:1}); game.traffic.vehicles.push(ai);
+    const own=game.ownedCar; game.car=own; if(game.isDriving) game.toggleVehicle();
+    const at=400+ai.length/2+6+own.length/2;
+    Object.assign(own,{x:lane.start.x+lane.ux*at,y:lane.start.y+lane.uy*at,angle:lane.angle,vx:0,vy:0,speed:0,controlMode:'PARKED',hasDriver:false,visible:true});
+    game.player.x=own.x+nx*300; game.player.y=own.y+ny*300;
+    const s0=[own.x,own.y]; let backed=false, passed=-1;
+    for(let i=0;i<600;i++){ game.update(); if(ai.speed<-0.3) backed=true; if((ai.x-own.x)*lane.ux+(ai.y-own.y)*lane.uy>own.length){passed=i;break;} }
+    return {backed, passed, moved:Math.round(Math.hypot(own.x-s0[0],own.y-s0[1]))};
+  `);
+  ok(r.backed, 'it backs up first');
+  ok(r.passed > 0, `then gets by (${r.passed} ticks)`);
+  ok(r.moved <= 2, `her car stays put (${r.moved} px)`);
+}, {events:true});
+
 test('Saves: her car stays where she parked it through a save made indoors; a hijacked drive loads on foot', env => {
   carsFixture(env);
   const result=value(env, `

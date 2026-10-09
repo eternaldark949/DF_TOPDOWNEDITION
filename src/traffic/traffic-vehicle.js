@@ -88,6 +88,8 @@
                         this.maxSpeed += 2; 
                     }
                 }
+                // How it treats people in the road (traffic/traffic-people.js): the gangers push; a third of the rest are in no hurry
+                this.temper = this.driverType === 'ganger' ? 'pushy' : Math.random() < 0.35 ? 'calm' : 'normal';
                 
                 this.state = 'DRIVING'; 
                 this.stateTimer = 0;
@@ -705,20 +707,6 @@
                 return false;
             }
 
-            /** The last resort: is the strip we'd drive through to pass a person (toward the kerb) empty of people? */
-            _kerbClear(obs) {
-                if (typeof game === 'undefined') return false;
-                const a = this.angle, fx = Math.cos(a), fy = Math.sin(a), side = obs.lateral > 0 ? -1 : 1;   // pass on the side away from them
-                const passLat = obs.lateral + side * ((obs.width || 20) / 2 + this.width / 2 + 8), half = this.width / 2 + 14;
-                const people = (game._makeWay || []).concat(game.pedestrians && game.pedestrians.pedestrians || []);
-                for (const p of people) {
-                    if (!p || p.dead) continue;
-                    const dx = p.x - this.x, dy = p.y - this.y, along = dx * fx + dy * fy, lat = -dx * fy + dy * fx;
-                    if (along > -this.length / 2 && along < obs.dist + this.length * 1.5 && Math.abs(lat - passLat) < half) return false;
-                }
-                return true;
-            }
-
             /** The lanes beside ours on this stretch (same segment), nearest first */
             _sideLanes(opposing) {
                 const cur = this.currentLane, seg = cur.segment;
@@ -760,10 +748,10 @@
                     const along = dx * ux + dy * uy;                               // + ahead of us, - behind
                     const vAlong = v.vx !== undefined ? v.vx * ux + v.vy * uy : (v.speed || 0) * Math.cos((v.angle || 0) - Math.atan2(uy, ux));
                     const closing = Math.max(0, vAlong - mySpeed);                 // gaining on us from behind
-                    const behind = this.length + v.length / 2 + closing * 40 + 20;
+                    const behind = this.length + v.length / 2 + closing * 40 * this._temper().take + 20;   // (the pushy take tighter gaps)
                     if (along > -behind && along < ahead + v.length / 2) return false;
                 }
-                return true;
+                return !this._folkInLane(targetLane, ahead);                       // and nobody on foot in it
             }
 
             // --- AUTO-DRIVE LOGIC ---
@@ -840,6 +828,8 @@
                 this.postIntersectionGraceTimer = 0;
                 this._stuckContactFrames = 0;
                 this._stuckRecovery = 0;
+                this._reverseLeft = 0; this._reverseFrom = null; this._folkWait = 0; this._folkBacks = 0;
+                if (this._folkPlan) this._folkPlan.sideStep = 0;
                 
                 // --- Aggressive / idle modes ---
                 this.isAggressive = false;
@@ -1301,7 +1291,7 @@
             }
         
             // --- MAIN UPDATE (AI & Logic) ---
-            update(player, playerCar, allVehicles, weather, intersections = [], walls = [], buildings = [], decalSystem, teammates = []) {
+            update(player, playerCar, allVehicles, weather, intersections = [], walls = [], buildings = [], decalSystem, folk = []) {
                 // --- CONTROL MODE BRANCHING ---
                 if (this.controlMode === 'PARKED') {
                     this.speed = 0;
@@ -1315,7 +1305,7 @@
                 
                 // --- AI DRIVING MODE (PHYSICS-BASED) ---
                 // AI now uses the same physics model as manual driving
-                this.updateAIDriving(player, playerCar, allVehicles, weather, intersections, walls, buildings, decalSystem, teammates);
+                this.updateAIDriving(player, playerCar, allVehicles, weather, intersections, walls, buildings, decalSystem, folk);
             }
             
             // --- PHYSICS-BASED AI DRIVING (Refactored v4.5.10) ---
@@ -1348,7 +1338,7 @@
                 });
             }
 
-            updateAIDriving(player, playerCar, allVehicles, weather, intersections, walls, buildings, decalSystem, teammates = []) {
+            updateAIDriving(player, playerCar, allVehicles, weather, intersections, walls, buildings, decalSystem, folk = []) {
                 /* ── DISTANCE-BASED AI THINNING ──────────────────────────
                    Cars within AI_NEAR_RADIUS of the player think every step, full
                    stop. Those are the only cars whose reaction time the player
@@ -1388,6 +1378,7 @@
                 
                 this._allVehicles = allVehicles;
                 this._playerCar = playerCar;
+                this._folk = folk;
                 if (this._driveRoute) this.advanceToRelevantWaypoint();
 
                 if (this.postIntersectionGraceTimer > 0) this.postIntersectionGraceTimer--;
@@ -1540,91 +1531,14 @@
 
                 // --- CATEGORIZED OBSTACLE DETECTION ---
                 // Category 1: Traffic to queue behind (AI drivers, autodriving player vehicles)
-                // Category 2: Swerve targets (actors, driverless cars, parked cars)
+                // Category 2: Swerve targets (driverless cars, parked cars)
+                // People on foot are their own thing: read for what they're doing (traffic/traffic-people.js)
                 let trafficObstacle = null;      // Vehicle to queue behind
                 let trafficObstacleDist = Infinity;
                 let swerveObstacles = [];        // Obstacles to swerve around
-                let actorObstacle = null;        // Player on foot
-                let actorObstacleDist = Infinity;
-                let actorLateral = 0;
-
-                // ── ACTOR CLUSTER (player + on-foot teammates as one obstacle) ──
-                // Player and recruited companions usually move together in formation.
-                // Treating them as separate point obstacles produces unstable swerve
-                // decisions (which one is "closest" oscillates each frame) and lets
-                // cars pick paths that thread between companions. The fix: collect all
-                // on-foot actors into a list, project each onto our heading frame, and
-                // emit a SINGLE swerve obstacle whose lateral span covers the whole
-                // group — a virtual bounding box in the car's reference frame.
-                const cluster = [];
-                // Mid lane change / overtake: only people in the lane we're moving into are in the way
+                // Mid lane change / overtake: only what's in the lane we're moving into is in the way
                 const tl = this.laneChangeState !== 'NONE' && this.targetLane, tlHalf = this.width / 2 + 18;
-                const inTarget = (x, y) => !tl || Math.abs((x - tl.start.x) * -tl.uy + (y - tl.start.y) * tl.ux) < tlHalf || Math.hypot(x - this.x, y - this.y) < this.length * 1.4;   // (or right under our nose)
-                if (player.visible && !(playerCar && playerCar.hasDriver) && inTarget(player.x, player.y)) {
-                    const r = checkTunnelEx(player.x, player.y, lookAheadDist, dynamicTunnelWidth + 10);
-                    if (r) cluster.push({ entity: player, x: player.x, y: player.y, dist: r.dist, lateral: r.lateral, vx: player.vx || 0, vy: player.vy || 0 });
-                }
-                if (teammates && teammates.length > 0) {
-                    for (let tm of teammates) {
-                        if (!tm || tm.inCar || tm.dead || tm.downed || !tm.recruited || !inTarget(tm.x, tm.y)) continue;
-                        const r = checkTunnelEx(tm.x, tm.y, lookAheadDist, dynamicTunnelWidth + 10);
-                        if (r) cluster.push({ entity: tm, x: tm.x, y: tm.y, dist: r.dist, lateral: r.lateral, vx: tm.vx || 0, vy: tm.vy || 0 });
-                    }
-                }
-
-                if (cluster.length === 1) {
-                    // Single actor — treat as point, identical to old behavior.
-                    const c = cluster[0];
-                    actorObstacle = c.entity;
-                    actorObstacleDist = c.dist;
-                    actorLateral = c.lateral;
-                    const moving = Math.hypot(c.vx, c.vy) > 0.5;
-                    swerveObstacles.push({
-                        type: 'actor',
-                        x: c.x, y: c.y,
-                        dist: c.dist,
-                        lateral: c.lateral,
-                        width: 20,
-                        inMotion: moving
-                    });
-                } else if (cluster.length > 1) {
-                    // Multi-actor — emit a single bounding-box swerve obstacle.
-                    // Anchor to the NEAREST member's forward distance (so the car
-                    // brakes for the closest actor, not the centroid which could be
-                    // further). Span the lateral extent of the group + per-actor radius.
-                    const ACTOR_HALF_WIDTH = 10; // Half of width:20 — matches existing convention
-                    let minDist = Infinity;
-                    let nearestEntity = null;
-                    let nearestLat = 0;
-                    let minLat = Infinity, maxLat = -Infinity;
-                    let maxSpeed = 0;
-                    for (const c of cluster) {
-                        if (c.dist < minDist) {
-                            minDist = c.dist;
-                            nearestEntity = c.entity;
-                            nearestLat = c.lateral;
-                        }
-                        if (c.lateral < minLat) minLat = c.lateral;
-                        if (c.lateral > maxLat) maxLat = c.lateral;
-                        const sp = Math.hypot(c.vx, c.vy);
-                        if (sp > maxSpeed) maxSpeed = sp;
-                    }
-                    // Bounding box centroid + half-width in the car's heading frame.
-                    const clusterLateral = (minLat + maxLat) / 2;
-                    const clusterHalfWidth = (maxLat - minLat) / 2 + ACTOR_HALF_WIDTH;
-                    actorObstacle = nearestEntity;
-                    actorObstacleDist = minDist;
-                    actorLateral = nearestLat;
-                    swerveObstacles.push({
-                        type: 'actor_cluster',
-                        x: nearestEntity.x, y: nearestEntity.y,
-                        dist: minDist,
-                        lateral: clusterLateral,
-                        // width is the full bounding-box width (used by leftClear/rightClear)
-                        width: clusterHalfWidth * 2,
-                        inMotion: maxSpeed > 0.5
-                    });
-                }
+                const folkPlan = this._readFolk(folk, lookAheadDist + 60, tl);
                 
                 // Cars to queue behind are found along the route itself (lane, planned turn, exit lane),
                 // as a bumper-to-bumper gap; parked ones still come from the heading tunnel (swerve targets)
@@ -1699,40 +1613,24 @@
                 }
 
                 // --- 2. SWERVE CALCULATION ---
-                // Calculate optimal swerve direction for avoidable obstacles
-                let swerveSteer = 0, edgeNudgeNow = false;
+                // A parked car part-way into the lane: steer round it inside the lane. (People are never swerved
+                // round: traffic/traffic-people.js)
+                let swerveSteer = 0;
                 let needsSwerve = false;
                 
-                // People in the road (949, her crew): no swerving round them. Slow, stop, and go round only by a
-                // proper lane change or overtake into a lane that's clear (section 3). The pavement is a last resort:
-                // after a long wait (_actorWait > 480 ticks), slowly, and only if nobody is standing on that side.
-                const actorAhead = swerveObstacles.find(o => o.type === 'actor' || o.type === 'actor_cluster');
-                if (actorAhead) {
-                    if (Math.abs(this.speed) < 0.5) this._actorWait = (this._actorWait || 0) + 1;
-                    if (this._actorWait === 120 && typeof ambience !== 'undefined' && ambience.ready && ambience._horn) ambience._horn(0.025);   // a polite toot
-                } else this._actorWait = 0;
                 if (swerveObstacles.length > 0 && this.laneChangeState === 'NONE' && !this.currentTurnPath) {
                     // Find the closest swerve obstacle
                     const closestSwerve = swerveObstacles.reduce((a, b) => a.dist < b.dist ? a : b);
-                    const isPerson = closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster';
                     // A parked car squarely in the lane can't be swerved round inside it (the lane gives ~30 px, two
                     // bodies need their half-widths): change lanes or stop and overtake instead (section 3), never shove it
-                    const blockingCar = closestSwerve.type === 'vehicle' &&
-                        Math.abs(closestSwerve.lateral) < (this.width + (closestSwerve.entity.width || this.width)) / 2 + 4;
-                    const kerbOK = isPerson && this._actorWait > 480 && this._kerbClear(closestSwerve);
-                    // Someone at the edge of our path (already mostly clear of the body) only needs a nudge, never the kerb
-                    const edgeNudge = isPerson && Math.abs(closestSwerve.lateral) - (closestSwerve.width || 20) / 2 > this.width / 2 - 8;
+                    const blockingCar = Math.abs(closestSwerve.lateral) < (this.width + (closestSwerve.entity.width || this.width)) / 2 + 4;
                     
-                    // Only swerve if obstacle is close enough to matter (people: only a nudge, or that last resort)
+                    // Only swerve if obstacle is close enough to matter
                     const swerveThreshold = this.length * 4 + currentSpeed * 5;
-                    if (closestSwerve.dist < swerveThreshold && !blockingCar && (!isPerson || kerbOK || edgeNudge)) {
-                        needsSwerve = true; edgeNudgeNow = edgeNudge && !kerbOK;
+                    if (closestSwerve.dist < swerveThreshold && !blockingCar) {
+                        needsSwerve = true;
                         
                         // Calculate open space on each side, accounting for obstacle width.
-                        // For point obstacles (single actor, single car) this matches old
-                        // behavior. For an actor_cluster the bounding-box span shrinks
-                        // available clearance, which is the whole point of the cluster
-                        // approach: cars no longer try to thread between companions.
                         const laneWidth = this.currentLane ? 40 : 50; // Approximate lane width
                         const obsHalfWidth = (closestSwerve.width || 20) / 2;
                         const obsLeftEdge = closestSwerve.lateral - obsHalfWidth;
@@ -1741,16 +1639,12 @@
                         const rightClear = laneWidth - obsRightEdge;  // Space from obs's right edge to lane's right edge
                         
                         // Check if other obstacles block the swerve paths.
-                        // Window extended to length*3.5 so a cluster of actors (player +
-                        // formation companions) is treated as a group when picking sides.
                         let leftBlocked = false;
                         let rightBlocked = false;
                         const blockWindow = this.length * 3.5;
                         for (let obs of swerveObstacles) {
                             if (obs === closestSwerve) continue;
                             if (obs.dist < closestSwerve.dist + blockWindow) {
-                                // Use a small lateral epsilon so two actors at nearly the
-                                // same lateral don't both register as different sides.
                                 if (obs.lateral < closestSwerve.lateral - 2) leftBlocked = true;
                                 if (obs.lateral > closestSwerve.lateral + 2) rightBlocked = true;
                             }
@@ -1763,24 +1657,9 @@
                         // the swerve threshold.
                         const baseUrgency = Math.max(0.5, 1 - closestSwerve.dist / swerveThreshold);
                         const urgency = closestSwerve.dist < 50 ? 1.0 : baseUrgency;
+                        const magnitude = 0.9;
                         
-                        // Magnitude scales with obstacle size — actors are small (20px wide)
-                        // and don't need full lock to clear. Parked vehicles still get full
-                        // magnitude. Without this, cars veered way off-road for pedestrians
-                        // and the player on foot.
-                        const isActor = closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster';
-                        // When the actor is moving, the situation is dynamic — they'll be
-                        // out of the way in a moment, so bias toward gentle steering and
-                        // let the speed-slowdown logic do most of the work via braking.
-                        // When stationary (standing in the road), commit harder to swerve.
-                        const actorMoving = isActor && closestSwerve.inMotion;
-                        let magnitude = isActor ? 0.45 : 0.9;
-                        if (actorMoving) magnitude *= 0.55;
-                        if (isActor && edgeNudge && !kerbOK) magnitude = Math.min(magnitude, 0.2);
-                        
-                        // Pick a side. Threshold scales with obstacle width — a wide
-                        // cluster needs to be more "off-center" before we commit to
-                        // squeezing past on one specific side.
+                        // Pick a side. Threshold scales with obstacle width.
                         const sideThreshold = Math.max(5, obsHalfWidth * 0.5);
                         if (closestSwerve.lateral > sideThreshold && !leftBlocked) {
                             // Obstacle is to our right, swerve left
@@ -1788,23 +1667,10 @@
                         } else if (closestSwerve.lateral < -sideThreshold && !rightBlocked) {
                             // Obstacle is to our left, swerve right
                             swerveSteer = urgency * magnitude;
-                        } else if (leftBlocked && rightBlocked) {
-                            // Cluster of actors blocks both sides — don't pick a doomed
-                            // swerve direction. Hard brake instead (handled by speed
-                            // control below using closestObstacleDist).
-                            swerveSteer = 0;
-                        } else {
-                            // Obstacle is centered - pick side with more space.
-                            // For actors specifically, also reduce magnitude further
-                            // (no clear lateral signal = ambiguous; better to nudge gently
-                            // than commit a hard swerve into nothing in particular).
-                            const centeredMag = isActor ? magnitude * 0.8 : 1.0;
-                            if (leftClear > rightClear && !leftBlocked) {
-                                swerveSteer = -urgency * centeredMag;
-                            } else if (!rightBlocked) {
-                                swerveSteer = urgency * centeredMag;
-                            }
-                            // If both blocked, we'll just slow down (handled below)
+                        } else if (!(leftBlocked && rightBlocked)) {
+                            // Obstacle is centered - pick side with more space (both blocked: just slow down, below)
+                            if (leftClear > rightClear && !leftBlocked) swerveSteer = -urgency;
+                            else if (!rightBlocked) swerveSteer = urgency;
                         }
                     }
                 }
@@ -1847,49 +1713,51 @@
                 
                 // Only consider lane change for truly stuck situations (traffic that won't move)
                 let shouldOvertake = false;
-                let waitBriefly = false;          // she, or a parked car: neither is about to move off, so go round soon
-                let clearAhead = 150;             // how far the lane beside must be clear (past a parked car, all of it)
+                let waitBriefly = false;          // someone standing, or a parked car: neither is about to move off, so go round soon
+                let clearAhead = 150;             // how far the lane beside must be clear (past what's in the way, all of it)
+                let backOff = 0;                  // too close behind a parked car to pull out round it (she parked on our nose): back up this far first
                 
                 // Swerve obstacles that can't be swerved around become overtake candidates
                 if (hasSwerveObstacle && !needsSwerve) {
-                    const closestSwerve = swerveObstacles.reduce((a, b) => a.dist < b.dist ? a : b);
-                    if (closestSwerve.type === 'vehicle' || closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster') {
-                        shouldOvertake = true;
-                        waitBriefly = true;
-                        if (closestSwerve.type === 'vehicle') clearAhead = Math.max(clearAhead, closestSwerve.dist + (closestSwerve.entity.length || this.length) + 30);
-                    }
+                    const closestSwerve = swerveObstacles.reduce((a, b) => a.dist < b.dist ? a : b), otherLen = closestSwerve.entity.length || this.length;
+                    shouldOvertake = true;
+                    waitBriefly = true;
+                    clearAhead = Math.max(clearAhead, closestSwerve.dist + otherLen + 30);
+                    if (closestSwerve.dist < this.length * 1.2 + otherLen / 2 && Math.abs(this.speed) < 0.3) backOff = this.length * 1.6 + otherLen / 2 - closestSwerve.dist;
                 }
+                
+                // Someone standing in the road: the wait, the horn, then round them (traffic/traffic-people.js)
+                const folkMove = this._folkLadder(folkPlan, folk);
                 
                 // Stuck traffic also triggers overtake
                 if (trafficObstacle && Math.abs(trafficObstacle.speed) < 0.3 && trafficObstacle.stuckTimer > 100) {
                     shouldOvertake = true;
                 }
                 
-                if (shouldOvertake && this.currentLane && !this.currentTurnPath && 
-                    this.laneChangeState === 'NONE' && this.state === 'DRIVING' && 
-                    !approachingIntersection && !waitingForIntersection) {
-                    
-                    // Player/Zib autodrive should NOT overtake or change lanes - stay on navigation path
-                    const isPlayerAutodrive = this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib');
-                    if (!isPlayerAutodrive) {
-                        const adjacentLane = this.findAdjacentLane(clearAhead);
-                        if (adjacentLane) {
-                            this.initiateNormalLaneChange(adjacentLane);
-                        } else {
-                            if (Math.abs(this.speed) < 0.5) {
-                                this.stuckTimer++;
-                                const waitLimit = waitBriefly ? 30 : 240;
-                                if (this.stuckTimer > waitLimit) {
-                                    const opposingLane = this.findOpposingLane();
-                                    if (opposingLane) { 
-                                        this.initiateOvertake(opposingLane);
-                                        this.stuckTimer = 0;
-                                    }
+                // Player/Zib autodrive should NOT overtake or change lanes - stay on navigation path (it just waits)
+                const isPlayerAutodrive = this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib');
+                const canPullOut = this.currentLane && !this.currentTurnPath && !(this._reverseLeft > 0) &&
+                    this.laneChangeState === 'NONE' && this.state === 'DRIVING' &&
+                    !approachingIntersection && !waitingForIntersection && !isPlayerAutodrive;
+                if (folkMove === 'round' && canPullOut) {
+                    this._goRound(folkPlan);
+                } else if (shouldOvertake && canPullOut && !(backOff && this._backUp(backOff))) {
+                    const adjacentLane = this.findAdjacentLane(clearAhead);
+                    if (adjacentLane) {
+                        this.initiateNormalLaneChange(adjacentLane);
+                    } else {
+                        if (Math.abs(this.speed) < 0.5) {
+                            this.stuckTimer++;
+                            const waitLimit = waitBriefly ? 30 : 240;
+                            if (this.stuckTimer > waitLimit) {
+                                const opposingLane = this.findOpposingLane();
+                                if (opposingLane) { 
+                                    this.initiateOvertake(opposingLane);
+                                    this.stuckTimer = 0;
                                 }
                             }
                         }
                     }
-                    // Player autodrive just waits (handled by slowing down for obstacles)
                 }
 
                 // --- 4. CALCULATE AI TARGETS ---
@@ -1969,34 +1837,13 @@
                 if (hasSwerveObstacle && !needsSwerve && !this.currentTurnPath) {
                     // Can't swerve, must slow down — behind a parked car, far enough back to pull out round it
                     const closest = swerveObstacles.reduce((a, b) => a.dist < b.dist ? a : b), closestDist = closest.dist;
-                    const standOff = closest.type === 'vehicle' ? this.length * 1.1 + (closest.entity.length || this.length) / 2 : this.length * 1.5;
+                    const standOff = this.length * 1.6 + (closest.entity.length || this.length) / 2;
                     const brakeDist = standOff + this.length * 1.5 + currentSpeed * 4;
                     if (closestDist < brakeDist) {
                         const brakeFactor = closestDist / brakeDist;
                         targetSpeed = Math.min(targetSpeed, this.maxSpeed * brakeFactor * 0.5);
                         if (closestDist < standOff) {
                             targetSpeed = 0;
-                        }
-                    }
-                }
-                
-                // --- ACTOR-IN-MOTION BRAKING ---
-                // When an actor (player/teammate) is moving across our path, we'd rather
-                // wait a moment than veer. Even when needsSwerve is true (the swerve will
-                // be applied at reduced magnitude — see actorMoving multiplier above),
-                // we *also* tighten the speed envelope so the car has time for the actor
-                // to clear. Without this layer, gentle swerve + full speed = clipping the
-                // actor's heels.
-                if (needsSwerve && actorAhead && !edgeNudgeNow) targetSpeed = Math.min(targetSpeed, this.maxSpeed * 0.3);   // the last-resort kerb pass: crawling
-                if (needsSwerve) {
-                    const movingActor = swerveObstacles.find(o =>
-                        (o.type === 'actor' || o.type === 'actor_cluster') && o.inMotion
-                    );
-                    if (movingActor) {
-                        const brakeDist = this.length * 4 + currentSpeed * 5;
-                        if (movingActor.dist < brakeDist) {
-                            const factor = Math.max(0.15, movingActor.dist / brakeDist);
-                            targetSpeed = Math.min(targetSpeed, this.maxSpeed * factor * 0.65);
                         }
                     }
                 }
@@ -2059,8 +1906,9 @@
                     if (this.lightAggressiveDuration <= 0) this.isLightAggressive = false;
                 }
                 
-                // Safety caps come last, so no boost or nudge can push a car into the one ahead or over its line
-                targetSpeed = Math.min(targetSpeed, followCap, stopLineCap);
+                // Safety caps come last, so no boost or nudge can push a car into the one ahead, over its line, or into
+                // someone on foot (stopped short of them, or going by no faster than the room allows)
+                targetSpeed = Math.min(targetSpeed, followCap, stopLineCap, folkPlan.cap, folkPlan.stopCap);
                 const route = this._driveRoute;
                 if (route && route.index >= route.transitions.length && !this.currentTurnPath && this.currentLane === route.endLane) {
                     const remaining = (route.destination.x - this.x) * this.currentLane.ux
@@ -2074,6 +1922,8 @@
                 // --- 6. APPLY PHYSICS (Same as manual driving) ---
                 this.manualGas = targetThrottle;
                 this.manualTurn = targetSteer;
+                // Backing up a little to get round something (traffic/traffic-people.js: _backUp)
+                this._reverseStep();
                 
                 // --- INTERSECTION DEADLOCK RECOVERY ---
                 // When a car overswings a turn and pins itself against another vehicle in
@@ -2350,10 +2200,12 @@
                 // Get look-ahead target on lane
                 const laneTarget = AIDriverSolver.getLaneTarget(this, this.currentLane, 50);
                 if (laneTarget) {
-                    steer = AIDriverSolver.steerToward(this, laneTarget.x, laneTarget.y, 0.5);
+                    // Stepping aside within the lane to pass someone at its edge (traffic/traffic-people.js: sideStep)
+                    const ln = this.currentLane, side = this._folkPlan ? this._folkPlan.sideStep : 0;
+                    steer = AIDriverSolver.steerToward(this, laneTarget.x - ln.uy * side, laneTarget.y + ln.ux * side, 0.5);
                     
                     // Also correct for lateral offset (drift correction)
-                    const lateralOffset = AIDriverSolver.getLateralOffset(this, this.currentLane);
+                    const lateralOffset = AIDriverSolver.getLateralOffset(this, this.currentLane) - side;
                     if (Math.abs(lateralOffset) > 5) {
                         // Additional steering to return to lane center
                         const correctionSteer = -lateralOffset * 0.02;
@@ -2592,6 +2444,18 @@
             }
             
             /**
+             * Steering onto `lane`'s line, our way along it (pure pursuit): aim a little way ahead on the line, so the
+             * car eases onto it rather than reaching a point at an angle and swinging on past (`look` is shorter when
+             * pulling out from a crawl, round something close ahead). Returns the steer and how far off the line we are.
+             */
+            _steerOntoLane(lane, urgency, look = this.length * 1.2) {
+                const dir = this.originalLane || this.currentLane || lane;
+                look = Math.max(look, Math.abs(this.speed) * 14);
+                const aim = this._laneProject(lane, this.x + dir.ux * look, this.y + dir.uy * look);
+                return { steer: AIDriverSolver.steerToward(this, aim.x, aim.y, urgency), off: Math.abs(this._latTo(lane)) };
+            }
+
+            /**
              * Calculate steering for lane change maneuver.
              */
             calculateLaneChangeSteering() {
@@ -2605,18 +2469,9 @@
                 const currentDist = Math.hypot(this.x - this.laneChangeStartX, this.y - this.laneChangeStartY);
                 this.laneChangeProgress = Math.min(1.0, currentDist / totalDist);
                 
-                // Steer toward end point
-                let steer = AIDriverSolver.steerToward(this, this.laneChangeEndX, this.laneChangeEndY, 0.6);
-                
-                // Near the end, start aligning with lane
-                if (this.laneChangeProgress > 0.7) {
-                    const alignSteer = AIDriverSolver.calculateSteering(this, this.laneChangeTargetAngle, 0.5);
-                    steer = steer * 0.5 + alignSteer * 0.5;
-                }
-                
-                // Check completion
-                const distToEnd = Math.hypot(this.x - this.laneChangeEndX, this.y - this.laneChangeEndY);
-                if (distToEnd < 15 || this.laneChangeProgress >= 1.0) {
+                // Onto the target lane's line; done once on it (or well past where it was meant to end)
+                const { steer, off } = this._steerOntoLane(this.targetLane, 0.6, this._pullOutLook);
+                if (off < 6 || this.laneChangeProgress >= 1.0 && off < 15 || currentDist > totalDist * 2.5) {
                     this.currentLane = this.targetLane;
                     this.laneChangeState = 'NONE';
                     this.targetLane = null;
@@ -2642,12 +2497,9 @@
                 const currentDist = Math.hypot(this.x - this.laneChangeStartX, this.y - this.laneChangeStartY);
                 this.laneChangeProgress = Math.min(1.0, currentDist / totalDist);
                 
-                // Steer toward target
-                let steer = AIDriverSolver.steerToward(this, this.laneChangeEndX, this.laneChangeEndY, 0.7);
-                
-                // Check completion
-                const distToEnd = Math.hypot(this.x - this.laneChangeEndX, this.y - this.laneChangeEndY);
-                if (distToEnd < 15 || this.laneChangeProgress >= 1.0) {
+                // Onto the oncoming lane's line (our way along it); out once on it
+                const { steer, off } = this._steerOntoLane(this.targetLane, 0.7, this._pullOutLook);
+                if (off < 8 || this.laneChangeProgress >= 1.0 && off < 15 || currentDist > totalDist * 2.5) {
                     // Setup return maneuver
                     this.laneChangeState = 'OVERTAKING_RETURN';
                     this.laneChangeProgress = 0;
@@ -2680,11 +2532,8 @@
                 if (this.stateTimer <= 0 && this.laneChangeProgress === 0 && !this.isLaneClear(this.originalLane, this.length * 2)) this.stateTimer = 10;
                 if (this.stateTimer > 0) {
                     this.stateTimer--;
-                    // Just follow lane during wait
-                    if (this.originalLane) {
-                        return AIDriverSolver.calculateSteering(this, this.originalLane.angle, 0.3);
-                    }
-                    return 0;
+                    // Hold the oncoming lane's line while we pass (squaring up alone let the car drift on across)
+                    return this._steerOntoLane(this.targetLane, 0.5).steer;
                 }
                 
                 // Progress based on distance
@@ -2692,8 +2541,8 @@
                 const currentDist = Math.hypot(this.x - this.laneChangeStartX, this.y - this.laneChangeStartY);
                 this.laneChangeProgress = Math.min(1.0, currentDist / totalDist);
                 
-                // Steer toward return target
-                let steer = AIDriverSolver.steerToward(this, this.laneChangeEndX, this.laneChangeEndY, 0.6);
+                // Back onto our own lane's line
+                const { steer, off } = this._steerOntoLane(this.originalLane, 0.6);
                 
                 // Setup turn signal
                 if (this.laneChangeProgress < 0.5 && this.turnSignalTimer === 0) {
@@ -2707,8 +2556,7 @@
                 }
                 
                 // Check completion
-                const distToEnd = Math.hypot(this.x - this.laneChangeEndX, this.y - this.laneChangeEndY);
-                if (distToEnd < 15 || this.laneChangeProgress >= 1.0) {
+                if (off < 6 || this.laneChangeProgress >= 1.0 && off < 15 || currentDist > totalDist * 2.5) {
                     this.currentLane = this.originalLane;
                     this.laneChangeState = 'NONE';
                     this.targetLane = null;
@@ -2722,6 +2570,7 @@
             
             initiateNormalLaneChange(targetLane) {
                 this.laneChangeState = 'CHANGING';
+                this._pullOutLook = Math.abs(this.speed) < 2 ? this.length * 0.75 : undefined;   // from a crawl: pulling out round something
                 this.targetLane = targetLane;
                 this.laneChangeProgress = 0;
                 this.originalLane = this.currentLane;
@@ -2744,6 +2593,7 @@
             
             initiateOvertake(opposingLane) {
                 this.laneChangeState = 'OVERTAKING_OUT';
+                this._pullOutLook = Math.abs(this.speed) < 2 ? this.length * 0.75 : undefined;
                 this.targetLane = opposingLane;
                 this.originalLane = this.currentLane;
                 this.laneChangeProgress = 0;
