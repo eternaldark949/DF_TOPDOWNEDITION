@@ -645,10 +645,13 @@
                     if (chars && this.velvetCat && this.velvetCat.visible && !this.velvetCat.inCar) {
                         this.velvetCat.draw(this.ctx);
                     }
+                    // In night vision the hostiles burn white-hot (ui/silhouette-fx.js); civilians don't
+                    SilhouetteFX.heat = this.nvIntensity > 0.02 ? this.nvIntensity : 0;
                     if (chars) this.enemies.forEach(e => {
                         if (e.x < cbE.left || e.x > cbE.right || e.y < cbE.top || e.y > cbE.bottom) return;
                         e.draw(this.ctx);
                     });
+                    SilhouetteFX.heat = 0;
 
                     // Sticky Orbs (Golden Child DOT — rendered on top of enemies)
                     if (RL.at('combat')) for (const orb of this.stickyOrbs) {
@@ -1056,6 +1059,8 @@
                 }
                 // Glowing details drawn after the darkness layer: windows, neon, rooftops, sky
                 if (RL.at('glow')) this.drawEmissivePass(this.ctx);
+                // Her halo, above the darkness so it reads at night (kept from her draw: engine/player-draw-input.js)
+                if (RL.at('stella')) this.drawPlayerGlow(this.ctx);
                 if (RL.at('combat')) {
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
                     this.drawFireTrail(this.ctx, cullBounds.view);

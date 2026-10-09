@@ -1449,6 +1449,32 @@ test('Garage switch while out in a hijacked car keeps her in it, and the old mod
   equal(result, {driving:true, inH:true, replaced:true, at:result.was, was:result.was, oldSolid:false, newShown:true});
 }, {events:true});
 
+test('Visibility: her halo by day, by night and in night vision; only hostiles burn white in night vision', env => {
+  const r = value(env, `
+    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+    const p = game.player, g = new Ganger(p.x + 80, p.y, {}), gg = new GatlingGunner(p.x - 80, p.y, 901);
+    game.enemies.push(g, gg);
+    const peds = game.pedestrians.pedestrians; if (peds[0]) { peds[0].x = p.x; peds[0].y = p.y + 60; }
+    const seen = [], take = SilhouetteFX.take.bind(SilhouetteFX);
+    SilhouetteFX.take = (e, c) => { const k = take(e, c); if (k) seen.push((e === p ? 'her' : e === g ? 'ganger' : 'other') + ':' + k); return k; };
+    gg._drawGunnerBody = function (c) { if (c.canvas !== game.canvas) seen.push('gunner:heat'); return GatlingGunner.prototype._drawGunnerBody.call(this, c); };
+    const glow = SilhouetteFX.drawGlow.bind(SilhouetteFX); let halos = 0;
+    SilhouetteFX.drawGlow = (ctx, d) => { if (SilhouetteFX._kept) halos++; return glow(ctx, d); };
+    const frame = (mins, nv) => {
+      game.worldMinutes = mins; game.nightVision = nv; game.nvIntensity = nv ? 1 : 0;
+      seen.length = 0; halos = 0; _frameTime += 16; game.draw();
+      return { seen: [...new Set(seen)].sort(), halos, heat: SilhouetteFX.heat, open: !!SilhouetteFX._cur, world: _worldCanvas === game.canvas };
+    };
+    return { day: frame(1440 + 13 * 60, false), night: frame(1440 + 22 * 60, false), nv: frame(1440 + 22 * 60, true) };`);
+  for (const k of ['day', 'night']) {
+    equal(r[k].seen, ['her:glow'], `${k}: only she is captured, for her halo`);
+    equal(r[k].halos, 1, `${k}: her halo is drawn after the light`);
+  }
+  equal(r.nv.seen, ['ganger:heat', 'gunner:heat', 'her:glow'], 'night vision: the ganger and the gunner burn white, she keeps her halo, the civilian is left alone');
+  equal(r.nv.halos, 1, 'night vision: her halo still draws');
+  for (const k of ['day', 'night', 'nv']) equal([r[k].heat, r[k].open, r[k].world], [0, false, true], `${k}: nothing is left switched on, and the world canvas is restored`);
+}, {affine:true});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');

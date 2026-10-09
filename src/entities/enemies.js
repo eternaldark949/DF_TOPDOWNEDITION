@@ -1145,6 +1145,23 @@
                 ctx.ellipse(0, 10, 20, 12, 0, 0, Math.PI*2); 
                 ctx.fill();
                 
+                // In night vision the body burns white-hot: drawn into a capture and stamped back (ui/silhouette-fx.js)
+                const heat = SilhouetteFX.heat, cap = heat > 0.01 ? SilhouetteFX.begin(ctx, 56) : null;
+                try { this._drawGunnerBody(cap || ctx); }
+                finally { if (cap) SilhouetteFX.end('heat', heat); }
+                
+                // (Health bar: drawn with the other combat overlays once hit — engine/combat-fx.js)
+                ctx.restore();
+
+                // Telegraph aim line (world space)
+                if (this.isTelegraphing && this.burstCooldown > 0) {
+                    drawEnemyTelegraph(ctx, this.x, this.y, this.telegraphAngle,
+                        this.burstCooldown, this.telegraphThreshold, '#ffaa00', 350);
+                }
+            }
+
+            /** The gunner itself (body, head, barrels, muzzle flash), in its own turned frame. */
+            _drawGunnerBody(ctx) {
                 // Body
                 ctx.fillStyle = '#1a1a1a';
                 ctx.beginPath(); 
@@ -1176,15 +1193,6 @@
                     ctx.arc(35, 0, 8, 0, Math.PI*2); 
                     ctx.fill(); 
                     ctx.shadowBlur = 0;
-                }
-                
-                // (Health bar: drawn with the other combat overlays once hit — engine/combat-fx.js)
-                ctx.restore();
-
-                // Telegraph aim line (world space)
-                if (this.isTelegraphing && this.burstCooldown > 0) {
-                    drawEnemyTelegraph(ctx, this.x, this.y, this.telegraphAngle,
-                        this.burstCooldown, this.telegraphThreshold, '#ffaa00', 350);
                 }
             }
 

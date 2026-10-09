@@ -63,6 +63,7 @@
                 const outfit = cosmeticConfig.outfit;
                 const wx = weatherAt(this.player), rainOn = !!(wx && wx.rain > 0.05);
 
+                SilhouetteFX.glow = this._playerGlowOn();   // her halo (ui/silhouette-fx.js; drawn after the light)
                 drawProceduralHumanoid(this.ctx, this.player, {
                     skinColor: cosmeticConfig.skinColor,
                     hair: cosmeticConfig.hair,
@@ -91,8 +92,22 @@
                     // A drawn gun takes the hand; the umbrella waits
                     held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
                 });
+                SilhouetteFX.glow = false;
                 
                 this.ctx.restore();
+            },
+
+            /** Whether she wears her halo this frame: on foot and in play, as for her marker. */
+            _playerGlowOn() {
+                const p = this.player;
+                return !!(this.running && p && p.visible && !p.isHidden && !p.dead && !this.isDriving && !p.inCar &&
+                    !(this.scenes && this.scenes.running) && !(this.cutscene && this.cutscene.active) &&
+                    !this.cineCam && !this.finisher && !this.finCam);
+            },
+
+            /** Her halo, after the darkness, so it reads by day, by night and in night vision. */
+            drawPlayerGlow(ctx) {
+                SilhouetteFX.drawGlow(ctx, this._renderScale || 1);
             },
 
             /**

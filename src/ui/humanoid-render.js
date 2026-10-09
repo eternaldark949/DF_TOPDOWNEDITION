@@ -1148,6 +1148,33 @@
         function drawProceduralHumanoid(ctx, entity, config = {}) {
             if (config._crowdBake) RenderStats.bakedBodies++;
             else { RenderStats.bodies++; RenderStats.liveBodies++; }
+            // Her glow, or a hostile burning white in night vision (ui/silhouette-fx.js)
+            const fx = SilhouetteFX.take(entity, config);
+            if (fx) return _drawHumanoidSilhouette(ctx, entity, config, fx);
+            if (!RenderStats.timed) return _drawProceduralHumanoid(ctx, entity, config);
+            const t0 = performance.now();
+            RenderStats.peopleDepth++;
+            try { return _drawProceduralHumanoid(ctx, entity, config); }
+            finally { RenderStats.peopleDepth--; RenderStats.peopleMs += performance.now() - t0; }
+        }
+        /** The body drawn into SilhouetteFX's capture (its contact shadow stays on the frame), then stamped back with its effect. */
+        function _drawHumanoidSilhouette(ctx, entity, config, fx) {
+            const g = SilhouetteFX.begin(ctx);
+            if (!g) return _drawProceduralHumanoidTimed(ctx, entity, config);
+            const noShadow = config.noShadow;
+            try {
+                if (!noShadow && _zoomLOD < 2) {
+                    const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a);
+                    drawHumanContactShadow(ctx);
+                }
+                config.noShadow = true;
+                _drawProceduralHumanoidTimed(g, entity, config);
+            } finally {
+                config.noShadow = noShadow;
+                SilhouetteFX.end(fx, SilhouetteFX.heat);
+            }
+        }
+        function _drawProceduralHumanoidTimed(ctx, entity, config) {
             if (!RenderStats.timed) return _drawProceduralHumanoid(ctx, entity, config);
             const t0 = performance.now();
             RenderStats.peopleDepth++;
