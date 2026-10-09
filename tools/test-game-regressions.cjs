@@ -953,6 +953,158 @@ test('An unmarked plane (the Moon City canopy) stamps as one sprite instead of d
   ok(names.includes('stroke'), 'the gold posts still draw live');
 }, {affine: true});
 
+// Cars (engine/cars.js): her own car, Amber's van and whatever she's taken, on the hub and off it
+function carsFixture(env) {
+  env.run(`{
+    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+    game.traffic.vehicles=[]; game.traffic.spawnTimer=1e9; GameSettings.getMaxTraffic=()=>0;
+    game.zibSystem.passengerRide=null; game.zibSystem.activeZibs=[]; game.zibSystem.trySpawn=()=>{};
+    game.keys={}; game.joystick.active=false; game.joystick.dx=game.joystick.dy=0;
+    globalThis.__lane=game.traffic.network.allLanes.find(l=>l.id==='R0.S0.L2');
+    globalThis.__street=(along,brand='LADY')=>{
+      const c=new TrafficVehicle(__lane,brand,brand==='LADY'?'suv2':Object.keys(VEHICLE_BRANDS[brand].models)[0],'AI');
+      Object.assign(c,{x:__lane.start.x+__lane.ux*along,y:__lane.start.y+__lane.uy*along,angle:__lane.angle,speed:0,vx:0,vy:0});
+      game.traffic.vehicles.push(c); return c;
+    };
+    globalThis.__beside=c=>{game.player.x=c.x-Math.sin(c.angle)*45;game.player.y=c.y+Math.cos(c.angle)*45;};
+  }`);
+}
+
+test('Cars live on the hub: after a hijack nothing of hers is drawn, solid or offered indoors, and each is back where she left it', env => {
+  carsFixture(env);
+  const result=value(env, `
+    const own=game.ownedCar, van=game.deliveryVehicle, ownAt=[own.x,own.y], vanAt=[van.x,van.y];
+    const h=__street(300); __beside(h); game.hijackVehicle(h);
+    h.x+=120; game.toggleVehicle(); const hAt=[h.x,h.y];
+    game._doLoadMap('cozy_cafe_interior');
+    game.player.x=own.x; game.player.y=own.y; game.update(); game.draw();      // standing where her car is on the hub
+    const indoors={cars:[own,van,h].map(c=>[c.visible,c.active]),
+      solid:[own,van,h].some(c=>c.active&&GameEntity.registry.all.includes(c)),
+      offered:game.activeInteraction&&game.activeInteraction.target||null, parked:game.parkedCars().length};
+    game._doLoadMap('hub_949');
+    return {indoors:{...indoors,offered:!!indoors.offered}, linked:game.car===h, vans:GameEntity.registry.all.filter(e=>e.isDeliveryVehicle).length,
+      own:[own.x,own.y], ownAt, van:[van.x,van.y], vanAt, h:[h.x,h.y], hAt,
+      shown:[own,van,h].map(c=>c.visible&&c.active&&GameEntity.registry.all.includes(c)), inTraffic:game.traffic.vehicles.includes(h)};
+  `);
+  equal(result.indoors, {cars:[[false,false],[false,false],[false,false]], solid:false, offered:false, parked:0}, 'every car put away indoors');
+  equal([result.own, result.van, result.h], [result.ownAt, result.vanAt, result.hAt], 'each where she left it');
+  equal([result.linked, result.vans, result.shown, result.inTraffic], [true, 1, [true,true,true], false]);
+}, {events:true});
+
+test('Out of a hijacked car: lights left on, still hers to Drive; taking another sends it back to traffic, lit, and an empty one has nobody to put out', env => {
+  carsFixture(env);
+  const result=value(env, `
+    const a=__street(300,'Gelfash'), b=__street(700); __beside(a); game.hijackVehicle(a); game.toggleVehicle();
+    game.update();
+    const left={mode:a.controlMode, lit:carLampsOn(a), traffic:game.traffic.vehicles.includes(a), pill:game.interactBtn._apSig,
+      kind:game.activeInteraction&&game.activeInteraction.type};
+    document.getElementById('message-modal').textContent='';
+    game.interact(); for(let i=0;i<300&&!game.isDriving;i++) game.update();         // the Drive pill: round to her door, back in, no second theft
+    const again={driving:game.isDriving, car:game.car===a, msg:document.getElementById('message-modal').textContent||''};
+    game.toggleVehicle(); __beside(b); game.update(); const hijackPill=game.interactBtn._apSig;
+    game.hijackVehicle(b);
+    const switched={lit:carLampsOn(a), traffic:game.traffic.vehicles.includes(a), linked:game.car===b, driving:game.isDriving};
+    game.toggleVehicle(); for(let i=0;i<5;i++) game.update();
+    const later={mode:a.controlMode, lit:carLampsOn(a)};
+    const enemies=game.enemies.length, R=Math.random; Math.random=()=>0;              // a Gelfash driver comes out fighting 1 time in 5 — but nobody's in it
+    __beside(a); game.hijackVehicle(a); Math.random=R;
+    return {left, again, hijackPill, switched, later, retaken:{car:game.car===a, enemies:game.enemies.length-enemies, bBack:game.traffic.vehicles.includes(b)}};
+  `);
+  equal(result.left, {mode:'PARKED', lit:true, traffic:false, pill:'Drive|Car|E', kind:'drive'});
+  equal([result.again.driving, result.again.car], [true, true]);
+  ok(!/HIJACKED/.test(result.again.msg), 'getting back in is not a hijack');
+  equal(result.hijackPill, 'Hijack|Vehicle|E');
+  equal(result.switched, {lit:true, traffic:true, linked:true, driving:true}, 'the old one keeps its lights as it goes back to traffic');
+  equal(result.later, {mode:'PARKED', lit:true});
+  equal(result.retaken, {car:true, enemies:0, bBack:true});
+}, {events:true});
+
+test("Amber's van is sanctioned: never duplicated, parked where she leaves it, home for a new job", env => {
+  carsFixture(env);
+  const result=value(env, `
+    const van=game.deliveryVehicle, home={...van.home}; __beside(van); game.update();
+    const pill=game.interactBtn._apSig;
+    game.interact(); for(let i=0;i<300&&!game.isDriving;i++) game.update();         // round to the driver's door and in
+    game._rideHud();
+    const inVan={car:game.car===van, kept:game.deliveryVehicle===van, kind:game.carKind(van), chip:document.getElementById('ui-ride').querySelector('.r-chip').textContent,
+      traffic:game.traffic.vehicles.includes(van)};
+    van.x+=500; game.toggleVehicle(); const leftAt=[van.x,van.y];
+    game._doLoadMap('cozy_cafe_interior'); game._doLoadMap('hub_949');
+    const back={same:game.deliveryVehicle===van, vans:GameEntity.registry.all.filter(e=>e.isDeliveryVehicle).length, at:[van.x,van.y], traffic:game.traffic.vehicles.includes(van)};
+    game._doLoadMap('cozy_cafe_interior'); NPC_DIALOGUE['Barista Ren'].accept(game);
+    const job=game.missions.activeMission&&game.missions.activeMission.type;
+    game._doLoadMap('hub_949');
+    return {pill, inVan, leftAt, back, job, home:[van.x,van.y,van.angle], homeWas:[home.x,home.y,home.angle], vans:GameEntity.registry.all.filter(e=>e.isDeliveryVehicle).length};
+  `);
+  equal(result.pill, 'Drive|Delivery van|E');
+  equal(result.inVan, {car:true, kept:true, kind:'sanctioned', chip:'Sanctioned', traffic:false});
+  equal(result.back, {same:true, vans:1, at:result.leftAt, traffic:false}, 'one van, where she left it');
+  equal([result.job, result.home, result.vans], ['delivery', result.homeWas, 1], 'a new job finds it by the cafe');
+}, {events:true});
+
+test('Markers: pins over her car and the van after the light, at the edge when away, none indoors or in the car', env => {
+  carsFixture(env);
+  const draw=(setup)=>value(env, `
+    ${setup}
+    const kinds=[], order=[], M=MapIcons.draw, L=game.drawLightingSystem, C=game.drawCarMarkers;
+    MapIcons.draw=function(ctx,k,...a){ if(/^(amberPin|pin):|objective/.test(k)) kinds.push(k); return M.call(this,ctx,k,...a); };
+    game.drawLightingSystem=function(...a){ order.push('light'); return L.apply(this,a); };
+    game.drawCarMarkers=function(...a){ order.push('markers'); return C.apply(this,a); };
+    const labels=[], F=game.ctx.fillText; game.ctx.fillText=function(t,...a){ if(/CAR|AMBER|DROP|BOUNTY|SALVAGE/.test(t)) labels.push(t); return F.call(this,t,...a); };
+    try { game.camera.x=game.player.x; game.camera.y=game.player.y; game.draw(); }
+    finally { MapIcons.draw=M; delete game.drawLightingSystem; delete game.drawCarMarkers; game.ctx.fillText=F; }
+    return {kinds:kinds.sort(), labels:labels.sort(), order:order.join(',')};
+  `);
+  const own='game.ownedCar', van='game.deliveryVehicle';
+  const near=draw(`__beside(${own}); game.missions.activeMission=null;`);
+  equal(near.kinds, [], 'her car within reach: the Drive pill instead of a pin (the van is far, and no job)');
+  equal(near.order, 'light,markers', 'after the light');
+  const view=draw(`game.player.x=${own}.x-300; game.player.y=${own}.y;`);
+  ok(view.kinds.includes('pin:car') && view.labels.includes('YOUR CAR'), 'on screen: a pin and her car\'s name');
+  const far=draw(`game.player.x=${own}.x+2400; game.player.y=${own}.y;`);
+  ok(far.kinds.includes('pin:car') && far.labels.some(l=>/^YOUR CAR · \d+m$/.test(l)), 'off screen on foot: at the edge with the distance');
+  ok(!far.kinds.includes('amberPin:box'), 'the van stays off the edge without a job');
+  const job=draw(`const d=game.missions.generateDelivery(game); game.missions.acceptMission(d,game);`);
+  ok(job.kinds.includes('amberPin:box') && job.labels.some(l=>/^AMBER DELIVERY · \d+m$/.test(l)), 'a job to fetch it: the van at the edge');
+  const driving=draw(`game.missions.activeMission=null; const h=__street(300); __beside(h); game.hijackVehicle(h);
+    h.x=${own}.x+2400; h.y=${own}.y; game.player.x=h.x; game.player.y=h.y;`);
+  equal(driving.kinds.filter(k=>k==='pin:car'), [], 'driving another car: the ride tag points home instead');
+  const inside=draw(`game.toggleVehicle(); game._doLoadMap('cozy_cafe_interior'); game.running=true;`);
+  equal(inside.kinds, [], 'none indoors');
+}, {events:true});
+
+test('Saves: her car stays where she parked it through a save made indoors; a hijacked drive loads on foot', env => {
+  carsFixture(env);
+  const result=value(env, `
+    const own=game.ownedCar; Object.assign(own,{x:900,y:1300,angle:0.5});
+    game._doLoadMap('cozy_cafe_interior'); game.saveGame({auto:true});
+    Object.assign(own,{x:10,y:10}); game.loadGame('dfab_save_slot_auto');
+    const indoors={visible:game.ownedCar.visible, active:game.ownedCar.active, linked:game.car===game.ownedCar};
+    game._doLoadMap('hub_949'); const out=[game.ownedCar.x,game.ownedCar.y,game.ownedCar.visible];
+    const h=new TrafficVehicle(game.traffic.network.allLanes[3],'LADY','suv2','AI'); game.traffic.vehicles.push(h);
+    game.player.x=h.x+30; game.player.y=h.y; game.hijackVehicle(h); game.saveGame({auto:true});
+    const saved=JSON.parse(localStorage.getItem('dfab_save_slot_auto'));
+    game.loadGame('dfab_save_slot_auto');
+    return {indoors, out, savedDriving:saved.isDriving, loaded:{driving:game.isDriving, linked:game.car===game.ownedCar, at:[game.ownedCar.x,game.ownedCar.y]}};
+  `);
+  equal(result.indoors, {visible:false, active:false, linked:true});
+  equal(result.out, [900, 1300, true], 'back outside, the car is where she parked it');
+  equal(result.savedDriving, false, 'a hijacked drive is not saved as driving her car');
+  equal(result.loaded, {driving:false, linked:true, at:[900, 1300]});
+}, {events:true});
+
+test('Garage switch while out in a hijacked car keeps her in it, and the old model leaves no invisible wall', env => {
+  carsFixture(env);
+  const result=value(env, `
+    const old=game.ownedCar; game.garage.addCar('LADY','suv2');
+    const h=__street(300); __beside(h); game.hijackVehicle(h);
+    game.switchGarageCar(game.garage.count-1);
+    return {driving:game.isDriving, inH:game.car===h, replaced:game.ownedCar!==old, at:[game.ownedCar.x,game.ownedCar.y], was:[old.x,old.y],
+      oldSolid:old.active||old.visible, newShown:game.ownedCar.visible&&game.ownedCar.active};
+  `);
+  equal(result, {driving:true, inH:true, replaced:true, at:result.was, was:result.was, oldSolid:false, newShown:true});
+}, {events:true});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');

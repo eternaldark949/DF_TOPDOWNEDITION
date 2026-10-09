@@ -20,7 +20,7 @@
 
         const MapIcons = {
             // Fixed sizes in CSS px (the whole set in one place)
-            SIZE: { player: 22, car: 20, pin: 30, objective: 30, danger: 30, dest: 30, transition: 15, client: 11, search: 14 },
+            SIZE: { player: 22, car: 20, pin: 30, amberPin: 30, objective: 30, danger: 30, dest: 30, transition: 15, client: 11, search: 14 },
             /** A gentle response to zoom (icons grow a little as you zoom in), never to the screen. */
             zoomK(zoom) { return Math.max(0.9, Math.min(1.2, 0.86 + 0.08 * zoom)); },
             _cache: new Map(),
@@ -62,13 +62,14 @@
                 c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
             },
             _paint: {
-                /** A crimson teardrop pin: dark centre, dotted white ring, violet underglow, a lavender glyph. Anchored at its tip. */
-                pin(c, S, glyph) {
+                /** A crimson teardrop pin: dark centre, dotted white ring, violet underglow, a lavender glyph. Anchored at its tip.
+                 *  `amberPin:<glyph>` is the same in amber (Amber's delivery van). */
+                pin(c, S, glyph, amber) {
                     const cx = S / 2, r = S * 0.3, cy = S * 0.36, tip = S * 0.98;
                     this._glow(c, cx, tip - S * 0.06, S * 0.42, '139, 92, 246', 0.55);
                     c.beginPath(); c.arc(cx, cy, r, Math.PI * 0.82, Math.PI * 0.18); c.lineTo(cx, tip); c.closePath();
                     const g = c.createLinearGradient(0, cy - r, 0, tip);
-                    g.addColorStop(0, '#d0204e'); g.addColorStop(1, '#5e0418');
+                    g.addColorStop(0, amber ? '#f2a03a' : '#d0204e'); g.addColorStop(1, amber ? '#6e3304' : '#5e0418');
                     c.fillStyle = g; c.fill();
                     c.strokeStyle = 'rgba(255, 210, 220, 0.55)'; c.lineWidth = Math.max(1, S * 0.03); c.stroke();
                     c.fillStyle = '#12061c'; c.beginPath(); c.arc(cx, cy, r * 0.62, 0, Math.PI * 2); c.fill();
@@ -88,12 +89,12 @@
                     c.fillStyle = g; c.fill();
                     c.strokeStyle = '#efe6ff'; c.lineWidth = Math.max(1, S * 0.06); c.lineJoin = 'round'; c.stroke();
                 },
-                /** Your car: a crimson capsule with gold headlights, pointing +x. */
-                car(c, S) {
-                    const cx = S / 2, cy = S / 2, L = S * 0.86, Wd = S * 0.44;
-                    this._glow(c, cx, cy, S * 0.6, '224, 40, 90', 0.4);
+                /** Your car: a crimson capsule with gold headlights, pointing +x. `car:amber` is Amber's delivery van. */
+                car(c, S, glyph) {
+                    const cx = S / 2, cy = S / 2, L = S * 0.86, Wd = S * 0.44, amber = glyph === 'amber';
+                    this._glow(c, cx, cy, S * 0.6, amber ? '255, 159, 67' : '224, 40, 90', 0.4);
                     c.beginPath(); c.roundRect(cx - L / 2, cy - Wd / 2, L, Wd, Wd * 0.4);
-                    c.fillStyle = '#c0143e'; c.fill();
+                    c.fillStyle = amber ? '#d9821f' : '#c0143e'; c.fill();
                     c.strokeStyle = 'rgba(255, 220, 230, 0.7)'; c.lineWidth = Math.max(1, S * 0.05); c.stroke();
                     c.fillStyle = 'rgba(20, 6, 30, 0.75)'; c.fillRect(cx - L * 0.05, cy - Wd * 0.32, L * 0.26, Wd * 0.64);
                     c.fillStyle = '#ffd76a';
@@ -145,6 +146,7 @@
                     c.beginPath(); c.arc(S * 0.42, S * 0.42, S * 0.26, 0, Math.PI * 2); c.stroke();
                     c.beginPath(); c.moveTo(S * 0.62, S * 0.62); c.lineTo(S * 0.9, S * 0.9); c.stroke();
                 },
+                amberPin(c, S, glyph) { return MapIcons._paint.pin.call(this, c, S, glyph, true); },
                 dest(c, S) { return MapIcons._paint.pin.call(this, c, S, 'flag'); }
             },
             /** A four-point star. */
@@ -167,6 +169,8 @@
                     case 'flag': c.fillRect(x - r * 0.55, y - r, r * 0.22, r * 2); c.beginPath(); c.moveTo(x - r * 0.33, y - r); c.lineTo(x + r * 0.9, y - r * 0.55); c.lineTo(x - r * 0.33, y - r * 0.1); c.closePath(); c.fillStyle = '#ffd76a'; c.fill(); break;
                     case 'sparkle': MapIcons._star(c, x, y, r * 1.1, '#ffd76a'); break;
                     case 'person': c.beginPath(); c.arc(x, y - r * 0.45, r * 0.42, 0, Math.PI * 2); c.fill(); c.beginPath(); c.ellipse(x, y + r * 0.55, r * 0.75, r * 0.45, 0, Math.PI, 0); c.fill(); break;
+                    case 'car': c.beginPath(); c.roundRect(x - r, y - r * 0.5, r * 2, r, r * 0.4); c.fill(); c.fillStyle = '#12061c'; c.fillRect(x - r * 0.05, y - r * 0.32, r * 0.5, r * 0.64); c.fillStyle = '#ffd76a'; c.fillRect(x + r * 0.8, y - r * 0.42, r * 0.18, r * 0.24); c.fillRect(x + r * 0.8, y + r * 0.18, r * 0.18, r * 0.24); break;
+                    case 'box': c.fillRect(x - r * 0.85, y - r * 0.75, r * 1.7, r * 1.5); c.fillStyle = '#ffd76a'; c.fillRect(x - r * 0.14, y - r * 0.75, r * 0.28, r * 1.5); c.fillRect(x - r * 0.85, y - r * 0.12, r * 1.7, r * 0.24); break;
                     default: c.beginPath(); c.arc(x, y, r * 0.55, 0, Math.PI * 2); c.fill();
                 }
                 c.restore();

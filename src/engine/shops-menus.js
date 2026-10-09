@@ -68,25 +68,9 @@
                     this.toggleVehicle();
                 }
                 
-                // Preserve current state
-                const oldX = this.ownedCar.x;
-                const oldY = this.ownedCar.y;
-                const oldAngle = this.ownedCar.angle;
-                const oldVisible = this.ownedCar.visible;
-                
-                // Rebuild TrafficVehicle with new brand/model
-                this.ownedCar = new TrafficVehicle(null, carData.brand, carData.model, 'PLAYER');
-                this.ownedCar.isOwnedCar = true;
-                this.ownedCar.x = oldX;
-                this.ownedCar.y = oldY;
-                this.ownedCar.angle = oldAngle;
-                this.ownedCar.visible = oldVisible;
-                
-                // Apply customization colors from garage
-                this.garage.applyToVehicle(this.ownedCar);
-                
-                // Update the car reference
-                this.car = this.ownedCar;
+                // The new model where the old one stood, with its colours from the garage. Her linked car stays
+                // the one she's in or last left (the new model, if that was her own: engine/cars.js)
+                this._replaceOwnedCar(carData.brand, carData.model);
                 
                 const name = this.garage.getDisplayName(garageIndex);
                 showMessage(`ACTIVE VEHICLE: ${name.toUpperCase()}`);

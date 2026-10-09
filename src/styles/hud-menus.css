@@ -70,6 +70,7 @@
         #ui-ride .r-chip { font-size: 0.48rem; letter-spacing: 2px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(208, 16, 28, 0.75); color: #ff8a92; }
         #ui-ride .r-chip.own { border-color: rgba(255, 194, 72, 0.75); color: var(--df-gold); }
         #ui-ride .r-chip.zib { border-color: rgba(202, 176, 250, 0.7); color: var(--df-lavender-pale); }
+        #ui-ride .r-chip.work { border-color: rgba(255, 159, 67, 0.75); color: #ffb870; }   /* Amber's van: hers to use on the job */
         #ui-ride .r-sub { display: none; align-items: center; gap: 7px; padding-left: 24px; font: 500 0.54rem var(--font-ui); letter-spacing: 2.5px; text-transform: uppercase; color: var(--df-lavender-pale); }
         #ui-ride.away .r-sub { display: flex; }
         @media (orientation: portrait) { body:not(.landscape) #ui-ride { bottom: auto; top: 128px; } }   /* a tall phone: under the menu badge, clear of the controls */

@@ -700,13 +700,13 @@
                     this.ownedCar.draw(this.ctx);
                 }
                 
-                // Draw Delivery Vehicle (persistent, never despawns)
+                // Draw Delivery Vehicle (persistent, never despawns; drawn as the active car below when it's hers right now)
                 if (RL.at('cars') && this.deliveryVehicle && this.deliveryVehicle.visible) {
                     const cbV = cullBounds.vehicles;
                     const dv = this.deliveryVehicle;
                     if (!(dv.x < cbV.left || dv.x > cbV.right || dv.y < cbV.top || dv.y > cbV.bottom)) {
                         dv._lod = 0;
-                        dv.draw(this.ctx);
+                        if (dv !== this.car) dv.draw(this.ctx);
                         
                         // Draw amber package beside the vehicle (if delivery mission active, not yet picked up)
                         if (this.missions.activeMission && this.missions.activeMission.type === MISSION_TYPES.DELIVERY
@@ -1256,11 +1256,8 @@
                 const hud = RL.at('hud');
                 if (hud) this.drawPlayerMarker(this.ctx);
                 
-                // Mission waypoint marker (screen-space indicator)
-                if (hud && this.missions.activeMission && this.missions.activeMission.status === 'active' 
-                    && this.activeMap && this.activeMap.id === 'hub_949') {
-                    this.drawMissionMarker();
-                }
+                // Her car, Amber's van and the job's objective: pins over them, or at the screen's edge (engine/cars.js)
+                if (hud) this.drawCarMarkers(this.ctx);
                 
                 // HUD mission objective text (top of screen)
                 if (hud && this.missions.activeMission && this.missions.activeMission.status === 'active') {
@@ -1467,7 +1464,7 @@
 
             /**
              * The ride tag (#ui-ride, bottom left): the car's name with a chip (HIJACKED, YOURS,
-             * ZIB · PASSENGER) and, in someone else's car, how far off her own car is with a gold
+             * SANCTIONED for Amber's van, ZIB · PASSENGER) and, in any other car, how far off her own car is with a gold
              * arrow pointing to it. Touches the DOM only when something it shows changes.
              */
             _rideHud() {
@@ -1479,15 +1476,16 @@
                 if (!on) return;
                 if (!R.parts) R.parts = { ico: el.querySelector('.r-ico'), name: el.querySelector('.r-name'), chip: el.querySelector('.r-chip'),
                                           dist: el.querySelector('.r-dist'), arrow: el.querySelector('.r-arrow') };
-                const P = R.parts, own = this.car === this.ownedCar, zib = !!(this.zibSystem && this.zibSystem.isPassenger);
-                const name = zib ? 'Zib autonomous taxi' : own ? this.garage.getDisplayName(this.garage.activeIndex) : `${this.car.brand} ${this.car.modelName}`;
-                const chip = zib ? 'zib' : own ? 'own' : 'hijacked';
+                const P = R.parts, zib = !!(this.zibSystem && this.zibSystem.isPassenger);
+                const kind = zib ? 'zib' : this.carKind(this.car), own = kind === 'own';   // own · sanctioned · hijacked (engine/cars.js)
+                const name = zib ? 'Zib autonomous taxi' : own ? this.garage.getDisplayName(this.garage.activeIndex)
+                    : kind === 'sanctioned' ? 'Amber delivery van' : `${this.car.brand} ${this.car.modelName}`;
                 if (name !== R.name) { P.name.textContent = name; R.name = name; }
-                if (chip !== R.chip) {
-                    P.chip.textContent = zib ? 'Zib · passenger' : own ? 'Yours' : 'Hijacked';
-                    P.chip.className = 'r-chip' + (zib ? ' zib' : own ? ' own' : '');
+                if (kind !== R.chip) {
+                    P.chip.textContent = zib ? 'Zib · passenger' : own ? 'Yours' : kind === 'sanctioned' ? 'Sanctioned' : 'Hijacked';
+                    P.chip.className = 'r-chip' + (zib ? ' zib' : own ? ' own' : kind === 'sanctioned' ? ' work' : '');
                     if (!P.ico.firstChild && typeof ACTION_ICONS !== 'undefined') P.ico.innerHTML = ACTION_ICONS.car;
-                    R.chip = chip;
+                    R.chip = kind;
                 }
                 const away = !own && !zib && this.ownedCar && this.ownedCar.visible;
                 if (!!away !== R.away) { el.classList.toggle('away', !!away); R.away = !!away; }

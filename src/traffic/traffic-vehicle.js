@@ -129,10 +129,6 @@
                 this.manualGas = 0;
                 this.manualTurn = 0;
                 
-                // --- OWNED CAR MARKER STATE ---
-                this.markerOpacity = 0;
-                this.markerTargetOpacity = 0;
-                
                 // --- PARK IDLE TIMER ---
                 this.parkIdleTimer = 0; 
                 
@@ -218,54 +214,6 @@
                 const farLOD = this._lod === 1; // Skip expensive effects when distant
                 
                 ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
-                
-                // Owned Car Marker (always render - important UI element)
-                if (this.isOwnedCar && this.controlMode !== 'PLAYER' && this.markerOpacity > 0.01) {
-                    const breathe = (Math.sin(_frameTime / 800) + 1) / 2; 
-                    const scale = 1.0 + (breathe * 0.15); 
-                    const alpha = this.markerOpacity;
-                    
-                    ctx.shadowColor = `rgba(255, 215, 0, ${alpha})`;
-                    ctx.shadowBlur = (25 + (breathe * 15)) * alpha;
-                    ctx.fillStyle = `rgba(255, 215, 0, ${(0.25 + breathe * 0.25) * alpha})`;
-                    
-                    const baseSize = 8;
-                    const scaledSize = baseSize * scale;
-                    ctx.beginPath();
-                    ctx.rect(-this.length/2 - scaledSize, -this.width/2 - scaledSize, 
-                             this.length + scaledSize * 2, this.width + scaledSize * 2);
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                    
-                    // the label in the HUD's champagne caps (Montserrat, spaced), with a gold glow
-                    ctx.font = `600 ${10 * scale}px Montserrat, sans-serif`;
-                    if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
-                    ctx.shadowColor = `rgba(255, 194, 72, ${0.8 * alpha})`; ctx.shadowBlur = 6;
-                    ctx.fillStyle = `rgba(255, 240, 214, ${alpha})`;
-                    ctx.textAlign = 'center';
-                    ctx.fillText('YOUR CAR', 0, -this.width/2 - (20 * scale));
-                    ctx.shadowBlur = 0;
-                    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-                }
-                
-                // Delivery Vehicle Marker (pulsing violet)
-                if (this.isDeliveryVehicle) {
-                    const breathe = (Math.sin(_frameTime / 600) + 1) / 2; 
-                    const scale = 1.0 + (breathe * 0.1);
-                    
-                    ctx.shadowColor = `rgba(164, 105, 255, 0.6)`;
-                    ctx.shadowBlur = 15 + (breathe * 10);
-                    ctx.fillStyle = `rgba(164, 105, 255, ${0.15 + breathe * 0.15})`;
-                    ctx.beginPath();
-                    ctx.rect(-this.length/2 - 6, -this.width/2 - 6, this.length + 12, this.width + 12);
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                    
-                    ctx.font = `bold ${10 * scale}px Courier New`;
-                    ctx.fillStyle = `rgba(164, 105, 255, ${0.7 + breathe * 0.3})`;
-                    ctx.textAlign = 'center';
-                    ctx.fillText('AMBER DELIVERY', 0, -this.width/2 - (16 * scale));
-                }
                 
                 // Status Shadows (AI state: red pushing through, orange waiting at a box, yellow nudging) —
                 // a debug view now that queues are real; underglow and the rest stay
@@ -1318,6 +1266,9 @@
                 
                 // Player gets the speed-dependent steering curve; see applyDrivePhysics.
                 this.applyDrivePhysics({ weather, walls, buildings, decalSystem, steerCurve: true });
+                // Nobody at the wheel (she got out) and it has come to rest: parked, so traffic steers round it
+                // (the lights stay as she left them: lampsOn, traffic/car-art.js)
+                if (!this.hasDriver && Math.abs(this.speed) < 0.05 && Math.abs(this.vx) < 0.05 && Math.abs(this.vy) < 0.05) this.controlMode = 'PARKED';
 
                 // Clamp to map bounds (prevent driving off-map)
                 if (this._mapBounds) {

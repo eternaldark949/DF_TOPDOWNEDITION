@@ -237,7 +237,7 @@
                 for (const g of scratch.propGlows) g.p = null;
                 scratch.iVisible.length = scratch.litLamps.length = scratch.visibleLamps.length = 0;
                 scratch.beams.length = scratch.softLights.length = scratch.propGlows.length = 0;
-                scratch.lampHeap.length = scratch.nearestLamps.length = 0;
+                scratch.lampHeap.length = scratch.nearestLamps.length = scratch.parked.length = 0;
                 scratch.cars.clear();
                 // Bound the retained empty records even after exceptionally crowded views.
                 if (scratch.beamPool.length > 64) scratch.beamPool.length = 64;
@@ -319,7 +319,7 @@
                 let scratch = this._lightingScratch;
                 if (!scratch || scratch.busy) {
                     scratch = { iVisible: [], litLamps: [], visibleLamps: [], beams: [], softLights: [], propGlows: [],
-                        lampHeap: [], nearestLamps: [], beamPool: [], softPool: [], propPool: [], cars: new Set(), busy: false };
+                        lampHeap: [], nearestLamps: [], beamPool: [], softPool: [], propPool: [], cars: new Set(), parked: [], busy: false };
                     // A reentrant render receives its own buffers while the outer frame is using its pools.
                     if (!this._lightingScratch) this._lightingScratch = scratch;
                 }
@@ -444,7 +444,7 @@
                     lc.fillStyle = 'rgba(255, 50, 0, 0.4)'; lc.fill();
                 }
             
-                // Headlights: the player's car, up to six in traffic, bumper cars
+                // Headlights: the player's car, hers standing with the lights left on, up to six in traffic, bumper cars
                 const beams = scratch.beams;
                 const beamOf = (owner, stat, color, haze) => {
                     const off = owner.length / 2;
@@ -454,6 +454,10 @@
                     b.L = stat * 6; b.W = stat * 1.5; b.color = color; b.haze = haze;
                 };
                 if (this.isDriving || (this.car && this.car.forceLights)) beamOf(this.car, this.car.lightRange || 60, this.car.headlightColor || '#ffffdd', this.isDriving ? 1 : 0);
+                for (const v of this.parkedCars(scratch.parked)) {
+                    if ((v === this.car && v.forceLights) || !carLampsOn(v) || !inView(v.x, v.y, 260)) continue;
+                    beamOf(v, 40, v.headlightColor || '#ffffee', 0.7);
+                }
                 if (this.traffic && this.traffic.vehicles) {
                     let n = 0;
                     for (let i = 0; i < this.traffic.vehicles.length && n < 6; i++) {
@@ -473,7 +477,7 @@
                 if (this.traffic) {
                     const soft = glowSprite('255, 255, 255', 0.5), cars = scratch.cars;
                     for (const v of this.traffic.vehicles || []) cars.add(v);
-                    if (this.car) cars.add(this.car); if (this.ownedCar) cars.add(this.ownedCar);
+                    if (this.car) cars.add(this.car); if (this.ownedCar) cars.add(this.ownedCar); if (this.deliveryVehicle) cars.add(this.deliveryVehicle);
                     lc.globalAlpha = 0.55;
                     for (const v of cars) {
                         if (!v.glowColor || !v.visible || v.dead || !v.length || !inView(v.x, v.y, 80)) continue;

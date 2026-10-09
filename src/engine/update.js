@@ -85,12 +85,6 @@
                     if (out !== this._lastOutdoorness) { this._lastOutdoorness = out; this.updateDaytimeExposure(); }
                 }
                 
-                // Owned car marker fade logic
-                if (this.ownedCar) {
-                    const fadeSpeed = 0.05;
-                    this.ownedCar.markerOpacity += (this.ownedCar.markerTargetOpacity - this.ownedCar.markerOpacity) * fadeSpeed;
-                }
-                
                 // Check if player reached navigation destination
                 this.checkNavArrival();
             
@@ -175,17 +169,15 @@
             
                 // --- 2. AI & TRAFFIC ---
                 this.profiler.start('AI:Traffic');
-                this.traffic.update(this.player, this.activeMap, this.car, this.weather, this.ownedCar, this.decals, this.teammates);
+                // her cars standing about (the owned car, Amber's van, the one she got out of): traffic bumps them, they roll to a stop
+                const parked = this.parkedCars(this._parkedCars || (this._parkedCars = []));
+                this.traffic.update(this.player, this.activeMap, this.car, this.weather, parked, this.decals, this.teammates);
                 
                 // Zib taxi system — spawn, arrival check, cleanup
                 if (this.zibSystem && this.activeMap.type !== 'indoor') {
                     this.zibSystem.trySpawn(this.traffic);
                     this.zibSystem.tick(this);
                     this.zibSystem.cleanup();
-                }
-                // Add delivery vehicle to spatial grid (managed separately from traffic lifecycle)
-                if (this.deliveryVehicle && this.deliveryVehicle.visible && this.traffic.grid) {
-                    this.traffic.grid.add(this.deliveryVehicle);
                 }
                 this.profiler.stop('AI:Traffic');
                 
@@ -196,11 +188,14 @@
                 // (intentionally, so traffic AI doesn't try to drive around
                 // itself). For the ped reaction system, we want it included —
                 // otherwise peds phase through the player's car while
-                // dodging every AI car around them. Concat is cheap; no
-                // allocation when not driving.
-                const reactionVehicles = (this.isDriving && this.car)
-                    ? this.traffic.vehicles.concat(this.car)
-                    : this.traffic.vehicles;
+                // dodging every AI car around them. Her parked cars are
+                // out of traffic too, and count the same. Concat is cheap;
+                // no allocation with none of hers about.
+                let reactionVehicles = this.traffic.vehicles;
+                if (parked.length || (this.isDriving && this.car)) {
+                    reactionVehicles = reactionVehicles.concat(parked);
+                    if (this.isDriving && this.car) reactionVehicles.push(this.car);
+                }
                 // Who the crowds make way for: 949 and her crew on foot (pedestrians, the lobby's and the club's walkers)
                 this._makeWay = [this.player];
                 for (const t of this.teammates) if (t && (t.recruited || t.hired) && !t.inCar && !t.downed && !t.dead) this._makeWay.push(t);
@@ -1299,7 +1294,6 @@
                 }
                 if (!inTransition) this.transitionBtn.style.display = 'none';
             
-                let carDist = Math.hypot(this.player.x - this.car.x, this.player.y - this.car.y);
                 let nearInteractable = null;
                 
                 // Find Interactables
@@ -1332,19 +1326,16 @@
                 
                 captionSystem.checkProximityGreetings(this.player, this.npcs, this.teammates);
                 
-                let ownedCarDist = null;
-                if (this.ownedCar && this.ownedCar !== this.car && this.ownedCar.visible) {
-                    ownedCarDist = Math.hypot(this.player.x - this.ownedCar.x, this.player.y - this.ownedCar.y);
+                // The nearest of her cars in reach (the owned car, Amber's van, the one she got out of: engine/cars.js)
+                let nearMine = null;
+                if (!this.isDriving) {
+                    let best = 80;
+                    for (const c of this.parkedCars(this._parkedCars || (this._parkedCars = []))) {
+                        const d = Math.hypot(this.player.x - c.x, this.player.y - c.y);
+                        if (d < best) { best = d; nearMine = c; }
+                    }
                 }
                 let nearTraffic = this.traffic.getNearest(this.player.x, this.player.y, 80);
-                
-                // Check delivery vehicle proximity (managed separately from traffic)
-                let nearDeliveryVehicle = null;
-                if (this.deliveryVehicle && this.deliveryVehicle.visible && !this.isDriving
-                    && this.deliveryVehicle.controlMode !== 'PLAYER') {
-                    const dvDist = Math.hypot(this.player.x - this.deliveryVehicle.x, this.player.y - this.deliveryVehicle.y);
-                    if (dvDist < 80) nearDeliveryVehicle = this.deliveryVehicle;
-                }
             
                 // Update Button State
                 const execT = this._execTarget = this.executionTarget();             // an unaware back, in reach (engine/executions.js)
@@ -1372,11 +1363,10 @@
                         }
                     } else { this.setInteract('Talk', nearInteractable.name); }
                 }
-                else if (ownedCarDist !== null && ownedCarDist < 80) {
-                    this.setInteract('Drive', 'Your car'); this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hijack', target: this.ownedCar };
-                }
-                else if (nearDeliveryVehicle) {
-                    this.setInteract('Drive', 'Delivery van'); this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hijack', target: nearDeliveryVehicle };
+                else if (nearMine) {
+                    const kind = this.carKind(nearMine);
+                    this.setInteract('Drive', kind === 'own' ? 'Your car' : kind === 'sanctioned' ? 'Delivery van' : 'Car');
+                    this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'drive', target: nearMine };
                 }
                 else if (nearTraffic && nearTraffic.isZib) {
                     this.setInteract('Hail', 'Zib cab'); this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hail_zib', target: nearTraffic };
@@ -1384,9 +1374,6 @@
                 else if (nearTraffic) {
                     this.setInteract('Hijack', 'Vehicle'); this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hijack', target: nearTraffic };
                 }
-                else if (carDist < 80 && this.activeMap.type !== 'indoor') { 
-                    this.setInteract('Drive', 'Car'); this.interactBtn.style.display = 'flex'; this.activeInteraction = null; 
-                } 
                 else { 
                     this.interactBtn.style.display = 'none'; this.activeInteraction = null; 
                 }
@@ -1529,7 +1516,7 @@
                 }
 
                 // 2. VEHICLE vs VEHICLE Collisions
-                this.traffic.resolveCollisions(this.car, this.player, this.weather, audioSys, this.ownedCar, this.decals);
+                this.traffic.resolveCollisions(this.car, this.player, this.weather, audioSys, this.parkedCars(this._parkedCars || (this._parkedCars = [])), this.decals);
             },
 
             

@@ -272,8 +272,9 @@
             ctx.restore();
         }
 
-        /** Whether the car's lamps are burning (someone at the wheel). */
-        const carLampsOn = v => v.hasDriver || v.controlMode === 'PLAYER' || (typeof game !== 'undefined' && game.car === v && game.isDriving);
+        /** Whether the car's lamps are burning: someone at the wheel, or left on when she got out (lampsOn,
+         *  engine/cars.js); her own car's always are. */
+        const carLampsOn = v => v.hasDriver || v.lampsOn || v.isOwnedCar || v.controlMode === 'PLAYER' || (typeof game !== 'undefined' && game.car === v && game.isDriving);
 
         // Rear-lamp motion streaks: short world-space histories, recorded only by simulation.
         const CAR_TAIL_TRAIL = {
