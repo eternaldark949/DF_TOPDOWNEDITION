@@ -1449,7 +1449,7 @@ test('Garage switch while out in a hijacked car keeps her in it, and the old mod
   equal(result, {driving:true, inH:true, replaced:true, at:result.was, was:result.was, oldSolid:false, newShown:true});
 }, {events:true});
 
-test('Visibility: her halo by day, by night and in night vision; only hostiles burn white in night vision', env => {
+test('Visibility: her halo by day, by night and in night vision (and off with Player Glow off); only hostiles burn white in night vision', env => {
   const r = value(env, `
     game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
     const p = game.player, g = new Ganger(p.x + 80, p.y, {}), gg = new GatlingGunner(p.x - 80, p.y, 901);
@@ -1465,14 +1465,19 @@ test('Visibility: her halo by day, by night and in night vision; only hostiles b
       seen.length = 0; halos = 0; _frameTime += 16; game.draw();
       return { seen: [...new Set(seen)].sort(), halos, heat: SilhouetteFX.heat, open: !!SilhouetteFX._cur, world: _worldCanvas === game.canvas };
     };
-    return { day: frame(1440 + 13 * 60, false), night: frame(1440 + 22 * 60, false), nv: frame(1440 + 22 * 60, true) };`);
+    const out = { day: frame(1440 + 13 * 60, false), night: frame(1440 + 22 * 60, false), nv: frame(1440 + 22 * 60, true) };
+    GameSettings.playerGlow = false; out.nvOff = frame(1440 + 22 * 60, true);
+    out.dayOff = frame(1440 + 13 * 60, false); GameSettings.playerGlow = true;
+    return out;`);
   for (const k of ['day', 'night']) {
     equal(r[k].seen, ['her:glow'], `${k}: only she is captured, for her halo`);
     equal(r[k].halos, 1, `${k}: her halo is drawn after the light`);
   }
   equal(r.nv.seen, ['ganger:heat', 'gunner:heat', 'her:glow'], 'night vision: the ganger and the gunner burn white, she keeps her halo, the civilian is left alone');
   equal(r.nv.halos, 1, 'night vision: her halo still draws');
-  for (const k of ['day', 'night', 'nv']) equal([r[k].heat, r[k].open, r[k].world], [0, false, true], `${k}: nothing is left switched on, and the world canvas is restored`);
+  equal(r.nvOff.seen, ['ganger:heat', 'gunner:heat'], 'Player Glow off: no halo, and night vision still burns the hostiles white');
+  equal([r.dayOff.seen, r.nvOff.halos, r.dayOff.halos], [[], 0, 0], 'Player Glow off: nothing captured by day, no halo drawn');
+  for (const k of ['day', 'night', 'nv', 'nvOff', 'dayOff']) equal([r[k].heat, r[k].open, r[k].world], [0, false, true], `${k}: nothing is left switched on, and the world canvas is restored`);
 }, {affine:true});
 
 test('Every bundled map loads, updates and draws without runtime errors', env => {

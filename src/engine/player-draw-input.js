@@ -97,10 +97,10 @@
                 this.ctx.restore();
             },
 
-            /** Whether she wears her halo this frame: on foot and in play, as for her marker. */
+            /** Whether she wears her halo this frame: Settings → Visibility → Player Glow, on foot and in play, as for her marker. */
             _playerGlowOn() {
                 const p = this.player;
-                return !!(this.running && p && p.visible && !p.isHidden && !p.dead && !this.isDriving && !p.inCar &&
+                return !!(GameSettings.playerGlow !== false && this.running && p && p.visible && !p.isHidden && !p.dead && !this.isDriving && !p.inCar &&
                     !(this.scenes && this.scenes.running) && !(this.cutscene && this.cutscene.active) &&
                     !this.cineCam && !this.finisher && !this.finCam);
             },

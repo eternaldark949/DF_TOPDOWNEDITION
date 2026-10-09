@@ -135,6 +135,7 @@ engineMixin({
                         finisher: GameSettings.finisher,
                         footsteps: GameSettings.footsteps,
                         enemyRings: GameSettings.enemyRings,
+                        playerGlow: GameSettings.playerGlow,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
@@ -771,6 +772,7 @@ engineMixin({
                         if (save.settings.finisher) GameSettings.finisher = save.settings.finisher;
                         GameSettings.footsteps = save.settings.footsteps !== false;
                         GameSettings.enemyRings = save.settings.enemyRings !== false;
+                        GameSettings.playerGlow = save.settings.playerGlow !== false;
                         if (typeof restoreGameGrade === 'function') restoreGameGrade();       // the grade back on screen, not just in the setting
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;

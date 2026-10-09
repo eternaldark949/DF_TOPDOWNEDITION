@@ -922,37 +922,11 @@
             
             <!-- SETTINGS PANEL (replaces nav when active) -->
             <div class="pause-settings-panel" id="pause-settings-panel">
-                <div class="settings-section-label">Density</div>
-                <div class="settings-row">
-                    <span class="settings-label">Traffic</span>
-                    <span class="settings-value val-high" id="set-traffic" data-key="trafficDensity">HIGH</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Pedestrians</span>
-                    <span class="settings-value val-high" id="set-pedestrians" data-key="pedestrianDensity">HIGH</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Foliage</span>
-                    <span class="settings-value val-high" id="set-foliage" data-key="foliageDensity">HIGH</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Crowd Quality</span>
-                    <span class="settings-value val-high" id="set-crowd" data-key="crowdQuality">HIGH</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Rain</span>
-                    <span class="settings-value val-high" id="set-rain" data-key="rainDensity">HIGH</span>
-                </div>
+                <!-- Category chips: tap to jump; the one in view is lit (ui/save-slots-pause-menu.js) -->
+                <nav class="settings-jump" id="settings-jump" aria-label="Settings categories"><span class="settings-jump-chip" data-group="controls" tabindex="0">Controls</span><span class="settings-jump-chip" data-group="camera" tabindex="0">Camera</span><span class="settings-jump-chip" data-group="visibility" tabindex="0">Visibility</span><span class="settings-jump-chip" data-group="graphics" tabindex="0">Graphics</span><span class="settings-jump-chip" data-group="colour" tabindex="0">Colour</span><span class="settings-jump-chip" data-group="world" tabindex="0">World</span><span class="settings-jump-chip" data-group="display" tabindex="0">Display</span><span class="settings-jump-chip" data-group="audio" tabindex="0">Audio</span><span class="settings-jump-chip" data-group="dev" tabindex="0">Dev</span></nav>
                 
-                <div class="settings-section-label">Visual</div>
-                <div class="settings-row">
-                    <span class="settings-label">Lighting</span>
-                    <span class="settings-value val-high" id="set-lighting" data-key="lightingQuality">HIGH</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Adaptive Lighting</span>
-                    <span class="settings-value val-on" id="set-adaptive-lighting" data-key="adaptiveLighting">ON</span>
-                </div>
+                <section class="settings-group" data-group="controls">
+                <div class="settings-section-label">Controls</div>
                 <div class="settings-row">
                     <span class="settings-label">Flit Ring</span>
                     <span class="settings-value val-on" id="set-flitring" data-key="flitRing">ON</span>
@@ -977,6 +951,10 @@
                     <span class="settings-label">Sniper Fire on Release</span>
                     <span class="settings-value val-on" id="set-sniperrelease" data-key="sniperRelease">ON</span>
                 </div>
+                </section>
+                
+                <section class="settings-group" data-group="camera">
+                <div class="settings-section-label">Camera &amp; Combat</div>
                 <div class="settings-row">
                     <span class="settings-label">Scope View</span>
                     <span class="settings-value val-on" id="set-scopeview" data-key="scopeView">ON</span>
@@ -990,8 +968,40 @@
                     <span class="settings-value val-on" id="set-camedge" data-key="cameraEdgeLock">ON</span>
                 </div>
                 <div class="settings-row">
-                    <span class="settings-label">Film Grain</span>
-                    <span class="settings-value val-on" id="set-grain" data-key="filmGrain">ON</span>
+                    <span class="settings-label">Finisher</span>
+                    <span class="settings-value" id="set-finisher" data-key="finisher">FULL</span>
+                </div>
+                </section>
+                
+                <section class="settings-group" data-group="visibility">
+                <div class="settings-section-label">Visibility</div>
+                <div class="settings-row">
+                    <span class="settings-label">Player Glow</span>
+                    <span class="settings-value val-on" id="set-playerglow" data-key="playerGlow">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Stealth Grey</span>
+                    <span class="settings-value val-on" id="set-stealthgray" data-key="stealthGray">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Sound Rings</span>
+                    <span class="settings-value" id="set-soundrings" data-key="soundRings">MIRAGE</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Enemy Sound Rings</span>
+                    <span class="settings-value val-on" id="set-enemyrings" data-key="enemyRings">ON</span>
+                </div>
+                </section>
+                
+                <section class="settings-group" data-group="graphics">
+                <div class="settings-section-label">Graphics</div>
+                <div class="settings-row">
+                    <span class="settings-label">Lighting</span>
+                    <span class="settings-value val-high" id="set-lighting" data-key="lightingQuality">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Adaptive Lighting</span>
+                    <span class="settings-value val-on" id="set-adaptive-lighting" data-key="adaptiveLighting">ON</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Soft Shadows</span>
@@ -1005,22 +1015,10 @@
                     <span class="settings-label">Reflections</span>
                     <span class="settings-value val-high" id="set-wetreflections" data-key="reflections">HIGH</span>
                 </div>
-                <div class="settings-row">
-                    <span class="settings-label">Enemy Sound Rings</span>
-                    <span class="settings-value val-on" id="set-enemyrings" data-key="enemyRings">ON</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Finisher</span>
-                    <span class="settings-value" id="set-finisher" data-key="finisher">FULL</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Sound Rings</span>
-                    <span class="settings-value" id="set-soundrings" data-key="soundRings">MIRAGE</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Atmosphere</span>
-                    <span class="settings-value" id="set-atmosphere" data-key="atmosphereTint">OFF</span>
-                </div>
+                </section>
+                
+                <section class="settings-group" data-group="colour">
+                <div class="settings-section-label">Colour &amp; Mood</div>
                 <div class="settings-row">
                     <span class="settings-label">Color Grade</span>
                     <span class="settings-value" id="set-colorgrade" data-key="colorGrade">NONE</span>
@@ -1030,11 +1028,41 @@
                     <span class="settings-value" id="set-gradedrawer" data-key="gradeDrawer">OPEN ›</span>
                 </div>
                 <div class="settings-row">
-                    <span class="settings-label">Stealth Grey</span>
-                    <span class="settings-value val-on" id="set-stealthgray" data-key="stealthGray">ON</span>
+                    <span class="settings-label">Atmosphere</span>
+                    <span class="settings-value" id="set-atmosphere" data-key="atmosphereTint">OFF</span>
                 </div>
+                <div class="settings-row">
+                    <span class="settings-label">Film Grain</span>
+                    <span class="settings-value val-on" id="set-grain" data-key="filmGrain">ON</span>
+                </div>
+                </section>
                 
-                <div class="settings-section-label">Display</div>
+                <section class="settings-group" data-group="world">
+                <div class="settings-section-label">World Density</div>
+                <div class="settings-row">
+                    <span class="settings-label">Traffic</span>
+                    <span class="settings-value val-high" id="set-traffic" data-key="trafficDensity">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Pedestrians</span>
+                    <span class="settings-value val-high" id="set-pedestrians" data-key="pedestrianDensity">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Foliage</span>
+                    <span class="settings-value val-high" id="set-foliage" data-key="foliageDensity">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Crowd Quality</span>
+                    <span class="settings-value val-high" id="set-crowd" data-key="crowdQuality">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Rain</span>
+                    <span class="settings-value val-high" id="set-rain" data-key="rainDensity">HIGH</span>
+                </div>
+                </section>
+                
+                <section class="settings-group" data-group="display">
+                <div class="settings-section-label">Display &amp; Performance</div>
                 <div class="settings-row">
                     <span class="settings-label">Fullscreen</span>
                     <span class="settings-value val-high" id="set-fullscreen" data-key="fullscreen">ON</span>
@@ -1043,7 +1071,13 @@
                     <span class="settings-label">Screen Orientation</span>
                     <span class="settings-value" id="set-orientation" data-key="orientation">AUTO</span>
                 </div>
+                <div class="settings-row">
+                    <span class="settings-label">Frame Limit</span>
+                    <span class="settings-value" id="set-fps" data-key="fpsLimit">NONE</span>
+                </div>
+                </section>
                 
+                <section class="settings-group" data-group="audio">
                 <div class="settings-section-label">Audio</div>
                 <div class="settings-row">
                     <span class="settings-label">Master Audio</span>
@@ -1065,13 +1099,9 @@
                     <span class="settings-label">Music</span>
                     <span class="amb-slider-wrap"><input type="range" class="ggp-slider amb-slider" id="set-music" min="0" max="100" step="5" value="70"><span class="amb-val" id="set-music-val">70</span></span>
                 </div>
+                </section>
                 
-                <div class="settings-section-label">Performance</div>
-                <div class="settings-row">
-                    <span class="settings-label">Frame Limit</span>
-                    <span class="settings-value" id="set-fps" data-key="fpsLimit">NONE</span>
-                </div>
-
+                <section class="settings-group" data-group="dev">
                 <div class="settings-section-label">Developer</div>
                 <div class="settings-row">
                     <span class="settings-label">Profiler</span>
@@ -1105,6 +1135,7 @@
                     <span class="settings-label">Resolution Bench</span>
                     <span class="settings-value" id="set-bench" data-key="perfBench">RUN ›</span>
                 </div>
+                </section>
                 
                 <div class="settings-back-btn" id="pause-settings-back">◁ BACK</div>
             </div>
