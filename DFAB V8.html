@@ -44928,13 +44928,30 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         }
                         ctx.restore();
                     } },
-                bangles: { at: 'wrists', draw(ctx, g, c) {
-                    const gold = c.color || '#e8c27a';
-                    for (let i = 0; i < 2; i++) {
-                        const [ex, ey] = g.elbows[i], [fx, fy] = g.fists[i];
-                        for (const t of [0.7, 0.8]) { ctx.strokeStyle = gold; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(ex + (fx - ex) * t, ey + (fy - ey) * t, bodyLimbRadius(g.body.fore, t) + 0.7, 0, Math.PI * 2); ctx.stroke(); }
+                // The wrist goes through them: `under` draws the half that passes beneath the wrist
+                // (before the forearm, which hides it), `draw` the half over the top.
+                bangles: { at: 'wrists', under(ctx, g, c) { bangleHalves(ctx, g, g.darken(c.color || '#e8c27a', 0.35), -1); },
+                    draw(ctx, g, c) { bangleHalves(ctx, g, c.color || '#e8c27a', 1); }, portrait() {} }
+            };
+            // Two bangles round each wrist, 1 and 2.3 px up the forearm from the fist. A bangle's ring
+            // stands across the arm, so from above it is an ellipse: a band across a reaching wrist
+            // (bowed a little toward the hand so it still reads as round), opening to a full ring as
+            // the arm hangs (k: reach, as for the hand). side +1: the half toward the hand, which is
+            // the top; −1: the half toward the elbow, underneath.
+            const bangleHalves = (ctx, g, color, side) => {
+                ctx.strokeStyle = color; ctx.lineWidth = 0.9; ctx.beginPath();
+                for (let i = 0; i < 2; i++) {
+                    const [ex, ey] = g.elbows[i], [fx, fy] = g.fists[i];
+                    const dx = fx - ex, dy = fy - ey, L = Math.hypot(dx, dy) || 1e-6, a = Math.atan2(dy, dx);
+                    const k = Math.min(1, L / 10), tilt = Math.max(0.28, Math.sqrt(1 - k * k)), s = Math.sin(a), co = Math.cos(a);
+                    for (const d of [1, 2.3]) {
+                        const t = Math.max(0, 1 - d * k / L), R = bodyLimbRadius(g.body.fore, t) + 0.7;
+                        const x = ex + dx * t, y = ey + dy * t;
+                        ctx.moveTo(x + side * R * s, y - side * R * co);
+                        ctx.ellipse(x, y, R * tilt, R, a, -side * Math.PI / 2, side * Math.PI / 2);
                     }
-                }, portrait() {} }
+                }
+                ctx.stroke();
             };
 
             // A soft fabric outline through the simulated nodes, including the long side chains.
@@ -47174,7 +47191,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             drawBodyHand(ctx, lElbowX, lElbowY, lFistX, lFistY, bothGrip || glassHand === 'left', BC);
             drawBodyHand(ctx, rElbowX, rElbowY, rFistX, rFistY, bothGrip || stance === 'pistol' || gunHand || glassHand === 'right', BC);
         
-            // 7. Forearms (fabric only under long sleeves)
+            // 7. Forearms (fabric only under long sleeves), with whatever passes under the wrists beneath them
+            if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
+                const p = WD.jewelry[j.type]; if (p && p.under) p.under(ctx, g, j);
+            }
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
             drawLimb(lElbowX, lElbowY, lFistX, lFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
             drawLimb(rElbowX, rElbowY, rFistX, rFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);

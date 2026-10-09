@@ -1896,7 +1896,10 @@
             drawBodyHand(ctx, lElbowX, lElbowY, lFistX, lFistY, bothGrip || glassHand === 'left', BC);
             drawBodyHand(ctx, rElbowX, rElbowY, rFistX, rFistY, bothGrip || stance === 'pistol' || gunHand || glassHand === 'right', BC);
         
-            // 7. Forearms (fabric only under long sleeves)
+            // 7. Forearms (fabric only under long sleeves), with whatever passes under the wrists beneath them
+            if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
+                const p = WD.jewelry[j.type]; if (p && p.under) p.under(ctx, g, j);
+            }
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
             drawLimb(lElbowX, lElbowY, lFistX, lFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
             drawLimb(rElbowX, rElbowY, rFistX, rFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
