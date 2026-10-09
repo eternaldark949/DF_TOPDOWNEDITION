@@ -353,8 +353,8 @@
         /* 4. Movement Joystick Visuals */
         #joystick-zone { 
             position: absolute; 
-            width: 80px; 
-            height: 80px; 
+            width: 128px;   /* the knob's full-speed reach (WALK, initJoystick) sits just inside; BASE there is half of this */
+            height: 128px; 
             background: rgba(20, 0, 10, 0.4); /* Almost black */
             border: none;
             border-radius: 50%; 

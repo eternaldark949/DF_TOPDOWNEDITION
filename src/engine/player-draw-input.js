@@ -299,7 +299,9 @@
                ========================================================= */
             initJoystick() {
                 const inputZone = document.getElementById('input-zone-left'), visualZone = document.getElementById('joystick-zone'), knob = document.getElementById('joystick-knob');
-                const J = this.joystick, WALK = 35, RING_IN = 82, RING_OUT = 65, EDGE = 100;
+                // WALK: full speed at 60 px (was 35), so walking and driving get finer control on the way out.
+                // It stays inside RING_OUT, so a held full-speed thumb re-arms the ring. BASE: half the base disc (CSS #joystick-zone)
+                const J = this.joystick, WALK = 60, RING_IN = 82, RING_OUT = 65, EDGE = 100, BASE = 64;
                 // CSS-pixel radial travel: at least 24 px at 500 px/sec within 120 ms.
                 // A fixed ring buffer retains recent raw movement, independent of Flick to Flit.
                 const RING_WINDOW = 120, RING_TRAVEL = 24, RING_SPEED = 0.5;
@@ -353,7 +355,7 @@
                     J.trail = [{ x: 0, y: 0, t: performance.now() }];
                     J.ringArmed = true; ringCount = 0;
                     if (GameSettings.flitRing) seedRing(0, ringTime(e));
-                    visualZone.style.display = 'block'; visualZone.style.left = (ox - 40) + 'px'; visualZone.style.top = (oy - 40) + 'px';
+                    visualZone.style.display = 'block'; visualZone.style.left = (ox - BASE) + 'px'; visualZone.style.top = (oy - BASE) + 'px';
                     knob.style.transform = `translate(-50%, -50%)`;
                     if (this.flitRingEl) this.flitRingEl.classList.toggle('off', !GameSettings.flitRing || !canFlit());
                 }, { passive: false });
