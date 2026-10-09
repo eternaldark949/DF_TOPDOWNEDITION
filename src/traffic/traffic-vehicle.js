@@ -677,13 +677,14 @@
                 return { x: lane.start.x + lane.ux * d, y: lane.start.y + lane.uy * d, d };
             }
 
-            /** Another car is ahead of us in our lane (between us and its end) — we're not first in line. */
-            _carAheadInLane() {
+            /** Another car is ahead of us in our lane (between us and its end) — we're not first in line. With `ix`
+             *  (lights), one that already has the green into it doesn't count: we can follow it in. */
+            _carAheadInLane(ix = null) {
                 const ln = this.currentLane;
                 if (!ln || !this._allVehicles) return false;
                 const my = (this.x - ln.start.x) * ln.ux + (this.y - ln.start.y) * ln.uy;
                 for (const v of this._allVehicles) {
-                    if (v === this || v.dead || !v.length) continue;
+                    if (v === this || v.dead || !v.length || (ix && ix.occupants.includes(v))) continue;
                     const dx = v.x - ln.start.x, dy = v.y - ln.start.y;
                     const along = dx * ln.ux + dy * ln.uy;
                     if (along <= my || along > ln.length + 10) continue;
@@ -1432,6 +1433,11 @@
                                 stillApproaching = true;
                             }
                         }
+                        // Starting one of its turns (its centre not over the edge yet): still this junction's.
+                        // (By distance alone, a long box's centre is too far: it let go of the box as it went in.)
+                        if (!stillApproaching && this.currentTurnPath && this.currentTurnPath.intersection === this.currentIntersection) {
+                            stillApproaching = true;
+                        }
                         // Also check raw distance as fallback for mid-turn (no currentLane)
                         if (!stillApproaching && !this.currentLane) {
                             const ci = this.currentIntersection;
@@ -1457,12 +1463,23 @@
                     const nextZone = this.getNextIntersection(icRange);
                     if (nextZone) nearestIntersection = nextZone.intersection;
                 }
+
+                // Lights ahead (traffic/traffic-signals.js) see us coming, from further out than we ask to go in
+                this._sigDist = null;
+                if (this.currentLane && !this.currentTurnPath && !this.wasInIntersection) {
+                    const sz = this.getNextIntersection(SIGNAL.SEE);
+                    if (sz && sz.intersection.signal) {
+                        this._sigDist = sz.entryDist - this.getDistanceAlongLane();
+                        sz.intersection.signal.note(this, this._sigDist);
+                    }
+                }
                 
                 // Only the car at the front of its lane may claim the intersection: a fast car further back would
-                // otherwise take the access and sit behind the slower car it belongs to, which waits for it forever
+                // otherwise take the access and sit behind the slower car it belongs to, which waits for it forever.
+                // With lights, a car may follow one ahead that already has the green in.
                 const beforeBox = nearestIntersection && !this.wasInIntersection && !this.currentTurnPath;
                 // Nor while the lane out has no room for it (it waits at the line without holding the box)
-                const notFirst = beforeBox && (this._carAheadInLane() || this._exitBlocked());
+                const notFirst = beforeBox && (this._carAheadInLane(nearestIntersection.signal ? nearestIntersection : null) || this._exitBlocked());
                 if (notFirst) {
                     nearestIntersection.releaseEntry(this);
                     this.hasIntersectionAccess = false;
@@ -1801,13 +1818,14 @@
                         this.isWaiting = false;
                     }
                 } else if (nearestIntersection && !this.wasInIntersection) {
-                    // Slow down when approaching intersection (even if we have access)
+                    // Slow down when approaching intersection (even if we have access) — less going straight on a green
                     const nextZone = this.currentLane ? this.getNextIntersection(120) : null;
                     if (nextZone) {
                         const distToIntersection = nextZone.entryDist - this.getDistanceAlongLane();
                         if (distToIntersection > 0 && distToIntersection < 100) {
-                            // Gradual slowdown: 100% at 100px, 60% at intersection
-                            const approachMod = 0.60 + (distToIntersection / 100) * 0.40;
+                            // Gradual slowdown: 100% at 100px, 60% at intersection (85% straight through lights)
+                            const low = nearestIntersection.signal && this.plannedTurn && this.plannedTurn.turnType === 'straight' ? 0.85 : 0.6;
+                            const approachMod = low + (distToIntersection / 100) * (1 - low);
                             targetSpeed = Math.min(targetSpeed, this.maxSpeed * approachMod);
                         }
                     }
@@ -1993,9 +2011,11 @@
                     const projectedT = proj.t;
                     const crossTrackDist = proj.dist;
                     
-                    // Advance progress: speed-based + projected, never backward
-                    const speedIncrement = 0.015 * Math.max(0.5, Math.abs(this.speed) / 4);
-                    this.turnProgress = Math.max(this.turnProgress + speedIncrement, projectedT);
+                    // Advance progress: speed-based + projected, never backward — and not while standing, nor far past
+                    // where the car really is (else, waiting in the box, its aim runs on round the corner, and it cuts
+                    // across it when it moves off: with lights, other cars are in the box with it)
+                    const speedIncrement = Math.abs(this.speed) < 0.3 ? 0 : 0.015 * Math.max(0.5, Math.abs(this.speed) / 4);
+                    this.turnProgress = Math.max(Math.min(this.turnProgress + speedIncrement, projectedT + 0.12), projectedT, this.turnProgress);
                     
                     // --- FORCE-ADVANCE if stuck in intersection ---
                     if (this.intersectionTimer > 180 && Math.abs(this.speed) < 1.0) {
@@ -2430,17 +2450,38 @@
                 };
                 
                 const safePaths = relevantPaths.filter(p => isSafePath(p));
-                const pool = safePaths.length > 0 ? safePaths : relevantPaths;
+                let pool = safePaths.length > 0 ? safePaths : relevantPaths;
+                // Lane discipline: turn left from the inside lane, right from the kerb lane (straight on from any), and
+                // come out in the matching lane across the road (inside to inside, kerb to kerb), so cars side by side
+                // in the box don't cut across each other
+                const rank = TrafficVehicle._laneRank, mine = rank(this.currentLane), outer = this.currentLane.road.numLanes - 1;
+                const kept = this.currentLane.road.symmetrical ? pool.filter(p => p.turnType === 'straight' || (p.turnType === 'left' ? mine === 0 : mine === outer)) : pool;
+                if (kept.length) pool = kept;
+                const matching = (p) => {
+                    let best = p;
+                    for (const q of pool) {
+                        if (q.toLane.road === p.toLane.road && q.toLane.direction === p.toLane.direction &&
+                            Math.abs(rank(q.toLane) - mine) < Math.abs(rank(best.toLane) - mine)) best = q;
+                    }
+                    return best;
+                };
                 const straightPaths = pool.filter(p => Math.abs(p.toLane.angle - this.currentLane.angle) < 0.5);
                 const turnPaths = pool.filter(p => Math.abs(p.toLane.angle - this.currentLane.angle) >= 0.5);
-                
+
                 let chosenPath = null;
                 if (turnPaths.length > 0 && Math.random() < this.turnProbability) {
-                    chosenPath = turnPaths[Math.floor(Math.random() * turnPaths.length)];
+                    chosenPath = matching(turnPaths[Math.floor(Math.random() * turnPaths.length)]);
                 }
-                if (!chosenPath && straightPaths.length > 0) chosenPath = straightPaths[0];
-                if (!chosenPath && turnPaths.length > 0) chosenPath = turnPaths[Math.floor(Math.random() * turnPaths.length)];
+                if (!chosenPath && straightPaths.length > 0) chosenPath = matching(straightPaths[0]);
+                if (!chosenPath && turnPaths.length > 0) chosenPath = matching(turnPaths[Math.floor(Math.random() * turnPaths.length)]);
                 return chosenPath;
+            }
+
+            /** Which lane across its side of the road: 0 the inside one (by the centre line), up to numLanes − 1 at the kerb */
+            static _laneRank(lane) {
+                const r = lane.road, w = r.laneWidth || 60;
+                if (lane._rank === undefined) lane._rank = Math.max(0, Math.round((Math.abs(r.worldToParam(lane.start.x, lane.start.y).lateral) - w / 2) / w));
+                return lane._rank;
             }
             
             /**

@@ -8,7 +8,7 @@
         // [key, chip, group], in draw order (engine/draw.js)
         const RENDER_LAYERS = [
             ['ground', 'Ground', 'World'], ['floors', 'Floors', 'World'], ['walls', 'Walls', 'World'],
-            ['reflections', 'Reflections', 'World'], ['decals', 'Decals', 'World'], ['shadows', 'Sun shadows', 'World'],
+            ['reflections', 'Reflections', 'World'], ['decals', 'Decals', 'World'], ['shadows', 'Sun shadows', 'World'], ['signals', 'Signals', 'World'],
             ['buildings', 'Buildings', 'World'], ['roofs', 'Roofs', 'World'], ['neon', 'Neon', 'World'],
             ['trees', 'Trees', 'World'], ['lamps', 'Lamps', 'World'],
             ['props', 'Props', 'Things'], ['cars', 'Cars', 'Things'], ['markers', 'Markers', 'Things'],

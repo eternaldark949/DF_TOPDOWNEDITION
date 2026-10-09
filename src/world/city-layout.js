@@ -1003,39 +1003,52 @@
                 }
                 
                 // ====== CROSSWALK CONNECTIONS ======
-                // Create crosswalk nodes and connect them to nearby sidewalk nodes
+                // Create crosswalk nodes and connect them to nearby sidewalk nodes (and, where a gap in the pavement's
+                // walk leaves none near, to the nearest: a crossing is never a dead end)
+                const linkNearest = (cn) => {
+                    if (cn.connections.some(id => !nodes[id].isCrosswalk)) return;
+                    let best = null, bd = 260;
+                    for (const n of nodes) {
+                        if (n.isCrosswalk) continue;
+                        const d = Math.hypot(n.x - cn.x, n.y - cn.y);
+                        if (d < bd) { bd = d; best = n; }
+                    }
+                    if (best) connect(cn, best);
+                };
                 for (let cw of crosswalks) {
                     const cwCenterX = cw.x + cw.w / 2;
                     const cwCenterY = cw.y + cw.h / 2;
                     
-                    if (cw.orientation === 'V') {
-                        // Vertical road crossing - nodes at top and bottom of crosswalk
+                    // A crosswalk carries the pavement across the road it crosses: its ends are on the kerbs either
+                    // side of that road (a vertical road's crossing runs left to right; a horizontal road's, top to bottom)
+                    if (cw.orientation === 'H') {
                         const topNode = createNode(cwCenterX, cw.y - 10, true, cw);
                         const bottomNode = createNode(cwCenterX, cw.y + cw.h + 10, true, cw);
                         connect(topNode, bottomNode);
                         
-                        // Connect to nearby sidewalk nodes
+                        // Connect to nearby sidewalk nodes (the walks along both pavements stop ~100 px short of the corner)
                         for (let n of nodes) {
                             if (n.isCrosswalk) continue;
                             const dist = Math.hypot(n.x - topNode.x, n.y - topNode.y);
-                            if (dist < 80) connect(topNode, n);
+                            if (dist < 130) connect(topNode, n);
                             const dist2 = Math.hypot(n.x - bottomNode.x, n.y - bottomNode.y);
-                            if (dist2 < 80) connect(bottomNode, n);
+                            if (dist2 < 130) connect(bottomNode, n);
                         }
+                        linkNearest(topNode); linkNearest(bottomNode);
                     } else {
-                        // Horizontal road crossing - nodes at left and right of crosswalk
                         const leftNode = createNode(cw.x - 10, cwCenterY, true, cw);
                         const rightNode = createNode(cw.x + cw.w + 10, cwCenterY, true, cw);
                         connect(leftNode, rightNode);
                         
-                        // Connect to nearby sidewalk nodes
+                        // Connect to nearby sidewalk nodes (as above)
                         for (let n of nodes) {
                             if (n.isCrosswalk) continue;
                             const dist = Math.hypot(n.x - leftNode.x, n.y - leftNode.y);
-                            if (dist < 80) connect(leftNode, n);
+                            if (dist < 130) connect(leftNode, n);
                             const dist2 = Math.hypot(n.x - rightNode.x, n.y - rightNode.y);
-                            if (dist2 < 80) connect(rightNode, n);
+                            if (dist2 < 130) connect(rightNode, n);
                         }
+                        linkNearest(leftNode); linkNearest(rightNode);
                     }
                 }
                 

@@ -402,6 +402,9 @@
                 this.maxOccupancy = 1;
                 this.occupiedBy = null;
                 
+                // Lights (traffic/traffic-signals.js): set up when traffic first runs; null where there are none
+                this.signal = undefined;
+                
                 // Queue deadlock detection
                 this.lastQueueState = '';
                 this.queueUnchangedFrames = 0;
@@ -489,6 +492,7 @@
             
             // === QUEUE MANAGEMENT ===
             requestEntry(vehicle) {
+                if (this.signal) return this.signal.request(vehicle);           // lights (traffic/traffic-signals.js)
                 if (this.occupants.includes(vehicle)) return true;
                 if (this.occupants.length < this.maxOccupancy) {
                     this._grant(vehicle);

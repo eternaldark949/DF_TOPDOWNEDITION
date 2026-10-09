@@ -301,7 +301,7 @@
                         this._updateWaiting(trafficVehicles, searches && searches.vehicles);
                         break;
                     case 'crossing':
-                        this._updateCrossing(player, otherPedestrians);
+                        this._updateCrossing(player, otherPedestrians, trafficVehicles, searches && searches.vehicles);
                         break;
                     case 'dodging':
                         this._updateDodging(trafficVehicles, searches && searches.vehicles);
@@ -522,6 +522,7 @@
                 
                 // Move towards target
                 if (dist > 5) {
+                    this._noteOnCrossing(targetNode);
                     const pace = this.speed * (this._raining() ? (this.look.hurry || 1.25) : 1);   // hurrying in the rain
                     let moveX = (dx / dist) * pace;
                     let moveY = (dy / dist) * pace;
@@ -563,7 +564,28 @@
                     if (this.targetNodeId === oldTarget) {
                         this._findNearestNode();
                     }
+
+                    // At the kerb with the far side of a crossing next: look first (at lights, wait for the walk)
+                    const at = this._getNode(this.currentNodeId), next = this._getNode(this.targetNodeId);
+                    if (at && next && at.isCrosswalk && next.isCrosswalk && at.crosswalkData === next.crosswalkData) {
+                        if (this._isTrafficClear(next.crosswalkData, trafficVehicles, searches && searches.vehicles)) { this.state = 'crossing'; this.crossingTimer = 0; }
+                        else { this.state = 'waiting'; this.waitTimer = 0; }
+                    }
                 }
+            }
+
+            /** Out on the road (kerb to kerb) at lights: they hold the next green till we're over */
+            _noteOnCrossing(targetNode) {
+                const from = this._getNode(this.currentNodeId);
+                if (!from || !from.isCrosswalk || !targetNode.isCrosswalk || from.crosswalkData !== targetNode.crosswalkData) return;
+                const sig = this._crossingSignal(targetNode.crosswalkData);
+                if (sig) sig.pedCrossing(targetNode.crosswalkData._sigPhase);
+            }
+
+            /** The lights at a crossing (traffic/traffic-signals.js), if it has them */
+            _crossingSignal(cw) {
+                const net = typeof game !== 'undefined' && game.traffic ? game.traffic.network : null;
+                return net && typeof JunctionSignal !== 'undefined' ? JunctionSignal.atCrosswalk(cw, net) : null;
             }
             
             _updateWaiting(trafficVehicles, carSearch = null) {
@@ -575,8 +597,9 @@
                     return;
                 }
                 
-                // Check traffic periodically
-                if (this.waitTimer % 30 === 0) {
+                // Check traffic periodically (at lights, often: they're watching for the walk, and asking for it)
+                const lit = this._crossingSignal(targetNode.crosswalkData);
+                if (this.waitTimer % (lit ? 6 : 30) === 0) {
                     if (this._isTrafficClear(targetNode.crosswalkData, trafficVehicles, carSearch)) {
                         this.state = 'crossing';
                         this.crossingTimer = 0;
@@ -584,7 +607,7 @@
                 }
                 
                 // Give up after waiting too long (find alternate route)
-                if (this.waitTimer > 300) {
+                if (this.waitTimer > (lit ? 900 : 300)) {
                     const currentNode = this._getNode(this.currentNodeId);
                     if (currentNode && currentNode.connections.length > 1) {
                         const alternatives = currentNode.connections.filter(id => id !== this.targetNodeId);
@@ -596,7 +619,7 @@
                 }
             }
             
-            _updateCrossing(player, otherPedestrians) {
+            _updateCrossing(player, otherPedestrians, trafficVehicles = [], carSearch = null) {
                 // Cross quickly!
                 const targetNode = this._getNode(this.targetNodeId);
                 if (!targetNode) {
@@ -607,6 +630,8 @@
                 const dx = targetNode.x - this.x;
                 const dy = targetNode.y - this.y;
                 const dist = Math.hypot(dx, dy);
+
+                this._noteOnCrossing(targetNode);
                 
                 // Move faster when crossing
                 const crossSpeed = this.speed * 1.5;
@@ -618,10 +643,15 @@
                     this.facingAngle = Math.atan2(dy, dx);
                     this.crossingTimer++;
                 } else {
-                    // Made it across!
+                    // Made it across! (or to the kerb: with the far side next, look again before stepping out)
                     this.currentNodeId = this.targetNodeId;
                     this._pickNextTarget();
                     this.state = 'walking';
+                    const at = this._getNode(this.currentNodeId), next = this._getNode(this.targetNodeId);
+                    if (at && next && at.isCrosswalk && next.isCrosswalk && at.crosswalkData === next.crosswalkData) {
+                        if (this._isTrafficClear(next.crosswalkData, trafficVehicles, carSearch)) { this.state = 'crossing'; this.crossingTimer = 0; }
+                        else { this.state = 'waiting'; this.waitTimer = 0; }
+                    }
                 }
                 
                 // Safety timeout
@@ -632,6 +662,29 @@
             
             _isTrafficClear(crosswalkData, trafficVehicles, carSearch = null) {
                 if (!crosswalkData) return true;
+
+                // Not while a car sits on the crossing (a queue backed over it, one turning in): no threading between bumpers
+                const cw = crosswalkData, ex = 30;
+                for (const v of carSearch ? carSearch.query(cw.x + cw.w / 2, cw.y + cw.h / 2, Math.max(cw.w, cw.h) / 2 + ex) : trafficVehicles) {
+                    if (v && !v.dead && v.x > cw.x - ex && v.x < cw.x + cw.w + ex && v.y > cw.y - ex && v.y < cw.y + cw.h + ex) return false;
+                }
+
+                // At lights: the walk, then only a car actually moving onto this crossing (turning in, or running
+                // the red) — not the ones waiting at it
+                const sig = this._crossingSignal(crosswalkData);
+                if (sig) {
+                    const p = crosswalkData._sigPhase, road = sig.phases[p].road;
+                    if (!sig.walkOK(p)) { sig.pedWaiting(p); return false; }
+                    const cx = crosswalkData.x + crosswalkData.w / 2, cy = crosswalkData.y + crosswalkData.h / 2;
+                    for (const v of carSearch ? carSearch.query(cx, cy, 170) : trafficVehicles) {
+                        if (!v || v.dead || Math.abs(v.speed || 0) < 1.2) continue;
+                        const dx = cx - v.x, dy = cy - v.y, d = Math.hypot(dx, dy);
+                        if (d > 170 || (dx * Math.cos(v.angle) + dy * Math.sin(v.angle)) < d * 0.3) continue;
+                        const on = v.currentTurnPath ? v.currentTurnPath.toLane.road : v.currentLane && v.currentLane.road;
+                        if (on === road || (v.plannedTurn && v.plannedTurn.toLane && v.plannedTurn.toLane.road === road)) return false;
+                    }
+                    return true;
+                }
                 
                 const checkDist = 250; // How far to check for oncoming traffic
                 const cwCenterX = crosswalkData.x + crosswalkData.w / 2;

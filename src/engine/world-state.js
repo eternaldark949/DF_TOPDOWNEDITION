@@ -261,6 +261,8 @@
                         if (dark > 0.04 && !(v.x < c.x - hw || v.x > c.x + hw || v.y < c.y - hh || v.y > c.y + hh)) drawCarGlow(ctx, v, dark);
                     }
                 }
+                // The junction lights, lit (traffic/traffic-signals.js)
+                if (this.activeMap.type === 'outdoor' && this.traffic && this._cullBounds) this.traffic.drawSignalGlow(ctx, dark, this._cullBounds.world, this.activeMap.crosswalks);
                 // The job's package and drop-off, lit (engine/markers.js)
                 this.drawMissionGlow(ctx, dark);
                 if (this.activeMap.billboards) {

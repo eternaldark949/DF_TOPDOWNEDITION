@@ -22,9 +22,10 @@
             // pause: ticks stopped before going round        honk, rehonk: the horn (and again every rehonk ticks)
             // pass: × the speed it goes by people at         kerb: ticks before squeezing by on the far side
             // backUp: ticks stuck before backing up to try again   take: × the gap it wants to pull into a moving lane
-            calm:   { gap: 32, pull: 72, swing: 1.85, pause: 45, honk: 300, rehonk: 0,   pass: 0.85, kerb: 600, backUp: 480, take: 1.25 },
-            normal: { gap: 22, pull: 66, swing: 1.7,  pause: 22, honk: 150, rehonk: 0,   pass: 1,    kerb: 420, backUp: 330, take: 1 },
-            pushy:  { gap: 12, pull: 56, swing: 1.45, pause: 6,  honk: 40,  rehonk: 100, pass: 1.3,  kerb: 200, backUp: 220, take: 0.7 },
+            //   (or to turn left across: traffic-signals.js)   amber: the share of its full brake it'll use to stop for one
+            calm:   { gap: 32, pull: 72, swing: 1.85, pause: 45, honk: 300, rehonk: 0,   pass: 0.85, kerb: 600, backUp: 480, take: 1.25, amber: 1 },
+            normal: { gap: 22, pull: 66, swing: 1.7,  pause: 22, honk: 150, rehonk: 0,   pass: 1,    kerb: 420, backUp: 330, take: 1,    amber: 0.75 },
+            pushy:  { gap: 12, pull: 56, swing: 1.45, pause: 6,  honk: 40,  rehonk: 100, pass: 1.3,  kerb: 200, backUp: 220, take: 0.7,  amber: 0.45 },
         };
 
         Object.assign(TrafficVehicle.prototype, {
@@ -39,11 +40,13 @@
                 return Math.min(this.maxSpeed, (2.4 + Math.max(0, room) * 0.13) * this._temper().pass);
             },
 
-            /** Out on the road surface, not the pavement: within our road's carriageway (its junctions included) */
+            /** Out on the road surface, not the pavement: within our road's carriageway (its junctions included), or
+             *  within reach of our own body where it's strayed over the kerb */
             _onCarriageway(x, y) {
                 const lane = this.currentLane || (this.currentTurnPath && this.currentTurnPath.toLane), road = lane && lane.road;
                 if (!road || !road.thickness) return true;
-                return Math.abs((x - road.x1) * road.nx + (y - road.y1) * road.ny) < road.thickness / 2;
+                const mine = Math.abs((this.x - road.x1) * road.nx + (this.y - road.y1) * road.ny) + this.width / 2 + 18;
+                return Math.abs((x - road.x1) * road.nx + (y - road.y1) * road.ny) < Math.max(road.thickness / 2, mine);
             },
 
             /**
@@ -99,7 +102,8 @@
                     let tIn = 0, tOut = Infinity;
                     if (Math.abs(vLat) < 0.2) { if (Math.abs(lat) >= band) continue; }
                     else { const wide = band + 8, e1 = (-wide - lat) / vLat, e2 = (wide - lat) / vLat; tIn = Math.max(0, Math.min(e1, e2)); tOut = Math.max(e1, e2); }   // (crossing: a wider berth)
-                    if (tOut < tF || tIn > tR + 10) continue;                  // clear before we get there, or not in till we've gone by
+                    // Clear before we get there (with the time our stopping gap takes to spare), or not in till we've gone by
+                    if (tOut < tF - (T.gap + 10) / close || tIn > tR + 10) continue;
                     const crossing = Math.abs(vLat) >= 0.2 && vx * vx + vy * vy > 0.12;
                     if (!crossing && stepFor(laneLat, rad, false)) continue;   // standing at the edge of our path: a step aside gets us by
                     const stop = front - (crossing ? T.gap : T.pull);
