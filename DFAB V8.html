@@ -4364,6 +4364,10 @@
                     <span class="settings-value val-on" id="set-scopeslow" data-key="scopeSlow">ON</span>
                 </div>
                 <div class="settings-row">
+                    <span class="settings-label">Camera Edge Lock</span>
+                    <span class="settings-value val-on" id="set-camedge" data-key="cameraEdgeLock">ON</span>
+                </div>
+                <div class="settings-row">
                     <span class="settings-label">Film Grain</span>
                     <span class="settings-value val-on" id="set-grain" data-key="filmGrain">ON</span>
                 </div>
@@ -8080,7 +8084,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // --- CONTROLS (touch) — flitting without letting go of the trigger ---
             // Kept in localStorage (dfab_controls) and in saves. See initJoystick.
             ...(() => {
-                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, scopeView: true, scopeSlow: true };
+                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, scopeView: true, scopeSlow: true, cameraEdgeLock: true };   // cameraEdgeLock: the view never leaves the map (engine/draw.js _clampView)
                 try { Object.assign(d, JSON.parse(localStorage.getItem('dfab_controls') || '{}')); } catch (e) { /* private mode */ }
                 return d;
             })(),
@@ -8159,7 +8163,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Apply film grain visibility
             /** Store the control toggles and show or hide the ⚡ button. */
             applyControls() {
-                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, scopeView: this.scopeView, scopeSlow: this.scopeSlow })); } catch (e) { /* private mode */ }
+                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, scopeView: this.scopeView, scopeSlow: this.scopeSlow, cameraEdgeLock: this.cameraEdgeLock })); } catch (e) { /* private mode */ }
                 const b = document.getElementById('btn-flit');
                 if (b) b.classList.toggle('hidden-by-setting', !this.flitButton);
                 const r = document.getElementById('joystick-ring');
@@ -13285,6 +13289,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
             'apt_949': {
                 id: 'apt_949', width: 1400, height: 900, type: 'indoor',
+                cameraBounds: { top: -394 },    // the camera may rise over the city strip above the railing (engine/interiors.js _makeAptCityView)
                 label: 'Silver Queen Apartments', floorColor: '#1a0a0a',
                 spawn: { x: 1050, y: 370 },
                 zones: [
@@ -59265,7 +59270,7 @@ engineMixin({
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
                         flitTwoFinger: GameSettings.flitTwoFinger, flitButton: GameSettings.flitButton,
-                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, scopeView: GameSettings.scopeView, scopeSlow: GameSettings.scopeSlow,
+                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, scopeView: GameSettings.scopeView, scopeSlow: GameSettings.scopeSlow, cameraEdgeLock: GameSettings.cameraEdgeLock,
                         ambienceVolume: GameSettings.ambienceVolume,
                         musicVolume: GameSettings.musicVolume,
                         fullscreen: GameSettings.fullscreen,
@@ -59909,6 +59914,7 @@ engineMixin({
                         GameSettings.sniperRelease = save.settings.sniperRelease !== false;
                         GameSettings.scopeView = save.settings.scopeView !== false;
                         GameSettings.scopeSlow = save.settings.scopeSlow !== false;
+                        GameSettings.cameraEdgeLock = save.settings.cameraEdgeLock !== false;
                         GameSettings.applyControls();
                         if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
                         if (typeof save.settings.musicVolume === 'number') audioSys.setMusicVolume(save.settings.musicVolume);
@@ -60031,6 +60037,7 @@ engineMixin({
                 }
                 if (this.cineCam) { x += this.cineCam.dx; y += this.cineCam.dy; }
                 if (this.finCam) { x += this.finCam.dx; y += this.finCam.dy; }
+                ({ x, y } = this._clampView(x, y, this.camera.zoom));       // as draw() keeps the view inside the map
                 const hw = this.canvas.width / 2 / this.camera.zoom, hh = this.canvas.height / 2 / this.camera.zoom, map = this.activeMap;
                 return { left: Math.max(0, x - hw - 50), top: Math.max(0, y - hh - 50),
                     right: Math.min(map.width, x + hw + 50), bottom: Math.min(map.height, y + hh + 50) };
@@ -64191,6 +64198,21 @@ engineMixin({
                 WorldRenderProfiler.sync(!!(this.showProfiler && GameSettings.profilerMode === 'full'));
             },
 
+            /** Keep the view inside the map (GameSettings.cameraEdgeLock): the centre (x, y) moved so the screen at `zoom`
+                shows nothing beyond the map's camera rect — its own rect, any edge moved by its `cameraBounds` (apt_949: up
+                over the city strip). On an axis where the map is no bigger than the view, the map is centred. A reused point. */
+            _clampView(x, y, zoom) {
+                const out = this._camClamp || (this._camClamp = { x: 0, y: 0 }), map = this.activeMap;
+                out.x = x; out.y = y;
+                if (!map || GameSettings.cameraEdgeLock === false || !(zoom > 0)) return out;
+                const B = map.cameraBounds || {}, l = B.left !== undefined ? B.left : 0, t = B.top !== undefined ? B.top : 0;
+                const r = B.right !== undefined ? B.right : map.width, b = B.bottom !== undefined ? B.bottom : map.height;
+                const hw = this.canvas.width / 2 / zoom, hh = this.canvas.height / 2 / zoom;
+                out.x = r - l <= hw * 2 ? (l + r) / 2 : Math.max(l + hw, Math.min(r - hw, x));
+                out.y = b - t <= hh * 2 ? (t + b) / 2 : Math.max(t + hh, Math.min(b - hh, y));
+                return out;
+            },
+
             /* THE VIEW — where the camera actually is this frame (draw() resolves it once:
                the cutscene camera, or her position plus the scope lean and the drive
                look-ahead). Everything that maps world <-> screen reads it — the world, both
@@ -64262,8 +64284,9 @@ engineMixin({
                 // Camera Logic: Cutscene Director vs Player Tracking
                 let camX, camY;
                 if (this.cutscene && this.cutscene.active) {
-                    camX = this.camera.x;
-                    camY = this.camera.y;
+                    const c = this._clampView(this.camera.x, this.camera.y, viewZoom);   // pans and cuts stop at the map's edge
+                    camX = this.camera.x = c.x;
+                    camY = this.camera.y = c.y;
                 } else {
                     /* Behind the wheel the camera looks a little down the road, easing after the
                        car's velocity (per frame, so it glides between ticks); on foot it drifts home. */
@@ -64277,13 +64300,14 @@ engineMixin({
                     const cityV = this._cityView, look = cityV && !drv ? cityV.lookoutLean(this.player, this.camera.zoom) : 0;
                     this.lookLeanY = cityV ? (this.lookLeanY || 0) + (look - (this.lookLeanY || 0)) * (1 - Math.exp(-dtCam / 450)) : 0;
                     // Scoped with a sniper, the camera leans down her line (engine/scope.js)
-                    camX = this.player.x + (this.scopeLeanX || 0) + this.driveLeanX;
-                    camY = this.player.y + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY;
+                    const c = this._clampView(this.player.x + (this.scopeLeanX || 0) + this.driveLeanX, this.player.y + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY, viewZoom);
+                    camX = c.x; camY = c.y;
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
                 if (this.cineCam) { camX += this.cineCam.dx; camY += this.cineCam.dy; }   // Cinematic View's pan
                 if (fc) { camX += fc.dx; camY += fc.dy; }
+                if (this.cineCam || fc) { const c = this._clampView(camX, camY, viewZoom); camX = c.x; camY = c.y; }
                 this.view = { x: camX, y: camY, zoom: viewZoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
                 
                 this.ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
@@ -72393,7 +72417,7 @@ engineMixin({
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
                 this._updateValueEl('set-adaptive-lighting', GameSettings.adaptiveLighting ? 'on' : 'off');
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
-                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease'], ['set-scopeview', 'scopeView'], ['set-scopeslow', 'scopeSlow']])
+                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease'], ['set-scopeview', 'scopeView'], ['set-scopeslow', 'scopeSlow'], ['set-camedge', 'cameraEdgeLock']])
                     this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
@@ -72446,7 +72470,7 @@ engineMixin({
             _cycleSetting(el) {
                 const key = el.dataset.key;
                 
-                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'aimBeforeFire' || key === 'sniperRelease' || key === 'scopeView' || key === 'scopeSlow') {
+                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'aimBeforeFire' || key === 'sniperRelease' || key === 'scopeView' || key === 'scopeSlow' || key === 'cameraEdgeLock') {
                     GameSettings[key] = !GameSettings[key];
                     GameSettings.applyControls();
                     this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');

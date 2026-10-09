@@ -9,6 +9,21 @@
                 WorldRenderProfiler.sync(!!(this.showProfiler && GameSettings.profilerMode === 'full'));
             },
 
+            /** Keep the view inside the map (GameSettings.cameraEdgeLock): the centre (x, y) moved so the screen at `zoom`
+                shows nothing beyond the map's camera rect — its own rect, any edge moved by its `cameraBounds` (apt_949: up
+                over the city strip). On an axis where the map is no bigger than the view, the map is centred. A reused point. */
+            _clampView(x, y, zoom) {
+                const out = this._camClamp || (this._camClamp = { x: 0, y: 0 }), map = this.activeMap;
+                out.x = x; out.y = y;
+                if (!map || GameSettings.cameraEdgeLock === false || !(zoom > 0)) return out;
+                const B = map.cameraBounds || {}, l = B.left !== undefined ? B.left : 0, t = B.top !== undefined ? B.top : 0;
+                const r = B.right !== undefined ? B.right : map.width, b = B.bottom !== undefined ? B.bottom : map.height;
+                const hw = this.canvas.width / 2 / zoom, hh = this.canvas.height / 2 / zoom;
+                out.x = r - l <= hw * 2 ? (l + r) / 2 : Math.max(l + hw, Math.min(r - hw, x));
+                out.y = b - t <= hh * 2 ? (t + b) / 2 : Math.max(t + hh, Math.min(b - hh, y));
+                return out;
+            },
+
             /* THE VIEW — where the camera actually is this frame (draw() resolves it once:
                the cutscene camera, or her position plus the scope lean and the drive
                look-ahead). Everything that maps world <-> screen reads it — the world, both
@@ -80,8 +95,9 @@
                 // Camera Logic: Cutscene Director vs Player Tracking
                 let camX, camY;
                 if (this.cutscene && this.cutscene.active) {
-                    camX = this.camera.x;
-                    camY = this.camera.y;
+                    const c = this._clampView(this.camera.x, this.camera.y, viewZoom);   // pans and cuts stop at the map's edge
+                    camX = this.camera.x = c.x;
+                    camY = this.camera.y = c.y;
                 } else {
                     /* Behind the wheel the camera looks a little down the road, easing after the
                        car's velocity (per frame, so it glides between ticks); on foot it drifts home. */
@@ -95,13 +111,14 @@
                     const cityV = this._cityView, look = cityV && !drv ? cityV.lookoutLean(this.player, this.camera.zoom) : 0;
                     this.lookLeanY = cityV ? (this.lookLeanY || 0) + (look - (this.lookLeanY || 0)) * (1 - Math.exp(-dtCam / 450)) : 0;
                     // Scoped with a sniper, the camera leans down her line (engine/scope.js)
-                    camX = this.player.x + (this.scopeLeanX || 0) + this.driveLeanX;
-                    camY = this.player.y + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY;
+                    const c = this._clampView(this.player.x + (this.scopeLeanX || 0) + this.driveLeanX, this.player.y + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY, viewZoom);
+                    camX = c.x; camY = c.y;
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
                 if (this.cineCam) { camX += this.cineCam.dx; camY += this.cineCam.dy; }   // Cinematic View's pan
                 if (fc) { camX += fc.dx; camY += fc.dy; }
+                if (this.cineCam || fc) { const c = this._clampView(camX, camY, viewZoom); camX = c.x; camY = c.y; }
                 this.view = { x: camX, y: camY, zoom: viewZoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
                 
                 this.ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);

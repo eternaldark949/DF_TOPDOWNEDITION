@@ -90,6 +90,7 @@ engineMixin({
                 }
                 if (this.cineCam) { x += this.cineCam.dx; y += this.cineCam.dy; }
                 if (this.finCam) { x += this.finCam.dx; y += this.finCam.dy; }
+                ({ x, y } = this._clampView(x, y, this.camera.zoom));       // as draw() keeps the view inside the map
                 const hw = this.canvas.width / 2 / this.camera.zoom, hh = this.canvas.height / 2 / this.camera.zoom, map = this.activeMap;
                 return { left: Math.max(0, x - hw - 50), top: Math.max(0, y - hh - 50),
                     right: Math.min(map.width, x + hw + 50), bottom: Math.min(map.height, y + hh + 50) };

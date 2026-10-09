@@ -778,13 +778,38 @@ test('Look-out: at the veranda edge the camera leans out over the city; nowhere 
   const at = (x, y) => value(env, `
     if (!game._cityView) game._cityView = game._makeAptCityView();
     for (let i = 0; i < 120; i++) { game.player.x = ${x}; game.player.y = ${y}; _frameTime += 50; game.draw(); }
-    return { lean: game.lookLeanY, want: -game._cityView.lookout / game.camera.zoom, camY: game.camera.y };`);
+    return { lean: game.lookLeanY, want: -game._cityView.lookout / game.camera.zoom, camY: game.camera.y, top: game.activeMap.cameraBounds.top + game.canvas.height / 2 / game.camera.zoom };`);
   const edge = at(700, 20), room = at(400, 500);
   ok(Math.abs(edge.lean - edge.want) < 1, `at the railing it leans ${Math.round(edge.lean)} px (${Math.round(edge.want)} wanted: the same on screen at any zoom)`);
-  equal(Math.round(edge.camY), Math.round(20 + edge.want), 'the camera is that far out past her');
+  equal(Math.round(edge.camY), Math.round(Math.max(20 + edge.want, edge.top)), 'the camera is that far out past her (or as far as the city strip goes, on a tall screen)');
   ok(Math.abs(room.lean) < 0.01, 'in the rooms: none');
   const hub = value(env, `game._doLoadMap('hub_949'); _frameTime += 16; game.draw(); return game.lookLeanY;`);
   equal(hub, 0, 'and none at once on another map');
+}, {affine: true});
+
+test('Camera edge lock: the view stays inside the map, a narrow map is centred, and off it follows her as before', env => {
+  env.run(`game.story.update=()=>{};`);
+  const view = (map, px, py, pre = '') => value(env, `
+    if (!game.activeMap || game.activeMap.id !== '${map}') { game._doLoadMap('${map}'); game.running=false; game.enterWorld(); game.loop=()=>{}; }
+    ${pre}
+    for (let i = 0; i < 3; i++) { game.player.x = ${px}; game.player.y = ${py}; _frameTime += 50; game.draw(); }
+    const v = game.view, hw = game.canvas.width / 2 / v.zoom, hh = game.canvas.height / 2 / v.zoom;
+    return { l: v.x - hw, r: v.x + hw, t: v.y - hh, b: v.y + hh, x: v.x, y: v.y, cx: game.camera.x, cy: game.camera.y };`);
+  const e = 1e-6;
+  const west = view('apt_949', 20, 100), east = view('apt_949', 1380, 100), rail = view('apt_949', 700, 20);
+  ok(Math.abs(west.l) < e && Math.abs(east.r - 1400) < e, 'at the veranda\'s ends the view stops at the apartment\'s walls');
+  ok(rail.t >= -394 - e && rail.t < 6, 'at the railing it still rises over the city strip, and no further than its top');
+  ok(west.x === west.cx && west.y === west.cy, 'the camera everything else reads is the clamped one');
+  const van = view('van_interior', 60, 400, 'game.camera.zoom = 1.6;');
+  equal(van.x, 200, 'a map narrower than the view is centred');
+  const hub = view('hub_949', 10, 10);
+  ok(hub.l >= -e && hub.t >= -e, 'at the hub\'s corner the view stays inside the city');
+  const cut = view('hub_949', 2000, 2000, 'game.cutscene.active = true; game.camera.x = -500; game.camera.y = 20000;');
+  env.run(`game.cutscene.active = false;`);
+  ok(cut.l >= -e && cut.b <= 11000 + e && cut.cx === cut.x, 'a cutscene camera outside the map is brought in, and stays in');
+  const off = view('apt_949', 20, 100, 'GameSettings.cameraEdgeLock = false;');
+  env.run(`GameSettings.cameraEdgeLock = true;`);
+  equal([off.x, off.y], [20, 100], 'with the lock off the camera is her own position again');
 }, {affine: true});
 
 test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {

@@ -29,6 +29,7 @@
             },
             'apt_949': {
                 id: 'apt_949', width: 1400, height: 900, type: 'indoor',
+                cameraBounds: { top: -394 },    // the camera may rise over the city strip above the railing (engine/interiors.js _makeAptCityView)
                 label: 'Silver Queen Apartments', floorColor: '#1a0a0a',
                 spawn: { x: 1050, y: 370 },
                 zones: [

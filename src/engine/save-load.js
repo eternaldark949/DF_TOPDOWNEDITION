@@ -137,7 +137,7 @@ engineMixin({
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
                         flitTwoFinger: GameSettings.flitTwoFinger, flitButton: GameSettings.flitButton,
-                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, scopeView: GameSettings.scopeView, scopeSlow: GameSettings.scopeSlow,
+                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, scopeView: GameSettings.scopeView, scopeSlow: GameSettings.scopeSlow, cameraEdgeLock: GameSettings.cameraEdgeLock,
                         ambienceVolume: GameSettings.ambienceVolume,
                         musicVolume: GameSettings.musicVolume,
                         fullscreen: GameSettings.fullscreen,
@@ -781,6 +781,7 @@ engineMixin({
                         GameSettings.sniperRelease = save.settings.sniperRelease !== false;
                         GameSettings.scopeView = save.settings.scopeView !== false;
                         GameSettings.scopeSlow = save.settings.scopeSlow !== false;
+                        GameSettings.cameraEdgeLock = save.settings.cameraEdgeLock !== false;
                         GameSettings.applyControls();
                         if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
                         if (typeof save.settings.musicVolume === 'number') audioSys.setMusicVolume(save.settings.musicVolume);
