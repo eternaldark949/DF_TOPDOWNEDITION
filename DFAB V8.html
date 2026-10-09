@@ -3558,6 +3558,11 @@
                 </div>
 
                 <div id="settings-menu-list" class="hidden">
+                    <div class="menu-item-row" id="btn-toggle-devicepreset">
+                        <div class="row-left"><div class="desc-box">Lower settings for this device's power.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-devicepreset">Device Preset: OFF</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
                     <div class="menu-item-row" id="btn-toggle-lighting">
                         <div class="row-left"><div class="desc-box">Low improves FPS significantly.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-lighting">Lighting: HIGH</div></div>
@@ -8112,6 +8117,40 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             // --- AUTO-DETECT ---
             _isMobile: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent),
+
+            // --- DEVICE PRESET --- (main menu → Settings → Device Preset; off by default)
+            // On: the preset for this device's tier (applyPreset) over the settings it touches, the
+            // values it replaced kept so that turning it off puts them back. Kept per device
+            // (dfab_device_preset: { on, before }), not in saves, and applied again at launch and
+            // after a save's settings load (app/boot.js, engine/save-load.js) while it's on.
+            devicePreset: (() => { try { return !!(JSON.parse(localStorage.getItem('dfab_device_preset') || '{}') || {}).on; } catch (e) { return false; } })(),
+            _PRESET_KEYS: ['lightingQuality', 'trafficDensity', 'pedestrianDensity', 'foliageDensity', 'rainDensity',
+                           'filmGrain', 'softShadows', 'bloom', 'wetReflections', 'reflections', 'soundRings'],
+            /** This device's tier, from what the browser says of it: 'low' | 'medium' | 'high' */
+            deviceTier() {
+                const nav = typeof navigator !== 'undefined' ? navigator : {}, mem = nav.deviceMemory, cores = nav.hardwareConcurrency || 0;
+                const handheld = this._isMobile || (nav.maxTouchPoints > 1 && /Macintosh/.test(nav.userAgent || ''));   // (an iPad says it's a Mac)
+                if ((mem && mem <= 2) || (cores && cores <= 2)) return 'low';
+                if ((mem && mem <= 4) || (cores && cores <= 4) || handheld) return 'medium';
+                return 'high';
+            },
+            /** Turn the device preset on (this tier's preset, the replaced values kept) or off (them put back) */
+            setDevicePreset(on) {
+                let rec = {};
+                try { rec = JSON.parse(localStorage.getItem('dfab_device_preset') || '{}') || {}; } catch (e) { /* private mode */ }
+                if (on) {
+                    if (!rec.before) { rec.before = {}; for (const k of this._PRESET_KEYS) rec.before[k] = this[k]; }
+                    this.applyPreset(this.deviceTier());
+                } else if (rec.before) {
+                    for (const k of this._PRESET_KEYS) if (k in rec.before) this[k] = rec.before[k];
+                    rec.before = null;
+                }
+                this.devicePreset = !!on; rec.on = this.devicePreset;
+                this.saveDensity();
+                try { localStorage.setItem('dfab_device_preset', JSON.stringify(rec)); } catch (e) { /* private mode */ }
+            },
+            /** While it's on, the preset again (at launch, and after a save brings its own settings) */
+            reapplyDevicePreset() { if (this.devicePreset) { this.applyPreset(this.deviceTier()); this.saveDensity(); } },
             
             // Apply mobile-friendly defaults on first load
             applyPreset(preset) {
@@ -60005,6 +60044,7 @@ engineMixin({
                         if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
                         if (typeof save.settings.musicVolume === 'number') audioSys.setMusicVolume(save.settings.musicVolume);
                         if (typeof syncAmbienceSliders === 'function') syncAmbienceSliders();
+                        GameSettings.reapplyDevicePreset();       // while it's on, this device's preset outranks the save's (core/settings.js)
                         // Apply lighting scale
                         this.lightingScale = GameSettings.lightingQuality === 'low' ? 0.5 : GameSettings.lightingQuality === 'medium' ? 0.75 : 1.0;
                         GameSettings.applyFilmGrain();
@@ -72889,6 +72929,8 @@ engineMixin({
             };
             const dColor = (v) => v === 'low' ? '#4CAF50' : v === 'medium' ? '#FFD700' : '';
             
+            lbl('lbl-devicepreset', `Device Preset: ${GameSettings.devicePreset ? `ON (${GameSettings.deviceTier().toUpperCase()})` : 'OFF'}`,
+                GameSettings.devicePreset ? '#4CAF50' : '#666');
             lbl('lbl-lighting', `Lighting: ${GameSettings.lightingQuality.toUpperCase()}`, 
                 GameSettings.lightingQuality === 'low' ? '#ffaa00' : '');
             lbl('lbl-traffic', `Traffic: ${GameSettings.trafficDensity.toUpperCase()}`,
@@ -73023,6 +73065,20 @@ engineMixin({
             else GameSettings.fpsLimit = 0;
             syncMainMenuLabels();
         });
+
+        // Device Preset (off by default): this device's tier of settings, or back to what was there (core/settings.js)
+        function applyPresetSettings() {
+            game.lightingScale = GameSettings.lightingQuality === 'low' ? 0.5 : GameSettings.lightingQuality === 'medium' ? 0.75 : 1.0;
+            GameSettings.applyFilmGrain();
+            game.resize();
+            syncMainMenuLabels();
+        }
+        document.getElementById('btn-toggle-devicepreset').addEventListener('click', () => {
+            GameSettings.setDevicePreset(!GameSettings.devicePreset);
+            applyPresetSettings();
+        });
+        // On at launch: again, as lighting, bloom and reflections start from their defaults each time
+        if (GameSettings.devicePreset) { GameSettings.reapplyDevicePreset(); applyPresetSettings(); }
 
     </script>
     

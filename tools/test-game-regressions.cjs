@@ -867,6 +867,37 @@ test('Adaptive reflections: slow frames step Ultra down to High then Medium (nev
   equal(r.slice(7), ['ultra', 'ultra', 'ultra'], 'on target, or slow for other reasons, or with the switch off: no change');
 }, {affine: true});
 
+test('Device Preset: off by default; on applies this device\'s tier, a save can\'t undo it, and off puts every setting back', env => {
+  const r = value(env, `
+    const G = GameSettings, out = { def: G.devicePreset }, keys = G._PRESET_KEYS, before = {};
+    for (const k of keys) before[k] = G[k];
+    const nav = navigator, mob = G._isMobile;
+    const tier = (cores, mem, mobile) => {
+      const c0 = nav.hardwareConcurrency, m0 = nav.deviceMemory;
+      nav.hardwareConcurrency = cores; nav.deviceMemory = mem; G._isMobile = mobile;
+      try { return G.deviceTier(); } finally { nav.hardwareConcurrency = c0; nav.deviceMemory = m0; G._isMobile = mob; }
+    };
+    out.tiers = [tier(2, undefined, false), tier(8, 2, false), tier(4, undefined, false), tier(8, 8, true), tier(8, 8, false)];
+    G.deviceTier = () => 'low';
+    try {
+      G.setDevicePreset(true);
+      out.on = [G.devicePreset, G.lightingQuality, G.reflections, G.trafficDensity, G.bloom, JSON.parse(localStorage.getItem('dfab_device_preset')).on];
+      G.reflections = 'ultra'; G.lightingQuality = 'high'; G.bloom = true;      // a save's own settings, restored
+      G.reapplyDevicePreset();
+      out.afterSave = [G.lightingQuality, G.reflections, G.bloom];
+      G.setDevicePreset(false);
+      out.off = [G.devicePreset, keys.every(k => G[k] === before[k]), JSON.parse(localStorage.getItem('dfab_device_preset')).on];
+      G.reflections = 'ultra'; G.reapplyDevicePreset(); out.offSave = G.reflections; G.reflections = before.reflections;
+    } finally { delete G.deviceTier; G.setDevicePreset(false); }
+    return out;`);
+  equal(r.def, false, 'off by default');
+  equal(r.tiers, ['low', 'low', 'medium', 'medium', 'high'], 'tiers: 2 cores, 2 GB, 4 cores, a phone, a strong desktop');
+  equal(r.on, [true, 'low', 'off', 'low', false, true], 'on: the low preset (lighting low, reflections off, traffic low, no bloom), kept on this device');
+  equal(r.afterSave, ['low', 'off', false], 'a save bringing heavier settings is brought back to the preset');
+  equal(r.off, [false, true, false], 'off: every setting it touched back exactly as it was');
+  equal(r.offSave, 'ultra', 'and while off, a save\'s settings stand');
+});
+
 test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
   const r = value(env, `

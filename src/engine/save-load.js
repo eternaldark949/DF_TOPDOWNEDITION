@@ -786,6 +786,7 @@ engineMixin({
                         if (typeof save.settings.ambienceVolume === 'number') GameSettings.ambienceVolume = Math.max(0, Math.min(1, save.settings.ambienceVolume));
                         if (typeof save.settings.musicVolume === 'number') audioSys.setMusicVolume(save.settings.musicVolume);
                         if (typeof syncAmbienceSliders === 'function') syncAmbienceSliders();
+                        GameSettings.reapplyDevicePreset();       // while it's on, this device's preset outranks the save's (core/settings.js)
                         // Apply lighting scale
                         this.lightingScale = GameSettings.lightingQuality === 'low' ? 0.5 : GameSettings.lightingQuality === 'medium' ? 0.75 : 1.0;
                         GameSettings.applyFilmGrain();

@@ -149,6 +149,8 @@
             };
             const dColor = (v) => v === 'low' ? '#4CAF50' : v === 'medium' ? '#FFD700' : '';
             
+            lbl('lbl-devicepreset', `Device Preset: ${GameSettings.devicePreset ? `ON (${GameSettings.deviceTier().toUpperCase()})` : 'OFF'}`,
+                GameSettings.devicePreset ? '#4CAF50' : '#666');
             lbl('lbl-lighting', `Lighting: ${GameSettings.lightingQuality.toUpperCase()}`, 
                 GameSettings.lightingQuality === 'low' ? '#ffaa00' : '');
             lbl('lbl-traffic', `Traffic: ${GameSettings.trafficDensity.toUpperCase()}`,
@@ -283,4 +285,18 @@
             else GameSettings.fpsLimit = 0;
             syncMainMenuLabels();
         });
+
+        // Device Preset (off by default): this device's tier of settings, or back to what was there (core/settings.js)
+        function applyPresetSettings() {
+            game.lightingScale = GameSettings.lightingQuality === 'low' ? 0.5 : GameSettings.lightingQuality === 'medium' ? 0.75 : 1.0;
+            GameSettings.applyFilmGrain();
+            game.resize();
+            syncMainMenuLabels();
+        }
+        document.getElementById('btn-toggle-devicepreset').addEventListener('click', () => {
+            GameSettings.setDevicePreset(!GameSettings.devicePreset);
+            applyPresetSettings();
+        });
+        // On at launch: again, as lighting, bloom and reflections start from their defaults each time
+        if (GameSettings.devicePreset) { GameSettings.reapplyDevicePreset(); applyPresetSettings(); }
 
