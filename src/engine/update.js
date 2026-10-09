@@ -1314,14 +1314,11 @@
                     if (catDist < 50) nearInteractable = { interactionType: 'adopt_cat', entity: this.velvetCat };
                 }
                 
-                // Delivery vehicle interaction (for pickup when mission active)
-                if (this.deliveryVehicle && this.deliveryVehicle.visible && this.missions.activeMission 
-                    && this.missions.activeMission.type === MISSION_TYPES.DELIVERY 
-                    && !this.missions.activeMission.pickedUp && !this.isDriving) {
-                    const dvDist = Math.hypot(this.player.x - this.deliveryVehicle.x, this.player.y - this.deliveryVehicle.y);
-                    if (dvDist < 80) {
-                        nearInteractable = { interactionType: 'delivery_pickup' };
-                    }
+                // The job's package by the van (engine/markers.js): beside it, or the van
+                const pkg = this.isDriving ? null : this.deliveryPackageSpot();
+                if (pkg && (Math.hypot(this.player.x - pkg.x, this.player.y - pkg.y) < 70 ||
+                            Math.hypot(this.player.x - this.deliveryVehicle.x, this.player.y - this.deliveryVehicle.y) < 80)) {
+                    nearInteractable = { interactionType: 'delivery_pickup' };
                 }
                 
                 captionSystem.checkProximityGreetings(this.player, this.npcs, this.teammates);

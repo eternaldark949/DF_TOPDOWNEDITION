@@ -1042,35 +1042,109 @@ test("Amber's van is sanctioned: never duplicated, parked where she leaves it, h
   equal([result.job, result.home, result.vans], ['delivery', result.homeWas, 1], 'a new job finds it by the cafe');
 }, {events:true});
 
-test('Markers: pins over her car and the van after the light, at the edge when away, none indoors or in the car', env => {
+test('Markers: pins over what is on screen after the light; the compass round her for what is not; none indoors', env => {
   carsFixture(env);
   const draw=(setup)=>value(env, `
     ${setup}
-    const kinds=[], order=[], M=MapIcons.draw, L=game.drawLightingSystem, C=game.drawCarMarkers;
-    MapIcons.draw=function(ctx,k,...a){ if(/^(amberPin|pin):|objective/.test(k)) kinds.push(k); return M.call(this,ctx,k,...a); };
+    const kinds=[], at=[], order=[], M=MapIcons.draw, L=game.drawLightingSystem, C=game.drawMarkers;
+    MapIcons.draw=function(ctx,k,x,y,...a){ if(/Pin:|^pin:|[bB]adge:/.test(k)) { kinds.push(k); at.push([k,x,y]); } return M.call(this,ctx,k,x,y,...a); };
     game.drawLightingSystem=function(...a){ order.push('light'); return L.apply(this,a); };
-    game.drawCarMarkers=function(...a){ order.push('markers'); return C.apply(this,a); };
-    const labels=[], F=game.ctx.fillText; game.ctx.fillText=function(t,...a){ if(/CAR|AMBER|DROP|BOUNTY|SALVAGE/.test(t)) labels.push(t); return F.call(this,t,...a); };
-    try { game.camera.x=game.player.x; game.camera.y=game.player.y; game.draw(); }
-    finally { MapIcons.draw=M; delete game.drawLightingSystem; delete game.drawCarMarkers; game.ctx.fillText=F; }
-    return {kinds:kinds.sort(), labels:labels.sort(), order:order.join(',')};
+    game.drawMarkers=function(...a){ order.push('markers'); return C.apply(this,a); };
+    const labels=[], F=game.ctx.fillText; game.ctx.fillText=function(t,...a){ if(/CAR|AMBER|PICK|DROP|\\dm$/.test(t)) labels.push(t); return F.call(this,t,...a); };
+    try { game.draw(); }
+    finally { MapIcons.draw=M; delete game.drawLightingSystem; delete game.drawMarkers; game.ctx.fillText=F; }
+    const v=game.view, z=v.zoom, hub=game.isDriving?game.car:game.player;
+    const hx=game.canvas.width/2+(hub.x-v.x)*z, hy=game.canvas.height/2+(hub.y-v.y)*z;
+    return {kinds:kinds.sort(), labels:labels.sort(), order:order.join(','), round:at.filter(a=>/[bB]adge/.test(a[0])).map(a=>Math.round(Math.hypot(a[1]-hx,a[2]-hy)))};
   `);
-  const own='game.ownedCar', van='game.deliveryVehicle';
+  const own='game.ownedCar';
   const near=draw(`__beside(${own}); game.missions.activeMission=null;`);
   equal(near.kinds, [], 'her car within reach: the Drive pill instead of a pin (the van is far, and no job)');
   equal(near.order, 'light,markers', 'after the light');
   const view=draw(`game.player.x=${own}.x-300; game.player.y=${own}.y;`);
   ok(view.kinds.includes('pin:car') && view.labels.includes('YOUR CAR'), 'on screen: a pin and her car\'s name');
   const far=draw(`game.player.x=${own}.x+2400; game.player.y=${own}.y;`);
-  ok(far.kinds.includes('pin:car') && far.labels.some(l=>/^YOUR CAR · \d+m$/.test(l)), 'off screen on foot: at the edge with the distance');
-  ok(!far.kinds.includes('amberPin:box'), 'the van stays off the edge without a job');
+  equal(far.kinds, ['crimsonBadge:car'], 'off screen on foot: her car on the compass');
+  ok(far.labels.some(l=>/^\d+m$/.test(l)), 'with the distance');
+  ok(far.round.every(r=>r>40 && r<110), 'round her, not at the screen\'s edge');
   const job=draw(`const d=game.missions.generateDelivery(game); game.missions.acceptMission(d,game);`);
-  ok(job.kinds.includes('amberPin:box') && job.labels.some(l=>/^AMBER DELIVERY · \d+m$/.test(l)), 'a job to fetch it: the van at the edge');
+  ok(job.kinds.includes('amberBadge:box'), 'a delivery to fetch: the package on the compass');
+  const pkg=draw(`const p=game.deliveryPackageSpot(); game.player.x=p.x-280; game.player.y=p.y;`);
+  ok(pkg.kinds.includes('amberPin:box') && pkg.labels.includes('PICK UP'), 'the package on screen: an amber pin, PICK UP');
+  ok(!pkg.kinds.includes('amberPin:car'), 'the van\'s own pin gives way to the package');
+  const drop=draw(`game.pickUpPackage(); const m=game.missions.activeMission; game.player.x=m.targetX; game.player.y=m.targetY+(m.targetY>5500?-1500:1500);`);
+  ok(drop.kinds.includes('badge:flag'), 'the drop-off on the compass, in gold');
   const driving=draw(`game.missions.activeMission=null; const h=__street(300); __beside(h); game.hijackVehicle(h);
     h.x=${own}.x+2400; h.y=${own}.y; game.player.x=h.x; game.player.y=h.y;`);
-  equal(driving.kinds.filter(k=>k==='pin:car'), [], 'driving another car: the ride tag points home instead');
+  equal(driving.kinds.filter(k=>/car$/.test(k) && !/amber/.test(k)), [], 'driving another car: the ride tag points home instead');
   const inside=draw(`game.toggleVehicle(); game._doLoadMap('cozy_cafe_interior'); game.running=true;`);
   equal(inside.kinds, [], 'none indoors');
+}, {events:true});
+
+test('The package: drawn by the van and lit at night, picked up there or loaded with the van; the readout follows the job', env => {
+  carsFixture(env);
+  const result=value(env, `
+    game.missions.acceptMission(game.missions.generateDelivery(game), game);
+    const p=game.deliveryPackageSpot(), van=game.deliveryVehicle, spot={x:p.x,y:p.y};
+    const bad=[]; game.ctx.translate=function(x,y){ if(!Number.isFinite(x)||!Number.isFinite(y)) bad.push([x,y]); };
+    game.drawDeliveryPackage(game.ctx, null); game.drawMissionGlow(game.ctx, 1); delete game.ctx.translate;
+    game.player.x=spot.x-Math.sin(van.angle)*40; game.player.y=spot.y+Math.cos(van.angle)*40; game.update();
+    const pill=game.interactBtn._apSig; game._objectiveHud();
+    const el=document.getElementById('ui-objective'), q=c=>el.querySelector(c).textContent;
+    const before={show:el.classList.contains('show'), title:q('.o-title'), step:q('.o-step'), dist:q('.o-dist'), body:document.body.classList.contains('objective-hud')};
+    game.interact();
+    const picked=game.missions.activeMission.pickedUp, gone=game.deliveryPackageSpot()===null;
+    game._objectiveHud(); const after=q('.o-step');
+    game.missions.activeMission=null; game.missions.acceptMission(game.missions.generateDelivery(game), game);
+    __beside(van); game.enterCar(van); for(let i=0;i<300&&!game.isDriving;i++) game.update();
+    const loaded=game.missions.activeMission.pickedUp;
+    game.missions.activeMission=null; game._objectiveHud();
+    return {bad:bad.length, pill, before, picked, gone, after, loaded, hidden:!el.classList.contains('show'), bodyAfter:document.body.classList.contains('objective-hud')};
+  `);
+  equal(result.bad, 0, 'drawn where it is (the old art was placed by a width the van does not have)');
+  equal(result.pill, 'Pick Up|Delivery|E');
+  equal([result.before.show, result.before.body, result.before.title], [true, true, 'Amber delivery']);
+  ok(/package/i.test(result.before.step) && /^\d+m$/.test(result.before.dist), 'the step and the distance to the package');
+  equal([result.picked, result.gone], [true, true]);
+  ok(/^Deliver to /.test(result.after), 'then the drop-off');
+  equal(result.loaded, true, 'driving off in the van takes the package with her');
+  equal([result.hidden, result.bodyAfter], [true, false], 'no job, no readout');
+}, {events:true});
+
+test('Hijacking: a ganger at the wheel comes out fighting; a civilian, or an empty car, does not', env => {
+  carsFixture(env);
+  const result=value(env, `
+    const out=[];
+    for (const [driver, has] of [['ganger',true],['civilian',true],['ganger',false]]) {
+      if (game.isDriving) game.toggleVehicle();
+      const c=__street(300+out.length*200); c.driverType=driver; c.hasDriver=has; if(!has) c.controlMode='PARKED';
+      const n=game.enemies.length; __beside(c); game.hijackVehicle(c);
+      out.push([driver, has, game.enemies.length-n, /HOSTILE/.test(document.getElementById('message-modal').textContent)]);
+    }
+    return out;
+  `);
+  equal(result, [['ganger',true,1,true],['civilian',true,0,false],['ganger',false,0,false]]);
+}, {events:true});
+
+test('Traffic goes round her parked car: a lane change, or a stop and an overtake when both lanes are hers; never a shove', env => {
+  carsFixture(env);
+  const run=(both)=>value(env, `
+    game.traffic.vehicles.forEach(c=>c.destroy()); game.traffic.vehicles=[]; GameSettings.getMaxTraffic=()=>20;
+    const lane=__lane, probe=new TrafficVehicle(lane,'Gelfash','sedan','AI'); probe.currentLane=lane; const other=probe._sideLanes(false)[0]; probe.destroy();
+    const own=game.ownedCar, van=game.deliveryVehicle, at=520; game.car=own; if(game.isDriving) game.toggleVehicle();
+    const place=(c,l)=>{const off=-(l.start.x-lane.start.x)*lane.uy+(l.start.y-lane.start.y)*lane.ux; Object.assign(c,{x:lane.start.x+lane.ux*at-lane.uy*off,y:lane.start.y+lane.uy*at+lane.ux*off,angle:lane.angle,vx:0,vy:0,speed:0,controlMode:'PARKED',hasDriver:false,visible:true});};
+    place(own,lane); if(${both}) place(van,other); else Object.assign(van, van.home);
+    const ai=new TrafficVehicle(lane,'Gelfash','sedan','AI'); Object.assign(ai,{x:lane.start.x+lane.ux*200,y:lane.start.y+lane.uy*200,angle:lane.angle}); game.traffic.vehicles.push(ai);
+    game.player.x=own.x+lane.uy*400; game.player.y=own.y-lane.ux*400;
+    const s0=[own.x,own.y,van.x,van.y]; let passed=-1;
+    for(let i=0;i<1500;i++){ game.update(); if((ai.x-own.x)*lane.ux+(ai.y-own.y)*lane.uy>own.length){passed=i;break;} }
+    return {passed, moved:Math.round(Math.hypot(own.x-s0[0],own.y-s0[1])+(${both}?Math.hypot(van.x-s0[2],van.y-s0[3]):0))};
+  `);
+  const one=run(false), both=run(true);
+  ok(one.passed >= 0 && one.passed < 300, `round it by the next lane (${one.passed} ticks)`);
+  ok(one.moved <= 2, `her car stays put (${one.moved} px)`);
+  ok(both.passed >= 0, `both lanes hers: it stops, then overtakes (${both.passed} ticks)`);
+  ok(both.moved <= 10, `no shove (${both.moved} px)`);
 }, {events:true});
 
 test('Saves: her car stays where she parked it through a save made indoors; a hijacked drive loads on foot', env => {

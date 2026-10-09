@@ -505,117 +505,8 @@
                     this.ctx.restore();
                 }
                 
-                // --- DELIVERY DROP-OFF MARKER (world-space spinning amber coffee cup) ---
-                const markers = RL.at('markers');
-                if (markers && this.missions.activeMission && this.missions.activeMission.status === 'active'
-                    && this.missions.activeMission.type === MISSION_TYPES.DELIVERY
-                    && this.missions.activeMission.pickedUp && this.activeMap.id === 'hub_949') {
-                    const m = this.missions.activeMission;
-                    const tx = m.targetX;
-                    const ty = m.targetY;
-                    const t = _frameTime;
-                    const pulse = (Math.sin(t / 400) + 1) / 2;
-                    const spin = (t / 1000) % (Math.PI * 2);
-                    
-                    this.ctx.save();
-                    this.ctx.translate(tx, ty);
-                    
-                    // Ground glow ring
-                    const grad = this.ctx.createRadialGradient(0, 0, 0, 0, 0, 50);
-                    grad.addColorStop(0, `rgba(255, 170, 0, ${0.15 + pulse * 0.1})`);
-                    grad.addColorStop(0.6, `rgba(255, 170, 0, ${0.05 + pulse * 0.05})`);
-                    grad.addColorStop(1, 'rgba(255, 170, 0, 0)');
-                    this.ctx.fillStyle = grad;
-                    this.ctx.beginPath();
-                    this.ctx.arc(0, 0, 50, 0, Math.PI * 2);
-                    this.ctx.fill();
-                    
-                    // Spinning coffee cup icon
-                    const scaleX = Math.cos(spin); // Creates 3D spin illusion
-                    this.ctx.save();
-                    this.ctx.scale(scaleX, 1);
-                    
-                    // Cup body (amber)
-                    this.ctx.shadowColor = '#ffaa00';
-                    this.ctx.shadowBlur = 12 + pulse * 8;
-                    this.ctx.fillStyle = `rgba(255, 170, 0, ${0.7 + pulse * 0.3})`;
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(-8, -12);
-                    this.ctx.lineTo(-6, 6);
-                    this.ctx.quadraticCurveTo(0, 10, 6, 6);
-                    this.ctx.lineTo(8, -12);
-                    this.ctx.closePath();
-                    this.ctx.fill();
-                    
-                    // Cup rim (champagne)
-                    this.ctx.fillStyle = '#f5e6c8';
-                    this.ctx.fillRect(-9, -14, 18, 3);
-                    
-                    // Handle
-                    this.ctx.strokeStyle = `rgba(255, 170, 0, ${0.6 + pulse * 0.3})`;
-                    this.ctx.lineWidth = 2;
-                    this.ctx.beginPath();
-                    this.ctx.arc(10, -4, 5, -Math.PI / 2, Math.PI / 2);
-                    this.ctx.stroke();
-                    
-                    // Steam wisps
-                    for (let i = 0; i < 3; i++) {
-                        const sx = -3 + i * 3;
-                        const sy = -14 - 4 - Math.sin(t / 300 + i * 2) * 4;
-                        this.ctx.fillStyle = `rgba(255, 255, 255, ${0.15 + pulse * 0.1})`;
-                        this.ctx.beginPath();
-                        this.ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
-                        this.ctx.fill();
-                    }
-                    
-                    this.ctx.shadowBlur = 0;
-                    this.ctx.restore();
-                    
-                    // "DELIVER HERE" text
-                    this.ctx.font = 'bold 10px Orbitron';
-                    this.ctx.textAlign = 'center';
-                    this.ctx.fillStyle = `rgba(255, 170, 0, ${0.6 + pulse * 0.4})`;
-                    this.ctx.shadowColor = '#ffaa00';
-                    this.ctx.shadowBlur = 8;
-                    this.ctx.fillText('DELIVER HERE', 0, 30);
-                    this.ctx.shadowBlur = 0;
-                    
-                    this.ctx.restore();
-                }
-                
-                // --- BOUNTY TARGET MARKER (world-space red skull indicator) ---
-                if (markers && this.missions.activeMission && this.missions.activeMission.status === 'active'
-                    && this.missions.activeMission.type === MISSION_TYPES.BOUNTY
-                    && this.missions.activeMission.targetEntity
-                    && !this.missions.activeMission.targetEntity.dead
-                    && this.activeMap.id === 'hub_949') {
-                    const target = this.missions.activeMission.targetEntity;
-                    const pulse = (Math.sin(_frameTime / 300) + 1) / 2;
-                    
-                    this.ctx.save();
-                    this.ctx.translate(target.x, target.y - 35);
-                    
-                    // Red diamond marker above target
-                    this.ctx.shadowColor = '#ff3355';
-                    this.ctx.shadowBlur = 10 + pulse * 8;
-                    this.ctx.fillStyle = `rgba(255, 51, 85, ${0.7 + pulse * 0.3})`;
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(0, -10);
-                    this.ctx.lineTo(7, 0);
-                    this.ctx.lineTo(0, 10);
-                    this.ctx.lineTo(-7, 0);
-                    this.ctx.closePath();
-                    this.ctx.fill();
-                    
-                    // Skull icon (simplified)
-                    this.ctx.fillStyle = '#fff';
-                    this.ctx.font = 'bold 8px sans-serif';
-                    this.ctx.textAlign = 'center';
-                    this.ctx.fillText('☠', 0, 4);
-                    
-                    this.ctx.shadowBlur = 0;
-                    this.ctx.restore();
-                }
+                // The delivery's drop-off: the zone to reach, ringed in gold (engine/markers.js; the pins are drawn over the HUD)
+                if (RL.at('markers')) this.drawDropZone(this.ctx, cullBounds.world);
             
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Grid (Faint) - WITH VIEWPORT CULLING (not in the city: its ground is painted)
@@ -707,42 +598,11 @@
                     if (!(dv.x < cbV.left || dv.x > cbV.right || dv.y < cbV.top || dv.y > cbV.bottom)) {
                         dv._lod = 0;
                         if (dv !== this.car) dv.draw(this.ctx);
-                        
-                        // Draw amber package beside the vehicle (if delivery mission active, not yet picked up)
-                        if (this.missions.activeMission && this.missions.activeMission.type === MISSION_TYPES.DELIVERY
-                            && !this.missions.activeMission.pickedUp) {
-                            const pkgX = dv.x + Math.cos(dv.angle + Math.PI / 2) * (dv.vehicleWidth / 2 + 15);
-                            const pkgY = dv.y + Math.sin(dv.angle + Math.PI / 2) * (dv.vehicleWidth / 2 + 15);
-                            const pulse = (Math.sin(_frameTime / 500) + 1) / 2;
-                            
-                            this.ctx.save();
-                            this.ctx.translate(pkgX, pkgY);
-                            
-                            // Glow
-                            this.ctx.shadowColor = '#ffaa00';
-                            this.ctx.shadowBlur = 8 + pulse * 6;
-                            
-                            // Amber box
-                            this.ctx.fillStyle = '#cc8800';
-                            this.ctx.fillRect(-8, -6, 16, 12);
-                            
-                            // Champagne stripe
-                            this.ctx.fillStyle = '#f5e6c8';
-                            this.ctx.fillRect(-8, -1, 16, 2);
-                            
-                            // Vertical champagne stripe
-                            this.ctx.fillRect(-1, -6, 2, 12);
-                            
-                            // Box edge highlight
-                            this.ctx.strokeStyle = '#ffcc44';
-                            this.ctx.lineWidth = 0.5;
-                            this.ctx.strokeRect(-8, -6, 16, 12);
-                            
-                            this.ctx.shadowBlur = 0;
-                            this.ctx.restore();
-                        }
                     }
                 }
+            
+                // The job's package by the van: a parcel and its pickup ring (engine/markers.js)
+                if (RL.at('markers')) this.drawDeliveryPackage(this.ctx, cullBounds.world);
             
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 if (RL.at('markers')) this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
@@ -1256,25 +1116,11 @@
                 const hud = RL.at('hud');
                 if (hud) this.drawPlayerMarker(this.ctx);
                 
-                // Her car, Amber's van and the job's objective: pins over them, or at the screen's edge (engine/cars.js)
-                if (hud) this.drawCarMarkers(this.ctx);
+                // Pins over her cars, the package and the job's target; the compass round her for what's off screen (engine/markers.js)
+                if (hud) this.drawMarkers(this.ctx);
                 
-                // HUD mission objective text (top of screen)
-                if (hud && this.missions.activeMission && this.missions.activeMission.status === 'active') {
-                    this.ctx.save();
-                    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-                    const objText = this.missions.getObjectiveText();
-                    if (objText) {
-                        this.ctx.font = 'bold 11px Courier New';
-                        this.ctx.textAlign = 'center';
-                        this.ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                        this.ctx.fillRect(this.canvas.width / 2 - 200, 4, 400, 20);
-                        this.ctx.fillStyle = '#ffaa00';
-                        this.ctx.globalAlpha = 0.8 + 0.2 * Math.sin(_frameTime / 500);
-                        this.ctx.fillText(objText, this.canvas.width / 2, 18);
-                    }
-                    this.ctx.restore();
-                }
+                // The objective readout (top centre, #ui-objective: engine/markers.js)
+                this._objectiveHud();
                 
                 // The ride tag (bottom left, #ui-ride): what she's driving, and where her own car is
                 this._rideHud();

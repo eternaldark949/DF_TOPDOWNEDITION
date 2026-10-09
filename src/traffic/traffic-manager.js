@@ -127,6 +127,15 @@
                     }
                 }
                 
+                // What the AI sees on the road: traffic, and her parked cars (empty and parked: it goes round them)
+                let sensed = this.vehicles;
+                if (parked && parked.length) {
+                    sensed = this._sensed || (this._sensed = []);
+                    sensed.length = 0;
+                    for (const v of this.vehicles) sensed.push(v);
+                    for (const c of parked) if (!this.vehicles.includes(c)) sensed.push(c);
+                }
+                
                 // 1. VEHICLE UPDATES & CLEANUP
                 for (let i = this.vehicles.length - 1; i >= 0; i--) {
                     let v = this.vehicles[i]; 
@@ -167,7 +176,7 @@
                         this.vehicles.splice(i, 1);
                     } else if (!v.dead) {
                         // Pass decalSystem to update
-                        v.update(player, playerCar, this.vehicles, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, teammates);
+                        v.update(player, playerCar, sensed, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, teammates);
                     }
                 }
                 

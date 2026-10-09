@@ -261,6 +261,8 @@
                         if (dark > 0.04 && !(v.x < c.x - hw || v.x > c.x + hw || v.y < c.y - hh || v.y > c.y + hh)) drawCarGlow(ctx, v, dark);
                     }
                 }
+                // The job's package and drop-off, lit (engine/markers.js)
+                this.drawMissionGlow(ctx, dark);
                 if (this.activeMap.billboards) {
                     const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z + 250, hh = this.canvas.height / 2 / z + 250, c = this.camera;
                     for (const bb of this.activeMap.billboards) if (bb.inView({ left: c.x - hw, right: c.x + hw, top: c.y - hh, bottom: c.y + hh })) bb.drawEmissive(ctx, dark);

@@ -48,6 +48,7 @@
                     title: 'AMBER DELIVERY',
                     description: `Deliver package to ${target.label || 'Apartments'}`,
                     banner: `DELIVER TO: ${(target.label || 'APARTMENTS').toUpperCase()}`,
+                    targetLabel: target.label || 'Apartments',
                     targetX: target.x + (target.w || 100) / 2,
                     targetY: target.y + (target.h || 100) + 30,
                     targetRadius: 100,
@@ -356,6 +357,22 @@
                 this.activeMission.status = 'failed';
                 this.activeMission = null;
                 audioSys.sfx('ui');
+            }
+
+            /** The objective readout's two lines (#ui-objective, engine/markers.js): the job's title, the step she's on */
+            getObjectiveParts() {
+                const m = this.activeMission;
+                if (!m) return null;
+                if (m.type === MISSION_TYPES.DELIVERY) {
+                    return { title: 'Amber delivery', step: m.pickedUp ? `Deliver to ${m.targetLabel || 'the apartments'}` : 'Pick up the package at Cozy Cafe' };
+                }
+                if (m.type === MISSION_TYPES.BOUNTY) return { title: `Bounty · ${m.targetName || 'the mark'}`, step: 'Find them and take them down' };
+                if (m.type === MISSION_TYPES.SALVAGE) {
+                    const step = !m.guardsSpawned ? 'Head to the site' : m.guardsAlive > 0 ? `Clear the hostiles · ${m.guardsAlive} left`
+                        : !m.crateCollected ? 'Collect the scrap crate' : 'Done';
+                    return { title: m.title.replace(/^SALVAGE: /, 'Salvage · '), step };
+                }
+                return { title: m.title || 'Job', step: m.banner || '' };
             }
 
             getObjectiveText() {

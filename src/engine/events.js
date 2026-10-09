@@ -33,15 +33,7 @@
                             audioSys.sfx('ui');
                         }
                     } else if(this.activeInteraction.interactionType === 'delivery_pickup') {
-                        // Delivery mission: pick up package from vehicle
-                        if (this.missions.activeMission && !this.missions.activeMission.pickedUp) {
-                            this.missions.activeMission.pickedUp = true;
-                            showMessage('PACKAGE SECURED. DELIVER TO THE TARGET LOCATION.');
-                            if (this.ui && this.ui.showMissionBanner) {
-                                this.ui.showMissionBanner(this.missions.activeMission.banner, 'gold', 'IN PROGRESS');
-                            }
-                            audioSys.sfx('ui');
-                        }
+                        this.pickUpPackage();                          // the package by the van (engine/markers.js)
                     } else if(this.activeInteraction.interactionType === 'adopt_cat') {
                         this.questState.hasVelvetCat = true;
                         if (this.velvetCat) {

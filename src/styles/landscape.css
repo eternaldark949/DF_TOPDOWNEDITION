@@ -49,6 +49,10 @@
         body.landscape #ui-wave { top: 12px; }
         body.landscape #ui-wave .w-line { font-size: 0.64rem; }
         body.landscape.wave-hud #ui-stealth-indicator { top: 60px; }
+        body.landscape #ui-objective { top: 10px; padding: 4px 14px 5px; }
+        body.landscape #ui-objective .o-line { font-size: 0.56rem; }
+        body.landscape #ui-objective .o-step { font-size: 0.54rem; }
+        body.landscape.objective-hud #ui-stealth-indicator { top: 64px; }
 
         /* --- Cinema --- */
         body.landscape #cinematic-bars.active .cine-bar { height: 9vh; }
