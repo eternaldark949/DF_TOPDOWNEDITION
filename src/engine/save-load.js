@@ -40,15 +40,17 @@ engineMixin({
                     },
                     
                     // --- VEHICLE DATA ---
+                    // Her own car, where it's parked on the hub (cars live there: engine/cars.js). A hijacked car
+                    // or a Zib ride isn't kept: the load finds her on foot where she was.
                     car: {
-                        x: this.ownedCar?.x ?? 0,
-                        y: this.ownedCar?.y ?? 0,
-                        angle: this.ownedCar?.angle ?? 0,
-                        mapId: this.activeMap?.id ?? 'hub_949',
-                        visible: this.ownedCar?.visible ?? true
+                        x: this.ownedCar?.x ?? CAR_START.x,
+                        y: this.ownedCar?.y ?? CAR_START.y,
+                        angle: this.ownedCar?.angle ?? CAR_START.angle,
+                        mapId: 'hub_949',
+                        visible: true
                     },
                     garage: this.garage?.serialize() ?? null,
-                    isDriving: this.isDriving ?? false,
+                    isDriving: !!(this.isDriving && this.car && this.car === this.ownedCar),
                     
                     // --- NPC DATA ---
                     dancers: [],      // Populated dynamically
@@ -170,9 +172,9 @@ engineMixin({
                         weather: null
                     },
                     car: {
-                        x: 0,
-                        y: 0,
-                        angle: 0,
+                        x: CAR_START.x,
+                        y: CAR_START.y,
+                        angle: CAR_START.angle,
                         mapId: 'hub_949',
                         visible: true
                     },
@@ -495,6 +497,10 @@ engineMixin({
                     if (worldData.weather) this.weather.deserialize(worldData.weather);
                     
                     // 3. Load Map & Player Position
+                    // (her own car again: whatever she'd taken in this session isn't in the save)
+                    this._endDrive();
+                    this.car = this.ownedCar;
+                    this.returnVanHome();
                     let mapId = worldData.mapId ?? rawSave.mapId ?? defaults.world.mapId;
                     const playerX = playerData.x ?? rawSave.player?.x ?? defaults.player.x;
                     const playerY = playerData.y ?? rawSave.player?.y ?? defaults.player.y;
@@ -581,9 +587,7 @@ engineMixin({
                         const activeCarData = this.garage.getActive();
                         // Rebuild ownedCar if saved car differs from default
                         if (activeCarData.brand !== this.ownedCar.brand || activeCarData.model !== this.ownedCar.model) {
-                            this.ownedCar = new TrafficVehicle(null, activeCarData.brand, activeCarData.model, 'PLAYER');
-                            this.ownedCar.isOwnedCar = true;
-                            this.car = this.ownedCar;
+                            this._replaceOwnedCar(activeCarData.brand, activeCarData.model);
                         }
                     }
                     // Apply garage customization colors
@@ -593,15 +597,12 @@ engineMixin({
                     this.ownedCar.y = carData.y ?? defaults.car.y;
                     this.ownedCar.angle = carData.angle ?? defaults.car.angle;
                     
-                    let carMapId = carData.mapId ?? rawSave.car?.mapId ?? defaults.car.mapId;
-                    if (carMapId === 'road_test') {                                       // left in the old road test zone: parked back in the city
-                        carMapId = 'hub_949'; this.ownedCar.x = defaults.car.x; this.ownedCar.y = defaults.car.y; this.ownedCar.angle = defaults.car.angle;
-                    }
-                    if (carMapId === this.activeMap.id && this.activeMap.type !== 'indoor') {
-                        this.ownedCar.visible = true;
-                    } else {
-                        this.ownedCar.visible = false;
-                    }
+                    const carMapId = carData.mapId ?? rawSave.car?.mapId ?? defaults.car.mapId;
+                    const carAtStart = carMapId === 'road_test' ||                        // left in the old road test zone: parked back in the city
+                        (carData.x === 0 && carData.y === 0);                             // (saved before it first reached the hub: it had no spot yet)
+                    if (carAtStart) Object.assign(this.ownedCar, CAR_START);
+                    // Shown on the hub, put away anywhere else (engine/cars.js)
+                    this._setCarHere(this.ownedCar, this.activeMap.id === 'hub_949');
         
                     // 7. Restore Driving State
                     const wasDriving = save.isDriving ?? rawSave.isDriving ?? false;

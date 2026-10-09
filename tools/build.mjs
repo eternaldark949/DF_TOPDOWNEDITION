@@ -141,6 +141,8 @@ const SCRIPTS = [
     'engine/save-load.js',
     'engine/map-loading.js',
     'engine/world-state.js',
+    'engine/cars.js',
+    'engine/markers.js',
     'engine/update.js',
     'engine/draw.js',
     'engine/interiors.js',

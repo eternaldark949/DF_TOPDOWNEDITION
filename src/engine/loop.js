@@ -144,13 +144,10 @@
                 }
                 
                 // --- DRIVING / VEHICLE ---
-                this.isDriving = false;
-                if (this.car) {
-                    this.car.controlMode = 'PARKED';
-                    this.car.hasDriver = false;
-                }
-                this.car = this.ownedCar;
-                this.deliveryVehicle = null;
+                this._endDrive();
+                this.car = this.ownedCar;                               // her car, back where a new game starts (engine/cars.js)
+                Object.assign(this.ownedCar, CAR_START, { vx: 0, vy: 0, speed: 0, controlMode: 'PARKED' });
+                this.deliveryVehicle = null;                            // Amber's van parks by the cafe again on the next hub load
                 
                 // --- COMPANIONS ---
                 // Dismiss all contract companions

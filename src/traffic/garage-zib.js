@@ -350,7 +350,7 @@
                 zib.hasDriver = true;
                 zib.controlMode = 'AI';
                 zib.driverType = 'zib';
-                game.car = zib;
+                game._switchCar(zib);                         // (a hijacked car she had goes back to traffic: engine/cars.js)
                 game.isDriving = true;
                 game.player.visible = true;
                 zib._mapBounds = { w: game.activeMap.width, h: game.activeMap.height };

@@ -852,6 +852,7 @@
                     const p = S(b.x + (b.w || 100) / 2, b.y + (b.h || 100) / 2);
                     if (on(p)) MapIcons.draw(ctx, b.mapCategory === 'restaurant' ? 'pin:cup' : 'pin:cross', p.x, p.y, { dpr: D, css: MapIcons.SIZE.pin * k });
                 }
+                if (game.deliveryVehicle && game.deliveryVehicle.visible) { const v = game.deliveryVehicle, p = S(v.x, v.y); if (on(p)) MapIcons.draw(ctx, 'car:amber', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: v.angle }); }   // Amber's van
                 if (game.ownedCar && game.ownedCar.visible) { const p = S(game.ownedCar.x, game.ownedCar.y); if (on(p)) MapIcons.draw(ctx, 'car', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: game.ownedCar.angle }); }
                 const pp = S(game.player.x, game.player.y);
                 MapIcons.draw(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: game.player.angle });
@@ -1263,6 +1264,7 @@
 
                 const container = document.getElementById('carme-content');
                 const isIndoor = game.activeMap.type === 'indoor';
+                const noSummon = game.activeMap.id !== 'hub_949';   // cars live on the hub (engine/cars.js)
                 let html = '';
 
                 // Current active car indicator
@@ -1293,14 +1295,14 @@
                     if (!isActive) {
                         html += `<button class="carme-activate" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:1px; padding:6px; background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.25); color:#00ff88; border-radius:4px; cursor:pointer;">SET ACTIVE</button>`;
                     }
-                    html += `<button class="carme-summon" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:1px; padding:6px; background:rgba(255,136,0,0.1); border:1px solid rgba(255,136,0,0.3); color:#ff8800; border-radius:4px; cursor:pointer;${isIndoor ? ' opacity:0.3; pointer-events:none;' : ''}">SUMMON</button>`;
+                    html += `<button class="carme-summon" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:1px; padding:6px; background:rgba(255,136,0,0.1); border:1px solid rgba(255,136,0,0.3); color:#ff8800; border-radius:4px; cursor:pointer;${noSummon ? ' opacity:0.3; pointer-events:none;' : ''}">SUMMON</button>`;
                     html += `</div>`;
 
                     html += `</div>`;
                 }
 
-                if (isIndoor) {
-                    html += `<div style="font-size:0.6rem; color:#555; text-align:center; margin-top:8px; font-style:italic;">Cannot summon vehicles indoors.</div>`;
+                if (noSummon) {
+                    html += `<div style="font-size:0.6rem; color:#555; text-align:center; margin-top:8px; font-style:italic;">${isIndoor ? 'Cannot summon vehicles indoors.' : 'No road out here to bring it to.'}</div>`;
                 }
 
                 container.innerHTML = html;
@@ -1321,9 +1323,9 @@
                         if (idx !== game.garage.activeIndex) {
                             game.switchGarageCar(idx);
                         }
-                        // Summon to player position
-                        game.ownedCar.x = game.player.x + 50;
-                        game.ownedCar.y = game.player.y;
+                        // Summon to player position (the hub only: cars live there)
+                        if (game.activeMap.id !== 'hub_949' || (game.isDriving && game.car === game.ownedCar)) return;
+                        Object.assign(game.ownedCar, { x: game.player.x + 50, y: game.player.y, vx: 0, vy: 0, speed: 0 });
                         game.ownedCar.visible = true;
                         const name = game.garage.getDisplayName(idx);
                         showMessage(`${name.toUpperCase()} DELIVERED`);

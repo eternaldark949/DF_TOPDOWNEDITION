@@ -635,7 +635,7 @@
             drawMapLegend(ctx, w, h) {
                 // Built from the same icons and sizes as the map; kept inside the free area between the sidebars
                 // On a short screen (a phone on its side) the whole legend scales down
-                const D = this.dpr * Math.max(0.62, Math.min(1, h / this.dpr / 640)), items = [['player', 'You'], ['car', 'Your vehicle'], ['dest', 'Destination'], ['objective', 'Objective'], ['client', 'Client'], ['transition', 'Way through'], ['danger', 'Danger zone']];
+                const D = this.dpr * Math.max(0.62, Math.min(1, h / this.dpr / 640)), items = [['player', 'You'], ['car', 'Your vehicle'], ['car:amber', 'Delivery van'], ['dest', 'Destination'], ['objective', 'Objective'], ['client', 'Client'], ['transition', 'Way through'], ['danger', 'Danger zone']];
                 const lw = 150 * D, row = 21 * D, lh = (34 + items.length * 21) * D, area = this._freeArea(w, h);
                 const x = area.right - lw - 14 * D, y = area.bottom - lh - 14 * D;
                 ctx.save();
@@ -1004,6 +1004,7 @@
                 }
                 this.drawDistanceLine(ctx);
                 this.drawNavMarker(ctx);
+                if (this.game.deliveryVehicle && this.game.deliveryVehicle.visible) { const c = this.game.deliveryVehicle, p = S(c.x, c.y); if (on(p)) MapIcons.draw(ctx, 'car:amber', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: c.angle }); }   // Amber's van
                 if (this.game.ownedCar && this.game.ownedCar.visible) { const c = this.game.ownedCar, p = S(c.x, c.y); if (on(p)) MapIcons.draw(ctx, 'car', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: c.angle }); }
                 const pl = this.game.player, pp = S(pl.x, pl.y);                // you, on top
                 MapIcons.draw(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: pl.angle, scale: 0.94 + Math.sin(_frameTime / 350) * 0.06 });

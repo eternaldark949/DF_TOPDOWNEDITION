@@ -288,10 +288,6 @@ engineMixin({
                 
                 this.neonSigns = [];
                 
-                if (this.activeMap && this.activeMap.id === 'hub_949') { 
-                    this.hubState.carX = this.car.x; this.hubState.carY = this.car.y; this.hubState.carAngle = this.car.angle; 
-                }
-                
                 if (mapId !== 'hub_949') {
                     this.traffic.reset();
                     this.pedestrians.reset();
@@ -1175,9 +1171,6 @@ engineMixin({
                 
                 // Re-register persistents
                 if (this.player) { this.player.active = true; this.player.markedForDestroy = false; this.player.reregister(); }
-                if (this.ownedCar && this.ownedCar instanceof VehicleEntity) { this.ownedCar.active = true; this.ownedCar.markedForDestroy = false; this.ownedCar.dead = false; this.ownedCar.reregister(); }
-                // A taken car (hijacked off the street) is hers like the owned one: back in the registry, or it's a ghost with no collision
-                if (this.car && this.car !== this.ownedCar && this.car instanceof GameEntity) { this.car.markedForDestroy = false; this.car.dead = false; this.car.reregister(); }
                 for (let tm of this.teammates) { if (tm instanceof ActorEntity) { tm.active = true; tm.markedForDestroy = false; tm.reregister(); } }
                 
                 // Activate current map entities
@@ -1315,56 +1308,8 @@ engineMixin({
                     this.player.y = this.activeMap.spawn.y; 
                 }
                 
-                // Setup Car for Hub
-                if (this.activeMap.id === 'hub_949') {
-                    this.car.x = this.hubState.carX; 
-                    this.car.y = this.hubState.carY; 
-                    this.car.angle = this.hubState.carAngle;
-                    this.car.visible = true; 
-                    this.car.active = true;  // Enable collision on outdoor maps
-                    this.car.controlMode = 'PLAYER'; 
-                    this.player.visible = true; 
-                    this.isDriving = false;
-                } else {
-                    this.car.visible = false; 
-                    this.car.active = false;  // Disable collision on indoor maps
-                    this.car.controlMode = 'PARKED';
-                    this.isDriving = false; 
-                    this.player.visible = true;
-                }
-                
-                // --- DELIVERY VEHICLE (Amber LADY Blackmark V3, parked near Cozy Cafe) ---
-                if (this.activeMap.id === 'hub_949') {
-                    // Get cafe landmark position for parking nearby
-                    const cafeLandmark = this.landmarkRegistry['cozy_cafe'];
-                    if (cafeLandmark && !this.deliveryVehicle) {
-                        this.deliveryVehicle = new TrafficVehicle(null, 'LADY', 'suv2', 'PARKED');
-                        //this.deliveryVehicle.color = '#1a0b2e'; // Deep violet body
-                        this.deliveryVehicle.color = '#58391C'
-                        this.deliveryVehicle.glowColor = '#a469ff'; // Violet underglow
-                        this.deliveryVehicle.headlightColor = '#a469ff'; // Violet headlights
-                        this.deliveryVehicle.isDeliveryVehicle = true;
-                        this.deliveryVehicle.controlMode = 'PARKED';
-                        this.deliveryVehicle.hasDriver = false;
-                        // Park near cafe entrance (offset to the side so it doesn't block door)
-                        this.deliveryVehicle.x = cafeLandmark.x - 80;
-                        this.deliveryVehicle.y = cafeLandmark.y + 20;
-                        this.deliveryVehicle.angle = Math.PI / 2; // Facing south
-                        this.deliveryVehicle.visible = true;
-                        this.deliveryVehicle.active = true;
-                    } else if (this.deliveryVehicle) {
-                        // Re-show on return to hub
-                        this.deliveryVehicle.visible = true;
-                        this.deliveryVehicle.active = true;
-                        this.deliveryVehicle.reregister();
-                    }
-                } else {
-                    // Hide delivery vehicle on indoor maps
-                    if (this.deliveryVehicle) {
-                        this.deliveryVehicle.visible = false;
-                        this.deliveryVehicle.active = false;
-                    }
-                }
+                // Her cars: on the hub where she left them, on any other map put away (engine/cars.js)
+                this._placeCarsForMap();
                 
                 // =========================================================
                 // SMART COMPANION PLACEMENT (Teammates & Dancers)

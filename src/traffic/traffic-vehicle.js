@@ -129,10 +129,6 @@
                 this.manualGas = 0;
                 this.manualTurn = 0;
                 
-                // --- OWNED CAR MARKER STATE ---
-                this.markerOpacity = 0;
-                this.markerTargetOpacity = 0;
-                
                 // --- PARK IDLE TIMER ---
                 this.parkIdleTimer = 0; 
                 
@@ -218,54 +214,6 @@
                 const farLOD = this._lod === 1; // Skip expensive effects when distant
                 
                 ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
-                
-                // Owned Car Marker (always render - important UI element)
-                if (this.isOwnedCar && this.controlMode !== 'PLAYER' && this.markerOpacity > 0.01) {
-                    const breathe = (Math.sin(_frameTime / 800) + 1) / 2; 
-                    const scale = 1.0 + (breathe * 0.15); 
-                    const alpha = this.markerOpacity;
-                    
-                    ctx.shadowColor = `rgba(255, 215, 0, ${alpha})`;
-                    ctx.shadowBlur = (25 + (breathe * 15)) * alpha;
-                    ctx.fillStyle = `rgba(255, 215, 0, ${(0.25 + breathe * 0.25) * alpha})`;
-                    
-                    const baseSize = 8;
-                    const scaledSize = baseSize * scale;
-                    ctx.beginPath();
-                    ctx.rect(-this.length/2 - scaledSize, -this.width/2 - scaledSize, 
-                             this.length + scaledSize * 2, this.width + scaledSize * 2);
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                    
-                    // the label in the HUD's champagne caps (Montserrat, spaced), with a gold glow
-                    ctx.font = `600 ${10 * scale}px Montserrat, sans-serif`;
-                    if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
-                    ctx.shadowColor = `rgba(255, 194, 72, ${0.8 * alpha})`; ctx.shadowBlur = 6;
-                    ctx.fillStyle = `rgba(255, 240, 214, ${alpha})`;
-                    ctx.textAlign = 'center';
-                    ctx.fillText('YOUR CAR', 0, -this.width/2 - (20 * scale));
-                    ctx.shadowBlur = 0;
-                    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-                }
-                
-                // Delivery Vehicle Marker (pulsing violet)
-                if (this.isDeliveryVehicle) {
-                    const breathe = (Math.sin(_frameTime / 600) + 1) / 2; 
-                    const scale = 1.0 + (breathe * 0.1);
-                    
-                    ctx.shadowColor = `rgba(164, 105, 255, 0.6)`;
-                    ctx.shadowBlur = 15 + (breathe * 10);
-                    ctx.fillStyle = `rgba(164, 105, 255, ${0.15 + breathe * 0.15})`;
-                    ctx.beginPath();
-                    ctx.rect(-this.length/2 - 6, -this.width/2 - 6, this.length + 12, this.width + 12);
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                    
-                    ctx.font = `bold ${10 * scale}px Courier New`;
-                    ctx.fillStyle = `rgba(164, 105, 255, ${0.7 + breathe * 0.3})`;
-                    ctx.textAlign = 'center';
-                    ctx.fillText('AMBER DELIVERY', 0, -this.width/2 - (16 * scale));
-                }
                 
                 // Status Shadows (AI state: red pushing through, orange waiting at a box, yellow nudging) —
                 // a debug view now that queues are real; underglow and the rest stay
@@ -779,9 +727,9 @@
             }
             _latTo(lane) { return (this.x - lane.start.x) * -lane.uy + (this.y - lane.start.y) * lane.ux; }
 
-            findAdjacentLane() {
+            findAdjacentLane(ahead = 150) {
                 if (!this.currentLane || !this.currentLane.road) return null;
-                for (const lane of this._sideLanes(false)) if (this.isLaneClear(lane, 150)) return lane;   // (this stretch only, nearest first)
+                for (const lane of this._sideLanes(false)) if (this.isLaneClear(lane, ahead)) return lane;   // (this stretch only, nearest first)
                 return null;
             }
             
@@ -1318,6 +1266,9 @@
                 
                 // Player gets the speed-dependent steering curve; see applyDrivePhysics.
                 this.applyDrivePhysics({ weather, walls, buildings, decalSystem, steerCurve: true });
+                // Nobody at the wheel (she got out) and it has come to rest: parked, so traffic steers round it
+                // (the lights stay as she left them: lampsOn, traffic/car-art.js)
+                if (!this.hasDriver && Math.abs(this.speed) < 0.05 && Math.abs(this.vx) < 0.05 && Math.abs(this.vy) < 0.05) this.controlMode = 'PARKED';
 
                 // Clamp to map bounds (prevent driving off-map)
                 if (this._mapBounds) {
@@ -1687,6 +1638,10 @@
                     if (gap < trafficObstacleDist) { trafficObstacle = v; trafficObstacleDist = gap; }
                 };
 
+                // Mid lane change / overtake, a parked car is in the way only in the lane we're moving into
+                // (the one we're pulling out from behind is being left; the same rule as people, above)
+                const parkedInWay = c => !tl || Math.abs((c.x - tl.start.x) * -tl.uy + (c.y - tl.start.y) * tl.ux) < tlHalf + c.width / 2;
+
                 // Check for player car
                 if (playerCar && playerCar !== this && (playerCar.x !== 0 || playerCar.y !== 0)) {
                     const result = checkTunnelEx(playerCar.x, playerCar.y, lookAheadDist, dynamicTunnelWidth);
@@ -1698,7 +1653,7 @@
                         
                         if (playerWaiting) {
                             // Ignore — player car is queued at intersection entry
-                        } else if (!playerCar.hasDriver && playerCar.controlMode === 'PARKED') {
+                        } else if (!playerCar.hasDriver && playerCar.controlMode === 'PARKED' && parkedInWay(playerCar)) {
                             // Truly parked and empty - can swerve around
                             swerveObstacles.push({
                                 type: 'vehicle',
@@ -1728,7 +1683,7 @@
                     if (this.currentTurnPath && v.isWaiting && !v.wasInIntersection) continue;
                     const parkedEmpty = !v.hasDriver && v.controlMode === 'PARKED';
                     if (!parkedEmpty) { senseQueue(v); continue; }
-                    const result = checkTunnelEx(v.x, v.y, lookAheadDist, dynamicTunnelWidth);
+                    const result = parkedInWay(v) && checkTunnelEx(v.x, v.y, lookAheadDist, dynamicTunnelWidth);
                     if (result) {
                         // Empty parked vehicle - can swerve
                         swerveObstacles.push({
@@ -1760,13 +1715,17 @@
                     // Find the closest swerve obstacle
                     const closestSwerve = swerveObstacles.reduce((a, b) => a.dist < b.dist ? a : b);
                     const isPerson = closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster';
+                    // A parked car squarely in the lane can't be swerved round inside it (the lane gives ~30 px, two
+                    // bodies need their half-widths): change lanes or stop and overtake instead (section 3), never shove it
+                    const blockingCar = closestSwerve.type === 'vehicle' &&
+                        Math.abs(closestSwerve.lateral) < (this.width + (closestSwerve.entity.width || this.width)) / 2 + 4;
                     const kerbOK = isPerson && this._actorWait > 480 && this._kerbClear(closestSwerve);
                     // Someone at the edge of our path (already mostly clear of the body) only needs a nudge, never the kerb
                     const edgeNudge = isPerson && Math.abs(closestSwerve.lateral) - (closestSwerve.width || 20) / 2 > this.width / 2 - 8;
                     
                     // Only swerve if obstacle is close enough to matter (people: only a nudge, or that last resort)
                     const swerveThreshold = this.length * 4 + currentSpeed * 5;
-                    if (closestSwerve.dist < swerveThreshold && (!isPerson || kerbOK || edgeNudge)) {
+                    if (closestSwerve.dist < swerveThreshold && !blockingCar && (!isPerson || kerbOK || edgeNudge)) {
                         needsSwerve = true; edgeNudgeNow = edgeNudge && !kerbOK;
                         
                         // Calculate open space on each side, accounting for obstacle width.
@@ -1888,17 +1847,16 @@
                 
                 // Only consider lane change for truly stuck situations (traffic that won't move)
                 let shouldOvertake = false;
-                let isPlayerObstacle = false;
+                let waitBriefly = false;          // she, or a parked car: neither is about to move off, so go round soon
+                let clearAhead = 150;             // how far the lane beside must be clear (past a parked car, all of it)
                 
                 // Swerve obstacles that can't be swerved around become overtake candidates
                 if (hasSwerveObstacle && !needsSwerve) {
                     const closestSwerve = swerveObstacles.reduce((a, b) => a.dist < b.dist ? a : b);
-                    if (closestSwerve.type === 'vehicle') {
+                    if (closestSwerve.type === 'vehicle' || closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster') {
                         shouldOvertake = true;
-                        isPlayerObstacle = closestSwerve.entity === playerCar;
-                    } else if (closestSwerve.type === 'actor' || closestSwerve.type === 'actor_cluster') {
-                        shouldOvertake = true;
-                        isPlayerObstacle = true;
+                        waitBriefly = true;
+                        if (closestSwerve.type === 'vehicle') clearAhead = Math.max(clearAhead, closestSwerve.dist + (closestSwerve.entity.length || this.length) + 30);
                     }
                 }
                 
@@ -1914,13 +1872,13 @@
                     // Player/Zib autodrive should NOT overtake or change lanes - stay on navigation path
                     const isPlayerAutodrive = this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib');
                     if (!isPlayerAutodrive) {
-                        const adjacentLane = this.findAdjacentLane();
+                        const adjacentLane = this.findAdjacentLane(clearAhead);
                         if (adjacentLane) {
                             this.initiateNormalLaneChange(adjacentLane);
                         } else {
                             if (Math.abs(this.speed) < 0.5) {
                                 this.stuckTimer++;
-                                const waitLimit = isPlayerObstacle ? 30 : 240;
+                                const waitLimit = waitBriefly ? 30 : 240;
                                 if (this.stuckTimer > waitLimit) {
                                     const opposingLane = this.findOpposingLane();
                                     if (opposingLane) { 
@@ -2009,13 +1967,14 @@
                 // Slow down for obstacles we need to swerve around
                 // SKIP during active turn paths — committed to the maneuver
                 if (hasSwerveObstacle && !needsSwerve && !this.currentTurnPath) {
-                    // Can't swerve, must slow down
-                    const closestDist = Math.min(...swerveObstacles.map(o => o.dist));
-                    const brakeDist = this.length * 3 + currentSpeed * 4;
+                    // Can't swerve, must slow down — behind a parked car, far enough back to pull out round it
+                    const closest = swerveObstacles.reduce((a, b) => a.dist < b.dist ? a : b), closestDist = closest.dist;
+                    const standOff = closest.type === 'vehicle' ? this.length * 1.1 + (closest.entity.length || this.length) / 2 : this.length * 1.5;
+                    const brakeDist = standOff + this.length * 1.5 + currentSpeed * 4;
                     if (closestDist < brakeDist) {
                         const brakeFactor = closestDist / brakeDist;
                         targetSpeed = Math.min(targetSpeed, this.maxSpeed * brakeFactor * 0.5);
-                        if (closestDist < this.length * 1.5) {
+                        if (closestDist < standOff) {
                             targetSpeed = 0;
                         }
                     }

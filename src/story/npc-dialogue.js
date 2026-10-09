@@ -27,7 +27,7 @@
                 accept(g) {
                     if (g.missions.activeMission) { showMessage('FINISH YOUR CURRENT MISSION FIRST.'); return; }
                     const delivery = g.missions.generateDelivery(g);
-                    if (delivery) { g.missions.acceptMission(delivery, g); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE OUTSIDE.'); }
+                    if (delivery) { g.missions.acceptMission(delivery, g); g.returnVanHome(); showMessage('PICK UP THE PACKAGE FROM THE AMBER DELIVERY VEHICLE OUTSIDE.'); }
                     else showMessage('NO DELIVERIES AVAILABLE. TRY AGAIN LATER.');
                 }
             },

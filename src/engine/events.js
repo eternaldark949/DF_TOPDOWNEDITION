@@ -33,15 +33,7 @@
                             audioSys.sfx('ui');
                         }
                     } else if(this.activeInteraction.interactionType === 'delivery_pickup') {
-                        // Delivery mission: pick up package from vehicle
-                        if (this.missions.activeMission && !this.missions.activeMission.pickedUp) {
-                            this.missions.activeMission.pickedUp = true;
-                            showMessage('PACKAGE SECURED. DELIVER TO THE TARGET LOCATION.');
-                            if (this.ui && this.ui.showMissionBanner) {
-                                this.ui.showMissionBanner(this.missions.activeMission.banner, 'gold', 'IN PROGRESS');
-                            }
-                            audioSys.sfx('ui');
-                        }
+                        this.pickUpPackage();                          // the package by the van (engine/markers.js)
                     } else if(this.activeInteraction.interactionType === 'adopt_cat') {
                         this.questState.hasVelvetCat = true;
                         if (this.velvetCat) {
@@ -56,21 +48,24 @@
                         if (noteId) this.openNote(noteId);
                     } else if(this.activeInteraction.type === 'hail_zib') {
                         this.openZibMenu(this.activeInteraction.target);
+                    } else if(this.activeInteraction.type === 'drive') {
+                        // one of hers (engine/cars.js): she walks round to the driver's door first
+                        const car = this.activeInteraction.target;
+                        if (this._walkToCar(car)) return;
+                        this.enterCar(car);
                     } else if(this.activeInteraction.type === 'hijack') {
                         this.hijackVehicle(this.activeInteraction.target);
                     } else if(this.activeInteraction instanceof NPC) {
                         this.startDialogue(this.activeInteraction);
                     }
-                } else {
-                    if (this._walkToCar()) return;                     // she walks round to the driver's door first
-                    this.toggleVehicle();
+                } else if (this.isDriving) {
+                    this.toggleVehicle();                              // Exit
                 }
             },
 
-            /** Getting in on foot: walk to the driver's door (Walker.goTo), face the car, then get in.
+            /** Getting into one of her cars on foot: walk to the driver's door (Walker.goTo), face the car, then get in.
              *  True when a walk started (or is already on); close enough, or turned off, gets in at once. */
-            _walkToCar() {
-                const car = this.car;
+            _walkToCar(car) {
                 if (!CONFIG.WALK_TO_CAR || this.isDriving || !car || this.activeMap.type === 'indoor') return false;
                 if (this.player._walk && this.player._walk.toCar) return true;
                 // In the car's frame: +x forward, -y the driver's side (traffic-vehicle.js seat layout)
@@ -82,11 +77,18 @@
                 if (nav && !nav.walkable(dx, dy)) { side = 1; [dx, dy] = W(hl * 0.2, hw + 20); }      // blocked: in from the other side
                 const door = { x: dx, y: dy };
                 if (Math.hypot(door.x - this.player.x, door.y - this.player.y) < 30) return false;
-                // On the far side? Round the nose or the tail (the nav grid doesn't know about cars)
-                const [plx, ply] = L(this.player.x, this.player.y), via = [], ex = plx >= 0 ? hl + 30 : -(hl + 30), ew = hw + 32;
-                if (Math.sign(ply) !== side && Math.abs(plx) < hl + 20) via.push(W(ex, Math.sign(ply || 1) * ew), W(ex, side * ew));
-                const h = Walker.goTo(this.player, door.x, door.y, { face: [car.x, car.y], arrive: 7, timeout: 240, via,
-                    onArrive: () => { if (!this.isDriving && this.car === car && Math.hypot(car.x - this.player.x, car.y - this.player.y) < 90) this.toggleVehicle(); } });
+                // On the far side? Round the nose or the tail (the nav grid doesn't know about cars): the nearer, unless
+                // it's against a wall (Amber's van has the cafe at its back) and the other end is open
+                const [plx, ply] = L(this.player.x, this.player.y), via = [], ew = hw + 32;
+                if (Math.sign(ply) !== side && Math.abs(plx) < hl + 20) {
+                    let ex = plx >= 0 ? hl + 30 : -(hl + 30);
+                    const open = e => !nav || (nav.walkable(...W(e, Math.sign(ply || 1) * ew)) && nav.walkable(...W(e, side * ew)));
+                    if (!open(ex) && open(-ex)) ex = -ex;
+                    via.push(W(ex, Math.sign(ply || 1) * ew), W(ex, side * ew));
+                }
+                // Arrived, or stuck on the way but still beside it: in either way (the walk is how she gets in, not whether)
+                const getIn = () => { if (!this.isDriving && car.visible && Math.hypot(car.x - this.player.x, car.y - this.player.y) < 90) this.enterCar(car); };
+                const h = Walker.goTo(this.player, door.x, door.y, { face: [car.x, car.y], arrive: 7, timeout: 240, via, onArrive: getIn, onFail: getIn });
                 if (this.player._walk) this.player._walk.toCar = true;
                 return !!h;
             },

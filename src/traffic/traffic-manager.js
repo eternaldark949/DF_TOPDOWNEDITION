@@ -84,8 +84,9 @@
                 this.grid.clear();
             }
             
-            // Update signature to accept decalSystem
-            update(player, map, playerCar, weather, ownedCar, decalSystem, teammates) { 
+            /** `playerCar`: the car she's in or last left; `parked`: her cars on the map she isn't driving (the owned
+             *  car, Amber's van, that last one: GameEngine.parkedCars) — out of traffic, but solid and rolling */
+            update(player, map, playerCar, weather, parked, decalSystem, teammates) { 
                 if (map.type === 'indoor') return;
                 
                 // 1. GRID UPDATE: Clear and Rebuild
@@ -101,10 +102,8 @@
                     this.grid.add(playerCar);
                 }
                 
-                // Add Owned Car if it's separate from player car
-                if (ownedCar && ownedCar.visible && ownedCar !== playerCar) {
-                    this.grid.add(ownedCar);
-                }
+                // Her parked cars
+                if (parked) for (const c of parked) if (c !== playerCar) this.grid.add(c);
             
                 this.spawnTimer--;
                 
@@ -126,6 +125,15 @@
                             }
                         }
                     }
+                }
+                
+                // What the AI sees on the road: traffic, and her parked cars (empty and parked: it goes round them)
+                let sensed = this.vehicles;
+                if (parked && parked.length) {
+                    sensed = this._sensed || (this._sensed = []);
+                    sensed.length = 0;
+                    for (const v of this.vehicles) sensed.push(v);
+                    for (const c of parked) if (!this.vehicles.includes(c)) sensed.push(c);
                 }
                 
                 // 1. VEHICLE UPDATES & CLEANUP
@@ -168,22 +176,17 @@
                         this.vehicles.splice(i, 1);
                     } else if (!v.dead) {
                         // Pass decalSystem to update
-                        v.update(player, playerCar, this.vehicles, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, teammates);
+                        v.update(player, playerCar, sensed, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, teammates);
                     }
                 }
                 
-                // --- NEW: Update Owned Car Momentum ---
-                if (ownedCar && ownedCar.visible) {
-                     const isInList = this.vehicles.includes(ownedCar);
-                     const isBeingDriven = (ownedCar === playerCar && ownedCar.hasDriver);
-                     
-                     if (!isInList && !isBeingDriven) {
-                         ownedCar.update(player, playerCar, this.vehicles, weather, this.network.intersections, map.walls, getColliders(map), decalSystem);
-                     }
+                // Her parked cars roll on to a stop (then park: TrafficVehicle.updateManualDriving)
+                if (parked) for (const c of parked) {
+                    if (!c.hasDriver && !this.vehicles.includes(c)) c.update(player, playerCar, this.vehicles, weather, this.network.intersections, map.walls, getColliders(map), decalSystem);
                 }
         
                 // Over the cap (the setting was turned down): the farthest cars out of view fade away
-                if (_simTick % 60 === 0) this.trimToCap(player, playerCar, ownedCar);
+                if (_simTick % 60 === 0) this.trimToCap(player, playerCar);
                 // 2. SPAWN LOGIC
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
                     this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
@@ -227,34 +230,27 @@
                 }
             }
             
-            /** Down to GameSettings' cap: the farthest cars out of view fade out (theirs, the driven and the delivery stay) */
-            trimToCap(player, playerCar, ownedCar) {
+            /** Down to GameSettings' cap: the farthest cars out of view fade out (hers are never in the list; one rolling stays) */
+            trimToCap(player, playerCar) {
                 const live = this.vehicles.filter(v => !v.fading && !v.dead);
                 const over = live.length - GameSettings.getMaxTraffic();
                 if (over <= 0 || !player) return;
                 const g = typeof game !== 'undefined' ? game : null, cb = g && g._cullBounds && g._cullBounds.cars;
-                const keep = v => v === playerCar || v === ownedCar || v.controlMode === 'PLAYER' || (g && v === g.deliveryVehicle);
+                const keep = v => v === playerCar || v.controlMode === 'PLAYER';
                 live.filter(v => !keep(v) && (!cb || v.x < cb.left || v.x > cb.right || v.y < cb.top || v.y > cb.bottom))
                     .sort((a, b) => Math.hypot(b.x - player.x, b.y - player.y) - Math.hypot(a.x - player.x, a.y - player.y))
                     .slice(0, over).forEach(v => { v.fading = true; });
             }
 
             // Optimized Collision Resolution with DEBRIS
-            resolveCollisions(playerCar, player, weather, audioSys, ownedCar, decalSystem) {
+            resolveCollisions(playerCar, player, weather, audioSys, parked, decalSystem) {
                 if (this._crunchCd > 0) this._crunchCd--;
                 // 1. GATHER ALL PHYSICAL VEHICLES (and re-grid them where they are now, after moving)
                 const allVehicles = this.vehicles.filter(v => !v.dead && !(v.fading && v.fade < 0.5));   // (a car fading out is a ghost)
+                if (playerCar && playerCar.visible && !allVehicles.includes(playerCar)) allVehicles.push(playerCar);
+                if (parked) for (const c of parked) if (!allVehicles.includes(c)) allVehicles.push(c);   // her cars standing about
                 this.grid.clear();
                 for (const v of allVehicles) this.grid.add(v);
-                if (playerCar && playerCar.visible && !allVehicles.includes(playerCar)) this.grid.add(playerCar);
-                if (ownedCar && ownedCar.visible && ownedCar !== playerCar && !allVehicles.includes(ownedCar)) this.grid.add(ownedCar);
-                if (playerCar && playerCar.visible && !allVehicles.includes(playerCar)) {
-                    allVehicles.push(playerCar);
-                }
-                
-                if (ownedCar && ownedCar.visible && ownedCar !== playerCar && !allVehicles.includes(ownedCar)) {
-                    allVehicles.push(ownedCar);
-                }
                 // Each pair once, at the turn of whichever comes first in the list (as the old pair-key Set did:
                 // neighbours are mutual, so the first to meet the other is the earlier one)
                 for (let i = 0; i < allVehicles.length; i++) allVehicles[i]._colIdx = i;

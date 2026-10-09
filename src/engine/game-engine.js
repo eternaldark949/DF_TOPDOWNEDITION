@@ -163,6 +163,7 @@
                 this.ownedCar = new TrafficVehicle(null, 'LADY', 'suv', 'PLAYER');
                 this.ownedCar.color = '#1a1a1a'; // Consistent dark color for player's car
                 this.ownedCar.isOwnedCar = true; // Mark as player's owned vehicle
+                Object.assign(this.ownedCar, CAR_START);  // parked on the hub where a new game starts (engine/cars.js)
                 
                 // Garage system — multi-car ownership & customization
                 this.garage = new PlayerGarage();
@@ -197,9 +198,9 @@
                 this.foundNotes = [];  // IDs of discovered notes (persists in save)
                 this.bokeh = new BokehSystem(18);
                 this.missions = new MissionSystem();
-                this.deliveryVehicle = null; // Spawned on hub_949 map load
+                this.deliveryVehicle = null; // Amber's van: spawned by the cafe on the first hub load (engine/cars.js)
                 
-                this.hubState = { carX: 580, carY: 640, carAngle: Math.PI };                 this.worldMinutes = 21 * 60; this.lastTimeTick = 0;
+                this.worldMinutes = 21 * 60; this.lastTimeTick = 0;
                 
                 // --- NAVIGATION SYSTEM ---
                 this.navDestination = null; // Set by map UI when player places marker
