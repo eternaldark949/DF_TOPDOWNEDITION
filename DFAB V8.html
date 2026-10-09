@@ -54504,6 +54504,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // Settings → Reflections: Ultra / High / Medium / Off. Cinematic View has its own toggle
         // (GameSettings.photoReflections, on by default) so photos can always have them.
 
+        const REFLECT_LEVELS = ['medium', 'high', 'ultra'];   // the steps adaptive reflections move between (Off is only chosen)
+
         const REFLECT = {
             ROAD: 0.45,             // how strongly wet asphalt reflects (puddles: 1)
             PAVE: 0.28,             // and wet paving
@@ -54594,11 +54596,57 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             },
 
-            /** Ultra redraws detailed art; High/Medium keep the existing light and silhouette passes. */
+            /** Ultra redraws detailed art; High/Medium keep the existing light and silhouette passes. The level in use can
+                be below the chosen one while adaptive reflections have stepped it down (_adaptReflections). */
             reflectQuality() {
                 if (this.cineCam) return GameSettings.photoReflections === false ? null : (GameSettings.reflections === 'ultra' ? 'ultra' : 'high');
                 const q = GameSettings.reflections || 'high';
-                return q === 'off' ? null : q;
+                if (q === 'off') return null;
+                const cap = this._reflAdapt && this._reflAdapt.cap;
+                return cap && REFLECT_LEVELS.indexOf(cap) < REFLECT_LEVELS.indexOf(q) ? cap : q;
+            },
+
+            /**
+             * Adaptive reflections (with the Adaptive Lighting setting). `reflMs` is the reflection pass's own time on a
+             * sampled frame (every 8th), or -1. Over a 3 s window: if frames run over budget (1.18 × the target) and the
+             * reflections take a real share (over 2 ms), the level steps down one for this session (Ultra → High →
+             * Medium; never to Off, which stays a choice). After 15 s, and three steady windows on target, it tries one
+             * back up; when a try doesn't hold (down again within a minute), the next waits twice as long (up to 4 min).
+             * The saved setting is never touched, and choosing a level again starts afresh.
+             */
+            _adaptReflections(reflMs) {
+                const chosen = GameSettings.reflections || 'high', now = performance.now();
+                let s = this._reflAdapt;
+                if (!s || s.chosen !== chosen) {
+                    s = this._reflAdapt = { chosen, cap: null, begin: now + 1000, count: 0, frames: 0, refl: 0, stable: 0,
+                        downAt: 0, upAt: 0, lastUp: -Infinity, backoff: 15000 };
+                }
+                if (!GameSettings.adaptiveLighting) { s.cap = null; return; }   // (off: the chosen level, always)
+                if (reflMs < 0 || !this._refl) return;
+                const eligible = GameSettings.adaptiveLighting && chosen !== 'off' && chosen !== 'medium' && this.running && !this.paused &&
+                    !this.cineCam && !this.cutscene?.active && !this.scenes?.running && !PerfBench.active && !this.showProfiler &&
+                    !GameSettings.baseline && !document.hidden;
+                const frameMs = this._renderFrameMs;
+                if (!eligible || !Number.isFinite(frameMs) || frameMs < 2 || frameMs > 100) { s.begin = Math.max(s.begin, now + 500); s.count = s.frames = s.refl = 0; return; }
+                if (now < s.begin) return;
+                s.frames += frameMs; s.refl += reflMs; s.count++;
+                if (now - s.begin < 3000 || s.count < 12) return;
+                const frame = s.frames / s.count, refl = s.refl / s.count;
+                const target = 1000 / (GameSettings.fpsLimit > 0 ? Math.min(60, GameSettings.fpsLimit) : 60);
+                s.begin = now; s.count = s.frames = s.refl = 0;
+                const level = this.reflectQuality(), i = REFLECT_LEVELS.indexOf(level);
+                if (frame > target * 1.18 && refl > 2 && i > 0 && now >= s.downAt) {
+                    if (now - s.lastUp < 60000) s.backoff = Math.min(240000, s.backoff * 2);   // a try back up that didn't hold
+                    s.cap = REFLECT_LEVELS[i - 1]; s.stable = 0;
+                    s.upAt = now + s.backoff; s.begin = now + 500;                     // (ignore the frames the change itself costs)
+                } else if (s.cap) {
+                    s.stable = frame <= target * 1.06 ? s.stable + 1 : 0;
+                    if (s.stable >= 3 && now >= s.upAt) {
+                        const up = REFLECT_LEVELS[i + 1];
+                        s.cap = up === chosen ? null : up; s.stable = 0;
+                        s.lastUp = now; s.downAt = now + 3000; s.begin = now + 500;
+                    }
+                }
             },
 
             /**
@@ -54680,14 +54728,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Out of Ultra: its full-screen detail layer and scratch canvases go (they're rebuilt on the way back in)
                 if (q !== 'ultra' && this._reflDetailCv) this._reflDetailCv = this._ultraWalkerCanvas = this._ultraCarScratch = null;
                 if (!q || !this.view || (wet < 0.02 && !surf)) return;
-                const W = this.canvas.width, H = this.canvas.height, s = q === 'ultra' ? 1 : q === 'high' ? 0.5 : 0.25;
+                // The lights and the mask at half size on High and Ultra (soft glows lose nothing), a quarter on Medium;
+                // Ultra's own detail layer (people, cars, trees) is the one drawn at full size
+                const W = this.canvas.width, H = this.canvas.height, s = q === 'medium' ? 0.25 : 0.5;
                 const rw = Math.max(1, Math.round(W * s)), rh = Math.max(1, Math.round(H * s));
                 let R = this._reflCv, M = this._reflMask;
                 if (!R) { R = this._reflCv = document.createElement('canvas'); M = this._reflMask = document.createElement('canvas'); }
                 if (R.width !== rw || R.height !== rh) { R.width = M.width = rw; R.height = M.height = rh; }
                 const rc = R.getContext('2d'), mc = M.getContext('2d');
                 const v = this.view, z = v.zoom;
-                const toView = (c) => { c.setTransform(s, 0, 0, s, 0, 0); c.translate(W / 2, H / 2); c.scale(z, z); c.translate(-v.x + (v.shakeX || 0), -v.y + (v.shakeY || 0)); };
+                const toView = (c, k = s) => { c.setTransform(k, 0, 0, k, 0, 0); c.translate(W / 2, H / 2); c.scale(z, z); c.translate(-v.x + (v.shakeX || 0), -v.y + (v.shakeY || 0)); };
                 const hw = W / 2 / z + 140, hh = H / 2 / z + 140;
                 const near = (x, y, m = 0) => x > v.x - hw - m && x < v.x + hw + m && y > v.y - hh - m - 160 && y < v.y + hh + m;
 
@@ -54825,33 +54875,52 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
                 // Ultra's ordinary colours stay separate from emitted light: colour reflects
                 // with source-over and never punches a bright hole in the darkness layer.
-                let D = null;
+                let D = null, Dr = null;
                 if (q === 'ultra') {
                     D = this._reflDetailCv || (this._reflDetailCv = document.createElement('canvas'));
-                    if (D.width !== rw || D.height !== rh) { D.width = rw; D.height = rh; }
-                    const dc = D.getContext('2d');
-                    dc.setTransform(1, 0, 0, 1, 0, 0); dc.clearRect(0, 0, rw, rh);
-                    dc.globalAlpha = 1; dc.globalCompositeOperation = 'source-over'; toView(dc);
+                    if (D.width !== W || D.height !== H) { D.width = W; D.height = H; D._dirty = null; }
+                    const dc = D.getContext('2d'), old = D._dirty;
+                    dc.setTransform(1, 0, 0, 1, 0, 0);
+                    if (old) dc.clearRect(old.x0, old.y0, old.x1 - old.x0, old.y1 - old.y0);   // (all last frame drew was in there)
+                    dc.globalAlpha = 1; dc.globalCompositeOperation = 'source-over'; toView(dc, 1);
+                    // What goes into it (world box), so it's masked and laid down only there
+                    const box = this._ultraBox || (this._ultraBox = { x0: 0, y0: 0, x1: 0, y1: 0, mark: null });
+                    box.x0 = box.y0 = Infinity; box.x1 = box.y1 = -Infinity;
+                    const mark = box.mark || (box.mark = (x0, y0, x1, y1) => {
+                        if (x0 < box.x0) box.x0 = x0; if (y0 < box.y0) box.y0 = y0; if (x1 > box.x1) box.x1 = x1; if (y1 > box.y1) box.y1 = y1;
+                    });
                     this._drawUltraReflectionFoliage(dc, near, {
                         left: v.x - hw - 260, right: v.x + hw + 260,
                         top: v.y - hh - 360, bottom: v.y + hh + 260
-                    });
+                    }, mark);
                     for (const m of this._ultraReflectionMovers(near)) {
-                        if (m.kind === 'car') this._drawUltraReflectionCar(dc, m.e);
-                        else if (!this._drawUltraReflectionWalker(dc, m.e)) {
+                        if (m.kind === 'car') this._drawUltraReflectionCar(dc, m.e, undefined, mark);
+                        else if (!this._drawUltraReflectionWalker(dc, m.e, undefined, mark, m.kind === 'crowd')) {
                             // no reflected art (drones, automata): their silhouette still blocks the reflected lights
                             rc.globalCompositeOperation = 'destination-out'; this._reflShape(rc, m, 0.85);
                             rc.globalCompositeOperation = 'source-over';
                         }
                     }
-                    // A reflected body interrupts the reflected lights through its actual art,
-                    // including gaps between limbs and leaves, rather than the cheap silhouette.
-                    rc.setTransform(1, 0, 0, 1, 0, 0);
-                    rc.globalCompositeOperation = 'destination-out'; rc.globalAlpha = 0.85;
-                    rc.drawImage(D, 0, 0); rc.globalAlpha = 1;
-                    dc.setTransform(1, 0, 0, 1, 0, 0);
-                    dc.globalCompositeOperation = 'destination-in'; dc.drawImage(M, 0, 0);
-                    dc.globalCompositeOperation = 'source-over';
+                    if (box.x1 > box.x0) {
+                        const sx = (x) => (x - v.x + (v.shakeX || 0)) * z + W / 2, sy = (y) => (y - v.y + (v.shakeY || 0)) * z + H / 2;
+                        // (whole half-size pixels, so the same rect is exact in the lights and the mask)
+                        const x0 = Math.max(0, Math.floor(sx(box.x0) / 2 - 1) * 2), x1 = Math.min(W, Math.ceil(sx(box.x1) / 2 + 1) * 2);
+                        const y0 = Math.max(0, Math.floor(sy(box.y0) / 2 - 1) * 2), y1 = Math.min(H, Math.ceil(sy(box.y1) / 2 + 1) * 2);
+                        if (x1 > x0 && y1 > y0) Dr = { x0, y0, x1, y1 };
+                    }
+                    D._dirty = Dr;
+                    if (Dr) {
+                        const w = Dr.x1 - Dr.x0, h = Dr.y1 - Dr.y0;
+                        // A reflected body interrupts the reflected lights through its actual art,
+                        // including gaps between limbs and leaves, rather than the cheap silhouette.
+                        rc.setTransform(1, 0, 0, 1, 0, 0);
+                        rc.globalCompositeOperation = 'destination-out'; rc.globalAlpha = 0.85;
+                        rc.drawImage(D, Dr.x0, Dr.y0, w, h, Dr.x0 * s, Dr.y0 * s, w * s, h * s); rc.globalAlpha = 1;
+                        dc.setTransform(1, 0, 0, 1, 0, 0);
+                        dc.save(); dc.beginPath(); dc.rect(Dr.x0, Dr.y0, w, h); dc.clip();
+                        dc.globalCompositeOperation = 'destination-in'; dc.drawImage(M, Dr.x0 * s, Dr.y0 * s, w * s, h * s, Dr.x0, Dr.y0, w, h);
+                        dc.restore();
+                    } else D = null;
                 }
 
                 // 3. Only where the ground is wet enough to mirror
@@ -54859,7 +54928,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 rc.globalCompositeOperation = 'destination-in';
                 rc.drawImage(M, 0, 0);
                 rc.globalCompositeOperation = 'source-over';
-                this._refl = { R, D, q, wet };
+                this._refl = { R, D, Dr, q, wet };
             },
 
 
@@ -54880,11 +54949,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (!this.isDriving) add(this.player);
                 if (!(this.scenes && this.scenes.crewOffstage))
                     for (const e of this.teammates || []) if (e.recruited) add(e);
-                for (const e of this.npcs || []) add(e);
+                // (the crowd, as the main pass counts it: passers-by, guests and staff, standing NPCs)
+                for (const e of this.npcs || []) add(e, e.role === 'teammate' ? 'walker' : 'crowd');
                 for (const e of this.enemies || []) add(e);
-                for (const e of (this.pedestrians && this.pedestrians.pedestrians) || []) add(e);
+                for (const e of (this.pedestrians && this.pedestrians.pedestrians) || []) add(e, 'crowd');
                 for (const life of [this.lobbyLife, this.clubLife, this.cafeLife])
-                    for (const e of (life && life.walkers) || []) add(e);
+                    for (const e of (life && life.walkers) || []) add(e, 'crowd');
                 for (const e of (this.scenes && this.scenes.actors) || []) add(e);
                 for (const e of this._ultraReflectionCars(buffer.cars)) add(e, 'car');
                 for (let i = count; i < previous; i++) buffer.records[i].e = null;
@@ -54912,14 +54982,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return cars;
             },
 
-            _drawUltraReflectionCar(ctx, e, alpha = 0.58) {
+            _drawUltraReflectionCar(ctx, e, alpha = 0.58, mark = null) {
                 if (!e || e.dead || e.visible === false || !(alpha > 0)) return;
                 if (![e.x, e.y, e.length, e.width].every(Number.isFinite) || e.length <= 0 || e.width <= 0) return;
                 const fade = Math.max(0, Math.min(1, e.fade ?? 1));
                 if (!(fade > 0)) return;
                 // Car art sets its own alpha for rims and lamps. Group it in a reusable small
                 // canvas so those settings cannot override the reflected body's overall opacity.
-                const scale = CAR_ART.SCALE || 2, pad = CAR_ART.PAD + 16;
+                const scale = this._ultraArtScale(), pad = CAR_ART.PAD + 16;
                 const rw = Math.ceil((e.length + pad * 2) * scale);
                 const rh = Math.ceil((e.width + pad * 2) * scale);
                 let cv = this._ultraCarScratch;
@@ -54944,9 +55014,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.scale(1, -1);
                 ctx.drawImage(cv, 0, 0, rw, rh, -rw / scale / 2, -rh / scale / 2, rw / scale, rh / scale);
                 ctx.restore();
+                if (mark) {   // its box, turned any way, mirrored about the ground below it
+                    const r = Math.hypot(rw, rh) / scale / 2;
+                    mark(e.x - r, groundY - 0.8 * (e.y + r - groundY), e.x + r, groundY + 0.8 * (groundY - e.y + r));
+                }
             },
+            /** Ultra's reflected art is painted at the scale it's seen: 1x up to zoom 1.25, 2x closer in */
+            _ultraArtScale() { return this.view && this.view.zoom > 1.25 ? (CAR_ART.SCALE || 2) : 1; },
 
-            _drawUltraReflectionFoliage(ctx, near, bounds) {
+            _drawUltraReflectionFoliage(ctx, near, bounds, mark = null) {
                 if (!this.activeMap || !this.activeMap.foliage) return;
                 const wind = this.weather && Number.isFinite(this.weather.wind) ? this.weather.wind : 0.3;
                 const windDir = this.weather && Number.isFinite(this.weather.windDirection) ? this.weather.windDirection : 1;
@@ -54975,6 +55051,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.drawImage(spr.cv, -spr.w / 2, -spr.w / 2);
                     } else ctx.drawImage(spr.cv, cx - spr.w / 2, cy - spr.w / 2);
                     ctx.restore();
+                    if (mark) { const hw = spr.w * 0.6; mark(cx - hw, f.y - 0.8 * (cy + hw - f.y), cx + hw, f.y - 0.8 * (cy - hw - f.y)); }
                 }
             },
             /** Scratch owners keep reflection paint from changing live animation or shot origins. */
@@ -55090,7 +55167,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             },
 
             /** Detailed actor art reflected about the ground beneath its body, at current facing. */
-            _drawUltraReflectionWalker(ctx, e, alpha = 0.58) {
+            _drawUltraReflectionWalker(ctx, e, alpha = 0.58, mark = null, crowd = false) {
                 if (!e || e.dead || e.visible === false || e.inCar || e === this.player && this.isDriving) return false;
                 if (e.invincibleTimer > 0 && e.invincibleTimer % 6 < 3) return false;
                 const proxy = this._ultraReflectionWalkerProxy(e);
@@ -55117,12 +55194,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (e === this.player && (e.isHidden || this.flitState && this.flitState.active)) fade *= 0.5;
                 // Body parts sometimes set their own alpha (weapons, glow, jewellery). Render them
                 // once into shared scratch art, then apply reflection opacity to the complete result.
-                const radius = 96, quality = 2;
+                const radius = 96, quality = this._ultraArtScale();
                 let canvas = this._ultraWalkerCanvas;
-                if (!canvas) {
-                    canvas = this._ultraWalkerCanvas = document.createElement('canvas');
-                    canvas.width = canvas.height = radius * 2 * quality;
-                }
+                if (!canvas) canvas = this._ultraWalkerCanvas = document.createElement('canvas');
+                if (canvas.width !== radius * 2 * quality) canvas.width = canvas.height = radius * 2 * quality;
                 const paint = canvas.getContext('2d');
                 paint.setTransform(1, 0, 0, 1, 0, 0);
                 paint.clearRect(0, 0, canvas.width, canvas.height);
@@ -55131,7 +55206,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 paint.shadowOffsetX = paint.shadowOffsetY = 0;
                 paint.setLineDash([]);
                 paint.setTransform(quality, 0, 0, quality, radius * quality, radius * quality);
-                _drawProceduralHumanoid(paint, proxy, cfg);
+                // The crowd's reflections replay its baked walk (ui/crowd-impostors.js: one bake a frame, live until then):
+                // in rippling water, squashed and faint, nobody can tell, and it's one stamp instead of a whole body
+                if (!(crowd && CrowdImpostors.draw(paint, proxy, cfg))) _drawProceduralHumanoid(paint, proxy, cfg);
                 ctx.save();
                 try {
                     ctx.globalCompositeOperation = 'source-over';
@@ -55145,6 +55222,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.scale(1, -1);
                     if (sx !== 1 || sy !== 1) ctx.scale(sx, sy);
                     ctx.drawImage(canvas, -radius, -radius, radius * 2, radius * 2);
+                    // its box: the art's circle (turned, stretched up to 1.1), mirrored about the feet
+                    if (mark) { const r = radius * Math.max(sx, sy, 1); mark(e.x - r, e.y + 12 - 0.8 * (r + 12), e.x + r, e.y + 12 + 0.8 * (r + 12)); }
                     return true;
                 } finally { ctx.restore(); }
             },
@@ -55194,7 +55273,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** A mirrored shape below where it stands: a figure (body, then head) or a car's flank */
             _reflShape(c, m, a) {
                 c.globalAlpha = a;
-                if (m.kind === 'walker') {
+                if (m.kind === 'walker' || m.kind === 'crowd') {
                     c.beginPath(); c.ellipse(m.x, m.y + 17, 5.5, 14, 0, 0, Math.PI * 2); c.fill();
                     c.beginPath(); c.arc(m.x, m.y + 33, 5.5, 0, Math.PI * 2); c.fill();
                 } else {
@@ -55364,11 +55443,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (F.q === 'ultra' && F.D) {
                     // The same horizontal water movement is applied to colour and light.
                     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 0.95;
-                    this._drawUltraReflectionBands(ctx, F.D, W, H);
+                    this._drawUltraReflectionBands(ctx, F.D, W, H, REFLECT.BANDS * 2, F.Dr);
                 }
                 ctx.globalCompositeOperation = 'lighter';
                 ctx.globalAlpha = 0.95;
-                if (F.q === 'ultra') this._drawUltraReflectionBands(ctx, R, W, H);
+                if (F.q === 'ultra') this._drawUltraReflectionBands(ctx, R, W, H, REFLECT.BANDS, null);
                 else if (F.q === 'high') {
                     const rain = this.weather && this.weather.isRaining ? this.weather.intensity : 0;
                     const n = REFLECT.BANDS, bh = R.height / n, t = _gameTimeSec, amp = (1.2 + rain * 3.2) * (W / R.width) * 0.5;
@@ -55380,15 +55459,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             },
 
-            /** Full-resolution detail stays sharp while a small water shimmer breaks its outline. */
-            _drawUltraReflectionBands(ctx, cv, W, H) {
+            /** Ultra's water shimmer: `n` bands across the screen, each slid sideways by the wave at its height (the same
+                wave for the full-size detail and the half-size lights, whatever their band count); only the rows and
+                columns of `rect` (screen px) when given: where the detail layer has anything. */
+            _drawUltraReflectionBands(ctx, cv, W, H, n, rect) {
                 const rain = this.weather && this.weather.isRaining ? this.weather.intensity : 0;
-                const n = Math.min(REFLECT.BANDS * 2, cv.height), t = _gameTimeSec, amp = 0.6 + rain * 1.6;
+                const t = _gameTimeSec, amp = 0.6 + rain * 1.6, k = cv.height / H, kx = cv.width / W;
+                n = Math.min(n, H);
+                const x0 = rect ? rect.x0 : 0, x1 = rect ? rect.x1 : W;
                 for (let i = 0; i < n; i++) {
-                    const sy = Math.floor(i * cv.height / n), bh = Math.floor((i + 1) * cv.height / n) - sy;
-                    const dx = Math.sin(t * 2.1 + i * 0.45) * amp
-                        + Math.sin(t * 5.3 + i * 1.35) * amp * 0.35 * rain;
-                    ctx.drawImage(cv, 0, sy, cv.width, bh, dx, sy * H / cv.height, W, bh * H / cv.height);
+                    let y0 = Math.floor(i * H / n), y1 = Math.floor((i + 1) * H / n);
+                    if (rect) { if (y1 <= rect.y0 || y0 >= rect.y1) continue; y0 = Math.max(y0, rect.y0); y1 = Math.min(y1, rect.y1); }
+                    const u = (Math.floor(i * H / n) + Math.floor((i + 1) * H / n)) / 2 / H * REFLECT.BANDS * 2;   // its place in 60 bands
+                    const dx = Math.sin(t * 2.1 + u * 0.45) * amp
+                        + Math.sin(t * 5.3 + u * 1.35) * amp * 0.35 * rain;
+                    ctx.drawImage(cv, x0 * kx, y0 * k, (x1 - x0) * kx, (y1 - y0) * k, x0 + dx, y0, x1 - x0, y1 - y0);
                 }
             },
 
@@ -56070,7 +56155,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     `<span>live <b>${RenderStats.liveBodies}</b> / sprites <b>${RenderStats.cachedBodies}</b> / bake poses <b>${RenderStats.bakedBodies}</b></span>`,
                     `<span>cars <b>${T ? T.vehicles.length : 0}</b>/${GameSettings.getMaxTraffic()}</span>`,
                     `<span>peds <b>${P ? P.pedestrians.length : 0}</b>/${GameSettings.getMaxPedestrians()}</span>`,
-                    `<span>crowd <b>${GameSettings.crowdQuality || 'high'}</b></span>`
+                    `<span>crowd <b>${GameSettings.crowdQuality || 'high'}</b></span>`,
+                    `<span>reflections <b>${game.reflectQuality() || 'off'}</b>${game._reflAdapt && game._reflAdapt.cap ? ` (auto, from ${GameSettings.reflections})` : ''}</span>`
                 ];
                 if (counting) parts.push(`<span>canvas calls <b>${n.toLocaleString()}</b>/frame</span>`);
                 // The world: buildings drawn of the map's, the ground tiles held, and the big image caches' memory
@@ -64569,9 +64655,11 @@ engineMixin({
                 // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
                 // the wet asphalt, on the ground and the floors (after the painted interiors) before buildings and people so they walk over it
                 if (RL.at('reflections')) {
+                    const reflT = (this._renderDrawId & 7) === 0 ? performance.now() : 0;   // (every 8th frame: adaptive reflections)
                     this.prepareReflections();
                     this.drawPuddles(this.ctx);
                     this.drawReflections(this.ctx);
+                    this._adaptReflections(reflT ? performance.now() - reflT : -1);
                 } else this._refl = null;                                 // (so the light layer lifts no stale one)
 
                 // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)

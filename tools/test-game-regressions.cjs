@@ -812,6 +812,61 @@ test('Camera edge lock: the view stays inside the map, a narrow map is centred, 
   equal([off.x, off.y], [20, 100], 'with the lock off the camera is her own position again');
 }, {affine: true});
 
+test('Ultra reflections: lights at half size, detail at full size and only where it has something, art at the scale it is seen', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=false; game.enterWorld(); game.loop=()=>{};
+    const W = game.weather; W.triggerLightning = () => {}; if (W.lockSchedule) W.lockSchedule('rain'); W.setCondition('rain', null, true);
+    GameSettings.reflections = 'ultra'; GameSettings.adaptiveLighting = false;
+    for (let i = 0; i < 3; i++) { W.wetness = 1; game.worldMinutes = 22 * 60; game.player.x = 1200; game.player.y = 2400; _frameTime += 16; game.draw(); }`);
+  const r = value(env, `
+    const F = game._refl, W = game.canvas.width, H = game.canvas.height;
+    const out = { R: [F.R.width, F.R.height], full: [W, H], D: F.D ? [F.D.width, F.D.height] : null, Dr: F.Dr };
+    game.view.zoom = 1; out.s1 = game._ultraArtScale(); game.view.zoom = 1.6; out.s2 = game._ultraArtScale();
+    // nobody and nothing near: no detail layer at all
+    const movers = game._ultraReflectionMovers, fol = game._drawUltraReflectionFoliage;
+    game._ultraReflectionMovers = () => []; game._drawUltraReflectionFoliage = () => {};
+    game.prepareReflections(); out.empty = game._refl.D;
+    game._ultraReflectionMovers = movers; game._drawUltraReflectionFoliage = fol;
+    return out;`);
+  equal(r.R, r.full.map(v => Math.round(v * 0.5)), 'the lights at half size, as on High');
+  equal(r.D, r.full, 'the detail layer (people, cars, trees) at full size');
+  ok(r.Dr && r.Dr.x1 > r.Dr.x0 && r.Dr.y1 > r.Dr.y0, 'and it knows where it drew');
+  equal([r.s1, r.s2], [1, 2], 'reflected art painted at 1x up to zoom 1.25, 2x closer in');
+  equal(r.empty, null, 'with nothing to reflect, no detail layer is laid down');
+  // The shimmer lays down only the bands across the rect it drew in, and only its columns
+  env.setTrace(true);
+  env.run(`(() => { const cv = document.createElement('canvas'); cv.width = 900; cv.height = 600; game._drawUltraReflectionBands(game.ctx, cv, 900, 600, 60, { x0: 100, y0: 100, x1: 300, y1: 160 }); })()`);
+  const ops = env.trace.filter(o => o[1] === 'drawImage');
+  env.setTrace(false);
+  equal(ops.length, 6, 'a 60 px tall rect: the 6 bands of 10 px it crosses');
+  ok(ops.every(o => o[5] === 200 && o[9] === 200), 'each only 200 px wide, the rect\'s columns');
+}, {affine: true});
+
+test('Adaptive reflections: slow frames step Ultra down to High then Medium (never Off), steady frames bring it back, the saved choice untouched', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=false; game.enterWorld(); game.loop=()=>{};`);
+  const r = value(env, `
+    let T = 100000; const pn = performance.now; performance.now = () => T;
+    const out = [];
+    try {
+      game.running = true; game.paused = false; game.cineCam = null; game._refl = { R: null };
+      GameSettings.adaptiveLighting = true; GameSettings.fpsLimit = 0; GameSettings.reflections = 'ultra'; game._reflAdapt = null;
+      const run = (frameMs, reflMs, secs) => { for (let t = 0; t < secs * 1000; t += 133) { T += 133; game._renderFrameMs = frameMs; game._adaptReflections(reflMs); } return game.reflectQuality(); };
+      out.push(run(25, 6, 5), run(25, 6, 5), run(25, 6, 30));           // slow: ultra → high → medium, and no lower
+      out.push(GameSettings.reflections);
+      out.push(run(15, 3, 20), run(15, 3, 15));                         // steady: back to high, then to ultra
+      game.cineCam = {}; GameSettings.reflections = 'high'; GameSettings.reflections = 'ultra';
+      game._reflAdapt.cap = 'medium'; out.push(game.reflectQuality()); game.cineCam = null;   // photo mode keeps its own choice
+      game._reflAdapt = null; out.push(run(15, 6, 30));                 // on target: never steps down
+      game._reflAdapt = null; out.push(run(25, 1, 30));                 // slow, but not the reflections' doing: stays
+      game._reflAdapt = null; GameSettings.adaptiveLighting = false; out.push(run(25, 6, 30));   // the switch off: the choice, always
+    } finally { performance.now = pn; GameSettings.adaptiveLighting = true; game._reflAdapt = null; }
+    return out;`);
+  equal(r.slice(0, 3), ['high', 'medium', 'medium'], 'slow frames step it down a level at a time, never to Off');
+  equal(r[3], 'ultra', 'the saved setting is still Ultra');
+  equal(r.slice(4, 6), ['high', 'ultra'], 'steady frames bring it back up');
+  equal(r[6], 'ultra', 'photo mode keeps its own reflections');
+  equal(r.slice(7), ['ultra', 'ultra', 'ultra'], 'on target, or slow for other reasons, or with the switch off: no change');
+}, {affine: true});
+
 test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);
   const r = value(env, `

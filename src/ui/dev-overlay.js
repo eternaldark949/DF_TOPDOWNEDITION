@@ -175,7 +175,8 @@
                     `<span>live <b>${RenderStats.liveBodies}</b> / sprites <b>${RenderStats.cachedBodies}</b> / bake poses <b>${RenderStats.bakedBodies}</b></span>`,
                     `<span>cars <b>${T ? T.vehicles.length : 0}</b>/${GameSettings.getMaxTraffic()}</span>`,
                     `<span>peds <b>${P ? P.pedestrians.length : 0}</b>/${GameSettings.getMaxPedestrians()}</span>`,
-                    `<span>crowd <b>${GameSettings.crowdQuality || 'high'}</b></span>`
+                    `<span>crowd <b>${GameSettings.crowdQuality || 'high'}</b></span>`,
+                    `<span>reflections <b>${game.reflectQuality() || 'off'}</b>${game._reflAdapt && game._reflAdapt.cap ? ` (auto, from ${GameSettings.reflections})` : ''}</span>`
                 ];
                 if (counting) parts.push(`<span>canvas calls <b>${n.toLocaleString()}</b>/frame</span>`);
                 // The world: buildings drawn of the map's, the ground tiles held, and the big image caches' memory

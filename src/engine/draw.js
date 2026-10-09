@@ -380,9 +380,11 @@
                 // Reflections (engine/reflections.js): the puddles, and the mirrored lights in them and
                 // the wet asphalt, on the ground and the floors (after the painted interiors) before buildings and people so they walk over it
                 if (RL.at('reflections')) {
+                    const reflT = (this._renderDrawId & 7) === 0 ? performance.now() : 0;   // (every 8th frame: adaptive reflections)
                     this.prepareReflections();
                     this.drawPuddles(this.ctx);
                     this.drawReflections(this.ctx);
+                    this._adaptReflections(reflT ? performance.now() - reflT : -1);
                 } else this._refl = null;                                 // (so the light layer lifts no stale one)
 
                 // Building forecourts sit on top of the pavement (Silver Queen portico floor, steps, carpet)
