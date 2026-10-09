@@ -201,7 +201,7 @@
             // --- CONTROLS (touch) — flitting without letting go of the trigger ---
             // Kept in localStorage (dfab_controls) and in saves. See initJoystick.
             ...(() => {
-                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, scopeView: true, scopeSlow: true };
+                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, scopeView: true, scopeSlow: true, cameraEdgeLock: true };   // cameraEdgeLock: the view never leaves the map (engine/draw.js _clampView)
                 try { Object.assign(d, JSON.parse(localStorage.getItem('dfab_controls') || '{}')); } catch (e) { /* private mode */ }
                 return d;
             })(),
@@ -229,6 +229,40 @@
 
             // --- AUTO-DETECT ---
             _isMobile: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent),
+
+            // --- DEVICE PRESET --- (main menu → Settings → Device Preset; off by default)
+            // On: the preset for this device's tier (applyPreset) over the settings it touches, the
+            // values it replaced kept so that turning it off puts them back. Kept per device
+            // (dfab_device_preset: { on, before }), not in saves, and applied again at launch and
+            // after a save's settings load (app/boot.js, engine/save-load.js) while it's on.
+            devicePreset: (() => { try { return !!(JSON.parse(localStorage.getItem('dfab_device_preset') || '{}') || {}).on; } catch (e) { return false; } })(),
+            _PRESET_KEYS: ['lightingQuality', 'trafficDensity', 'pedestrianDensity', 'foliageDensity', 'rainDensity',
+                           'filmGrain', 'softShadows', 'bloom', 'wetReflections', 'reflections', 'soundRings'],
+            /** This device's tier, from what the browser says of it: 'low' | 'medium' | 'high' */
+            deviceTier() {
+                const nav = typeof navigator !== 'undefined' ? navigator : {}, mem = nav.deviceMemory, cores = nav.hardwareConcurrency || 0;
+                const handheld = this._isMobile || (nav.maxTouchPoints > 1 && /Macintosh/.test(nav.userAgent || ''));   // (an iPad says it's a Mac)
+                if ((mem && mem <= 2) || (cores && cores <= 2)) return 'low';
+                if ((mem && mem <= 4) || (cores && cores <= 4) || handheld) return 'medium';
+                return 'high';
+            },
+            /** Turn the device preset on (this tier's preset, the replaced values kept) or off (them put back) */
+            setDevicePreset(on) {
+                let rec = {};
+                try { rec = JSON.parse(localStorage.getItem('dfab_device_preset') || '{}') || {}; } catch (e) { /* private mode */ }
+                if (on) {
+                    if (!rec.before) { rec.before = {}; for (const k of this._PRESET_KEYS) rec.before[k] = this[k]; }
+                    this.applyPreset(this.deviceTier());
+                } else if (rec.before) {
+                    for (const k of this._PRESET_KEYS) if (k in rec.before) this[k] = rec.before[k];
+                    rec.before = null;
+                }
+                this.devicePreset = !!on; rec.on = this.devicePreset;
+                this.saveDensity();
+                try { localStorage.setItem('dfab_device_preset', JSON.stringify(rec)); } catch (e) { /* private mode */ }
+            },
+            /** While it's on, the preset again (at launch, and after a save brings its own settings) */
+            reapplyDevicePreset() { if (this.devicePreset) { this.applyPreset(this.deviceTier()); this.saveDensity(); } },
             
             // Apply mobile-friendly defaults on first load
             applyPreset(preset) {
@@ -280,7 +314,7 @@
             // Apply film grain visibility
             /** Store the control toggles and show or hide the ⚡ button. */
             applyControls() {
-                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, scopeView: this.scopeView, scopeSlow: this.scopeSlow })); } catch (e) { /* private mode */ }
+                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, scopeView: this.scopeView, scopeSlow: this.scopeSlow, cameraEdgeLock: this.cameraEdgeLock })); } catch (e) { /* private mode */ }
                 const b = document.getElementById('btn-flit');
                 if (b) b.classList.toggle('hidden-by-setting', !this.flitButton);
                 const r = document.getElementById('joystick-ring');

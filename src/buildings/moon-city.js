@@ -292,7 +292,7 @@
                     else {
                         const c = cf, t = _frameTime / 1000;                                            // marquee bulbs along the valance
                         c.globalCompositeOperation = 'lighter';
-                        const bulb = _zoomLOD < 1 ? LandmarkKit.bulb(c, '255,232,240', 1, 1.6, '255,180,210', 0.35, 7, true) : LandmarkKit.bulb(c, '255,232,240', 1, 1.6), br = bulb.r;
+                        const bulb = _zoomLOD < 1 ? bulbSprite(c, '255,232,240', 1, 1.6, '255,180,210', 0.35, 7, true) : bulbSprite(c, '255,232,240', 1, 1.6), br = bulb.r;
                         for (let x = x0 + 6, i = 0; x < x1; x += 12, i++) {                                   // (core and glow in one stamp)
                             c.globalAlpha = 0.55 + 0.45 * Math.sin(t * 3 + i * 1.3); c.drawImage(bulb, x - br, y1 - 3 - br, br * 2, br * 2);
                         }

@@ -250,6 +250,12 @@
             return cv;
         }
         /** Stamp a glow of radius r at x, y (alpha from the context's globalAlpha). */
+        /** Could a world rect show this frame? Against the draw's view (the screen, with its zoom and shake): true when
+            there's no view yet (a standalone draw). For set pieces drawn every frame, so they cost nothing off screen. */
+        function viewHasRect(x, y, w, h) {
+            const V = typeof game !== 'undefined' && game && game._cullBounds && game._cullBounds.view;
+            return !V || !(x + w < V.left || x > V.right || y + h < V.top || y > V.bottom);
+        }
         function drawGlow(ctx, x, y, r, color, core) {
             ctx.drawImage(glowSprite(color, core), x - r, y - r, r * 2, r * 2);
         }
@@ -258,6 +264,37 @@
             if (a <= 0.003) return;
             ctx.globalAlpha = Math.min(1, a);
             drawGlow(ctx, x, y, r, rgb, 0);
+        }
+
+        /**
+         * A bulb for an additive ('lighter') glow pass: a core of radius cr (rgb, alpha ca) with its halo added over it,
+         * as a dot and a glow drawn one by one would: a disc of radius hr (hrgb at ha), or with soft, a glow falling off
+         * to nothing (drawGlow's). Baked once per size (the power of two at or over ctx's pixels a world px, so a stamp
+         * never shrinks more than half) and stamped at the bulb's own alpha: one draw where it was two or three.
+         * Stamp it centred on (x, y), b.r world px each way: ctx.drawImage(b, x - b.r, y - b.r, b.r * 2, b.r * 2).
+         */
+        const _bulbSprites = new Map();
+        function bulbSprite(ctx, rgb, ca, cr, hrgb, ha, hr, soft) {
+            const m = ctx.getTransform(), S = Math.min(8, Math.max(1, 2 ** Math.ceil(Math.log2(Math.hypot(m.a, m.b) || 1))));
+            const key = S + rgb + ca + cr + (hrgb ? hrgb + ha + hr + soft : '');
+            let cv = _bulbSprites.get(key);
+            if (cv) return cv;
+            const R = (hrgb ? hr : cr) + 1, n = Math.ceil(R * 2 * S);   // (a pixel's pad for the edge's antialiasing)
+            cv = document.createElement('canvas'); cv.width = cv.height = n; cv.r = n / S / 2;
+            const c = cv.getContext('2d'); c.scale(S, S); c.globalCompositeOperation = 'lighter';
+            c.fillStyle = `rgba(${rgb},${ca})`; c.beginPath(); c.arc(cv.r, cv.r, cr, 0, Math.PI * 2); c.fill();
+            if (hrgb) {
+                if (soft) { const g = c.createRadialGradient(cv.r, cv.r, 0, cv.r, cv.r, hr); g.addColorStop(0, `rgba(${hrgb},${ha})`); g.addColorStop(1, `rgba(${hrgb},0)`); c.fillStyle = g; }
+                else c.fillStyle = `rgba(${hrgb},${ha})`;
+                c.beginPath(); c.arc(cv.r, cv.r, hr, 0, Math.PI * 2); c.fill();
+            }
+            _bulbSprites.set(key, cv);
+            return cv;
+        }
+        /** Stamp bulb sprite b centred on (x, y) at alpha a (skipped when it'd be invisible). Sets globalAlpha. */
+        function drawBulb(ctx, b, x, y, a) {
+            if (a <= 0.003) return;
+            ctx.globalAlpha = Math.min(1, a); ctx.drawImage(b, x - b.r, y - b.r, b.r * 2, b.r * 2);
         }
 
         /**

@@ -666,11 +666,237 @@ test('Portico marquee: one stamp a bulb, from a sprite baked to the screen scale
   equal(ops.filter(o => o === 'arc').length, 0, 'no bulb, dot or lantern is an arc of its own');
   ok(ops.filter(o => o === 'drawImage').length >= r.n, `the ${r.n} marquee bulbs are stamped`);
   const s = value(env, `
-    const c = game.ctx, bulb = () => LandmarkKit.bulb(c, '1,2,3', 1, 1.5, '4,5,6', 0.22, 4.5);
+    const c = game.ctx, bulb = () => bulbSprite(c, '1,2,3', 1, 1.5, '4,5,6', 0.22, 4.5);
     c.setTransform(1, 0, 0, 1, 0, 0); const a = bulb(); c.setTransform(2.5, 0, 0, 2.5, 0, 0); const b = bulb(); c.setTransform(1, 0, 0, 1, 0, 0);
     return [a.width, a.r, b.width, b.r, a === bulb()];`);
   equal(s, [11, 5.5, 44, 5.5, true], 'baked once per scale (1 and 4 px a world px), stamped the same size in the world');
 }, {affine: true});
+
+test('Apartment lights: each lamp shade and festoon bulb is one stamp, glow and bulb together', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.worldMinutes=22*60; game.drawApartmentGlow(game.ctx);`);   // (bakes the sprites)
+  env.setTrace(true);
+  env.run(`game.drawApartmentGlow(game.ctx)`);
+  const ops = env.trace.map(op => op[1]);
+  env.setTrace(false);
+  equal(ops.filter(o => o === 'arc').length, 2, 'the only arcs left are the two gas-burner rings');
+  ok(ops.filter(o => o === 'drawImage').length >= 72 + 8, 'the 72 festoon bulbs and the lamp shades are stamped');
+}, {affine: true});
+
+test('The window city draws nothing while its strip is off screen', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.worldMinutes=22*60;
+    game._cullBounds = { view: { left: 0, right: 900, top: 300, bottom: 700 } }; game.drawApartmentBackdrop(game.ctx);`);   // (lays out and bakes)
+  env.setTrace(true);
+  env.run(`game.drawApartmentBackdrop(game.ctx)`);
+  const off = env.trace.length;
+  env.run(`game._cullBounds = { view: { left: 0, right: 900, top: -300, bottom: 100 } }; game.drawApartmentBackdrop(game.ctx)`);
+  const on = env.trace.length - off;
+  env.setTrace(false);
+  equal(off, 0, 'in the rooms: no calls at all');
+  ok(on > 0, 'on the veranda: it draws');
+}, {affine: true});
+
+test('City view: the hub kit seen from a window; its bake leaves the camera as it found it, and each car is one stamp', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.worldMinutes=22*60;`);
+  const r = value(env, `
+    const cam = game.camera, lod = _zoomLOD, cv = new CityView({ x: 0, y: -394, w: 1400, h: 400, seed: 949 });
+    cv.bakeBase(); cv.bakeGlow();
+    game._cullBounds = { view: { left: -2000, right: 4000, top: -2000, bottom: 2000 } };
+    const t = _frameTime / 1000, s = cv.scale, inWin = (x, w) => !(x + w < cv.x || x > cv.x + cv.w), span = cv.VW + 60, pw = 8 * s * 2;
+    const cars = cv.cars.filter(c => { const p = cv._carAt(c, t), st = cv._carStamp(c.v, p.rot); return p.a > 0.02 && inWin(cv.x + p.x * s - st.w / 2, st.w); }).length;
+    const peds = cv.peds.filter(q => inWin(cv.x + (((q.offset + t * q.speed) % span + span) % span - 30) * s - pw, pw * 2)).length;
+    window.__cv = cv; cv.drawBase(game.ctx);   // (turns each car's stamp once)
+    return { same: game.camera === cam && _zoomLOD === lod, buildings: cv.buildings.length, cars, peds, kinds: [...new Set(cv.buildings.map(b => b.type))].sort() };`);
+  ok(r.same, 'the game camera and zoom LOD are back as they were');
+  ok(r.buildings >= 10, 'blocks filled with the hub\'s generic buildings');
+  equal(r.kinds, ['apartment', 'shop', 'warehouse'], 'in the hub\'s mix');
+  env.setTrace(true);
+  env.run(`window.__cv.drawBase(game.ctx)`);
+  const images = env.trace.filter(op => op[1] === 'drawImage').length;
+  env.setTrace(false);
+  equal(images, 1 + r.cars + r.peds, 'the still city, then one stamp per car and per person in the window');
+}, {affine: true});
+
+test('City traffic: the cars on a lane share its speed, and never close on each other', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949');`);
+  const r = value(env, `
+    const out = [];
+    for (const seed of [1, 7, 949]) {
+      const cv = new CityView({ x: 0, y: -394, w: 1400, h: 400, seed, parallax: 0.35, edgeY: 20 }), span = cv.VW + 240, lanes = new Map();
+      for (const c of cv.cars) if (c.axis === 'h') { if (!lanes.has(c.y)) lanes.set(c.y, []); lanes.get(c.y).push(c); }
+      let worst = Infinity, oneSpeed = true;
+      for (const cars of lanes.values()) {
+        oneSpeed = oneSpeed && cars.every(c => c.speed === cars[0].speed);
+        for (let t = 0; t < 600; t += 0.25) {
+          const xs = cars.map(c => cv._carAt(c, t).x);
+          for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++) {
+            const d = Math.abs(xs[i] - xs[j]);
+            worst = Math.min(worst, Math.min(d, span - d) - (cars[i].v.length + cars[j].v.length) / 2);
+          }
+        }
+      }
+      out.push({ lanes: lanes.size, oneSpeed, worst: Math.round(worst) });
+    }
+    return out;`);
+  for (const l of r) {
+    equal(l.lanes, 4, 'two lanes each way');
+    ok(l.oneSpeed, 'one speed a lane');
+    ok(l.worst >= 40, `over ten minutes the closest two cars on a lane come is ${l.worst} hub px, bumper to bumper`);
+  }
+});
+
+test('City parallax: the city slides slower than the floor, never past its picture, and sits as laid out at the edge', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.worldMinutes=22*60;`);
+  const r = value(env, `
+    const cv = game._makeAptCityView(), P = cv.parallax, out = { covered: true };
+    for (let x = -300; x <= 1700; x += 50) for (let y = -400; y <= 1000; y += 50) {
+      game.view = { x, y, zoom: 1 }; cv.slide();
+      const L = cv.ix + cv.dx, T = cv.iy + cv.dy, e = 1e-6;
+      if (L > cv.x + e || L + cv.iw < cv.x + cv.w - e || T > cv.y + e || T + cv.ih < cv.y + cv.h - e) out.covered = false;
+    }
+    game.view = { x: cv.x + cv.w / 2, y: cv.edgeY, zoom: 1 }; cv.slide(); out.edge = [cv.dx, cv.dy];
+    game.view = { x: cv.x + cv.w / 2 + 100, y: cv.edgeY + 60, zoom: 1 }; cv.slide(); out.moved = [cv.dx / P, cv.dy / P];
+    game._cullBounds = { view: { left: -2000, right: 4000, top: -2000, bottom: 2000 } };
+    window.__cv = cv; cv.drawBase(game.ctx);   // (bakes, and turns the car stamps)
+    return out;`);
+  ok(r.covered, 'from any camera, the picture covers the whole window');
+  equal(r.edge, [0, 0], 'at the edge, centred: the city as laid out');
+  equal(r.moved.map(Math.round), [100, 60], 'the camera 100 px along and 60 back: the city follows it by the parallax');
+  const src = (vx, vy) => {
+    env.setTrace(true);
+    env.run(`game.view = { x: ${vx}, y: ${vy}, zoom: 1 }; window.__cv.drawBase(game.ctx)`);
+    const op = env.trace.find(o => o[1] === 'drawImage');
+    env.setTrace(false);
+    return [op[3], op[4], op[7], op[8]];
+  };
+  const a = src(700, 20), b = src(800, 80), res = 1.5, P = 0.35;
+  equal([a[2], a[3]], [0, -394], 'the still city is stamped into the window');
+  equal([Math.round((a[0] - b[0]) / res / P), Math.round((a[1] - b[1]) / res / P)], [100, 60], 'and the part of it that shows slides with the camera, by the parallax');
+}, {affine: true});
+
+test('Look-out: at the veranda edge the camera leans out over the city; nowhere else', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.running=false; game.enterWorld(); game.loop=()=>{};`);
+  const at = (x, y) => value(env, `
+    if (!game._cityView) game._cityView = game._makeAptCityView();
+    for (let i = 0; i < 120; i++) { game.player.x = ${x}; game.player.y = ${y}; _frameTime += 50; game.draw(); }
+    return { lean: game.lookLeanY, want: -game._cityView.lookout / game.camera.zoom, camY: game.camera.y, top: game.activeMap.cameraBounds.top + game.canvas.height / 2 / game.camera.zoom };`);
+  const edge = at(700, 20), room = at(400, 500);
+  ok(Math.abs(edge.lean - edge.want) < 1, `at the railing it leans ${Math.round(edge.lean)} px (${Math.round(edge.want)} wanted: the same on screen at any zoom)`);
+  equal(Math.round(edge.camY), Math.round(Math.max(20 + edge.want, edge.top)), 'the camera is that far out past her (or as far as the city strip goes, on a tall screen)');
+  ok(Math.abs(room.lean) < 0.01, 'in the rooms: none');
+  const hub = value(env, `game._doLoadMap('hub_949'); _frameTime += 16; game.draw(); return game.lookLeanY;`);
+  equal(hub, 0, 'and none at once on another map');
+}, {affine: true});
+
+test('Camera edge lock: the view stays inside the map, a narrow map is centred, and off it follows her as before', env => {
+  env.run(`game.story.update=()=>{};`);
+  const view = (map, px, py, pre = '') => value(env, `
+    if (!game.activeMap || game.activeMap.id !== '${map}') { game._doLoadMap('${map}'); game.running=false; game.enterWorld(); game.loop=()=>{}; }
+    ${pre}
+    for (let i = 0; i < 3; i++) { game.player.x = ${px}; game.player.y = ${py}; _frameTime += 50; game.draw(); }
+    const v = game.view, hw = game.canvas.width / 2 / v.zoom, hh = game.canvas.height / 2 / v.zoom;
+    return { l: v.x - hw, r: v.x + hw, t: v.y - hh, b: v.y + hh, x: v.x, y: v.y, cx: game.camera.x, cy: game.camera.y };`);
+  const e = 1e-6;
+  const west = view('apt_949', 20, 100), east = view('apt_949', 1380, 100), rail = view('apt_949', 700, 20);
+  ok(Math.abs(west.l) < e && Math.abs(east.r - 1400) < e, 'at the veranda\'s ends the view stops at the apartment\'s walls');
+  ok(rail.t >= -394 - e && rail.t < 6, 'at the railing it still rises over the city strip, and no further than its top');
+  ok(west.x === west.cx && west.y === west.cy, 'the camera everything else reads is the clamped one');
+  const van = view('van_interior', 60, 400, 'game.camera.zoom = 1.6;');
+  equal(van.x, 200, 'a map narrower than the view is centred');
+  const hub = view('hub_949', 10, 10);
+  ok(hub.l >= -e && hub.t >= -e, 'at the hub\'s corner the view stays inside the city');
+  const cut = view('hub_949', 2000, 2000, 'game.cutscene.active = true; game.camera.x = -500; game.camera.y = 20000;');
+  env.run(`game.cutscene.active = false;`);
+  ok(cut.l >= -e && cut.b <= 11000 + e && cut.cx === cut.x, 'a cutscene camera outside the map is brought in, and stays in');
+  const off = view('apt_949', 20, 100, 'GameSettings.cameraEdgeLock = false;');
+  env.run(`GameSettings.cameraEdgeLock = true;`);
+  equal([off.x, off.y], [20, 100], 'with the lock off the camera is her own position again');
+}, {affine: true});
+
+test('Ultra reflections: lights at half size, detail at full size and only where it has something, art at the scale it is seen', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=false; game.enterWorld(); game.loop=()=>{};
+    const W = game.weather; W.triggerLightning = () => {}; if (W.lockSchedule) W.lockSchedule('rain'); W.setCondition('rain', null, true);
+    GameSettings.reflections = 'ultra'; GameSettings.adaptiveLighting = false;
+    for (let i = 0; i < 3; i++) { W.wetness = 1; game.worldMinutes = 22 * 60; game.player.x = 1200; game.player.y = 2400; _frameTime += 16; game.draw(); }`);
+  const r = value(env, `
+    const F = game._refl, W = game.canvas.width, H = game.canvas.height;
+    const out = { R: [F.R.width, F.R.height], full: [W, H], D: F.D ? [F.D.width, F.D.height] : null, Dr: F.Dr };
+    game.view.zoom = 1; out.s1 = game._ultraArtScale(); game.view.zoom = 1.6; out.s2 = game._ultraArtScale();
+    // nobody and nothing near: no detail layer at all
+    const movers = game._ultraReflectionMovers, fol = game._drawUltraReflectionFoliage;
+    game._ultraReflectionMovers = () => []; game._drawUltraReflectionFoliage = () => {};
+    game.prepareReflections(); out.empty = game._refl.D;
+    game._ultraReflectionMovers = movers; game._drawUltraReflectionFoliage = fol;
+    return out;`);
+  equal(r.R, r.full.map(v => Math.round(v * 0.5)), 'the lights at half size, as on High');
+  equal(r.D, r.full, 'the detail layer (people, cars, trees) at full size');
+  ok(r.Dr && r.Dr.x1 > r.Dr.x0 && r.Dr.y1 > r.Dr.y0, 'and it knows where it drew');
+  equal([r.s1, r.s2], [1, 2], 'reflected art painted at 1x up to zoom 1.25, 2x closer in');
+  equal(r.empty, null, 'with nothing to reflect, no detail layer is laid down');
+  // The shimmer lays down only the bands across the rect it drew in, and only its columns
+  env.setTrace(true);
+  env.run(`(() => { const cv = document.createElement('canvas'); cv.width = 900; cv.height = 600; game._drawUltraReflectionBands(game.ctx, cv, 900, 600, 60, { x0: 100, y0: 100, x1: 300, y1: 160 }); })()`);
+  const ops = env.trace.filter(o => o[1] === 'drawImage');
+  env.setTrace(false);
+  equal(ops.length, 6, 'a 60 px tall rect: the 6 bands of 10 px it crosses');
+  ok(ops.every(o => o[5] === 200 && o[9] === 200), 'each only 200 px wide, the rect\'s columns');
+}, {affine: true});
+
+test('Adaptive reflections: slow frames step Ultra down to High then Medium (never Off), steady frames bring it back, the saved choice untouched', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=false; game.enterWorld(); game.loop=()=>{};`);
+  const r = value(env, `
+    let T = 100000; const pn = performance.now; performance.now = () => T;
+    const out = [];
+    try {
+      game.running = true; game.paused = false; game.cineCam = null; game._refl = { R: null };
+      GameSettings.adaptiveLighting = true; GameSettings.fpsLimit = 0; GameSettings.reflections = 'ultra'; game._reflAdapt = null;
+      const run = (frameMs, reflMs, secs) => { for (let t = 0; t < secs * 1000; t += 133) { T += 133; game._renderFrameMs = frameMs; game._adaptReflections(reflMs); } return game.reflectQuality(); };
+      out.push(run(25, 6, 5), run(25, 6, 5), run(25, 6, 30));           // slow: ultra → high → medium, and no lower
+      out.push(GameSettings.reflections);
+      out.push(run(15, 3, 20), run(15, 3, 15));                         // steady: back to high, then to ultra
+      game.cineCam = {}; GameSettings.reflections = 'high'; GameSettings.reflections = 'ultra';
+      game._reflAdapt.cap = 'medium'; out.push(game.reflectQuality()); game.cineCam = null;   // photo mode keeps its own choice
+      game._reflAdapt = null; out.push(run(15, 6, 30));                 // on target: never steps down
+      game._reflAdapt = null; out.push(run(25, 1, 30));                 // slow, but not the reflections' doing: stays
+      game._reflAdapt = null; GameSettings.adaptiveLighting = false; out.push(run(25, 6, 30));   // the switch off: the choice, always
+    } finally { performance.now = pn; GameSettings.adaptiveLighting = true; game._reflAdapt = null; }
+    return out;`);
+  equal(r.slice(0, 3), ['high', 'medium', 'medium'], 'slow frames step it down a level at a time, never to Off');
+  equal(r[3], 'ultra', 'the saved setting is still Ultra');
+  equal(r.slice(4, 6), ['high', 'ultra'], 'steady frames bring it back up');
+  equal(r[6], 'ultra', 'photo mode keeps its own reflections');
+  equal(r.slice(7), ['ultra', 'ultra', 'ultra'], 'on target, or slow for other reasons, or with the switch off: no change');
+}, {affine: true});
+
+test('Device Preset: off by default; on applies this device\'s tier, a save can\'t undo it, and off puts every setting back', env => {
+  const r = value(env, `
+    const G = GameSettings, out = { def: G.devicePreset }, keys = G._PRESET_KEYS, before = {};
+    for (const k of keys) before[k] = G[k];
+    const nav = navigator, mob = G._isMobile;
+    const tier = (cores, mem, mobile) => {
+      const c0 = nav.hardwareConcurrency, m0 = nav.deviceMemory;
+      nav.hardwareConcurrency = cores; nav.deviceMemory = mem; G._isMobile = mobile;
+      try { return G.deviceTier(); } finally { nav.hardwareConcurrency = c0; nav.deviceMemory = m0; G._isMobile = mob; }
+    };
+    out.tiers = [tier(2, undefined, false), tier(8, 2, false), tier(4, undefined, false), tier(8, 8, true), tier(8, 8, false)];
+    G.deviceTier = () => 'low';
+    try {
+      G.setDevicePreset(true);
+      out.on = [G.devicePreset, G.lightingQuality, G.reflections, G.trafficDensity, G.bloom, JSON.parse(localStorage.getItem('dfab_device_preset')).on];
+      G.reflections = 'ultra'; G.lightingQuality = 'high'; G.bloom = true;      // a save's own settings, restored
+      G.reapplyDevicePreset();
+      out.afterSave = [G.lightingQuality, G.reflections, G.bloom];
+      G.setDevicePreset(false);
+      out.off = [G.devicePreset, keys.every(k => G[k] === before[k]), JSON.parse(localStorage.getItem('dfab_device_preset')).on];
+      G.reflections = 'ultra'; G.reapplyDevicePreset(); out.offSave = G.reflections; G.reflections = before.reflections;
+    } finally { delete G.deviceTier; G.setDevicePreset(false); }
+    return out;`);
+  equal(r.def, false, 'off by default');
+  equal(r.tiers, ['low', 'low', 'medium', 'medium', 'high'], 'tiers: 2 cores, 2 GB, 4 cores, a phone, a strong desktop');
+  equal(r.on, [true, 'low', 'off', 'low', false, true], 'on: the low preset (lighting low, reflections off, traffic low, no bloom), kept on this device');
+  equal(r.afterSave, ['low', 'off', false], 'a save bringing heavier settings is brought back to the preset');
+  equal(r.off, [false, true, false], 'off: every setting it touched back exactly as it was');
+  equal(r.offSave, 'ultra', 'and while off, a save\'s settings stand');
+});
 
 test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949');`);

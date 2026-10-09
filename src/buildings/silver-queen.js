@@ -490,8 +490,8 @@
                 ctx.globalAlpha = fade;
                 if (cam.y > g.yb - 2) {                                                                      // marquee bulbs chasing along the fascia
                     const zb = g.z - 2, n = Math.floor((g.x1 - g.x0 - 8) / (lod ? 14 : 9));
-                    const odd = lod ? LandmarkKit.bulb(ctx, '214,186,255', 1, 1.5) : LandmarkKit.bulb(ctx, '214,186,255', 1, 1.5, '200,168,255', 0.22, 4.5);
-                    const even = lod ? LandmarkKit.bulb(ctx, '255,238,214', 1, 1.5) : LandmarkKit.bulb(ctx, '255,238,214', 1, 1.5, '200,168,255', 0.22, 4.5), br = odd.r;
+                    const odd = lod ? bulbSprite(ctx, '214,186,255', 1, 1.5) : bulbSprite(ctx, '214,186,255', 1, 1.5, '200,168,255', 0.22, 4.5);
+                    const even = lod ? bulbSprite(ctx, '255,238,214', 1, 1.5) : bulbSprite(ctx, '255,238,214', 1, 1.5, '200,168,255', 0.22, 4.5), br = odd.r;
                     for (let i = 0; i <= n; i++) {
                         const p = P3(g.x0 + 4 + (g.x1 - g.x0 - 8) * i / n, g.yb, zb);
                         const on = 0.35 + 0.65 * Math.pow(Math.max(0, Math.cos(i * 0.55 - t * 4.2)), 3);
@@ -720,7 +720,7 @@
                     }
                 } else {
                     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                    const a = ctx.globalAlpha, bulb = lod === 0 ? LandmarkKit.bulb(ctx, '255,240,210', 0.95, 1.5, '255,214,150', 0.5, 10, true) : LandmarkKit.bulb(ctx, '255,240,210', 0.95, 1.5), br = bulb.r;
+                    const a = ctx.globalAlpha, bulb = lod === 0 ? bulbSprite(ctx, '255,240,210', 0.95, 1.5, '255,214,150', 0.5, 10, true) : bulbSprite(ctx, '255,240,210', 0.95, 1.5), br = bulb.r;
                     for (let i = 0; i < ribs; i++) for (const py of [y0 - 4, y1 + 4]) {                   // gold lanterns on the pergola, glow and all in one stamp
                         const rx = ribX(i), f = 0.8 + 0.2 * Math.sin(t * 2.1 + i * 1.3 + py);
                         ctx.globalAlpha = a * f; ctx.drawImage(bulb, rx - br, py - br, br * 2, br * 2);

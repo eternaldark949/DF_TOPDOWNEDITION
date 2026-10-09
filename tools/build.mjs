@@ -79,6 +79,7 @@ const SCRIPTS = [
     'buildings/moon-city.js',
     'buildings/sky-layer.js',
     'buildings/factories.js',
+    'buildings/city-view.js',
     'buildings/registry-v3.js',
     'traffic/roads.js',
     'traffic/garage-zib.js',
