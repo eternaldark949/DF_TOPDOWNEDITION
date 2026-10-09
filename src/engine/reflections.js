@@ -766,7 +766,7 @@
                     out[count++] = m;
                 };
                 const walker = (e, col) => { if (e && !e.dead && e.visible !== false && !e.inCar && near(e.x, e.y, 40)) add(e, 'walker', col); };
-                const lookCol = (e) => { const L = e.look || e.appearance; return (L && L.top && L.top.color) || null; };
+                const lookCol = (e) => { const L = e.look || e.appearance; return (L && topColor(L.top)) || null; };
                 if (!this.isDriving) walker(this.player, '#c9a6ff');
                 for (const t of this.teammates || []) if (t.recruited) walker(t, lookCol(t));
                 for (const n of this.npcs || []) walker(n, lookCol(n));

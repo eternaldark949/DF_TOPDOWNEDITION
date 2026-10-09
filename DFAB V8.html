@@ -43716,7 +43716,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return t < d ? Math.sin(t / d * Math.PI) : 0;
         }
         /* =====================================================================
-           BODIES — builds, height, and Double Nights androids
+           BODIES — builds, height, the body's shape, and Double Nights androids
            ---------------------------------------------------------------------
            config.build   'slim' | 'athletic' | 'curvy' | 'broad' | 'heavy'
                           (none = the classic shape for the character's gender)
@@ -43725,6 +43725,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             glow: '#hex' (visor colour), hover: true, emblem: false }
            Builds scale the body (breadth y, depth x) and keep the head's shape;
            height scales everything. Both are visual only — collision is unchanged.
+           The shape itself (BODY_CANON below): tapered limbs joined at round
+           joints, hands and feet, a torso with deltoid caps, the pelvis, the head.
 
            Double Nights' AI staff are finished in the ethereal silver of the moon,
            the soft gold of sunlight on the moon, or — a select few — Blood Moon
@@ -43745,6 +43747,237 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (!b && h === 1) return null;
             const B = b || { w: 1, d: 1, head: 1 };
             return { x: h * B.d, y: h * B.w, k: h * B.head };
+        }
+
+        /* ── The body's shape ──────────────────────────────────────────────────
+           Proportions per gender, adjusted by the build (bodyCanon). The head
+           stays big (16 across): that's the style. Torso and pelvis numbers are
+           in their own frames: origin at the hip anchor (3px behind the head's
+           centre), +x facing, y shoulder to shoulder.
+             sh, del      shoulder joints at ±sh; the deltoid cap's radius
+             tf, tb       chest front and upper back; chest, back: half-breadths there
+             bust         { x, y, r } (female)
+             hf, hb, hw   pelvis front, back, half-breadth at the hip bones; cleft: the seat's
+             leg          where each thigh hangs from the pelvis (±leg)
+             thigh, calf, upper, fore   limb tapers [near r, belly r, belly at 0..1, far r]
+             hand, foot   hand and foot size (1 = female)
+           Every limb segment ends in a circle the size of its joint and the next
+           starts with the same circle, so knees and elbows stay joined. The
+           deltoids are caps drawn over the torso's edge: seen from above, the
+           shoulders are the highest thing after the head.
+           ───────────────────────────────────────────────────────────────────── */
+        const BODY_CANON = {
+            female:      { sh: 10.5, del: 4.0, tf: 6.0, tb: -7.2, chest: 7.8, back: 8.8, bust: { x: 5.4, y: 4.9, r: 3.3 },
+                           hf: 3.0, hb: -9.0, hw: 12.0, cleft: 0.8, leg: 5.4,
+                           thigh: [4.7, 4.5, 0.28, 3.3], calf: [3.3, 3.6, 0.3, 2.05],
+                           upper: [3.5, 3.35, 0.35, 2.55], fore: [2.55, 2.7, 0.22, 1.8], hand: 1.0, foot: 1.0 },
+            androgynous: { sh: 11.0, del: 4.3, tf: 6.3, tb: -7.8, chest: 8.8, back: 9.4, bust: null,
+                           hf: 2.6, hb: -8.0, hw: 11.2, cleft: 0.6, leg: 5.0,
+                           thigh: [4.75, 4.55, 0.28, 3.45], calf: [3.45, 3.75, 0.3, 2.2],
+                           upper: [3.8, 3.6, 0.35, 2.75], fore: [2.75, 2.9, 0.22, 1.95], hand: 1.04, foot: 1.02 },
+            male:        { sh: 12.5, del: 4.8, tf: 6.6, tb: -8.0, chest: 10.0, back: 10.8, bust: null,
+                           hf: 2.5, hb: -7.5, hw: 10.8, cleft: 0.4, leg: 4.9,
+                           thigh: [4.85, 4.65, 0.28, 3.6], calf: [3.6, 3.95, 0.3, 2.35],
+                           upper: [4.2, 4.0, 0.35, 3.0], fore: [3.0, 3.2, 0.22, 2.1], hand: 1.1, foot: 1.05 },
+        };
+        const BOOT_SHAFT = [2.7, 3.05, 0.5, 3.7];                            // a boot, ankle → top of the shaft
+
+        /** The body for a gender and build: shoulders follow `shoulder`, the pelvis and legs `hip`. Cached. */
+        const _bodyCanons = new Map();
+        function bodyCanon(gender, buildId) {
+            const key = (BODY_CANON[gender] ? gender : 'androgynous') + '|' + (buildId || '');
+            let C = _bodyCanons.get(key);
+            if (C) return C;
+            const b = BUILDS[buildId] || {};
+            C = { ...BODY_CANON[gender] || BODY_CANON.androgynous, paths: new Map() };
+            if (b.shoulder) { const k = b.shoulder; C.sh *= k; C.del *= 1 + (k - 1) * 0.8; C.chest *= 1 + (k - 1) * 0.6; C.back *= 1 + (k - 1) * 0.7; }
+            if (b.hip) { const k = b.hip; C.hw *= k; C.hb *= 1 + (k - 1) * 0.6; C.leg *= 1 + (k - 1) * 0.5; C.cleft *= k; }
+            _bodyCanons.set(key, C);
+            return C;
+        }
+
+        /** A closed Catmull-Rom spline through [[x, y], …] as béziers, pushed out by `inflate`, always
+         *  wound the same way (so paths added to it, like a thumb, fill as one shape). */
+        function _bodySpline(pts, inflate = 0, path = new Path2D()) {
+            const n = pts.length;
+            let area = 0;
+            for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; area += a[0] * b[1] - b[0] * a[1]; }
+            if (area < 0) pts = pts.slice().reverse();
+            const P = i => pts[(i % n + n) % n];
+            const q = !inflate ? pts : pts.map((p, i) => {
+                const a = P(i - 1), b = P(i + 1), tx = b[0] - a[0], ty = b[1] - a[1], l = Math.hypot(tx, ty) || 1;
+                return [p[0] + ty / l * inflate, p[1] - tx / l * inflate];
+            });
+            const Q = i => q[(i % n + n) % n];
+            path.moveTo(q[0][0], q[0][1]);
+            for (let i = 0; i < n; i++) {
+                const p0 = Q(i - 1), p1 = Q(i), p2 = Q(i + 1), p3 = Q(i + 2);
+                path.bezierCurveTo(p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6,
+                                   p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6, p2[0], p2[1]);
+            }
+            path.closePath();
+            return path;
+        }
+        /** One side's points (front → back, +y), mirrored into a closed outline. */
+        function _bodyMirror(front, side, back) {
+            return [front, ...side, back, ...side.slice().reverse().map(([x, y]) => [x, -y])];
+        }
+        function _bodyCached(C, key, make) {
+            let p = C.paths.get(key);
+            if (!p) C.paths.set(key, p = make());
+            return p;
+        }
+
+        /** The torso: chest across the front, shoulder blades and a shallow spine behind, ending at the
+         *  shoulder joints (the deltoid caps go on top). `band` keeps only |y| ≤ band of it (a tank top). */
+        function bodyTorsoPath(C, inflate = 0, band = 0) {
+            return _bodyCached(C, 't' + inflate + '|' + band, () => {
+                const { tf, tb, chest, back, sh, del } = C, lim = band || Infinity;
+                const side = [
+                    [tf - 0.9, chest * 0.55],               // the chest
+                    [tf - 2.6, chest],                      // where it turns into the shoulder
+                    [del * 0.35, sh + del * 0.28],          // shoulder joint, front
+                    [-del * 0.65, sh + del * 0.12],         // shoulder joint, back
+                    [tb + 2.0, back],                       // shoulder blade
+                    [tb, back * 0.42],
+                ].map(([x, y]) => [x, Math.min(y, lim)]);
+                return _bodySpline(_bodyMirror([tf, 0], side, [tb + 0.35, 0]), inflate);
+            });
+        }
+        /** The pelvis: widest at the hip bones, rounding into the seat, a soft cleft behind. */
+        function bodyHipPath(C, inflate = 0) {
+            return _bodyCached(C, 'h' + inflate, () => {
+                const { hf, hb, hw, cleft } = C;
+                return _bodySpline(_bodyMirror([hf, 0], [
+                    [hf - 0.8, hw * 0.55],
+                    [hf - 3.2, hw * 0.93],
+                    [(hf + hb) / 2 - 0.6, hw],              // hip bones
+                    [hb + 2.4, hw * 0.86],
+                    [hb + 0.25, hw * 0.42],                 // the seat
+                ], [hb + cleft, 0]), inflate);
+            });
+        }
+
+        /** The head from above: an egg, longer than wide and fuller behind; the ears as one path. */
+        let _bodyHead = null, _bodyEars = null;
+        function bodyHeadPaths() {
+            if (!_bodyHead) {
+                _bodyHead = _bodySpline(_bodyMirror([7.8, 0], [[6.5, 4.9], [2.6, 7.0], [-1.0, 7.35], [-5.0, 6.4], [-7.6, 3.6]], [-8.4, 0]));
+                _bodyEars = new Path2D();
+                for (const s of [-1, 1]) { _bodyEars.moveTo(1.3, s * 7.05); _bodyEars.ellipse(-0.4, s * 7.05, 1.7, 1.15, 0, 0, Math.PI * 2); }
+            }
+            return { head: _bodyHead, ears: _bodyEars };
+        }
+
+        /** A limb segment from joint (x1, y1) to joint (x2, y2), tapered by T, as the current path. */
+        function bodyLimbPath(ctx, x1, y1, x2, y2, T) {
+            const r0 = T[0], rb = T[1], tb = T[2], r1 = T[3];
+            const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1e-6, a = Math.atan2(dy, dx);
+            const ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+            const c1 = Math.max(0.05, tb * 0.85) * L, c2 = (tb + (1 - tb) * 0.5) * L;
+            const w1 = Math.max(rb * 1.05, r0), w2 = (rb + r1) * 0.5;
+            ctx.beginPath();
+            ctx.arc(x1, y1, r0, a + Math.PI / 2, a + Math.PI * 1.5);
+            ctx.bezierCurveTo(x1 + ux * c1 - nx * w1, y1 + uy * c1 - ny * w1, x1 + ux * c2 - nx * w2, y1 + uy * c2 - ny * w2, x2 - nx * r1, y2 - ny * r1);
+            ctx.arc(x2, y2, r1, a - Math.PI / 2, a + Math.PI / 2);
+            ctx.bezierCurveTo(x1 + ux * c2 + nx * w2, y1 + uy * c2 + ny * w2, x1 + ux * c1 + nx * w1, y1 + uy * c1 + ny * w1, x1 + nx * r0, y1 + ny * r0);
+            ctx.closePath();
+        }
+        /** A limb's radius a fraction t of the way along it (for bangles, cuffs). */
+        function bodyLimbRadius(T, t) {
+            return t <= T[2] ? T[0] + (T[1] - T[0]) * t / T[2] : T[1] + (T[3] - T[1]) * (t - T[2]) / (1 - T[2]);
+        }
+
+        /** A hand in its own frame (x along the forearm, origin at the fist point), thumb included.
+         *  Relaxed: seen from the thumb side, shortened by reach k (0 hanging straight down … 1 reaching
+         *  out, in 8 steps). Gripping: a fist. t: the thumb's side. Cached per size. */
+        const _bodyHands = new Map();
+        function bodyHandPath(grip, k, t, size) {
+            const ks = grip ? 0 : Math.round(k * 7), key = (grip ? 'g' : ks) + '|' + t + '|' + size;
+            let p = _bodyHands.get(key);
+            if (p) return p;
+            const z = size, K = ks / 7, S = pts => pts.map(([x, y]) => [x * z, y * z]);
+            if (grip) {
+                p = _bodySpline(S([[-2.2, 0], [-2.0, 2.45], [1.0, 2.9], [3.3, 2.65], [4.15, 1.2], [4.2, -1.2], [3.3, -2.65], [1.0, -2.9], [-2.0, -2.45]]));
+                _bodyThumb(p, 1.2 * z, t * 2.1 * z, 1.55 * z, 1.05 * z, t * 0.25);
+            } else {
+                const palm = 0.4 + 1.0 * K, kn = 0.8 + 4.4 * K, tip = 1.4 + 5.6 * K;     // a hanging hand is seen end-on
+                p = _bodySpline(S([[-2.0, 0], [-1.6, 1.95], [palm, 2.3], [kn, 1.8], [tip, 0.55], [tip, -0.55], [kn, -1.8], [palm, -2.3], [-1.6, -1.95]]));
+                const tx = 0.5 + 1.5 * K, rx = 1.2 + 0.55 * K;
+                _bodyThumb(p, tx * z, t * 2.2 * z, rx * z, 1.0 * z, t * 0.35);
+            }
+            _bodyHands.set(key, p);
+            return p;
+        }
+        function _bodyThumb(p, x, y, rx, ry, rot) {                   // its own subpath, started where the ellipse starts
+            p.moveTo(x + rx * Math.cos(rot), y + rx * Math.sin(rot)); p.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+        }
+        /** Fill a cached path placed at (x, y) and turned by a, undoing the move exactly (cheaper than save/restore).
+         *  The context's current path is cleared first: the browser re-maps it through every transform. */
+        function _bodyFillAt(ctx, path, x, y, a) {
+            ctx.beginPath();
+            if (!a) { ctx.translate(x, y); ctx.fill(path); ctx.translate(-x, -y); return; }
+            const c = Math.cos(a), s = Math.sin(a);
+            ctx.transform(c, s, -s, c, x, y); ctx.fill(path); ctx.transform(c, -s, s, c, -(c * x + s * y), s * x - c * y);
+        }
+        /** Draw a hand at the fist point (fx, fy), turned along the forearm from the elbow (ex, ey). */
+        function drawBodyHand(ctx, ex, ey, fx, fy, grip, C) {
+            const dx = fx - ex, dy = fy - ey, L = Math.hypot(dx, dy);
+            const a = L > 0.3 ? Math.atan2(dy, dx) : (fy < 0 ? -Math.PI / 2 : Math.PI / 2);
+            // the thumb sits toward the body's midline (and a little forward)
+            const t = (-Math.sin(a) * 0.4 + Math.cos(a) * (fy < 0 ? 1 : -1)) >= 0 ? 1 : -1;
+            _bodyFillAt(ctx, bodyHandPath(grip, Math.min(1, L / 10), t, C.hand), fx, fy, a);
+        }
+
+        /** A foot around its ankle point: a narrow heel, the arch on the inside, wide across the ball,
+         *  toes stepping back from the big toe, turned out a little. side −1 left, +1 right; `inflate`
+         *  makes it a shoe; `pump` a pointed court shoe. Cached with size and turn-out baked in. */
+        const _bodyFeet = new Map();
+        function bodyFootPath(side, inflate, pump, size) {
+            const key = side + '|' + inflate + '|' + (pump ? 1 : 0) + '|' + size;
+            let p = _bodyFeet.get(key);
+            if (p) return p;
+            const s = side, c = Math.cos(s * 0.09), n = Math.sin(s * 0.09);
+            const pts = (pump
+                ? [[-3.0, 0], [-2.3, 1.7 * s], [1.8, 2.15 * s], [5.4, 2.5 * s], [7.8, 1.45 * s], [9.4, -0.3 * s], [8.0, -1.85 * s], [5.4, -2.45 * s], [1.8, -1.75 * s], [-2.3, -1.7 * s]]
+                : [[-3.2, 0], [-2.3, 1.95 * s], [1.8, 2.45 * s], [5.6, 2.8 * s], [7.8, 1.95 * s], [8.8, 0.5 * s], [9.2, -0.9 * s], [8.5, -2.2 * s], [5.6, -2.75 * s], [1.8, -1.9 * s], [-2.3, -1.9 * s]])
+                .map(([x, y]) => [(x * c - y * n) * size, (x * n + y * c) * size]);
+            p = _bodySpline(pts, inflate);
+            _bodyFeet.set(key, p);
+            return p;
+        }
+        function drawBodyFoot(ctx, x, y, side, inflate, pump, size) {
+            _bodyFillAt(ctx, bodyFootPath(side, inflate, pump, size), x, y, 0);
+        }
+
+        /** The deltoid caps over the shoulder joints (0, ±sh in the torso frame), leaning toward each
+         *  elbow (given in the torso frame) as the arm lifts. `stripe`: a sleeve stripe across each;
+         *  `seam`: the armhole seam round each cap's inner side (a T-shirt's). */
+        function drawBodyCaps(ctx, C, color, lex, ley, rex, rey, pad = 0, stripe = null, seam = false) {
+            ctx.fillStyle = color;
+            const both = !stripe && !seam;                                  // plain caps: one path for the pair
+            if (both) ctx.beginPath();
+            for (let i = 0; i < 2; i++) {
+                const s = i ? 1 : -1, ex = i ? rex : lex, ey = i ? rey : ley;
+                const y0 = s * C.sh, dy = ey - y0, L = Math.hypot(ex, dy), w = Math.min(1, L / 7);
+                let ux = (L > 0.01 ? ex / L : 1) * w + (1 - w), uy = (L > 0.01 ? dy / L : 0) * w;
+                const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+                const cx = ux * C.del * 0.22, cy = y0 + uy * C.del * 0.22 - s * 0.3, rx = C.del * 1.06 + pad;
+                const ry = C.del * 0.8 + pad, rot = Math.atan2(uy, ux);
+                if (both) { ctx.moveTo(cx + rx * ux, cy + rx * uy); ctx.ellipse(cx, cy, rx, ry, rot, 0, Math.PI * 2); continue; }
+                ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, rot, 0, Math.PI * 2); ctx.fill();
+                if (seam) {
+                    const inner = -s * Math.PI / 2 - rot;                       // toward the body's midline, in the cap's own frame
+                    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.6;
+                    ctx.beginPath(); ctx.ellipse(cx, cy, rx - 0.3, ry - 0.3, rot, inner - 1.2, inner + 1.2); ctx.stroke();
+                }
+                if (stripe) {
+                    ctx.strokeStyle = stripe; ctx.lineWidth = 0.8;
+                    ctx.beginPath(); ctx.moveTo(cx - ux * rx * 0.8, cy - uy * rx * 0.8); ctx.lineTo(cx + ux * rx * 0.8, cy + uy * rx * 0.8); ctx.stroke();
+                }
+            }
+            if (both) ctx.fill();
+            ctx.beginPath();                                                // leave no path for the next transform to carry
         }
 
         /** How wide a build's shoulders read in a portrait (1 = classic). */
@@ -44090,14 +44323,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
            way the character faces, y runs shoulder to shoulder) from the geometry
            drawProceduralHumanoid already works out, passed in as `g`:
              g.darken(hex, frac), g.skin, g.gender, g.walkCycle
-             g.torso = { x, w }   (rect x..x+w, y -10..10, in the torso's rotated frame)
-             g.hip   = { x, w }   (rect x..x+w, y -11..11, in the hips' rotated frame)
+             g.body               the body's shape (ui/bodies.js bodyCanon): fill bodyTorsoPath(g.body)
+                                  for the torso, bodyHipPath(g.body) for the pelvis; sh/del (shoulders),
+                                  tf/tb/chest/back, hf/hb/hw, bust, foot
+             g.torso = { x, w }   back to front of the torso (x..x+w), in its rotated frame
+             g.hip   = { x, w }   back to front of the pelvis, in its rotated frame
              g.headInTorso        head centre x in the torso frame
              g.feet/knees/fists/elbows/hipPt = [[lx,ly],[rx,ry]]  (hipPt = where each thigh starts)
              g.headX              head centre x in the body frame
              g.cloth(key, spec)   simulated cloth drawn in the current frame (see ui/cloth.js)
            Tops also say which parts of the arm are fabric (`sleeve`), bottoms which
-           parts of the leg (`legs`), hats how much hair they hide (`hides`).
+           parts of the leg (`legs`), hats how much hair they hide (`hides`). The
+           renderer draws the shoulder caps over a top in its sleeve colour; a top
+           can pad them (`padded`), stripe them (`armStripe`) or seam them (`seams`).
            Portrait versions take P = { cx, cy, fw, fh, w, h, eyeY, eyeSpacing }.
            ===================================================================== */
         const WARDROBE = (() => {
@@ -44166,17 +44404,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return { segs: 2, stiffness: 0.12, damping: 0.87, keepOut: 6, chains };
             };
             const rr = (ctx, x, y, w, h, r, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
-            const TORSO_R = [3, 5, 5, 3];
-            const body = (ctx, g, c, shade = 0.1, y0 = -10, y1 = 10) => rr(ctx, g.torso.x, y0, g.torso.w, y1 - y0, TORSO_R, g.darken(c.color, shade));
-            const bust = (ctx, g, c, shade = 0.15, r = 3) => {
-                if (g.gender !== 'female') return;
+            // The top over the torso. y0..y1 is how far across it reaches, ±10 being shoulder to shoulder:
+            // less keeps to a band (a tank top's straps), more pads it out (a hoodie's bulk).
+            const body = (ctx, g, c, shade = 0.1, y0 = -10, y1 = 10) => {
+                const B = g.body, reach = Math.min(-y0, y1);
                 ctx.fillStyle = g.darken(c.color, shade);
-                for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(g.torso.x + g.torso.w - 1.2, s * 3.5, r, 0, Math.PI * 2); ctx.fill(); }
+                ctx.fill(reach < 10 ? bodyTorsoPath(B, 0, Math.round(reach / 10 * B.sh * 4) / 4) : bodyTorsoPath(B, (reach - 10) * 0.8));
             };
-            const shoulderSeams = (ctx, g, c) => {
-                ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.7; ctx.beginPath();
-                for (const s of [-1, 1]) { ctx.moveTo(g.torso.x + 1, s * 7.5); ctx.lineTo(g.torso.x + g.torso.w - 1, s * 7.5); }
-                ctx.stroke();
+            const bust = (ctx, g, c, shade = 0.15, r = 3) => {
+                const B = g.body.bust;
+                if (!B) return;
+                ctx.fillStyle = g.darken(c.color, shade);
+                for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(B.x + 0.15, s * B.y, B.r * (r + 0.4) / 3.5, 0, Math.PI * 2); ctx.fill(); }
             };
             const collarRing = (ctx, g, color, r = 9.3, width = 2.2) => {
                 ctx.strokeStyle = color; ctx.lineWidth = width;
@@ -44224,24 +44463,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     draw(ctx, g, c) {
                         body(ctx, g, c);
                         bust(ctx, g, c, 0.15, 3.5);
-                        ctx.fillStyle = g.darken(c.color, 0.05);
-                        const x = g.torso.x, w = g.torso.w;
-                        ctx.beginPath(); ctx.moveTo(x + 2, -10); ctx.lineTo(x + w / 2, -2); ctx.lineTo(x + w / 2, 2); ctx.lineTo(x + 2, 10); ctx.lineTo(x, 10); ctx.lineTo(x, -10); ctx.fill();
+                        ctx.fillStyle = g.darken(c.color, 0.05);                 // the racerback, narrowing up the back
+                        const x = g.torso.x, w = g.torso.w, b = g.body.back;
+                        ctx.beginPath(); ctx.moveTo(x + 2.2, -b * 0.85); ctx.lineTo(x + w / 2, -2); ctx.lineTo(x + w / 2, 2); ctx.lineTo(x + 2.2, b * 0.85); ctx.lineTo(x + 0.6, b * 0.4); ctx.lineTo(x + 0.6, -b * 0.4); ctx.fill();
                     },
                     portrait(ctx, P, c, skinShadow) { pShoulders(ctx, P, skinShadow); const { cx, cy, fw, fh } = P; ctx.fillStyle = c.color; ctx.beginPath(); ctx.ellipse(cx, cy + fh * 2.55, fw * 1.6, fh * 0.55, 0, Math.PI, 0); ctx.fill(); ctx.strokeStyle = c.color; ctx.lineWidth = fw * 0.12; ctx.beginPath(); for (const s of [-1, 1]) { ctx.moveTo(cx + s * fw * 0.9, cy + fh * 2.1); ctx.lineTo(cx + s * fw * 0.75, cy + fh * 1.5); } ctx.stroke(); }
                 },
                 // The sports bra's fitted crop, with long sleeves to the wrist; a scooped neck in the portrait
                 sleeved_crop: {
-                    sleeve: 'long',
-                    draw(ctx, g, c) { tops.sports_bra.draw(ctx, g, c); shoulderSeams(ctx, g, c); },
+                    sleeve: 'long', seams: true,
+                    draw(ctx, g, c) { tops.sports_bra.draw(ctx, g, c); },
                     portrait(ctx, P, c, skinShadow) {
                         pShoulders(ctx, P, c.color); pNeckline(ctx, P, skinShadow, 0.55, 0.62);
                         const { cx, cy, fw, fh } = P; ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(cx - fw * 1.6, cy + fh * 2.6, fw * 3.2, fh * 0.08);   // the crop's hem
                     }
                 },
                 tshirt: {
-                    sleeve: 'short',
-                    draw(ctx, g, c) { body(ctx, g, c); shoulderSeams(ctx, g, c); bust(ctx, g, c, 0.16, 3); },
+                    sleeve: 'short', seams: true,
+                    draw(ctx, g, c) { body(ctx, g, c); bust(ctx, g, c, 0.16, 3); },
                     portrait(ctx, P, c, skinShadow) { pShoulders(ctx, P, c.color); pNeckline(ctx, P, skinShadow, 0.35); const { cx, cy, fw, fh } = P; ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - fw * 0.47, cy + fh * 1.41); ctx.quadraticCurveTo(cx, cy + fh * 1.8, cx + fw * 0.47, cy + fh * 1.41); ctx.stroke(); }
                 },
                 tank: {
@@ -44253,7 +44492,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     sleeve: 'none',
                     draw(ctx, g, c) {
                         body(ctx, g, c, 0.1, -8.5, 8.5); bust(ctx, g, c, 0.16, 3.2);
-                        rr(ctx, g.torso.x - 0.5, -6, 2.6, 12, 1.2, g.darken(g.skin, 0.05));   // bare midriff at the waist
+                        ctx.fillStyle = g.darken(g.skin, 0.05);                   // bare skin at the small of the back
+                        ctx.beginPath(); ctx.ellipse(g.torso.x + 1.5, 0, 1.3, g.body.back * 0.45, 0, 0, Math.PI * 2); ctx.fill();
                     },
                     portrait(ctx, P, c, skinShadow) { tops.tank.portrait(ctx, P, c, skinShadow); const { cx, cy, fw, fh } = P; ctx.fillStyle = skinShadow; ctx.fillRect(cx - fw * 1.6, cy + fh * 2.55, fw * 3.2, fh * 0.3); }
                 },
@@ -44292,12 +44532,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     sleeve: 'long',
                     draw(ctx, g, c) {
                         body(ctx, g, c); bust(ctx, g, c, 0.14, 3);
-                        ctx.strokeStyle = c.trim || '#f5f5f5'; ctx.lineWidth = 1.1; ctx.beginPath();   // stripes over the shoulders
-                        for (const s of [-1, 1]) { ctx.moveTo(g.torso.x, s * 8.6); ctx.lineTo(g.torso.x + g.torso.w, s * 8.6); }
-                        ctx.stroke();
                     },
                     collar(ctx, g, c) { collarRing(ctx, g, g.darken(c.color, 0.05), 9.1, 1.6); },
-                    armStripe: true,
+                    armStripe: true,                                     // down the sleeves and over the shoulder caps
                     portrait(ctx, P, c) {
                         pShoulders(ctx, P, c.color); const { cx, cy, fw, fh } = P;
                         rr(ctx, cx - fw * 0.5, cy + fh * 1.1, fw, fh * 0.45, fw * 0.15, c.color);
@@ -44308,13 +44545,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 },
                 jacket: {
-                    sleeve: 'long',
+                    sleeve: 'long', padded: 0.6,
                     draw(ctx, g, c) {
-                        rr(ctx, g.torso.x - 0.5, -11, g.torso.w + 1, 22, TORSO_R, g.darken(c.color, 0.1));   // a touch wider: padded shoulders
-                        const front = g.torso.x + g.torso.w;
+                        ctx.fillStyle = g.darken(c.color, 0.1); ctx.fill(bodyTorsoPath(g.body, 0.8));         // a touch wider: padded shoulders
+                        const front = g.torso.x + g.torso.w, ch = g.body.chest;
                         rr(ctx, front - 4, -3, 4, 6, 1.5, g.darken(c.inner || '#111', 0.05));                  // the top underneath
                         ctx.fillStyle = c.trim || g.darken(c.color, 0.02);                                       // lapels
-                        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(front - 0.5, s * 3); ctx.lineTo(front - 5, s * 7); ctx.lineTo(front - 1, s * 7.5); ctx.closePath(); ctx.fill(); }
+                        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(front - 0.6, s * 2.6); ctx.lineTo(front - 5.5, s * Math.min(7, ch * 0.8)); ctx.lineTo(front - 2.2, s * ch * 0.72); ctx.closePath(); ctx.fill(); }
                     },
                     portrait(ctx, P, c, skinShadow) {
                         pShoulders(ctx, P, c.color, 0.55); const { cx, cy, fw, fh } = P;
@@ -44324,7 +44561,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                 },
                 coat: {
-                    sleeve: 'long',
+                    sleeve: 'long', padded: 0.6,
                     draw(ctx, g, c) { tops.jacket.draw(ctx, g, c); },
                     collar(ctx, g, c) {                                   // turned-up collar behind the neck
                         ctx.strokeStyle = g.darken(c.color, 0.25); ctx.lineWidth = 2.4;
@@ -44341,12 +44578,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 vest: {
                     sleeve: 'long', sleeveFrom: 'inner',
                     draw(ctx, g, c) {
-                        const shirt = c.inner || '#f2f2f2';
-                        rr(ctx, g.torso.x, -10, g.torso.w, 20, TORSO_R, g.darken(shirt, 0.08));
-                        const front = g.torso.x + g.torso.w;
-                        ctx.fillStyle = g.darken(c.color, 0.1);                  // the two vest panels, open in a V at the front
-                        for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(g.torso.x, s * 10); ctx.lineTo(front - 1, s * 9.5); ctx.lineTo(front - 1, s * 2); ctx.lineTo(g.torso.x + g.torso.w * 0.35, s * 1); ctx.lineTo(g.torso.x, s * 1.5); ctx.closePath(); ctx.fill(); }
+                        const shirt = c.inner || '#f2f2f2', torso = bodyTorsoPath(g.body);
+                        ctx.fillStyle = g.darken(c.color, 0.1); ctx.fill(torso);  // the waistcoat (the shirt's sleeves are the shoulder caps)
                         bust(ctx, g, { color: c.color }, 0.14, 2.8);
+                        const front = g.torso.x + g.torso.w;
+                        ctx.save(); ctx.clip(torso);                              // open in a V at the front, the shirt showing
+                        ctx.fillStyle = g.darken(shirt, 0.08);
+                        ctx.beginPath(); ctx.moveTo(front + 1, -3.4); ctx.lineTo(front - g.torso.w * 0.45, 0); ctx.lineTo(front + 1, 3.4); ctx.closePath(); ctx.fill();
+                        ctx.restore();
                         ctx.fillStyle = c.trim || '#8b0000';                      // bow tie
                         ctx.beginPath(); ctx.moveTo(front - 1.5, 0); ctx.lineTo(front + 0.5, -2); ctx.lineTo(front + 0.5, 2); ctx.closePath(); ctx.fill();
                     },
@@ -44359,14 +44598,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.beginPath(); ctx.moveTo(cx, cy + fh * 1.5); ctx.lineTo(cx - fw * 0.3, cy + fh * 1.38); ctx.lineTo(cx - fw * 0.3, cy + fh * 1.62); ctx.closePath(); ctx.moveTo(cx, cy + fh * 1.5); ctx.lineTo(cx + fw * 0.3, cy + fh * 1.38); ctx.lineTo(cx + fw * 0.3, cy + fh * 1.62); ctx.closePath(); ctx.fill();
                     }
                 },
-                // Doctor's white coat: breast pocket, a small red-cross pin, a swinging hem
+                // Doctor's white coat: breast pocket, a small red-cross pin, a swinging hem.
+                // `color` is the coat's own when a look doesn't give one (topColor reads it).
                 lab_coat: {
-                    sleeve: 'long',
+                    sleeve: 'long', color: '#f1f3f5', padded: 0.6,
                     draw(ctx, g, c) {
                         tops.jacket.draw(ctx, g, { ...c, color: c.color || '#f1f3f5' });
-                        const front = g.torso.x + g.torso.w;
+                        const front = g.torso.x + g.torso.w, py = -Math.min(6.2, g.body.chest * 0.72);
                         ctx.fillStyle = '#d9342b';
-                        ctx.fillRect(front - 4, -7.2, 2.4, 0.8); ctx.fillRect(front - 3.6, -7.6, 0.8, 1.6);   // the pin
+                        ctx.fillRect(front - 4, py - 0.4, 2.4, 0.8); ctx.fillRect(front - 3.2, py - 0.8, 0.8, 1.6);   // the pin
                     },
                     tail(ctx, g, c) { coatTail(ctx, g, { ...c, color: c.color || '#f1f3f5' }, 8); },
                     portrait(ctx, P, c, skinShadow) {
@@ -44381,9 +44621,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 },
                 // Medical scrubs: short sleeves, V-neck
                 scrubs: {
-                    sleeve: 'short',
+                    sleeve: 'short', seams: true,
                     draw(ctx, g, c) {
-                        body(ctx, g, c); shoulderSeams(ctx, g, c); bust(ctx, g, c, 0.16, 3);
+                        body(ctx, g, c); bust(ctx, g, c, 0.16, 3);
                         const front = g.torso.x + g.torso.w;
                         ctx.fillStyle = g.skin; ctx.beginPath(); ctx.moveTo(front - 1, -2.5); ctx.lineTo(front - 4.5, 0); ctx.lineTo(front - 1, 2.5); ctx.closePath(); ctx.fill();
                     },
@@ -44398,10 +44638,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     sleeve: 'long',
                     draw(ctx, g, c) {
                         body(ctx, g, c, 0.08); bust(ctx, g, c, 0.14, 3);
-                        const front = g.torso.x + g.torso.w, accent = c.trim || '#e8c27a';
-                        ctx.strokeStyle = accent; ctx.lineWidth = 0.8; ctx.beginPath();
-                        ctx.moveTo(front - 1, -9); ctx.lineTo(front - 1, 9); ctx.stroke();                       // button line
-                        drawDNEmblem(ctx, g.torso.x + g.torso.w * 0.55, -5, 1.9, accent);
+                        const front = g.torso.x + g.torso.w, ch = g.body.chest, accent = c.trim || '#e8c27a';
+                        ctx.strokeStyle = accent; ctx.lineWidth = 0.8; ctx.beginPath();                          // piping round the front
+                        ctx.moveTo(front - 3.2, -ch * 0.8); ctx.quadraticCurveTo(front + 0.2, 0, front - 3.2, ch * 0.8); ctx.stroke();
+                        drawDNEmblem(ctx, front - 3.4, -ch * 0.62, 1.9, accent);
                     },
                     collar(ctx, g, c) { collarRing(ctx, g, g.darken(c.color, 0.2), 9, 1.4); },
                     portrait(ctx, P, c) {
@@ -44422,7 +44662,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const front = g.hip.x + g.hip.w;
                     rr(ctx, front - 3, -8.5, 5.5, 17, [1, 3, 3, 1], g.darken(c.color, 0.12));
                     ctx.strokeStyle = g.darken(c.color, 0.3); ctx.lineWidth = 0.7; ctx.beginPath();
-                    ctx.moveTo(g.hip.x + 1, -9.5); ctx.lineTo(front - 2, -9); ctx.moveTo(g.hip.x + 1, 9.5); ctx.lineTo(front - 2, 9);
+                    const hw = g.body.hw * 0.8;                              // the strings round the waist
+                    ctx.moveTo(g.hip.x + 2.6, -hw); ctx.lineTo(front - 2.6, -hw); ctx.moveTo(g.hip.x + 2.6, hw); ctx.lineTo(front - 2.6, hw);
                     ctx.moveTo(g.hip.x + 1, -2); ctx.lineTo(g.hip.x - 2, -3.5); ctx.moveTo(g.hip.x + 1, 2); ctx.lineTo(g.hip.x - 2, 3.5);   // bow at the back
                     ctx.stroke();
                 } },
@@ -44481,7 +44722,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.restore(); ctx.beginPath(); contour();
                         ctx.strokeStyle = g.darken(c.color, 0.3); ctx.lineWidth = 0.4; ctx.stroke();
                     }
-                    rr(ctx, g.hip.x, -11, g.hip.w, 23, [8, 3, 3, 8], g.darken(c.color, 0.2));
+                    ctx.fillStyle = g.darken(c.color, 0.2); ctx.fill(bodyHipPath(g.body, 0.5));
                 } },
                 // Form-fitting: no cloth, it moves with her. Hugs the hips and the tops of the thighs; a back slit
                 pencil_skirt: { legs: 'bare', hips(ctx, g, c) {
@@ -44489,10 +44730,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.lineWidth = 6.5;
                     for (let i = 0; i < 2; i++) { const [hx, hy] = g.hipPt[i], [kx, ky] = g.knees[i]; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + (kx - hx) * 0.55, hy + (ky - hy) * 0.55); ctx.stroke(); }
                     ctx.lineCap = 'butt';
-                    rr(ctx, g.hip.x - 0.5, -11, g.hip.w + 0.5, 22, [7, 3, 3, 7], col);
+                    ctx.fillStyle = col; ctx.fill(bodyHipPath(g.body, 0.3));
                     ctx.strokeStyle = g.darken(c.color, 0.34); ctx.lineWidth = 0.6; ctx.beginPath();
                     ctx.moveTo(g.hip.x + 0.5, -2); ctx.lineTo(g.hip.x - 1.5, 0); ctx.lineTo(g.hip.x + 0.5, 2);   // the slit at the back
-                    ctx.moveTo(g.hip.x + g.hip.w - 1, -10); ctx.lineTo(g.hip.x + g.hip.w - 1, 10);                  // the waist seam
+                    const seam = g.body.hw * 0.6;                                                                // the waist seam
+                    ctx.moveTo(g.hip.x + g.hip.w - 1.2, -seam); ctx.lineTo(g.hip.x + g.hip.w - 1.2, seam);
                     ctx.stroke();
                 } },
                 // A full circle of pleats all the way round, simulated as cloth: it swirls out as she turns and
@@ -44528,29 +44770,32 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const x0 = g.hip.x + g.hip.w - 2, xb = g.hip.x - 2;
                     drawClothPanel(ctx, g.cloth('long_skirt', pieceSpec('long_skirt', x0, xb, 0, longSkirtSpec)),
                         g.darken(c.color, 0.24), g.darken(c.color, 0.34));
-                    rr(ctx, g.hip.x - 3, -13, g.hip.w + 3, 26, [10, 3, 3, 10], g.darken(c.color, 0.18));
+                    ctx.fillStyle = g.darken(c.color, 0.18); ctx.fill(bodyHipPath(g.body, 1.8));
                     ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 0.7; ctx.beginPath();
-                    for (const y of [-6, 0, 6]) { ctx.moveTo(g.hip.x - 2, y); ctx.lineTo(g.hip.x + g.hip.w - 1, y * 0.8); }
+                    for (const y of [-6, 0, 6]) { ctx.moveTo(g.hip.x - 1, y); ctx.lineTo(g.hip.x + g.hip.w - 1, y * 0.8); }
                     ctx.stroke();
                 } }
             };
 
-            const soleFoot = (ctx, x, y, color, rim) => {
-                const L = 12, W = 6, H = 3;
-                if (rim) { ctx.fillStyle = rim; ctx.beginPath(); ctx.roundRect(x - H - 0.7, y - W / 2 - 0.7, L + 1.4, W + 1.4, 3.5); ctx.fill(); }
-                ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x - H, y - W / 2, L, W, 3); ctx.fill();
+            // A shoe is the foot (ui/bodies.js bodyFootPath) a little bigger, a rim round it for a thick sole.
+            // Foot i: 0 left, 1 right; the toes turn out a little, so details along the foot do too.
+            const soleFoot = (ctx, g, i, color, rim) => {
+                const [x, y] = g.feet[i], side = i ? 1 : -1;
+                if (rim) { ctx.fillStyle = rim; drawBodyFoot(ctx, x, y, side, 1.1, false, g.body.foot); }
+                ctx.fillStyle = color; drawBodyFoot(ctx, x, y, side, 0.45, false, g.body.foot);
             };
             const shoes = {
-                heels:    { draw(ctx, g, c) { ctx.fillStyle = g.darken(c.color, 0.55); for (const [x, y] of g.feet) { ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill(); } } },
-                loafers:  { draw(ctx, g, c) { for (const [x, y] of g.feet) { soleFoot(ctx, x, y, g.darken(c.color, 0.55)); ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(x + 5, y - 1, 2.5, 2); } } },
+                heels:    { draw(ctx, g, c) { ctx.fillStyle = g.darken(c.color, 0.55); for (let i = 0; i < 2; i++) drawBodyFoot(ctx, g.feet[i][0], g.feet[i][1], i ? 1 : -1, 0.35, true, g.body.foot); } },
+                loafers:  { draw(ctx, g, c) { for (let i = 0; i < 2; i++) { soleFoot(ctx, g, i, g.darken(c.color, 0.55)); const [x, y] = g.feet[i]; ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(x + 4.6, y - 1 + (i ? 0.45 : -0.45), 2.5, 2); } } },
                 sneakers: { draw(ctx, g, c) {
-                    for (const [x, y] of g.feet) {
-                        soleFoot(ctx, x, y, g.darken(c.color, 0.35), '#f4f4f4');
+                    for (let i = 0; i < 2; i++) {
+                        soleFoot(ctx, g, i, g.darken(c.color, 0.35), '#f4f4f4');
+                        const [x, y] = g.feet[i];
                         ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.7;
-                        ctx.beginPath(); ctx.moveTo(x + 1, y); ctx.lineTo(x + 6, y); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(x + 1, y + (i ? 0.1 : -0.1)); ctx.lineTo(x + 6, y + (i ? 0.55 : -0.55)); ctx.stroke();
                     }
                 } },
-                boots:    { calf: 0.45, draw(ctx, g, c) { for (const [x, y] of g.feet) soleFoot(ctx, x, y, g.darken(c.color, 0.5)); } }
+                boots:    { calf: 0.45, draw(ctx, g, c) { for (let i = 0; i < 2; i++) soleFoot(ctx, g, i, g.darken(c.color, 0.5)); } }
             };
             shoes.shoes = shoes.loafers;                                      // old generic id
 
@@ -44687,7 +44932,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const gold = c.color || '#e8c27a';
                     for (let i = 0; i < 2; i++) {
                         const [ex, ey] = g.elbows[i], [fx, fy] = g.fists[i];
-                        for (const t of [0.7, 0.8]) { ctx.strokeStyle = gold; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(ex + (fx - ex) * t, ey + (fy - ey) * t, 3.3, 0, Math.PI * 2); ctx.stroke(); }
+                        for (const t of [0.7, 0.8]) { ctx.strokeStyle = gold; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(ex + (fx - ex) * t, ey + (fy - ey) * t, bodyLimbRadius(g.body.fore, t) + 0.7, 0, Math.PI * 2); ctx.stroke(); }
                     }
                 }, portrait() {} }
             };
@@ -44724,6 +44969,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             };
             return { tops, bottoms, shoes, hats, jewelry, trains };
         })();
+
+        /** A top's colour: the look's own, else its WARDROBE piece's default (the lab coat's white), else null. */
+        function topColor(top) {
+            if (!top) return null;
+            const piece = WARDROBE.tops[top.type];
+            return top.color || (piece && piece.color) || null;
+        }
 
         /* =====================================================================
            WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
@@ -46013,8 +46265,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (dyn.android) {
                 drawAndroidHead(ctx, headX, dyn.android, blinkNow);        // plated dome and visor (ui/bodies.js)
             } else {
-                ctx.fillStyle = skinColor;
-                ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();
+                const H = bodyHeadPaths();                                    // an egg from above, the ears just showing (ui/bodies.js)
+                ctx.beginPath(); ctx.translate(headX, 0);
+                ctx.fillStyle = darkenHex(skinColor, 26); ctx.fill(H.ears);
+                ctx.fillStyle = skinColor; ctx.fill(H.head);
+                ctx.translate(-headX, 0);
                 if (blinkNow < 0.5) {
                     ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
                     ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
@@ -46194,27 +46449,27 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.save(); ctx.scale(S.k / S.x, S.k / S.y); draw(hx * S.x / S.k); ctx.restore();
             };
             h.pf = (key, i) => (h.pose && h.pose[key] ? h.pose[key][i] * h.poseW : 0);
-            h.drawLimb = (x1, y1, x2, y2, width, color, gloss) => {
+            // A limb segment between two joints, tapered by T (ui/bodies.js): round at each joint so the
+            // next segment carries on from the same circle. Only fillStyle changes without a shade, so
+            // restore that explicitly. The path is cleared after the fill: the browser would otherwise
+            // re-map it through every later transform, save and restore.
+            h.drawLimb = (x1, y1, x2, y2, T, color, gloss) => {
                 const ctx = h.ctx, SH = h.shade;
-                const len = Math.hypot(x2-x1, y2-y1)/2 + 2;
-                const ang = Math.atan2(y2-y1, x2-x1);
                 if (!SH) {
-                    // ellipse's own rotation gives the same shape without changing the
-                    // Canvas frame. Only fillStyle changes, so restore that explicitly.
                     const fill = ctx.fillStyle;
-                    ctx.fillStyle = color;
-                    ctx.beginPath(); ctx.ellipse((x1+x2)/2, (y1+y2)/2, len, width, ang, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = color; bodyLimbPath(ctx, x1, y1, x2, y2, T); ctx.fill(); ctx.beginPath();
                     ctx.fillStyle = fill;
                     return;
                 }
-                ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
-                ctx.fillStyle = color;
-                ctx.beginPath(); ctx.ellipse(0, 0, len, width, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = color; bodyLimbPath(ctx, x1, y1, x2, y2, T); ctx.fill(); ctx.beginPath();
+                const len = Math.hypot(x2-x1, y2-y1)/2 + 2, ang = Math.atan2(y2-y1, x2-x1), width = Math.max(T[0], T[1]);
                 const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;
+                if (!gloss && !SH.lx && !SH.ly) return;
+                ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
                 if (gloss) {
                     ctx.fillStyle = SH.hl2;
-                    ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.36, 0, 0, Math.PI*2); ctx.fill();
-                } else if (SH.lx || SH.ly) {
+                    ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.32, 0, 0, Math.PI*2); ctx.fill();
+                } else {
                     _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.3);
                 }
                 ctx.restore();
@@ -46281,15 +46536,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const darken = h.darken;
         
             // --- 2. PROPORTIONS ---
-            let shoulderSpread = 9; let hipWidth = 8; let hipXOff = -5; let torsoWidth = 10; let torsoXOff = -3;
-            if (gender === 'female') {
-                shoulderSpread = 7; hipWidth = 12; hipXOff = -8; torsoWidth = 9; torsoXOff = -2.5;
-            } else if (gender === 'male') {
-                shoulderSpread = 12; hipWidth = 7; hipXOff = -4.5; torsoWidth = 13; torsoXOff = -4.5;
-            }
-            const build = BUILDS[config.build];
-            if (build && build.hip) { hipXOff -= hipWidth * (build.hip - 1) / 2; hipWidth *= build.hip; }
-            if (build && build.shoulder) shoulderSpread *= build.shoulder;
+            // The body's shape for this gender and build (ui/bodies.js BODY_CANON)
+            const BC = bodyCanon(gender, config.build);
+            const shoulderSpread = BC.sh;
             // Head keeps its shape under a build's scale: draw it through this
             const withHead = h.withHead;
         
@@ -46614,6 +46863,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             
             const drawLimb = h.drawLimb;
+            let gunHand = false;                                            // the right hand closes round a drawn weapon
             
             // --- DRAW WEAPON (Behind hands) ---
             // Only draw if player and has a weapon, and NOT driving (driving has its own weapon logic)
@@ -46634,6 +46884,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Skip rendering once fully holstered — weapon is "stowed"
                 if (anim > 0.02) {
                     const weaponId = game.currentWeapon.id;
+                    gunHand = true;
 
                     // Lerp from hip-ish stow position back to the fist as anim → 1
                     const hipX = rFistX * 0.4 - 2;
@@ -46677,6 +46928,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // The raise/lower eases over ~0.2s of game time (same at any frame rate).
             if (!isDriving && config.weapon && config.weapon.id && entity.type !== 'player') {
                 const W = config.weapon, target = W.ready ? 1 : 0;
+                gunHand = true;
                 if (entity._wpnReady === undefined) { entity._wpnReady = target; entity._wpnT = _gameTimeSec; }
                 const dt = Math.max(0, Math.min(0.1, _gameTimeSec - entity._wpnT));
                 entity._wpnT = _gameTimeSec;
@@ -46696,7 +46948,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const topP = WD && clothes.top ? WD.tops[clothes.top.type] : null;
             const sleeve = clothes.top ? (topP ? topP.sleeve : 'long') : 'none';
             // Sleeves can come from the shirt under a vest; legs from trousers under an apron
-            const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : clothes.top.color) : null;
+            const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : topColor(clothes.top)) : null;
             if (isDriving) {
                 // Driving mode rendering - different poses for shooting vs not shooting
                 ctx.save();
@@ -46707,14 +46959,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 ctx.translate(driveOffset - bodyRecoil + shootLean, 0);
                 
-                // --- TORSO ---
-                ctx.fillStyle = darken(clothes.top ? clothes.top.color : skinColor, 0.1);
-                ctx.beginPath(); 
-                ctx.roundRect(torsoXOff - 2, -shoulderSpread - 1, torsoWidth + 4, (shoulderSpread * 2) + 2, 5); 
-                ctx.fill();
+                // --- TORSO --- (seated: a touch fuller, the lap under it)
+                ctx.fillStyle = darken(clothes.top ? topColor(clothes.top) : skinColor, 0.1);
+                ctx.fill(bodyTorsoPath(BC, 1));
                 
                 const sleeveColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
                 const skinArmColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
+                const capColor = sleeve !== 'none' ? darken(sleeveCol, 0.12) : darken(skinColor, 0.12);
                 
                 if (isShootingFromCar) {
                     // --- SHOOTING POSE ---
@@ -46730,10 +46981,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const rFistXAdj = 10;
                     const rFistYAdj = 4;
                     
-                    drawLimb(0, rShoulderY, rElbowXAdj, rElbowYAdj, 3.5, sleeveColor);
-                    drawLimb(rElbowXAdj, rElbowYAdj, rFistXAdj, rFistYAdj, 3, skinArmColor);
+                    drawLimb(0, rShoulderY, rElbowXAdj, rElbowYAdj, BC.upper, sleeveColor);
+                    drawLimb(rElbowXAdj, rElbowYAdj, rFistXAdj, rFistYAdj, BC.fore, skinArmColor);
                     ctx.fillStyle = darken(skinColor, 0.4);
-                    ctx.beginPath(); ctx.ellipse(rFistXAdj, rFistYAdj, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                    drawBodyHand(ctx, rElbowXAdj, rElbowYAdj, rFistXAdj, rFistYAdj, true, BC);
                     
                     // Left arm extended out window (shooting arm)
                     // Arm reaches forward-left out the driver window
@@ -46742,29 +46993,31 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const lFistXAdj = 20 - (recoil * 4); // Recoil pulls back
                     const lFistYAdj = -12;
                     
-                    drawLimb(0, lShoulderY, lElbowXAdj, lElbowYAdj, 3.5, sleeveColor);
-                    drawLimb(lElbowXAdj, lElbowYAdj, lFistXAdj, lFistYAdj, 3, skinArmColor);
+                    drawLimb(0, lShoulderY, lElbowXAdj, lElbowYAdj, BC.upper, sleeveColor);
+                    drawLimb(lElbowXAdj, lElbowYAdj, lFistXAdj, lFistYAdj, BC.fore, skinArmColor);
                     ctx.fillStyle = darken(skinColor, 0.4);
-                    ctx.beginPath(); ctx.ellipse(lFistXAdj, lFistYAdj, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                    drawBodyHand(ctx, lElbowXAdj, lElbowYAdj, lFistXAdj, lFistYAdj, true, BC);
                     
                     // Draw weapon in left hand
                     if (entity.type === 'player' && entity._game && entity._game.currentWeapon) {
                         const weaponId = entity._game.currentWeapon.id;
                         drawWeapon(ctx, weaponId, lFistXAdj + 2, lFistYAdj, 0, 0.9);
                     }
+                    drawBodyCaps(ctx, BC, capColor, lElbowXAdj, lElbowYAdj, rElbowXAdj, rElbowYAdj);
                     
                 } else {
                     // --- NORMAL DRIVING POSE (hands on wheel) ---
                     const adjDriveOffset = driveOffset - bodyRecoil;
                     
                     // Both arms forward to steering wheel
-                    drawLimb(0, lShoulderY, lElbowX - adjDriveOffset, lElbowY, 3.5, sleeveColor);
-                    drawLimb(0, rShoulderY, rElbowX - adjDriveOffset, rElbowY, 3.5, sleeveColor);
-                    drawLimb(lElbowX - adjDriveOffset, lElbowY, lFistX - adjDriveOffset, lFistY, 3, skinArmColor);
-                    drawLimb(rElbowX - adjDriveOffset, rElbowY, rFistX - adjDriveOffset, rFistY, 3, skinArmColor);
+                    drawLimb(0, lShoulderY, lElbowX - adjDriveOffset, lElbowY, BC.upper, sleeveColor);
+                    drawLimb(0, rShoulderY, rElbowX - adjDriveOffset, rElbowY, BC.upper, sleeveColor);
+                    drawLimb(lElbowX - adjDriveOffset, lElbowY, lFistX - adjDriveOffset, lFistY, BC.fore, skinArmColor);
+                    drawLimb(rElbowX - adjDriveOffset, rElbowY, rFistX - adjDriveOffset, rFistY, BC.fore, skinArmColor);
                     ctx.fillStyle = darken(skinColor, 0.4);
-                    ctx.beginPath(); ctx.ellipse(lFistX - adjDriveOffset, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
-                    ctx.beginPath(); ctx.ellipse(rFistX - adjDriveOffset, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                    drawBodyHand(ctx, lElbowX - adjDriveOffset, lElbowY, lFistX - adjDriveOffset, lFistY, true, BC);
+                    drawBodyHand(ctx, rElbowX - adjDriveOffset, rElbowY, rFistX - adjDriveOffset, rFistY, true, BC);
+                    drawBodyCaps(ctx, BC, capColor, lElbowX - adjDriveOffset, lElbowY, rElbowX - adjDriveOffset, rElbowY);
                     // NO weapon drawn when not shooting
                 }
                 
@@ -46781,8 +47034,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // --- WALKING MODE ---
 
             // --- 4. CALCULATE POSITIONS ---
-            const lBaseY = -hipWidth / 2 - 1;
-            const rBaseY = hipWidth / 2 + 1;
+            // Feet stand under the leg roots; the legs hang from the pelvis, so their roots turn with it
+            const lBaseY = -BC.leg, rBaseY = BC.leg;
+            const hipC = Math.cos(hipRotation), hipS = Math.sin(hipRotation);
+            const lHipX = hipAnchorX - lBaseY * hipS, lHipY = lBaseY * hipC, rHipX = hipAnchorX - rBaseY * hipS, rHipY = rBaseY * hipC;
         
             const lWalkX = walkSin * strideLen * fwdAmt;
             const rWalkX = walkOppSin * strideLen * fwdAmt;
@@ -46794,10 +47049,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const lFootY = lBaseY + lWalkY + pf('lf', 1);
             const rFootY = rBaseY + rWalkY + pf('rf', 1);
 
-            const lKneeX = (hipAnchorX + lFootX) / 2;
-            const lKneeY = (lBaseY + lFootY) / 2;
-            const rKneeX = (hipAnchorX + rFootX) / 2;
-            const rKneeY = (rBaseY + rFootY) / 2;
+            const lKneeX = (lHipX + lFootX) / 2;
+            const lKneeY = (lHipY + lFootY) / 2;
+            const rKneeX = (rHipX + rFootX) / 2;
+            const rKneeY = (rHipY + rFootY) / 2;
             const botP = WD && clothes.bottom ? WD.bottoms[clothes.bottom.type] : null;
             const shoeP = WD && clothes.shoes ? WD.shoes[clothes.shoes.type] : null;
             const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
@@ -46812,11 +47067,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     cloth: (key, spec) => clothGeometry(h.ctx, entity, key, spec, h.clothDyn) };
             }
             g.skin = skinColor; g.gender = gender; g.walkCycle = walkCycle; g.android = A;
-            g.torso.x = torsoXOff; g.torso.w = torsoWidth; g.hip.x = hipXOff; g.hip.w = hipWidth;
+            g.torso.x = BC.tb; g.torso.w = BC.tf - BC.tb; g.hip.x = BC.hb; g.hip.w = BC.hf - BC.hb; g.body = BC;
             g.headX = headX0; g.headInTorso = headX0 - hipAnchorX;
             g.feet[0][0] = lFootX; g.feet[0][1] = lFootY; g.feet[1][0] = rFootX; g.feet[1][1] = rFootY;
             g.knees[0][0] = lKneeX; g.knees[0][1] = lKneeY; g.knees[1][0] = rKneeX; g.knees[1][1] = rKneeY;
-            g.hipPt[0][0] = hipAnchorX; g.hipPt[0][1] = lBaseY; g.hipPt[1][0] = hipAnchorX; g.hipPt[1][1] = rBaseY;
+            g.hipPt[0][0] = lHipX; g.hipPt[0][1] = lHipY; g.hipPt[1][0] = rHipX; g.hipPt[1][1] = rHipY;
             g.fists[0][0] = lFistX; g.fists[0][1] = lFistY; g.fists[1][0] = rFistX; g.fists[1][1] = rFistY;
             g.elbows[0][0] = lElbowX; g.elbows[0][1] = lElbowY; g.elbows[1][0] = rElbowX; g.elbows[1][1] = rElbowY;
 
@@ -46832,15 +47087,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (shoeP) {
                 shoeP.draw(ctx, g, clothes.shoes);
             } else {
-                // The foot point (lFootX, lFootY) is the ANKLE — where the calf ends.
-                // Center the foot across its width on that point and set the ankle a
-                // quarter of the way in from the heel. (Previously the ankle sat on the
-                // foot's top-left corner, so both feet hung 3px to the body's right and
-                // the whole foot projected forward of the leg.)
-                const FOOT_LEN = 12, FOOT_W = 6, HEEL_TO_ANKLE = 3;
+                // The foot point (lFootX, lFootY) is the ANKLE, where the calf ends; the heel
+                // sits a quarter of the foot behind it (ui/bodies.js bodyFootPath).
                 ctx.fillStyle = darken(clothes.shoes ? clothes.shoes.color : skinColor, 0.55);
-                ctx.beginPath(); ctx.roundRect(lFootX - HEEL_TO_ANKLE, lFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();
-                ctx.beginPath(); ctx.roundRect(rFootX - HEEL_TO_ANKLE, rFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();
+                drawBodyFoot(ctx, lFootX, lFootY, -1, 0, false, BC.foot);
+                drawBodyFoot(ctx, rFootX, rFootY, 1, 0, false, BC.foot);
             }
         
             // LEG COLOURS: which parts of the leg the bottom covers ('bare' | 'thigh' | 'full')
@@ -46849,17 +47100,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const thighColor = legs !== 'bare' ? darken(legCol, 0.35) : darken(skinColor, 0.05);
         
             // 2. Calves
-            drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor, legs === 'full' && botGloss);
-            drawLimb(rKneeX, rKneeY, rFootX, rFootY, 3, legColor, legs === 'full' && botGloss);
+            drawLimb(lKneeX, lKneeY, lFootX, lFootY, BC.calf, legColor, legs === 'full' && botGloss);
+            drawLimb(rKneeX, rKneeY, rFootX, rFootY, BC.calf, legColor, legs === 'full' && botGloss);
             if (shoeP && shoeP.calf) {                                   // boots come up the calf
                 const bootColor = darken(clothes.shoes.color, 0.45), c = shoeP.calf;
-                drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, 3.4, bootColor);
-                drawLimb(rFootX, rFootY, rFootX + (rKneeX - rFootX) * c, rFootY + (rKneeY - rFootY) * c, 3.4, bootColor);
+                drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, BOOT_SHAFT, bootColor);
+                drawLimb(rFootX, rFootY, rFootX + (rKneeX - rFootX) * c, rFootY + (rKneeY - rFootY) * c, BOOT_SHAFT, bootColor);
             }
         
             // 3. Thighs
-            drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor, legs !== 'bare' && botGloss);
-            drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor, legs !== 'bare' && botGloss);
+            drawLimb(lHipX, lHipY, lKneeX, lKneeY, BC.thigh, thighColor, legs !== 'bare' && botGloss);
+            drawLimb(rHipX, rHipY, rKneeX, rKneeY, BC.thigh, thighColor, legs !== 'bare' && botGloss);
             if (A && legs !== 'full') {                                     // android knees
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
@@ -46871,7 +47122,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         
             // Base Hips
             ctx.fillStyle = darken(clothes.bottom ? clothes.bottom.color : skinColor, 0.2);
-            ctx.beginPath(); ctx.roundRect(hipXOff, -11, hipWidth, 22, [8, 3, 3, 8]); ctx.fill();
+            ctx.fill(bodyHipPath(BC));
         
             // Skirts and other hip overlays (same geometry as the hips)
             if (botP && botP.hips) botP.hips(ctx, g, clothes.bottom);
@@ -46891,17 +47142,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // Two heavy panels trailing from the hips
                     for (const s of [-1, 1]) {
                         const panel = g.cloth(s < 0 ? 'train_l' : 'train_r', { segs: 4, stiffness: 0.07, damping: 0.9, chains: [
-                            { a: { x: hipXOff + 2, y: s * 10 }, t: { x: -30, y: s * 14 } },
-                            { a: { x: hipXOff + 2, y: s * 6 },  t: { x: -30, y: s * 8 } },
-                            { a: { x: hipXOff + 2, y: s * 2 },  t: { x: -30, y: s * 2 } } ] });
+                            { a: { x: BC.hb + 2, y: s * 10 }, t: { x: -30, y: s * 14 } },
+                            { a: { x: BC.hb + 2, y: s * 6 },  t: { x: -30, y: s * 8 } },
+                            { a: { x: BC.hb + 2, y: s * 2 },  t: { x: -30, y: s * 2 } } ] });
                         drawClothPanel(ctx, panel, darken(clothes.train.color, 0.1));
                     }
                 } else if (clothes.train.type === 'silk_flow') {
                     // Periwinkle silk: light, floaty, never quite still
                     const panel = g.cloth('train_silk', { segs: 5, stiffness: 0.045, damping: 0.93, drift: 0.25, chains: [
-                        { a: { x: hipXOff + 2, y: -10 }, t: { x: -36, y: -12 } },
-                        { a: { x: hipXOff + 2, y: -5 },  t: { x: -42, y: -2 } },
-                        { a: { x: hipXOff + 2, y: 0 },   t: { x: -40, y: 8 } } ] });
+                        { a: { x: BC.hb + 2, y: -10 }, t: { x: -36, y: -12 } },
+                        { a: { x: BC.hb + 2, y: -5 },  t: { x: -42, y: -2 } },
+                        { a: { x: BC.hb + 2, y: 0 },   t: { x: -40, y: 8 } } ] });
                     ctx.globalAlpha = 0.9;
                     drawClothPanel(ctx, panel, clothes.train.color);
                     ctx.globalAlpha = 1.0;
@@ -46917,31 +47168,35 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.restore();
             }
 
-            // 6. Fists
+            // 6. Hands, turned along the forearm: a fist round whatever they hold (a pistol's off hand stays relaxed)
             ctx.fillStyle = darken(skinColor, 0.4);
-            ctx.beginPath(); ctx.ellipse(lFistX, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+            const bothGrip = stance === 'rifle' || stance === 'sniper' || stance === 'punch';
+            drawBodyHand(ctx, lElbowX, lElbowY, lFistX, lFistY, bothGrip || glassHand === 'left', BC);
+            drawBodyHand(ctx, rElbowX, rElbowY, rFistX, rFistY, bothGrip || stance === 'pistol' || gunHand || glassHand === 'right', BC);
         
             // 7. Forearms (fabric only under long sleeves)
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
-            drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor, sleeve === 'long' && topGloss);
-            drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor, sleeve === 'long' && topGloss);
+            drawLimb(lElbowX, lElbowY, lFistX, lFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
+            drawLimb(rElbowX, rElbowY, rFistX, rFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
             if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
                 const p = WD.jewelry[j.type]; if (p && p.at === 'wrists') p.draw(ctx, g, j);
             }
         
-            // 8. Upper Arms (fabric under short or long sleeves)
+            // 8. Upper Arms (fabric under short or long sleeves). They hang from the shoulders, so their
+            // roots turn with the torso: forward with the opposite leg on a step, into the blow in a punch.
             const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
-            drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor, sleeve !== 'none' && topGloss);
-            drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor, sleeve !== 'none' && topGloss);
+            const torC = Math.cos(torsoRotation), torS = Math.sin(torsoRotation);
+            const lShX = shoulderX - lShoulderY * torS, lShY = lShoulderY * torC, rShX = shoulderX - rShoulderY * torS, rShY = rShoulderY * torC;
+            drawLimb(lShX, lShY, lElbowX, lElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
+            drawLimb(rShX, rShY, rElbowX, rElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
             if (A) {                                                        // android joints: seam rings at elbows and wrists
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY], [lFistX, lFistY], [rFistX, rFistY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
             }
             if (topP && topP.armStripe) {                                // track-jacket stripes down the sleeves
                 ctx.strokeStyle = clothes.top.trim || '#f5f5f5'; ctx.lineWidth = 0.8; ctx.beginPath();
-                ctx.moveTo(shoulderX, lShoulderY); ctx.lineTo(lElbowX, lElbowY); ctx.lineTo(lFistX, lFistY);
-                ctx.moveTo(shoulderX, rShoulderY); ctx.lineTo(rElbowX, rElbowY); ctx.lineTo(rFistX, rFistY);
+                ctx.moveTo(lShX, lShY); ctx.lineTo(lElbowX, lElbowY); ctx.lineTo(lFistX, lFistY);
+                ctx.moveTo(rShX, rShY); ctx.lineTo(rElbowX, rElbowY); ctx.lineTo(rFistX, rFistY);
                 ctx.stroke();
             }
         
@@ -46949,36 +47204,43 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation);
             
             ctx.fillStyle = darken(skinColor, 0.1);
-            ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill();
+            ctx.fill(bodyTorsoPath(BC));
         
-            if (gender === 'female' && !clothes.top) {
+            if (BC.bust && !clothes.top) {
                 ctx.fillStyle = darken(skinColor, 0.15);
-                ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1.5, -3.5, 3.5, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1.5, 3.5, 3.5, 0, Math.PI*2); ctx.fill();
+                for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(BC.bust.x, s * BC.bust.y, BC.bust.r, 0, Math.PI*2); ctx.fill(); }
             }
         
             if (clothes.top) {
                 if (topP) topP.draw(ctx, g, clothes.top);
-                else { ctx.fillStyle = darken(clothes.top.color, 0.1); ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill(); }
-                if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
+                else { ctx.fillStyle = darken(topColor(clothes.top), 0.1); ctx.fill(bodyTorsoPath(BC)); }
             }
+            // The shoulders: deltoid caps over the torso's edge in the sleeve's colour (bare in a tank
+            // top), leaning toward the elbows (brought into the torso's frame)
+            {
+                const lx = lElbowX - hipAnchorX, rx = rElbowX - hipAnchorX;
+                drawBodyCaps(ctx, BC, sleeve !== 'none' ? darken(sleeveCol, 0.12) : darken(skinColor, 0.12),
+                    lx * torC + lElbowY * torS, -lx * torS + lElbowY * torC, rx * torC + rElbowY * torS, -rx * torS + rElbowY * torC,
+                    topP && topP.padded || 0, topP && topP.armStripe ? clothes.top.trim || '#f5f5f5' : null, !!(topP && topP.seams));
+            }
+            if (topP && topP.collar) topP.collar(ctx, g, clothes.top);       // hood, turtleneck, coat collar
             if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
                 const p = WD.jewelry[j.type]; if (p && p.at === 'neck') p.draw(ctx, g, j);
             }
             if (SH && SH.body) {                                            // the torso's form: soft shade on the side away from the sun
-                const cx = torsoXOff + torsoWidth * 0.5;
-                if (SH.lx || SH.ly) _softSpot(ctx, cx - SH.lx * 2.5, -SH.ly * 7, torsoWidth * 1.5, 16, _SHADOW_RGB, SH.shA * 1.3);
+                const cx = (BC.tb + BC.tf) * 0.5, span = (BC.sh + BC.del) * 1.3;
+                if (SH.lx || SH.ly) _softSpot(ctx, cx - SH.lx * 2.5, -SH.ly * span * 0.44, (BC.tf - BC.tb) * 1.5, span, _SHADOW_RGB, SH.shA * 1.3);
                 if (topGloss) {                                             // glossy fabric: a crisp ridge across the shoulders too
                     ctx.fillStyle = SH.hl2;
-                    ctx.beginPath(); ctx.roundRect(cx - 1.4 + SH.lx * 1.5, -8 + SH.ly * 1.5, 2.8, 16, 1.4); ctx.fill();
+                    ctx.beginPath(); ctx.roundRect(cx - 1.4 + SH.lx * 1.5, -BC.sh * 0.8 + SH.ly * 1.5, 2.8, BC.sh * 1.6, 1.4); ctx.fill();
                 }
             }
             if (A && !clothes.top) {                                        // bare plating: chest panel seams and the Double Nights mark
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6; ctx.beginPath();
-                ctx.moveTo(torsoXOff + 1, 0); ctx.lineTo(torsoXOff + torsoWidth - 1, 0);
-                for (const y of [-7, 7]) { ctx.moveTo(torsoXOff + 1, y); ctx.lineTo(torsoXOff + torsoWidth - 1.5, y * 0.9); }
+                ctx.moveTo(BC.tb + 1.2, 0); ctx.lineTo(BC.tf - 1, 0);
+                for (const s of [-1, 1]) { ctx.moveTo(BC.tb + 2, s * BC.back * 0.75); ctx.lineTo(BC.tf - 2.6, s * BC.chest * 0.8); }
                 ctx.stroke();
-                if (A.emblem) drawDNEmblem(ctx, torsoXOff + torsoWidth * 0.62, -4, 2, A.glow);
+                if (A.emblem) drawDNEmblem(ctx, BC.tf - 3.2, -BC.chest * 0.45, 2, A.glow);
             }
             ctx.restore();
         
@@ -47009,7 +47271,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (SH && SH.rim) {                                             // a street lamp's colour catching shoulder and head
                 const r = SH.rim.ang;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
-                ctx.beginPath(); ctx.arc(-1, 0, 10, r - 0.7, r + 0.7);
+                const rimX = 9.5, rimY = BC.sh + BC.del * 0.55, rt = Math.atan2(rimX * Math.sin(r), rimY * Math.cos(r));   // round the shoulders
+                ctx.beginPath(); ctx.ellipse(-1.5, 0, rimX, rimY, 0, rt - 0.6, rt + 0.6);
                 ctx.moveTo(headX + Math.cos(r - 0.9) * 8, Math.sin(r - 0.9) * 8); ctx.arc(headX, 0, 8, r - 0.9, r + 0.9);
                 ctx.stroke(); ctx.restore();
             }
@@ -55295,7 +55558,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     out[count++] = m;
                 };
                 const walker = (e, col) => { if (e && !e.dead && e.visible !== false && !e.inCar && near(e.x, e.y, 40)) add(e, 'walker', col); };
-                const lookCol = (e) => { const L = e.look || e.appearance; return (L && L.top && L.top.color) || null; };
+                const lookCol = (e) => { const L = e.look || e.appearance; return (L && topColor(L.top)) || null; };
                 if (!this.isDriving) walker(this.player, '#c9a6ff');
                 for (const t of this.teammates || []) if (t.recruited) walker(t, lookCol(t));
                 for (const n of this.npcs || []) walker(n, lookCol(n));

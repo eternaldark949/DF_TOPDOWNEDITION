@@ -987,8 +987,11 @@
             if (dyn.android) {
                 drawAndroidHead(ctx, headX, dyn.android, blinkNow);        // plated dome and visor (ui/bodies.js)
             } else {
-                ctx.fillStyle = skinColor;
-                ctx.beginPath(); ctx.arc(headX, 0, 8, 0, Math.PI*2); ctx.fill();
+                const H = bodyHeadPaths();                                    // an egg from above, the ears just showing (ui/bodies.js)
+                ctx.beginPath(); ctx.translate(headX, 0);
+                ctx.fillStyle = darkenHex(skinColor, 26); ctx.fill(H.ears);
+                ctx.fillStyle = skinColor; ctx.fill(H.head);
+                ctx.translate(-headX, 0);
                 if (blinkNow < 0.5) {
                     ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
                     ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
@@ -1168,27 +1171,27 @@
                 ctx.save(); ctx.scale(S.k / S.x, S.k / S.y); draw(hx * S.x / S.k); ctx.restore();
             };
             h.pf = (key, i) => (h.pose && h.pose[key] ? h.pose[key][i] * h.poseW : 0);
-            h.drawLimb = (x1, y1, x2, y2, width, color, gloss) => {
+            // A limb segment between two joints, tapered by T (ui/bodies.js): round at each joint so the
+            // next segment carries on from the same circle. Only fillStyle changes without a shade, so
+            // restore that explicitly. The path is cleared after the fill: the browser would otherwise
+            // re-map it through every later transform, save and restore.
+            h.drawLimb = (x1, y1, x2, y2, T, color, gloss) => {
                 const ctx = h.ctx, SH = h.shade;
-                const len = Math.hypot(x2-x1, y2-y1)/2 + 2;
-                const ang = Math.atan2(y2-y1, x2-x1);
                 if (!SH) {
-                    // ellipse's own rotation gives the same shape without changing the
-                    // Canvas frame. Only fillStyle changes, so restore that explicitly.
                     const fill = ctx.fillStyle;
-                    ctx.fillStyle = color;
-                    ctx.beginPath(); ctx.ellipse((x1+x2)/2, (y1+y2)/2, len, width, ang, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = color; bodyLimbPath(ctx, x1, y1, x2, y2, T); ctx.fill(); ctx.beginPath();
                     ctx.fillStyle = fill;
                     return;
                 }
-                ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
-                ctx.fillStyle = color;
-                ctx.beginPath(); ctx.ellipse(0, 0, len, width, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = color; bodyLimbPath(ctx, x1, y1, x2, y2, T); ctx.fill(); ctx.beginPath();
+                const len = Math.hypot(x2-x1, y2-y1)/2 + 2, ang = Math.atan2(y2-y1, x2-x1), width = Math.max(T[0], T[1]);
                 const c = Math.cos(ang), s = Math.sin(ang), ly = -s * SH.lx + c * SH.ly, lx = (c * SH.lx + s * SH.ly) * len * 0.1;
+                if (!gloss && !SH.lx && !SH.ly) return;
+                ctx.save(); ctx.translate((x1+x2)/2, (y1+y2)/2); ctx.rotate(ang);
                 if (gloss) {
                     ctx.fillStyle = SH.hl2;
-                    ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.36, 0, 0, Math.PI*2); ctx.fill();
-                } else if (SH.lx || SH.ly) {
+                    ctx.beginPath(); ctx.ellipse(lx, ly * width * 0.4, len * 0.78, width * 0.32, 0, 0, Math.PI*2); ctx.fill();
+                } else {
                     _softSpot(ctx, -lx, -ly * width * 0.75, len * 1.6, width * 1.3, _SHADOW_RGB, SH.shA * 1.3);
                 }
                 ctx.restore();
@@ -1255,15 +1258,9 @@
             const darken = h.darken;
         
             // --- 2. PROPORTIONS ---
-            let shoulderSpread = 9; let hipWidth = 8; let hipXOff = -5; let torsoWidth = 10; let torsoXOff = -3;
-            if (gender === 'female') {
-                shoulderSpread = 7; hipWidth = 12; hipXOff = -8; torsoWidth = 9; torsoXOff = -2.5;
-            } else if (gender === 'male') {
-                shoulderSpread = 12; hipWidth = 7; hipXOff = -4.5; torsoWidth = 13; torsoXOff = -4.5;
-            }
-            const build = BUILDS[config.build];
-            if (build && build.hip) { hipXOff -= hipWidth * (build.hip - 1) / 2; hipWidth *= build.hip; }
-            if (build && build.shoulder) shoulderSpread *= build.shoulder;
+            // The body's shape for this gender and build (ui/bodies.js BODY_CANON)
+            const BC = bodyCanon(gender, config.build);
+            const shoulderSpread = BC.sh;
             // Head keeps its shape under a build's scale: draw it through this
             const withHead = h.withHead;
         
@@ -1588,6 +1585,7 @@
             }
             
             const drawLimb = h.drawLimb;
+            let gunHand = false;                                            // the right hand closes round a drawn weapon
             
             // --- DRAW WEAPON (Behind hands) ---
             // Only draw if player and has a weapon, and NOT driving (driving has its own weapon logic)
@@ -1608,6 +1606,7 @@
                 // Skip rendering once fully holstered — weapon is "stowed"
                 if (anim > 0.02) {
                     const weaponId = game.currentWeapon.id;
+                    gunHand = true;
 
                     // Lerp from hip-ish stow position back to the fist as anim → 1
                     const hipX = rFistX * 0.4 - 2;
@@ -1651,6 +1650,7 @@
             // The raise/lower eases over ~0.2s of game time (same at any frame rate).
             if (!isDriving && config.weapon && config.weapon.id && entity.type !== 'player') {
                 const W = config.weapon, target = W.ready ? 1 : 0;
+                gunHand = true;
                 if (entity._wpnReady === undefined) { entity._wpnReady = target; entity._wpnT = _gameTimeSec; }
                 const dt = Math.max(0, Math.min(0.1, _gameTimeSec - entity._wpnT));
                 entity._wpnT = _gameTimeSec;
@@ -1670,7 +1670,7 @@
             const topP = WD && clothes.top ? WD.tops[clothes.top.type] : null;
             const sleeve = clothes.top ? (topP ? topP.sleeve : 'long') : 'none';
             // Sleeves can come from the shirt under a vest; legs from trousers under an apron
-            const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : clothes.top.color) : null;
+            const sleeveCol = clothes.top ? (topP && topP.sleeveFrom === 'inner' ? (clothes.top.inner || '#f2f2f2') : topColor(clothes.top)) : null;
             if (isDriving) {
                 // Driving mode rendering - different poses for shooting vs not shooting
                 ctx.save();
@@ -1681,14 +1681,13 @@
                 
                 ctx.translate(driveOffset - bodyRecoil + shootLean, 0);
                 
-                // --- TORSO ---
-                ctx.fillStyle = darken(clothes.top ? clothes.top.color : skinColor, 0.1);
-                ctx.beginPath(); 
-                ctx.roundRect(torsoXOff - 2, -shoulderSpread - 1, torsoWidth + 4, (shoulderSpread * 2) + 2, 5); 
-                ctx.fill();
+                // --- TORSO --- (seated: a touch fuller, the lap under it)
+                ctx.fillStyle = darken(clothes.top ? topColor(clothes.top) : skinColor, 0.1);
+                ctx.fill(bodyTorsoPath(BC, 1));
                 
                 const sleeveColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
                 const skinArmColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
+                const capColor = sleeve !== 'none' ? darken(sleeveCol, 0.12) : darken(skinColor, 0.12);
                 
                 if (isShootingFromCar) {
                     // --- SHOOTING POSE ---
@@ -1704,10 +1703,10 @@
                     const rFistXAdj = 10;
                     const rFistYAdj = 4;
                     
-                    drawLimb(0, rShoulderY, rElbowXAdj, rElbowYAdj, 3.5, sleeveColor);
-                    drawLimb(rElbowXAdj, rElbowYAdj, rFistXAdj, rFistYAdj, 3, skinArmColor);
+                    drawLimb(0, rShoulderY, rElbowXAdj, rElbowYAdj, BC.upper, sleeveColor);
+                    drawLimb(rElbowXAdj, rElbowYAdj, rFistXAdj, rFistYAdj, BC.fore, skinArmColor);
                     ctx.fillStyle = darken(skinColor, 0.4);
-                    ctx.beginPath(); ctx.ellipse(rFistXAdj, rFistYAdj, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                    drawBodyHand(ctx, rElbowXAdj, rElbowYAdj, rFistXAdj, rFistYAdj, true, BC);
                     
                     // Left arm extended out window (shooting arm)
                     // Arm reaches forward-left out the driver window
@@ -1716,29 +1715,31 @@
                     const lFistXAdj = 20 - (recoil * 4); // Recoil pulls back
                     const lFistYAdj = -12;
                     
-                    drawLimb(0, lShoulderY, lElbowXAdj, lElbowYAdj, 3.5, sleeveColor);
-                    drawLimb(lElbowXAdj, lElbowYAdj, lFistXAdj, lFistYAdj, 3, skinArmColor);
+                    drawLimb(0, lShoulderY, lElbowXAdj, lElbowYAdj, BC.upper, sleeveColor);
+                    drawLimb(lElbowXAdj, lElbowYAdj, lFistXAdj, lFistYAdj, BC.fore, skinArmColor);
                     ctx.fillStyle = darken(skinColor, 0.4);
-                    ctx.beginPath(); ctx.ellipse(lFistXAdj, lFistYAdj, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                    drawBodyHand(ctx, lElbowXAdj, lElbowYAdj, lFistXAdj, lFistYAdj, true, BC);
                     
                     // Draw weapon in left hand
                     if (entity.type === 'player' && entity._game && entity._game.currentWeapon) {
                         const weaponId = entity._game.currentWeapon.id;
                         drawWeapon(ctx, weaponId, lFistXAdj + 2, lFistYAdj, 0, 0.9);
                     }
+                    drawBodyCaps(ctx, BC, capColor, lElbowXAdj, lElbowYAdj, rElbowXAdj, rElbowYAdj);
                     
                 } else {
                     // --- NORMAL DRIVING POSE (hands on wheel) ---
                     const adjDriveOffset = driveOffset - bodyRecoil;
                     
                     // Both arms forward to steering wheel
-                    drawLimb(0, lShoulderY, lElbowX - adjDriveOffset, lElbowY, 3.5, sleeveColor);
-                    drawLimb(0, rShoulderY, rElbowX - adjDriveOffset, rElbowY, 3.5, sleeveColor);
-                    drawLimb(lElbowX - adjDriveOffset, lElbowY, lFistX - adjDriveOffset, lFistY, 3, skinArmColor);
-                    drawLimb(rElbowX - adjDriveOffset, rElbowY, rFistX - adjDriveOffset, rFistY, 3, skinArmColor);
+                    drawLimb(0, lShoulderY, lElbowX - adjDriveOffset, lElbowY, BC.upper, sleeveColor);
+                    drawLimb(0, rShoulderY, rElbowX - adjDriveOffset, rElbowY, BC.upper, sleeveColor);
+                    drawLimb(lElbowX - adjDriveOffset, lElbowY, lFistX - adjDriveOffset, lFistY, BC.fore, skinArmColor);
+                    drawLimb(rElbowX - adjDriveOffset, rElbowY, rFistX - adjDriveOffset, rFistY, BC.fore, skinArmColor);
                     ctx.fillStyle = darken(skinColor, 0.4);
-                    ctx.beginPath(); ctx.ellipse(lFistX - adjDriveOffset, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
-                    ctx.beginPath(); ctx.ellipse(rFistX - adjDriveOffset, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                    drawBodyHand(ctx, lElbowX - adjDriveOffset, lElbowY, lFistX - adjDriveOffset, lFistY, true, BC);
+                    drawBodyHand(ctx, rElbowX - adjDriveOffset, rElbowY, rFistX - adjDriveOffset, rFistY, true, BC);
+                    drawBodyCaps(ctx, BC, capColor, lElbowX - adjDriveOffset, lElbowY, rElbowX - adjDriveOffset, rElbowY);
                     // NO weapon drawn when not shooting
                 }
                 
@@ -1755,8 +1756,10 @@
             // --- WALKING MODE ---
 
             // --- 4. CALCULATE POSITIONS ---
-            const lBaseY = -hipWidth / 2 - 1;
-            const rBaseY = hipWidth / 2 + 1;
+            // Feet stand under the leg roots; the legs hang from the pelvis, so their roots turn with it
+            const lBaseY = -BC.leg, rBaseY = BC.leg;
+            const hipC = Math.cos(hipRotation), hipS = Math.sin(hipRotation);
+            const lHipX = hipAnchorX - lBaseY * hipS, lHipY = lBaseY * hipC, rHipX = hipAnchorX - rBaseY * hipS, rHipY = rBaseY * hipC;
         
             const lWalkX = walkSin * strideLen * fwdAmt;
             const rWalkX = walkOppSin * strideLen * fwdAmt;
@@ -1768,10 +1771,10 @@
             const lFootY = lBaseY + lWalkY + pf('lf', 1);
             const rFootY = rBaseY + rWalkY + pf('rf', 1);
 
-            const lKneeX = (hipAnchorX + lFootX) / 2;
-            const lKneeY = (lBaseY + lFootY) / 2;
-            const rKneeX = (hipAnchorX + rFootX) / 2;
-            const rKneeY = (rBaseY + rFootY) / 2;
+            const lKneeX = (lHipX + lFootX) / 2;
+            const lKneeY = (lHipY + lFootY) / 2;
+            const rKneeX = (rHipX + rFootX) / 2;
+            const rKneeY = (rHipY + rFootY) / 2;
             const botP = WD && clothes.bottom ? WD.bottoms[clothes.bottom.type] : null;
             const shoeP = WD && clothes.shoes ? WD.shoes[clothes.shoes.type] : null;
             const legCol = clothes.bottom ? (clothes.bottom.under || clothes.bottom.color) : null;
@@ -1786,11 +1789,11 @@
                     cloth: (key, spec) => clothGeometry(h.ctx, entity, key, spec, h.clothDyn) };
             }
             g.skin = skinColor; g.gender = gender; g.walkCycle = walkCycle; g.android = A;
-            g.torso.x = torsoXOff; g.torso.w = torsoWidth; g.hip.x = hipXOff; g.hip.w = hipWidth;
+            g.torso.x = BC.tb; g.torso.w = BC.tf - BC.tb; g.hip.x = BC.hb; g.hip.w = BC.hf - BC.hb; g.body = BC;
             g.headX = headX0; g.headInTorso = headX0 - hipAnchorX;
             g.feet[0][0] = lFootX; g.feet[0][1] = lFootY; g.feet[1][0] = rFootX; g.feet[1][1] = rFootY;
             g.knees[0][0] = lKneeX; g.knees[0][1] = lKneeY; g.knees[1][0] = rKneeX; g.knees[1][1] = rKneeY;
-            g.hipPt[0][0] = hipAnchorX; g.hipPt[0][1] = lBaseY; g.hipPt[1][0] = hipAnchorX; g.hipPt[1][1] = rBaseY;
+            g.hipPt[0][0] = lHipX; g.hipPt[0][1] = lHipY; g.hipPt[1][0] = rHipX; g.hipPt[1][1] = rHipY;
             g.fists[0][0] = lFistX; g.fists[0][1] = lFistY; g.fists[1][0] = rFistX; g.fists[1][1] = rFistY;
             g.elbows[0][0] = lElbowX; g.elbows[0][1] = lElbowY; g.elbows[1][0] = rElbowX; g.elbows[1][1] = rElbowY;
 
@@ -1806,15 +1809,11 @@
             if (shoeP) {
                 shoeP.draw(ctx, g, clothes.shoes);
             } else {
-                // The foot point (lFootX, lFootY) is the ANKLE — where the calf ends.
-                // Center the foot across its width on that point and set the ankle a
-                // quarter of the way in from the heel. (Previously the ankle sat on the
-                // foot's top-left corner, so both feet hung 3px to the body's right and
-                // the whole foot projected forward of the leg.)
-                const FOOT_LEN = 12, FOOT_W = 6, HEEL_TO_ANKLE = 3;
+                // The foot point (lFootX, lFootY) is the ANKLE, where the calf ends; the heel
+                // sits a quarter of the foot behind it (ui/bodies.js bodyFootPath).
                 ctx.fillStyle = darken(clothes.shoes ? clothes.shoes.color : skinColor, 0.55);
-                ctx.beginPath(); ctx.roundRect(lFootX - HEEL_TO_ANKLE, lFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();
-                ctx.beginPath(); ctx.roundRect(rFootX - HEEL_TO_ANKLE, rFootY - FOOT_W / 2, FOOT_LEN, FOOT_W, 3); ctx.fill();
+                drawBodyFoot(ctx, lFootX, lFootY, -1, 0, false, BC.foot);
+                drawBodyFoot(ctx, rFootX, rFootY, 1, 0, false, BC.foot);
             }
         
             // LEG COLOURS: which parts of the leg the bottom covers ('bare' | 'thigh' | 'full')
@@ -1823,17 +1822,17 @@
             const thighColor = legs !== 'bare' ? darken(legCol, 0.35) : darken(skinColor, 0.05);
         
             // 2. Calves
-            drawLimb(lKneeX, lKneeY, lFootX, lFootY, 3, legColor, legs === 'full' && botGloss);
-            drawLimb(rKneeX, rKneeY, rFootX, rFootY, 3, legColor, legs === 'full' && botGloss);
+            drawLimb(lKneeX, lKneeY, lFootX, lFootY, BC.calf, legColor, legs === 'full' && botGloss);
+            drawLimb(rKneeX, rKneeY, rFootX, rFootY, BC.calf, legColor, legs === 'full' && botGloss);
             if (shoeP && shoeP.calf) {                                   // boots come up the calf
                 const bootColor = darken(clothes.shoes.color, 0.45), c = shoeP.calf;
-                drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, 3.4, bootColor);
-                drawLimb(rFootX, rFootY, rFootX + (rKneeX - rFootX) * c, rFootY + (rKneeY - rFootY) * c, 3.4, bootColor);
+                drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, BOOT_SHAFT, bootColor);
+                drawLimb(rFootX, rFootY, rFootX + (rKneeX - rFootX) * c, rFootY + (rKneeY - rFootY) * c, BOOT_SHAFT, bootColor);
             }
         
             // 3. Thighs
-            drawLimb(hipAnchorX, lBaseY, lKneeX, lKneeY, 4, thighColor, legs !== 'bare' && botGloss);
-            drawLimb(hipAnchorX, rBaseY, rKneeX, rKneeY, 4, thighColor, legs !== 'bare' && botGloss);
+            drawLimb(lHipX, lHipY, lKneeX, lKneeY, BC.thigh, thighColor, legs !== 'bare' && botGloss);
+            drawLimb(rHipX, rHipY, rKneeX, rKneeY, BC.thigh, thighColor, legs !== 'bare' && botGloss);
             if (A && legs !== 'full') {                                     // android knees
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
@@ -1845,7 +1844,7 @@
         
             // Base Hips
             ctx.fillStyle = darken(clothes.bottom ? clothes.bottom.color : skinColor, 0.2);
-            ctx.beginPath(); ctx.roundRect(hipXOff, -11, hipWidth, 22, [8, 3, 3, 8]); ctx.fill();
+            ctx.fill(bodyHipPath(BC));
         
             // Skirts and other hip overlays (same geometry as the hips)
             if (botP && botP.hips) botP.hips(ctx, g, clothes.bottom);
@@ -1865,17 +1864,17 @@
                     // Two heavy panels trailing from the hips
                     for (const s of [-1, 1]) {
                         const panel = g.cloth(s < 0 ? 'train_l' : 'train_r', { segs: 4, stiffness: 0.07, damping: 0.9, chains: [
-                            { a: { x: hipXOff + 2, y: s * 10 }, t: { x: -30, y: s * 14 } },
-                            { a: { x: hipXOff + 2, y: s * 6 },  t: { x: -30, y: s * 8 } },
-                            { a: { x: hipXOff + 2, y: s * 2 },  t: { x: -30, y: s * 2 } } ] });
+                            { a: { x: BC.hb + 2, y: s * 10 }, t: { x: -30, y: s * 14 } },
+                            { a: { x: BC.hb + 2, y: s * 6 },  t: { x: -30, y: s * 8 } },
+                            { a: { x: BC.hb + 2, y: s * 2 },  t: { x: -30, y: s * 2 } } ] });
                         drawClothPanel(ctx, panel, darken(clothes.train.color, 0.1));
                     }
                 } else if (clothes.train.type === 'silk_flow') {
                     // Periwinkle silk: light, floaty, never quite still
                     const panel = g.cloth('train_silk', { segs: 5, stiffness: 0.045, damping: 0.93, drift: 0.25, chains: [
-                        { a: { x: hipXOff + 2, y: -10 }, t: { x: -36, y: -12 } },
-                        { a: { x: hipXOff + 2, y: -5 },  t: { x: -42, y: -2 } },
-                        { a: { x: hipXOff + 2, y: 0 },   t: { x: -40, y: 8 } } ] });
+                        { a: { x: BC.hb + 2, y: -10 }, t: { x: -36, y: -12 } },
+                        { a: { x: BC.hb + 2, y: -5 },  t: { x: -42, y: -2 } },
+                        { a: { x: BC.hb + 2, y: 0 },   t: { x: -40, y: 8 } } ] });
                     ctx.globalAlpha = 0.9;
                     drawClothPanel(ctx, panel, clothes.train.color);
                     ctx.globalAlpha = 1.0;
@@ -1891,31 +1890,35 @@
                 ctx.restore();
             }
 
-            // 6. Fists
+            // 6. Hands, turned along the forearm: a fist round whatever they hold (a pistol's off hand stays relaxed)
             ctx.fillStyle = darken(skinColor, 0.4);
-            ctx.beginPath(); ctx.ellipse(lFistX, lFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.ellipse(rFistX, rFistY, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+            const bothGrip = stance === 'rifle' || stance === 'sniper' || stance === 'punch';
+            drawBodyHand(ctx, lElbowX, lElbowY, lFistX, lFistY, bothGrip || glassHand === 'left', BC);
+            drawBodyHand(ctx, rElbowX, rElbowY, rFistX, rFistY, bothGrip || stance === 'pistol' || gunHand || glassHand === 'right', BC);
         
             // 7. Forearms (fabric only under long sleeves)
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
-            drawLimb(lElbowX, lElbowY, lFistX, lFistY, 3, foreColor, sleeve === 'long' && topGloss);
-            drawLimb(rElbowX, rElbowY, rFistX, rFistY, 3, foreColor, sleeve === 'long' && topGloss);
+            drawLimb(lElbowX, lElbowY, lFistX, lFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
+            drawLimb(rElbowX, rElbowY, rFistX, rFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
             if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
                 const p = WD.jewelry[j.type]; if (p && p.at === 'wrists') p.draw(ctx, g, j);
             }
         
-            // 8. Upper Arms (fabric under short or long sleeves)
+            // 8. Upper Arms (fabric under short or long sleeves). They hang from the shoulders, so their
+            // roots turn with the torso: forward with the opposite leg on a step, into the blow in a punch.
             const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
-            drawLimb(shoulderX, lShoulderY, lElbowX, lElbowY, 3.5, upperColor, sleeve !== 'none' && topGloss);
-            drawLimb(shoulderX, rShoulderY, rElbowX, rElbowY, 3.5, upperColor, sleeve !== 'none' && topGloss);
+            const torC = Math.cos(torsoRotation), torS = Math.sin(torsoRotation);
+            const lShX = shoulderX - lShoulderY * torS, lShY = lShoulderY * torC, rShX = shoulderX - rShoulderY * torS, rShY = rShoulderY * torC;
+            drawLimb(lShX, lShY, lElbowX, lElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
+            drawLimb(rShX, rShY, rElbowX, rElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
             if (A) {                                                        // android joints: seam rings at elbows and wrists
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
                 for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY], [lFistX, lFistY], [rFistX, rFistY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
             }
             if (topP && topP.armStripe) {                                // track-jacket stripes down the sleeves
                 ctx.strokeStyle = clothes.top.trim || '#f5f5f5'; ctx.lineWidth = 0.8; ctx.beginPath();
-                ctx.moveTo(shoulderX, lShoulderY); ctx.lineTo(lElbowX, lElbowY); ctx.lineTo(lFistX, lFistY);
-                ctx.moveTo(shoulderX, rShoulderY); ctx.lineTo(rElbowX, rElbowY); ctx.lineTo(rFistX, rFistY);
+                ctx.moveTo(lShX, lShY); ctx.lineTo(lElbowX, lElbowY); ctx.lineTo(lFistX, lFistY);
+                ctx.moveTo(rShX, rShY); ctx.lineTo(rElbowX, rElbowY); ctx.lineTo(rFistX, rFistY);
                 ctx.stroke();
             }
         
@@ -1923,36 +1926,43 @@
             ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation);
             
             ctx.fillStyle = darken(skinColor, 0.1);
-            ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill();
+            ctx.fill(bodyTorsoPath(BC));
         
-            if (gender === 'female' && !clothes.top) {
+            if (BC.bust && !clothes.top) {
                 ctx.fillStyle = darken(skinColor, 0.15);
-                ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1.5, -3.5, 3.5, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(torsoXOff + torsoWidth - 1.5, 3.5, 3.5, 0, Math.PI*2); ctx.fill();
+                for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(BC.bust.x, s * BC.bust.y, BC.bust.r, 0, Math.PI*2); ctx.fill(); }
             }
         
             if (clothes.top) {
                 if (topP) topP.draw(ctx, g, clothes.top);
-                else { ctx.fillStyle = darken(clothes.top.color, 0.1); ctx.beginPath(); ctx.roundRect(torsoXOff, -10, torsoWidth, 20, [3, 5, 5, 3]); ctx.fill(); }
-                if (topP && topP.collar) topP.collar(ctx, g, clothes.top);   // hood, turtleneck, coat collar
+                else { ctx.fillStyle = darken(topColor(clothes.top), 0.1); ctx.fill(bodyTorsoPath(BC)); }
             }
+            // The shoulders: deltoid caps over the torso's edge in the sleeve's colour (bare in a tank
+            // top), leaning toward the elbows (brought into the torso's frame)
+            {
+                const lx = lElbowX - hipAnchorX, rx = rElbowX - hipAnchorX;
+                drawBodyCaps(ctx, BC, sleeve !== 'none' ? darken(sleeveCol, 0.12) : darken(skinColor, 0.12),
+                    lx * torC + lElbowY * torS, -lx * torS + lElbowY * torC, rx * torC + rElbowY * torS, -rx * torS + rElbowY * torC,
+                    topP && topP.padded || 0, topP && topP.armStripe ? clothes.top.trim || '#f5f5f5' : null, !!(topP && topP.seams));
+            }
+            if (topP && topP.collar) topP.collar(ctx, g, clothes.top);       // hood, turtleneck, coat collar
             if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
                 const p = WD.jewelry[j.type]; if (p && p.at === 'neck') p.draw(ctx, g, j);
             }
             if (SH && SH.body) {                                            // the torso's form: soft shade on the side away from the sun
-                const cx = torsoXOff + torsoWidth * 0.5;
-                if (SH.lx || SH.ly) _softSpot(ctx, cx - SH.lx * 2.5, -SH.ly * 7, torsoWidth * 1.5, 16, _SHADOW_RGB, SH.shA * 1.3);
+                const cx = (BC.tb + BC.tf) * 0.5, span = (BC.sh + BC.del) * 1.3;
+                if (SH.lx || SH.ly) _softSpot(ctx, cx - SH.lx * 2.5, -SH.ly * span * 0.44, (BC.tf - BC.tb) * 1.5, span, _SHADOW_RGB, SH.shA * 1.3);
                 if (topGloss) {                                             // glossy fabric: a crisp ridge across the shoulders too
                     ctx.fillStyle = SH.hl2;
-                    ctx.beginPath(); ctx.roundRect(cx - 1.4 + SH.lx * 1.5, -8 + SH.ly * 1.5, 2.8, 16, 1.4); ctx.fill();
+                    ctx.beginPath(); ctx.roundRect(cx - 1.4 + SH.lx * 1.5, -BC.sh * 0.8 + SH.ly * 1.5, 2.8, BC.sh * 1.6, 1.4); ctx.fill();
                 }
             }
             if (A && !clothes.top) {                                        // bare plating: chest panel seams and the Double Nights mark
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6; ctx.beginPath();
-                ctx.moveTo(torsoXOff + 1, 0); ctx.lineTo(torsoXOff + torsoWidth - 1, 0);
-                for (const y of [-7, 7]) { ctx.moveTo(torsoXOff + 1, y); ctx.lineTo(torsoXOff + torsoWidth - 1.5, y * 0.9); }
+                ctx.moveTo(BC.tb + 1.2, 0); ctx.lineTo(BC.tf - 1, 0);
+                for (const s of [-1, 1]) { ctx.moveTo(BC.tb + 2, s * BC.back * 0.75); ctx.lineTo(BC.tf - 2.6, s * BC.chest * 0.8); }
                 ctx.stroke();
-                if (A.emblem) drawDNEmblem(ctx, torsoXOff + torsoWidth * 0.62, -4, 2, A.glow);
+                if (A.emblem) drawDNEmblem(ctx, BC.tf - 3.2, -BC.chest * 0.45, 2, A.glow);
             }
             ctx.restore();
         
@@ -1983,7 +1993,8 @@
             if (SH && SH.rim) {                                             // a street lamp's colour catching shoulder and head
                 const r = SH.rim.ang;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = SH.rim.style; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
-                ctx.beginPath(); ctx.arc(-1, 0, 10, r - 0.7, r + 0.7);
+                const rimX = 9.5, rimY = BC.sh + BC.del * 0.55, rt = Math.atan2(rimX * Math.sin(r), rimY * Math.cos(r));   // round the shoulders
+                ctx.beginPath(); ctx.ellipse(-1.5, 0, rimX, rimY, 0, rt - 0.6, rt + 0.6);
                 ctx.moveTo(headX + Math.cos(r - 0.9) * 8, Math.sin(r - 0.9) * 8); ctx.arc(headX, 0, 8, r - 0.9, r + 0.9);
                 ctx.stroke(); ctx.restore();
             }

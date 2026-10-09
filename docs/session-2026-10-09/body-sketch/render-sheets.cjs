@@ -2,7 +2,10 @@
 /*
  * Body v2 sketch sheets, drawn by the game's own renderer.
  *
- *   node docs/session-2026-10-09/body-sketch/render-sheets.cjs
+ *   DFAB_BUILD=/path/to/pre-v2.html node docs/session-2026-10-09/body-sketch/render-sheets.cjs
+ *
+ * The hooks anchor on the renderer as it was before Body v2 shipped, so point
+ * DFAB_BUILD at that build: git show d315f4a:"DFAB V8.html" > /tmp/pre-v2.html
  *
  * Needs Playwright with Chromium (PLAYWRIGHT_BROWSERS_PATH or a normal install).
  * Builds a scratch copy of "DFAB V8.html" with the sketch hooks (sketch-hooks.cjs,
@@ -219,7 +222,7 @@ function sheetDressed({ FULL }) {
 }
 
 (async () => {
-    const html = fs.readFileSync(path.join(ROOT, 'DFAB V8.html'), 'utf8');
+    const html = fs.readFileSync(process.env.DFAB_BUILD || path.join(ROOT, 'DFAB V8.html'), 'utf8');
     fs.writeFileSync(PREVIEW, patchBuild(html));
     const browser = await chromium.launch();
     try {
