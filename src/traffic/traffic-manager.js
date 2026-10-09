@@ -69,6 +69,7 @@
             constructor() { 
                 this.vehicles = []; 
                 this.spawnTimer = 0; 
+                this.folk = [];                // everyone on foot the cars look out for, this tick (update)
                 this.network = new RoadNetwork(); 
                 // OPTIMIZATION: Grid size 150 covers roughly 2-3 car lengths
                 this.grid = new SpatialGrid(2400, 3200, 150); 
@@ -85,9 +86,27 @@
             }
             
             /** `playerCar`: the car she's in or last left; `parked`: her cars on the map she isn't driving (the owned
-             *  car, Amber's van, that last one: GameEngine.parkedCars) — out of traffic, but solid and rolling */
-            update(player, map, playerCar, weather, parked, decalSystem, teammates) { 
+             *  car, Amber's van, that last one: GameEngine.parkedCars) — out of traffic, but solid and rolling;
+             *  `teammates`, `walkers`: her crew, and the street's pedestrians (with her, the `folk` cars look out for) */
+            update(player, map, playerCar, weather, parked, decalSystem, teammates, walkers) { 
+                const folk = this.folk;
+                folk.length = 0;
                 if (map.type === 'indoor') return;
+                
+                // Everyone on foot, with how they're moving: measured here tick to tick, since nobody on foot keeps a
+                // velocity a car could read (traffic/traffic-people.js reads them). A jump (a door, a load) isn't walking.
+                const track = (p) => {
+                    if (p._tpt !== _simTick) {
+                        let vx = p._tpt === _simTick - 1 ? p.x - p._tpx : 0, vy = p._tpt === _simTick - 1 ? p.y - p._tpy : 0;
+                        if (vx * vx + vy * vy > 144) vx = vy = 0;
+                        p._tvx = (p._tvx || 0) * 0.4 + vx * 0.6; p._tvy = (p._tvy || 0) * 0.4 + vy * 0.6;
+                        p._tpx = p.x; p._tpy = p.y; p._tpt = _simTick;
+                    }
+                    folk.push(p);
+                };
+                if (player && player.visible && !player.dead && !(playerCar && playerCar.hasDriver)) track(player);
+                if (teammates) for (const t of teammates) if (t && (t.recruited || t.hired) && !t.inCar && !t.dead) track(t);
+                if (walkers) for (const w of walkers) if (w && !w.dead) track(w);
                 
                 // 1. GRID UPDATE: Clear and Rebuild
                 this.grid.clear();
@@ -176,7 +195,7 @@
                         this.vehicles.splice(i, 1);
                     } else if (!v.dead) {
                         // Pass decalSystem to update
-                        v.update(player, playerCar, sensed, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, teammates);
+                        v.update(player, playerCar, sensed, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, folk);
                     }
                 }
                 

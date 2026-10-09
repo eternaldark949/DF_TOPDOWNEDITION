@@ -171,7 +171,7 @@
                 this.profiler.start('AI:Traffic');
                 // her cars standing about (the owned car, Amber's van, the one she got out of): traffic bumps them, they roll to a stop
                 const parked = this.parkedCars(this._parkedCars || (this._parkedCars = []));
-                this.traffic.update(this.player, this.activeMap, this.car, this.weather, parked, this.decals, this.teammates);
+                this.traffic.update(this.player, this.activeMap, this.car, this.weather, parked, this.decals, this.teammates, this.pedestrians.pedestrians);
                 
                 // Zib taxi system — spawn, arrival check, cleanup
                 if (this.zibSystem && this.activeMap.type !== 'indoor') {
@@ -1120,7 +1120,7 @@
                                 }
                             }
                         }
-                        this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, getColliders(this.activeMap), this.decals, this.teammates);
+                        this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, getColliders(this.activeMap), this.decals, this.traffic.folk);
                         if (!(this.zibSystem && this.zibSystem.isPassenger) &&
                             (inputX !== 0 || inputY !== 0 || this.keys[' '] || this.handbrakeHeld)) {
                             this.car.disableAutoDrive(); this.car.clearNavWaypoints(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED");
@@ -1407,6 +1407,7 @@
             
             resolveTrafficCollisions() {
                 // 1. WALKING COLLISION (Player vs Traffic)
+                if (this._carHitCd > 0) this._carHitCd--;
                 if (!this.isDriving) {
                     // Create dummy for Grid Query
                     const playerDummy = this._trafficPlayerQuery || (this._trafficPlayerQuery = { x: 0, y: 0, length: 30, width: 30 });
@@ -1472,8 +1473,9 @@
                             }
                             // -------------------------
             
-                            // Damage Logic (Keep existing)
-                            if (Math.abs(v.speed) > 4.0) {
+                            // Hit by a car going over 4: once, then a moment's grace (as her crew), not every tick it touches
+                            if (Math.abs(v.speed) > 4.0 && !(this._carHitCd > 0)) {
+                                this._carHitCd = 40;
                                 this.damagePlayer(10);
                                 this.triggerShake(10);
                                 audioSys.sfx('explode'); 
