@@ -406,6 +406,8 @@
                 }
                 // The sun's shadows (engine/daylight.js): buildings and trees thrown across the ground by day
                 if (RL.at('shadows')) this.drawCastShadows(this.ctx, cullBounds.world);
+                // The junction lights: stop bars, demand gauges, heads, walk strips (traffic/traffic-signals.js)
+                if (RL.at('signals') && this.activeMap.type === 'outdoor' && this.traffic) this.traffic.drawSignals(this.ctx, cullBounds.world, this.activeMap.crosswalks);
                 
                 if (RenderStats.timed) this.profiler.add('Buildings: People', RenderStats.peopleMs - this._buildingPeopleBase, true);
                 this.profiler.stop('Render:Buildings');

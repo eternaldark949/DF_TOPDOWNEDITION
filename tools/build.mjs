@@ -86,6 +86,7 @@ const SCRIPTS = [
     'traffic/car-art.js',
     'traffic/traffic-vehicle.js',
     'traffic/traffic-people.js',
+    'traffic/traffic-signals.js',
     'traffic/traffic-manager.js',
     'world/parks.js',
     'world/ground-baker.js',

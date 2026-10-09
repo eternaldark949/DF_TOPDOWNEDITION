@@ -1251,6 +1251,172 @@ test('Parked on its nose: a car backs up off her car, then goes round it without
   ok(r.moved <= 2, `her car stays put (${r.moved} px)`);
 }, {events:true});
 
+function lightsScene(env) {
+  carsFixture(env);
+  env.run(`{
+    GameSettings.getMaxTraffic=()=>40; GameSettings.getMaxPedestrians=()=>10; game.pedestrians.spawnTimer=1e9;
+    game.pedestrians.pedestrians.forEach(p=>p.destroy()); game.pedestrians.pedestrians.length=0;
+    Object.assign(game.ownedCar,{x:-5000,y:-5000}); if(game.deliveryVehicle) Object.assign(game.deliveryVehicle,{x:-5000,y:-4000});
+    game.damagePlayer=()=>{};
+    const ix=__lane.exitGate.intersection; globalThis.__ix=ix; globalThis.__phases=JunctionSignal.make(ix).phases;
+    // A fresh junction: lights with road 0 (her lane's) green and resting, nobody about
+    globalThis.__reset=()=>{
+      game.traffic.vehicles.forEach(c=>c.destroy()); game.traffic.vehicles=[];
+      game.pedestrians.pedestrians.forEach(p=>p.destroy()); game.pedestrians.pedestrians.length=0;
+      ix.occupants.length=0; ix.queue.length=0; ix.signal=JunctionSignal.make(ix);
+      const sig=ix.signal; sig.cur=sig.phaseOf(__lane); sig.state='green'; sig.t=1000;
+      game.player.x=ix.x-120; game.player.y=ix.y-120;                          // on the corner, off both roads
+      return sig;
+    };
+    // A car on phase p's way in (dir: its lanes' direction; rank 0 inside, 1 kerb), back px (centre) short of the box,
+    // planning a turn of type 'straight' | 'left' | 'right' (out into the matching lane)
+    globalThis.__car=(p,dir,rank,back,turn='straight',o={})=>{
+      const lane=__phases[p].gates.map(g=>g.lane).find(l=>l.direction===dir&&TrafficVehicle._laneRank(l)===rank);
+      const c=new TrafficVehicle(lane,'Gelfash','sedan','AI'); c.driverType='civilian'; c.temper=o.temper||'normal'; c.maxSpeed=o.max||8.5;
+      const v=o.speed||0;
+      Object.assign(c,{x:lane.end.x-lane.ux*back,y:lane.end.y-lane.uy*back,angle:lane.angle,speed:v,vx:lane.ux*v,vy:lane.uy*v,fade:1});
+      const ts=lane.turnPaths.filter(t=>t.turnType===turn);
+      c.plannedTurn=ts.find(t=>TrafficVehicle._laneRank(t.toLane)===rank)||ts[0];
+      game.traffic.vehicles.push(c); return c;
+    };
+    globalThis.__obbHit=(a,b)=>{ const ax=[Math.cos(a.angle),Math.sin(a.angle)], bx=[Math.cos(b.angle),Math.sin(b.angle)], dx=b.x-a.x, dy=b.y-a.y;
+      for(const n of [ax,[-ax[1],ax[0]],bx,[-bx[1],bx[0]]]){
+        const ra=Math.abs(a.length/2*(ax[0]*n[0]+ax[1]*n[1]))+Math.abs(a.width/2*(-ax[1]*n[0]+ax[0]*n[1]));
+        const rb=Math.abs(b.length/2*(bx[0]*n[0]+bx[1]*n[1]))+Math.abs(b.width/2*(-bx[1]*n[0]+bx[0]*n[1]));
+        if(Math.abs(dx*n[0]+dy*n[1])>ra+rb) return false; }
+      return true; };
+    // Bumper to the box along the car's lane (negative: in it)
+    globalThis.__toBox=(c,lane)=>((lane.end.x-c.x)*lane.ux+(lane.end.y-c.y)*lane.uy)-c.length/2;
+  }`);
+}
+
+test('Junction lights follow demand: green rests on its road while the other is empty, and turns for the first car that waits', env => {
+  lightsScene(env);
+  const r=value(env, `
+    const sig=__reset(), mine=sig.cur;
+    for(let i=0;i<400;i++) game.update();
+    const rested=[sig.cur===mine, sig.state];
+    const c=__car(1-mine,1,1,330,'straight',{speed:6}), lane=c.currentLane;
+    let turned=-1, redEntered=false, through=-1;
+    for(let i=0;i<900;i++){ game.update();
+      if(turned<0 && sig.cur!==mine && sig.state==='green') turned=i;
+      if(__ix.isVehicleInside(c) && sig.lightFor(lane)==='red' && !c.wasInIntersection) redEntered=true;
+      if(through<0 && __toBox(c,lane)<-(__ix.width+c.length)) { through=i; break; } }
+    return {rested, turned, redEntered, through};
+  `);
+  equal(r.rested, [true, 'green'], 'nobody waiting on the other road: the green stays');
+  ok(r.turned >= 0 && r.turned < 120, `a car on its way in turns the lights its way (${r.turned} ticks)`);
+  ok(!r.redEntered, 'it never goes in on a red');
+  ok(r.through > 0, `and goes through (${r.through} ticks)`);
+}, {events:true});
+
+test('Junction lights: a red is stopped for at the line behind the crosswalk; amber stops the calm, the pushy run it', env => {
+  lightsScene(env);
+  const r=value(env, `
+    let sig=__reset(); const mine=sig.cur;
+    // The other road green and held there: our car comes up to a red
+    sig.cur=1-mine; sig.update=function(){ this.t++; };
+    const c=__car(mine,1,1,520,'straight',{speed:7}), lane=c.currentLane;
+    let inside=false; for(let i=0;i<500;i++){ game.update(); if(__ix.isVehicleInside(c)) inside=true; }
+    const red={inside, speed:+Math.abs(c.speed).toFixed(2), gap:Math.round(__toBox(c,lane))};
+    // Amber at 8 with the car as far from its line as it'd take at 0.6 of its full brake: a calm or normal driver
+    // stops on it (they'll brake that hard for one), a pushy one won't
+    const amber={};
+    for(const temper of ['calm','normal','pushy']){
+      sig=__reset(); const k=__car(sig.cur,1,1,0,'straight',{speed:8,max:9,temper}), kl=k.currentLane;
+      const back=64/(2*k.brake*0.6)+80+k.length/2+8; Object.assign(k,{x:kl.end.x-kl.ux*back,y:kl.end.y-kl.uy*back});
+      game.update(); sig.state='amber'; sig.t=0;
+      let went=false; for(let i=0;i<160;i++){ game.update(); if(__ix.isVehicleInside(k)) { went=true; break; } }
+      amber[temper]={went, gap:Math.round(__toBox(k,kl))};
+    }
+    return {red, amber};
+  `);
+  ok(!r.red.inside && r.red.speed < 0.3, `on red it stops and stays out (${JSON.stringify(r.red)})`);
+  ok(r.red.gap >= 72 && r.red.gap <= 100, `at the stop line, behind the crosswalk (${r.red.gap} px from the box)`);
+  ok(!r.amber.calm.went && !r.amber.normal.went, `amber: the calm and normal stop (${JSON.stringify(r.amber)})`);
+  ok(r.amber.pushy.went, 'amber: the pushy go on through');
+}, {events:true});
+
+test('Junction lights: a left turn waits for what is coming the other way; nobody goes into a box whose way out is full', env => {
+  lightsScene(env);
+  const r=value(env, `
+    let sig=__reset(); const p=sig.cur;
+    const L=__car(p,1,0,110,'left'), S=__car(p,-1,0,420,'straight',{speed:7}), Ll=L.currentLane, Sl=S.currentLane;
+    let lIn=-1, sIn=-1, touch=0;
+    for(let i=0;i<600;i++){ game.update();
+      if(lIn<0 && (__ix.isVehicleInside(L)||L.currentTurnPath)) lIn=i; if(sIn<0 && (__ix.isVehicleInside(S)||S.currentTurnPath)) sIn=i;
+      if(__obbHit(L,S)) touch++; if(lIn>=0 && sIn>=0 && i>lIn+200) break; }
+    const left={lIn, sIn, touch};
+    // Straight on into a lane out with a queue standing at its start
+    sig=__reset();
+    const C=__car(p,1,1,300,'straight',{speed:6}), out=C.plannedTurn.toLane, Cl=C.currentLane;
+    for(const d of [45,140,235]){ const b=new TrafficVehicle(out,'Gelfash','sedan','AI'); Object.assign(b,{x:out.start.x+out.ux*d,y:out.start.y+out.uy*d,angle:out.angle,speed:0,vx:0,vy:0,fade:1,controlMode:'PARKED',hasDriver:false}); game.traffic.vehicles.push(b); }
+    let inBox=false; for(let i=0;i<400;i++){ game.update(); if(__ix.isVehicleInside(C)) inBox=true; }
+    const held={inBox, gap:Math.round(__toBox(C,Cl)), light:sig.lightFor(Cl)};
+    game.traffic.vehicles.filter(v=>v.controlMode==='PARKED').forEach(v=>{ v.destroy(); game.traffic.vehicles.splice(game.traffic.vehicles.indexOf(v),1); });
+    let went=false; for(let i=0;i<300;i++){ game.update(); if(__ix.isVehicleInside(C)) { went=true; break; } }
+    return {left, held:{...held, went}};
+  `);
+  ok(r.left.sIn >= 0 && r.left.lIn > r.left.sIn, `the left turn goes in after the oncoming car (${JSON.stringify(r.left)})`);
+  equal(r.left.touch, 0, 'no contact');
+  ok(!r.held.inBox && r.held.light === 'green' && r.held.gap > 0, `on a green it waits at the line while the way out is full (${JSON.stringify(r.held)})`);
+  ok(r.held.went, 'and goes once there is room');
+}, {events:true});
+
+test('Walkers at junction lights wait at the kerb for the walk (asking for it), then cross; crossings join the pavement', env => {
+  lightsScene(env);
+  const r=value(env, `
+    const nodes=game.pedestrians.network.nodes, cw=nodes.filter(n=>n.isCrosswalk);
+    const linked=cw.filter(n=>n.connections.some(id=>!nodes[id].isCrosswalk)).length;
+    const sig=__reset(), roadP=sig.cur, road=sig.phases[roadP].road;
+    // The ends of a crossing over the green road, by this junction
+    const ends=cw.filter(n=>n.crosswalkData.orientation===road.orientation && JunctionSignal.atCrosswalk(n.crosswalkData,game.traffic.network)===sig);
+    const a=ends[0], b=ends.find(n=>n!==a && n.crosswalkData===a.crosswalkData);
+    const ped=new Pedestrian(a.x,a.y,game.pedestrians.network); ped.tryQuip=()=>{};
+    Object.assign(ped,{currentNodeId:a.id,targetNodeId:b.id,state:'waiting',waitTimer:0}); game.pedestrians.pedestrians.push(ped);
+    const onRoad=()=>Math.abs((ped.x-road.x1)*road.nx+(ped.y-road.y1)*road.ny)<road.thickness/2-4;
+    let early=false, walkAt=-1, crossed=-1;
+    for(let i=0;i<900;i++){ game.update();
+      const ok=sig.walkOK(roadP); if(walkAt<0 && ok) walkAt=i;
+      if(onRoad() && walkAt<0) early=true;
+      if(Math.hypot(ped.x-b.x,ped.y-b.y)<8){ crossed=i; break; } }
+    return {cw:cw.length, linked, early, walkAt, crossed};
+  `);
+  ok(r.cw > 0 && r.linked === r.cw, `every crossing's ends join the pavement (${r.linked}/${r.cw})`);
+  ok(!r.early, 'nobody steps out before the walk');
+  ok(r.walkAt > 0 && r.walkAt < 200, `waiting alone turns the lights for the walk (${r.walkAt} ticks)`);
+  ok(r.crossed > r.walkAt, `then crosses (${r.crossed} ticks)`);
+}, {events:true});
+
+test('A busy junction moves more cars with the lights than with the old one-at-a-time queue, and nobody touches', env => {
+  lightsScene(env);
+  const run=on=>value(env, `
+    const sig=__reset(); if(!${on}) __ix.signal=null; GameSettings.getMaxTraffic=()=>200;
+    let s=4242; Math.random=()=>(s=(s*16807)%2147483647)/2147483647;
+    globalThis.__busy={through:0, touch:0, seen:new Set()};
+  `);
+  const tick=n=>value(env, `
+    const B=__busy, ix=__ix;
+    for(let i=0;i<${n};i++){
+      if(_simTick%40===0) for(let p=0;p<2;p++) for(const dir of [1,-1]) for(const rank of [0,1]){
+        const lane=__phases[p].gates.map(g=>g.lane).find(l=>l.direction===dir&&TrafficVehicle._laneRank(l)===rank);
+        const sx=lane.end.x-lane.ux*430, sy=lane.end.y-lane.uy*430;
+        if(game.traffic.vehicles.some(v=>Math.hypot(v.x-sx,v.y-sy)<95)) continue;
+        const turns=['straight','straight',rank?'right':'left'], c=__car(p,dir,rank,430,turns[Math.floor(Math.random()*3)],{speed:5});
+      }
+      game.update();
+      const vs=game.traffic.vehicles;
+      for(const v of vs){ if(!B.seen.has(v) && (v.currentTurnPath||ix.isVehicleInside(v))) { B.seen.add(v); B.through++; } }
+      for(let a=0;a<vs.length;a++) for(let b=a+1;b<vs.length;b++){ if(Math.abs(vs[a].x-vs[b].x)>90||Math.abs(vs[a].y-vs[b].y)>90) continue; if(__obbHit(vs[a],vs[b])) B.touch++; }
+    }
+    return {through:B.through, touch:B.touch};
+  `);
+  const out={};
+  for (const on of [true, false]) { run(on); let t; for (let k=0;k<6;k++) t=tick(300); out[on?'lights':'queue']=t; }
+  ok(out.lights.through >= out.queue.through * 1.25, `more through with the lights (${out.lights.through} vs ${out.queue.through} in 30 s)`);
+  equal(out.lights.touch, 0, 'no contact with the lights');
+}, {events:true});
+
 test('Saves: her car stays where she parked it through a save made indoors; a hijacked drive loads on foot', env => {
   carsFixture(env);
   const result=value(env, `

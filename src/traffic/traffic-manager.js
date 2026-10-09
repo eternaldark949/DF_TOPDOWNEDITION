@@ -75,6 +75,28 @@
                 this.grid = new SpatialGrid(2400, 3200, 150); 
             }
             
+            /** Her car on its way into a junction with lights, by the lane it's driving along */
+            _noteHerCar(car) {
+                const lane = this.network.findNearestLane(car.x, car.y, 40);
+                if (!lane || Math.cos((car.angle || 0) - lane.angle) < 0.7 || !lane.intersectingZones) return;
+                const along = (car.x - lane.start.x) * lane.ux + (car.y - lane.start.y) * lane.uy;
+                for (const z of lane.intersectingZones) {
+                    if (z.entryDist < 5) continue;
+                    const d = z.entryDist - along;
+                    if (d > -40 && d < SIGNAL.SEE) { if (z.intersection.signal) z.intersection.signal.note(car, d, lane); break; }
+                }
+            }
+
+            /** The junction lights in view (traffic/traffic-signals.js): on the ground, and their glow after dark */
+            drawSignals(ctx, view, crosswalks) {
+                const t = _frameTime;
+                for (const ix of this.network.intersections) if (ix.signal && ix.signal.inView(view)) ix.signal.draw(ctx, crosswalks, t);
+            }
+            drawSignalGlow(ctx, dark, view, crosswalks) {
+                const t = _frameTime;
+                for (const ix of this.network.intersections) if (ix.signal && ix.signal.inView(view)) ix.signal.drawGlow(ctx, dark, crosswalks, t);
+            }
+
             reset() { 
                 // Properly destroy all vehicle entities before clearing
                 for (let v of this.vehicles) {
@@ -126,8 +148,12 @@
             
                 this.spawnTimer--;
                 
-                // 0. UPDATE INTERSECTIONS
+                // 0. UPDATE INTERSECTIONS (and their lights: traffic/traffic-signals.js)
+                // Her car, driven by hand, shows on the lights' gauges like anyone's (on autodrive it notes itself)
+                if (playerCar && playerCar.visible && playerCar.hasDriver && playerCar.controlMode !== 'AI') this._noteHerCar(playerCar);
                 for (let intersection of this.network.intersections) {
+                    if (intersection.signal === undefined) intersection.signal = JunctionSignal.make(intersection);
+                    if (intersection.signal) intersection.signal.update();
                     intersection.update();
                     if (intersection.queueUnchangedFrames === 0 && 
                         intersection.occupants.length === 0 && 
