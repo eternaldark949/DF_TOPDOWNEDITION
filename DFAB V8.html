@@ -1648,6 +1648,40 @@
         .settings-section-label:first-child {
             margin-top: 0;
         }
+        /* Categories: each a group of rows under its label; the chips above jump between them */
+        .settings-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 10px;
+            scroll-margin-top: 44px;            /* lands clear of the sticky chips */
+        }
+        .settings-jump {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 2px 4px;
+            padding: 6px 0 8px;
+            background: rgb(10, 2, 8);
+            box-shadow: 0 10px 10px -6px rgb(10, 2, 8);   /* rows fade out under it */
+        }
+        .settings-jump-chip {
+            position: relative; z-index: 0; isolation: isolate;
+            padding: 4px 10px; cursor: pointer; user-select: none;
+            font: 600 0.54rem var(--font-ui); letter-spacing: 2px; text-transform: uppercase;
+            color: var(--df-lilac-grey);
+            transition: color 0.2s;
+        }
+        .settings-jump-chip::before {
+            content: ''; position: absolute; inset: 1px 0; border-radius: 12px; z-index: -1; opacity: 0; transition: opacity 0.25s;
+            background: linear-gradient(90deg, transparent 0%, rgba(176, 150, 210, 0.75) 14%, #f2ecf4 42%, #f2ecf4 58%, rgba(176, 150, 210, 0.75) 86%, transparent 100%);
+        }
+        .settings-jump-chip:hover, .settings-jump-chip:focus-visible { color: var(--df-lavender-pale); outline: none; }
+        .settings-jump-chip.active { color: #1b0d2e; }
+        .settings-jump-chip.active::before { opacity: 1; }
         .settings-row {
             display: flex;
             justify-content: space-between;
@@ -4332,37 +4366,11 @@
             
             <!-- SETTINGS PANEL (replaces nav when active) -->
             <div class="pause-settings-panel" id="pause-settings-panel">
-                <div class="settings-section-label">Density</div>
-                <div class="settings-row">
-                    <span class="settings-label">Traffic</span>
-                    <span class="settings-value val-high" id="set-traffic" data-key="trafficDensity">HIGH</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Pedestrians</span>
-                    <span class="settings-value val-high" id="set-pedestrians" data-key="pedestrianDensity">HIGH</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Foliage</span>
-                    <span class="settings-value val-high" id="set-foliage" data-key="foliageDensity">HIGH</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Crowd Quality</span>
-                    <span class="settings-value val-high" id="set-crowd" data-key="crowdQuality">HIGH</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Rain</span>
-                    <span class="settings-value val-high" id="set-rain" data-key="rainDensity">HIGH</span>
-                </div>
+                <!-- Category chips: tap to jump; the one in view is lit (ui/save-slots-pause-menu.js) -->
+                <nav class="settings-jump" id="settings-jump" aria-label="Settings categories"><span class="settings-jump-chip" data-group="controls" tabindex="0">Controls</span><span class="settings-jump-chip" data-group="camera" tabindex="0">Camera</span><span class="settings-jump-chip" data-group="visibility" tabindex="0">Visibility</span><span class="settings-jump-chip" data-group="graphics" tabindex="0">Graphics</span><span class="settings-jump-chip" data-group="colour" tabindex="0">Colour</span><span class="settings-jump-chip" data-group="world" tabindex="0">World</span><span class="settings-jump-chip" data-group="display" tabindex="0">Display</span><span class="settings-jump-chip" data-group="audio" tabindex="0">Audio</span><span class="settings-jump-chip" data-group="dev" tabindex="0">Dev</span></nav>
                 
-                <div class="settings-section-label">Visual</div>
-                <div class="settings-row">
-                    <span class="settings-label">Lighting</span>
-                    <span class="settings-value val-high" id="set-lighting" data-key="lightingQuality">HIGH</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Adaptive Lighting</span>
-                    <span class="settings-value val-on" id="set-adaptive-lighting" data-key="adaptiveLighting">ON</span>
-                </div>
+                <section class="settings-group" data-group="controls">
+                <div class="settings-section-label">Controls</div>
                 <div class="settings-row">
                     <span class="settings-label">Flit Ring</span>
                     <span class="settings-value val-on" id="set-flitring" data-key="flitRing">ON</span>
@@ -4387,6 +4395,10 @@
                     <span class="settings-label">Sniper Fire on Release</span>
                     <span class="settings-value val-on" id="set-sniperrelease" data-key="sniperRelease">ON</span>
                 </div>
+                </section>
+                
+                <section class="settings-group" data-group="camera">
+                <div class="settings-section-label">Camera &amp; Combat</div>
                 <div class="settings-row">
                     <span class="settings-label">Scope View</span>
                     <span class="settings-value val-on" id="set-scopeview" data-key="scopeView">ON</span>
@@ -4400,8 +4412,40 @@
                     <span class="settings-value val-on" id="set-camedge" data-key="cameraEdgeLock">ON</span>
                 </div>
                 <div class="settings-row">
-                    <span class="settings-label">Film Grain</span>
-                    <span class="settings-value val-on" id="set-grain" data-key="filmGrain">ON</span>
+                    <span class="settings-label">Finisher</span>
+                    <span class="settings-value" id="set-finisher" data-key="finisher">FULL</span>
+                </div>
+                </section>
+                
+                <section class="settings-group" data-group="visibility">
+                <div class="settings-section-label">Visibility</div>
+                <div class="settings-row">
+                    <span class="settings-label">Player Glow</span>
+                    <span class="settings-value val-on" id="set-playerglow" data-key="playerGlow">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Stealth Grey</span>
+                    <span class="settings-value val-on" id="set-stealthgray" data-key="stealthGray">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Sound Rings</span>
+                    <span class="settings-value" id="set-soundrings" data-key="soundRings">MIRAGE</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Enemy Sound Rings</span>
+                    <span class="settings-value val-on" id="set-enemyrings" data-key="enemyRings">ON</span>
+                </div>
+                </section>
+                
+                <section class="settings-group" data-group="graphics">
+                <div class="settings-section-label">Graphics</div>
+                <div class="settings-row">
+                    <span class="settings-label">Lighting</span>
+                    <span class="settings-value val-high" id="set-lighting" data-key="lightingQuality">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Adaptive Lighting</span>
+                    <span class="settings-value val-on" id="set-adaptive-lighting" data-key="adaptiveLighting">ON</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Soft Shadows</span>
@@ -4415,22 +4459,10 @@
                     <span class="settings-label">Reflections</span>
                     <span class="settings-value val-high" id="set-wetreflections" data-key="reflections">HIGH</span>
                 </div>
-                <div class="settings-row">
-                    <span class="settings-label">Enemy Sound Rings</span>
-                    <span class="settings-value val-on" id="set-enemyrings" data-key="enemyRings">ON</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Finisher</span>
-                    <span class="settings-value" id="set-finisher" data-key="finisher">FULL</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Sound Rings</span>
-                    <span class="settings-value" id="set-soundrings" data-key="soundRings">MIRAGE</span>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-label">Atmosphere</span>
-                    <span class="settings-value" id="set-atmosphere" data-key="atmosphereTint">OFF</span>
-                </div>
+                </section>
+                
+                <section class="settings-group" data-group="colour">
+                <div class="settings-section-label">Colour &amp; Mood</div>
                 <div class="settings-row">
                     <span class="settings-label">Color Grade</span>
                     <span class="settings-value" id="set-colorgrade" data-key="colorGrade">NONE</span>
@@ -4440,11 +4472,41 @@
                     <span class="settings-value" id="set-gradedrawer" data-key="gradeDrawer">OPEN ›</span>
                 </div>
                 <div class="settings-row">
-                    <span class="settings-label">Stealth Grey</span>
-                    <span class="settings-value val-on" id="set-stealthgray" data-key="stealthGray">ON</span>
+                    <span class="settings-label">Atmosphere</span>
+                    <span class="settings-value" id="set-atmosphere" data-key="atmosphereTint">OFF</span>
                 </div>
+                <div class="settings-row">
+                    <span class="settings-label">Film Grain</span>
+                    <span class="settings-value val-on" id="set-grain" data-key="filmGrain">ON</span>
+                </div>
+                </section>
                 
-                <div class="settings-section-label">Display</div>
+                <section class="settings-group" data-group="world">
+                <div class="settings-section-label">World Density</div>
+                <div class="settings-row">
+                    <span class="settings-label">Traffic</span>
+                    <span class="settings-value val-high" id="set-traffic" data-key="trafficDensity">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Pedestrians</span>
+                    <span class="settings-value val-high" id="set-pedestrians" data-key="pedestrianDensity">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Foliage</span>
+                    <span class="settings-value val-high" id="set-foliage" data-key="foliageDensity">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Crowd Quality</span>
+                    <span class="settings-value val-high" id="set-crowd" data-key="crowdQuality">HIGH</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Rain</span>
+                    <span class="settings-value val-high" id="set-rain" data-key="rainDensity">HIGH</span>
+                </div>
+                </section>
+                
+                <section class="settings-group" data-group="display">
+                <div class="settings-section-label">Display &amp; Performance</div>
                 <div class="settings-row">
                     <span class="settings-label">Fullscreen</span>
                     <span class="settings-value val-high" id="set-fullscreen" data-key="fullscreen">ON</span>
@@ -4453,7 +4515,13 @@
                     <span class="settings-label">Screen Orientation</span>
                     <span class="settings-value" id="set-orientation" data-key="orientation">AUTO</span>
                 </div>
+                <div class="settings-row">
+                    <span class="settings-label">Frame Limit</span>
+                    <span class="settings-value" id="set-fps" data-key="fpsLimit">NONE</span>
+                </div>
+                </section>
                 
+                <section class="settings-group" data-group="audio">
                 <div class="settings-section-label">Audio</div>
                 <div class="settings-row">
                     <span class="settings-label">Master Audio</span>
@@ -4475,13 +4543,9 @@
                     <span class="settings-label">Music</span>
                     <span class="amb-slider-wrap"><input type="range" class="ggp-slider amb-slider" id="set-music" min="0" max="100" step="5" value="70"><span class="amb-val" id="set-music-val">70</span></span>
                 </div>
+                </section>
                 
-                <div class="settings-section-label">Performance</div>
-                <div class="settings-row">
-                    <span class="settings-label">Frame Limit</span>
-                    <span class="settings-value" id="set-fps" data-key="fpsLimit">NONE</span>
-                </div>
-
+                <section class="settings-group" data-group="dev">
                 <div class="settings-section-label">Developer</div>
                 <div class="settings-row">
                     <span class="settings-label">Profiler</span>
@@ -4515,6 +4579,7 @@
                     <span class="settings-label">Resolution Bench</span>
                     <span class="settings-value" id="set-bench" data-key="perfBench">RUN ›</span>
                 </div>
+                </section>
                 
                 <div class="settings-back-btn" id="pause-settings-back">◁ BACK</div>
             </div>
@@ -8077,6 +8142,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             kukriFromArmory: true,          // the Maiden's Kukri is in the armory (false: only the Demoness drops it)
             footsteps: true,                // footsteps by shoe and floor, splashes (engine/footsteps.js)
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
+            playerGlow: true,               // her soft halo (ui/silhouette-fx.js); off for a beauty walk
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
             baseline: false,                // Baseline's layer panel (ui/render-layers.js): each render layer on a chip, with its calls (not kept)
@@ -60534,6 +60600,7 @@ engineMixin({
                         finisher: GameSettings.finisher,
                         footsteps: GameSettings.footsteps,
                         enemyRings: GameSettings.enemyRings,
+                        playerGlow: GameSettings.playerGlow,
                         fpsLimit: GameSettings.fpsLimit,
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
@@ -61170,6 +61237,7 @@ engineMixin({
                         if (save.settings.finisher) GameSettings.finisher = save.settings.finisher;
                         GameSettings.footsteps = save.settings.footsteps !== false;
                         GameSettings.enemyRings = save.settings.enemyRings !== false;
+                        GameSettings.playerGlow = save.settings.playerGlow !== false;
                         if (typeof restoreGameGrade === 'function') restoreGameGrade();       // the grade back on screen, not just in the setting
                         GameSettings.fpsLimit = save.settings.fpsLimit || 0;
                         GameSettings.audioEnabled = save.settings.audioEnabled !== false;
@@ -70069,10 +70137,10 @@ engineMixin({
                 this.ctx.restore();
             },
 
-            /** Whether she wears her halo this frame: on foot and in play, as for her marker. */
+            /** Whether she wears her halo this frame: Settings → Visibility → Player Glow, on foot and in play, as for her marker. */
             _playerGlowOn() {
                 const p = this.player;
-                return !!(this.running && p && p.visible && !p.isHidden && !p.dead && !this.isDriving && !p.inCar &&
+                return !!(GameSettings.playerGlow !== false && this.running && p && p.visible && !p.isHidden && !p.dead && !this.isDriving && !p.inCar &&
                     !(this.scenes && this.scenes.running) && !(this.cutscene && this.cutscene.active) &&
                     !this.cineCam && !this.finisher && !this.finCam);
             },
@@ -73340,6 +73408,40 @@ engineMixin({
                         this._cycleSetting(el);
                     });
                 });
+
+                // Category chips: a tap (or Enter) scrolls its group to just under the chips; scrolling lights the one in view
+                this.settingsPanel.querySelectorAll('.settings-jump-chip').forEach(chip => {
+                    const go = () => this._jumpToSettingsGroup(chip.dataset.group);
+                    chip.addEventListener('click', go);
+                    chip.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+                });
+                this.settingsPanel.addEventListener('scroll', () => this._syncSettingsJump(), { passive: true });
+            }
+
+            /** Scroll the settings panel so a category's label sits just under the sticky chips. */
+            _jumpToSettingsGroup(key) {
+                const panel = this.settingsPanel, group = panel.querySelector(`.settings-group[data-group="${key}"]`);
+                if (!group) return;
+                const jump = panel.querySelector('.settings-jump'), under = jump ? jump.offsetHeight : 0;
+                const top = panel.scrollTop + group.getBoundingClientRect().top - panel.getBoundingClientRect().top - under;
+                // (next frame: the tap's own focus on the chip would otherwise cancel a smooth scroll begun in its click)
+                requestAnimationFrame(() => panel.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }));
+                this._litSettingsGroup(key);
+            }
+
+            /** Light the chip of the category at the top of the panel (the last one, at the very bottom). */
+            _syncSettingsJump() {
+                const panel = this.settingsPanel, groups = panel.querySelectorAll('.settings-group');
+                if (!groups.length) return;
+                const jump = panel.querySelector('.settings-jump');
+                const line = panel.getBoundingClientRect().top + (jump ? jump.offsetHeight : 0) + 8;
+                let key = groups[0].dataset.group;
+                for (const g of groups) if (g.getBoundingClientRect().top <= line) key = g.dataset.group;
+                if (panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 2) key = groups[groups.length - 1].dataset.group;
+                this._litSettingsGroup(key);
+            }
+            _litSettingsGroup(key) {
+                this.settingsPanel.querySelectorAll('.settings-jump-chip').forEach(c => c.classList.toggle('active', c.dataset.group === key));
             }
             
             open(force = false) {
@@ -73771,6 +73873,7 @@ engineMixin({
                 this.navMain.inert = true;
                 this.settingsPanel.classList.add('active');
                 this._syncSettingsUI();
+                this._syncSettingsJump();
                 this.settingsPanel.tabIndex = -1;
                 this.settingsPanel.focus({ preventScroll: true });
             }
@@ -73805,6 +73908,7 @@ engineMixin({
                 this._updateValueEl('set-soundrings', GameSettings.soundRings || 'mirage');
                 this._updateValueEl('set-finisher', GameSettings.finisher || 'full');
                 this._updateValueEl('set-enemyrings', GameSettings.enemyRings !== false ? 'on' : 'off');
+                this._updateValueEl('set-playerglow', GameSettings.playerGlow !== false ? 'on' : 'off');
                 this._updateValueEl('set-footsteps', GameSettings.footsteps !== false ? 'on' : 'off');
                 this._updateValueEl('set-audiobuffer', this._audioBufferLabel());
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
@@ -73915,7 +74019,7 @@ engineMixin({
                     try { localStorage.setItem('dfab_audio_buffer', GameSettings.audioBuffer); } catch (e) { /* private mode */ }
                     this._updateValueEl(el.id, this._audioBufferLabel());
 
-                } else if (key === 'enemyRings' || key === 'footsteps') {
+                } else if (key === 'enemyRings' || key === 'footsteps' || key === 'playerGlow') {
                     GameSettings[key] = GameSettings[key] === false;
                     this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
 

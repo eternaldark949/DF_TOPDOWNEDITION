@@ -162,6 +162,7 @@
             kukriFromArmory: true,          // the Maiden's Kukri is in the armory (false: only the Demoness drops it)
             footsteps: true,                // footsteps by shoe and floor, splashes (engine/footsteps.js)
             enemyRings: true,               // their noises ring in ember where she can hear them (engine/noise.js)
+            playerGlow: true,               // her soft halo (ui/silhouette-fx.js); off for a beauty walk
             soundRings: 'mirage',           // 'mirage' | 'simple' | 'off' (engine/noise.js)
             profilerMode: 'off',            // 'off' | 'compact' | 'full' (ui/dev-overlay.js)
             baseline: false,                // Baseline's layer panel (ui/render-layers.js): each render layer on a chip, with its calls (not kept)

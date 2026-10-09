@@ -35,6 +35,40 @@
         .settings-section-label:first-child {
             margin-top: 0;
         }
+        /* Categories: each a group of rows under its label; the chips above jump between them */
+        .settings-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 10px;
+            scroll-margin-top: 44px;            /* lands clear of the sticky chips */
+        }
+        .settings-jump {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 2px 4px;
+            padding: 6px 0 8px;
+            background: rgb(10, 2, 8);
+            box-shadow: 0 10px 10px -6px rgb(10, 2, 8);   /* rows fade out under it */
+        }
+        .settings-jump-chip {
+            position: relative; z-index: 0; isolation: isolate;
+            padding: 4px 10px; cursor: pointer; user-select: none;
+            font: 600 0.54rem var(--font-ui); letter-spacing: 2px; text-transform: uppercase;
+            color: var(--df-lilac-grey);
+            transition: color 0.2s;
+        }
+        .settings-jump-chip::before {
+            content: ''; position: absolute; inset: 1px 0; border-radius: 12px; z-index: -1; opacity: 0; transition: opacity 0.25s;
+            background: linear-gradient(90deg, transparent 0%, rgba(176, 150, 210, 0.75) 14%, #f2ecf4 42%, #f2ecf4 58%, rgba(176, 150, 210, 0.75) 86%, transparent 100%);
+        }
+        .settings-jump-chip:hover, .settings-jump-chip:focus-visible { color: var(--df-lavender-pale); outline: none; }
+        .settings-jump-chip.active { color: #1b0d2e; }
+        .settings-jump-chip.active::before { opacity: 1; }
         .settings-row {
             display: flex;
             justify-content: space-between;

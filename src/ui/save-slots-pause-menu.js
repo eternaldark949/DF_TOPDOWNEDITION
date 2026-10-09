@@ -571,6 +571,40 @@
                         this._cycleSetting(el);
                     });
                 });
+
+                // Category chips: a tap (or Enter) scrolls its group to just under the chips; scrolling lights the one in view
+                this.settingsPanel.querySelectorAll('.settings-jump-chip').forEach(chip => {
+                    const go = () => this._jumpToSettingsGroup(chip.dataset.group);
+                    chip.addEventListener('click', go);
+                    chip.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+                });
+                this.settingsPanel.addEventListener('scroll', () => this._syncSettingsJump(), { passive: true });
+            }
+
+            /** Scroll the settings panel so a category's label sits just under the sticky chips. */
+            _jumpToSettingsGroup(key) {
+                const panel = this.settingsPanel, group = panel.querySelector(`.settings-group[data-group="${key}"]`);
+                if (!group) return;
+                const jump = panel.querySelector('.settings-jump'), under = jump ? jump.offsetHeight : 0;
+                const top = panel.scrollTop + group.getBoundingClientRect().top - panel.getBoundingClientRect().top - under;
+                // (next frame: the tap's own focus on the chip would otherwise cancel a smooth scroll begun in its click)
+                requestAnimationFrame(() => panel.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }));
+                this._litSettingsGroup(key);
+            }
+
+            /** Light the chip of the category at the top of the panel (the last one, at the very bottom). */
+            _syncSettingsJump() {
+                const panel = this.settingsPanel, groups = panel.querySelectorAll('.settings-group');
+                if (!groups.length) return;
+                const jump = panel.querySelector('.settings-jump');
+                const line = panel.getBoundingClientRect().top + (jump ? jump.offsetHeight : 0) + 8;
+                let key = groups[0].dataset.group;
+                for (const g of groups) if (g.getBoundingClientRect().top <= line) key = g.dataset.group;
+                if (panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 2) key = groups[groups.length - 1].dataset.group;
+                this._litSettingsGroup(key);
+            }
+            _litSettingsGroup(key) {
+                this.settingsPanel.querySelectorAll('.settings-jump-chip').forEach(c => c.classList.toggle('active', c.dataset.group === key));
             }
             
             open(force = false) {
@@ -1002,6 +1036,7 @@
                 this.navMain.inert = true;
                 this.settingsPanel.classList.add('active');
                 this._syncSettingsUI();
+                this._syncSettingsJump();
                 this.settingsPanel.tabIndex = -1;
                 this.settingsPanel.focus({ preventScroll: true });
             }
@@ -1036,6 +1071,7 @@
                 this._updateValueEl('set-soundrings', GameSettings.soundRings || 'mirage');
                 this._updateValueEl('set-finisher', GameSettings.finisher || 'full');
                 this._updateValueEl('set-enemyrings', GameSettings.enemyRings !== false ? 'on' : 'off');
+                this._updateValueEl('set-playerglow', GameSettings.playerGlow !== false ? 'on' : 'off');
                 this._updateValueEl('set-footsteps', GameSettings.footsteps !== false ? 'on' : 'off');
                 this._updateValueEl('set-audiobuffer', this._audioBufferLabel());
                 this._updateValueEl('set-stealthgray', GameSettings.stealthGray !== false ? 'on' : 'off');
@@ -1146,7 +1182,7 @@
                     try { localStorage.setItem('dfab_audio_buffer', GameSettings.audioBuffer); } catch (e) { /* private mode */ }
                     this._updateValueEl(el.id, this._audioBufferLabel());
 
-                } else if (key === 'enemyRings' || key === 'footsteps') {
+                } else if (key === 'enemyRings' || key === 'footsteps' || key === 'playerGlow') {
                     GameSettings[key] = GameSettings[key] === false;
                     this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
 
