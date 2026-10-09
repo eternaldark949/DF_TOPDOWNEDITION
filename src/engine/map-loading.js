@@ -118,8 +118,8 @@ engineMixin({
                 // The city below the veranda: laid out and painted once, its night lights in a second job
                 if (map.id === 'apt_949' && !this._cityView) jobs.push(() => {
                     if (!this._cityView) this._cityView = this._makeAptCityView();
-                    if (!this._cityView.base) this._cityView.bakeBase();
-                }, () => { if (this._cityView && !this._cityView.glow) this._cityView.bakeGlow(); }, () => { if (this._cityView) this._cityView.warm(); });
+                    this._cityView.bakeGround();
+                }, () => { if (this._cityView) this._cityView.bakeTops(); }, () => { if (this._cityView && !this._cityView.glow) this._cityView.bakeGlow(); }, () => { if (this._cityView) this._cityView.warm(); });
                 // The furniture's sprites (entities/prop-sprites.js), a handful a job, at the zoom the map opens at
                 const props = (this.props || []).filter(p => p && PropSprites.kindOf(p));
                 for (let i = 0; i < props.length; i += 8) jobs.push(() => PropSprites.prepare(props.slice(i, i + 8), this.camera.zoom));

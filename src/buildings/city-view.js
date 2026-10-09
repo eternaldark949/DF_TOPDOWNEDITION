@@ -15,15 +15,28 @@
            (bakeGlow: lit windows, signs, lamp heads and pools), each in its own
            canvas; per frame only what moves draws, only where it shows, and
            nothing at all while the rect is off screen (viewHasRect).
+           Parallax (option): the rect is a window onto a bigger picture that
+           slides with the camera by `parallax`, so the city moves slower than
+           the floor and reads as far below; and a `lookout` leans the camera out
+           over it as the viewer reaches the window's edge (engine/draw.js).
            ===================================================================== */
         const CITY_VIEW_LAMP = '#ffcf8a';
         const CITY_VIEW_PEOPLE = ['200,155,255', '255,216,176', '169,191,255', '255,143,184', '232,194,122', '243,230,208'];
 
         class CityView {
-            /** o: { x, y, w, h (world rect), seed, scale (world px a hub px), res / glowRes (canvas px a world px) } */
+            /** o: { x, y, w, h (the window: a world rect), seed, scale (world px a hub px), res / glowRes (canvas px a world px),
+                     parallax (0: flat; else how much the city follows the camera), edgeY (where the viewer stands at the window's
+                     edge: the city sits as laid out there), over (world px of city above the window, for the slide back),
+                     lookout (screen px the camera leans out over the city at the edge; 0: none) } */
             constructor(o) {
-                Object.assign(this, { seed: 1, scale: 0.5, res: 1.5, glowRes: 1 }, o);
-                this.VW = this.w / this.scale; this.VH = this.h / this.scale;
+                Object.assign(this, { seed: 1, scale: 0.5, res: 1.5, glowRes: 1, parallax: 0, edgeY: null, over: 120, lookout: 0 }, o);
+                if (this.edgeY == null) this.edgeY = this.y + this.h;
+                // The picture: the window, widened and raised by as far as the city can slide (the window itself when flat)
+                this.ox = this.parallax ? Math.ceil(this.w / 2 * this.parallax) + 8 : 0;
+                this.oy = this.parallax ? this.over : 0;
+                this.ix = this.x - this.ox; this.iy = this.y - this.oy; this.iw = this.w + this.ox * 2; this.ih = this.h + this.oy;
+                this.dx = 0; this.dy = 0;
+                this.VW = this.iw / this.scale; this.VH = this.ih / this.scale;
                 this.base = null; this.glow = null; this.bakeMs = 0;
                 this._stamps = new Map();
                 this._layout();
@@ -68,7 +81,8 @@
                 const edges = [-60, ...this.cross.flatMap(x => [x - this.PW, x + this.CW + this.PW]), VW + 60];
                 for (let i = 0; i < edges.length; i += 2) {
                     fill(edges[i], edges[i + 1], B.farPave - range(12, 26), 300);           // the row across the street
-                    fill(edges[i], edges[i + 1], B.back - range(16, 40), 280);              // the row behind, mostly in the haze
+                    for (let front = B.back; front > 60; front -= 330)                    // the rows behind, into the haze, to the picture's top
+                        fill(edges[i], edges[i + 1], front - range(16, 40), 280);
                 }
                 // Street lamps along both pavements (none in a junction's mouth), trees between them on the far side
                 this.lamps = []; this.trees = [];
@@ -79,7 +93,8 @@
                     const tx = x + range(110, 150);
                     if (!inMouth(tx, 50) && rnd() < 0.7) this.trees.push({ x: tx, y: B.farPave + 38, kind: ['tree', 'glow_purple', 'glow_pink', 'tree'][Math.floor(rnd() * 4)], size: range(0.85, 1.15), variant: Math.floor(rnd() * 4) });
                 }
-                // Traffic: two lanes each way on the main street (right-hand: eastbound on the near side), one car down each cross street
+                // Traffic: two lanes each way on the main street (right-hand: eastbound on the near side), one car down each cross street.
+                // A lane's cars share its speed, spaced round its loop, each with a little sway that can never close the gap.
                 const brands = Object.keys(VEHICLE_BRANDS);
                 const look = () => {
                     const key = brands[Math.floor(rnd() * brands.length)], br = VEHICLE_BRANDS[key], models = Object.keys(br.models);
@@ -89,9 +104,11 @@
                 };
                 this.cars = [];
                 for (let l = 0; l < 4; l++) {
-                    const dir = l < 2 ? -1 : 1, y = B.street + 20 + l * 40;
-                    for (let n = Math.round(VW / range(560, 720)), i = 0; i < n; i++)
-                        this.cars.push({ axis: 'h', y, dir, offset: rnd() * (VW + 240), speed: range(150, 230), v: look() });
+                    const dir = l < 2 ? -1 : 1, y = B.street + 20 + l * 40, speed = range(150, 230);
+                    const n = Math.max(2, Math.round(VW / range(560, 720))), gap = (VW + 240) / n, phase = rnd() * gap;
+                    for (let i = 0; i < n; i++)
+                        this.cars.push({ axis: 'h', y, dir, speed, offset: phase + (i + range(-0.2, 0.2)) * gap,
+                                         sway: range(8, 24), swayW: range(0.25, 0.5), swayP: rnd() * Math.PI * 2, v: look() });
                 }
                 for (const cx of this.cross) {
                     const dir = rnd() < 0.5 ? -1 : 1;
@@ -115,17 +132,30 @@
             _byDepth() { return this.buildings.slice().sort((a, b) => (a.y + a.h) - (b.y + b.h)); }   // far rows first
             _canvas(res) {
                 const cv = document.createElement('canvas'), k = this.scale * res;
-                cv.width = Math.ceil(this.w * res); cv.height = Math.ceil(this.h * res);
+                cv.width = Math.ceil(this.iw * res); cv.height = Math.ceil(this.ih * res);
                 const c = cv.getContext('2d'); c.setTransform(k, 0, 0, k, 0, 0);
                 return [cv, c];
             }
 
-            /** The still city, painted once */
-            bakeBase() {
+            /** The still city, painted once: in two halves, so the warmup can give each its own frame */
+            bakeBase() { this.bakeGround(); this.bakeTops(); }
+            /** The first half: the ground, and the buildings' feet and shadows */
+            bakeGround() {
+                if (this.base || this._half) return;
                 const t0 = performance.now(), [cv, c] = this._canvas(this.res);
                 this._asViewer(() => {
                     this._paintGround(c);
                     for (const b of this.buildings) if (b.drawBase) b.drawBase(c);
+                });
+                this._half = [cv, c]; this.bakeMs += performance.now() - t0;
+            }
+            /** The second half: the buildings themselves (far rows first), their signs, the trees and lamps, the air */
+            bakeTops() {
+                if (this.base) return;
+                if (!this._half) this.bakeGround();
+                const t0 = performance.now(), [cv, c] = this._half;
+                this._half = null;
+                this._asViewer(() => {
                     for (const b of this._byDepth()) b.drawTop(c, game.worldMinutes);
                     for (const b of this.buildings) if (b.drawSign) b.drawSign(c);
                 });
@@ -212,7 +242,8 @@
             _carAt(car, t) {
                 if (car.axis === 'h') {
                     const span = this.VW + 240;
-                    return { x: ((car.offset + t * car.speed * car.dir) % span + span) % span - 120, y: car.y, rot: car.dir > 0 ? 0 : 1, a: 1 };
+                    const d = car.offset + t * car.speed * car.dir + car.sway * Math.sin(t * car.swayW + car.swayP);
+                    return { x: (d % span + span) % span - 120, y: car.y, rot: car.dir > 0 ? 0 : 1, a: 1 };
                 }
                 const y0 = -60, y1 = this.bands.farPave + 20, span = y1 - y0, y = ((car.offset + t * car.speed * car.dir) % span + span) % span + y0;
                 return { x: car.x, y, rot: car.dir > 0 ? 2 : 3, a: Math.max(0, Math.min(1, Math.min(y - y0, y1 - y) / 70)) };
@@ -230,27 +261,49 @@
                 return cv;
             }
 
+            /** How far the city has slid this frame (world px, into dx and dy). It follows the camera by `parallax`, so it moves
+                slower than the floor and reads as far below. Stepping back from the edge, the street right below slides under the
+                sill and the far rows come in at the top; at the edge the city sits as laid out. Never further than the picture covers. */
+            slide() {
+                const v = game.view, P = this.parallax;
+                if (!P || !v) { this.dx = this.dy = 0; return; }
+                this.dx = Math.max(-this.ox, Math.min(this.ox, (v.x - this.x - this.w / 2) * P));
+                this.dy = Math.max(0, Math.min(this.oy, (v.y - this.edgeY) * P));
+            }
+            /** Stamp a baked layer's part that shows through the window, slid by (dx, dy) */
+            _stampLayer(ctx, cv, res) {
+                ctx.drawImage(cv, (this.ox - this.dx) * res, (this.oy - this.dy) * res, this.w * res, this.h * res, this.x, this.y, this.w, this.h);
+            }
+            /** The camera's lean out over the city (world px, up) for a viewer at p: `lookout` screen px at the edge, easing in
+                over the last 70 px before it; none away from the window. engine/draw.js eases the camera to it. */
+            lookoutLean(p, zoom) {
+                if (!this.lookout || p.x < this.x || p.x > this.x + this.w) return 0;
+                const k = Math.max(0, Math.min(1, 1 - (p.y - this.edgeY) / 70));
+                return -this.lookout / zoom * k * k * (3 - 2 * k);
+            }
+
             /** The floor pass: the still city, then the traffic and the people that show */
             drawBase(ctx) {
                 if (!viewHasRect(this.x, this.y, this.w, this.h)) return;
                 if (!this.base) this.bakeBase();
-                ctx.drawImage(this.base, this.x, this.y, this.w, this.h);
+                this.slide();
+                this._stampLayer(ctx, this.base, this.res);
                 const V = game._cullBounds && game._cullBounds.view, vl = V ? V.left : -Infinity, vr = V ? V.right : Infinity;
-                const s = this.scale, t = _frameTime / 1000;
+                const s = this.scale, t = _frameTime / 1000, X0 = this.ix + this.dx, Y0 = this.iy + this.dy;
                 ctx.save(); ctx.beginPath(); ctx.rect(this.x, this.y, this.w, this.h); ctx.clip();
                 for (const car of this.cars) {
                     const p = this._carAt(car, t);
                     if (p.a <= 0.02) continue;
-                    const st = this._carStamp(car.v, p.rot), x = this.x + p.x * s - st.w / 2;
-                    if (x + st.w < vl || x > vr) continue;
-                    ctx.globalAlpha = p.a; ctx.drawImage(st.cv, x, this.y + p.y * s - st.h / 2, st.w, st.h);
+                    const st = this._carStamp(car.v, p.rot), x = X0 + p.x * s - st.w / 2;
+                    if (x + st.w < Math.max(vl, this.x) || x > Math.min(vr, this.x + this.w)) continue;
+                    ctx.globalAlpha = p.a; ctx.drawImage(st.cv, x, Y0 + p.y * s - st.h / 2, st.w, st.h);
                 }
                 ctx.globalAlpha = 1;
                 const span = this.VW + 60, pw = 8 * s * 2;
                 for (const ped of this.peds) {
-                    const x = this.x + (((ped.offset + t * ped.speed) % span + span) % span - 30) * s;
-                    if (x + pw < vl || x - pw > vr) continue;
-                    ctx.drawImage(this._pedStamp(ped.tint), x - pw / 2, this.y + ped.y * s + Math.sin(t * 6 + ped.bob) * 0.4 - pw / 2, pw, pw);
+                    const x = X0 + (((ped.offset + t * ped.speed) % span + span) % span - 30) * s;
+                    if (x + pw < Math.max(vl, this.x) || x - pw > Math.min(vr, this.x + this.w)) continue;
+                    ctx.drawImage(this._pedStamp(ped.tint), x - pw / 2, Y0 + ped.y * s + Math.sin(t * 6 + ped.bob) * 0.4 - pw / 2, pw, pw);
                 }
                 ctx.restore();
             }
@@ -259,12 +312,13 @@
             drawGlow(ctx, dark) {
                 if (!viewHasRect(this.x, this.y, this.w, this.h)) return;
                 if (!this.glow) this.bakeGlow();
-                const V = game._cullBounds && game._cullBounds.view, vl = V ? V.left : -Infinity, vr = V ? V.right : Infinity;
-                const s = this.scale, t = _frameTime / 1000, op = ctx.globalCompositeOperation, a0 = ctx.globalAlpha;
+                this.slide();
+                const V = game._cullBounds && game._cullBounds.view, vl = Math.max(this.x, V ? V.left : -Infinity), vr = Math.min(this.x + this.w, V ? V.right : Infinity);
+                const s = this.scale, t = _frameTime / 1000, op = ctx.globalCompositeOperation, a0 = ctx.globalAlpha, X0 = this.ix + this.dx, Y0 = this.iy + this.dy;
                 ctx.save(); ctx.beginPath(); ctx.rect(this.x, this.y, this.w, this.h); ctx.clip();
                 ctx.globalCompositeOperation = 'lighter';
                 ctx.globalAlpha = Math.max(0.15, Math.min(1, dark * 1.1));                  // as the hub's buildings glow
-                ctx.drawImage(this.glow, this.x, this.y, this.w, this.h);
+                this._stampLayer(ctx, this.glow, this.glowRes);
                 const on = Math.max(0, Math.min(1, (dark - 0.2) / 0.3));
                 if (on > 0) {
                     const head = bulbSprite(ctx, '255,243,214', 0.9, 1.3, '255,236,200', 0.3, 9, true), tail = bulbSprite(ctx, '255,70,50', 0.9, 1, '255,42,0', 0.4, 5, true);
@@ -272,7 +326,7 @@
                         const p = this._carAt(car, t);
                         if (p.a <= 0.02) continue;
                         const st = this._carStamp(car.v, p.rot), hl = st.L * 0.5 * s, d = [[1, 0], [-1, 0], [0, 1], [0, -1]][p.rot];
-                        const cx = this.x + p.x * s, cy = this.y + p.y * s;
+                        const cx = X0 + p.x * s, cy = Y0 + p.y * s;
                         if (cx + hl + 12 < vl || cx - hl - 12 > vr) continue;
                         drawBulb(ctx, head, cx + d[0] * hl, cy + d[1] * hl, on * p.a);
                         drawBulb(ctx, tail, cx - d[0] * hl, cy - d[1] * hl, on * p.a);
@@ -282,15 +336,15 @@
                 const cols = [bulbSprite(ctx, '0,255,110', 1, 1, '0,255,110', 0.3, 4, true), bulbSprite(ctx, '255,170,0', 1, 1, '255,170,0', 0.3, 4, true), bulbSprite(ctx, '255,42,42', 1, 1, '255,42,42', 0.3, 4, true)];
                 for (const g of this.signals) {
                     const ph = ((t + g.phase) % 11) / 11, b = cols[ph < 0.46 ? 0 : ph < 0.54 ? 1 : 2];
-                    for (const x of [g.x0, g.x1]) { const wx = this.x + x * s; if (wx >= vl - 4 && wx <= vr + 4) drawBulb(ctx, b, wx, this.y + g.y * s, 0.95); }
+                    for (const x of [g.x0, g.x1]) { const wx = X0 + x * s; if (wx >= vl - 4 && wx <= vr + 4) drawBulb(ctx, b, wx, Y0 + g.y * s, 0.95); }
                 }
                 if (!this._beacons) this._beacons = this._findBeacons();
                 const red = bulbSprite(ctx, '255,48,64', 1, 1.2, '255,48,64', 0.35, 6, true);
                 for (const bc of this._beacons) {
                     const blink = Math.sin(t * 1.6 + bc.phase);
                     if (blink < 0.55) continue;
-                    const wx = this.x + bc.x * s;
-                    if (wx >= vl - 6 && wx <= vr + 6) drawBulb(ctx, red, wx, this.y + bc.y * s, (blink - 0.55) / 0.45);
+                    const wx = X0 + bc.x * s;
+                    if (wx >= vl - 6 && wx <= vr + 6) drawBulb(ctx, red, wx, Y0 + bc.y * s, (blink - 0.55) / 0.45);
                 }
                 ctx.restore(); ctx.globalCompositeOperation = op; ctx.globalAlpha = a0;
             }
@@ -314,5 +368,5 @@
             }
 
             /** Its canvases, for the memory line (bytes) */
-            bytes() { return [this.base, this.glow].reduce((n, cv) => n + (cv ? cv.width * cv.height * 4 : 0), 0); }
+            bytes() { return [this.base, this.glow, this._half && this._half[0]].reduce((n, cv) => n + (cv ? cv.width * cv.height * 4 : 0), 0); }
         }

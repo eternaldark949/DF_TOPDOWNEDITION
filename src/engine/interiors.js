@@ -1063,7 +1063,7 @@
             /** The street below the Silver Queen's veranda: a CityView (buildings/city-view.js) in the strip above the
                 railing (world y −394..6), the hub's own buildings, roads, lamps and cars seen from its upper floors. */
             _makeAptCityView() {
-                return new CityView({ x: 0, y: -394, w: this.activeMap.width, h: 400, seed: 949 });
+                return new CityView({ x: 0, y: -394, w: this.activeMap.width, h: 400, seed: 949, parallax: 0.35, edgeY: 20, lookout: 110 });
             },
             drawApartmentBackdrop(ctx) {
                 if (!this._cityView) this._cityView = this._makeAptCityView();

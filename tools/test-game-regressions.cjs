@@ -701,9 +701,11 @@ test('City view: the hub kit seen from a window; its bake leaves the camera as i
     const cam = game.camera, lod = _zoomLOD, cv = new CityView({ x: 0, y: -394, w: 1400, h: 400, seed: 949 });
     cv.bakeBase(); cv.bakeGlow();
     game._cullBounds = { view: { left: -2000, right: 4000, top: -2000, bottom: 2000 } };
-    const t = _frameTime / 1000, cars = cv.cars.filter(c => cv._carAt(c, t).a > 0.02).length;
+    const t = _frameTime / 1000, s = cv.scale, inWin = (x, w) => !(x + w < cv.x || x > cv.x + cv.w), span = cv.VW + 60, pw = 8 * s * 2;
+    const cars = cv.cars.filter(c => { const p = cv._carAt(c, t), st = cv._carStamp(c.v, p.rot); return p.a > 0.02 && inWin(cv.x + p.x * s - st.w / 2, st.w); }).length;
+    const peds = cv.peds.filter(q => inWin(cv.x + (((q.offset + t * q.speed) % span + span) % span - 30) * s - pw, pw * 2)).length;
     window.__cv = cv; cv.drawBase(game.ctx);   // (turns each car's stamp once)
-    return { same: game.camera === cam && _zoomLOD === lod, buildings: cv.buildings.length, cars, peds: cv.peds.length, kinds: [...new Set(cv.buildings.map(b => b.type))].sort() };`);
+    return { same: game.camera === cam && _zoomLOD === lod, buildings: cv.buildings.length, cars, peds, kinds: [...new Set(cv.buildings.map(b => b.type))].sort() };`);
   ok(r.same, 'the game camera and zoom LOD are back as they were');
   ok(r.buildings >= 10, 'blocks filled with the hub\'s generic buildings');
   equal(r.kinds, ['apartment', 'shop', 'warehouse'], 'in the hub\'s mix');
@@ -711,7 +713,78 @@ test('City view: the hub kit seen from a window; its bake leaves the camera as i
   env.run(`window.__cv.drawBase(game.ctx)`);
   const images = env.trace.filter(op => op[1] === 'drawImage').length;
   env.setTrace(false);
-  equal(images, 1 + r.cars + r.peds, 'the still city, then one stamp per car and per person');
+  equal(images, 1 + r.cars + r.peds, 'the still city, then one stamp per car and per person in the window');
+}, {affine: true});
+
+test('City traffic: the cars on a lane share its speed, and never close on each other', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949');`);
+  const r = value(env, `
+    const out = [];
+    for (const seed of [1, 7, 949]) {
+      const cv = new CityView({ x: 0, y: -394, w: 1400, h: 400, seed, parallax: 0.35, edgeY: 20 }), span = cv.VW + 240, lanes = new Map();
+      for (const c of cv.cars) if (c.axis === 'h') { if (!lanes.has(c.y)) lanes.set(c.y, []); lanes.get(c.y).push(c); }
+      let worst = Infinity, oneSpeed = true;
+      for (const cars of lanes.values()) {
+        oneSpeed = oneSpeed && cars.every(c => c.speed === cars[0].speed);
+        for (let t = 0; t < 600; t += 0.25) {
+          const xs = cars.map(c => cv._carAt(c, t).x);
+          for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++) {
+            const d = Math.abs(xs[i] - xs[j]);
+            worst = Math.min(worst, Math.min(d, span - d) - (cars[i].v.length + cars[j].v.length) / 2);
+          }
+        }
+      }
+      out.push({ lanes: lanes.size, oneSpeed, worst: Math.round(worst) });
+    }
+    return out;`);
+  for (const l of r) {
+    equal(l.lanes, 4, 'two lanes each way');
+    ok(l.oneSpeed, 'one speed a lane');
+    ok(l.worst >= 40, `over ten minutes the closest two cars on a lane come is ${l.worst} hub px, bumper to bumper`);
+  }
+});
+
+test('City parallax: the city slides slower than the floor, never past its picture, and sits as laid out at the edge', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.worldMinutes=22*60;`);
+  const r = value(env, `
+    const cv = game._makeAptCityView(), P = cv.parallax, out = { covered: true };
+    for (let x = -300; x <= 1700; x += 50) for (let y = -400; y <= 1000; y += 50) {
+      game.view = { x, y, zoom: 1 }; cv.slide();
+      const L = cv.ix + cv.dx, T = cv.iy + cv.dy, e = 1e-6;
+      if (L > cv.x + e || L + cv.iw < cv.x + cv.w - e || T > cv.y + e || T + cv.ih < cv.y + cv.h - e) out.covered = false;
+    }
+    game.view = { x: cv.x + cv.w / 2, y: cv.edgeY, zoom: 1 }; cv.slide(); out.edge = [cv.dx, cv.dy];
+    game.view = { x: cv.x + cv.w / 2 + 100, y: cv.edgeY + 60, zoom: 1 }; cv.slide(); out.moved = [cv.dx / P, cv.dy / P];
+    game._cullBounds = { view: { left: -2000, right: 4000, top: -2000, bottom: 2000 } };
+    window.__cv = cv; cv.drawBase(game.ctx);   // (bakes, and turns the car stamps)
+    return out;`);
+  ok(r.covered, 'from any camera, the picture covers the whole window');
+  equal(r.edge, [0, 0], 'at the edge, centred: the city as laid out');
+  equal(r.moved.map(Math.round), [100, 60], 'the camera 100 px along and 60 back: the city follows it by the parallax');
+  const src = (vx, vy) => {
+    env.setTrace(true);
+    env.run(`game.view = { x: ${vx}, y: ${vy}, zoom: 1 }; window.__cv.drawBase(game.ctx)`);
+    const op = env.trace.find(o => o[1] === 'drawImage');
+    env.setTrace(false);
+    return [op[3], op[4], op[7], op[8]];
+  };
+  const a = src(700, 20), b = src(800, 80), res = 1.5, P = 0.35;
+  equal([a[2], a[3]], [0, -394], 'the still city is stamped into the window');
+  equal([Math.round((a[0] - b[0]) / res / P), Math.round((a[1] - b[1]) / res / P)], [100, 60], 'and the part of it that shows slides with the camera, by the parallax');
+}, {affine: true});
+
+test('Look-out: at the veranda edge the camera leans out over the city; nowhere else', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.running=false; game.enterWorld(); game.loop=()=>{};`);
+  const at = (x, y) => value(env, `
+    if (!game._cityView) game._cityView = game._makeAptCityView();
+    for (let i = 0; i < 120; i++) { game.player.x = ${x}; game.player.y = ${y}; _frameTime += 50; game.draw(); }
+    return { lean: game.lookLeanY, want: -game._cityView.lookout / game.camera.zoom, camY: game.camera.y };`);
+  const edge = at(700, 20), room = at(400, 500);
+  ok(Math.abs(edge.lean - edge.want) < 1, `at the railing it leans ${Math.round(edge.lean)} px (${Math.round(edge.want)} wanted: the same on screen at any zoom)`);
+  equal(Math.round(edge.camY), Math.round(20 + edge.want), 'the camera is that far out past her');
+  ok(Math.abs(room.lean) < 0.01, 'in the rooms: none');
+  const hub = value(env, `game._doLoadMap('hub_949'); _frameTime += 16; game.draw(); return game.lookLeanY;`);
+  equal(hub, 0, 'and none at once on another map');
 }, {affine: true});
 
 test('Rooftop festoons: every bulb at its own shimmer of the string, in one fill per shimmer', env => {

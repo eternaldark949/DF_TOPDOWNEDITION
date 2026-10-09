@@ -91,9 +91,12 @@
                     const kCam = 1 - Math.exp(-dtCam / LA.TAU_MS);
                     this.driveLeanX = (this.driveLeanX || 0) + ((drv ? (this.car.vx || 0) * LA.PER_SPEED : 0) - (this.driveLeanX || 0)) * kCam;
                     this.driveLeanY = (this.driveLeanY || 0) + ((drv ? (this.car.vy || 0) * LA.PER_SPEED : 0) - (this.driveLeanY || 0)) * kCam;
+                    // At a window's edge the camera leans out over the city beyond it (a CityView's lookout: buildings/city-view.js)
+                    const cityV = this._cityView, look = cityV && !drv ? cityV.lookoutLean(this.player, this.camera.zoom) : 0;
+                    this.lookLeanY = cityV ? (this.lookLeanY || 0) + (look - (this.lookLeanY || 0)) * (1 - Math.exp(-dtCam / 450)) : 0;
                     // Scoped with a sniper, the camera leans down her line (engine/scope.js)
                     camX = this.player.x + (this.scopeLeanX || 0) + this.driveLeanX;
-                    camY = this.player.y + (this.scopeLeanY || 0) + this.driveLeanY;
+                    camY = this.player.y + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY;
                     this.camera.x = camX; // Sync for smooth handoff
                     this.camera.y = camY;
                 }
