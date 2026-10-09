@@ -170,6 +170,18 @@
         function bodyLimbRadius(T, t) {
             return t <= T[2] ? T[0] + (T[1] - T[0]) * t / T[2] : T[1] + (T[3] - T[1]) * (t - T[2]) / (1 - T[2]);
         }
+        /** How level a forearm drawn L long is: 0 hanging straight down (seen end-on) … 1 reaching out. */
+        function bodyForearmReach(L) { return Math.min(1, L / 10); }
+        /** Half of a ring of radius R round a limb, centred at (x, y), added to the current path. A ring
+         *  stands across the limb, so from above it is an ellipse: a band across a level limb (kept a
+         *  little bowed, so it still reads as round), opening to a full ring as the limb points down.
+         *  a: the limb's direction; k: its reach (as above). side +1: the half toward the limb's far end,
+         *  which is the top; −1: the half beneath it, for the limb to hide. */
+        function bodyRingHalf(ctx, x, y, R, a, k, side) {
+            const tilt = Math.max(0.28, Math.sqrt(1 - k * k)), s = Math.sin(a), c = Math.cos(a);
+            ctx.moveTo(x + side * R * s, y - side * R * c);
+            ctx.ellipse(x, y, R * tilt, R, a, -side * Math.PI / 2, side * Math.PI / 2);
+        }
 
         /** A hand in its own frame (x along the forearm, origin at the fist point), thumb included.
          *  Relaxed: seen from the thumb side, shortened by reach k (0 hanging straight down … 1 reaching
@@ -209,7 +221,7 @@
             const a = L > 0.3 ? Math.atan2(dy, dx) : (fy < 0 ? -Math.PI / 2 : Math.PI / 2);
             // the thumb sits toward the body's midline (and a little forward)
             const t = (-Math.sin(a) * 0.4 + Math.cos(a) * (fy < 0 ? 1 : -1)) >= 0 ? 1 : -1;
-            _bodyFillAt(ctx, bodyHandPath(grip, Math.min(1, L / 10), t, C.hand), fx, fy, a);
+            _bodyFillAt(ctx, bodyHandPath(grip, bodyForearmReach(L), t, C.hand), fx, fy, a);
         }
 
         /** A foot around its ankle point: a narrow heel, the arch on the inside, wide across the ball,

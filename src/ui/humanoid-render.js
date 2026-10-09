@@ -984,6 +984,11 @@
             const owner = dyn.owner;
             if (owner && owner._blinkSeed === undefined) owner._blinkSeed = Math.floor(Math.random() * 997);
             const blinkNow = owner ? blinkAmount(_gameTimeSec, owner._blinkSeed) : 0;
+            // Earrings hang beneath the head and hair, the head hiding where they meet the ear; other
+            // head jewelry keeps its layer above the hair.
+            if (jewelry && typeof WARDROBE !== 'undefined') {
+                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && piece.underHair) piece.draw(ctx, { headX }, j); }
+            }
             if (dyn.android) {
                 drawAndroidHead(ctx, headX, dyn.android, blinkNow);        // plated dome and visor (ui/bodies.js)
             } else {
@@ -996,10 +1001,6 @@
                     ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
                     ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
                 }
-            }
-            // Earrings attach to the head beneath hair; other head jewelry retains its layer.
-            if (jewelry && typeof WARDROBE !== 'undefined') {
-                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && piece.underHair) piece.draw(ctx, { headX }, j); }
             }
             // Hair (all styles render on top of head) — strand physics via hairGeometry().
             // A raised hood hides short styles; long ones still spill out from under it.
@@ -1896,12 +1897,23 @@
             drawBodyHand(ctx, lElbowX, lElbowY, lFistX, lFistY, bothGrip || glassHand === 'left', BC);
             drawBodyHand(ctx, rElbowX, rElbowY, rFistX, rFistY, bothGrip || stance === 'pistol' || gunHand || glassHand === 'right', BC);
         
-            // 7. Forearms (fabric only under long sleeves)
+            // 7. Forearms (fabric only under long sleeves), with whatever passes under the wrists beneath them
+            if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
+                const p = WD.jewelry[j.type]; if (p && p.under) p.under(ctx, g, j);
+            }
             const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
             drawLimb(lElbowX, lElbowY, lFistX, lFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
             drawLimb(rElbowX, rElbowY, rFistX, rFistY, BC.fore, foreColor, sleeve === 'long' && topGloss);
             if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
                 const p = WD.jewelry[j.type]; if (p && p.at === 'wrists') p.draw(ctx, g, j);
+            }
+            if (A) {                                                        // android wrists: the seam over the top of each
+                ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6; ctx.beginPath();
+                for (let i = 0; i < 2; i++) {
+                    const [ex, ey] = g.elbows[i], [fx, fy] = g.fists[i];
+                    bodyRingHalf(ctx, fx, fy, BC.fore[3], Math.atan2(fy - ey, fx - ex), bodyForearmReach(Math.hypot(fx - ex, fy - ey)), 1);
+                }
+                ctx.stroke();
             }
         
             // 8. Upper Arms (fabric under short or long sleeves). They hang from the shoulders, so their
@@ -1911,9 +1923,9 @@
             const lShX = shoulderX - lShoulderY * torS, lShY = lShoulderY * torC, rShX = shoulderX - rShoulderY * torS, rShY = rShoulderY * torC;
             drawLimb(lShX, lShY, lElbowX, lElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
             drawLimb(rShX, rShY, rElbowX, rElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
-            if (A) {                                                        // android joints: seam rings at elbows and wrists
+            if (A) {                                                        // android elbows: a round joint plate on each
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
-                for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY], [lFistX, lFistY], [rFistX, rFistY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
+                for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
             }
             if (topP && topP.armStripe) {                                // track-jacket stripes down the sleeves
                 ctx.strokeStyle = clothes.top.trim || '#f5f5f5'; ctx.lineWidth = 0.8; ctx.beginPath();
