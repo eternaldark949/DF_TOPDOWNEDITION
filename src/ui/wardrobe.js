@@ -556,7 +556,10 @@
             };
 
             const jewelry = {
-                hoops: { at: 'head', underHair: true, draw(ctx, g, c) { ctx.strokeStyle = c.color || '#e8c27a'; ctx.lineWidth = 0.9; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(g.headX + 0.5, s * 8.6, 1.9, 0, Math.PI * 2); ctx.stroke(); } },
+                // A hoop hangs from the lobe facing forward, swung out a little by the jaw, so from above it
+                // is seen edge-on: a thin loop sticking out sideways from under the ear (drawn before the
+                // head, which hides its inner end). Portraits see it face-on, as a ring.
+                hoops: { at: 'head', underHair: true, draw(ctx, g, c) { ctx.strokeStyle = c.color || '#e8c27a'; ctx.lineWidth = 0.8; ctx.beginPath(); for (const s of [-1, 1]) { ctx.moveTo(g.headX + 1.1, s * 9); ctx.ellipse(g.headX + 0.5, s * 9, 0.6, 1.9, 0, 0, Math.PI * 2); } ctx.stroke(); },
                     portrait(ctx, P, c) { const { cx, cy, fw, fh } = P; ctx.strokeStyle = c.color || '#e8c27a'; ctx.lineWidth = fw * 0.05; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + s * fw * 1.02, cy + fh * 0.35, fw * 0.16, 0, Math.PI * 2); ctx.stroke(); } } },
                 sunglasses: { at: 'head', draw(ctx, g, c) { ctx.fillStyle = c.color || '#141414'; ctx.beginPath(); ctx.roundRect(g.headX + 3.6, -5.5, 2.8, 11, 1.2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(g.headX + 4.2, -4.5, 0.8, 2.5); },
                     portrait(ctx, P, c) { const { cx, fw, eyeY, eyeSpacing } = P; ctx.fillStyle = c.color || '#141414'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + s * eyeSpacing, eyeY, fw * 0.33, fw * 0.22, 0, 0, Math.PI * 2); ctx.fill(); } ctx.strokeStyle = c.color || '#141414'; ctx.lineWidth = fw * 0.06; ctx.beginPath(); ctx.moveTo(cx - eyeSpacing + fw * 0.3, eyeY - fw * 0.05); ctx.lineTo(cx + eyeSpacing - fw * 0.3, eyeY - fw * 0.05); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + s * eyeSpacing - fw * 0.1, eyeY - fw * 0.07, fw * 0.08, fw * 0.04, -0.4, 0, Math.PI * 2); ctx.fill(); } } },
@@ -628,22 +631,16 @@
                 bangles: { at: 'wrists', under(ctx, g, c) { bangleHalves(ctx, g, g.darken(c.color || '#e8c27a', 0.35), -1); },
                     draw(ctx, g, c) { bangleHalves(ctx, g, c.color || '#e8c27a', 1); }, portrait() {} }
             };
-            // Two bangles round each wrist, 1 and 2.3 px up the forearm from the fist. A bangle's ring
-            // stands across the arm, so from above it is an ellipse: a band across a reaching wrist
-            // (bowed a little toward the hand so it still reads as round), opening to a full ring as
-            // the arm hangs (k: reach, as for the hand). side +1: the half toward the hand, which is
-            // the top; −1: the half toward the elbow, underneath.
+            // Two bangles round each wrist, 1 and 2.3 px up the forearm from the fist, seen as rings
+            // round the arm (bodyRingHalf). side +1: the halves over the top; −1: the halves beneath.
             const bangleHalves = (ctx, g, color, side) => {
                 ctx.strokeStyle = color; ctx.lineWidth = 0.9; ctx.beginPath();
                 for (let i = 0; i < 2; i++) {
                     const [ex, ey] = g.elbows[i], [fx, fy] = g.fists[i];
-                    const dx = fx - ex, dy = fy - ey, L = Math.hypot(dx, dy) || 1e-6, a = Math.atan2(dy, dx);
-                    const k = Math.min(1, L / 10), tilt = Math.max(0.28, Math.sqrt(1 - k * k)), s = Math.sin(a), co = Math.cos(a);
+                    const dx = fx - ex, dy = fy - ey, L = Math.hypot(dx, dy) || 1e-6, a = Math.atan2(dy, dx), k = bodyForearmReach(L);
                     for (const d of [1, 2.3]) {
-                        const t = Math.max(0, 1 - d * k / L), R = bodyLimbRadius(g.body.fore, t) + 0.7;
-                        const x = ex + dx * t, y = ey + dy * t;
-                        ctx.moveTo(x + side * R * s, y - side * R * co);
-                        ctx.ellipse(x, y, R * tilt, R, a, -side * Math.PI / 2, side * Math.PI / 2);
+                        const t = Math.max(0, 1 - d * k / L);
+                        bodyRingHalf(ctx, ex + dx * t, ey + dy * t, bodyLimbRadius(g.body.fore, t) + 0.7, a, k, side);
                     }
                 }
                 ctx.stroke();

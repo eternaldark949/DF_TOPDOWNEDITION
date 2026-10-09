@@ -43887,6 +43887,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function bodyLimbRadius(T, t) {
             return t <= T[2] ? T[0] + (T[1] - T[0]) * t / T[2] : T[1] + (T[3] - T[1]) * (t - T[2]) / (1 - T[2]);
         }
+        /** How level a forearm drawn L long is: 0 hanging straight down (seen end-on) … 1 reaching out. */
+        function bodyForearmReach(L) { return Math.min(1, L / 10); }
+        /** Half of a ring of radius R round a limb, centred at (x, y), added to the current path. A ring
+         *  stands across the limb, so from above it is an ellipse: a band across a level limb (kept a
+         *  little bowed, so it still reads as round), opening to a full ring as the limb points down.
+         *  a: the limb's direction; k: its reach (as above). side +1: the half toward the limb's far end,
+         *  which is the top; −1: the half beneath it, for the limb to hide. */
+        function bodyRingHalf(ctx, x, y, R, a, k, side) {
+            const tilt = Math.max(0.28, Math.sqrt(1 - k * k)), s = Math.sin(a), c = Math.cos(a);
+            ctx.moveTo(x + side * R * s, y - side * R * c);
+            ctx.ellipse(x, y, R * tilt, R, a, -side * Math.PI / 2, side * Math.PI / 2);
+        }
 
         /** A hand in its own frame (x along the forearm, origin at the fist point), thumb included.
          *  Relaxed: seen from the thumb side, shortened by reach k (0 hanging straight down … 1 reaching
@@ -43926,7 +43938,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const a = L > 0.3 ? Math.atan2(dy, dx) : (fy < 0 ? -Math.PI / 2 : Math.PI / 2);
             // the thumb sits toward the body's midline (and a little forward)
             const t = (-Math.sin(a) * 0.4 + Math.cos(a) * (fy < 0 ? 1 : -1)) >= 0 ? 1 : -1;
-            _bodyFillAt(ctx, bodyHandPath(grip, Math.min(1, L / 10), t, C.hand), fx, fy, a);
+            _bodyFillAt(ctx, bodyHandPath(grip, bodyForearmReach(L), t, C.hand), fx, fy, a);
         }
 
         /** A foot around its ankle point: a narrow heel, the arch on the inside, wide across the ball,
@@ -44861,7 +44873,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             };
 
             const jewelry = {
-                hoops: { at: 'head', underHair: true, draw(ctx, g, c) { ctx.strokeStyle = c.color || '#e8c27a'; ctx.lineWidth = 0.9; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(g.headX + 0.5, s * 8.6, 1.9, 0, Math.PI * 2); ctx.stroke(); } },
+                // A hoop hangs from the lobe facing forward, swung out a little by the jaw, so from above it
+                // is seen edge-on: a thin loop sticking out sideways from under the ear (drawn before the
+                // head, which hides its inner end). Portraits see it face-on, as a ring.
+                hoops: { at: 'head', underHair: true, draw(ctx, g, c) { ctx.strokeStyle = c.color || '#e8c27a'; ctx.lineWidth = 0.8; ctx.beginPath(); for (const s of [-1, 1]) { ctx.moveTo(g.headX + 1.1, s * 9); ctx.ellipse(g.headX + 0.5, s * 9, 0.6, 1.9, 0, 0, Math.PI * 2); } ctx.stroke(); },
                     portrait(ctx, P, c) { const { cx, cy, fw, fh } = P; ctx.strokeStyle = c.color || '#e8c27a'; ctx.lineWidth = fw * 0.05; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + s * fw * 1.02, cy + fh * 0.35, fw * 0.16, 0, Math.PI * 2); ctx.stroke(); } } },
                 sunglasses: { at: 'head', draw(ctx, g, c) { ctx.fillStyle = c.color || '#141414'; ctx.beginPath(); ctx.roundRect(g.headX + 3.6, -5.5, 2.8, 11, 1.2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(g.headX + 4.2, -4.5, 0.8, 2.5); },
                     portrait(ctx, P, c) { const { cx, fw, eyeY, eyeSpacing } = P; ctx.fillStyle = c.color || '#141414'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + s * eyeSpacing, eyeY, fw * 0.33, fw * 0.22, 0, 0, Math.PI * 2); ctx.fill(); } ctx.strokeStyle = c.color || '#141414'; ctx.lineWidth = fw * 0.06; ctx.beginPath(); ctx.moveTo(cx - eyeSpacing + fw * 0.3, eyeY - fw * 0.05); ctx.lineTo(cx + eyeSpacing - fw * 0.3, eyeY - fw * 0.05); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + s * eyeSpacing - fw * 0.1, eyeY - fw * 0.07, fw * 0.08, fw * 0.04, -0.4, 0, Math.PI * 2); ctx.fill(); } } },
@@ -44933,22 +44948,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 bangles: { at: 'wrists', under(ctx, g, c) { bangleHalves(ctx, g, g.darken(c.color || '#e8c27a', 0.35), -1); },
                     draw(ctx, g, c) { bangleHalves(ctx, g, c.color || '#e8c27a', 1); }, portrait() {} }
             };
-            // Two bangles round each wrist, 1 and 2.3 px up the forearm from the fist. A bangle's ring
-            // stands across the arm, so from above it is an ellipse: a band across a reaching wrist
-            // (bowed a little toward the hand so it still reads as round), opening to a full ring as
-            // the arm hangs (k: reach, as for the hand). side +1: the half toward the hand, which is
-            // the top; −1: the half toward the elbow, underneath.
+            // Two bangles round each wrist, 1 and 2.3 px up the forearm from the fist, seen as rings
+            // round the arm (bodyRingHalf). side +1: the halves over the top; −1: the halves beneath.
             const bangleHalves = (ctx, g, color, side) => {
                 ctx.strokeStyle = color; ctx.lineWidth = 0.9; ctx.beginPath();
                 for (let i = 0; i < 2; i++) {
                     const [ex, ey] = g.elbows[i], [fx, fy] = g.fists[i];
-                    const dx = fx - ex, dy = fy - ey, L = Math.hypot(dx, dy) || 1e-6, a = Math.atan2(dy, dx);
-                    const k = Math.min(1, L / 10), tilt = Math.max(0.28, Math.sqrt(1 - k * k)), s = Math.sin(a), co = Math.cos(a);
+                    const dx = fx - ex, dy = fy - ey, L = Math.hypot(dx, dy) || 1e-6, a = Math.atan2(dy, dx), k = bodyForearmReach(L);
                     for (const d of [1, 2.3]) {
-                        const t = Math.max(0, 1 - d * k / L), R = bodyLimbRadius(g.body.fore, t) + 0.7;
-                        const x = ex + dx * t, y = ey + dy * t;
-                        ctx.moveTo(x + side * R * s, y - side * R * co);
-                        ctx.ellipse(x, y, R * tilt, R, a, -side * Math.PI / 2, side * Math.PI / 2);
+                        const t = Math.max(0, 1 - d * k / L);
+                        bodyRingHalf(ctx, ex + dx * t, ey + dy * t, bodyLimbRadius(g.body.fore, t) + 0.7, a, k, side);
                     }
                 }
                 ctx.stroke();
@@ -46279,6 +46288,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const owner = dyn.owner;
             if (owner && owner._blinkSeed === undefined) owner._blinkSeed = Math.floor(Math.random() * 997);
             const blinkNow = owner ? blinkAmount(_gameTimeSec, owner._blinkSeed) : 0;
+            // Earrings hang beneath the head and hair, the head hiding where they meet the ear; other
+            // head jewelry keeps its layer above the hair.
+            if (jewelry && typeof WARDROBE !== 'undefined') {
+                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && piece.underHair) piece.draw(ctx, { headX }, j); }
+            }
             if (dyn.android) {
                 drawAndroidHead(ctx, headX, dyn.android, blinkNow);        // plated dome and visor (ui/bodies.js)
             } else {
@@ -46291,10 +46305,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fillStyle = faceDark; ctx.fillRect(headX + 4, -2, 2, 1);
                     ctx.fillStyle = faceLight; ctx.fillRect(headX + 5, 2, 2, 1);
                 }
-            }
-            // Earrings attach to the head beneath hair; other head jewelry retains its layer.
-            if (jewelry && typeof WARDROBE !== 'undefined') {
-                for (const j of jewelry) { const piece = WARDROBE.jewelry[j.type]; if (piece && piece.underHair) piece.draw(ctx, { headX }, j); }
             }
             // Hair (all styles render on top of head) — strand physics via hairGeometry().
             // A raised hood hides short styles; long ones still spill out from under it.
@@ -47201,6 +47211,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             if (clothes.jewelry && WD) for (const j of clothes.jewelry) {
                 const p = WD.jewelry[j.type]; if (p && p.at === 'wrists') p.draw(ctx, g, j);
             }
+            if (A) {                                                        // android wrists: the seam over the top of each
+                ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6; ctx.beginPath();
+                for (let i = 0; i < 2; i++) {
+                    const [ex, ey] = g.elbows[i], [fx, fy] = g.fists[i];
+                    bodyRingHalf(ctx, fx, fy, BC.fore[3], Math.atan2(fy - ey, fx - ex), bodyForearmReach(Math.hypot(fx - ex, fy - ey)), 1);
+                }
+                ctx.stroke();
+            }
         
             // 8. Upper Arms (fabric under short or long sleeves). They hang from the shoulders, so their
             // roots turn with the torso: forward with the opposite leg on a step, into the blow in a punch.
@@ -47209,9 +47227,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const lShX = shoulderX - lShoulderY * torS, lShY = lShoulderY * torC, rShX = shoulderX - rShoulderY * torS, rShY = rShoulderY * torC;
             drawLimb(lShX, lShY, lElbowX, lElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
             drawLimb(rShX, rShY, rElbowX, rElbowY, BC.upper, upperColor, sleeve !== 'none' && topGloss);
-            if (A) {                                                        // android joints: seam rings at elbows and wrists
+            if (A) {                                                        // android elbows: a round joint plate on each
                 ctx.strokeStyle = A.trim; ctx.lineWidth = 0.6;
-                for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY], [lFistX, lFistY], [rFistX, rFistY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
+                for (const [x, y] of [[lElbowX, lElbowY], [rElbowX, rElbowY]]) { ctx.beginPath(); ctx.arc(x, y, 1.9, 0, Math.PI * 2); ctx.stroke(); }
             }
             if (topP && topP.armStripe) {                                // track-jacket stripes down the sleeves
                 ctx.strokeStyle = clothes.top.trim || '#f5f5f5'; ctx.lineWidth = 0.8; ctx.beginPath();
