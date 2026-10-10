@@ -1275,8 +1275,10 @@ engineMixin({
                 _physicsSpatial.track(this.activeMap.walls);
                 _physicsSpatial.track(getColliders(this.activeMap));
                 
-                if (this.activeMap.id === 'hub_949' && this.questState.ambushCleared) { 
-                    this.npcs.push(new NPC(2000, 9800, "Ms. Jean", 'ms_jean')); 
+                // Ms. Jean pays her respects at the centre of the graveyard (HUB_GRAVEYARD)
+                if (this.activeMap.id === 'hub_949' && this.questState.ambushCleared) {
+                    const G = HUB_GRAVEYARD;
+                    this.npcs.push(new NPC(G.x + G.w / 2, G.y + G.h / 2, "Ms. Jean", 'ms_jean'));
                 }
                 
                 // Spawn Grum North near the Scrapyard

@@ -4664,7 +4664,7 @@
         // Fireplaces: where the art draws the fire, and where the ambience hears it crackle
         const HEARTHS = { apt_949: { x: 580, y: 432 }, keepers_parlor: { x: 450, y: 62 }, cozy_cafe_interior: { x: 90, y: 535 } };
         // The city's graveyard, in the wide block on its southern edge (engine/map-loading.js 11d builds it; its music, candle glow,
-        // ghosts and Ms. Jean's lines all go by this)
+        // ghosts, Ms. Jean's spot and her lines all go by this)
         const HUB_GRAVEYARD = Object.freeze({ x: 4750, y: 11360, w: 2700, h: 1760 });
 
         // ╔════════════════════════════════════════════════════════════════════════════╗
@@ -63520,8 +63520,10 @@ engineMixin({
                 _physicsSpatial.track(this.activeMap.walls);
                 _physicsSpatial.track(getColliders(this.activeMap));
                 
-                if (this.activeMap.id === 'hub_949' && this.questState.ambushCleared) { 
-                    this.npcs.push(new NPC(2000, 9800, "Ms. Jean", 'ms_jean')); 
+                // Ms. Jean pays her respects at the centre of the graveyard (HUB_GRAVEYARD)
+                if (this.activeMap.id === 'hub_949' && this.questState.ambushCleared) {
+                    const G = HUB_GRAVEYARD;
+                    this.npcs.push(new NPC(G.x + G.w / 2, G.y + G.h / 2, "Ms. Jean", 'ms_jean'));
                 }
                 
                 // Spawn Grum North near the Scrapyard
