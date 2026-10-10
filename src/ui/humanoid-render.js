@@ -1141,7 +1141,7 @@
 
         /** A soft shadow under the feet: cast along the sun by day, a round pool at night and indoors,
          *  and at night one cast away from each of the (up to two) nearest burning lamps. */
-        let _contactShadowX, _contactShadowY, _contactShadowAngle = 0, _lampShadowFrame = -1, _lampShadowPeds = 0;
+        let _contactShadowX, _contactShadowY, _contactShadowAngle = 0;
         function _contactShadowDirection(x, y) {
             if (!Object.is(x, _contactShadowX) || !Object.is(y, _contactShadowY)) {
                 _contactShadowX = x; _contactShadowY = y; _contactShadowAngle = Math.atan2(y, x);
@@ -1160,17 +1160,19 @@
                 ctx.globalAlpha = a0 * (C.SHADOW_NIGHT + (C.SHADOW_DAY - C.SHADOW_NIGHT) * _sunShadow.k);
                 ctx.drawImage(sp, -32, -32);
             } else {
-                if (entity && C.LAMP_SHADOW && entity.x !== undefined) _drawLampShadows(ctx, entity, C, sp, a0);
+                if (entity && C.LAMP_SHADOW && entity.x !== undefined) _noteLampShadowBody(entity, C);
                 ctx.scale(12 / 32, 10 / 32); ctx.globalAlpha = a0 * C.SHADOW_NIGHT;
                 ctx.drawImage(sp, -32, -32);
             }
             ctx.restore();
         }
-        /** Lamp shadows: the contact sprite stretched away from each lamp, longer the farther off it stands
-         *  (a lamp is only a few heads taller than a person), fading with the lamp's own falloff. Each is
-         *  drawn faintly on the ground here and remembered for the light layer, where it puts the dark (and
-         *  the lamp's colour) back behind the body: drawLampShadowsInto(), engine/lighting.js. */
-        const LampShadows = { frame: -1, n: 0, list: [], tint: null, sprite: null, ground: null };
+        /** Lamp shadows: a soft shade stretched away from each lamp, longer the farther off a person stands
+         *  (a lamp is only a few heads taller than a person), fading with the lamp's own falloff. They lie
+         *  on their own layer under everyone: a body's draw only notes that it was drawn (_noteLampShadowBody),
+         *  and draw.js paints the shadows of the bodies noted last frame, at where they stand now, before the
+         *  people pass (drawLampShadowsUnder). The light layer then takes the lamp's light and colour back
+         *  behind each body, starting past its feet so the body itself isn't dimmed (drawLampShadowsInto). */
+        const LampShadows = { frame: -1, n: 0, list: [], noted: [], drawn: [], noteFrame: -1, peds: 0, tint: null, sprite: null, ground: null };
         /** A firmer blob than the contact shadow's: a person's length of shade with a soft rim, so it reads as a shape. */
         function _lampShadowSprite(rgb, cv) {
             cv = cv || document.createElement('canvas'); cv.width = cv.height = 64;
@@ -1179,33 +1181,47 @@
             c.fillStyle = g; c.fillRect(0, 0, 64, 64);
             return cv;
         }
-        function _drawLampShadows(ctx, entity, C, sp, a0) {
+        function _noteLampShadowBody(entity, C) {
+            const S = LampShadows;
+            if (S.noteFrame !== _frameTime) { S.noteFrame = _frameTime; S.peds = 0; }
+            if (entity._lampShadowFrame === _frameTime) return;               // once a frame, however many times it's drawn
+            const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
+            if ((ped && S.peds >= C.LAMP_SHADOW_PEDS) || S.noted.length >= 128) return;   // (a view that never paints them can't pile up)
+            if (ped) S.peds++;
+            entity._lampShadowFrame = _frameTime;
+            S.noted.push(entity);
+        }
+        /** The ground layer (draw.js, before the people pass, world transform): last frame's bodies, where they stand now. */
+        function drawLampShadowsUnder(ctx) {
+            const S = LampShadows, C = CONFIG.HUMAN_SHADE, bodies = S.noted;
+            S.noted = S.drawn; S.noted.length = 0; S.drawn = bodies;            // swap: this frame's draws note into the other list
+            S.frame = _frameTime; S.n = 0;
+            if (!bodies.length || !C.LAMP_SHADOW || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
             const sun = sunNow();
             if (sun.night <= 0.3) return;
-            const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
-            if (_lampShadowFrame !== _frameTime) { _lampShadowFrame = _frameTime; _lampShadowPeds = 0; }
-            if (ped && _lampShadowPeds >= C.LAMP_SHADOW_PEDS) return;
-            const n = _lampsNear2(entity.x, entity.y, C.LAMP_SHADOW_R);
-            if (!n) return;
-            if (ped) _lampShadowPeds++;
-            if (LampShadows.frame !== _frameTime) { LampShadows.frame = _frameTime; LampShadows.n = 0; }
-            const dusk = Math.min(1, (sun.night - 0.3) / 0.4);
-            for (let i = 0; i < n; i++) {
-                const { l, d } = _lampPair[i];
-                const k = lampWake(l) * lampFlicker(l) * (l.intensity ?? 1) * (1 - d / C.LAMP_SHADOW_R) * dusk;
-                if (k < 0.03) continue;
-                const len = Math.min(C.LAMP_SHADOW_MAX, d * C.LAMP_SHADOW_K), ang = Math.atan2(entity.y - l.y, entity.x - l.x);
-                const a = Math.min(1, k * 1.6);
-                ctx.save();
-                ctx.rotate(ang - _bodyRot);
-                ctx.translate(len / 2 - 2, 0); ctx.scale((20 + len) / 64, (9 + len * 0.06) / 32);
-                ctx.globalAlpha = a0 * C.LAMP_SHADOW_A * a;
-                ctx.drawImage(LampShadows.ground || (LampShadows.ground = _lampShadowSprite(_SHADOW_RGB)), -32, -32);
-                ctx.restore();
-                const rec = LampShadows.list[LampShadows.n] || (LampShadows.list[LampShadows.n] = {});
-                LampShadows.n++;
-                rec.x = entity.x; rec.y = entity.y; rec.ang = ang; rec.len = len; rec.a = a;
+            const dusk = Math.min(1, (sun.night - 0.3) / 0.4), sp = S.ground || (S.ground = _lampShadowSprite(_SHADOW_RGB));
+            const a0 = ctx.globalAlpha;
+            for (const e of bodies) {
+                if (e.visible === false || e.dead || e.inCar) continue;
+                const n = _lampsNear2(e.x, e.y, C.LAMP_SHADOW_R);
+                for (let i = 0; i < n; i++) {
+                    const { l, d } = _lampPair[i];
+                    const k = lampWake(l) * lampFlicker(l) * (l.intensity ?? 1) * (1 - d / C.LAMP_SHADOW_R) * dusk;
+                    if (k < 0.03) continue;
+                    const len = Math.min(C.LAMP_SHADOW_MAX, d * C.LAMP_SHADOW_K), ang = Math.atan2(e.y - l.y, e.x - l.x);
+                    const a = Math.min(1, k * 1.6);
+                    ctx.save();
+                    ctx.translate(e.x, e.y); ctx.rotate(ang);
+                    ctx.translate(len / 2 - 2, 0); ctx.scale((20 + len) / 64, (9 + len * 0.06) / 32);
+                    ctx.globalAlpha = a0 * C.LAMP_SHADOW_A * a;
+                    ctx.drawImage(sp, -32, -32);
+                    ctx.restore();
+                    const rec = S.list[S.n] || (S.list[S.n] = {});
+                    S.n++;
+                    rec.x = e.x; rec.y = e.y; rec.ang = ang; rec.len = len; rec.a = a;
+                }
             }
+            ctx.globalAlpha = a0;
         }
         /** The light layer's half (lighting.js, after its colour pass): this frame's lamp shadows, in the dark's own colour. */
         function drawLampShadowsInto(lc, tintRGB) {
@@ -1218,7 +1234,7 @@
                 const r = S.list[i];
                 lc.save();
                 lc.translate(r.x, r.y); lc.rotate(r.ang);
-                lc.translate(r.len / 2 + 2, 0); lc.scale((22 + r.len) / 64, (11 + r.len * 0.08) / 32);
+                lc.translate(r.len / 2 + 9, 0); lc.scale((10 + r.len) / 64, (11 + r.len * 0.08) / 32);   // from just past the feet
                 lc.globalAlpha = C.LAMP_SHADOW_DARK * r.a;
                 lc.drawImage(S.sprite, -32, -32);
                 lc.restore();
