@@ -17,6 +17,8 @@
         // ...and how far the glow pass draws past it without the beams (lamp halos, portico mist, the crown):
         // past this, only the beams can reach the screen (drawEmissive's beamsOnly)
         const SQ_GLOW_REACH = 240, MC_GLOW_REACH = 100;
+        const BUILDING_LANDMARK_STYLES = ['silver_queen', 'double_nights', 'moon_city', 'enni_cole'];
+
         class BuildingV2 {
             constructor(config) {
                 this.isV2 = true;
@@ -53,6 +55,10 @@
                 this.floorHeight = 12; // Visual height per floor in pixels
                 // Design style (roof/facade/neon treatment); may adjust colors, floors, sign
                 this._applyStyle(config);
+                // The street it fronts: 'S' (default), 'N', 'E' or 'W'. Its door, sign awning, entrance lights,
+                // front wash and balconies go on that side. The landmarks draw their own fronts and stay south.
+                this.facing = BUILDING_LANDMARK_STYLES.includes(this.style) ? 'S' : (['N', 'E', 'W'].includes(config.facing) ? config.facing : 'S');
+                this._shopfront = this.facing === config.facing || !!config.shopfront;   // hand-placed with a facing: a front (sign, lights) even without a door
                 
                 // Facade depth (3D effect on south/east walls)
                 this.facadeDepth = this.floors * 3;
@@ -175,10 +181,12 @@
                 const titleCase = (str) => str.replace(/\w\S*/g, (txt) => 
                     txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
                 
-                // Position sign on roof near south edge (entrance area)
+                // Position sign on roof near its front edge (entrance area)
+                const fx = { E: mainSection.w / 2 - 28, W: -mainSection.w / 2 + 28 }[this.facing] || 0;
+                const fy = { S: mainSection.h / 2 - 28, N: -mainSection.h / 2 + 28 }[this.facing] || 0;
                 this.attachedSign = new NeonSign(
-                    this.x + mainSection.x + mainSection.w / 2,
-                    this.y + mainSection.y + mainSection.h - 28, // Near south edge of roof
+                    this.x + mainSection.x + mainSection.w / 2 + fx,
+                    this.y + mainSection.y + mainSection.h / 2 + fy, // Near the front edge of the roof
                     titleCase(signConfig.text),
                     signConfig.color || this.colors.accent,
                     (signConfig.size || 20) * 1.2, // Slightly smaller for roof
@@ -189,27 +197,45 @@
             _setupDoor(doorConfig) {
                 if (this.style === 'double_nights') { this._dnDoor(doorConfig); return; }   // the door is under the porte-cochère
                 this._doorLightColor = doorConfig.lightColor || null;
-                // Find the southernmost section for entrance
-                let entranceSection = this.sections[0];
-                let maxY = entranceSection.y + entranceSection.h;
-                this.sections.forEach(s => {
-                    if (s.y + s.h > maxY) {
-                        entranceSection = s;
-                        maxY = s.y + s.h;
-                    }
-                });
-                
+                // On the front wall of the section furthest out on its facing side (the southernmost, facing south)
+                const g = this._frontGeo(), D = 10, L = 100, T = 60;
                 this.attachedTransition = {
-                    x: this.x + entranceSection.x + entranceSection.w / 2 - 50,
-                    y: this.y + entranceSection.y + entranceSection.h + 10,
-                    w: 100, h: 60,
+                    x: g.nx ? (g.nx > 0 ? g.cx + D : g.cx - D - T) : g.cx - L / 2,
+                    y: g.ny ? (g.ny > 0 ? g.cy + D : g.cy - D - T) : g.cy - L / 2,
+                    w: g.nx ? T : L, h: g.nx ? L : T,
                     target: doorConfig.target,
                     label: doorConfig.label
                 };
                 
                 if (doorConfig.lightColor && this.style !== 'moon_city') {           // (Moon City lights its door itself: _mcLights)
-                    this.attachedLights.push(new LampEntity({ x: this.x + entranceSection.x + entranceSection.w / 2, y: this.y + entranceSection.y + entranceSection.h - 5, lampType: 3, color: doorConfig.lightColor, lightRadius: 200 }));
+                    this.attachedLights.push(new LampEntity({ x: g.cx - g.nx * 5, y: g.cy - g.ny * 5, lampType: 3, color: doorConfig.lightColor, lightRadius: 200 }));
                 }
+            }
+
+            /**
+             * Its front: the middle of the facing wall of the section furthest out that way (world), the outward
+             * normal nx, ny and the wall's direction ux, uy. The door, sign, lights and wash are placed from it.
+             */
+            _frontGeo() {
+                if (this._front && this._front.side === this.facing) return this._front;
+                const f = this.facing, out = (s) => f === 'S' ? s.y + s.h : f === 'N' ? -s.y : f === 'E' ? s.x + s.w : -s.x;
+                let sec = this.sections[0];
+                this.sections.forEach(s2 => { if (out(s2) > out(sec)) sec = s2; });
+                const x0 = this.x + sec.x, y0 = this.y + sec.y, nx = f === 'E' ? 1 : f === 'W' ? -1 : 0, ny = f === 'S' ? 1 : f === 'N' ? -1 : 0;
+                return (this._front = {
+                    side: f, sec, nx, ny, ux: ny ? 1 : 0, uy: nx ? 1 : 0,
+                    cx: nx ? (nx > 0 ? x0 + sec.w : x0) : x0 + sec.w / 2,
+                    cy: ny ? (ny > 0 ? y0 + sec.h : y0) : y0 + sec.h / 2
+                });
+            }
+
+            /** Where its entrance is (the front, with the door's position along it), or null: no door and no shopfront */
+            _entrance() {
+                const t = this.attachedTransition;
+                if (!t && !this._shopfront) return null;
+                const g = this._frontGeo();
+                if (!t) return g;
+                return { ...g, cx: g.nx ? g.cx : t.x + t.w / 2, cy: g.ny ? g.cy : t.y + t.h / 2 };
             }
             
             _generateLights() {
@@ -268,10 +294,8 @@
                 this._generateLights();
                 // Recreate door light if applicable (Silver Queen has its own entrance rig)
                 if (this._doorLightColor && this.style !== 'silver_queen' && this.style !== 'double_nights' && this.style !== 'moon_city') {
-                    let entranceSection = this.sections[0];
-                    let maxY = entranceSection.y + entranceSection.h;
-                    this.sections.forEach(s => { if (s.y + s.h > maxY) { entranceSection = s; maxY = s.y + s.h; } });
-                    this.attachedLights.push(new LampEntity({ x: this.x + entranceSection.x + entranceSection.w / 2, y: this.y + entranceSection.y + entranceSection.h - 5, lampType: 3, color: this._doorLightColor, lightRadius: 200 }));
+                    const g = this._frontGeo();
+                    this.attachedLights.push(new LampEntity({ x: g.cx - g.nx * 5, y: g.cy - g.ny * 5, lampType: 3, color: this._doorLightColor, lightRadius: 200 }));
                 }
             }
             
@@ -380,7 +404,8 @@
             _paintSign(ctx) {
                 if (this.style === 'double_nights') { if (typeof game !== 'undefined' && game.camera) this._dnDrawSign(ctx); return; }
                 if (this.style === 'moon_city') { if (typeof game !== 'undefined' && game.camera) { this._mcDrawCanopy(ctx, false); this._mcDrawSign(ctx, false); } return; }
-                if (!this.attachedSign || !this.attachedTransition) return;
+                const E = this.attachedSign && this._entrance();
+                if (!E) return;
                 
                 ctx.save();
                 
@@ -390,12 +415,10 @@
                 // Use building lamp color (accent) directly
                 const lampColor = this.colors ? this.colors.accent : (this.attachedSign.color || '#a469ff');
                 
-                // Anchor to transition point center X, positioned just above it
-                const transitionCenterX = this.attachedTransition.x + this.attachedTransition.w / 2;
-                const transitionTopY = this.attachedTransition.y;
-                
-                const textX = transitionCenterX;
-                let textY = transitionTopY - signFontSize / 2 - 20;
+                // Anchored over the entrance, just inside its front wall
+                const inset = signFontSize / 2 + 10;
+                let textX = E.cx - E.nx * inset;
+                let textY = E.cy - E.ny * inset;
                 // Silver Queen: the script sign stands on the portico roof, in the portico's height plane
                 if (this.style === 'silver_queen' && CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera && this._sqPortico()) {
                     const sqG = this._sqPortico(), cam = game.camera, k = this._sqK(sqG.z);
@@ -405,8 +428,9 @@
                 } else if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) {
                     const A = this._signAwning(ctx, signText, signFontSize);                 // the awning, then the sign lying on it
                     LandmarkKit.plane(ctx, A.k);
-                    textY = A.y;
+                    textX = A.x; textY = A.y;
                 }
+                if (E.nx) { ctx.translate(textX, textY); ctx.rotate(E.nx * Math.PI / 2); textX = 0; textY = 0; }   // an east or west front: the sign runs along the wall
                 
                 // --- FLICKER ENGINE ---
                 // Multi-frequency sine waves create organic neon flicker
@@ -508,15 +532,16 @@
              */
             _signAwning(ctx, text, size) {
                 if (!this._awn || this._awn.text !== text) {
+                    const E = this._entrance();
                     const m = document.createElement('canvas').getContext('2d'); m.font = `${size}px "Great Vibes", cursive`;
-                    const tw = Math.min(this.w - 20, m.measureText(text).width + 34), d = Math.round(size * 0.95);
-                    const cx = this.attachedTransition.x + this.attachedTransition.w / 2, wall = this.attachedTransition.y - 10;
-                    this._awn = { text, x0: cx - tw / 2, x1: cx + tw / 2, wall, d, z: 2 * CONFIG.BUILDINGS.FLOOR_HEIGHT };
+                    const tw = Math.min((E.nx ? this.h : this.w) - 20, m.measureText(text).width + 34), d = Math.round(size * 0.95);
+                    this._awn = { text, a: [E.cx - E.ux * tw / 2, E.cy - E.uy * tw / 2], b: [E.cx + E.ux * tw / 2, E.cy + E.uy * tw / 2],
+                                  nx: E.nx, ny: E.ny, x: E.cx + E.nx * d / 2, y: E.cy + E.ny * d / 2, d, z: 2 * CONFIG.BUILDINGS.FLOOR_HEIGHT };
                 }
                 const A = this._awn, K = LandmarkKit;
-                K.ledge(ctx, [{ a: [A.x0, A.wall], b: [A.x1, A.wall], nx: 0, ny: 1 }], A.z, A.d, 3,
+                K.ledge(ctx, [{ a: A.a, b: A.b, nx: A.nx, ny: A.ny }], A.z, A.d, 3,
                         darkenHex(this.colors.wall || '#2a2436', 8), darkenHex(this.colors.wall || '#2a2436', 22), `rgba(${hexToRgb(this.colors.accent || '#a469ff')}, 0.55)`);
-                return { k: K.k(A.z + 0.5), y: A.wall + A.d / 2 };
+                return { k: K.k(A.z + 0.5), x: A.x, y: A.y };
             }
             
             
@@ -670,12 +695,13 @@
                 if (this.style === 'double_nights') { this._dnLights(); return; }
                 if (this.style === 'moon_city') { this._mcLights(); return; }
                 if (this.style === 'enni_cole') { this._ecLights(); return; }
-                if (t) {
-                    const cx = t.x + t.w / 2, cy = t.y - 10;
+                const E = this._entrance();
+                if (E) {
+                    const cx = E.cx, cy = E.cy, at = (u, n) => ({ x: cx + E.ux * u + E.nx * n, y: cy + E.uy * u + E.ny * n });
                     // Entrance pair, warm pool at the door — purposeful light instead of a bulb grid
-                    this.attachedLights.push(new LampEntity({ x: cx - 46, y: cy, lampType: 3, color: accent, lightRadius: 120 }));
-                    this.attachedLights.push(new LampEntity({ x: cx + 46, y: cy, lampType: 3, color: accent, lightRadius: 120 }));
-                    this.attachedLights.push(new LampEntity({ x: cx, y: cy + 26, lampType: 4, color: '#ffe2b8', lightRadius: this.style === 'silver_queen' ? 260 : 170 }));
+                    this.attachedLights.push(new LampEntity({ ...at(-46, 0), lampType: 3, color: accent, lightRadius: 120 }));
+                    this.attachedLights.push(new LampEntity({ ...at(46, 0), lampType: 3, color: accent, lightRadius: 120 }));
+                    this.attachedLights.push(new LampEntity({ ...at(0, 26), lampType: 4, color: '#ffe2b8', lightRadius: this.style === 'silver_queen' ? 260 : 170 }));
                     if (this.style === 'silver_queen') {   // the hexagon wing lamps
                         this.attachedLights.push(new LampEntity({ x: cx - 150, y: cy, lampType: 3, color: '#c8a8ff', lightRadius: 190 }));
                         this.attachedLights.push(new LampEntity({ x: cx + 150, y: cy, lampType: 3, color: '#c8a8ff', lightRadius: 190 }));
@@ -954,7 +980,7 @@
                 ctx.globalAlpha = glow;
                 if (this.style === 'silver_queen') this._sqDark = dark;
                 for (const f of this._visibleFaces(cam)) {
-                    if (this.style && f.side === 'S' && this.attachedTransition) this._drawFrontWash(ctx, f, P);
+                    if (this.style && f.side === this.facing && this._entrance()) this._drawFrontWash(ctx, f, P);
                     this._drawFaceWindows(ctx, f, P, true); this._drawFaceFeature(ctx, f, P, true);
                 }
                 if (this.style === 'silver_queen') { this._sqEmissiveStructure(ctx, dark, glow); ctx.globalAlpha = glow; ctx.globalCompositeOperation = 'source-over'; }
@@ -977,19 +1003,22 @@
             /** Floodlight wash up the front face from the entrance lamps (accent-tinted). */
             _drawFrontWash(ctx, f, P) {
                 if (this.style === 'silver_queen') return;               // Silver Queen lights its facade from the portico (_sqFace)
-                const door = this.attachedTransition, doorX = door.x + door.w / 2;
-                if (doorX < Math.min(f.x1, f.x2) - 40 || doorX > Math.max(f.x1, f.x2) + 40) return;
+                const E = this._entrance(), vert = !!E.nx, door = vert ? E.cy : E.cx;   // the door's place along this face
+                const lo = vert ? Math.min(f.y1, f.y2) : Math.min(f.x1, f.x2), hi = vert ? Math.max(f.y1, f.y2) : Math.max(f.x1, f.x2);
+                if (door < lo - 40 || door > hi + 40) return;
                 const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
                 const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
                 if (Math.hypot(dx - ax, dy - ay) < 6) return;
                 const reach = this.style === 'silver_queen' ? 260 : 120;
-                const g = ctx.createRadialGradient(doorX, ay, 0, doorX, ay, reach);
+                const gx = vert ? ax : door, gy = vert ? door : ay;
+                const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, reach);
                 g.addColorStop(0, hexToRgba(this.colors.accent, this.style === 'silver_queen' ? 0.55 : 0.35));
                 g.addColorStop(1, hexToRgba(this.colors.accent, 0));
                 ctx.save();
                 ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath(); ctx.clip();
                 ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g;
-                ctx.fillRect(Math.min(ax, dx) - 5, Math.min(ay, dy, cy) - 5, Math.abs(bx - ax) + 10 + Math.abs(cx - bx), Math.abs(dy - ay) + 10);
+                const X0 = Math.min(ax, bx, cx, dx), Y0 = Math.min(ay, by, cy, dy);
+                ctx.fillRect(X0 - 5, Y0 - 5, Math.max(ax, bx, cx, dx) - X0 + 10, Math.max(ay, by, cy, dy) - Y0 + 10);
                 ctx.restore();
             },
 
@@ -1363,7 +1392,7 @@
                 const at = (u, v) => { const x0 = ax + (bx - ax) * u, y0 = ay + (by - ay) * u, x1 = dx + (cx - dx) * u, y1 = dy + (cy - dy) * u; return [x0 + (x1 - x0) * v, y0 + (y1 - y0) * v]; };
                 const acc = this.colors.accent;
                 const seg = (path, p, q) => { path.moveTo(p[0], p[1]); path.lineTo(q[0], q[1]); };
-                if (this.facadeFeature === 'balconies' && f.side === 'S') {
+                if (this.facadeFeature === 'balconies' && f.side === this.facing) {
                     const path = new Path2D();                          // (one path: the rails never touch, nor the lights)
                     for (let fl = 1; fl < floors; fl += 2) {
                         const v = fl / floors;

@@ -1536,11 +1536,41 @@ test('City helpers: the hand-laid block has its shop parade wall to wall on Hote
   equal(r.ids, ['shop_small', 'apartment_small', 'shop_small'], 'the parade, west to east');
   equal(r.joins, [0, 0], 'neighbours share a wall');
   equal(r.fronts, [12, 12, 12], 'one street front, set back 12 px');
-  equal(r.others, 5, 'the parade, the corner apartment and the warehouse: nothing auto-filled on top');
+  equal(r.others, 6, 'the parade, the row round the corner and the warehouse: nothing auto-filled on top');
   equal(r.issues, [], 'nothing on the street or on another building');
   equal(r.lot, [r.lot[3], 100, 200, r.lot[3]], 'an east lot runs down the block, set back from its east edge');
   equal(r.tooBig, null, 'a lot bigger than the block is refused');
   ok(r.drawn, 'every placement is built');
+});
+
+test('Doors any side: a building faces the street it is placed on, door, sign, lights, landmark and Zib drop-off with it', env => {
+  const r = value(env, `
+    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    const map = game.activeMap, city = map.cityLayout, b = city.blockMap.block_0_4;
+    const west = map.buildings.filter((x, i) => city.placedBuildings[i].options.row === 'west');
+    const front = west.map(x => { const e = x._entrance(); return [x.facing, e && e.nx, e && e.ny, e && Math.round(e.cx - x.x)]; });
+    const lit = west.every(x => x.attachedLights.some(l => l.x < x.x));
+    // A building with a door, faced each way: the door stands outside that wall
+    const doors = {};
+    for (const f of ['S', 'N', 'E', 'W']) {
+      const t = BuildingV2Registry.create('torque_auto', 1000, 1000, { facing: f }), d = t.attachedTransition;
+      doors[f] = [d.y >= t.y + t.h, d.y + d.h <= t.y, d.x >= t.x + t.w, d.x + d.w <= t.x].map(Boolean);
+    }
+    const landmark = BuildingV2Registry.create('silver_queen', 0, 0, { facing: 'N' }).facing;
+    // A layout of its own: a landmark faced west takes its drop-off and landmark from the avenue on that side
+    const c = new CityLayout({ width: 3000, height: 3000 });
+    c.addHorizontalRoad(1500, 'Mid St', 2); c.addVerticalRoad(1500, 'Main Ave', 2); c.generateBlocks(); c.registerV2Buildings();
+    c.registerTemplates({ torque_auto: { landmarkId: 'garage' } });
+    const p = c.placeAt('torque_auto', 1700, 300, { facing: 'W' });
+    const drop = c.computeDropOffs(null, null).garage, mark = c.extractLandmarks().garage;
+    return { front, lit, doors, landmark, drop: [drop.roadName, drop.approach, drop.x, Math.round(drop.y - (p.y + p.h / 2))], mark: [mark.x, mark.y - (p.y + p.h / 2)], px: p.x };
+  `);
+  equal(r.front, [['W', -1, 0, 0], ['W', -1, 0, 0]], 'the row round the corner fronts East Ave.: entrance on its west wall');
+  ok(r.lit, 'their entrance lights are on the street side');
+  equal(r.doors, {S:[true,false,false,false], N:[false,true,false,false], E:[false,false,true,false], W:[false,false,false,true]}, 'the door follows the facing');
+  equal(r.landmark, 'S', 'the landmarks keep their own fronts');
+  equal(r.drop, ['Main Ave', 'west', 1500, 0], 'Zib drops off on the avenue it faces, level with the door');
+  equal(r.mark, [r.px - 50, 0], 'its landmark is 50 px out from that wall');
 });
 
 test('Every bundled map loads, updates and draws without runtime errors', env => {

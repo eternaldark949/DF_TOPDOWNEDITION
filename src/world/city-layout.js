@@ -179,6 +179,12 @@
                 ROAD: 'ROAD'
             };
             
+            /** The side a placement faces: its facing option, else the side of the street its row fronts, else south */
+            static facing(placement) {
+                const o = placement.options || {}, f = o.facing || { south: 'S', north: 'N', east: 'E', west: 'W' }[o.row];
+                return ['N', 'E', 'W'].includes(f) ? f : 'S';
+            }
+            
             constructor(config = {}) {
                 this.width = config.width || 4000;
                 this.height = config.height || 5000;
@@ -421,15 +427,16 @@
             // === HAND-AUTHORED LAYOUT ===
             // Blocks laid out the way streets are: buildings lined up along a street front, side by side
             // (sharing a wall at gap 0), on a corner, on a plot, or at an exact spot. A side names the street
-            // the buildings front ('south' = the road below the block). Doors are still drawn on the south
-            // face, so a 'north', 'west' or 'east' row has its doors facing into the block for now.
+            // the buildings front ('south' = the road below the block); a row's buildings face it (their door,
+            // sign awning and entrance lights on that side). Anything else takes a facing option: 'S', 'N', 'E', 'W'.
             
             /**
              * A row of buildings along one side of a block.
              * @param {string} side - 'south' | 'north' | 'west' | 'east'
              * @param {string[]} templateIds - in order: west to east along a south/north side, north to south along a west/east one
              * @param {object} [options] - gap (px between neighbours, default 0), setback (from the block edge, default the margin),
-             *   justify ('start' | 'center' | 'end', default 'center'), margin (clear of the block's other edges, default 30)
+             *   justify ('start' | 'center' | 'end', default 'center'), margin (clear of the block's other edges, default 30),
+             *   facing (default: towards the side's street)
              * @returns {object[]} the placements (what didn't fit is left out, with a warning)
              */
             row(blockName, side, templateIds, options = {}) {
@@ -461,7 +468,8 @@
                     if (!ok) console.warn(`row ${blockName} ${side}: ${p.it.template.id} intersects a safe zone`);
                     return ok;
                 });
-                const placed = clear.map(p => this._commit(p.it.template, blockName, p.it.S, p.x, p.y, { row: side }));
+                const facing = options.facing || { south: 'S', north: 'N', east: 'E', west: 'W' }[side];
+                const placed = clear.map(p => this._commit(p.it.template, blockName, p.it.S, p.x, p.y, { row: side, facing }));
                 for (const p of clear) this._addSafeZone(p.x - margin / 2, p.y - margin / 2, p.it.S.ext.w + margin, p.it.S.ext.h + margin, `Row: ${blockName} ${side}`);
                 return placed;
             }
@@ -871,9 +879,10 @@
                     // Only process buildings with a landmarkId
                     if (!template.landmarkId) continue;
                     
-                    // Calculate entrance position (bottom center of building, offset forward)
-                    const entranceX = placement.x + placement.w / 2;
-                    const entranceY = placement.y + placement.h + 50; // 50px in front of door
+                    // Entrance position: the middle of the side it faces (south unless placed with a facing), 50 px out
+                    const f = CityLayout.facing(placement), p = placement;
+                    const entranceX = f === 'E' ? p.x + p.w + 50 : f === 'W' ? p.x - 50 : p.x + p.w / 2;
+                    const entranceY = f === 'S' ? p.y + p.h + 50 : f === 'N' ? p.y - 50 : p.y + p.h / 2;
                     
                     landmarks[template.landmarkId] = {
                         x: entranceX,
@@ -920,6 +929,22 @@
                     // Optional per-template offset for buildings with deep setbacks (e.g. hotels).
                     const offsetX = template.dropOffsetX || 0;
                     const offsetY = template.dropOffsetY || 0;
+
+                    // --- FACING NORTH, EAST OR WEST: the nearest road on that side, level with the door ---
+                    const f = CityLayout.facing(placement);
+                    if (f !== 'S') {
+                        const doorY = tr ? (tr.y + tr.h / 2) : (placement.y + placement.h / 2);
+                        const roads = f === 'N' ? this.horizontalRoads : this.verticalRoads;
+                        const gapTo = (r) => f === 'N' ? buildingTopY - r.centerY : f === 'E' ? r.centerX - (placement.x + placement.w) : placement.x - r.centerX;
+                        let best = null;
+                        for (const r of roads) { const g = gapTo(r); if (g > 0 && (!best || g < gapTo(best))) best = r; }
+                        if (best) {
+                            dropOffs[template.landmarkId] = f === 'N'
+                                ? { x: doorX + offsetX, y: best.centerY + offsetY, roadName: best.name, approach: 'north' }
+                                : { x: best.centerX + offsetX, y: doorY + offsetY, roadName: best.name, approach: f === 'E' ? 'east' : 'west' };
+                            return;
+                        }
+                    }
 
                     // --- PRIMARY: nearest horizontal road BELOW the building ---
                     let roadBelow = null, gapBelow = Infinity;

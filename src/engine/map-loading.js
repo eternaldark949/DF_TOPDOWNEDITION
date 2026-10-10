@@ -473,9 +473,10 @@ engineMixin({
                     city.placeBuilding('biggs_park', 'block_4_2', { align: 'center' });    // Biggs Amusement Park - center
 
                     // 5a. A HAND-LAID BLOCK (world/city-layout.js: row, corner, lot, placeAt)
-                    // NE of Double Nights: a shop parade along Hotel Dr., wall to wall, with an apartment and a warehouse behind it
+                    // NE of Double Nights: a shop parade along Hotel Dr., wall to wall, a second row fronting East Ave.
+                    // round the corner (facing west, onto it) and a warehouse behind
                     city.row('block_0_4', 'south', ['shop_small', 'apartment_small', 'shop_small'], { gap: 0, setback: 12 });
-                    city.corner('block_0_4', 'nw', 'apartment_small');
+                    city.row('block_0_4', 'west', ['shop_small', 'apartment_small'], { gap: 0, setback: 12, justify: 'start' });
                     city.corner('block_0_4', 'ne', 'warehouse');
                     
                     // 5b. SET CUSTOM LAMP COLORS FOR V1 BUILDINGS
@@ -531,8 +532,9 @@ engineMixin({
                         
                         // Check BuildingV2Registry first (single source of truth)
                         if (t.isV2 && BuildingV2Registry.has(p.templateId)) {
+                            const facing = p.options && (p.options.facing || p.options.row) ? CityLayout.facing(p) : undefined;
                             const building = BuildingV2Registry.create(p.templateId, p.originX ?? p.x, p.originY ?? p.y, { 
-                                doorTarget: t.door?.target 
+                                doorTarget: t.door?.target, ...(facing ? { facing } : {})
                             });
                             // Propagate mapCategory from template for map icons
                             if (t.mapCategory) building.mapCategory = t.mapCategory;
@@ -839,11 +841,12 @@ engineMixin({
                         mapData.foliage = mapData.foliage.filter(f => !inCourt(f, 110));   // nor on the pavement in front, where a canopy would hide the steps
                         mapData.lamps = mapData.lamps.filter(l => !inCourt(l));
                     }
-                    // and the pavement in front of a row of shopfronts (city.row): a street wall shows its fronts, its trees go elsewhere
+                    // and the pavement in front of a row of shopfronts (city.row, whichever street it fronts): a street wall shows its fronts, its trees go elsewhere
                     for (const pl of city.placedBuildings) {
-                        if (!pl.options || pl.options.row !== 'south') continue;
-                        const e = pl.extent;
-                        mapData.foliage = mapData.foliage.filter(f => !(f.x > e.x - 30 && f.x < e.x + e.w + 30 && f.y > e.y && f.y < e.y + e.h + 140));
+                        if (!pl.options || !pl.options.row) continue;
+                        const e = pl.extent, F = CityLayout.facing(pl), R = 140;   // the front, out across the pavement
+                        const zone = { x: e.x - 30 - (F === 'W' ? R : 0), y: e.y - (F === 'N' ? R : 0), w: e.w + 60 + (F === 'E' || F === 'W' ? R : 0), h: e.h + (F === 'S' || F === 'N' ? R : 0) };
+                        mapData.foliage = mapData.foliage.filter(f => !(f.x > zone.x && f.x < zone.x + zone.w && f.y > zone.y && f.y < zone.y + zone.h));
                     }
                     // The parks' trees and lanterns (their ground is painted by the ground baker)
                     for (const b of city.blocks) {
