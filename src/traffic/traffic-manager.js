@@ -299,12 +299,13 @@
             
             /**
              * How far along a lane to start a car of length len: two lengths in where that's in range of her (as ever),
-             * else a random spot along it in range, clear of both its ends' junctions; null if none.
+             * else (on a straight road) a random spot along it in range, clear of both its ends' junctions; null if none.
              */
             _spawnAlong(lane, player, len) {
                 const lo = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN, hi = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX;
                 const d0 = Math.hypot(lane.start.x + lane.ux * len * 2 - player.x, lane.start.y + lane.uy * len * 2 - player.y);
                 if (d0 >= lo && d0 <= hi) return len * 2;
+                if (lane.road && lane.road.isCurved) return null;   // (a lane round a bend is its chord: a car started partway would be off the road)
                 const t0 = (player.x - lane.start.x) * lane.ux + (player.y - lane.start.y) * lane.uy;
                 const lat = Math.abs((player.x - lane.start.x) * -lane.uy + (player.y - lane.start.y) * lane.ux);
                 const d = lo + Math.random() * (hi - lo);

@@ -865,13 +865,22 @@
                                 if (inBlock(x, y, e.w, e.h) && !this._intersectsSafeZone(x, y, e.w, e.h)) { spot = { t, S, e, x, y, run: a1 - a0, facing }; break; }
                             }
                             if (!spot) { cursor += 40; continue; }
-                            placed.push(this._commit(spot.t, block.name, spot.S, spot.x, spot.y, { facing: spot.facing, angled: road.name, autoPlaced: true }));
+                            // round a bend the street can lie another way from the building than from where it started: face whichever way meets it first
+                            const faces = CityLayout._facingOnto(road.corridor, spot.x + spot.e.w / 2, spot.y + spot.e.h / 2) || spot.facing;
+                            placed.push(this._commit(spot.t, block.name, spot.S, spot.x, spot.y, { facing: faces, angled: road.name, autoPlaced: true }));
                             this._addSafeZone(spot.x, spot.y, spot.e.w, spot.e.h, `Angled: ${road.name}`);   // exact: the next one up the street may touch it
                             cursor += spot.run + gap;
                         }
                     }
                 }
                 return placed;
+            }
+            
+            /** Of N, E, S and W, the way from (x, y) that reaches the polygon soonest (within 500 px), or null */
+            static _facingOnto(poly, x, y) {
+                for (let k = 0; k <= 500; k += 10) for (const [f, dx, dy] of [['N', 0, -1], ['E', 1, 0], ['S', 0, 1], ['W', -1, 0]])
+                    if (Poly.contains(poly, x + dx * k, y + dy * k)) return f;
+                return null;
             }
             
             autoFillAll(options = {}) {

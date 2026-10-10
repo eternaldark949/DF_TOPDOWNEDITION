@@ -1742,6 +1742,10 @@ const angledStreet = (env, name, mouths) => {
 
 test('Angled streets: Lantern Cut joins its roads at shaped junctions, with pavements, crossings, walks and buildings to match', env => angledStreet(env, 'Lantern Cut', ['Clinic Way', 'East Ave']));
 
+for (const [name, mouths] of [['Foxglove Cut', ['Ashgrove St', 'Harbor St']], ['Starling Diagonal', ['Foundry Rd', 'Meridian Ave']],
+  ['Crescent Row', ['Clinic Way', 'Meridian Ave']], ['Velvet Hook', ['Commerce Blvd', 'Meridian Ave']]])
+  test(`The newer city's angled and curved streets: ${name} is built like the first ones`, env => angledStreet(env, name, mouths));
+
 test('Curved streets: Halfmoon Bend joins its roads at shaped junctions, with pavements, crossings, walks and buildings round the bend', env => {
   angledStreet(env, 'Halfmoon Bend', ['Skyline Ave', 'East Ave']);
   const r = value(env, `

@@ -426,6 +426,11 @@ engineMixin({
                     // And a curved one: Halfmoon Bend leaves Skyline Ave heading south, bends round to the west and meets East Ave
                     // (addCurvedRoad: a lane each way, the corner rounded to a 220 px radius; straight for a while at each end, so each T is square)
                     city.addCurvedRoad([[3550, 4900], [3550, 5500], [2800, 5500]], 'Halfmoon Bend', 1, { radius: 220 });
+                    // The newer city's: two cuts across corners and two bends (each T well clear of the junctions either side of it)
+                    city.addAngledRoad(10300, 8700, 11200, 9400, 'Foxglove Cut', 2);           // Ashgrove St down to Harbor St
+                    city.addAngledRoad(6900, 9900, 7800, 10600, 'Starling Diagonal', 2);      // Foundry Rd down to Meridian Ave
+                    city.addCurvedRoad([[8900, 6100], [8900, 6800], [7800, 6800]], 'Crescent Row', 1, { radius: 220 });   // Clinic Way round to Meridian Ave
+                    city.addCurvedRoad([[6000, 3800], [6000, 4400], [7800, 4400]], 'Velvet Hook', 1, { radius: 260 });    // Commerce Blvd round to Meridian Ave
                     
                     // 3. GENERATE BLOCKS (must be done before placing buildings); the parks are kept free (world/parks.js),
                     // and the graveyard's block (11d) is kept clear for it

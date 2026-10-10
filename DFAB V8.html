@@ -41902,12 +41902,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             /**
              * How far along a lane to start a car of length len: two lengths in where that's in range of her (as ever),
-             * else a random spot along it in range, clear of both its ends' junctions; null if none.
+             * else (on a straight road) a random spot along it in range, clear of both its ends' junctions; null if none.
              */
             _spawnAlong(lane, player, len) {
                 const lo = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN, hi = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX;
                 const d0 = Math.hypot(lane.start.x + lane.ux * len * 2 - player.x, lane.start.y + lane.uy * len * 2 - player.y);
                 if (d0 >= lo && d0 <= hi) return len * 2;
+                if (lane.road && lane.road.isCurved) return null;   // (a lane round a bend is its chord: a car started partway would be off the road)
                 const t0 = (player.x - lane.start.x) * lane.ux + (player.y - lane.start.y) * lane.uy;
                 const lat = Math.abs((player.x - lane.start.x) * -lane.uy + (player.y - lane.start.y) * lane.ux);
                 const d = lo + Math.random() * (hi - lo);
@@ -49896,13 +49897,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                 if (inBlock(x, y, e.w, e.h) && !this._intersectsSafeZone(x, y, e.w, e.h)) { spot = { t, S, e, x, y, run: a1 - a0, facing }; break; }
                             }
                             if (!spot) { cursor += 40; continue; }
-                            placed.push(this._commit(spot.t, block.name, spot.S, spot.x, spot.y, { facing: spot.facing, angled: road.name, autoPlaced: true }));
+                            // round a bend the street can lie another way from the building than from where it started: face whichever way meets it first
+                            const faces = CityLayout._facingOnto(road.corridor, spot.x + spot.e.w / 2, spot.y + spot.e.h / 2) || spot.facing;
+                            placed.push(this._commit(spot.t, block.name, spot.S, spot.x, spot.y, { facing: faces, angled: road.name, autoPlaced: true }));
                             this._addSafeZone(spot.x, spot.y, spot.e.w, spot.e.h, `Angled: ${road.name}`);   // exact: the next one up the street may touch it
                             cursor += spot.run + gap;
                         }
                     }
                 }
                 return placed;
+            }
+            
+            /** Of N, E, S and W, the way from (x, y) that reaches the polygon soonest (within 500 px), or null */
+            static _facingOnto(poly, x, y) {
+                for (let k = 0; k <= 500; k += 10) for (const [f, dx, dy] of [['N', 0, -1], ['E', 1, 0], ['S', 0, 1], ['W', -1, 0]])
+                    if (Poly.contains(poly, x + dx * k, y + dy * k)) return f;
+                return null;
             }
             
             autoFillAll(options = {}) {
@@ -62661,6 +62671,11 @@ engineMixin({
                     // And a curved one: Halfmoon Bend leaves Skyline Ave heading south, bends round to the west and meets East Ave
                     // (addCurvedRoad: a lane each way, the corner rounded to a 220 px radius; straight for a while at each end, so each T is square)
                     city.addCurvedRoad([[3550, 4900], [3550, 5500], [2800, 5500]], 'Halfmoon Bend', 1, { radius: 220 });
+                    // The newer city's: two cuts across corners and two bends (each T well clear of the junctions either side of it)
+                    city.addAngledRoad(10300, 8700, 11200, 9400, 'Foxglove Cut', 2);           // Ashgrove St down to Harbor St
+                    city.addAngledRoad(6900, 9900, 7800, 10600, 'Starling Diagonal', 2);      // Foundry Rd down to Meridian Ave
+                    city.addCurvedRoad([[8900, 6100], [8900, 6800], [7800, 6800]], 'Crescent Row', 1, { radius: 220 });   // Clinic Way round to Meridian Ave
+                    city.addCurvedRoad([[6000, 3800], [6000, 4400], [7800, 4400]], 'Velvet Hook', 1, { radius: 260 });    // Commerce Blvd round to Meridian Ave
                     
                     // 3. GENERATE BLOCKS (must be done before placing buildings); the parks are kept free (world/parks.js),
                     // and the graveyard's block (11d) is kept clear for it
