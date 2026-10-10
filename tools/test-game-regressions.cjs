@@ -127,6 +127,22 @@ test('Rejected Flit spends no charge, only the blocked cue; shortened landing cl
   ok(after.vfx[0].trails.every(t => t.points.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))));
 });
 
+test('Flit VFX draws without shadowBlur and keeps one body per spirit across frames', env => {
+  flitFixture(env, []);
+  equal(env.run('game.triggerFlit(0)'), true);
+  env.setTrace(true);
+  const kept = value(env, `
+    const v = game.flitVFX[0], ghost = v.ghostBody, arrival = v.arrivalBody;
+    game.updateFlitVFX(); game.drawFlitVFX(game.ctx);
+    const pose = ghost._pose;
+    for (let i = 0; i < 4; i++) { game.updateFlitVFX(); game.drawFlitVFX(game.ctx); }
+    return { bodies: v.ghostBody === ghost && v.arrivalBody === arrival, pose: !!pose && ghost._pose === pose };`);
+  ok(kept.bodies, 'the ghost and arrival bodies are the same objects every frame');
+  ok(kept.pose, 'the ghost keeps its pose state between frames');
+  equal(env.trace.filter(op => op[1] === 'set' && op[2] === 'shadowBlur' && op[3] > 0).length, 0, 'no blurred strokes or dots');
+  ok(env.trace.filter(op => op[1] === 'stroke').length > 0 && env.trace.filter(op => op[1] === 'drawImage').length > 0, 'bolts stroked, glows stamped');
+});
+
 test('Held ring flick requires fresh outward speed, rearms deliberately and preserves standalone flick', env => {
   env.run(`
     globalThis.__gesture = scenario => {
