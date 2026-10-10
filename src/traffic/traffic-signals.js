@@ -299,7 +299,8 @@
                     const p = this.phases.findIndex(ph => ph.road.orientation === cw.orientation);
                     if (p === -1) continue;
                     // the strips along both kerbs (the crossing runs across the road it crosses)
-                    const s = cw.orientation === 'V'
+                    const s = cw.kerbs ? cw.kerbs                                  // over an angled road: its own kerb lines
+                        : cw.orientation === 'V'
                         ? [[cw.x + 3, cw.y + 7, cw.x + 3, cw.y + cw.h - 7], [cw.x + cw.w - 3, cw.y + 7, cw.x + cw.w - 3, cw.y + cw.h - 7]]
                         : [[cw.x + 7, cw.y + 3, cw.x + cw.w - 7, cw.y + 3], [cw.x + 7, cw.y + cw.h - 3, cw.x + cw.w - 7, cw.y + cw.h - 3]];
                     this._walks.push({ p, s });

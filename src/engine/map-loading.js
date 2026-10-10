@@ -337,7 +337,7 @@ engineMixin({
                         mapData.buildingColliders = c.buildingColliders;
                         mapData.cityLayout = c.cityLayout;
                         mapData.ferrisWheel = c.ferrisWheel;
-                        mapData.pavements = c.pavements.map(p => new Pavement(p.x, p.y, p.w, p.h));
+                        mapData.pavements = c.pavements.map(p => Object.assign(new Pavement(p.x, p.y, p.w, p.h, p.poly), p.road ? { road: p.road } : {}));
                         mapData.crosswalks = [...c.crosswalks];
                         mapData.foliage = [...c.foliage];
                         mapData.walls = c.wallRects.map(w => ({...w}));
@@ -408,6 +408,11 @@ engineMixin({
                     // Vertical highways
                     city.addVerticalRoad(1200, 'West Ave', 2);
                     city.addVerticalRoad(2800, 'East Ave', 2);
+                    
+                    // An angled street: Lantern Cut cuts the corner of the block below Clinic Way, from the middle of Clinic Way
+                    // down to East Ave (world/city-layout.js addAngledRoad: a T at each end, the block's rows step along it).
+                    // Each T sits well clear of the next junction along, so a car through one can stop for the other's red.
+                    city.addAngledRoad(1950, 6100, 2800, 6800, 'Lantern Cut', 2);
                     
                     // 3. GENERATE BLOCKS (must be done before placing buildings); the parks are kept free (world/parks.js)
                     for (const [block, name] of Object.entries(HUB_PARKS)) city.setZoneType(block, CityLayout.ZONE.PARK, { name });
@@ -527,6 +532,11 @@ engineMixin({
                             net.addRoad(createRoad(r.x, 0, r.roadWidth, city.height, 'V', r.name, r.lanes, true, true));
                         });
                         
+                        // And the angled ones (their junctions come out as the shape where the carriageways meet: roads.js)
+                        city.angledRoads.forEach(r => {
+                            net.addRoad(new Road({ x1: r.x1, y1: r.y1, x2: r.x2, y2: r.y2, name: r.name, lanes: r.lanes, hasPavements: true }));
+                        });
+                        
                         net.buildGraph();
                     }
                     const net = this.traffic.network;
@@ -637,6 +647,7 @@ engineMixin({
                         const exclusions = [];
                         
                         intersections.forEach(ix => {
+                            if (ix.poly) return;   // where an angled road joins: cut to its shape below (city.cutPavements)
                             let start, end;
                             if (road.orientation === 'H') {
                                 start = ix.x - road.x;
@@ -673,10 +684,13 @@ engineMixin({
                         return paves;
                     };
                     
-                    mapData.pavements = [];
+                    const straightPaves = [];
                     net.roads.forEach(r => {
-                        mapData.pavements.push(...generateSmartPavements(r));
+                        if (!r.isDiagonal) straightPaves.push(...generateSmartPavements(r));
                     });
+                    // ...cut where an angled road joins, and the angled roads' own (polygons, with their bounds as x, y, w, h)
+                    mapData.pavements = city.cutPavements(straightPaves).map(p => p.poly ? new Pavement(p.x, p.y, p.w, p.h, p.poly) : p)
+                        .concat(city.angledPavements().map(({ poly, road }) => { const b = Poly.box(poly), p = new Pavement(b.x, b.y, b.w, b.h, poly); p.road = road; return p; }));
                     
                     // Generate crosswalks from CityLayout (knows all intersection positions)
                     mapData.crosswalks = city.generateCrosswalks();
@@ -730,7 +744,20 @@ engineMixin({
                     const foliageSpacing = 180; // Distance between trees
                     const foliageInset = 50;    // Distance from road edge
                     
+                    const glowKinds = ['glow_purple', 'glow_pink', 'glow_gold', 'glow_green', 'glow_cyan'];
                     net.roads.forEach(road => {
+                        if (road.isDiagonal) {
+                            // An angled road: a tree now and then down each pavement, clear of its ends' junctions and crossings
+                            const ex = net.getIntersectionsForRoad(road).map(ix => (ix.poly || []).map(q => road.worldToParam(q.x, q.y).along));
+                            const from = Math.max(50, ...ex.filter(a => a.length && Math.max(...a) < road.length / 2).map(a => Math.max(...a) + 160));
+                            const to = Math.min(road.length - 50, ...ex.filter(a => a.length && Math.min(...a) > road.length / 2).map(a => Math.min(...a) - 160));
+                            for (const sd of [-1, 1]) for (let a = from + foliageSpacing / 2; a < to; a += foliageSpacing * 1.4) {
+                                const p = road.paramToWorld(a + (Math.random() - 0.5) * 30, sd * (road.thickness / 2 + foliageInset));
+                                const r = Math.random(), type = r < 0.6 ? 'tree' : r < 0.75 ? 'bush' : glowKinds[Math.floor(Math.random() * glowKinds.length)];
+                                mapData.foliage.push(new Foliage(p.x, p.y, type, 1.2 + Math.random() * 0.6));
+                            }
+                            return;
+                        }
                         // Get intersections to avoid placing trees there
                         const intersections = net.getIntersectionsForRoad(road);
                         const exclusions = [];

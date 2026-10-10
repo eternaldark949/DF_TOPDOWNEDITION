@@ -255,8 +255,12 @@
             }
 
             _paintIntersection(c, ix) {
-                c.fillStyle = GROUND_LOOK.asphalt; c.fillRect(ix.x, ix.y, ix.width, ix.height);
-                c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 1; c.strokeRect(ix.x + 0.5, ix.y + 0.5, ix.width - 1, ix.height - 1);
+                c.fillStyle = GROUND_LOOK.asphalt;
+                if (ix.poly) { c.beginPath(); Poly.trace(c, ix.poly); c.fill(); }   // where an angled road meets: its own shape
+                else {
+                    c.fillRect(ix.x, ix.y, ix.width, ix.height);
+                    c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 1; c.strokeRect(ix.x + 0.5, ix.y + 0.5, ix.width - 1, ix.height - 1);
+                }
                 const cx = ix.x + ix.width / 2, cy = ix.y + ix.height / 2;                      // a manhole, off-centre
                 c.fillStyle = '#1d1a22'; c.beginPath(); c.arc(cx + 22, cy - 18, 11, 0, Math.PI * 2); c.fill();
                 c.strokeStyle = 'rgba(232, 200, 140, 0.18)'; c.lineWidth = 1; c.stroke();
@@ -266,6 +270,7 @@
             _paintPavement(c, p, R, rnd) {
                 const L = GROUND_LOOK, T = 25;
                 c.save(); c.beginPath(); c.rect(Math.max(p.x, R.left), Math.max(p.y, R.top), Math.min(p.x + p.w, R.right) - Math.max(p.x, R.left), Math.min(p.y + p.h, R.bottom) - Math.max(p.y, R.top)); c.clip();
+                if (p.poly) { c.beginPath(); Poly.trace(c, p.poly); c.clip(); }      // beside an angled road: its own shape
                 c.fillStyle = L.paveA; c.fillRect(p.x, p.y, p.w, p.h);
                 const gx0 = Math.floor(Math.max(p.x, R.left - T) / T) * T, gy0 = Math.floor(Math.max(p.y, R.top - T) / T) * T;
                 for (let gx = gx0; gx < Math.min(p.x + p.w, R.right); gx += T) for (let gy = gy0; gy < Math.min(p.y + p.h, R.bottom); gy += T) {
@@ -278,6 +283,13 @@
                 for (let gy = gy0; gy <= p.y + p.h; gy += T) { c.moveTo(p.x, gy + 0.5); c.lineTo(p.x + p.w, gy + 0.5); }
                 c.stroke();
                 // Kerbs all round, their top edge catching the light; a drain every so often
+                if (p.poly) {                                                                   // (clipped to the shape: the stroke's inner half)
+                    c.beginPath(); Poly.trace(c, p.poly);
+                    c.strokeStyle = L.kerb; c.lineWidth = 8; c.stroke();
+                    c.strokeStyle = L.kerbLit; c.lineWidth = 2; c.stroke();
+                    c.restore();
+                    return;
+                }
                 c.strokeStyle = L.kerb; c.lineWidth = 4; c.strokeRect(p.x + 2, p.y + 2, p.w - 4, p.h - 4);
                 c.strokeStyle = L.kerbLit; c.lineWidth = 1; c.strokeRect(p.x + 0.5, p.y + 0.5, p.w - 1, p.h - 1);
                 const long = p.w > p.h;
@@ -292,6 +304,7 @@
             }
 
             _paintCrossing(c, cw, rnd) {
+                if (cw.axis) return this._paintAngledCrossing(c, cw, rnd);
                 c.fillStyle = GROUND_LOOK.asphalt; c.fillRect(cw.x, cw.y, cw.w, cw.h);
                 c.fillStyle = GROUND_LOOK.stripe;
                 const stripe = (x, y, w, h) => {                                                 // worn: a few gaps, softer ends
@@ -302,5 +315,20 @@
                 };
                 if (cw.orientation === 'H') for (let sy = cw.y + 8; sy < cw.y + cw.h - 8; sy += 18) stripe(cw.x + 8, sy, cw.w - 16, 11);
                 else for (let sx = cw.x + 8; sx < cw.x + cw.w - 8; sx += 18) stripe(sx, cw.y + 8, 11, cw.h - 16);
+            }
+
+            /** A crossing over an angled road: the same worn stripes, laid in the road's own frame */
+            _paintAngledCrossing(c, cw, rnd) {
+                const A = cw.axis;
+                c.fillStyle = GROUND_LOOK.asphalt; c.beginPath(); Poly.trace(c, cw.poly); c.fill();
+                c.save();
+                c.transform(A.ux, A.uy, A.nx, A.ny, A.ox, A.oy);   // x: along the road, y: across it
+                const len = A.a1 - A.a0 - 16;
+                for (let l = -A.hT + 8; l < A.hT - 8; l += 18) {
+                    c.fillStyle = GROUND_LOOK.stripe; c.fillRect(A.a0 + 8, l, len, 11);
+                    c.fillStyle = 'rgba(22, 20, 27, 0.55)';
+                    for (let k = 0; k < 5; k++) c.fillRect(A.a0 + 8 + rnd() * len, l + rnd() * 11, 2 + rnd() * 4, 1 + rnd() * 3);
+                }
+                c.restore();
             }
         }

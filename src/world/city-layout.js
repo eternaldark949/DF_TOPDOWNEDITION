@@ -194,6 +194,7 @@
                 
                 this.horizontalRoads = [];
                 this.verticalRoads = [];
+                this.angledRoads = [];
                 this.blocks = [];
                 this.blockMap = {};
                 this.zoneOverrides = {};
@@ -250,6 +251,90 @@
                 this.verticalRoads.sort((a, b) => a.x - b.x);
                 this._addSafeZone(road.leftPavement, 0, footprint, this.height, `Road: ${name}`);
                 return road;
+            }
+            
+            /**
+             * An angled street from one road to another: (x1, y1) and (x2, y2) sit on the centre lines of the two
+             * roads it joins, so each end is a T. It runs through the blocks between them; buildings keep off it and
+             * its pavements (auto-fill lines it with a stepped row facing it), and the road network, pavements,
+             * crossings, lamps and the pedestrians' walks are built from it like the rest. Add it before placing buildings.
+             */
+            addAngledRoad(x1, y1, x2, y2, name, lanes = 2) {
+                const length = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / length, uy = (y2 - y1) / length;
+                const road = { x1, y1, x2, y2, name, lanes, length, ux, uy, nx: -uy, ny: ux, thickness: lanes * 2 * this.laneWidth, orientation: 'D' };
+                const hT = road.thickness / 2, pw = this.pavementWidth, at = (a, l) => this._along(road, a, l);
+                road.ends = [this._angledEnd(road, 0), this._angledEnd(road, 1)];
+                if (!road.ends[0] || !road.ends[1]) console.warn(`addAngledRoad ${name}: both ends should sit on the centre line of a road`);
+                road.carriageway = [at(0, -hT), at(length, -hT), at(length, hT), at(0, hT)];
+                road.corridor = [at(0, -hT - pw), at(length, -hT - pw), at(length, hT + pw), at(0, hT + pw)];   // and its pavements
+                this.angledRoads.push(road);
+                return road;
+            }
+            
+            /** A point on an angled road: `along` from its start, `lat` across (positive: to the right of its direction) */
+            _along(road, along, lat = 0) {
+                return { x: road.x1 + road.ux * along + road.nx * lat, y: road.y1 + road.uy * along + road.ny * lat };
+            }
+            
+            /** Where an angled road meets the road at one end (0: its start, 1: its end): that road, and how far in from the
+             *  end its carriageway is clear of it (`mouth`, where its lanes start and its crossing begins) */
+            _angledEnd(road, which) {
+                const p = which ? { x: road.x2, y: road.y2 } : { x: road.x1, y: road.y1 }, s = which ? -1 : 1, hT = road.thickness / 2;
+                const H = this.horizontalRoads.find(r => Math.abs(r.centerY - p.y) < 2), V = !H && this.verticalRoads.find(r => Math.abs(r.centerX - p.x) < 2);
+                if (!H && !V) return null;
+                const kind = H ? 'H' : 'V', dir = Math.sign(H ? road.uy * s : road.ux * s);   // +1: it heads off towards larger y (x)
+                const kerb = H ? (dir > 0 ? H.y + H.roadHeight : H.y) : (dir > 0 ? V.x + V.roadWidth : V.x);
+                let mouth = 0;
+                for (const l of [-hT, hT]) {
+                    const c0 = H ? p.y + road.ny * l : p.x + road.nx * l, v = H ? road.uy * s : road.ux * s;
+                    mouth = Math.max(mouth, (kerb - c0) / v);
+                }
+                return { road: H || V, kind, dir, kerb, mouth, along: which ? road.length - mouth : mouth };
+            }
+            
+            /** The part of a convex polygon on one side of an angled road: sign·lateral >= off */
+            static _sideOf(poly, road, sign, off) {
+                return Poly.clipHalf(poly, sign * road.nx, sign * road.ny, off + sign * (road.nx * road.x1 + road.ny * road.y1));
+            }
+            
+            /** The angled roads' pavements, two each, from kerb to kerb of the roads they join: [{ poly, road (its name) }] */
+            angledPavements() {
+                const out = [], pw = this.pavementWidth;
+                for (const road of this.angledRoads) {
+                    const hT = road.thickness / 2, at = (a, l) => this._along(road, a, l);
+                    for (const side of [-1, 1]) {
+                        let poly = [at(0, side * hT), at(road.length, side * hT), at(road.length, side * (hT + pw)), at(0, side * (hT + pw))];
+                        for (const e of road.ends) if (e) poly = e.kind === 'H' ? Poly.clipHalf(poly, 0, e.dir, e.dir * e.kerb) : Poly.clipHalf(poly, e.dir, 0, e.dir * e.kerb);
+                        if (poly.length >= 3) out.push({ poly, road: road.name });
+                    }
+                }
+                return out;
+            }
+            
+            /**
+             * The other roads' pavements, cut where an angled road joins: each ({x, y, w, h}, or with a `poly`) comes back
+             * whole, or as the pieces either side of the angled carriageway (each with its `poly`)
+             */
+            cutPavements(paves) {
+                let out = paves;
+                for (const road of this.angledRoads) {
+                    const hT = road.thickness / 2, next = [];
+                    for (const p of out) {
+                        const poly = p.poly || [{ x: p.x, y: p.y }, { x: p.x + p.w, y: p.y }, { x: p.x + p.w, y: p.y + p.h }, { x: p.x, y: p.y + p.h }];
+                        if (Math.abs(Poly.area(Poly.clip(poly, road.carriageway))) < 1) { next.push(p); continue; }
+                        for (const sign of [-1, 1]) {
+                            const piece = CityLayout._sideOf(poly, road, sign, hT);
+                            if (piece.length >= 3 && Math.abs(Poly.area(piece)) > 200) next.push({ ...Poly.box(piece), poly: piece });
+                        }
+                    }
+                    out = next;
+                }
+                return out;
+            }
+            
+            /** Does a rect reach an angled road or its pavements? */
+            _onAngledRoad(x, y, w, h) {
+                return this.angledRoads.some(r => Poly.hitsRect(r.corridor, { x, y, w, h }));
             }
             
             // === ZONE MANAGEMENT ===
@@ -467,7 +552,7 @@
                 // Neighbours may touch each other, but not anything already reserved
                 const clear = spots.filter(p => {
                     const ok = !this._intersectsSafeZone(p.x, p.y, p.it.S.ext.w, p.it.S.ext.h);
-                    if (!ok) console.warn(`row ${blockName} ${side}: ${p.it.template.id} intersects a safe zone`);
+                    if (!ok && !options.autoPlaced) console.warn(`row ${blockName} ${side}: ${p.it.template.id} intersects a safe zone`);
                     return ok;
                 });
                 const facing = options.facing || { south: 'S', north: 'N', east: 'E', west: 'W' }[side];
@@ -558,10 +643,13 @@
              */
             layoutIssues(street = []) {
                 const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+                // an angled road, or a pavement cut along one, by its shape (its box takes in the lots beside it)
+                const shape = z => z.poly || (z.isDiagonal && z.getCorners ? z.getCorners() : null);
+                const onStreet = (e, z) => hit(e, z) && (!shape(z) || Poly.hitsRect(shape(z), e));
                 const issues = [];
                 this.placedBuildings.forEach((p, i) => {
                     const e = p.extent || p;
-                    if (street.some(z => hit(e, z))) issues.push({ placement: p, what: 'street' });
+                    if (street.some(z => onStreet(e, z)) || this._onAngledRoad(e.x, e.y, e.w, e.h)) issues.push({ placement: p, what: 'street' });
                     for (let j = i + 1; j < this.placedBuildings.length; j++) {
                         const q = this.placedBuildings[j], f = q.extent || q;
                         if (hit(e, f)) issues.push({ placement: p, other: q, what: 'building' });
@@ -651,7 +739,24 @@
                     }
                     return ids;
                 };
-                const run = (side, span, maxDepth) => {
+                // An angled street through the block: the straight rows stop either side of it, and it gets stepped rows of its own (below)
+                const clearOf = (side, span, depth) => {                                       // span, less where the street crosses the row
+                    const along = side === 'south' || side === 'north';
+                    const band = side === 'south' ? { x: block.x, y: block.y + block.h - depth, w: block.w, h: depth }
+                        : side === 'north' ? { x: block.x, y: block.y, w: block.w, h: depth }
+                        : side === 'west' ? { x: block.x, y: block.y, w: depth, h: block.h } : { x: block.x + block.w - depth, y: block.y, w: depth, h: block.h };
+                    const bandPoly = [{ x: band.x, y: band.y }, { x: band.x + band.w, y: band.y }, { x: band.x + band.w, y: band.y + band.h }, { x: band.x, y: band.y + band.h }];
+                    let spans = [span];
+                    for (const r of this.angledRoads) {
+                        const cut = Poly.clip(r.corridor, bandPoly);
+                        if (cut.length < 3) continue;
+                        const b = Poly.box(cut), lo = (along ? b.x : b.y) - alley, hi = (along ? b.x + b.w : b.y + b.h) + alley;
+                        spans = spans.flatMap(([a, z]) => [[a, Math.min(z, lo)], [Math.max(a, hi), z]]).filter(([a, z]) => z - a > 120);
+                    }
+                    return spans;
+                };
+                const run = (side, span, maxDepth) => clearOf(side, span, maxDepth + setback).flatMap(sp => runSpan(side, sp, maxDepth));
+                const runSpan = (side, span, maxDepth) => {
                     const along = side === 'south' || side === 'north', gap = Math.random() < 0.65 ? 0 : alley;
                     const room = (span[1] - span[0]) * (options.fill ?? 1);   // fill < 1 leaves part of each street front open (fewer buildings to draw)
                     let ids = pick(room, maxDepth, along);
@@ -668,6 +773,50 @@
                 const bottom = ns.south.length ? Math.min(...ns.south.map(p => p.extent.y)) - alley : block.y + block.h - margin;
                 const weDepth = (both('west', 'east') ? (block.w - margin) / 2 : block.w - margin * 2) - setback;
                 if (bottom - top > 150) for (const side of ['west', 'east']) if (sides.includes(side)) run(side, [top, bottom], weDepth);
+                placed.push(...this._fillAngledFronts(block, templates, options));
+                return placed;
+            }
+            
+            /**
+             * The buildings along an angled street where it crosses a block: a stepped row on each side, each building's
+             * nearest corner on the line `setback` back from its pavement, facing it (whichever of N, E, S or W looks
+             * most onto it), side by side up the street.
+             */
+            _fillAngledFronts(block, templates, options = {}) {
+                const placed = [], setback = options.setback ?? 12, margin = 30, pw = this.pavementWidth;
+                const inBlock = (x, y, w, h) => x >= block.x + margin && y >= block.y + margin && x + w <= block.x + block.w - margin && y + h <= block.y + block.h - margin;
+                for (const road of this.angledRoads) {
+                    const bp = [{ x: block.x, y: block.y }, { x: block.x + block.w, y: block.y }, { x: block.x + block.w, y: block.y + block.h }, { x: block.x, y: block.y + block.h }];
+                    if (Poly.clip(road.corridor, bp).length < 3) continue;
+                    const hT = road.thickness / 2;
+                    for (const side of [-1, 1]) {
+                        // towards the street from this side, and the facing that looks most that way
+                        const tx = -side * road.nx, ty = -side * road.ny;
+                        const facing = Math.abs(tx) > Math.abs(ty) ? (tx > 0 ? 'E' : 'W') : (ty > 0 ? 'S' : 'N');
+                        const line = hT + pw + setback, gap = Math.random() < 0.65 ? 0 : 30;
+                        const pool = templates.filter(t => !t.unique);
+                        for (let cursor = 0; cursor < road.length && pool.length;) {
+                            // the weighted pick first, then whatever else fits here; nothing does: a little further up
+                            const first = this._selectWeightedTemplate(pool), order = [first, ...pool.filter(t => t !== first).sort(() => Math.random() - 0.5)];
+                            let spot = null;
+                            for (const t of order) {
+                                const S = this._shape(t, {}), e = S.ext;
+                                // the corner nearest the street, and how far the box runs along it from that corner
+                                const corners = [[0, 0], [e.w, 0], [e.w, e.h], [0, e.h]];
+                                const lat = ([cx, cy]) => side * (cx * road.nx + cy * road.ny), alongOf = ([cx, cy]) => cx * road.ux + cy * road.uy;
+                                const near = corners.reduce((a, b) => lat(b) < lat(a) ? b : a);
+                                const as = corners.map(c => alongOf(c) - alongOf(near)), a0 = Math.min(...as), a1 = Math.max(...as);
+                                const p = this._along(road, cursor - a0, side * line);
+                                const x = Math.floor(p.x - near[0]), y = Math.floor(p.y - near[1]);
+                                if (inBlock(x, y, e.w, e.h) && !this._intersectsSafeZone(x, y, e.w, e.h)) { spot = { t, S, e, x, y, run: a1 - a0 }; break; }
+                            }
+                            if (!spot) { cursor += 40; continue; }
+                            placed.push(this._commit(spot.t, block.name, spot.S, spot.x, spot.y, { facing, angled: road.name, autoPlaced: true }));
+                            this._addSafeZone(spot.x, spot.y, spot.e.w, spot.e.h, `Angled: ${road.name}`);   // exact: the next one up the street may touch it
+                            cursor += spot.run + gap;
+                        }
+                    }
+                }
                 return placed;
             }
             
@@ -826,6 +975,21 @@
                     }
                 }
                 
+                // Across each angled road at both ends, just clear of the junction (in the pavement's line, as above)
+                for (const road of this.angledRoads) for (const e of road.ends) {
+                    if (!e) continue;
+                    const hT = road.thickness / 2, a0 = e === road.ends[0] ? e.along : e.along - pw, a1 = a0 + pw;
+                    const at = (a, l) => this._along(road, a, l);
+                    const poly = [at(a0, -hT), at(a1, -hT), at(a1, hT), at(a0, hT)];
+                    crosswalks.push({
+                        ...Poly.box(poly), orientation: 'D', poly,
+                        // the stripes run with the road, laid across it; the walk lights sit along both kerbs; people step off at its ends
+                        axis: { ox: road.x1, oy: road.y1, ux: road.ux, uy: road.uy, nx: road.nx, ny: road.ny, a0, a1, hT },
+                        kerbs: [-1, 1].map(sd => { const p = at(a0 + 7, sd * (hT - 3)), q = at(a1 - 7, sd * (hT - 3)); return [p.x, p.y, q.x, q.y]; }),
+                        ends: [-1, 1].map(sd => at((a0 + a1) / 2, sd * (hT + 10)))
+                    });
+                }
+                
                 return crosswalks;
             }
             
@@ -839,7 +1003,7 @@
                 return this.safeZones.some(zone => 
                     x < zone.x + zone.w && x + w > zone.x &&
                     y < zone.y + zone.h && y + h > zone.y
-                );
+                ) || this._onAngledRoad(x, y, w, h);
             }
             
             _isRoadZone(x, y, w, h) {
@@ -1060,6 +1224,26 @@
              *   - nodes: Waypoints with { x, y, connections: [], isCrosswalk, crosswalkData }
              *   - crosswalks: Crosswalk data for rendering/collision
              */
+            /**
+             * Where an angled road's mouth breaks a road's walk on one side (dir: -1 the top/left side, +1 the
+             * bottom/right), as gaps along it ({start, end}, in x along a horizontal road, y along a vertical one)
+             */
+            _mouthGaps(straight, dir, walkAt) {
+                const gaps = [];
+                for (const road of this.angledRoads) for (const e of road.ends) {
+                    if (!e || e.road !== straight || e.dir !== dir) continue;
+                    const H = e.kind === 'H', hT = road.thickness / 2 + this.pavementWidth;
+                    // the carriageway and its pavements, where they cross the walk's line
+                    const xs = [-hT, hT].map(l => {
+                        const c0 = H ? road.y1 + road.ny * l : road.x1 + road.nx * l, v = H ? road.uy : road.ux;
+                        const t = (walkAt - c0) / v;
+                        return H ? road.x1 + road.ux * t + road.nx * l : road.y1 + road.uy * t + road.ny * l;
+                    });
+                    gaps.push({ start: Math.min(...xs) - 10, end: Math.max(...xs) + 10 });
+                }
+                return gaps;
+            }
+            
             generateSidewalkNetwork() {
                 const nodes = [];
                 const pw = this.pavementWidth;
@@ -1115,41 +1299,28 @@
                             end: vRoad.x + vRoad.roadWidth + pw + 10
                         });
                     }
-                    gaps.sort((a, b) => a.start - b.start);
                     
-                    // Create segments between gaps
-                    const segments = [];
-                    let currentX = this.margin;
-                    for (let gap of gaps) {
-                        if (gap.start > currentX) {
-                            segments.push({ start: currentX, end: gap.start });
+                    // Each side's walk, between the gaps (and, on the side an angled road joins, either side of its mouth)
+                    for (const [side, walkY, dir] of [['top', topWalkY, -1], ['bottom', bottomWalkY, 1]]) {
+                        const sideGaps = gaps.concat(this._mouthGaps(hRoad, dir, walkY)).sort((a, b) => a.start - b.start);
+                        const segments = [];
+                        let currentX = this.margin;
+                        for (let gap of sideGaps) {
+                            if (gap.start > currentX) segments.push({ start: currentX, end: gap.start });
+                            currentX = Math.max(currentX, gap.end);
                         }
-                        currentX = gap.end;
-                    }
-                    if (currentX < this.width - this.margin) {
-                        segments.push({ start: currentX, end: this.width - this.margin });
-                    }
-                    
-                    // Create nodes along each segment
-                    for (let seg of segments) {
-                        const topNodes = [];
-                        const bottomNodes = [];
+                        if (currentX < this.width - this.margin) segments.push({ start: currentX, end: this.width - this.margin });
                         
-                        for (let x = seg.start + walkOffset; x < seg.end - walkOffset; x += nodeSpacing) {
-                            const topNode = createNode(x, topWalkY);
-                            topNode.side = 'top';
-                            topNode.roadName = hRoad.name;
-                            topNodes.push(topNode);
-                            
-                            const bottomNode = createNode(x, bottomWalkY);
-                            bottomNode.side = 'bottom';
-                            bottomNode.roadName = hRoad.name;
-                            bottomNodes.push(bottomNode);
+                        for (let seg of segments) {
+                            const run = [];
+                            for (let x = seg.start + walkOffset; x < seg.end - walkOffset; x += nodeSpacing) {
+                                const node = createNode(x, walkY);
+                                node.side = side;
+                                node.roadName = hRoad.name;
+                                run.push(node);
+                            }
+                            for (let i = 1; i < run.length; i++) connect(run[i-1], run[i]);
                         }
-                        
-                        // Connect nodes in sequence
-                        for (let i = 1; i < topNodes.length; i++) connect(topNodes[i-1], topNodes[i]);
-                        for (let i = 1; i < bottomNodes.length; i++) connect(bottomNodes[i-1], bottomNodes[i]);
                     }
                 }
                 
@@ -1171,41 +1342,47 @@
                             end: hRoad.y + hRoad.roadHeight + pw + 10
                         });
                     }
-                    gaps.sort((a, b) => a.start - b.start);
                     
-                    // Create segments between gaps
-                    const segments = [];
-                    let currentY = this.margin;
-                    for (let gap of gaps) {
-                        if (gap.start > currentY) {
-                            segments.push({ start: currentY, end: gap.start });
+                    // Each side's walk, between the gaps (and either side of an angled road's mouth on its side)
+                    for (const [side, walkX, dir] of [['left', leftWalkX, -1], ['right', rightWalkX, 1]]) {
+                        const sideGaps = gaps.concat(this._mouthGaps(vRoad, dir, walkX)).sort((a, b) => a.start - b.start);
+                        const segments = [];
+                        let currentY = this.margin;
+                        for (let gap of sideGaps) {
+                            if (gap.start > currentY) segments.push({ start: currentY, end: gap.start });
+                            currentY = Math.max(currentY, gap.end);
                         }
-                        currentY = gap.end;
-                    }
-                    if (currentY < this.height - this.margin) {
-                        segments.push({ start: currentY, end: this.height - this.margin });
-                    }
-                    
-                    // Create nodes along each segment
-                    for (let seg of segments) {
-                        const leftNodes = [];
-                        const rightNodes = [];
+                        if (currentY < this.height - this.margin) segments.push({ start: currentY, end: this.height - this.margin });
                         
-                        for (let y = seg.start + walkOffset; y < seg.end - walkOffset; y += nodeSpacing) {
-                            const leftNode = createNode(leftWalkX, y);
-                            leftNode.side = 'left';
-                            leftNode.roadName = vRoad.name;
-                            leftNodes.push(leftNode);
-                            
-                            const rightNode = createNode(rightWalkX, y);
-                            rightNode.side = 'right';
-                            rightNode.roadName = vRoad.name;
-                            rightNodes.push(rightNode);
+                        for (let seg of segments) {
+                            const run = [];
+                            for (let y = seg.start + walkOffset; y < seg.end - walkOffset; y += nodeSpacing) {
+                                const node = createNode(walkX, y);
+                                node.side = side;
+                                node.roadName = vRoad.name;
+                                run.push(node);
+                            }
+                            for (let i = 1; i < run.length; i++) connect(run[i-1], run[i]);
                         }
-                        
-                        // Connect nodes in sequence
-                        for (let i = 1; i < leftNodes.length; i++) connect(leftNodes[i-1], leftNodes[i]);
-                        for (let i = 1; i < rightNodes.length; i++) connect(rightNodes[i-1], rightNodes[i]);
+                    }
+                }
+                
+                // ====== ANGLED ROADS ======
+                // A walk down each pavement, from just past one end's crossing to just short of the other's
+                for (const road of this.angledRoads) {
+                    const hT = road.thickness / 2, [e0, e1] = road.ends;
+                    const from = (e0 ? e0.along + pw : 0) + walkOffset, to = (e1 ? e1.along - pw : road.length) - walkOffset;
+                    const count = Math.max(1, Math.round((to - from) / nodeSpacing));
+                    for (const sd of [-1, 1]) {
+                        const run = [];
+                        for (let i = 0; i <= count; i++) {
+                            const p = this._along(road, from + (to - from) * i / count, sd * (hT + walkOffset));
+                            const node = createNode(p.x, p.y);
+                            node.side = sd < 0 ? 'left' : 'right';
+                            node.roadName = road.name;
+                            run.push(node);
+                        }
+                        for (let i = 1; i < run.length; i++) connect(run[i-1], run[i]);
                     }
                 }
                 
@@ -1228,7 +1405,15 @@
                     
                     // A crosswalk carries the pavement across the road it crosses: its ends are on the kerbs either
                     // side of that road (a vertical road's crossing runs left to right; a horizontal road's, top to bottom)
-                    if (cw.orientation === 'H') {
+                    if (cw.ends) {
+                        // An angled road's crossing: its ends are given (on the kerbs either side, halfway across it)
+                        const [a, b] = cw.ends.map(p => createNode(p.x, p.y, true, cw));
+                        connect(a, b);
+                        for (const cn of [a, b]) {
+                            for (let n of nodes) if (!n.isCrosswalk && Math.hypot(n.x - cn.x, n.y - cn.y) < 130) connect(cn, n);
+                            linkNearest(cn);
+                        }
+                    } else if (cw.orientation === 'H') {
                         const topNode = createNode(cwCenterX, cw.y - 10, true, cw);
                         const bottomNode = createNode(cwCenterX, cw.y + cw.h + 10, true, cw);
                         connect(topNode, bottomNode);
