@@ -1989,6 +1989,21 @@
             
             // --- PHYSICS-BASED STEERING CALCULATIONS ---
             
+            /** How fast a turn path can be followed from `t` on: by its tightest radius left, as round a bend
+             *  (`_bendAhead`), and no faster than the wheel turns the car round it (`handling` rad a tick) */
+            _turnSpeed(tp, t = 0) {
+                const R = tp.radiusFrom(t);
+                if (R === Infinity) return this.maxSpeed;
+                return Math.min(this.maxSpeed, Math.max(1.5, Math.min(Math.sqrt(0.16 * R), R * (this.handling || 0.05) * 0.75)));
+            }
+
+            /** The speed to be at now to be down to a turn's speed at its start */
+            _turnAhead(tp) {
+                const p = tp.controlPoints[0], d = Math.max(0, Math.hypot(p.x - this.x, p.y - this.y) - 25);
+                const v = this._turnSpeed(tp);
+                return Math.sqrt(v * v + 2 * (this.brake || 0.3) * 0.5 * d);
+            }
+
             /**
              * Calculate steering for normal lane/turn path following.
              * Returns steering input and recommended max speed.
@@ -2026,11 +2041,9 @@
                         this.turnProgress = 1.0;
                     }
                     
-                    // --- CURVATURE-AWARE LOOK-AHEAD ---
-                    const baseLookAhead = 0.15;
-                    const lookAheadScale = 1.0 - sharpness * 0.7;
-                    const speedMod = Math.max(0.3, Math.abs(this.speed) / 5);
-                    const lookAhead = baseLookAhead * lookAheadScale * speedMod;
+                    // --- LOOK-AHEAD --- a distance down the curve, longer with speed (as a share of the curve, a short kerb
+                    // turn's aim sat on the car's own nose, and it began to steer only once it was already off the line)
+                    const lookAhead = (14 + Math.abs(this.speed) * 5) / Math.max(20, this.currentTurnPath.length);
                     const targetT = Math.min(this.turnProgress + lookAhead, 1.0);
                     const targetPoint = this.currentTurnPath.getPoint(targetT);
                     const curveAngle = this.currentTurnPath.getAngle(targetT);
@@ -2055,6 +2068,13 @@
                     
                     const steerUrgency = 0.7 + sharpness * 0.25;
                     steer = AIDriverSolver.calculateSteering(this, this.angle + angleDiff, steerUrgency);
+                    // at least the lock that arcs the car through its aim (pure pursuit: a turn rate of 2·speed·sin(off)/distance),
+                    // so it turns in with the curve from the line instead of drifting out first and catching up
+                    const aimDist = Math.hypot(dx, dy), speedNow = Math.abs(this.speed);
+                    if (aimDist > 4 && speedNow > 0.5) {
+                        const pursue = clamp(2 * speedNow * Math.sin(angleDiff) / aimDist / (this.handling || 0.05), -1, 1);
+                        if (Math.sign(pursue) === Math.sign(steer) || Math.abs(steer) < 0.05) steer = Math.abs(pursue) > Math.abs(steer) ? pursue : steer;
+                    }
                     
                     // --- CROSS-TRACK CORRECTION ---
                     if (crossTrackDist > 5) {
@@ -2073,12 +2093,10 @@
                         this.y += (proj.point.y - this.y) * nudgeStrength;
                     }
                     
-                    // --- SPEED ---
+                    // --- SPEED --- what the rest of the curve allows (slowed for it before the box: `_turnAhead`), and
+                    // slower still while the car is off its line
                     const curveDiff = normalizeAngle(curveAngle - this.angle);
-                    maxSpeed = AIDriverSolver.calculateTurnSpeed(this, curveDiff, 50);
-                    if (sharpness > 0.5) {
-                        maxSpeed *= Math.max(0.5, 1.0 - (sharpness - 0.5) * 0.6);
-                    }
+                    maxSpeed = Math.min(this._turnSpeed(this.currentTurnPath, this.turnProgress), AIDriverSolver.calculateTurnSpeed(this, curveDiff * 0.5, 50));
                     
                     // Check if turn is complete
                     const exitPoint = this.currentTurnPath.controlPoints[this.currentTurnPath.controlPoints.length - 1];
@@ -2231,6 +2249,8 @@
                 // Round a bend ahead: slow to take it, and aim closer in (a long look cuts the corner)
                 const R = this._bendAhead(this.currentLane, distAlongLane, 60 + Math.abs(this.speed) * 22);
                 if (R < Infinity) maxSpeed = Math.min(maxSpeed, Math.max(2.5, Math.sqrt(0.16 * R)));
+                // A turn coming up: slow to take it by the time we reach it (braking only as hard as a gentle stop)
+                if (this.plannedTurn) maxSpeed = Math.min(maxSpeed, this._turnAhead(this.plannedTurn));
                 
                 // Get look-ahead target on lane
                 const laneTarget = AIDriverSolver.getLaneTarget(this, this.currentLane, 50, R * 0.6);
@@ -2429,8 +2449,8 @@
             pickCruiseTurn(relevantPaths) {
                 const isSafePath = (path) => {
                     const lane = path.toLane;
-                    const entryX = path.controlPoints[2].x;
-                    const entryY = path.controlPoints[2].y;
+                    const entryX = path.controlPoints.at(-1).x;
+                    const entryY = path.controlPoints.at(-1).y;
                     const dx = entryX - lane.start.x;
                     const dy = entryY - lane.start.y;
                     const entryDist = dx * lane.ux + dy * lane.uy;
@@ -2468,8 +2488,8 @@
             pickTrafficTurn(relevantPaths) {
                 const isSafePath = (path) => {
                     const lane = path.toLane;
-                    const entryX = path.controlPoints[2].x;
-                    const entryY = path.controlPoints[2].y;
+                    const entryX = path.controlPoints.at(-1).x;
+                    const entryY = path.controlPoints.at(-1).y;
                     const dx = entryX - lane.start.x;
                     const dy = entryY - lane.start.y;
                     const entryDist = dx * lane.ux + dy * lane.uy;

@@ -426,6 +426,20 @@
                 }
                 return this.fromLane?.angle || 0;
             }
+
+            /** The tightest radius left on the curve from `t` on (px; Infinity on a straight) */
+            radiusFrom(t = 0) {
+                if (!this._radii) {
+                    const N = 16, r = this._radii = [];
+                    for (let i = 0; i < N; i++) {
+                        const a = this.getPoint(i / N), b = this.getPoint((i + 1) / N);
+                        const turn = Math.abs(normalizeAngle(this.getAngle((i + 1) / N) - this.getAngle(i / N)));
+                        r.push(turn > 1e-4 ? Math.hypot(b.x - a.x, b.y - a.y) / turn : Infinity);
+                    }
+                    for (let i = r.length - 2; i >= 0; i--) r[i] = Math.min(r[i], r[i + 1]);
+                }
+                return this._radii[Math.min(this._radii.length - 1, Math.max(0, Math.floor(t * this._radii.length)))];
+            }
         }
 
         /**
@@ -681,11 +695,10 @@
                         ctx.lineWidth = 2;
                         
                         ctx.beginPath();
-                        const p0 = path.controlPoints[0];
-                        const p1 = path.controlPoints[1];
-                        const p2 = path.controlPoints[2];
+                        const [p0, p1, p2, p3] = path.controlPoints;
                         ctx.moveTo(p0.x, p0.y);
-                        ctx.quadraticCurveTo(p1.x, p1.y, p2.x, p2.y);
+                        if (p3) ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+                        else ctx.quadraticCurveTo(p1.x, p1.y, p2.x, p2.y);
                         ctx.stroke();
                     });
                 } else {
@@ -1541,12 +1554,39 @@
                 angleDiff = normalizeAngle(angleDiff);
                 const isStraight = Math.abs(angleDiff) < 0.5;
                 
-                const pullStrength = isStraight ? 0.0 : 0.5;
+                if (isStraight) return [p0, { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 }, p2];
+
+                // A turn bends round the corner where the lane in, run on, meets the lane out, run back: the curve leaves
+                // along the lane it's on and arrives along the lane it's going to, bending one way only (pulled towards
+                // the box's centre instead, a kerb turn first swung out towards the middle and back)
+                const ax = Math.cos(entryGate.angle), ay = Math.sin(entryGate.angle);
+                const bx = Math.cos(exitGate.angle), by = Math.sin(exitGate.angle);
+                const cross = ax * by - ay * bx, dx = p2.x - p0.x, dy = p2.y - p0.y;
+                const chord = Math.hypot(dx, dy);
+                if (Math.abs(cross) > 0.05) {
+                    const a = (dx * by - dy * bx) / cross;      // along the lane in to the corner
+                    const b = (ax * dy - ay * dx) / cross;      // and back from it along the lane out
+                    if (a > 0 && b > 0 && a < chord * 1.5 && b < chord * 1.5) {
+                        // a cubic as round as a circle's arc through the corner (a quadratic's tightest point, at its middle,
+                        // is a third tighter: harder to follow)
+                        const half = Math.acos(Math.max(-1, Math.min(1, ax * bx + ay * by))) / 2;
+                        const k = 4 / 3 * Math.tan(half / 2) / Math.tan(half);
+                        return [p0, { x: p0.x + ax * a * k, y: p0.y + ay * a * k }, { x: p2.x - bx * b * k, y: p2.y - by * b * k }, p2];
+                    }
+                }
+                // No corner to aim at between them (a hairpin's lanes meet far off; a shallow turn's lanes cross before
+                // the gate): a cubic, leaving along the lane in and arriving along the lane out all the same
+                if (Math.abs(cross) > 0.05 || ax * bx + ay * by > 0) {
+                    const h = chord * (ax * bx + ay * by < -0.3 ? 0.55 : 0.36);
+                    return [p0, { x: p0.x + ax * h, y: p0.y + ay * h }, { x: p2.x - bx * h, y: p2.y - by * h }, p2];
+                }
+                // A U-turn: pulled towards the box's centre
+                const pullStrength = 0.5;
                 const p1 = {
                     x: (p0.x + p2.x)/2 + (intersection.centerX - (p0.x + p2.x)/2) * pullStrength,
                     y: (p0.y + p2.y)/2 + (intersection.centerY - (p0.y + p2.y)/2) * pullStrength
                 };
-                
+
                 return [p0, p1, p2];
             }
             
