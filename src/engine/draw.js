@@ -44,6 +44,38 @@
                 this._lapT = now; this._lapP = pm;
             },
 
+            /** Is someone standing at (x, y) hidden by a roof or a canopy drawn over them this frame?
+                For the bubbles drawn after the lighting. A leaned roof is cam + (footprint - cam) * k,
+                so the point is under a building when the line from it back to cam + (p - cam) / k
+                crosses one of its sections (k = 1 without the lean: just the footprint). */
+            _speakerHidden(x, y, renderBuildings, roofsOn, foliageOn) {
+                const cam = this.camera, lean = CONFIG.BUILDINGS.LEAN;
+                if (roofsOn && this.activeMap.buildings) for (const entry of renderBuildings.v2) {
+                    const b = entry.item;
+                    if (!b.isV2 || !b.drawTop || !b.sections) continue;
+                    if (x < b.x - 2000 || x > b.x + (b.w || 200) + 2000 || y < b.y - 2000 || y > b.y + (b.h || 200) + 2000) continue;
+                    const k = lean ? 1 + b._leanScale() : 1;
+                    const x2 = cam.x + (x - cam.x) / k, y2 = cam.y + (y - cam.y) / k;
+                    for (const sec of b.sections) {
+                        const L = b.x + sec.x, T = b.y + sec.y;
+                        if (segmentHitsRect(x, y, x2, y2, L, T, L + sec.w, T + sec.h)) return true;
+                    }
+                }
+                if (foliageOn && this.activeMap.foliage) {
+                    const scale = GameSettings.getFoliageScale(), stride = scale < 1.0 ? Math.round(1 / scale) : 1;
+                    const near = this._queryRenderFoliage({ left: x - 80, right: x + 80, top: y - 80, bottom: y + 80 },
+                        this._speakerFoliage || (this._speakerFoliage = []));
+                    for (const entry of near) {
+                        const f = entry.item;
+                        if (stride > 1 && (entry.index % stride) !== 0) continue;   // thinned out: not drawn
+                        const r = (f.type === 'bush' ? 13 : f.type === 'palm' ? 24 : 21) * (f.size || 1) * 0.8;
+                        const dx = x - f.x, dy = y - foliageCanopyY(f);
+                        if (dx * dx + dy * dy < r * r) return true;
+                    }
+                }
+                return false;
+            },
+
             /** A point on the canvas (backing-store px) -> the world, through this frame's view. */
             viewToWorld(sx, sy) {
                 const v = this.view || { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom };
@@ -722,34 +754,9 @@
                     if (this.flitState.active) this.ctx.globalAlpha = 0.5; 
                     this.drawPlayer(); 
                     this.ctx.globalAlpha = 1.0; 
-                    this.drawPlayerEmote();
                 }
                 
                 if (RenderStats.timed) this._entLap('Entities: People extras');
-                // ── UNIFIED BUBBLE PASS ──
-                // Speech bubbles (NPC + pedestrian) draw AFTER all character
-                // bodies so they're never covered by the player, teammates,
-                // or other NPCs walking past. They still go under building
-                // roofs, foliage canopy, and weather — those layers come
-                // later in the render order, which is intentional: an
-                // indoor pedestrian's bubble shouldn't punch through the
-                // roof when you're standing outside.
-                {
-                    const cbE = cullBounds.entities;
-                    if (RL.at('characters')) for (const n of this.npcs) {
-                        if (!n.quipText) continue;
-                        if (n.x < cbE.left || n.x > cbE.right || n.y < cbE.top || n.y > cbE.bottom) continue;
-                        n.drawQuipBubble(this.ctx);
-                    }
-                    if (RL.at('crowd')) this.pedestrians.drawQuipBubbles(this.ctx, cbE);
-                    // Teammates can theoretically have quipText too (shared NPC class)
-                    if (RL.at('characters')) for (const tm of this.teammates) {
-                        if (!tm.quipText) continue;
-                        if (tm.x < cbE.left || tm.x > cbE.right || tm.y < cbE.top || tm.y > cbE.bottom) continue;
-                        tm.drawQuipBubble(this.ctx);
-                    }
-                }
-                
                 // Laser Sight beam (drawn after player, in world space) — from the gun's muzzle
                 // along the exact line the next shot takes (see getLaserSight / fireWeapon)
                 const laser = RL.at('combat') && (this.scopeK || 0) < 0.5 ? this.getLaserSight() : null;   // scoped, the hairline in the lane takes over
@@ -1079,6 +1086,23 @@
                 }
                 // The veil at the edge of an outdoor map (world/map-edge.js), above the darkness
                 if (RL.at('edge')) this.drawMapEdge(this.ctx);
+                // Speech bubbles, above the darkness so they read at night (as the health bars do).
+                // Drawn this late they'd show through roofs and canopies, so a speaker the world
+                // hides (_speakerHidden) keeps quiet; her own emote always shows, like her halo.
+                if (RL.at('stella') && this.player.visible) this.drawPlayerEmote();
+                {
+                    const cbE = cullBounds.entities;
+                    const quip = (n) => {
+                        if (!n.quipText) return;
+                        if (n.x < cbE.left || n.x > cbE.right || n.y < cbE.top || n.y > cbE.bottom) return;
+                        if (this._speakerHidden(n.x, n.y, renderBuildings, roofs, trees)) return;
+                        n.drawQuipBubble(this.ctx);
+                    };
+                    if (RL.at('characters')) for (const n of this.npcs) quip(n);
+                    if (RL.at('crowd')) this.pedestrians.drawQuipBubbles(this.ctx, cbE, p => !this._speakerHidden(p.x, p.y, renderBuildings, roofs, trees));
+                    // Teammates can theoretically have quipText too (shared NPC class)
+                    if (RL.at('characters')) for (const tm of this.teammates) quip(tm);
+                }
                 // Looking down a sniper's sight: the world narrows to her line
                 if (RL.at('hud')) this.drawScopeView(this.ctx);
                 // Health bars and damage numbers, above the darkness so they read at night
