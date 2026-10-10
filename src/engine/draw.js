@@ -621,6 +621,9 @@
                 if (RL.at('combat')) this.drawHunterDashes(this.ctx);   // crimson flits (engine/palace-art.js)
                 if (RL.at('markers')) this.drawExecuteCue(this.ctx);    // a gold reticle under an unaware back (engine/executions.js)
                 
+                // Lamp shadows: their own layer, under every person (ui/humanoid-render.js)
+                if (RL.at('characters')) drawLampShadowsUnder(this.ctx);
+
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // PERFORMANCE: AABB viewport culling for entities
                 {

@@ -410,8 +410,8 @@
                 LAMP_SHADOW_R: 230,     // … from a lamp this close (px); it fades out toward here
                 LAMP_SHADOW_K: 0.4,     // shadow length per px from the lamp
                 LAMP_SHADOW_MAX: 60,    // … capped (px)
-                LAMP_SHADOW_A: 0.7,     // alpha on the ground at full strength
-                LAMP_SHADOW_DARK: 1,    // … and in the light layer (how much of the lamp's light it takes back)
+                LAMP_SHADOW_A: 0.35,    // alpha on the ground at full strength
+                LAMP_SHADOW_DARK: 0.5,  // … and in the light layer (how much of the lamp's light it takes back)
                 LAMP_SHADOW_PEDS: 24    // pedestrians given lamp shadows per frame (named characters always are)
             },
             GAIT: {
