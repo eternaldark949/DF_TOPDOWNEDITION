@@ -709,7 +709,7 @@
             /** The hub graveyard's candle flames: only when the camera is near it. */
             drawGraveyardGlow(ctx) {
                 const cam = this.camera, z = cam.zoom || 1, hw = this.canvas.width / 2 / z + 60, hh = this.canvas.height / 2 / z + 60;
-                if (cam.x + hw < 500 || cam.x - hw > 3500 || cam.y + hh < 8800 || cam.y - hh > 10800) return;
+                const G = HUB_GRAVEYARD; if (cam.x + hw < G.x || cam.x - hw > G.x + G.w || cam.y + hh < G.y || cam.y - hh > G.y + G.h) return;
                 const t = _frameTime / 1000;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
                 for (const p of this.props) {

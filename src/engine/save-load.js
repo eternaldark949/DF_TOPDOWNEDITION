@@ -509,6 +509,11 @@ engineMixin({
                     if (mapId === 'grum_arena') { mapId = 'house_of_death'; this.loadMap(mapId); }
                     else if (mapId === 'road_test') { mapId = 'hub_949'; this.loadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
                     else this.loadMap(mapId, { x: playerX, y: playerY });
+                    // The city's layout changes now and then (it grew four times over): a spot saved where a building stands now
+                    // goes back to the city's spawn, and her car (below) to where it waits in a new game
+                    const hubCols = this.activeMap.id === 'hub_949' ? this.activeMap.buildingColliders : this._hubCache && this._hubCache.buildingColliders;
+                    const inBuilding = (x, y) => (hubCols || []).some(b => x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h);
+                    if (this.activeMap.id === 'hub_949' && inBuilding(this.player.x, this.player.y)) { this.player.x = this.activeMap.spawn.x; this.player.y = this.activeMap.spawn.y; }
         
                     // 4. Restore Teammates (unified — permanent + contract)
                     const savedTeammates = save.teammates || rawSave.teammates || [];
@@ -601,7 +606,7 @@ engineMixin({
                     const carMapId = carData.mapId ?? rawSave.car?.mapId ?? defaults.car.mapId;
                     const carAtStart = carMapId === 'road_test' ||                        // left in the old road test zone: parked back in the city
                         (carData.x === 0 && carData.y === 0);                             // (saved before it first reached the hub: it had no spot yet)
-                    if (carAtStart) Object.assign(this.ownedCar, CAR_START);
+                    if (carAtStart || inBuilding(this.ownedCar.x, this.ownedCar.y)) Object.assign(this.ownedCar, CAR_START);
                     // Shown on the hub, put away anywhere else (engine/cars.js)
                     this._setCarHere(this.ownedCar, this.activeMap.id === 'hub_949');
         

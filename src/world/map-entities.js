@@ -15,6 +15,18 @@
         ];
         const HUB_NPC_CLEARANCE = 90; // px half-extent kept building-free per anchor
 
+        // Where the city's landmarks and special blocks are (engine/map-loading.js lays them out; the Silver Queen and the
+        // Double Nights stay in the north-west corner, block_0_0 and block_0_2, where the story happens)
+        const HUB_BLOCKS = {
+            cafe: 'block_2_6',          // the Cozy Cafe and Torque Auto, side by side on Crimson Blvd
+            club: 'block_8_6',          // Moon City and Enni Cole, the middle of the city, on Clinic Way
+            clinic: 'block_4_12',       // Dr. Yin's and Neural Systems, the east edge, on Commerce Blvd
+            biggs: 'block_12_8',        // Biggs Amusement Park and its wheel
+            scrapyard: 'block_16_12',   // the Scrapyard (restricted zone), the far south-east
+            graveyard: 'block_18_6',    // the graveyard (HUB_GRAVEYARD), the middle of the southern edge
+        };
+        const HUB_OLLO_DOOR = { x: 8640, y: 13080, w: 80, h: 60 };   // the OllO Plaza door, on the southern edge east of the graveyard
+
         // The Cozy Cafe's round tables (centres) and booth rows (centre y): the props, the lamps and
         // the guests' seats (world/cafe-life.js) all come from these
         const CAFE_TABLES = [[505, 385], [628, 470], [505, 560], [628, 650], [505, 740]];

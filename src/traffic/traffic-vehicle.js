@@ -6,7 +6,7 @@
         // ║                     TRAFFIC SYSTEM                                ║
         // ╚══════════════════════════════════════════════════════════════════╝
         class TrafficVehicle extends VehicleEntity {
-            constructor(lane, brand = null, model = null, controlMode = 'AI') {
+            constructor(lane, brand = null, model = null, controlMode = 'AI', along = null) {
                 // --- RESOLVE BRAND/MODEL BEFORE SUPER ---
                 // Must resolve these first since dimensions come from model data
                 const resolvedBrand = brand || TrafficVehicle._selectRandomBrand();
@@ -21,7 +21,7 @@
                 // Calculate starting position - offset by 2 car lengths to avoid wall spawns
                 let startX = 0, startY = 0, startAngle = 0;
                 if (lane) {
-                    const spawnOffset = vehicleLength * 2; // 2 car lengths into the lane
+                    const spawnOffset = along ?? vehicleLength * 2; // 2 car lengths into the lane, unless told where (TrafficManager)
                     startX = lane.start.x + Math.cos(lane.angle) * spawnOffset;
                     startY = lane.start.y + Math.sin(lane.angle) * spawnOffset;
                     startAngle = lane.angle;

@@ -389,9 +389,11 @@ engineMixin({
                     Math.random = seededRandom(949);
                     
                     // 1. CREATE CITY LAYOUT
+                    // The whole map: the old city is its north-west corner, as it was (the story's spots are there), and the
+                    // city grows east and south from it. Rows: block_[row]_[col] counts the roads' edges from the north-west.
                     const city = new CityLayout({
-                        width: 4000,
-                        height: 8500,
+                        width: mapData.width,
+                        height: mapData.height,
                         margin: 25
                     });
                     
@@ -404,10 +406,18 @@ engineMixin({
                     city.addHorizontalRoad(4900, 'Skyline Ave', 2);
                     city.addHorizontalRoad(6100, 'Clinic Way', 2);
                     city.addHorizontalRoad(7400, 'Gridlock Ln', 3);
+                    city.addHorizontalRoad(8700, 'Ashgrove St', 2);
+                    city.addHorizontalRoad(9900, 'Foundry Rd', 2);
+                    city.addHorizontalRoad(11000, 'Southern Pkwy', 3);   // the graveyard's gate opens onto it
                     
-                    // Vertical highways
+                    // Vertical highways. Between Velvet Ave and Meridian Ave a column of wide blocks (2890 px) has room for
+                    // two landmarks side by side, and the graveyard at its foot
                     city.addVerticalRoad(1200, 'West Ave', 2);
                     city.addVerticalRoad(2800, 'East Ave', 2);
+                    city.addVerticalRoad(4400, 'Velvet Ave', 3);
+                    city.addVerticalRoad(7800, 'Meridian Ave', 3);
+                    city.addVerticalRoad(9500, 'Eclipse St', 2);
+                    city.addVerticalRoad(11200, 'Harbor St', 2);
                     
                     // An angled street: Lantern Cut cuts the corner of the block below Clinic Way, from the middle of Clinic Way
                     // down to East Ave (world/city-layout.js addAngledRoad: a T at each end, the block's rows step along it).
@@ -417,8 +427,10 @@ engineMixin({
                     // (addCurvedRoad: a lane each way, the corner rounded to a 220 px radius; straight for a while at each end, so each T is square)
                     city.addCurvedRoad([[3550, 4900], [3550, 5500], [2800, 5500]], 'Halfmoon Bend', 1, { radius: 220 });
                     
-                    // 3. GENERATE BLOCKS (must be done before placing buildings); the parks are kept free (world/parks.js)
+                    // 3. GENERATE BLOCKS (must be done before placing buildings); the parks are kept free (world/parks.js),
+                    // and the graveyard's block (11d) is kept clear for it
                     for (const [block, name] of Object.entries(HUB_PARKS)) city.setZoneType(block, CityLayout.ZONE.PARK, { name });
+                    city.setZoneType(HUB_BLOCKS.graveyard, CityLayout.ZONE.RESERVED, { name: 'Graveyard' });
                     city.generateBlocks();
                     
                     // Debug: Log blocks to console
@@ -466,19 +478,23 @@ engineMixin({
                     
                     // 5. PLACE KEY BUILDINGS
                     // Block naming: block_[row]_[col]
-                    // Rows: 0, 2, 4, 6, 8, 10 (even numbers - odd rows are road zones)
-                    // Cols: 0, 2, 4 (even numbers - odd cols are road zones)
-                    // Col 0 = west side, Col 2 = center, Col 4 = east side
+                    // Rows: 0, 2, 4 ... 18 (even numbers - odd rows are road zones), north to south
+                    // Cols: 0, 2, 4 ... 12 (even numbers - odd cols are road zones), west to east; col 6 is the wide one
+                    // Where landmarks share a block they stand side by side along its south street, each with its own door,
+                    // Zib drop-off and lamp colour (setLandmarkLampColors below)
                     
-                    city.placeBuilding('silver_queen', 'block_0_0', { align: 'center' });   // Silver Queen Apartments - NW
-                    city.placeBuilding('double_nights', 'block_0_2', { align: 'bottom', margin: 5 });  // Double Nights Hotel - N center, its drive meeting the pavement
-                    city.placeBuilding('moon_city', 'block_2_2', { align: 'center' });      // Moon City Nightclub - center
-                    city.placeBuilding('enni_cole', 'block_2_4', { align: 'center' });      // Enni Cole - E side
-                    city.placeBuilding('cozy_cafe', 'block_4_0', { align: 'center' });      // Cozy Cafe - W side
-                    city.placeBuilding('dr_yins', 'block_4_4', { align: 'center' });        // Dr. Yin's Clinic - E side
-                    city.placeBuilding('neural_sys', 'block_6_2', { align: 'center' });     // Neural Systems - S center
-                    city.placeBuilding('torque_auto', 'block_2_0', { align: 'center' });   // Torque Auto - W center
-                    city.placeBuilding('biggs_park', 'block_4_2', { align: 'center' });    // Biggs Amusement Park - center
+                    city.placeBuilding('silver_queen', 'block_0_0', { align: 'center' });   // Silver Queen Apartments - NW, home
+                    city.placeBuilding('double_nights', 'block_0_2', { align: 'bottom', margin: 5 });  // Double Nights Hotel - N, its drive meeting the pavement
+                    // Crimson Blvd's strip, east of home: Torque Auto and the Cozy Cafe in one wide block
+                    city.corner(HUB_BLOCKS.cafe, 'sw', 'cozy_cafe', { margin: 60 });
+                    city.corner(HUB_BLOCKS.cafe, 'se', 'torque_auto', { margin: 60 });
+                    // The middle of the city: Moon City and Enni Cole, side by side on Clinic Way
+                    city.placeAt('moon_city', city.blockMap[HUB_BLOCKS.club].x + 420, city.blockMap[HUB_BLOCKS.club].y + 60);
+                    city.placeAt('enni_cole', city.blockMap[HUB_BLOCKS.club].x + 1520, city.blockMap[HUB_BLOCKS.club].y + 55);
+                    // East: Dr. Yin's and Neural Systems share a block on Commerce Blvd
+                    city.corner(HUB_BLOCKS.clinic, 'sw', 'dr_yins', { margin: 60 });
+                    city.corner(HUB_BLOCKS.clinic, 'se', 'neural_sys', { margin: 60 });
+                    city.placeBuilding('biggs_park', HUB_BLOCKS.biggs, { align: 'center' });    // Biggs Amusement Park - south-east, its wheel above it
 
                     // 5a. A HAND-LAID BLOCK (world/city-layout.js: row, corner, lot, placeAt)
                     // NE of Double Nights: a shop parade along Hotel Dr., wall to wall, a second row fronting East Ave.
@@ -487,13 +503,14 @@ engineMixin({
                     city.row('block_0_4', 'west', ['shop_small', 'apartment_small'], { gap: 0, setback: 12, justify: 'start' });
                     city.corner('block_0_4', 'ne', 'warehouse');
                     
-                    // 5b. SET CUSTOM LAMP COLORS FOR V1 BUILDINGS
-                    // V2 buildings auto-set their block lamp colors from accent color
-                    city.setBlockLampColors({
-                        'block_2_2': '#ff00aa',    // Moon City Nightclub - hot pink (its own lights keep their colours). Violet '#b48cff' was the first pick: swap back here to revert
-                        'block_4_4': '#00f3ff',    // Dr. Yin's Clinic - medical cyan
-                        'block_6_2': '#0088ff',    // Neural Systems - tech blue
-                        'block_4_2': '#ff8800'     // Biggs Amusement Park - carnival amber
+                    // 5b. SET CUSTOM LAMP COLORS
+                    // V2 buildings auto-set their block lamp colors from accent color; these go with the landmark wherever it
+                    // stands (a block shared by two is split between their colours: world/city-layout.js)
+                    city.setLandmarkLampColors({
+                        moon_city: '#ff00aa',      // Moon City Nightclub - hot pink (its own lights keep their colours). Violet '#b48cff' was the first pick: swap back here to revert
+                        dr_yins: '#00f3ff',        // Dr. Yin's Clinic - medical cyan
+                        neural_sys: '#0088ff',     // Neural Systems - tech blue
+                        biggs_park: '#ff8800'      // Biggs Amusement Park - carnival amber
                     });
                     
                     // 5b. RESERVE SCRIPTED NPC ANCHORS
@@ -508,6 +525,8 @@ engineMixin({
                         );
                     }
 
+                    city._addSafeZone(HUB_OLLO_DOOR.x - 120, HUB_OLLO_DOOR.y - 260, HUB_OLLO_DOOR.w + 240, HUB_OLLO_DOOR.h + 260, 'OllO Plaza door');
+                    
                     // 6. AUTO-FILL REMAINING BLOCKS
                     // Rows along every street a block fronts, facing the road (world/city-layout.js _fillStreetFronts);
                     // the Scrapyard keeps its scattered cover. fill: how much of each street front gets buildings
@@ -516,7 +535,8 @@ engineMixin({
                         density: 0.4,
                         fill: 1,
                         categories: ['residential', 'shopping', 'commercial'],
-                        scatter: ['block_10_4']
+                        scatter: [HUB_BLOCKS.scrapyard],
+                        fillPartial: [HUB_BLOCKS.cafe, HUB_BLOCKS.club, HUB_BLOCKS.clinic]   // the shared blocks: rows round their landmarks
                     });
                     
                     // 7. CREATE ROAD NETWORK
@@ -574,7 +594,7 @@ engineMixin({
                     
                     // Create Ferris Wheel next to Biggs Amusement Park
                     const biggsBuilding = buildings.find(b => b.id === 'biggs_park');
-                    const biggsBlock = city.blockMap['block_4_2'];
+                    const biggsBlock = city.blockMap[HUB_BLOCKS.biggs];
                     if (biggsBuilding && biggsBlock) {
                         const blockCenterX = biggsBlock.x + biggsBlock.w / 2;
                         const aboveBuildingY = biggsBuilding.y - 100; // Just above the building
@@ -583,6 +603,13 @@ engineMixin({
                             aboveBuildingY,
                             { radius: 560, axleHeight: 600, gondolas: 8, speed: 0.003, rimGap: 112, facing: 0 }
                         );
+                    }
+                    
+                    // Biggs Park's dark forecourt (a floor zone: it tints the ground, ground-baker.js), under it and its wheel
+                    if (biggsBuilding && biggsBlock) {
+                        const cx = biggsBlock.x + biggsBlock.w / 2;
+                        mapData.floorZones = mapData.floorZones.filter(z => !z.biggs);
+                        mapData.floorZones.push({ x: cx - 600, y: biggsBlock.y + biggsBlock.h - 405, w: 1200, h: 400, color: '#222', biggs: true });
                     }
                     
                     // Build per-section collision shapes for old-style collision checks
@@ -600,9 +627,9 @@ engineMixin({
                     mapData.cityLayout = city;
                     
                     // ── RESTRICTED ZONE (Hostile farming area) ──
-                    // Place in block_10_4 — deep southeast, between Clinic Way & Gridlock Ln
-                    const rzBlock = city.blockMap['block_10_4'];
-                    console.log('[RESTRICTED ZONE] block_10_4:', rzBlock ? `${rzBlock.x},${rzBlock.y} ${rzBlock.w}x${rzBlock.h}` : 'NOT FOUND');
+                    // The Scrapyard: the far south-east, between Foundry Rd & Southern Pkwy
+                    const rzBlock = city.blockMap[HUB_BLOCKS.scrapyard];
+                    console.log('[RESTRICTED ZONE]', HUB_BLOCKS.scrapyard, rzBlock ? `${rzBlock.x},${rzBlock.y} ${rzBlock.w}x${rzBlock.h}` : 'NOT FOUND');
                     if (rzBlock) {
                         this.restrictedZone = new RestrictedZone({
                             id: 'rz_scrapyard',
@@ -616,7 +643,7 @@ engineMixin({
                             mapId: 'hub_949'
                         });
                         // Set block lamp color to danger crimson
-                        city.setBlockLampColors({ 'block_10_4': '#ff2200' });
+                        city.setBlockLampColors({ [HUB_BLOCKS.scrapyard]: '#ff2200' });
                         
                         // Ground visual — dark crimson floor tint so the zone is visible in-world
                         mapData.floorZones.push({
@@ -626,7 +653,7 @@ engineMixin({
                         
                         console.log('[RESTRICTED ZONE] Created at', this.restrictedZone.x, this.restrictedZone.y, this.restrictedZone.w, 'x', this.restrictedZone.h);
                     } else {
-                        console.warn('[RESTRICTED ZONE] block_10_4 not found in city layout! Available blocks:', Object.keys(city.blockMap).join(', '));
+                        console.warn(`[RESTRICTED ZONE] ${HUB_BLOCKS.scrapyard} not found in city layout! Available blocks:`, Object.keys(city.blockMap).join(', '));
                     }
                     
                     // 8b. EXTRACT LANDMARKS FROM BUILDINGS
@@ -893,10 +920,10 @@ engineMixin({
                     console.log(`Generated ${mapData.foliage.length} foliage elements (including glowing trees)`);
                     
                     // 11d. SOUTHERN GRAVEYARD
-                    // Large cemetery south of the road grid with stone walls, warm lamps,
-                    // gravestones, and Ms. Jean's spawn point at center.
+                    // Large cemetery in the wide block on the city's southern edge (HUB_GRAVEYARD), its gate onto
+                    // Southern Pkwy, with stone walls, warm lamps, gravestones, and Ms. Jean's spawn point at center.
                     {
-                        const gx = 500, gy = 8800, gw = 3000, gh = 2000;
+                        const { x: gx, y: gy, w: gw, h: gh } = HUB_GRAVEYARD;
                         const wallT = 30;         // Wall thickness
                         const gateW = 300;        // North entrance gap width
                         const gateCX = gx + gw / 2; // Gate center X
@@ -1097,10 +1124,10 @@ engineMixin({
                         this.activeMap.cityLayout.applyBlockLampColors(this.activeMap.lamps);
                     }
                     
-                    // The Ollo test zone's door (bottom centre of the hub)
+                    // The Ollo test zone's door (on the city's southern edge, east of the graveyard)
                     if (this.activeMap.id === 'hub_949') {
                         this.activeMap.transitions.push({
-                            x: 1960, y: 8500, w: 80, h: 60,
+                            ...HUB_OLLO_DOOR,
                             target: 'ollo_test',
                             label: 'Visit OllO Plaza',
                             _fromBuilding: true

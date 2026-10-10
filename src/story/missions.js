@@ -68,9 +68,10 @@
                 const reward = 200 + Math.floor(Math.random() * 200);
                 const scrapReward = 15 + Math.floor(Math.random() * 11);
                 
-                // Random spawn location in the city
-                const spawnX = 400 + Math.random() * 3200;
-                const spawnY = 400 + Math.random() * 7600;
+                // Random spawn location in the city (spawnBountyTarget moves it in front of a building)
+                const hub = MAP_DATA.hub_949;
+                const spawnX = 400 + Math.random() * (hub.width - 800);
+                const spawnY = 400 + Math.random() * (hub.height - 800);
 
                 return {
                     type: MISSION_TYPES.BOUNTY,

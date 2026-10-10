@@ -822,7 +822,7 @@ test('Camera edge lock: the view stays inside the map, a narrow map is centred, 
   ok(hub.l >= -e && hub.t >= -e, 'at the hub\'s corner the view stays inside the city');
   const cut = view('hub_949', 2000, 2000, 'game.cutscene.active = true; game.camera.x = -500; game.camera.y = 20000;');
   env.run(`game.cutscene.active = false;`);
-  ok(cut.l >= -e && cut.b <= 11000 + e && cut.cx === cut.x, 'a cutscene camera outside the map is brought in, and stays in');
+  ok(cut.l >= -e && cut.b <= env.probe.MAPS.hub_949.height + e && cut.cx === cut.x, 'a cutscene camera outside the map is brought in, and stays in');
   const off = view('apt_949', 20, 100, 'GameSettings.cameraEdgeLock = false;');
   env.run(`GameSettings.cameraEdgeLock = true;`);
   equal([off.x, off.y], [20, 100], 'with the lock off the camera is her own position again');
@@ -1458,6 +1458,22 @@ test('A busy junction moves more cars with the lights than with the old one-at-a
   equal(out.lights.touch, 0, 'no contact with the lights');
 }, {events:true});
 
+test('Saves from the old city: a spot where a building stands now loads at the spawn, her car where it waits in a new game', env => {
+  carsFixture(env);
+  const r = value(env, `
+    game._doLoadMap('hub_949'); const b = game.activeMap.buildingColliders.find(c => c.w > 120 && c.h > 120), inside = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    game.player.x = inside.x; game.player.y = inside.y; Object.assign(game.ownedCar, { x: inside.x, y: inside.y }); game.saveGame({ auto: true });
+    game.loadGame('dfab_save_slot_auto');
+    const moved = { player: [game.player.x, game.player.y], car: [game.ownedCar.x, game.ownedCar.y], spawn: [game.activeMap.spawn.x, game.activeMap.spawn.y] };
+    game.player.x = 2000; game.player.y = 1400; Object.assign(game.ownedCar, { x: 900, y: 1300 }); game.saveGame({ auto: true });
+    game.loadGame('dfab_save_slot_auto');
+    return { moved, kept: { player: [game.player.x, game.player.y], car: [game.ownedCar.x, game.ownedCar.y] } };
+  `);
+  equal(r.moved.player, r.moved.spawn, 'inside a building: she starts at the spawn');
+  equal(r.moved.car, [580, 640], 'and her car where it waits in a new game (CAR_START)');
+  equal(r.kept, { player: [2000, 1400], car: [900, 1300] }, 'anywhere clear stays as saved');
+}, {events:true});
+
 test('Saves: her car stays where she parked it through a save made indoors; a hijacked drive loads on foot', env => {
   carsFixture(env);
   const result=value(env, `
@@ -1600,19 +1616,69 @@ test('Doors any side: a building faces the street it is placed on, door, sign, l
   equal(r.mark, [r.px - 50, 0], 'its landmark is 50 px out from that wall');
 });
 
+test('The bigger city: four times the old area, near square, every landmark placed clear of the street and reachable by Zib and autodrive', env => {
+  const r = value(env, `
+    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    const map = game.activeMap, city = map.cityLayout, net = game.traffic.network;
+    const ids = Object.keys(game.dropOffRegistry), home = game.dropOffRegistry.parking_spot;
+    const routes = ids.map(id => {
+      const d = game.dropOffRegistry[id], p = net.buildPrecisePath(home.x, home.y, d.x, d.y), last = p[p.length - 1];
+      const onRoad = net.findNearestRoadPoint(d.x, d.y);
+      return { id, steps: p.length, end: Math.round(Math.hypot(last.x - d.x, last.y - d.y)), road: onRoad ? Math.round(Math.hypot(onRoad.x - d.x, onRoad.y - d.y)) : -1 };
+    });
+    const landmarks = city.placedBuildings.filter(p => p.template.landmarkId);
+    const shared = {}; for (const p of landmarks) (shared[p.blockName] = shared[p.blockName] || []).push(p.templateId);
+    const street = map.pavements.concat(net.roads.filter(x => !x.isDiagonal));
+    const issues = city.layoutIssues(street).filter(i => i.placement.template.landmarkId || (i.other && i.other.template.landmarkId))
+      .map(i => i.placement.templateId + ' ' + i.what + (i.other ? ' ' + i.other.templateId : ''));
+    // each landmark's door is on the street side of its block, and its block's lamps are its colour (a shared block: by whose they're nearest)
+    // (the lamps on its own side of the street: across it is the next block's)
+    const near = (id, R) => { const lm = game.landmarkRegistry[id], street = game.dropOffRegistry[id].y;
+      return map.lamps.filter(l => !l.keepColor && l.y < street && Math.hypot(l.x - lm.x, l.y - lm.y) < R).map(l => l.color); };
+    const lamps = { moon: near('club_entrance', 450), enni: near('enni_cole', 450), yin: near('clinic', 400), neural: near('neural_systems', 400), biggs: near('biggs_park', 450) };
+    return { w: map.width, h: map.height, cw: city.width, ch: city.height, routes, shared: Object.values(shared).filter(a => a.length > 1).length,
+      landmarks: landmarks.length, issues, lamps, graveyard: game.landmarkRegistry.graveyard_center,
+      gyBlock: city.blockMap[HUB_BLOCKS.graveyard], G: HUB_GRAVEYARD, gyBuilt: city.placedBuildings.filter(p => p.blockName === HUB_BLOCKS.graveyard).length,
+      ollo: map.transitions.find(t => t.target === 'ollo_test'), olloHit: map.buildingColliders.filter(b => { const o = HUB_OLLO_DOOR;
+        return b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h + 60 && b.y + b.h > o.y - 60; }).length };
+  `);
+  const area = r.w * r.h / (4000 * 11000);
+  ok(area > 3.8 && area < 4.2, `four times the old city's area (${area.toFixed(2)}x)`);
+  ok(Math.min(r.w, r.h) / Math.max(r.w, r.h) > 0.9, 'and near square');
+  equal([r.cw, r.ch], [r.w, r.h], 'the street grid covers the whole map');
+  equal(r.landmarks, 9, 'all nine landmarks are placed');
+  ok(!env.warnings.some(w => /\[NAV\] No/.test(w)), 'every route is planned over the road graph');
+  ok(r.shared >= 3, 'some blocks hold two landmarks');
+  equal(r.issues, [], 'no landmark reaches a street or another building');
+  for (const x of r.routes) {
+    ok(x.road >= 0 && x.road < 5, `${x.id}: its Zib drop-off is on a road`);
+    ok(x.steps > 2 && x.end < 5, `${x.id}: a route from home reaches it (${x.steps} steps)`);
+  }
+  equal([...new Set(r.lamps.moon)], ['#ff00aa'], 'Moon City keeps its hot pink lamps');
+  ok(r.lamps.enni.length && !r.lamps.enni.includes('#ff00aa'), 'Enni Cole, beside it, keeps its own');
+  equal([...new Set(r.lamps.yin)], ['#00f3ff'], 'Dr. Yin\'s keeps its cyan');
+  equal([...new Set(r.lamps.neural)], ['#0088ff'], 'Neural Systems, beside it, keeps its blue');
+  equal([...new Set(r.lamps.biggs)], ['#ff8800'], 'Biggs Park keeps its amber');
+  const g = r.G, b = r.gyBlock;
+  ok(g.x > b.x && g.y > b.y && g.x + g.w < b.x + b.w && g.y + g.h < b.y + b.h, 'the graveyard sits inside its block');
+  equal(r.gyBuilt, 0, 'and nothing else is built there');
+  equal([r.graveyard.x, r.graveyard.y], [g.x + g.w / 2, g.y + g.h / 2], 'Ms. Jean\'s spot is its centre');
+  ok(r.ollo && r.olloHit === 0, 'the OllO Plaza door is clear of buildings');
+});
+
 test('Street-front fill: auto-filled blocks grow rows along the streets they front, facing the road', env => {
   const r = value(env, `
     game.story.update=()=>{}; game._doLoadMap('hub_949');
     const map = game.activeMap, city = map.cityLayout, rows = {}, wrong = [];
     city.placedBuildings.forEach((p, i) => {
-      if (!p.options.autoPlaced || p.blockName === 'block_10_4' || p.options.angled) return;   // (along an angled street: its own test)
+      if (!p.options.autoPlaced || p.blockName === HUB_BLOCKS.scrapyard || p.options.angled) return;   // (along an angled street: its own test)
       const b = city.blockMap[p.blockName], sides = city.streetSides(b), f = map.buildings[i].facing;
       if (!p.options.row || !sides.includes(p.options.row)) wrong.push(p.blockName + ' ' + p.templateId + ' ' + p.options.row);
       if (f !== {south:'S', north:'N', west:'W', east:'E'}[p.options.row]) wrong.push(p.blockName + ' faces ' + f);
       (rows[p.blockName] = rows[p.blockName] || new Set()).add(p.options.row);
     });
-    const scatter = city.placedBuildings.filter(p => p.blockName === 'block_10_4').every(p => !p.options.row);
-    const edge = city.streetSides(city.blockMap.block_12_4);
+    const scatter = city.placedBuildings.filter(p => p.blockName === HUB_BLOCKS.scrapyard).every(p => !p.options.row);
+    const edge = city.streetSides(city.blockMap.block_18_12);   // the south-east corner
     return { wrong, blocks: Object.keys(rows).length, sides: Object.values(rows).reduce((n, s) => n + s.size, 0), scatter, edge };
   `);
   equal(r.wrong, [], 'every filler stands in a row on one of its block\'s streets, facing it');

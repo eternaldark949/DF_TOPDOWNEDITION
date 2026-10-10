@@ -291,19 +291,19 @@
                     if (this._hasLost) this.refreshLostLuggage();
                 }
 
-                // Graveyard Humanoid Ghosts (Cemetery: x 500-3500, y 8800-10800)
-                const inGraveyard = this.activeMap.id === 'hub_949' && 
-                    this.player.x > 400 && this.player.x < 3600 && 
-                    this.player.y > 8600 && this.player.y < 11000;
+                // Graveyard Humanoid Ghosts (the cemetery, HUB_GRAVEYARD, and a little round it)
+                const G = HUB_GRAVEYARD, inGraveyard = this.activeMap.id === 'hub_949' &&
+                    this.player.x > G.x - 100 && this.player.x < G.x + G.w + 100 &&
+                    this.player.y > G.y - 200 && this.player.y < G.y + G.h + 200;
                 if (inGraveyard) {
                     // Spawn new ghosts periodically (max 5 at once)
                     if (this.graveyardGhosts.length < 15 && Math.random() < 0.02) {
                         const look = ROLE_LOOKS.ghost(Math.random);   // pale and icy (core/appearances.js)
-                        const gx = 600 + Math.random() * 2800;
-                        const gy = 8900 + Math.random() * 1800;
+                        const gx = G.x + 100 + Math.random() * (G.w - 200);
+                        const gy = G.y + 100 + Math.random() * (G.h - 200);
                         // Pick a random wander target inside graveyard
-                        const tx = 600 + Math.random() * 2800;
-                        const ty = 8900 + Math.random() * 1800;
+                        const tx = G.x + 100 + Math.random() * (G.w - 200);
+                        const ty = G.y + 100 + Math.random() * (G.h - 200);
                         this.graveyardGhosts.push({
                             x: gx, y: gy,
                             targetX: tx, targetY: ty,
@@ -339,8 +339,8 @@
                                 g.y += Math.sin(g.angle) * g.speed;
                             } else {
                                 // Pick new target
-                                g.targetX = 600 + Math.random() * 2800;
-                                g.targetY = 8900 + Math.random() * 1800;
+                                g.targetX = G.x + 100 + Math.random() * (G.w - 200);
+                                g.targetY = G.y + 100 + Math.random() * (G.h - 200);
                             }
                             if (g.wanderTimer <= 0) g.phase = 'out';
                         } else if (g.phase === 'out') {

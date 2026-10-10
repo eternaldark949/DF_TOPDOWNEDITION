@@ -176,6 +176,7 @@
                 PARK: 'PARK',
                 PLAZA: 'PLAZA',
                 RESTRICTED: 'RESTRICTED',
+                RESERVED: 'RESERVED',   // kept clear for something laid out by hand (the graveyard): no buildings, plain ground
                 ROAD: 'ROAD'
             };
             
@@ -199,6 +200,7 @@
                 this.blockMap = {};
                 this.zoneOverrides = {};
                 this.blockLampColors = {};  // Custom lamp colors per block
+                this.landmarkLampColors = {};   // ...and per landmark, for a block with more than one (setLandmarkLampColors)
                 this.safeZones = [];
                 this.buildingTemplates = {};
                 this.placedBuildings = [];
@@ -393,9 +395,35 @@
                 return this;
             }
             
+            /**
+             * Lamp colours by landmark: { moon_city: '#ff00aa', ... }. Its block takes the colour; a block holding more
+             * than one landmark is split, each of its lamps taking the colour of the landmark nearest it. Call after placing them.
+             */
+            setLandmarkLampColors(colorMap) {
+                for (const id in colorMap) {
+                    this.landmarkLampColors[id] = colorMap[id];
+                    const p = this.placedBuildings.find(q => q.templateId === id);
+                    if (p) this.setBlockLampColor(p.blockName, colorMap[id]);
+                }
+                return this;
+            }
+            
+            /** The blocks with more than one landmark: block name -> [{ e: extent, color }] (applyBlockLampColors) */
+            _sharedBlocks() {
+                const by = {};
+                for (const p of this.placedBuildings) {
+                    const color = p.template.landmarkId && (this.landmarkLampColors[p.templateId] || (p.template.isV2 && p.template.color));
+                    if (color) (by[p.blockName] = by[p.blockName] || []).push({ e: p.extent || p, color });
+                }
+                for (const k in by) if (by[k].length < 2) delete by[k];
+                return by;
+            }
+            
             applyBlockLampColors(lamps) {
                 // Post-process lamps array to apply custom block colors
                 if (Object.keys(this.blockLampColors).length === 0) return lamps;
+                const shared = this._sharedBlocks();
+                const gap = (e, x, y) => Math.hypot(Math.max(e.x - x, 0, x - e.x - e.w), Math.max(e.y - y, 0, y - e.y - e.h));
                 
                 // Build spatial lookup: which blocks have custom colors
                 const coloredBlocks = [];
@@ -407,6 +435,7 @@
                     // Expand bounds slightly to catch lamps on block edges (road-side lamps)
                     const padding = 100;
                     coloredBlocks.push({
+                        landmarks: shared[blockName],
                         x: block.x - padding,
                         y: block.y - padding,
                         x2: block.x + block.w + padding,
@@ -425,9 +454,10 @@
                     
                     for (let cb of coloredBlocks) {
                         if (lx >= cb.x && lx <= cb.x2 && ly >= cb.y && ly <= cb.y2) {
-                            // Lamp is within this colored block
-                            lamp.color = cb.color;
-                            if (lamp.baseColor !== undefined) lamp.baseColor = cb.color;
+                            // Lamp is within this colored block (shared by landmarks: the nearest one's colour)
+                            const near = cb.landmarks && cb.landmarks.reduce((a, b) => gap(b.e, lx, ly) < gap(a.e, lx, ly) ? b : a);
+                            lamp.color = near ? near.color : cb.color;
+                            if (lamp.baseColor !== undefined) lamp.baseColor = lamp.color;
                             if (cb.radius && lamp.radius !== undefined) lamp.radius = cb.radius;
                             if (cb.radius && lamp.baseRadius !== undefined) lamp.baseRadius = cb.radius;
                             break;  // First match wins
@@ -629,7 +659,7 @@
                 const block = this.blockMap[blockName];
                 if (!block) { console.error(`Block '${blockName}' not found`); return null; }
                 const zoneType = this._getZoneType(blockName);
-                if (zoneType === CityLayout.ZONE.RESTRICTED || zoneType === CityLayout.ZONE.ROAD) return null;
+                if (zoneType === CityLayout.ZONE.RESTRICTED || zoneType === CityLayout.ZONE.RESERVED || zoneType === CityLayout.ZONE.ROAD) return null;
                 return { template, block };
             }
             
@@ -654,8 +684,9 @@
                     extent: { x: ex, y: ey, w: S.ext.w, h: S.ext.h }, options
                 };
                 this.placedBuildings.push(placement);
-                // Auto-set block lamp color for V2 buildings from their accent color
-                if (template.isV2 && template.color) this.setBlockLampColor(blockName, template.color);
+                // Auto-set block lamp color for V2 buildings from their accent color (a filler round a landmark leaves the landmark's)
+                const besideLandmark = options.autoPlaced && this.placedBuildings.some(p => p !== placement && p.blockName === blockName && p.template.landmarkId);
+                if (template.isV2 && template.color && !besideLandmark) this.setBlockLampColor(blockName, template.color);
                 return placement;
             }
             
@@ -749,7 +780,8 @@
              */
             _fillStreetFronts(block, templates, options = {}) {
                 const sides = this.streetSides(block), setback = options.setback ?? 12, margin = 30, alley = 30;
-                const placed = [], both = (a, b) => sides.includes(a) && sides.includes(b);
+                // an angled street's stepped rows first (they have the least room), the straight rows round them
+                const placed = this._fillAngledFronts(block, templates, options), both = (a, b) => sides.includes(a) && sides.includes(b);
                 const pick = (room, maxDepth, alongW) => {                                   // a random run of buildings that fits
                     const ids = [], ok = templates.filter(t => !t.unique && (alongW ? t.extent?.h ?? t.h : t.extent?.w ?? t.w) <= maxDepth);
                     if (!ok.length) return ids;
@@ -796,7 +828,6 @@
                 const bottom = ns.south.length ? Math.min(...ns.south.map(p => p.extent.y)) - alley : block.y + block.h - margin;
                 const weDepth = (both('west', 'east') ? (block.w - margin) / 2 : block.w - margin * 2) - setback;
                 if (bottom - top > 150) for (const side of ['west', 'east']) if (sides.includes(side)) run(side, [top, bottom], weDepth);
-                placed.push(...this._fillAngledFronts(block, templates, options));
                 return placed;
             }
             
@@ -847,7 +878,9 @@
                 const allPlacements = [];
                 for (let block of this.blocks) {
                     if (this._getZoneType(block.name) !== CityLayout.ZONE.BLOCK) continue;
-                    if (this.placedBuildings.some(p => p.blockName === block.name) && !options.fillPartial) continue;
+                    // a block with something in it already is left as it is, unless fillPartial (true, or a list of blocks) says to build round it
+                    const partial = options.fillPartial === true || (Array.isArray(options.fillPartial) && options.fillPartial.includes(block.name));
+                    if (this.placedBuildings.some(p => p.blockName === block.name) && !partial) continue;
                     
                     let templateIds = options.templateIds;
                     if (options.categories) {
