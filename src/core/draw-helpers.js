@@ -87,6 +87,19 @@
         /** Get building colliders from a map object (with fallbacks). */
         function getColliders(map) { return map.buildingColliders || map.buildings || []; }
         
+        /** Does the segment (x1, y1)-(x2, y2) touch the rect [L, R] x [T, B]? (slab clip) */
+        function segmentHitsRect(x1, y1, x2, y2, L, T, R, B) {
+            let t0 = 0, t1 = 1;
+            const dx = x2 - x1, dy = y2 - y1;
+            for (const [p, q] of [[-dx, x1 - L], [dx, R - x1], [-dy, y1 - T], [dy, B - y1]]) {
+                if (p === 0) { if (q < 0) return false; continue; }
+                const r = q / p;
+                if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
+                else { if (r < t0) return false; if (r < t1) t1 = r; }
+            }
+            return true;
+        }
+
         /** Everything that blocks sight and light on a map: walls plus building footprints (cached per map). */
         function getOccluders(map) {
             if (!map) return [];

@@ -1138,11 +1138,13 @@
              * Called from the main render loop AFTER all character bodies
              * (player, teammates, enemies, etc.) so bubbles always sit on
              * top and don't get covered by characters drawn later.
+             * `shown(ped)`, when given, can keep a hidden speaker's bubble back.
              */
-            drawQuipBubbles(ctx, cb) {
+            drawQuipBubbles(ctx, cb, shown) {
                 for (let ped of this.pedestrians) {
                     if (!ped.quipText) continue;
                     if (cb && (ped.x < cb.left || ped.x > cb.right || ped.y < cb.top || ped.y > cb.bottom)) continue;
+                    if (shown && !shown(ped)) continue;
                     ped.drawQuipBubble(ctx);
                 }
             }
