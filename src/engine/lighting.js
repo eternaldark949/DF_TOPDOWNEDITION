@@ -663,7 +663,7 @@
                 lc.globalAlpha = 1;
 
                 // 6b. LAMP SHADOWS — behind each person in a lamp's light, the dark and its colour come back (ui/humanoid-render.js)
-                drawLampShadowsInto(lc, tint);
+                drawLampShadowsInto(lc, tint, litLamps);
 
                 lc.restore();
             

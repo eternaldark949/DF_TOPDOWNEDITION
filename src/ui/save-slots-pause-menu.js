@@ -1065,6 +1065,7 @@
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
                 this._updateValueEl('set-wetreflections', GameSettings.reflections || 'high');
+                this._updateValueEl('set-lampshadows', GameSettings.lampShadows || 'low');
                 this._updateValueEl('set-atmosphere', GameSettings.atmosphereTint || 'off');
                 this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
                 this._updateValueEl('set-colorgrade', GameSettings.colorGrade === 'none' ? 'none' : GameSettings.colorGrade.replace(/_/g, ' '));
@@ -1137,6 +1138,12 @@
                     GameSettings.reflections = order[(order.indexOf(GameSettings.reflections || 'high') + 1) % order.length];
                     GameSettings.wetReflections = GameSettings.reflections !== 'off';
                     this._updateValueEl(el.id, GameSettings.reflections);
+                    
+                } else if (key === 'lampShadows') {
+                    const order = ['off', 'low', 'high', 'ultra'];
+                    GameSettings.lampShadows = order[(order.indexOf(GameSettings.lampShadows || 'low') + 1) % order.length];
+                    GameSettings.saveDensity();                                    // this device's, like the crowd's detail
+                    this._updateValueEl(el.id, GameSettings.lampShadows);
                     
                 } else if (key === 'fullscreen') {
                     if (!FullscreenManager.supported()) {

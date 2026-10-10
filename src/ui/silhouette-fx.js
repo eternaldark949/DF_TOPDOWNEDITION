@@ -69,7 +69,10 @@
                 return cur.g;
             },
 
-            /** Stamp the captured body onto the frame, then its effect. */
+            /** The body being captured also casts its lamp shadow from this capture (ui/humanoid-render.js) */
+            keepFor(entity) { if (this._cur) this._cur.keepFor = entity; },
+
+            /** Stamp the captured body onto the frame, then its effect ('plain': none). */
             end(kind, k = 1) {
                 const c = this._cur;
                 if (!c) return;
@@ -80,6 +83,7 @@
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
                 ctx.drawImage(cv, 0, 0, side, side, ox, oy, side, side);     // the body, as drawn
+                if (c.keepFor) keepLampSilhouette(c.keepFor, cv, ox, oy, side);
                 if (kind === 'heat' || kind === 'glow') {
                     // The silhouette in one colour (the capture is spent after this)
                     g.save();

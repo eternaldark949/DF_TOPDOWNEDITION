@@ -406,13 +406,19 @@
                 RIM_R: 180,             // a lamp this close (px) rims them in its colour
                 RIM_A: 0.6,
                 RIM_PEDS: 8,            // pedestrians rimmed per frame (named characters always are)
-                LAMP_SHADOW: true,      // at night, a shadow cast away from each of the two nearest burning lamps
+                // Lamp shadows (how much: Settings → Lamp Shadows, ui/humanoid-render.js)
                 LAMP_SHADOW_R: 230,     // … from a lamp this close (px); it fades out toward here
                 LAMP_SHADOW_K: 0.4,     // shadow length per px from the lamp
                 LAMP_SHADOW_MAX: 60,    // … capped (px)
                 LAMP_SHADOW_A: 0.35,    // alpha on the ground at full strength
                 LAMP_SHADOW_DARK: 0.5,  // … and in the light layer (how much of the lamp's light it takes back)
-                LAMP_SHADOW_PEDS: 24    // pedestrians given lamp shadows per frame (named characters always are)
+                LAMP_SHADOW_PEDS: 24,   // pedestrians given lamp shadows per frame (named characters always are)
+                LAMP_SHADOW_HIGH_MAX: 16,   // High: bodies a frame whose shadow is their silhouette (the rest: the soft shade)
+                LAMP_SHADOW_CAP_R: 40,  // … captured this far round the body (world px)
+                LAMP_SHADOW_DEPTH: 24,  // … the body's depth the silhouette stretches from (px)
+                LAMP_SHADOW_SIL: 0.8,   // … its alpha against the soft shade's (it's solid where the shade is soft)
+                LAMP_BLOCK_R: 9,        // Ultra: a body blocks lamp light as a disc this wide (px)
+                LAMP_BLOCK_A: 0.5       // … taking back this much of the lamp's light right behind it
             },
             GAIT: {
                 CADENCE: 0.2,           // sqrt curve: within ~5% of the old 0.25 + 0.04v at speeds 3.5-7, but slows down at crawl speeds instead of shuffling
