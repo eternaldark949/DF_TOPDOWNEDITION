@@ -234,8 +234,8 @@
                 ctx.fill();
                 ctx.strokeStyle = MAP_PAL.rim; ctx.lineWidth = 1.2 * u * (opts.dpr || 1); ctx.stroke();
                 // Roads: molten gold — a wide amber halo, a warm body, a gold core, a white-gold hairline
-                const roads = (opts.network && opts.network.roads || []).filter(r => hit(Math.min(r.x1, r.x2), Math.min(r.y1, r.y2), Math.abs(r.x2 - r.x1), Math.abs(r.y2 - r.y1)));
-                const stroke = (wid, style, op) => { ctx.globalCompositeOperation = op || 'lighter'; ctx.strokeStyle = style; ctx.lineWidth = wid; ctx.beginPath(); for (const r of roads) { ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); } ctx.stroke(); };
+                const roads = (opts.network && opts.network.roads || []).filter(r => hit(r.x, r.y, r.w, r.h));
+                const stroke = (wid, style, op) => { ctx.globalCompositeOperation = op || 'lighter'; ctx.strokeStyle = style; ctx.lineWidth = wid; ctx.beginPath(); for (const r of roads) { if (r.path) r.path.points.forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); else { ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); } } ctx.stroke(); };
                 ctx.lineCap = 'round';
                 const T = roads.length ? Math.max(...roads.map(r => r.thickness || 200)) : 200;
                 stroke(T * 1.5, 'rgba(255, 140, 40, 0.07)');

@@ -35229,6 +35229,100 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
         /**
+         * RoadPath: a road's centre line as a chain of straight pieces (a curve is many short ones). Distances along it
+         * (`s`) run from its first point; `lat` is across it, positive to the right of its direction. At each joint the
+         * offset lines meet at a mitre, so a lane, a kerb or a pavement edge at any `lat` is one unbroken line.
+         */
+        class RoadPath {
+            constructor(points) {
+                this.points = points.map(p => Array.isArray(p) ? { x: p[0], y: p[1] } : { x: p.x, y: p.y });
+                this.pieces = [];
+                let s = 0;
+                for (let i = 0; i + 1 < this.points.length; i++) {
+                    const a = this.points[i], b = this.points[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y);
+                    if (len < 1e-6) continue;
+                    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+                    this.pieces.push({ x: a.x, y: a.y, ux, uy, nx: -uy, ny: ux, angle: Math.atan2(uy, ux), s0: s, len });
+                    s += len;
+                }
+                this.length = s;
+                // the mitre at each joint: the offset of a unit `lat` there
+                const P = this.pieces, n = P.length;
+                this.joints = [];
+                for (let j = 0; j <= n; j++) {
+                    const a = P[Math.max(0, j - 1)], b = P[Math.min(n - 1, j)];
+                    let mx = a.nx + b.nx, my = a.ny + b.ny;
+                    const ml = Math.hypot(mx, my) || 1; mx /= ml; my /= ml;
+                    const k = 1 / Math.max(0.2, mx * b.nx + my * b.ny);
+                    const q = j < n ? { x: b.x, y: b.y } : { x: a.x + a.ux * a.len, y: a.y + a.uy * a.len };
+                    this.joints.push({ x: q.x, y: q.y, mx: mx * k, my: my * k, s: j < n ? b.s0 : this.length });
+                }
+            }
+            
+            /** Which piece `s` falls on (the first or last for a distance off either end) */
+            pieceIndex(s) {
+                const P = this.pieces;
+                let lo = 0, hi = P.length - 1;
+                while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (P[mid].s0 <= s) lo = mid; else hi = mid - 1; }
+                return lo;
+            }
+            
+            at(s, lat = 0) {
+                const i = this.pieceIndex(s), p = this.pieces[i], A = this.joints[i], B = this.joints[i + 1], f = (s - p.s0) / p.len;
+                const ax = A.x + A.mx * lat, ay = A.y + A.my * lat, bx = B.x + B.mx * lat, by = B.y + B.my * lat;
+                return { x: ax + (bx - ax) * f, y: ay + (by - ay) * f };
+            }
+            
+            /** The direction there: { ux, uy, nx, ny, angle } */
+            frame(s) { return this.pieces[this.pieceIndex(s)]; }
+            
+            /** The nearest point on it: { along, lateral } */
+            project(x, y) {
+                const P = this.pieces, last = P.length - 1;
+                let best = null, bd = Infinity;
+                for (let i = 0; i <= last; i++) {
+                    const p = P[i], dx = x - p.x, dy = y - p.y;
+                    let a = dx * p.ux + dy * p.uy;
+                    if (i > 0 && a < 0) a = 0;
+                    if (i < last && a > p.len) a = p.len;
+                    const lat = dx * p.nx + dy * p.ny, ex = dx - p.ux * a, ey = dy - p.uy * a, d = ex * ex + ey * ey;
+                    if (d < bd) { bd = d; best = { along: p.s0 + a, lateral: lat }; }
+                }
+                return best;
+            }
+            
+            /** The strip between two offsets (a polygon: concave on a curve), optionally only from s0 to s1 */
+            band(latA, latB, s0 = 0, s1 = this.length) {
+                const ss = [s0, ...this.joints.map(j => j.s).filter(v => v > s0 + 0.5 && v < s1 - 0.5), s1];
+                return [...ss.map(v => this.at(v, latA)), ...ss.reverse().map(v => this.at(v, latB))];
+            }
+            
+            /** The distances where it bends (where a lane or kerb line has a corner) */
+            bends() { return this.joints.slice(1, -1).map(j => j.s); }
+            
+            /**
+             * A polyline with its corners rounded off: each interior corner becomes an arc of `radius` (smaller where
+             * the legs are too short for it), drawn as pieces of at most `step` radians. Returns the points.
+             */
+            static rounded(points, radius, step = Math.PI / 24) {
+                const pts = points.map(p => Array.isArray(p) ? { x: p[0], y: p[1] } : p), out = [pts[0]];
+                for (let i = 1; i + 1 < pts.length; i++) {
+                    const A = pts[i - 1], B = pts[i], C = pts[i + 1];
+                    const l1 = Math.hypot(B.x - A.x, B.y - A.y), l2 = Math.hypot(C.x - B.x, C.y - B.y);
+                    const d1 = { x: (B.x - A.x) / l1, y: (B.y - A.y) / l1 }, d2 = { x: (C.x - B.x) / l2, y: (C.y - B.y) / l2 };
+                    const cross = d1.x * d2.y - d1.y * d2.x, th = Math.acos(Math.max(-1, Math.min(1, d1.x * d2.x + d1.y * d2.y)));
+                    if (th < 1e-3) { out.push(B); continue; }
+                    const sgn = Math.sign(cross), R = Math.min(radius, Math.min(l1, l2) * 0.95 / Math.tan(th / 2)), t = R * Math.tan(th / 2);
+                    const T1 = { x: B.x - d1.x * t, y: B.y - d1.y * t };
+                    const cx = T1.x - d1.y * sgn * R, cy = T1.y + d1.x * sgn * R, a0 = Math.atan2(T1.y - cy, T1.x - cx), K = Math.max(1, Math.ceil(th / step));
+                    for (let k = 0; k <= K; k++) { const a = a0 + sgn * th * k / K; out.push({ x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R }); }
+                }
+                out.push(pts[pts.length - 1]);
+                return out;
+            }
+        }
+
+        /**
          * Road: A named entity spanning the map, containing segments.
          * ID Format: "R0", "R1", "R2", ...
          */
@@ -35243,7 +35337,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // === GEOMETRY: Unified angle-based representation ===
                 // Accept either x1,y1,x2,y2 (diagonal) or x,y,w,h,orientation (legacy H/V)
-                if (config.x1 !== undefined && config.y1 !== undefined && config.x2 !== undefined && config.y2 !== undefined) {
+                if (config.path) {
+                    // A road along a path: a curve (or any polyline); x1, y1 → x2, y2 are its ends
+                    this.path = config.path instanceof RoadPath ? config.path : new RoadPath(config.path);
+                    const a = this.path.points[0], b = this.path.points[this.path.points.length - 1];
+                    this.x1 = a.x; this.y1 = a.y; this.x2 = b.x; this.y2 = b.y;
+                    this.isDiagonal = true;
+                    this.isCurved = this.path.pieces.length > 1;
+                    this.orientation = 'D';
+                } else if (config.x1 !== undefined && config.y1 !== undefined && config.x2 !== undefined && config.y2 !== undefined) {
                     // Diagonal/freeform road
                     this.x1 = config.x1;
                     this.y1 = config.y1;
@@ -35271,12 +35373,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Road axis vector and length
                 const dx = this.x2 - this.x1;
                 const dy = this.y2 - this.y1;
-                this.length = Math.hypot(dx, dy);
+                this.length = this.path ? this.path.length : Math.hypot(dx, dy);
                 this.angle = Math.atan2(dy, dx);
                 
                 // Unit vectors: forward (along road) and normal (perpendicular left)
-                this.ux = this.length > 0 ? dx / this.length : 1;
-                this.uy = this.length > 0 ? dy / this.length : 0;
+                const chord = Math.hypot(dx, dy);       // (a curve's ux/uy: the way from its start to its end)
+                this.ux = chord > 0 ? dx / chord : 1;
+                this.uy = chord > 0 ? dy / chord : 0;
                 this.nx = -this.uy; // perpendicular left
                 this.ny = this.ux;
                 
@@ -35301,6 +35404,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     { x: this.x2 + this.nx * halfT, y: this.y2 + this.ny * halfT },
                     { x: this.x2 - this.nx * halfT, y: this.y2 - this.ny * halfT },
                 ];
+                if (this.path) corners.push(...this.path.band(-halfT, halfT));
                 const xs = corners.map(c => c.x), ys = corners.map(c => c.y);
                 this.x = Math.min(...xs);
                 this.y = Math.min(...ys);
@@ -35326,6 +35430,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // Convert a parametric distance along the road to world coordinates
             paramToWorld(t, lateralOffset = 0) {
+                if (this.path) return this.path.at(t, lateralOffset);
                 return {
                     x: this.x1 + this.ux * t + this.nx * lateralOffset,
                     y: this.y1 + this.uy * t + this.ny * lateralOffset
@@ -35334,6 +35439,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             // Project a world point onto the road axis, returns { along, lateral }
             worldToParam(wx, wy) {
+                if (this.path) return this.path.project(wx, wy);
                 const dx = wx - this.x1;
                 const dy = wy - this.y1;
                 return {
@@ -35345,6 +35451,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Get the 4 corners of the road polygon (for rendering and collision)
             getCorners() {
                 const halfT = this.thickness / 2;
+                if (this.path) return this.path.band(-halfT, halfT);     // (concave on a curve)
                 return [
                     { x: this.x1 - this.nx * halfT, y: this.y1 - this.ny * halfT },
                     { x: this.x2 - this.nx * halfT, y: this.y2 - this.ny * halfT },
@@ -35353,7 +35460,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ];
             }
             
+            /** Its direction at distance `t` along it: { ux, uy, nx, ny, angle } (a curve's changes as it bends) */
+            frameAt(t) {
+                return this.path ? this.path.frame(t) : this;
+            }
+            
             buildSegments(intersectionCoords) {
+                if (this.isCurved) return this._buildCurvedSegments(intersectionCoords);
                 this.segments = [];
                 this.segmentIds = [];
                 this.lanes = [];
@@ -35385,6 +35498,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const segment of this.segments) {
                     this._generateLanesForSegment(segment);
                 }
+            }
+            
+            /** A curve's segments: between its junctions as usual, and split again at each bend, so every lane is straight
+             *  (the pieces of one stretch link end to end: RoadNetwork._connectSegments) */
+            _buildCurvedSegments(intersectionCoords) {
+                this.segments = []; this.segmentIds = []; this.lanes = []; this.laneIds = [];
+                const sorted = [...intersectionCoords].sort((a, b) => a.coord - b.coord), runs = [];
+                let prev = this.startCoord, prevBound = null;
+                for (const ix of sorted) {
+                    if (ix.coord > prev) runs.push([prev, ix.coord, prevBound, ix.id]);
+                    prev = ix.coord + ix.width; prevBound = ix.id;
+                }
+                if (prev < this.endCoord) runs.push([prev, this.endCoord, prevBound, null]);
+                const bends = this.path.bends();
+                let index = 0;
+                for (const [a, b, sb, eb] of runs) {
+                    const cuts = [a, ...bends.filter(v => v > a + 1 && v < b - 1), b];
+                    for (let k = 0; k + 1 < cuts.length; k++) {
+                        const segment = new Segment(this, index++, cuts[k], cuts[k + 1], k === 0 ? sb : null, k + 2 === cuts.length ? eb : null);
+                        this.segments.push(segment); this.segmentIds.push(segment.id);
+                    }
+                }
+                for (const segment of this.segments) this._generateLanesForSegment(segment);
             }
             
             _generateLanesForSegment(segment) {
@@ -35555,10 +35691,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (len < 50) continue;
                     const count = Math.max(1, Math.floor(len / spacing)), step = len / (count + 1);
                     for (const side of [-1, 1]) {
-                        // the arm faces the road: angle = the way out from the kerb, less a quarter turn (as on the H/V roads)
-                        const angle = Math.atan2(this.ny * side, this.nx * side) - Math.PI / 2;
                         for (let i = 1; i <= count; i++) {
-                            const p = this.paramToWorld(run.start + step * i, side * (hT + 20));
+                            // the arm faces the road: angle = the way out from the kerb, less a quarter turn (as on the H/V roads)
+                            const at = run.start + step * i, f = this.frameAt(at), angle = Math.atan2(f.ny * side, f.nx * side) - Math.PI / 2;
+                            const p = this.paramToWorld(at, side * (hT + 20));
                             lamps.push(new LampEntity({ x: p.x, y: p.y, lampType: 2, color: side < 0 ? '#ffaa00' : '#ffffff', angle }));
                         }
                     }
@@ -35793,7 +35929,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // An angled road: the junction is where the two carriageways overlap, widened to each road's full
                 // width over that stretch (so a T, where one ends on the other, takes in the far lanes too)
-                const P = Poly.clip(r1.getCorners(), r2.getCorners());
+                // (a curve's outline is concave: it goes in as the subject, the other road's rectangle as the clip)
+                const [sub, cl] = r1.isCurved ? [r1, r2] : [r2, r1], P = Poly.clip(sub.getCorners(), cl.getCorners());
                 if (P.length < 3 || Math.abs(Poly.area(P)) < 100) return null;
                 const pts = [];
                 for (const r of [r1, r2]) {
@@ -36008,6 +36145,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     
                     lane.intersectingZones.sort((a, b) => a.entryDist - b.entryDist);
                 }
+                // Down a curve the lanes are pieces linked end to end: each also sees the junctions ahead of the pieces after
+                // it (further by its own length), so cars slow for the lights and turn in from round the bend
+                const ahead = new Map();
+                const chain = (lane, seen) => {
+                    if (ahead.has(lane)) return ahead.get(lane);
+                    const next = lane.connections && lane.connections.length === 1 && !(lane.turnPaths && lane.turnPaths.length) ? lane.connections[0] : null;
+                    let zones = lane.intersectingZones;
+                    if (next && !seen.has(next)) {
+                        seen.add(lane);
+                        const own = new Set(zones.map(z => z.intersection));
+                        zones = zones.concat(chain(next, seen).filter(z => z.entryDist >= 5 && !own.has(z.intersection)).map(z => ({ ...z, entryDist: z.entryDist + lane.length })));
+                    }
+                    ahead.set(lane, zones);
+                    return zones;
+                };
+                for (const lane of this.lanes) chain(lane, new Set());
+                for (const [lane, zones] of ahead) lane.intersectingZones = zones;
             }
             
             _buildNavigationGraph() {
@@ -37461,7 +37615,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * @param {number} lookAhead - How far ahead to look (in pixels)
              * @returns {{x: number, y: number, angle: number}} Target point and tangent angle
              */
-            static getLaneTarget(vehicle, lane, lookAhead = 60) {
+            static getLaneTarget(vehicle, lane, lookAhead = 60, maxLook = Infinity) {
                 if (!lane) return null;
                 
                 // Find current position along lane
@@ -37471,12 +37625,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Calculate look-ahead distance based on speed
                 const speedMod = Math.max(1, Math.abs(vehicle.speed) * 0.8);
-                const adjustedLookAhead = lookAhead * speedMod;
+                const adjustedLookAhead = Math.min(lookAhead * speedMod, maxLook);   // (shorter round a bend, or it cuts the corner)
                 
-                // Get target point ahead on lane
-                const targetDist = Math.min(currentDist + adjustedLookAhead, lane.length);
-                const t = targetDist / lane.length;
-                const point = lane.getPoint(t);
+                // Get target point ahead on lane (round a curve, on along the lanes it runs into: its pieces are short)
+                let ln = lane, targetDist = currentDist + adjustedLookAhead;
+                for (let hop = 0; targetDist > ln.length && ln.connections && ln.connections.length === 1 && hop < 24; hop++) { targetDist -= ln.length; ln = ln.connections[0]; }
+                targetDist = Math.min(targetDist, ln.length);
+                const t = targetDist / ln.length;
+                const point = ln.getPoint(t);
                 
                 return {
                     x: point.x,
@@ -38708,9 +38864,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return false;
             }
 
-            /** The lanes beside ours on this stretch (same segment), nearest first */
+            /** The lanes beside ours on this stretch (same segment), nearest first (none on a curved road: no pulling out on a bend) */
             _sideLanes(opposing) {
                 const cur = this.currentLane, seg = cur.segment;
+                if (cur.road.isCurved) return [];
                 return cur.road.lanes.filter(l => l !== cur && (!seg || l.segment === seg) && (l.isOpposing !== cur.isOpposing) === opposing)
                     .sort((p, q) => Math.abs(this._latTo(p)) - Math.abs(this._latTo(q)));
             }
@@ -40198,6 +40355,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.currentLane = nextLane;
                         const step = this._driveRoute?.transitions[this._driveRoute.index];
                         if (step && !step.turnPath && step.toLane === nextLane) this._driveRoute.index++;
+                        // Round a curve the lanes are short pieces: catch up with any we're already past, and steer on along
+                        // the new one this tick (a tick without steering at each piece would carry us wide)
+                        for (let hop = 0; hop < 24; hop++) {
+                            const ln = this.currentLane, next = ln.connections && ln.connections.length === 1 && !(ln.turnPaths && ln.turnPaths.length) ? ln.connections[0] : null;
+                            if (!next || (this.x - ln.start.x) * ln.ux + (this.y - ln.start.y) * ln.uy < ln.length - 10) break;
+                            this.currentLane = next;
+                            const st = this._driveRoute?.transitions[this._driveRoute.index];
+                            if (st && !st.turnPath && st.toLane === next) this._driveRoute.index++;
+                        }
+                        if (this.currentLane.road && this.currentLane.road.isCurved) return this.calculateNavigationSteering();
                     } else {
                         if (this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib')) {
                             if (this.driverType === 'zib') {
@@ -40217,8 +40384,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     return { steer, maxSpeed };
                 }
                 
+                // Round a bend ahead: slow to take it, and aim closer in (a long look cuts the corner)
+                const R = this._bendAhead(this.currentLane, distAlongLane, 60 + Math.abs(this.speed) * 22);
+                if (R < Infinity) maxSpeed = Math.min(maxSpeed, Math.max(2.5, Math.sqrt(0.16 * R)));
+                
                 // Get look-ahead target on lane
-                const laneTarget = AIDriverSolver.getLaneTarget(this, this.currentLane, 50);
+                const laneTarget = AIDriverSolver.getLaneTarget(this, this.currentLane, 50, R * 0.6);
                 if (laneTarget) {
                     // Stepping aside within the lane to pass someone at its edge (traffic/traffic-people.js: sideStep)
                     const ln = this.currentLane, side = this._folkPlan ? this._folkPlan.sideStep : 0;
@@ -40234,6 +40405,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 
                 return { steer, maxSpeed };
+            }
+            
+            /** How tight the road bends within `reach` px ahead, down the lanes we run into (a curve's lanes are short
+             *  straight pieces, each turned a little from the last): its smallest radius there, or Infinity if straight */
+            _bendAhead(lane, along, reach) {
+                let R = Infinity, ln = lane, d = -along;
+                for (let hop = 0; d < reach && hop < 24; hop++) {
+                    const next = ln.connections && ln.connections.length === 1 ? ln.connections[0] : null;
+                    if (!next) break;
+                    const turn = Math.abs(Math.atan2(ln.ux * next.uy - ln.uy * next.ux, ln.ux * next.ux + ln.uy * next.uy));
+                    if (turn > 0.02) R = Math.min(R, Math.min(ln.length, next.length) / turn);
+                    d += ln.length; ln = next;
+                }
+                return R;
             }
             
             /**
@@ -40702,8 +40887,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _onCarriageway(x, y) {
                 const lane = this.currentLane || (this.currentTurnPath && this.currentTurnPath.toLane), road = lane && lane.road;
                 if (!road || !road.thickness) return true;
-                const mine = Math.abs((this.x - road.x1) * road.nx + (this.y - road.y1) * road.ny) + this.width / 2 + 18;
-                return Math.abs((x - road.x1) * road.nx + (y - road.y1) * road.ny) < Math.max(road.thickness / 2, mine);
+                const mine = Math.abs(road.worldToParam(this.x, this.y).lateral) + this.width / 2 + 18;
+                return Math.abs(road.worldToParam(x, y).lateral) < Math.max(road.thickness / 2, mine);
             },
 
             /**
@@ -41971,8 +42156,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
             /**
              * A road, painted from its geometry: asphalt with grain and repairs, wheel paths,
-             * lane dashes, the centre line, faint edges and its name. Works for any angle; a
-             * curved road would provide the same getCorners/paramToWorld along its path.
+             * lane dashes, the centre line, faint edges and its name. Works for any angle, and
+             * along a curve (each line follows its path: getCorners / paramToWorld / frameAt).
              */
             paintRoad(c, road, R, rnd) {
                 const L = GROUND_LOOK, corners = road.getCorners(), halfT = road.thickness / 2;
@@ -41985,13 +42170,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (let k = 0; k < (w * h) / 60; k++) { c.fillStyle = rnd() < 0.5 ? 'rgba(255,240,255,0.03)' : 'rgba(0,0,0,0.18)'; c.fillRect(x + rnd() * w, y + rnd() * h, 1 + rnd() * 2, 1); }
                 for (let k = 0; k < (w * h) / 40000; k++) { c.fillStyle = L.asphaltHi; c.fillRect(x + rnd() * w, y + rnd() * h, 30 + rnd() * 70, 16 + rnd() * 30); }
                 const lanes = road.symmetrical ? road.numLanes * 2 : road.numLanes;
+                const stops = road.path ? [0, ...road.path.bends(), road.length] : [0, road.length];   // where a line along it turns
+                const trace = lat => { stops.forEach((s, k) => { const p = road.paramToWorld(s, lat); k ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y); }); };
                 c.lineWidth = 9; c.strokeStyle = 'rgba(0, 0, 0, 0.16)';
                 for (let l = 0; l < lanes; l++) for (const off of [-13, 13]) {
-                    const lat = -halfT + road.laneWidth * (l + 0.5) + off, a = road.paramToWorld(0, lat), b = road.paramToWorld(road.length, lat);
-                    c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+                    c.beginPath(); trace(-halfT + road.laneWidth * (l + 0.5) + off); c.stroke();
                 }
                 // Lane markings
-                const line = (lat, style) => { const a = road.paramToWorld(0, lat), b = road.paramToWorld(road.length, lat); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke(); };
+                const line = (lat, style) => { c.beginPath(); trace(lat); c.stroke(); };
                 for (let l = 1; l < lanes; l++) {
                     const lat = l * road.laneWidth - halfT;
                     if (road.symmetrical && l === road.numLanes) {                               // the centre: a double lavender line
@@ -42007,7 +42193,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         const along = road.length * (k + 0.5) / n;
                         for (const s of road.symmetrical ? [-1, 1] : [1]) {
                             const p = road.paramToWorld(along, s * lat);
-                            c.save(); c.translate(p.x, p.y); c.rotate(road.angle + (s > 0 ? Math.PI : 0)); c.fillText(road.name.toUpperCase(), 0, 0); c.restore();
+                            c.save(); c.translate(p.x, p.y); c.rotate(road.frameAt(along).angle + (s > 0 ? Math.PI : 0)); c.fillText(road.name.toUpperCase(), 0, 0); c.restore();
                         }
                     }
                 }
@@ -42328,8 +42514,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.fill();
                 ctx.strokeStyle = MAP_PAL.rim; ctx.lineWidth = 1.2 * u * (opts.dpr || 1); ctx.stroke();
                 // Roads: molten gold — a wide amber halo, a warm body, a gold core, a white-gold hairline
-                const roads = (opts.network && opts.network.roads || []).filter(r => hit(Math.min(r.x1, r.x2), Math.min(r.y1, r.y2), Math.abs(r.x2 - r.x1), Math.abs(r.y2 - r.y1)));
-                const stroke = (wid, style, op) => { ctx.globalCompositeOperation = op || 'lighter'; ctx.strokeStyle = style; ctx.lineWidth = wid; ctx.beginPath(); for (const r of roads) { ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); } ctx.stroke(); };
+                const roads = (opts.network && opts.network.roads || []).filter(r => hit(r.x, r.y, r.w, r.h));
+                const stroke = (wid, style, op) => { ctx.globalCompositeOperation = op || 'lighter'; ctx.strokeStyle = style; ctx.lineWidth = wid; ctx.beginPath(); for (const r of roads) { if (r.path) r.path.points.forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); else { ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); } } ctx.stroke(); };
                 ctx.lineCap = 'round';
                 const T = roads.length ? Math.max(...roads.map(r => r.thickness || 200)) : 200;
                 stroke(T * 1.5, 'rgba(255, 140, 40, 0.07)');
@@ -43214,8 +43400,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             
             drawRoadLine(ctx, road) {
                 ctx.beginPath();
-                ctx.moveTo(road.x1, road.y1);
-                ctx.lineTo(road.x2, road.y2);
+                if (road.path) road.path.points.forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));   // a curve
+                else { ctx.moveTo(road.x1, road.y1); ctx.lineTo(road.x2, road.y2); }
                 ctx.stroke();
             }
         
@@ -48953,50 +49139,68 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * crossings, lamps and the pedestrians' walks are built from it like the rest. Add it before placing buildings.
              */
             addAngledRoad(x1, y1, x2, y2, name, lanes = 2) {
-                const length = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / length, uy = (y2 - y1) / length;
-                const road = { x1, y1, x2, y2, name, lanes, length, ux, uy, nx: -uy, ny: ux, thickness: lanes * 2 * this.laneWidth, orientation: 'D' };
-                const hT = road.thickness / 2, pw = this.pavementWidth, at = (a, l) => this._along(road, a, l);
+                return this._addPathRoad([[x1, y1], [x2, y2]], name, lanes);
+            }
+            
+            /**
+             * A curved street, as an angled one (above) but along a polyline whose corners are rounded off to `radius`:
+             * [[x, y], ...], its first and last points on the centre lines of the roads it joins. Keep the first and
+             * last legs straight for a while (300 px or so past the junction) so its ends meet those roads square on.
+             */
+            addCurvedRoad(points, name, lanes = 2, { radius = 300 } = {}) {
+                return this._addPathRoad(RoadPath.rounded(points, radius), name, lanes);
+            }
+            
+            _addPathRoad(points, name, lanes) {
+                const path = new RoadPath(points), a = path.points[0], b = path.points[path.points.length - 1];
+                const road = { x1: a.x, y1: a.y, x2: b.x, y2: b.y, name, lanes, path, points: path.points, length: path.length, curved: path.pieces.length > 1, thickness: lanes * 2 * this.laneWidth, orientation: 'D' };
+                const hT = road.thickness / 2, pw = this.pavementWidth;
                 road.ends = [this._angledEnd(road, 0), this._angledEnd(road, 1)];
                 if (!road.ends[0] || !road.ends[1]) console.warn(`addAngledRoad ${name}: both ends should sit on the centre line of a road`);
-                road.carriageway = [at(0, -hT), at(length, -hT), at(length, hT), at(0, hT)];
-                road.corridor = [at(0, -hT - pw), at(length, -hT - pw), at(length, hT + pw), at(0, hT + pw)];   // and its pavements
+                road.carriageway = path.band(-hT, hT);
+                road.corridor = path.band(-hT - pw, hT + pw);   // and its pavements (both concave on a curve)...
+                const cuts = [0, ...path.bends(), path.length];
+                road.corridorPieces = cuts.slice(1).map((s1, k) => path.band(-hT - pw, hT + pw, cuts[k], s1));   // ...as convex pieces
                 this.angledRoads.push(road);
                 return road;
             }
             
             /** A point on an angled road: `along` from its start, `lat` across (positive: to the right of its direction) */
             _along(road, along, lat = 0) {
-                return { x: road.x1 + road.ux * along + road.nx * lat, y: road.y1 + road.uy * along + road.ny * lat };
+                return road.path.at(along, lat);
             }
             
-            /** Where an angled road meets the road at one end (0: its start, 1: its end): that road, and how far in from the
-             *  end its carriageway is clear of it (`mouth`, where its lanes start and its crossing begins) */
+            /** Where an angled road meets the road at one end (0: its start, 1: its end): that road, the angled road's
+             *  direction there (`f`) and end point (`p`), and how far in from the end its carriageway is clear of it
+             *  (`mouth`, where its lanes start and its crossing begins) */
             _angledEnd(road, which) {
                 const p = which ? { x: road.x2, y: road.y2 } : { x: road.x1, y: road.y1 }, s = which ? -1 : 1, hT = road.thickness / 2;
+                const f = road.path.frame(which ? road.length : 0);
                 const H = this.horizontalRoads.find(r => Math.abs(r.centerY - p.y) < 2), V = !H && this.verticalRoads.find(r => Math.abs(r.centerX - p.x) < 2);
                 if (!H && !V) return null;
-                const kind = H ? 'H' : 'V', dir = Math.sign(H ? road.uy * s : road.ux * s);   // +1: it heads off towards larger y (x)
+                const kind = H ? 'H' : 'V', dir = Math.sign(H ? f.uy * s : f.ux * s);   // +1: it heads off towards larger y (x)
                 const kerb = H ? (dir > 0 ? H.y + H.roadHeight : H.y) : (dir > 0 ? V.x + V.roadWidth : V.x);
                 let mouth = 0;
                 for (const l of [-hT, hT]) {
-                    const c0 = H ? p.y + road.ny * l : p.x + road.nx * l, v = H ? road.uy * s : road.ux * s;
+                    const c0 = H ? p.y + f.ny * l : p.x + f.nx * l, v = H ? f.uy * s : f.ux * s;
                     mouth = Math.max(mouth, (kerb - c0) / v);
                 }
-                return { road: H || V, kind, dir, kerb, mouth, along: which ? road.length - mouth : mouth };
+                return { road: H || V, kind, dir, kerb, mouth, along: which ? road.length - mouth : mouth, f, p };
             }
             
-            /** The part of a convex polygon on one side of an angled road: sign·lateral >= off */
-            static _sideOf(poly, road, sign, off) {
-                return Poly.clipHalf(poly, sign * road.nx, sign * road.ny, off + sign * (road.nx * road.x1 + road.ny * road.y1));
+            /** The part of a polygon on one side of an angled road's end: sign·lateral >= off (across its end piece) */
+            static _sideOf(poly, e, sign, off) {
+                const { f, p } = e;
+                return Poly.clipHalf(poly, sign * f.nx, sign * f.ny, off + sign * (f.nx * p.x + f.ny * p.y));
             }
             
             /** The angled roads' pavements, two each, from kerb to kerb of the roads they join: [{ poly, road (its name) }] */
             angledPavements() {
                 const out = [], pw = this.pavementWidth;
                 for (const road of this.angledRoads) {
-                    const hT = road.thickness / 2, at = (a, l) => this._along(road, a, l);
+                    const hT = road.thickness / 2;
                     for (const side of [-1, 1]) {
-                        let poly = [at(0, side * hT), at(road.length, side * hT), at(road.length, side * (hT + pw)), at(0, side * (hT + pw))];
+                        let poly = road.path.band(side * hT, side * (hT + pw));
                         for (const e of road.ends) if (e) poly = e.kind === 'H' ? Poly.clipHalf(poly, 0, e.dir, e.dir * e.kerb) : Poly.clipHalf(poly, e.dir, 0, e.dir * e.kerb);
                         if (poly.length >= 3) out.push({ poly, road: road.name });
                     }
@@ -49014,9 +49218,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const hT = road.thickness / 2, next = [];
                     for (const p of out) {
                         const poly = p.poly || [{ x: p.x, y: p.y }, { x: p.x + p.w, y: p.y }, { x: p.x + p.w, y: p.y + p.h }, { x: p.x, y: p.y + p.h }];
-                        if (Math.abs(Poly.area(Poly.clip(poly, road.carriageway))) < 1) { next.push(p); continue; }
+                        const over = Poly.clip(road.carriageway, poly);
+                        if (over.length < 3 || Math.abs(Poly.area(over)) < 1) { next.push(p); continue; }
+                        // cut across the end it meets (the one nearest where they overlap)
+                        const c = Poly.box(over), cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+                        const e = road.ends.filter(Boolean).reduce((a, b) => Math.hypot(b.p.x - cx, b.p.y - cy) < Math.hypot(a.p.x - cx, a.p.y - cy) ? b : a);
                         for (const sign of [-1, 1]) {
-                            const piece = CityLayout._sideOf(poly, road, sign, hT);
+                            const piece = CityLayout._sideOf(poly, e, sign, hT);
                             if (piece.length >= 3 && Math.abs(Poly.area(piece)) > 200) next.push({ ...Poly.box(piece), poly: piece });
                         }
                     }
@@ -49432,7 +49640,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }
                     return ids;
                 };
-                // An angled street through the block: the straight rows stop either side of it, and it gets stepped rows of its own (below)
+                // An angled street through the block: the straight rows stop either side of it (where it crosses their front, as deep as
+                // most buildings go; one deeper that would reach it is left out), and it gets stepped rows of its own (below)
                 const clearOf = (side, span, depth) => {                                       // span, less where the street crosses the row
                     const along = side === 'south' || side === 'north';
                     const band = side === 'south' ? { x: block.x, y: block.y + block.h - depth, w: block.w, h: depth }
@@ -49440,15 +49649,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         : side === 'west' ? { x: block.x, y: block.y, w: depth, h: block.h } : { x: block.x + block.w - depth, y: block.y, w: depth, h: block.h };
                     const bandPoly = [{ x: band.x, y: band.y }, { x: band.x + band.w, y: band.y }, { x: band.x + band.w, y: band.y + band.h }, { x: band.x, y: band.y + band.h }];
                     let spans = [span];
-                    for (const r of this.angledRoads) {
-                        const cut = Poly.clip(r.corridor, bandPoly);
-                        if (cut.length < 3) continue;
+                    for (const r of this.angledRoads) for (const piece of r.corridorPieces) {   // (a curve's piece by piece: its box takes in the lots inside the bend)
+                        const cut = Poly.clip(piece, bandPoly);
+                        if (cut.length < 3 || Math.abs(Poly.area(cut)) < 1) continue;
                         const b = Poly.box(cut), lo = (along ? b.x : b.y) - alley, hi = (along ? b.x + b.w : b.y + b.h) + alley;
                         spans = spans.flatMap(([a, z]) => [[a, Math.min(z, lo)], [Math.max(a, hi), z]]).filter(([a, z]) => z - a > 120);
                     }
                     return spans;
                 };
-                const run = (side, span, maxDepth) => clearOf(side, span, maxDepth + setback).flatMap(sp => runSpan(side, sp, maxDepth));
+                const run = (side, span, maxDepth) => clearOf(side, span, Math.min(maxDepth, 260) + setback).flatMap(sp => runSpan(side, sp, maxDepth));
                 const runSpan = (side, span, maxDepth) => {
                     const along = side === 'south' || side === 'north', gap = Math.random() < 0.65 ? 0 : alley;
                     const room = (span[1] - span[0]) * (options.fill ?? 1);   // fill < 1 leaves part of each street front open (fewer buildings to draw)
@@ -49483,12 +49692,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (Poly.clip(road.corridor, bp).length < 3) continue;
                     const hT = road.thickness / 2;
                     for (const side of [-1, 1]) {
-                        // towards the street from this side, and the facing that looks most that way
-                        const tx = -side * road.nx, ty = -side * road.ny;
-                        const facing = Math.abs(tx) > Math.abs(ty) ? (tx > 0 ? 'E' : 'W') : (ty > 0 ? 'S' : 'N');
                         const line = hT + pw + setback, gap = Math.random() < 0.65 ? 0 : 30;
                         const pool = templates.filter(t => !t.unique);
                         for (let cursor = 0; cursor < road.length && pool.length;) {
+                            // the street's direction here (on a curve it turns), and towards it from this side the facing that looks most that way
+                            const f = road.path.frame(cursor), tx = -side * f.nx, ty = -side * f.ny;
+                            const facing = Math.abs(tx) > Math.abs(ty) ? (tx > 0 ? 'E' : 'W') : (ty > 0 ? 'S' : 'N');
                             // the weighted pick first, then whatever else fits here; nothing does: a little further up
                             const first = this._selectWeightedTemplate(pool), order = [first, ...pool.filter(t => t !== first).sort(() => Math.random() - 0.5)];
                             let spot = null;
@@ -49496,15 +49705,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                                 const S = this._shape(t, {}), e = S.ext;
                                 // the corner nearest the street, and how far the box runs along it from that corner
                                 const corners = [[0, 0], [e.w, 0], [e.w, e.h], [0, e.h]];
-                                const lat = ([cx, cy]) => side * (cx * road.nx + cy * road.ny), alongOf = ([cx, cy]) => cx * road.ux + cy * road.uy;
+                                const lat = ([cx, cy]) => side * (cx * f.nx + cy * f.ny), alongOf = ([cx, cy]) => cx * f.ux + cy * f.uy;
                                 const near = corners.reduce((a, b) => lat(b) < lat(a) ? b : a);
                                 const as = corners.map(c => alongOf(c) - alongOf(near)), a0 = Math.min(...as), a1 = Math.max(...as);
                                 const p = this._along(road, cursor - a0, side * line);
                                 const x = Math.floor(p.x - near[0]), y = Math.floor(p.y - near[1]);
-                                if (inBlock(x, y, e.w, e.h) && !this._intersectsSafeZone(x, y, e.w, e.h)) { spot = { t, S, e, x, y, run: a1 - a0 }; break; }
+                                if (inBlock(x, y, e.w, e.h) && !this._intersectsSafeZone(x, y, e.w, e.h)) { spot = { t, S, e, x, y, run: a1 - a0, facing }; break; }
                             }
                             if (!spot) { cursor += 40; continue; }
-                            placed.push(this._commit(spot.t, block.name, spot.S, spot.x, spot.y, { facing, angled: road.name, autoPlaced: true }));
+                            placed.push(this._commit(spot.t, block.name, spot.S, spot.x, spot.y, { facing: spot.facing, angled: road.name, autoPlaced: true }));
                             this._addSafeZone(spot.x, spot.y, spot.e.w, spot.e.h, `Angled: ${road.name}`);   // exact: the next one up the street may touch it
                             cursor += spot.run + gap;
                         }
@@ -49675,9 +49884,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const at = (a, l) => this._along(road, a, l);
                     const poly = [at(a0, -hT), at(a1, -hT), at(a1, hT), at(a0, hT)];
                     crosswalks.push({
-                        ...Poly.box(poly), orientation: 'D', poly,
+                        ...Poly.box(poly), orientation: 'D', poly, road: road.name,
                         // the stripes run with the road, laid across it; the walk lights sit along both kerbs; people step off at its ends
-                        axis: { ox: road.x1, oy: road.y1, ux: road.ux, uy: road.uy, nx: road.nx, ny: road.ny, a0, a1, hT },
+                        axis: (() => { const o = at(a0, 0), f = e.f; return { ox: o.x, oy: o.y, ux: f.ux, uy: f.uy, nx: f.nx, ny: f.ny, a0: 0, a1: pw, hT }; })(),
                         kerbs: [-1, 1].map(sd => { const p = at(a0 + 7, sd * (hT - 3)), q = at(a1 - 7, sd * (hT - 3)); return [p.x, p.y, q.x, q.y]; }),
                         ends: [-1, 1].map(sd => at((a0 + a1) / 2, sd * (hT + 10)))
                     });
@@ -49925,12 +50134,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const gaps = [];
                 for (const road of this.angledRoads) for (const e of road.ends) {
                     if (!e || e.road !== straight || e.dir !== dir) continue;
-                    const H = e.kind === 'H', hT = road.thickness / 2 + this.pavementWidth;
-                    // the carriageway and its pavements, where they cross the walk's line
+                    const H = e.kind === 'H', hT = road.thickness / 2 + this.pavementWidth, { f, p } = e;
+                    // the carriageway and its pavements, where they cross the walk's line (along the end piece)
                     const xs = [-hT, hT].map(l => {
-                        const c0 = H ? road.y1 + road.ny * l : road.x1 + road.nx * l, v = H ? road.uy : road.ux;
+                        const c0 = H ? p.y + f.ny * l : p.x + f.nx * l, v = H ? f.uy : f.ux;
                         const t = (walkAt - c0) / v;
-                        return H ? road.x1 + road.ux * t + road.nx * l : road.y1 + road.uy * t + road.ny * l;
+                        return H ? p.x + f.ux * t + f.nx * l : p.y + f.uy * t + f.ny * l;
                     });
                     gaps.push({ start: Math.min(...xs) - 10, end: Math.max(...xs) + 10 });
                 }
@@ -50066,10 +50275,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const hT = road.thickness / 2, [e0, e1] = road.ends;
                     const from = (e0 ? e0.along + pw : 0) + walkOffset, to = (e1 ? e1.along - pw : road.length) - walkOffset;
                     const count = Math.max(1, Math.round((to - from) / nodeSpacing));
+                    // a node every nodeSpacing, and round a bend one at each of its joints (so the walk keeps to the pavement)
+                    const at = [...Array(count + 1).keys()].map(i => from + (to - from) * i / count);
+                    for (const b of road.path.bends()) if (b > from && b < to && at.every(a => Math.abs(a - b) > 20)) at.push(b);
+                    at.sort((a, b) => a - b);
                     for (const sd of [-1, 1]) {
                         const run = [];
-                        for (let i = 0; i <= count; i++) {
-                            const p = this._along(road, from + (to - from) * i / count, sd * (hT + walkOffset));
+                        for (const a of at) {
+                            const p = this._along(road, a, sd * (hT + walkOffset));
                             const node = createNode(p.x, p.y);
                             node.side = sd < 0 ? 'left' : 'right';
                             node.roadName = road.name;
@@ -56558,7 +56771,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     for (const road of net.roads) {
                         if (road.x > v.x + hw || road.x + road.w < v.x - hw || road.y > v.y + hh || road.y + road.h < v.y - hh) continue;
                         const c = road.getCorners();
-                        mc.beginPath(); mc.moveTo(c[0].x, c[0].y); for (let i = 1; i < 4; i++) mc.lineTo(c[i].x, c[i].y); mc.closePath(); mc.fill();
+                        mc.beginPath(); Poly.trace(mc, c); mc.fill();
                     }
                 }
                 mc.fillStyle = `rgba(255,255,255,${(REFLECT.PAVE * Math.min(1, wet * 1.3)).toFixed(3)})`;
@@ -62244,6 +62457,9 @@ engineMixin({
                     // down to East Ave (world/city-layout.js addAngledRoad: a T at each end, the block's rows step along it).
                     // Each T sits well clear of the next junction along, so a car through one can stop for the other's red.
                     city.addAngledRoad(1950, 6100, 2800, 6800, 'Lantern Cut', 2);
+                    // And a curved one: Halfmoon Bend leaves Skyline Ave heading south, bends round to the west and meets East Ave
+                    // (addCurvedRoad: a lane each way, the corner rounded to a 220 px radius; straight for a while at each end, so each T is square)
+                    city.addCurvedRoad([[3550, 4900], [3550, 5500], [2800, 5500]], 'Halfmoon Bend', 1, { radius: 220 });
                     
                     // 3. GENERATE BLOCKS (must be done before placing buildings); the parks are kept free (world/parks.js)
                     for (const [block, name] of Object.entries(HUB_PARKS)) city.setZoneType(block, CityLayout.ZONE.PARK, { name });
@@ -62365,7 +62581,7 @@ engineMixin({
                         
                         // And the angled ones (their junctions come out as the shape where the carriageways meet: roads.js)
                         city.angledRoads.forEach(r => {
-                            net.addRoad(new Road({ x1: r.x1, y1: r.y1, x2: r.x2, y2: r.y2, name: r.name, lanes: r.lanes, hasPavements: true }));
+                            net.addRoad(new Road(r.curved ? { path: r.path, name: r.name, lanes: r.lanes, hasPavements: true } : { x1: r.x1, y1: r.y1, x2: r.x2, y2: r.y2, name: r.name, lanes: r.lanes, hasPavements: true }));
                         });
                         
                         net.buildGraph();

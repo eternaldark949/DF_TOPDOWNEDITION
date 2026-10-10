@@ -270,7 +270,7 @@
                     for (const road of net.roads) {
                         if (road.x > v.x + hw || road.x + road.w < v.x - hw || road.y > v.y + hh || road.y + road.h < v.y - hh) continue;
                         const c = road.getCorners();
-                        mc.beginPath(); mc.moveTo(c[0].x, c[0].y); for (let i = 1; i < 4; i++) mc.lineTo(c[i].x, c[i].y); mc.closePath(); mc.fill();
+                        mc.beginPath(); Poly.trace(mc, c); mc.fill();
                     }
                 }
                 mc.fillStyle = `rgba(255,255,255,${(REFLECT.PAVE * Math.min(1, wet * 1.3)).toFixed(3)})`;

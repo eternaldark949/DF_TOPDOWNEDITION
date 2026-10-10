@@ -847,8 +847,8 @@
             
             drawRoadLine(ctx, road) {
                 ctx.beginPath();
-                ctx.moveTo(road.x1, road.y1);
-                ctx.lineTo(road.x2, road.y2);
+                if (road.path) road.path.points.forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));   // a curve
+                else { ctx.moveTo(road.x1, road.y1); ctx.lineTo(road.x2, road.y2); }
                 ctx.stroke();
             }
         

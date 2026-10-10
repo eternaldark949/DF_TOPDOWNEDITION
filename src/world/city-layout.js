@@ -260,50 +260,68 @@
              * crossings, lamps and the pedestrians' walks are built from it like the rest. Add it before placing buildings.
              */
             addAngledRoad(x1, y1, x2, y2, name, lanes = 2) {
-                const length = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / length, uy = (y2 - y1) / length;
-                const road = { x1, y1, x2, y2, name, lanes, length, ux, uy, nx: -uy, ny: ux, thickness: lanes * 2 * this.laneWidth, orientation: 'D' };
-                const hT = road.thickness / 2, pw = this.pavementWidth, at = (a, l) => this._along(road, a, l);
+                return this._addPathRoad([[x1, y1], [x2, y2]], name, lanes);
+            }
+            
+            /**
+             * A curved street, as an angled one (above) but along a polyline whose corners are rounded off to `radius`:
+             * [[x, y], ...], its first and last points on the centre lines of the roads it joins. Keep the first and
+             * last legs straight for a while (300 px or so past the junction) so its ends meet those roads square on.
+             */
+            addCurvedRoad(points, name, lanes = 2, { radius = 300 } = {}) {
+                return this._addPathRoad(RoadPath.rounded(points, radius), name, lanes);
+            }
+            
+            _addPathRoad(points, name, lanes) {
+                const path = new RoadPath(points), a = path.points[0], b = path.points[path.points.length - 1];
+                const road = { x1: a.x, y1: a.y, x2: b.x, y2: b.y, name, lanes, path, points: path.points, length: path.length, curved: path.pieces.length > 1, thickness: lanes * 2 * this.laneWidth, orientation: 'D' };
+                const hT = road.thickness / 2, pw = this.pavementWidth;
                 road.ends = [this._angledEnd(road, 0), this._angledEnd(road, 1)];
                 if (!road.ends[0] || !road.ends[1]) console.warn(`addAngledRoad ${name}: both ends should sit on the centre line of a road`);
-                road.carriageway = [at(0, -hT), at(length, -hT), at(length, hT), at(0, hT)];
-                road.corridor = [at(0, -hT - pw), at(length, -hT - pw), at(length, hT + pw), at(0, hT + pw)];   // and its pavements
+                road.carriageway = path.band(-hT, hT);
+                road.corridor = path.band(-hT - pw, hT + pw);   // and its pavements (both concave on a curve)...
+                const cuts = [0, ...path.bends(), path.length];
+                road.corridorPieces = cuts.slice(1).map((s1, k) => path.band(-hT - pw, hT + pw, cuts[k], s1));   // ...as convex pieces
                 this.angledRoads.push(road);
                 return road;
             }
             
             /** A point on an angled road: `along` from its start, `lat` across (positive: to the right of its direction) */
             _along(road, along, lat = 0) {
-                return { x: road.x1 + road.ux * along + road.nx * lat, y: road.y1 + road.uy * along + road.ny * lat };
+                return road.path.at(along, lat);
             }
             
-            /** Where an angled road meets the road at one end (0: its start, 1: its end): that road, and how far in from the
-             *  end its carriageway is clear of it (`mouth`, where its lanes start and its crossing begins) */
+            /** Where an angled road meets the road at one end (0: its start, 1: its end): that road, the angled road's
+             *  direction there (`f`) and end point (`p`), and how far in from the end its carriageway is clear of it
+             *  (`mouth`, where its lanes start and its crossing begins) */
             _angledEnd(road, which) {
                 const p = which ? { x: road.x2, y: road.y2 } : { x: road.x1, y: road.y1 }, s = which ? -1 : 1, hT = road.thickness / 2;
+                const f = road.path.frame(which ? road.length : 0);
                 const H = this.horizontalRoads.find(r => Math.abs(r.centerY - p.y) < 2), V = !H && this.verticalRoads.find(r => Math.abs(r.centerX - p.x) < 2);
                 if (!H && !V) return null;
-                const kind = H ? 'H' : 'V', dir = Math.sign(H ? road.uy * s : road.ux * s);   // +1: it heads off towards larger y (x)
+                const kind = H ? 'H' : 'V', dir = Math.sign(H ? f.uy * s : f.ux * s);   // +1: it heads off towards larger y (x)
                 const kerb = H ? (dir > 0 ? H.y + H.roadHeight : H.y) : (dir > 0 ? V.x + V.roadWidth : V.x);
                 let mouth = 0;
                 for (const l of [-hT, hT]) {
-                    const c0 = H ? p.y + road.ny * l : p.x + road.nx * l, v = H ? road.uy * s : road.ux * s;
+                    const c0 = H ? p.y + f.ny * l : p.x + f.nx * l, v = H ? f.uy * s : f.ux * s;
                     mouth = Math.max(mouth, (kerb - c0) / v);
                 }
-                return { road: H || V, kind, dir, kerb, mouth, along: which ? road.length - mouth : mouth };
+                return { road: H || V, kind, dir, kerb, mouth, along: which ? road.length - mouth : mouth, f, p };
             }
             
-            /** The part of a convex polygon on one side of an angled road: sign·lateral >= off */
-            static _sideOf(poly, road, sign, off) {
-                return Poly.clipHalf(poly, sign * road.nx, sign * road.ny, off + sign * (road.nx * road.x1 + road.ny * road.y1));
+            /** The part of a polygon on one side of an angled road's end: sign·lateral >= off (across its end piece) */
+            static _sideOf(poly, e, sign, off) {
+                const { f, p } = e;
+                return Poly.clipHalf(poly, sign * f.nx, sign * f.ny, off + sign * (f.nx * p.x + f.ny * p.y));
             }
             
             /** The angled roads' pavements, two each, from kerb to kerb of the roads they join: [{ poly, road (its name) }] */
             angledPavements() {
                 const out = [], pw = this.pavementWidth;
                 for (const road of this.angledRoads) {
-                    const hT = road.thickness / 2, at = (a, l) => this._along(road, a, l);
+                    const hT = road.thickness / 2;
                     for (const side of [-1, 1]) {
-                        let poly = [at(0, side * hT), at(road.length, side * hT), at(road.length, side * (hT + pw)), at(0, side * (hT + pw))];
+                        let poly = road.path.band(side * hT, side * (hT + pw));
                         for (const e of road.ends) if (e) poly = e.kind === 'H' ? Poly.clipHalf(poly, 0, e.dir, e.dir * e.kerb) : Poly.clipHalf(poly, e.dir, 0, e.dir * e.kerb);
                         if (poly.length >= 3) out.push({ poly, road: road.name });
                     }
@@ -321,9 +339,13 @@
                     const hT = road.thickness / 2, next = [];
                     for (const p of out) {
                         const poly = p.poly || [{ x: p.x, y: p.y }, { x: p.x + p.w, y: p.y }, { x: p.x + p.w, y: p.y + p.h }, { x: p.x, y: p.y + p.h }];
-                        if (Math.abs(Poly.area(Poly.clip(poly, road.carriageway))) < 1) { next.push(p); continue; }
+                        const over = Poly.clip(road.carriageway, poly);
+                        if (over.length < 3 || Math.abs(Poly.area(over)) < 1) { next.push(p); continue; }
+                        // cut across the end it meets (the one nearest where they overlap)
+                        const c = Poly.box(over), cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+                        const e = road.ends.filter(Boolean).reduce((a, b) => Math.hypot(b.p.x - cx, b.p.y - cy) < Math.hypot(a.p.x - cx, a.p.y - cy) ? b : a);
                         for (const sign of [-1, 1]) {
-                            const piece = CityLayout._sideOf(poly, road, sign, hT);
+                            const piece = CityLayout._sideOf(poly, e, sign, hT);
                             if (piece.length >= 3 && Math.abs(Poly.area(piece)) > 200) next.push({ ...Poly.box(piece), poly: piece });
                         }
                     }
@@ -739,7 +761,8 @@
                     }
                     return ids;
                 };
-                // An angled street through the block: the straight rows stop either side of it, and it gets stepped rows of its own (below)
+                // An angled street through the block: the straight rows stop either side of it (where it crosses their front, as deep as
+                // most buildings go; one deeper that would reach it is left out), and it gets stepped rows of its own (below)
                 const clearOf = (side, span, depth) => {                                       // span, less where the street crosses the row
                     const along = side === 'south' || side === 'north';
                     const band = side === 'south' ? { x: block.x, y: block.y + block.h - depth, w: block.w, h: depth }
@@ -747,15 +770,15 @@
                         : side === 'west' ? { x: block.x, y: block.y, w: depth, h: block.h } : { x: block.x + block.w - depth, y: block.y, w: depth, h: block.h };
                     const bandPoly = [{ x: band.x, y: band.y }, { x: band.x + band.w, y: band.y }, { x: band.x + band.w, y: band.y + band.h }, { x: band.x, y: band.y + band.h }];
                     let spans = [span];
-                    for (const r of this.angledRoads) {
-                        const cut = Poly.clip(r.corridor, bandPoly);
-                        if (cut.length < 3) continue;
+                    for (const r of this.angledRoads) for (const piece of r.corridorPieces) {   // (a curve's piece by piece: its box takes in the lots inside the bend)
+                        const cut = Poly.clip(piece, bandPoly);
+                        if (cut.length < 3 || Math.abs(Poly.area(cut)) < 1) continue;
                         const b = Poly.box(cut), lo = (along ? b.x : b.y) - alley, hi = (along ? b.x + b.w : b.y + b.h) + alley;
                         spans = spans.flatMap(([a, z]) => [[a, Math.min(z, lo)], [Math.max(a, hi), z]]).filter(([a, z]) => z - a > 120);
                     }
                     return spans;
                 };
-                const run = (side, span, maxDepth) => clearOf(side, span, maxDepth + setback).flatMap(sp => runSpan(side, sp, maxDepth));
+                const run = (side, span, maxDepth) => clearOf(side, span, Math.min(maxDepth, 260) + setback).flatMap(sp => runSpan(side, sp, maxDepth));
                 const runSpan = (side, span, maxDepth) => {
                     const along = side === 'south' || side === 'north', gap = Math.random() < 0.65 ? 0 : alley;
                     const room = (span[1] - span[0]) * (options.fill ?? 1);   // fill < 1 leaves part of each street front open (fewer buildings to draw)
@@ -790,12 +813,12 @@
                     if (Poly.clip(road.corridor, bp).length < 3) continue;
                     const hT = road.thickness / 2;
                     for (const side of [-1, 1]) {
-                        // towards the street from this side, and the facing that looks most that way
-                        const tx = -side * road.nx, ty = -side * road.ny;
-                        const facing = Math.abs(tx) > Math.abs(ty) ? (tx > 0 ? 'E' : 'W') : (ty > 0 ? 'S' : 'N');
                         const line = hT + pw + setback, gap = Math.random() < 0.65 ? 0 : 30;
                         const pool = templates.filter(t => !t.unique);
                         for (let cursor = 0; cursor < road.length && pool.length;) {
+                            // the street's direction here (on a curve it turns), and towards it from this side the facing that looks most that way
+                            const f = road.path.frame(cursor), tx = -side * f.nx, ty = -side * f.ny;
+                            const facing = Math.abs(tx) > Math.abs(ty) ? (tx > 0 ? 'E' : 'W') : (ty > 0 ? 'S' : 'N');
                             // the weighted pick first, then whatever else fits here; nothing does: a little further up
                             const first = this._selectWeightedTemplate(pool), order = [first, ...pool.filter(t => t !== first).sort(() => Math.random() - 0.5)];
                             let spot = null;
@@ -803,15 +826,15 @@
                                 const S = this._shape(t, {}), e = S.ext;
                                 // the corner nearest the street, and how far the box runs along it from that corner
                                 const corners = [[0, 0], [e.w, 0], [e.w, e.h], [0, e.h]];
-                                const lat = ([cx, cy]) => side * (cx * road.nx + cy * road.ny), alongOf = ([cx, cy]) => cx * road.ux + cy * road.uy;
+                                const lat = ([cx, cy]) => side * (cx * f.nx + cy * f.ny), alongOf = ([cx, cy]) => cx * f.ux + cy * f.uy;
                                 const near = corners.reduce((a, b) => lat(b) < lat(a) ? b : a);
                                 const as = corners.map(c => alongOf(c) - alongOf(near)), a0 = Math.min(...as), a1 = Math.max(...as);
                                 const p = this._along(road, cursor - a0, side * line);
                                 const x = Math.floor(p.x - near[0]), y = Math.floor(p.y - near[1]);
-                                if (inBlock(x, y, e.w, e.h) && !this._intersectsSafeZone(x, y, e.w, e.h)) { spot = { t, S, e, x, y, run: a1 - a0 }; break; }
+                                if (inBlock(x, y, e.w, e.h) && !this._intersectsSafeZone(x, y, e.w, e.h)) { spot = { t, S, e, x, y, run: a1 - a0, facing }; break; }
                             }
                             if (!spot) { cursor += 40; continue; }
-                            placed.push(this._commit(spot.t, block.name, spot.S, spot.x, spot.y, { facing, angled: road.name, autoPlaced: true }));
+                            placed.push(this._commit(spot.t, block.name, spot.S, spot.x, spot.y, { facing: spot.facing, angled: road.name, autoPlaced: true }));
                             this._addSafeZone(spot.x, spot.y, spot.e.w, spot.e.h, `Angled: ${road.name}`);   // exact: the next one up the street may touch it
                             cursor += spot.run + gap;
                         }
@@ -982,9 +1005,9 @@
                     const at = (a, l) => this._along(road, a, l);
                     const poly = [at(a0, -hT), at(a1, -hT), at(a1, hT), at(a0, hT)];
                     crosswalks.push({
-                        ...Poly.box(poly), orientation: 'D', poly,
+                        ...Poly.box(poly), orientation: 'D', poly, road: road.name,
                         // the stripes run with the road, laid across it; the walk lights sit along both kerbs; people step off at its ends
-                        axis: { ox: road.x1, oy: road.y1, ux: road.ux, uy: road.uy, nx: road.nx, ny: road.ny, a0, a1, hT },
+                        axis: (() => { const o = at(a0, 0), f = e.f; return { ox: o.x, oy: o.y, ux: f.ux, uy: f.uy, nx: f.nx, ny: f.ny, a0: 0, a1: pw, hT }; })(),
                         kerbs: [-1, 1].map(sd => { const p = at(a0 + 7, sd * (hT - 3)), q = at(a1 - 7, sd * (hT - 3)); return [p.x, p.y, q.x, q.y]; }),
                         ends: [-1, 1].map(sd => at((a0 + a1) / 2, sd * (hT + 10)))
                     });
@@ -1232,12 +1255,12 @@
                 const gaps = [];
                 for (const road of this.angledRoads) for (const e of road.ends) {
                     if (!e || e.road !== straight || e.dir !== dir) continue;
-                    const H = e.kind === 'H', hT = road.thickness / 2 + this.pavementWidth;
-                    // the carriageway and its pavements, where they cross the walk's line
+                    const H = e.kind === 'H', hT = road.thickness / 2 + this.pavementWidth, { f, p } = e;
+                    // the carriageway and its pavements, where they cross the walk's line (along the end piece)
                     const xs = [-hT, hT].map(l => {
-                        const c0 = H ? road.y1 + road.ny * l : road.x1 + road.nx * l, v = H ? road.uy : road.ux;
+                        const c0 = H ? p.y + f.ny * l : p.x + f.nx * l, v = H ? f.uy : f.ux;
                         const t = (walkAt - c0) / v;
-                        return H ? road.x1 + road.ux * t + road.nx * l : road.y1 + road.uy * t + road.ny * l;
+                        return H ? p.x + f.ux * t + f.nx * l : p.y + f.uy * t + f.ny * l;
                     });
                     gaps.push({ start: Math.min(...xs) - 10, end: Math.max(...xs) + 10 });
                 }
@@ -1373,10 +1396,14 @@
                     const hT = road.thickness / 2, [e0, e1] = road.ends;
                     const from = (e0 ? e0.along + pw : 0) + walkOffset, to = (e1 ? e1.along - pw : road.length) - walkOffset;
                     const count = Math.max(1, Math.round((to - from) / nodeSpacing));
+                    // a node every nodeSpacing, and round a bend one at each of its joints (so the walk keeps to the pavement)
+                    const at = [...Array(count + 1).keys()].map(i => from + (to - from) * i / count);
+                    for (const b of road.path.bends()) if (b > from && b < to && at.every(a => Math.abs(a - b) > 20)) at.push(b);
+                    at.sort((a, b) => a - b);
                     for (const sd of [-1, 1]) {
                         const run = [];
-                        for (let i = 0; i <= count; i++) {
-                            const p = this._along(road, from + (to - from) * i / count, sd * (hT + walkOffset));
+                        for (const a of at) {
+                            const p = this._along(road, a, sd * (hT + walkOffset));
                             const node = createNode(p.x, p.y);
                             node.side = sd < 0 ? 'left' : 'right';
                             node.roadName = road.name;

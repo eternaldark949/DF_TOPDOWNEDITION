@@ -413,6 +413,9 @@ engineMixin({
                     // down to East Ave (world/city-layout.js addAngledRoad: a T at each end, the block's rows step along it).
                     // Each T sits well clear of the next junction along, so a car through one can stop for the other's red.
                     city.addAngledRoad(1950, 6100, 2800, 6800, 'Lantern Cut', 2);
+                    // And a curved one: Halfmoon Bend leaves Skyline Ave heading south, bends round to the west and meets East Ave
+                    // (addCurvedRoad: a lane each way, the corner rounded to a 220 px radius; straight for a while at each end, so each T is square)
+                    city.addCurvedRoad([[3550, 4900], [3550, 5500], [2800, 5500]], 'Halfmoon Bend', 1, { radius: 220 });
                     
                     // 3. GENERATE BLOCKS (must be done before placing buildings); the parks are kept free (world/parks.js)
                     for (const [block, name] of Object.entries(HUB_PARKS)) city.setZoneType(block, CityLayout.ZONE.PARK, { name });
@@ -534,7 +537,7 @@ engineMixin({
                         
                         // And the angled ones (their junctions come out as the shape where the carriageways meet: roads.js)
                         city.angledRoads.forEach(r => {
-                            net.addRoad(new Road({ x1: r.x1, y1: r.y1, x2: r.x2, y2: r.y2, name: r.name, lanes: r.lanes, hasPavements: true }));
+                            net.addRoad(new Road(r.curved ? { path: r.path, name: r.name, lanes: r.lanes, hasPavements: true } : { x1: r.x1, y1: r.y1, x2: r.x2, y2: r.y2, name: r.name, lanes: r.lanes, hasPavements: true }));
                         });
                         
                         net.buildGraph();

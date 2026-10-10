@@ -696,6 +696,100 @@
         }
 
         /**
+         * RoadPath: a road's centre line as a chain of straight pieces (a curve is many short ones). Distances along it
+         * (`s`) run from its first point; `lat` is across it, positive to the right of its direction. At each joint the
+         * offset lines meet at a mitre, so a lane, a kerb or a pavement edge at any `lat` is one unbroken line.
+         */
+        class RoadPath {
+            constructor(points) {
+                this.points = points.map(p => Array.isArray(p) ? { x: p[0], y: p[1] } : { x: p.x, y: p.y });
+                this.pieces = [];
+                let s = 0;
+                for (let i = 0; i + 1 < this.points.length; i++) {
+                    const a = this.points[i], b = this.points[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y);
+                    if (len < 1e-6) continue;
+                    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+                    this.pieces.push({ x: a.x, y: a.y, ux, uy, nx: -uy, ny: ux, angle: Math.atan2(uy, ux), s0: s, len });
+                    s += len;
+                }
+                this.length = s;
+                // the mitre at each joint: the offset of a unit `lat` there
+                const P = this.pieces, n = P.length;
+                this.joints = [];
+                for (let j = 0; j <= n; j++) {
+                    const a = P[Math.max(0, j - 1)], b = P[Math.min(n - 1, j)];
+                    let mx = a.nx + b.nx, my = a.ny + b.ny;
+                    const ml = Math.hypot(mx, my) || 1; mx /= ml; my /= ml;
+                    const k = 1 / Math.max(0.2, mx * b.nx + my * b.ny);
+                    const q = j < n ? { x: b.x, y: b.y } : { x: a.x + a.ux * a.len, y: a.y + a.uy * a.len };
+                    this.joints.push({ x: q.x, y: q.y, mx: mx * k, my: my * k, s: j < n ? b.s0 : this.length });
+                }
+            }
+            
+            /** Which piece `s` falls on (the first or last for a distance off either end) */
+            pieceIndex(s) {
+                const P = this.pieces;
+                let lo = 0, hi = P.length - 1;
+                while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (P[mid].s0 <= s) lo = mid; else hi = mid - 1; }
+                return lo;
+            }
+            
+            at(s, lat = 0) {
+                const i = this.pieceIndex(s), p = this.pieces[i], A = this.joints[i], B = this.joints[i + 1], f = (s - p.s0) / p.len;
+                const ax = A.x + A.mx * lat, ay = A.y + A.my * lat, bx = B.x + B.mx * lat, by = B.y + B.my * lat;
+                return { x: ax + (bx - ax) * f, y: ay + (by - ay) * f };
+            }
+            
+            /** The direction there: { ux, uy, nx, ny, angle } */
+            frame(s) { return this.pieces[this.pieceIndex(s)]; }
+            
+            /** The nearest point on it: { along, lateral } */
+            project(x, y) {
+                const P = this.pieces, last = P.length - 1;
+                let best = null, bd = Infinity;
+                for (let i = 0; i <= last; i++) {
+                    const p = P[i], dx = x - p.x, dy = y - p.y;
+                    let a = dx * p.ux + dy * p.uy;
+                    if (i > 0 && a < 0) a = 0;
+                    if (i < last && a > p.len) a = p.len;
+                    const lat = dx * p.nx + dy * p.ny, ex = dx - p.ux * a, ey = dy - p.uy * a, d = ex * ex + ey * ey;
+                    if (d < bd) { bd = d; best = { along: p.s0 + a, lateral: lat }; }
+                }
+                return best;
+            }
+            
+            /** The strip between two offsets (a polygon: concave on a curve), optionally only from s0 to s1 */
+            band(latA, latB, s0 = 0, s1 = this.length) {
+                const ss = [s0, ...this.joints.map(j => j.s).filter(v => v > s0 + 0.5 && v < s1 - 0.5), s1];
+                return [...ss.map(v => this.at(v, latA)), ...ss.reverse().map(v => this.at(v, latB))];
+            }
+            
+            /** The distances where it bends (where a lane or kerb line has a corner) */
+            bends() { return this.joints.slice(1, -1).map(j => j.s); }
+            
+            /**
+             * A polyline with its corners rounded off: each interior corner becomes an arc of `radius` (smaller where
+             * the legs are too short for it), drawn as pieces of at most `step` radians. Returns the points.
+             */
+            static rounded(points, radius, step = Math.PI / 24) {
+                const pts = points.map(p => Array.isArray(p) ? { x: p[0], y: p[1] } : p), out = [pts[0]];
+                for (let i = 1; i + 1 < pts.length; i++) {
+                    const A = pts[i - 1], B = pts[i], C = pts[i + 1];
+                    const l1 = Math.hypot(B.x - A.x, B.y - A.y), l2 = Math.hypot(C.x - B.x, C.y - B.y);
+                    const d1 = { x: (B.x - A.x) / l1, y: (B.y - A.y) / l1 }, d2 = { x: (C.x - B.x) / l2, y: (C.y - B.y) / l2 };
+                    const cross = d1.x * d2.y - d1.y * d2.x, th = Math.acos(Math.max(-1, Math.min(1, d1.x * d2.x + d1.y * d2.y)));
+                    if (th < 1e-3) { out.push(B); continue; }
+                    const sgn = Math.sign(cross), R = Math.min(radius, Math.min(l1, l2) * 0.95 / Math.tan(th / 2)), t = R * Math.tan(th / 2);
+                    const T1 = { x: B.x - d1.x * t, y: B.y - d1.y * t };
+                    const cx = T1.x - d1.y * sgn * R, cy = T1.y + d1.x * sgn * R, a0 = Math.atan2(T1.y - cy, T1.x - cx), K = Math.max(1, Math.ceil(th / step));
+                    for (let k = 0; k <= K; k++) { const a = a0 + sgn * th * k / K; out.push({ x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R }); }
+                }
+                out.push(pts[pts.length - 1]);
+                return out;
+            }
+        }
+
+        /**
          * Road: A named entity spanning the map, containing segments.
          * ID Format: "R0", "R1", "R2", ...
          */
@@ -710,7 +804,15 @@
                 
                 // === GEOMETRY: Unified angle-based representation ===
                 // Accept either x1,y1,x2,y2 (diagonal) or x,y,w,h,orientation (legacy H/V)
-                if (config.x1 !== undefined && config.y1 !== undefined && config.x2 !== undefined && config.y2 !== undefined) {
+                if (config.path) {
+                    // A road along a path: a curve (or any polyline); x1, y1 → x2, y2 are its ends
+                    this.path = config.path instanceof RoadPath ? config.path : new RoadPath(config.path);
+                    const a = this.path.points[0], b = this.path.points[this.path.points.length - 1];
+                    this.x1 = a.x; this.y1 = a.y; this.x2 = b.x; this.y2 = b.y;
+                    this.isDiagonal = true;
+                    this.isCurved = this.path.pieces.length > 1;
+                    this.orientation = 'D';
+                } else if (config.x1 !== undefined && config.y1 !== undefined && config.x2 !== undefined && config.y2 !== undefined) {
                     // Diagonal/freeform road
                     this.x1 = config.x1;
                     this.y1 = config.y1;
@@ -738,12 +840,13 @@
                 // Road axis vector and length
                 const dx = this.x2 - this.x1;
                 const dy = this.y2 - this.y1;
-                this.length = Math.hypot(dx, dy);
+                this.length = this.path ? this.path.length : Math.hypot(dx, dy);
                 this.angle = Math.atan2(dy, dx);
                 
                 // Unit vectors: forward (along road) and normal (perpendicular left)
-                this.ux = this.length > 0 ? dx / this.length : 1;
-                this.uy = this.length > 0 ? dy / this.length : 0;
+                const chord = Math.hypot(dx, dy);       // (a curve's ux/uy: the way from its start to its end)
+                this.ux = chord > 0 ? dx / chord : 1;
+                this.uy = chord > 0 ? dy / chord : 0;
                 this.nx = -this.uy; // perpendicular left
                 this.ny = this.ux;
                 
@@ -768,6 +871,7 @@
                     { x: this.x2 + this.nx * halfT, y: this.y2 + this.ny * halfT },
                     { x: this.x2 - this.nx * halfT, y: this.y2 - this.ny * halfT },
                 ];
+                if (this.path) corners.push(...this.path.band(-halfT, halfT));
                 const xs = corners.map(c => c.x), ys = corners.map(c => c.y);
                 this.x = Math.min(...xs);
                 this.y = Math.min(...ys);
@@ -793,6 +897,7 @@
             
             // Convert a parametric distance along the road to world coordinates
             paramToWorld(t, lateralOffset = 0) {
+                if (this.path) return this.path.at(t, lateralOffset);
                 return {
                     x: this.x1 + this.ux * t + this.nx * lateralOffset,
                     y: this.y1 + this.uy * t + this.ny * lateralOffset
@@ -801,6 +906,7 @@
             
             // Project a world point onto the road axis, returns { along, lateral }
             worldToParam(wx, wy) {
+                if (this.path) return this.path.project(wx, wy);
                 const dx = wx - this.x1;
                 const dy = wy - this.y1;
                 return {
@@ -812,6 +918,7 @@
             // Get the 4 corners of the road polygon (for rendering and collision)
             getCorners() {
                 const halfT = this.thickness / 2;
+                if (this.path) return this.path.band(-halfT, halfT);     // (concave on a curve)
                 return [
                     { x: this.x1 - this.nx * halfT, y: this.y1 - this.ny * halfT },
                     { x: this.x2 - this.nx * halfT, y: this.y2 - this.ny * halfT },
@@ -820,7 +927,13 @@
                 ];
             }
             
+            /** Its direction at distance `t` along it: { ux, uy, nx, ny, angle } (a curve's changes as it bends) */
+            frameAt(t) {
+                return this.path ? this.path.frame(t) : this;
+            }
+            
             buildSegments(intersectionCoords) {
+                if (this.isCurved) return this._buildCurvedSegments(intersectionCoords);
                 this.segments = [];
                 this.segmentIds = [];
                 this.lanes = [];
@@ -852,6 +965,29 @@
                 for (const segment of this.segments) {
                     this._generateLanesForSegment(segment);
                 }
+            }
+            
+            /** A curve's segments: between its junctions as usual, and split again at each bend, so every lane is straight
+             *  (the pieces of one stretch link end to end: RoadNetwork._connectSegments) */
+            _buildCurvedSegments(intersectionCoords) {
+                this.segments = []; this.segmentIds = []; this.lanes = []; this.laneIds = [];
+                const sorted = [...intersectionCoords].sort((a, b) => a.coord - b.coord), runs = [];
+                let prev = this.startCoord, prevBound = null;
+                for (const ix of sorted) {
+                    if (ix.coord > prev) runs.push([prev, ix.coord, prevBound, ix.id]);
+                    prev = ix.coord + ix.width; prevBound = ix.id;
+                }
+                if (prev < this.endCoord) runs.push([prev, this.endCoord, prevBound, null]);
+                const bends = this.path.bends();
+                let index = 0;
+                for (const [a, b, sb, eb] of runs) {
+                    const cuts = [a, ...bends.filter(v => v > a + 1 && v < b - 1), b];
+                    for (let k = 0; k + 1 < cuts.length; k++) {
+                        const segment = new Segment(this, index++, cuts[k], cuts[k + 1], k === 0 ? sb : null, k + 2 === cuts.length ? eb : null);
+                        this.segments.push(segment); this.segmentIds.push(segment.id);
+                    }
+                }
+                for (const segment of this.segments) this._generateLanesForSegment(segment);
             }
             
             _generateLanesForSegment(segment) {
@@ -1022,10 +1158,10 @@
                     if (len < 50) continue;
                     const count = Math.max(1, Math.floor(len / spacing)), step = len / (count + 1);
                     for (const side of [-1, 1]) {
-                        // the arm faces the road: angle = the way out from the kerb, less a quarter turn (as on the H/V roads)
-                        const angle = Math.atan2(this.ny * side, this.nx * side) - Math.PI / 2;
                         for (let i = 1; i <= count; i++) {
-                            const p = this.paramToWorld(run.start + step * i, side * (hT + 20));
+                            // the arm faces the road: angle = the way out from the kerb, less a quarter turn (as on the H/V roads)
+                            const at = run.start + step * i, f = this.frameAt(at), angle = Math.atan2(f.ny * side, f.nx * side) - Math.PI / 2;
+                            const p = this.paramToWorld(at, side * (hT + 20));
                             lamps.push(new LampEntity({ x: p.x, y: p.y, lampType: 2, color: side < 0 ? '#ffaa00' : '#ffffff', angle }));
                         }
                     }
@@ -1260,7 +1396,8 @@
                 
                 // An angled road: the junction is where the two carriageways overlap, widened to each road's full
                 // width over that stretch (so a T, where one ends on the other, takes in the far lanes too)
-                const P = Poly.clip(r1.getCorners(), r2.getCorners());
+                // (a curve's outline is concave: it goes in as the subject, the other road's rectangle as the clip)
+                const [sub, cl] = r1.isCurved ? [r1, r2] : [r2, r1], P = Poly.clip(sub.getCorners(), cl.getCorners());
                 if (P.length < 3 || Math.abs(Poly.area(P)) < 100) return null;
                 const pts = [];
                 for (const r of [r1, r2]) {
@@ -1475,6 +1612,23 @@
                     
                     lane.intersectingZones.sort((a, b) => a.entryDist - b.entryDist);
                 }
+                // Down a curve the lanes are pieces linked end to end: each also sees the junctions ahead of the pieces after
+                // it (further by its own length), so cars slow for the lights and turn in from round the bend
+                const ahead = new Map();
+                const chain = (lane, seen) => {
+                    if (ahead.has(lane)) return ahead.get(lane);
+                    const next = lane.connections && lane.connections.length === 1 && !(lane.turnPaths && lane.turnPaths.length) ? lane.connections[0] : null;
+                    let zones = lane.intersectingZones;
+                    if (next && !seen.has(next)) {
+                        seen.add(lane);
+                        const own = new Set(zones.map(z => z.intersection));
+                        zones = zones.concat(chain(next, seen).filter(z => z.entryDist >= 5 && !own.has(z.intersection)).map(z => ({ ...z, entryDist: z.entryDist + lane.length })));
+                    }
+                    ahead.set(lane, zones);
+                    return zones;
+                };
+                for (const lane of this.lanes) chain(lane, new Set());
+                for (const [lane, zones] of ahead) lane.intersectingZones = zones;
             }
             
             _buildNavigationGraph() {
