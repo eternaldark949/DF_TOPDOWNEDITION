@@ -471,6 +471,12 @@ engineMixin({
                     city.placeBuilding('neural_sys', 'block_6_2', { align: 'center' });     // Neural Systems - S center
                     city.placeBuilding('torque_auto', 'block_2_0', { align: 'center' });   // Torque Auto - W center
                     city.placeBuilding('biggs_park', 'block_4_2', { align: 'center' });    // Biggs Amusement Park - center
+
+                    // 5a. A HAND-LAID BLOCK (world/city-layout.js: row, corner, lot, placeAt)
+                    // NE of Double Nights: a shop parade along Hotel Dr., wall to wall, with an apartment and a warehouse behind it
+                    city.row('block_0_4', 'south', ['shop_small', 'apartment_small', 'shop_small'], { gap: 0, setback: 12 });
+                    city.corner('block_0_4', 'nw', 'apartment_small');
+                    city.corner('block_0_4', 'ne', 'warehouse');
                     
                     // 5b. SET CUSTOM LAMP COLORS FOR V1 BUILDINGS
                     // V2 buildings auto-set their block lamp colors from accent color
@@ -832,6 +838,12 @@ engineMixin({
                         const inCourt = (o, front = 0) => o.x > court.x && o.x < court.x + court.w && o.y > court.y && o.y < court.y + court.h + front;
                         mapData.foliage = mapData.foliage.filter(f => !inCourt(f, 110));   // nor on the pavement in front, where a canopy would hide the steps
                         mapData.lamps = mapData.lamps.filter(l => !inCourt(l));
+                    }
+                    // and the pavement in front of a row of shopfronts (city.row): a street wall shows its fronts, its trees go elsewhere
+                    for (const pl of city.placedBuildings) {
+                        if (!pl.options || pl.options.row !== 'south') continue;
+                        const e = pl.extent;
+                        mapData.foliage = mapData.foliage.filter(f => !(f.x > e.x - 30 && f.x < e.x + e.w + 30 && f.y > e.y && f.y < e.y + e.h + 140));
                     }
                     // The parks' trees and lanterns (their ground is painted by the ground baker)
                     for (const b of city.blocks) {

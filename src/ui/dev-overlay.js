@@ -8,7 +8,8 @@
         const DEBUG_LAYERS = [
             ['nav', 'Nav', '#6f8cff'], ['lights', 'Lights', '#f1e8fe'], ['traffic', 'Traffic', '#ffc248'],
             ['projectiles', 'Shots', '#9be8dc'], ['rooms', 'Rooms', '#cab0fa'], ['vision', 'Vision', '#ff8a92'],
-            ['hearing', 'Hearing', '#e6dff0'], ['colliders', 'Colliders', '#ff6ab8'], ['labels', 'Labels', '#f4e6c8']
+            ['hearing', 'Hearing', '#e6dff0'], ['colliders', 'Colliders', '#ff6ab8'], ['labels', 'Labels', '#f4e6c8'],
+            ['city', 'City', '#8fe3a8']
         ];
         const DEBUG_COLOUR = Object.fromEntries(DEBUG_LAYERS.map(([k, , c]) => [k, c]));
 
@@ -310,6 +311,31 @@
                         if (!e.active || !inView(e.x, e.y)) continue;
                         const r = e.radius || e.collisionRadius || 0;
                         if (r) { ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.stroke(); }
+                    }
+                    ctx.globalAlpha = 1;
+                }
+
+                // City layout: blocks (thin), what each building occupies (dashed: sections and forecourt), its sections' box
+                // (solid), and in red anything reaching the street or another building (world/city-layout.js layoutIssues)
+                const city = this.activeMap && this.activeMap.cityLayout;
+                if (this.dbg('city') && city) {
+                    const c = DEBUG_COLOUR.city;
+                    if (!city._dbgIssues) {
+                        const net = this.traffic && this.traffic.network;
+                        city._dbgIssues = new Set(city.layoutIssues([...(this.activeMap.pavements || []), ...((net && net.roads) || [])]).map(i => i.placement));
+                    }
+                    ctx.strokeStyle = c; ctx.globalAlpha = 0.35;
+                    for (const b of city.blocks) if (inView(b.x + b.w / 2, b.y + b.h / 2, Math.max(b.w, b.h))) {
+                        ctx.strokeRect(b.x, b.y, b.w, b.h);
+                        ctx.globalAlpha = 0.8; label(b.name + (b.type !== 'BLOCK' ? ' · ' + b.type.toLowerCase() : ''), b.x + b.w / 2, b.y + 14 * px, c); ctx.globalAlpha = 0.35;
+                    }
+                    for (const p of city.placedBuildings) {
+                        const e = p.extent || p, bad = city._dbgIssues.has(p);
+                        if (!inView(e.x + e.w / 2, e.y + e.h / 2, Math.max(e.w, e.h))) continue;
+                        ctx.strokeStyle = bad ? '#ff4d5e' : c; ctx.globalAlpha = 0.9;
+                        ctx.setLineDash([6 * px, 4 * px]); ctx.strokeRect(e.x, e.y, e.w, e.h); ctx.setLineDash([]);
+                        ctx.globalAlpha = 0.5; ctx.strokeRect(p.x, p.y, p.w, p.h);
+                        ctx.globalAlpha = 1; label(p.templateId + (p.options && p.options.row ? ' · row ' + p.options.row : ''), e.x + e.w / 2, e.y + e.h - 10 * px, bad ? '#ff4d5e' : c);
                     }
                     ctx.globalAlpha = 1;
                 }

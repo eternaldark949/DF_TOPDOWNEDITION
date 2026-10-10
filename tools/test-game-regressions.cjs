@@ -1522,6 +1522,27 @@ test('City: no building, portico, forecourt or drive in the hub reaches a paveme
   equal(r.aprons, {silver_queen:[0,0,0,0], double_nights:[0,0,0,0], moon_city:[0,0,0,0]}, 'aprons match the forecourts');
 });
 
+test('City helpers: the hand-laid block has its shop parade wall to wall on Hotel Dr., and no building overlaps another', env => {
+  const r = value(env, `
+    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    const city = game.activeMap.cityLayout, b = city.blockMap.block_0_4;
+    const row = city.placedBuildings.filter(p => p.blockName === 'block_0_4' && p.options.row === 'south').sort((a, c) => a.x - c.x);
+    const issues = city.layoutIssues([...game.activeMap.pavements, ...game.traffic.network.roads]).map(i => i.placement.templateId + ' ' + i.what + (i.other ? ' ' + i.other.templateId : ''));
+    const lot = city.lot('block_0_4', 'east', { frontage: 200, depth: 100 }), tooBig = city.lot('block_0_4', 'south', { frontage: 5000, depth: 100 });
+    return { ids: row.map(p => p.templateId), joins: row.slice(1).map((p, i) => p.x - (row[i].x + row[i].w)),
+      fronts: row.map(p => b.y + b.h - (p.y + p.h)), issues, others: city.placedBuildings.filter(p => p.blockName === 'block_0_4').length,
+      lot: lot && [lot.x + lot.w, lot.w, lot.h, b.x + b.w - 30], tooBig, drawn: game.activeMap.buildings.length === city.placedBuildings.length };
+  `);
+  equal(r.ids, ['shop_small', 'apartment_small', 'shop_small'], 'the parade, west to east');
+  equal(r.joins, [0, 0], 'neighbours share a wall');
+  equal(r.fronts, [12, 12, 12], 'one street front, set back 12 px');
+  equal(r.others, 5, 'the parade, the corner apartment and the warehouse: nothing auto-filled on top');
+  equal(r.issues, [], 'nothing on the street or on another building');
+  equal(r.lot, [r.lot[3], 100, 200, r.lot[3]], 'an east lot runs down the block, set back from its east edge');
+  equal(r.tooBig, null, 'a lot bigger than the block is refused');
+  ok(r.drawn, 'every placement is built');
+});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');
