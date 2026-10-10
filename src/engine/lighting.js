@@ -662,6 +662,9 @@
                 }
                 lc.globalAlpha = 1;
 
+                // 6b. LAMP SHADOWS — behind each person in a lamp's light, the dark and its colour come back (ui/humanoid-render.js)
+                drawLampShadowsInto(lc, tint);
+
                 lc.restore();
             
                 // 7. RENDER TO SCREEN (UPSCALING) — soft shadows: blur the small layer, then scale it up

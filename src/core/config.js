@@ -405,7 +405,14 @@
                 SHADOW_DAY: 0.34, SHADOW_NIGHT: 0.3,    // contact shadow alphas
                 RIM_R: 180,             // a lamp this close (px) rims them in its colour
                 RIM_A: 0.6,
-                RIM_PEDS: 8             // pedestrians rimmed per frame (named characters always are)
+                RIM_PEDS: 8,            // pedestrians rimmed per frame (named characters always are)
+                LAMP_SHADOW: true,      // at night, a shadow cast away from each of the two nearest burning lamps
+                LAMP_SHADOW_R: 230,     // … from a lamp this close (px); it fades out toward here
+                LAMP_SHADOW_K: 0.4,     // shadow length per px from the lamp
+                LAMP_SHADOW_MAX: 60,    // … capped (px)
+                LAMP_SHADOW_A: 0.7,     // alpha on the ground at full strength
+                LAMP_SHADOW_DARK: 1,    // … and in the light layer (how much of the lamp's light it takes back)
+                LAMP_SHADOW_PEDS: 24    // pedestrians given lamp shadows per frame (named characters always are)
             },
             GAIT: {
                 CADENCE: 0.2,           // sqrt curve: within ~5% of the old 0.25 + 0.04v at speeds 3.5-7, but slows down at crawl speeds instead of shuffling

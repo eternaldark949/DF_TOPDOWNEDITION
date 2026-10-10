@@ -88,7 +88,7 @@
                 const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
                 const f = walking ? 1 + (Math.round(ph / (Math.PI * 2) * F) % F) : 0;
                 // the contact shadow, live (it follows the sun and their facing)
-                if (!c.noShadow && !c.isDriving && _zoomLOD < 2) { const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a); drawHumanContactShadow(ctx); }
+                if (!c.noShadow && !c.isDriving && _zoomLOD < 2) { const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a); drawHumanContactShadow(ctx, e); }
                 ctx.drawImage(b.cv, b.cell * f, 0, b.cell, b.cell, -R, -R, R * 2, R * 2);
                 RenderStats.bodies++; RenderStats.cachedBodies++;
                 return true;
