@@ -21,7 +21,7 @@ For editor/runtime batches that change static building or foliage geometry, reac
 ## core/ (loaded first)
 | File | What's in it |
 |---|---|
-| `core/config.js` | Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…). `HEARTHS`: where each fireplace is (art and ambience share it). `console.log` is silent unless `localStorage.dfab_debug = '1'`; `leanCamHeight()` (the building lean's camera height, normalised to zoom) `HUB_GRAVEYARD`: where the city's graveyard is (its walls, music, candle glow, ghosts and Ms. Jean's lines all go by it). |
+| `core/config.js` | Frame-time globals and `CONFIG`: every tunable constant (buildings, weather, loop, lighting…). `HEARTHS`: where each fireplace is (art and ambience share it). `console.log` is silent unless `localStorage.dfab_debug = '1'`; `leanCamHeight()` (the building lean's camera height, normalised to zoom) `HUB_GRAVEYARD`: where the city's graveyard is (its walls, music, candle glow, ghosts, Ms. Jean's spot and her lines all go by it). |
 | *(generated)* | `ASSETS`: your images and audio from `assets/`, built automatically |
 | `core/assets.js` | `getImage`, `drawAsset`, `playSound` / `loadSound` for your assets |
 | `core/registries.js` | Notes, consumables, drinks, cosmetics (wigs, skins, outfits, hats, jewelry…); `CosmeticsSystem`, `BuffSystem` |
