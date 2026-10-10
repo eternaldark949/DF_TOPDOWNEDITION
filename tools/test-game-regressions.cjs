@@ -1353,6 +1353,31 @@ test('Junction lights: a red is stopped for at the line behind the crosswalk; am
   ok(r.amber.pushy.went, 'amber: the pushy go on through');
 }, {events:true});
 
+test('Junction lights: right turns only from the kerb lane, and a kerb right turn goes with the car going straight beside it', env => {
+  lightsScene(env);
+  const r = value(env, `
+    const sig = __reset(), mine = sig.cur;
+    // Each lane's own pick: right only from the kerb, left only from the inside, straight from any
+    const lanes = __phases[mine].gates.map(g => g.lane), picks = [];
+    for (const lane of lanes) {
+      const c = new TrafficVehicle(lane, 'Gelfash', 'sedan', 'AI'); c.driverType = 'civilian';
+      for (let i = 0; i < 60; i++) { const p = c.pickTrafficTurn(lane.turnPaths); if (p) picks.push({ type: p.turnType, ok: TrafficVehicle.laneMayTake(lane, p), rank: TrafficVehicle._laneRank(lane) }); }
+      c.destroy();
+    }
+    // Side by side at the line on the green: straight from the inside lane, right from the kerb lane
+    const a = __car(mine, 1, 0, 60, 'straight'), b = __car(mine, 1, 1, 60, 'right');
+    let both = -1;
+    for (let i = 0; i < 200; i++) { game.update(); if (both < 0 && __ix.occupants.includes(a) && __ix.occupants.includes(b)) both = i; }
+    return { wrong: picks.filter(p => !p.ok).length, rights: [...new Set(picks.filter(p => p.type === 'right').map(p => p.rank))], n: picks.length, both,
+      side: JunctionSignal.sideBySide(a._sigPath || a.plannedTurn || a.currentTurnPath, b._sigPath || b.plannedTurn || b.currentTurnPath) };
+  `);
+  ok(r.n > 100, 'every lane picks its turns');
+  equal(r.wrong, 0, 'no lane takes a turn it mustn\'t');
+  equal(r.rights, [1], 'right turns come only from the kerb lane');
+  ok(r.side, 'a kerb right turn and the straight beside it keep out of each other\'s way');
+  ok(r.both >= 0, `they go into the box together (${r.both} ticks)`);
+}, {events:true});
+
 test('Junction lights: a left turn waits for what is coming the other way; nobody goes into a box whose way out is full', env => {
   lightsScene(env);
   const r=value(env, `

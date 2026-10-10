@@ -2459,8 +2459,10 @@
                     return intersectionsAhead.length > 0;
                 };
                 
-                const safePaths = relevantPaths.filter(p => isSafePath(p));
-                const pool = safePaths.length > 0 ? safePaths : relevantPaths;
+                const allowed = relevantPaths.filter(p => TrafficVehicle.laneMayTake(this.currentLane, p));
+                const from = allowed.length ? allowed : relevantPaths;
+                const safePaths = from.filter(p => isSafePath(p));
+                const pool = safePaths.length > 0 ? safePaths : from;
                 const straightPaths = pool.filter(p => Math.abs(p.toLane.angle - this.currentLane.angle) < 0.5);
                 const turnPaths = pool.filter(p => Math.abs(p.toLane.angle - this.currentLane.angle) >= 0.5);
                 
@@ -2498,14 +2500,16 @@
                     return intersectionsAhead.length > 0;
                 };
                 
-                const safePaths = relevantPaths.filter(p => isSafePath(p));
-                let pool = safePaths.length > 0 ? safePaths : relevantPaths;
-                // Lane discipline: turn left from the inside lane, right from the kerb lane (straight on from any), and
-                // come out in the matching lane across the road (inside to inside, kerb to kerb), so cars side by side
-                // in the box don't cut across each other
-                const rank = TrafficVehicle._laneRank, mine = rank(this.currentLane), outer = this.currentLane.road.numLanes - 1;
-                const kept = this.currentLane.road.symmetrical ? pool.filter(p => p.turnType === 'straight' || (p.turnType === 'left' ? mine === 0 : mine === outer)) : pool;
-                if (kept.length) pool = kept;
+                // Lane discipline first (before what's safe ahead, which could otherwise leave only a turn this lane
+                // mustn't make): right only from the kerb lane, left from the inside lane, straight on from any (only a
+                // lane with no other way out turns from where it is, side by side with the next), and come out in the
+                // matching lane across the road (inside to inside, kerb to kerb), so cars side by side in the box don't
+                // cut across each other and a turn waits in its own lane, out of the way of cars going on
+                const rank = TrafficVehicle._laneRank, mine = rank(this.currentLane);
+                const allowed = relevantPaths.filter(p => TrafficVehicle.laneMayTake(this.currentLane, p));
+                const from = allowed.length ? allowed : relevantPaths;
+                const safePaths = from.filter(p => isSafePath(p));
+                let pool = safePaths.length > 0 ? safePaths : from;
                 const matching = (p) => {
                     let best = p;
                     for (const q of pool) {
@@ -2524,6 +2528,14 @@
                 if (!chosenPath && straightPaths.length > 0) chosenPath = matching(straightPaths[0]);
                 if (!chosenPath && turnPaths.length > 0) chosenPath = matching(turnPaths[Math.floor(Math.random() * turnPaths.length)]);
                 return chosenPath;
+            }
+
+            /** May a car in `lane` take turn path `p`: right only from the kerb lane, left only from the inside lane, straight
+             *  on from any (a one-lane side does all three) */
+            static laneMayTake(lane, p) {
+                if (p.turnType === 'straight' || !lane.road || !lane.road.symmetrical) return true;
+                const mine = TrafficVehicle._laneRank(lane);
+                return p.turnType === 'left' ? mine === 0 : p.turnType === 'right' ? mine === lane.road.numLanes - 1 : true;
             }
 
             /** Which lane across its side of the road: 0 the inside one (by the centre line), up to numLanes − 1 at the kerb */

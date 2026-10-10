@@ -210,8 +210,22 @@
                 if (a === b || a.fromLane === b.fromLane) return false;
                 const key = a.id < b.id ? a.id + '|' + b.id : b.id + '|' + a.id;
                 let c = this._conf.get(key);
-                if (c === undefined) this._conf.set(key, c = JunctionSignal.pathsCross(a, b));
+                if (c === undefined) this._conf.set(key, c = JunctionSignal.sideBySide(a, b) ? false : JunctionSignal.pathsCross(a, b));
                 return c;
+            }
+
+            /** Two cars coming in side by side (the same way in, different lanes) that keep out of each other's way: the
+             *  one on the right turning no further left than the one beside it (a kerb right turn beside a car going
+             *  on, or two going on), and not out into the same lane. Their curves stay in their own strips, so they go
+             *  together (by shape alone, each curve's drift allowance had a right turn wait for the car beside it) */
+            static sideBySide(a, b) {
+                const la = a.fromLane, lb = b.fromLane, rank = TrafficVehicle._laneRank;
+                if (!la || !lb || la.road !== lb.road || la.direction !== lb.direction || la === lb || a.toLane === b.toLane) return false;
+                const order = { left: 0, straight: 1, right: 2 };
+                const [inner, outer] = rank(la) < rank(lb) ? [a, b] : [b, a];
+                if (!(inner.turnType in order) || !(outer.turnType in order) || order[inner.turnType] > order[outer.turnType]) return false;
+                // going the same way, they come out in the same order they went in (inside lane still inside)
+                return inner.turnType !== outer.turnType || inner.toLane.road !== outer.toLane.road || rank(inner.toLane) < rank(outer.toLane);
             }
 
             /** Do cars on paths `a` and `b` come within reach of each other, allowing for how far each strays off its
