@@ -979,7 +979,7 @@
                 if (this.playerCar) {
                     let gas = 0, turn = 0;
                     const inputMag = Math.hypot(inputX, inputY);
-                    if (inputMag > 0.15) {
+                    if (inputMag > (GameSettings.preciseStick && game.joystick && game.joystick.active ? 0.03 : 0.15)) {   // Precise Stick has its own dead centre
                         const inputAngle = Math.atan2(inputY, inputX);
                         let angleDiff = inputAngle - this.playerCar.angle;
                         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;

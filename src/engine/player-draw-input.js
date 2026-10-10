@@ -317,6 +317,13 @@
                 // WALK: full speed at 60 px (was 35), so walking and driving get finer control on the way out.
                 // It stays inside RING_OUT, so a held full-speed thumb re-arms the ring. BASE: half the base disc (CSS #joystick-zone)
                 const J = this.joystick, WALK = 60, RING_IN = 82, RING_OUT = 65, EDGE = 100, BASE = 64;
+                // Precise Stick (setting, on): a dead centre of DEAD px, then a curve that spends the first
+                // half of the travel on the slowest ~30% of speed (full speed still at WALK). The dead centre
+                // also keeps a resting thumb's wobble from turning her or the wheel.
+                const DEAD = 7, shapePush = far => {
+                    const t = Math.max(0, Math.min(1, (far - DEAD) / (WALK - DEAD)));
+                    return 0.3 * t + 0.7 * Math.pow(t, 2.2);
+                };
                 // CSS-pixel radial travel: at least 24 px at 500 px/sec within 120 ms.
                 // A fixed ring buffer retains recent raw movement, independent of Flick to Flit.
                 const RING_WINDOW = 120, RING_TRAVEL = 24, RING_SPEED = 0.5;
@@ -383,7 +390,10 @@
                         const distance = Math.min(far, WALK), angle = Math.atan2(deltaY, deltaX);
                         const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
                         knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
-                        J.dx = moveX / WALK; J.dy = moveY / WALK;
+                        if (GameSettings.preciseStick) {
+                            const push = shapePush(far);
+                            J.dx = Math.cos(angle) * push; J.dy = Math.sin(angle) * push;
+                        } else { J.dx = moveX / WALK; J.dy = moveY / WALK; }
                         // A held-touch ring flick needs fresh, substantial outward speed.
                         // Keep the standalone flick's existing shared latch/re-arm behavior.
                         if (far <= RING_OUT) J.armed = true;

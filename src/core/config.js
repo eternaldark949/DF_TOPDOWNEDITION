@@ -524,6 +524,8 @@
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
                 CAM_ZOOM: { SPAN: 0.25, FLOOR: 0.75 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
                 STICK_YAW_DAMP: 5,
+                STICK_LIGHT_LOCK: 0.35,         // Precise Stick: wheel lock at the lightest push…
+                STICK_FULL_LOCK_PUSH: 0.6,      // …growing to full lock by this shaped push (about two-thirds out)
                 IMPACT_YAW: 0.9,                // Twist from an off-centre knock (onImpact)              // Touch stick unwinds by this × yawRate (no overshoot)
                 COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)
             }

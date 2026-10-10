@@ -140,7 +140,7 @@ engineMixin({
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
                         flitTwoFinger: GameSettings.flitTwoFinger, flitButton: GameSettings.flitButton,
-                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, scopeView: GameSettings.scopeView, scopeSlow: GameSettings.scopeSlow, cameraEdgeLock: GameSettings.cameraEdgeLock,
+                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, preciseStick: GameSettings.preciseStick, scopeView: GameSettings.scopeView, scopeSlow: GameSettings.scopeSlow, cameraEdgeLock: GameSettings.cameraEdgeLock,
                         ambienceVolume: GameSettings.ambienceVolume,
                         musicVolume: GameSettings.musicVolume,
                         fullscreen: GameSettings.fullscreen,
@@ -787,6 +787,7 @@ engineMixin({
                         GameSettings.flitButton = save.settings.flitButton !== false;
                         GameSettings.aimBeforeFire = save.settings.aimBeforeFire !== false;
                         GameSettings.sniperRelease = save.settings.sniperRelease !== false;
+                        GameSettings.preciseStick = save.settings.preciseStick !== false;
                         GameSettings.scopeView = save.settings.scopeView !== false;
                         GameSettings.scopeSlow = save.settings.scopeSlow !== false;
                         GameSettings.cameraEdgeLock = save.settings.cameraEdgeLock !== false;
