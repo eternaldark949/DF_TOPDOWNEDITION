@@ -1053,7 +1053,7 @@
         function humanShadeReset() { _lampGrid = null; }
 
         /** Street lamps bucketed in 200px cells, rebuilt when the map's lamp list changes. */
-        function _lampNear(x, y, R) {
+        function _lampCells() {
             const L = typeof game !== 'undefined' ? game.lamps : null;
             if (!L || !L.length) return null;
             if (!_lampGrid || _lampGrid.src !== L || _lampGrid.n !== L.length) {
@@ -1061,13 +1061,37 @@
                 for (const l of L) { if (l.candle) continue; const k = Math.floor(l.x / 200) + ',' + Math.floor(l.y / 200); (cells.get(k) || cells.set(k, []).get(k)).push(l); }
                 _lampGrid = { src: L, n: L.length, cells };
             }
+            return _lampGrid.cells;
+        }
+        function _lampNear(x, y, R) {
+            const cells = _lampCells();
+            if (!cells) return null;
             const cx = Math.floor(x / 200), cy = Math.floor(y / 200);
             let best = null, bd = R;
             for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-                const c = _lampGrid.cells.get((cx + i) + ',' + (cy + j));
+                const c = cells.get((cx + i) + ',' + (cy + j));
                 if (c) for (const l of c) { const d = Math.hypot(l.x - x, l.y - y); if (d < bd) { bd = d; best = l; } }
             }
             return best ? { l: best, d: bd } : null;
+        }
+        /** The (up to) two nearest street lamps within R of x, y, nearest first: [{ l, d }] (reused array). */
+        const _lampPair = [{ l: null, d: 0 }, { l: null, d: 0 }];
+        let _lampPairN = 0;
+        function _lampsNear2(x, y, R) {
+            _lampPairN = 0;
+            const cells = _lampCells();
+            if (!cells) return 0;
+            const cx = Math.floor(x / 200), cy = Math.floor(y / 200), A = _lampPair[0], B = _lampPair[1];
+            for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+                const c = cells.get((cx + i) + ',' + (cy + j));
+                if (c) for (const l of c) {
+                    const d = Math.hypot(l.x - x, l.y - y);
+                    if (d >= R) continue;
+                    if (!_lampPairN || d < A.d) { B.l = A.l; B.d = A.d; A.l = l; A.d = d; _lampPairN = Math.min(2, _lampPairN + 1); }
+                    else if (_lampPairN < 2 || d < B.d) { B.l = l; B.d = d; _lampPairN = 2; }
+                }
+            }
+            return _lampPairN;
         }
 
         /**
@@ -1115,15 +1139,16 @@
             return S;
         }
 
-        /** A soft shadow under the feet: cast along the sun by day, a round pool at night and indoors. */
-        let _contactShadowX, _contactShadowY, _contactShadowAngle = 0;
+        /** A soft shadow under the feet: cast along the sun by day, a round pool at night and indoors,
+         *  and at night one cast away from each of the (up to two) nearest burning lamps. */
+        let _contactShadowX, _contactShadowY, _contactShadowAngle = 0, _lampShadowFrame = -1, _lampShadowPeds = 0;
         function _contactShadowDirection(x, y) {
             if (!Object.is(x, _contactShadowX) || !Object.is(y, _contactShadowY)) {
                 _contactShadowX = x; _contactShadowY = y; _contactShadowAngle = Math.atan2(y, x);
             }
             return _contactShadowAngle;
         }
-        function drawHumanContactShadow(ctx) {
+        function drawHumanContactShadow(ctx, entity) {
             if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
             const C = CONFIG.HUMAN_SHADE, sp = glowSprite(_SHADOW_RGB, 0.45), a0 = ctx.globalAlpha;
             ctx.save();
@@ -1133,9 +1158,72 @@
                 ctx.rotate(_contactShadowDirection(_sunShadow.dx, _sunShadow.dy) - _bodyRot);
                 ctx.translate(2 + 5 * L, 0); ctx.scale((11 + 9 * L) / 32, 9 / 32);
                 ctx.globalAlpha = a0 * (C.SHADOW_NIGHT + (C.SHADOW_DAY - C.SHADOW_NIGHT) * _sunShadow.k);
-            } else { ctx.scale(12 / 32, 10 / 32); ctx.globalAlpha = a0 * C.SHADOW_NIGHT; }
-            ctx.drawImage(sp, -32, -32);
+                ctx.drawImage(sp, -32, -32);
+            } else {
+                if (entity && C.LAMP_SHADOW && entity.x !== undefined) _drawLampShadows(ctx, entity, C, sp, a0);
+                ctx.scale(12 / 32, 10 / 32); ctx.globalAlpha = a0 * C.SHADOW_NIGHT;
+                ctx.drawImage(sp, -32, -32);
+            }
             ctx.restore();
+        }
+        /** Lamp shadows: the contact sprite stretched away from each lamp, longer the farther off it stands
+         *  (a lamp is only a few heads taller than a person), fading with the lamp's own falloff. Each is
+         *  drawn faintly on the ground here and remembered for the light layer, where it puts the dark (and
+         *  the lamp's colour) back behind the body: drawLampShadowsInto(), engine/lighting.js. */
+        const LampShadows = { frame: -1, n: 0, list: [], tint: null, sprite: null, ground: null };
+        /** A firmer blob than the contact shadow's: a person's length of shade with a soft rim, so it reads as a shape. */
+        function _lampShadowSprite(rgb, cv) {
+            cv = cv || document.createElement('canvas'); cv.width = cv.height = 64;
+            const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+            g.addColorStop(0, `rgba(${rgb}, 1)`); g.addColorStop(0.55, `rgba(${rgb}, 0.85)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
+            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+            return cv;
+        }
+        function _drawLampShadows(ctx, entity, C, sp, a0) {
+            const sun = sunNow();
+            if (sun.night <= 0.3) return;
+            const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
+            if (_lampShadowFrame !== _frameTime) { _lampShadowFrame = _frameTime; _lampShadowPeds = 0; }
+            if (ped && _lampShadowPeds >= C.LAMP_SHADOW_PEDS) return;
+            const n = _lampsNear2(entity.x, entity.y, C.LAMP_SHADOW_R);
+            if (!n) return;
+            if (ped) _lampShadowPeds++;
+            if (LampShadows.frame !== _frameTime) { LampShadows.frame = _frameTime; LampShadows.n = 0; }
+            const dusk = Math.min(1, (sun.night - 0.3) / 0.4);
+            for (let i = 0; i < n; i++) {
+                const { l, d } = _lampPair[i];
+                const k = lampWake(l) * lampFlicker(l) * (l.intensity ?? 1) * (1 - d / C.LAMP_SHADOW_R) * dusk;
+                if (k < 0.03) continue;
+                const len = Math.min(C.LAMP_SHADOW_MAX, d * C.LAMP_SHADOW_K), ang = Math.atan2(entity.y - l.y, entity.x - l.x);
+                const a = Math.min(1, k * 1.6);
+                ctx.save();
+                ctx.rotate(ang - _bodyRot);
+                ctx.translate(len / 2 - 2, 0); ctx.scale((20 + len) / 64, (9 + len * 0.06) / 32);
+                ctx.globalAlpha = a0 * C.LAMP_SHADOW_A * a;
+                ctx.drawImage(LampShadows.ground || (LampShadows.ground = _lampShadowSprite(_SHADOW_RGB)), -32, -32);
+                ctx.restore();
+                const rec = LampShadows.list[LampShadows.n] || (LampShadows.list[LampShadows.n] = {});
+                LampShadows.n++;
+                rec.x = entity.x; rec.y = entity.y; rec.ang = ang; rec.len = len; rec.a = a;
+            }
+        }
+        /** The light layer's half (lighting.js, after its colour pass): this frame's lamp shadows, in the dark's own colour. */
+        function drawLampShadowsInto(lc, tintRGB) {
+            const S = LampShadows, C = CONFIG.HUMAN_SHADE;
+            if (S.frame !== _frameTime || !S.n || !C.LAMP_SHADOW_DARK) return;
+            if (S.tint !== tintRGB) { S.sprite = _lampShadowSprite(tintRGB, S.sprite); S.tint = tintRGB; }    // rebuilt when the dark's colour shifts
+            const a0 = lc.globalAlpha;
+            lc.globalCompositeOperation = 'source-over';
+            for (let i = 0; i < S.n; i++) {
+                const r = S.list[i];
+                lc.save();
+                lc.translate(r.x, r.y); lc.rotate(r.ang);
+                lc.translate(r.len / 2 + 2, 0); lc.scale((22 + r.len) / 64, (11 + r.len * 0.08) / 32);
+                lc.globalAlpha = C.LAMP_SHADOW_DARK * r.a;
+                lc.drawImage(S.sprite, -32, -32);
+                lc.restore();
+            }
+            lc.globalAlpha = a0;
         }
 
         /**
@@ -1165,7 +1253,7 @@
             try {
                 if (!noShadow && _zoomLOD < 2) {
                     const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a);
-                    drawHumanContactShadow(ctx);
+                    drawHumanContactShadow(ctx, entity);
                 }
                 config.noShadow = true;
                 _drawProceduralHumanoidTimed(g, entity, config);
@@ -1234,7 +1322,7 @@
             const hover = A && A.hover && !config.isDriving;
             if (!config.isDriving && _zoomLOD < 2) {
                 const t = ctx.getTransform(); _bodyRot = entity._reflectionProxy ? (entity.angle || 0) : Math.atan2(t.b, t.a); // original facing for mirrored art
-                if (!config.noShadow) drawHumanContactShadow(ctx);
+                if (!config.noShadow) drawHumanContactShadow(ctx, entity);
             }
             if (!S && !hover) return _drawHumanoidBody(ctx, entity, config, null, A);
             const bob = hover ? 1 + Math.sin(_gameTimeSec * 2.2 + (entity.x || 0) * 0.01) * 0.035 : 1;
