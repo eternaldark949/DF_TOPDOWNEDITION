@@ -54911,6 +54911,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const open = e => !nav || (nav.walkable(...W(e, Math.sign(ply || 1) * ew)) && nav.walkable(...W(e, side * ew)));
                     if (!open(ex) && open(-ex)) ex = -ex;
                     via.push(W(ex, Math.sign(ply || 1) * ew), W(ex, side * ew));
+                } else if (segmentHitsRect(plx, ply, hl * 0.2, side * (hw + 20), -(hl + 17), -(hw + 17), hl + 17, hw + 17)) {
+                    // Behind it or in front (either side): the straight line to the door cuts the corner, so round the
+                    // corner on the door's side of the end she's at first, then along the side to the door
+                    via.push(W(Math.sign(plx || -1) * (hl + 30), side * ew));
                 }
                 // Arrived, or stuck on the way but still beside it: in either way (the walk is how she gets in, not whether)
                 const getIn = () => { if (!this.isDriving && car.visible && Math.hypot(car.x - this.player.x, car.y - this.player.y) < 90) this.enterCar(car); };
@@ -64831,13 +64835,6 @@ engineMixin({
                 }
             },
 
-            checkPlayerCarCollision(px, py) {
-                if (!this.car.visible) return false;
-                const dx = px - this.car.x; const dy = py - this.car.y; const cos = Math.cos(-this.car.angle); const sin = Math.sin(-this.car.angle);
-                const localX = dx * cos - dy * sin; const localY = dx * sin + dy * cos; const halfLen = this.car.length / 2 + 15; const halfWid = this.car.width / 2 + 15;
-                if (Math.abs(localX) < halfLen && Math.abs(localY) < halfWid) return true; return false;
-            },
-
             updateTime(force = false) {
                 // Counted in sim ticks (not wall-clock) so the clock follows
                 // CONFIG.LOOP.GAME_SPEED along with everything else.
@@ -66781,18 +66778,9 @@ engineMixin({
                         if (inputX !== 0 || inputY !== 0) this.player.angle = Math.atan2(inputY, inputX);
                     }
                     
-                    // Apply movement via PlayerEntity (collision resolution via CollisionSystem)
-                    // Store pre-movement position for car collision check
-                    const prevX = this.player.x;
-                    const prevY = this.player.y;
-                    
+                    // Apply movement via PlayerEntity (collision resolution via CollisionSystem). Cars, hers included,
+                    // push her out along their side in resolveTrafficCollisions, so she slides along them
                     this.player.applyMovement(inputX, inputY);
-                    
-                    // Car collision (not in entity system yet) - revert if colliding
-                    if (this.checkPlayerCarCollision(this.player.x, this.player.y)) {
-                        this.player.x = prevX;
-                        this.player.y = prevY;
-                    }
                     
                     // Clamp player within map bounds
                     const boundsMargin = 15;
