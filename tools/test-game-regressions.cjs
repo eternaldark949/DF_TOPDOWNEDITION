@@ -217,6 +217,30 @@ test('Precise Stick: dead centre, gentle response curve, and steering that grows
   ok(car.creep > 0.05, 'a light throttle still rolls the car (' + car.creep + ')');
 }, {events:true});
 
+test('A car turned into a wall or corner can always drive away from it', env => {
+  const r = value(env, `
+    game._doLoadMap('hub_949'); const car=game.ownedCar; car._mapBounds=null; GameSettings.preciseStick=false;
+    const walls=[{x:1000,y:1000,w:400,h:400},{x:300,y:300,w:2000,h:40},{x:300,y:300,w:40,h:2000},{x:2260,y:300,w:40,h:2000},{x:300,y:2260,w:2000,h:40}];
+    const drive=(a)=>{ car.driverInput(Math.cos(a),Math.sin(a),true); car.updateManualDriving(walls,[],null,null); };
+    const reset=(o)=>Object.assign(car,{vx:0,vy:0,speed:0,yawRate:0,steer:0,pedal:0,load:0,handbrake:false,hasDriver:true,controlMode:'PLAYER'},o);
+    // nose 4px into the block's side at an angle (what steering against it used to leave): reversing gets it out
+    const D=Math.PI/180, out=[];
+    for (const a of [20,45,70]) {
+      reset({angle:a*D, y:1200}); car.x=1000; while(!car.checkEnvironmentCollision(car.x,car.y,car.angle,walls,[])) car.x++; car.x+=4;
+      const x0=car.x, y0=car.y; for(let i=0;i<120;i++) drive(a*D+Math.PI);
+      out.push({a, moved:Math.hypot(car.x-x0,car.y-y0), clear:!car.checkEnvironmentCollision(car.x,car.y,car.angle,walls,[])});
+    }
+    // wandering the arena with random stick: it never stays inside a wall
+    reset({x:800,y:800,angle:0}); let seed=7, inside=0, longest=0, stick=0, hold=0;
+    const rnd=()=>((seed=(seed*16807)%2147483647)/2147483647);
+    for(let t=0;t<12000;t++){ if(--hold<=0){ stick=rnd()*Math.PI*2; hold=20+rnd()*120|0; } drive(stick);
+      if(car.checkEnvironmentCollision(car.x,car.y,car.angle,walls,[])) longest=Math.max(longest,++inside); else inside=0; }
+    return {out, longest};
+  `);
+  for (const o of r.out) ok(o.moved > 60 && o.clear, 'backs out of the wall at ' + o.a + '° (' + Math.round(o.moved) + ' px)');
+  ok(r.longest <= 1, 'never left inside a wall (' + r.longest + ' ticks)');
+}, {events:true});
+
 function setupDrive(env, {taxi=false,lane='R0.S0.L2',destination='clinic',endpoint=false}={}) {
   env.run(`{
     game._doLoadMap('hub_949'); game.story.update=()=>{}; game.running=true; game.paused=false;
