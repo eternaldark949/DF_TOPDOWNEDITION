@@ -401,49 +401,163 @@
             // === BUILDING PLACEMENT ===
             
             placeBuilding(templateId, blockName, options = {}) {
-                const template = this.buildingTemplates[templateId];
-                if (!template) { console.error(`Template '${templateId}' not found`); return null; }
+                const ready = this._ready(templateId, blockName);
+                if (!ready) return null;
+                const { template, block } = ready, S = this._shape(template, options);
                 
-                const block = this.blockMap[blockName];
-                if (!block) { console.error(`Block '${blockName}' not found`); return null; }
-                
-                const zoneType = this._getZoneType(blockName);
-                if (zoneType === CityLayout.ZONE.RESTRICTED || zoneType === CityLayout.ZONE.ROAD) return null;
-                
-                const w = options.w || template.w;
-                const h = options.h || template.h;
-                const margin = options.margin || template.margin || 30;
-                // Fit everything it occupies (its sections and its apron: portico, forecourt, drive), not just the sections
-                const sized = options.w || options.h || !template.extent;
-                const ext = sized ? { x: 0, y: 0, w, h } : template.extent;
-                const foot = sized ? { x: 0, y: 0 } : template.footprint;
-                
-                const coords = this._calculateBuildingPosition(block, ext.w, ext.h, margin, options.align || 'center');
+                const coords = this._calculateBuildingPosition(block, S.ext.w, S.ext.h, S.margin, options.align || 'center');
                 if (!coords) { console.warn(`Not enough space in ${blockName} for ${templateId}`); return null; }
                 
-                if (this._intersectsSafeZone(coords.x, coords.y, ext.w, ext.h)) {
+                if (this._intersectsSafeZone(coords.x, coords.y, S.ext.w, S.ext.h)) {
                     console.warn(`Building ${templateId} intersects safe zone in ${blockName}`);
                     return null;
                 }
                 
-                // x, y, w, h: the sections' box in the world; originX/Y: where the building itself goes (its frame's 0, 0)
-                const originX = coords.x - ext.x, originY = coords.y - ext.y;
-                const placement = {
-                    templateId, template, blockName,
-                    x: originX + foot.x, y: originY + foot.y, w, h, originX, originY,
-                    extent: { x: coords.x, y: coords.y, w: ext.w, h: ext.h }, options
-                };
-                
-                this.placedBuildings.push(placement);
-                this._addSafeZone(coords.x - margin/2, coords.y - margin/2, ext.w + margin, ext.h + margin, `Building: ${template.label}`);
-                
-                // Auto-set block lamp color for V2 buildings from their accent color
-                if (template.isV2 && template.color) {
-                    this.setBlockLampColor(blockName, template.color);
-                    console.log(`CityLayout: Auto-set lamp color for ${blockName} to ${template.color} (from ${templateId})`);
-                }
-                
+                const placement = this._commit(template, blockName, S, coords.x, coords.y, options);
+                this._addSafeZone(coords.x - S.margin/2, coords.y - S.margin/2, S.ext.w + S.margin, S.ext.h + S.margin, `Building: ${template.label}`);
                 return placement;
+            }
+            
+            // === HAND-AUTHORED LAYOUT ===
+            // Blocks laid out the way streets are: buildings lined up along a street front, side by side
+            // (sharing a wall at gap 0), on a corner, on a plot, or at an exact spot. A side names the street
+            // the buildings front ('south' = the road below the block). Doors are still drawn on the south
+            // face, so a 'north', 'west' or 'east' row has its doors facing into the block for now.
+            
+            /**
+             * A row of buildings along one side of a block.
+             * @param {string} side - 'south' | 'north' | 'west' | 'east'
+             * @param {string[]} templateIds - in order: west to east along a south/north side, north to south along a west/east one
+             * @param {object} [options] - gap (px between neighbours, default 0), setback (from the block edge, default the margin),
+             *   justify ('start' | 'center' | 'end', default 'center'), margin (clear of the block's other edges, default 30)
+             * @returns {object[]} the placements (what didn't fit is left out, with a warning)
+             */
+            row(blockName, side, templateIds, options = {}) {
+                const block = this.blockMap[blockName];
+                if (!block || !this._ready(templateIds[0], blockName)) return [];
+                const along = side === 'south' || side === 'north';
+                const margin = options.margin ?? 30, gap = options.gap ?? 0, setback = options.setback ?? margin;
+                const items = templateIds.map(id => this.buildingTemplates[id]).filter(Boolean).map(t => ({ template: t, S: this._shape(t, {}) }));
+                const room = (along ? block.w : block.h) - margin * 2, depthRoom = (along ? block.h : block.w) - setback - margin;
+                const fits = [];
+                let len = 0;
+                for (const it of items) {
+                    const l = along ? it.S.ext.w : it.S.ext.h, d = along ? it.S.ext.h : it.S.ext.w, next = len + (fits.length ? gap : 0) + l;
+                    if (next > room || d > depthRoom) { console.warn(`row ${blockName} ${side}: no room for ${it.template.id}`); continue; }
+                    fits.push(it); len = next;
+                }
+                const justify = options.justify || 'center';
+                let cursor = (along ? block.x : block.y) + margin + (justify === 'end' ? room - len : justify === 'center' ? (room - len) / 2 : 0);
+                const spots = fits.map(it => {
+                    const e = it.S.ext;
+                    const x = along ? cursor : side === 'west' ? block.x + setback : block.x + block.w - setback - e.w;
+                    const y = !along ? cursor : side === 'north' ? block.y + setback : block.y + block.h - setback - e.h;
+                    cursor += (along ? e.w : e.h) + gap;
+                    return { it, x: Math.floor(x), y: Math.floor(y) };
+                });
+                // Neighbours may touch each other, but not anything already reserved
+                const clear = spots.filter(p => {
+                    const ok = !this._intersectsSafeZone(p.x, p.y, p.it.S.ext.w, p.it.S.ext.h);
+                    if (!ok) console.warn(`row ${blockName} ${side}: ${p.it.template.id} intersects a safe zone`);
+                    return ok;
+                });
+                const placed = clear.map(p => this._commit(p.it.template, blockName, p.it.S, p.x, p.y, { row: side }));
+                for (const p of clear) this._addSafeZone(p.x - margin / 2, p.y - margin / 2, p.it.S.ext.w + margin, p.it.S.ext.h + margin, `Row: ${blockName} ${side}`);
+                return placed;
+            }
+            
+            /** A building on a block's corner: 'nw' | 'ne' | 'sw' | 'se' (options as placeBuilding's) */
+            corner(blockName, corner, templateId, options = {}) {
+                const align = { nw: 'top-left', ne: 'top-right', sw: 'bottom-left', se: 'bottom-right' }[corner];
+                if (!align) { console.error(`corner: '${corner}' is not nw, ne, sw or se`); return null; }
+                return this.placeBuilding(templateId, blockName, { ...options, align });
+            }
+            
+            /**
+             * A plot along one side of a block (world rect), for laying a block out by hand.
+             * @param {object} o - offset (along the side from its west/north end, default 0), frontage (along it), depth (into the block), setback (default 30)
+             */
+            lot(blockName, side, { offset = 0, frontage, depth, setback = 30 } = {}) {
+                const b = this.blockMap[blockName];
+                if (!b || !frontage || !depth) return null;
+                const r = side === 'south' ? { x: b.x + offset, y: b.y + b.h - setback - depth, w: frontage, h: depth }
+                    : side === 'north' ? { x: b.x + offset, y: b.y + setback, w: frontage, h: depth }
+                    : side === 'west' ? { x: b.x + setback, y: b.y + offset, w: depth, h: frontage }
+                    : side === 'east' ? { x: b.x + b.w - setback - depth, y: b.y + offset, w: depth, h: frontage } : null;
+                if (!r || r.x < b.x || r.y < b.y || r.x + r.w > b.x + b.w || r.y + r.h > b.y + b.h) return null;
+                return r;
+            }
+            
+            /**
+             * A building at an exact spot: x, y is where everything it occupies (sections and apron) starts.
+             * Pass a lot() as { x, y } to fill a plot. The spot must be inside a block and clear.
+             */
+            placeAt(templateId, x, y, options = {}) {
+                const template = this.buildingTemplates[templateId];
+                if (!template) { console.error(`Template '${templateId}' not found`); return null; }
+                const S = this._shape(template, options);
+                const block = this.blocks.find(b => x >= b.x && y >= b.y && x + S.ext.w <= b.x + b.w && y + S.ext.h <= b.y + b.h);
+                if (!block) { console.warn(`placeAt ${templateId}: (${x}, ${y}) isn't inside a block`); return null; }
+                if (!this._ready(templateId, block.name)) return null;
+                if (this._intersectsSafeZone(x, y, S.ext.w, S.ext.h)) { console.warn(`placeAt ${templateId}: (${x}, ${y}) intersects a safe zone`); return null; }
+                const placement = this._commit(template, block.name, S, Math.floor(x), Math.floor(y), options);
+                this._addSafeZone(x - S.margin / 2, y - S.margin / 2, S.ext.w + S.margin, S.ext.h + S.margin, `Building: ${template.label}`);
+                return placement;
+            }
+            
+            /** Template and block, if a building may go there */
+            _ready(templateId, blockName) {
+                const template = this.buildingTemplates[templateId];
+                if (!template) { console.error(`Template '${templateId}' not found`); return null; }
+                const block = this.blockMap[blockName];
+                if (!block) { console.error(`Block '${blockName}' not found`); return null; }
+                const zoneType = this._getZoneType(blockName);
+                if (zoneType === CityLayout.ZONE.RESTRICTED || zoneType === CityLayout.ZONE.ROAD) return null;
+                return { template, block };
+            }
+            
+            /** What a building occupies: its sections plus its apron (portico, forecourt, drive), in its own frame */
+            _shape(template, options) {
+                const w = options.w || template.w, h = options.h || template.h;
+                const sized = options.w || options.h || !template.extent;
+                return {
+                    w, h, margin: options.margin || template.margin || 30,
+                    ext: sized ? { x: 0, y: 0, w, h } : template.extent,
+                    foot: sized ? { x: 0, y: 0 } : template.footprint
+                };
+            }
+            
+            /** Record a placement whose extent starts at ex, ey */
+            _commit(template, blockName, S, ex, ey, options) {
+                // x, y, w, h: the sections' box in the world; originX/Y: where the building itself goes (its frame's 0, 0)
+                const originX = ex - S.ext.x, originY = ey - S.ext.y;
+                const placement = {
+                    templateId: template.id, template, blockName,
+                    x: originX + S.foot.x, y: originY + S.foot.y, w: S.w, h: S.h, originX, originY,
+                    extent: { x: ex, y: ey, w: S.ext.w, h: S.ext.h }, options
+                };
+                this.placedBuildings.push(placement);
+                // Auto-set block lamp color for V2 buildings from their accent color
+                if (template.isV2 && template.color) this.setBlockLampColor(blockName, template.color);
+                return placement;
+            }
+            
+            /**
+             * Everything placed that reaches a street or another building (for the City debug layer and tests).
+             * @param {object[]} street - rects ({x, y, w, h}) of the pavements and roads
+             */
+            layoutIssues(street = []) {
+                const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+                const issues = [];
+                this.placedBuildings.forEach((p, i) => {
+                    const e = p.extent || p;
+                    if (street.some(z => hit(e, z))) issues.push({ placement: p, what: 'street' });
+                    for (let j = i + 1; j < this.placedBuildings.length; j++) {
+                        const q = this.placedBuildings[j], f = q.extent || q;
+                        if (hit(e, f)) issues.push({ placement: p, other: q, what: 'building' });
+                    }
+                });
+                return issues;
             }
             
             autoFillBlock(blockName, templateIds = null, options = {}) {
