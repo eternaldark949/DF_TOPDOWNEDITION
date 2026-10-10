@@ -501,9 +501,14 @@ engineMixin({
                     }
 
                     // 6. AUTO-FILL REMAINING BLOCKS
+                    // Rows along every street a block fronts, facing the road (world/city-layout.js _fillStreetFronts);
+                    // the Scrapyard keeps its scattered cover. fill: how much of each street front gets buildings
+                    // (lower it if the busier streets cost too much frame on a phone)
                     city.autoFillAll({
                         density: 0.4,
-                        categories: ['residential', 'shopping', 'commercial']
+                        fill: 1,
+                        categories: ['residential', 'shopping', 'commercial'],
+                        scatter: ['block_10_4']
                     });
                     
                     // 7. CREATE ROAD NETWORK
@@ -534,7 +539,7 @@ engineMixin({
                         if (t.isV2 && BuildingV2Registry.has(p.templateId)) {
                             const facing = p.options && (p.options.facing || p.options.row) ? CityLayout.facing(p) : undefined;
                             const building = BuildingV2Registry.create(p.templateId, p.originX ?? p.x, p.originY ?? p.y, { 
-                                doorTarget: t.door?.target, ...(facing ? { facing } : {})
+                                doorTarget: t.door?.target, ...(facing ? { facing } : {}), ...(p.options.autoPlaced && facing ? { shopfront: 'pool' } : {})
                             });
                             // Propagate mapCategory from template for map icons
                             if (t.mapCategory) building.mapCategory = t.mapCategory;
@@ -843,7 +848,7 @@ engineMixin({
                     }
                     // and the pavement in front of a row of shopfronts (city.row, whichever street it fronts): a street wall shows its fronts, its trees go elsewhere
                     for (const pl of city.placedBuildings) {
-                        if (!pl.options || !pl.options.row) continue;
+                        if (!pl.options || !pl.options.row || pl.options.autoPlaced) continue;   // (the auto-filled streets keep their trees)
                         const e = pl.extent, F = CityLayout.facing(pl), R = 140;   // the front, out across the pavement
                         const zone = { x: e.x - 30 - (F === 'W' ? R : 0), y: e.y - (F === 'N' ? R : 0), w: e.w + 60 + (F === 'E' || F === 'W' ? R : 0), h: e.h + (F === 'S' || F === 'N' ? R : 0) };
                         mapData.foliage = mapData.foliage.filter(f => !(f.x > zone.x && f.x < zone.x + zone.w && f.y > zone.y && f.y < zone.y + zone.h));

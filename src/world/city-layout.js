@@ -436,7 +436,7 @@
              * @param {string[]} templateIds - in order: west to east along a south/north side, north to south along a west/east one
              * @param {object} [options] - gap (px between neighbours, default 0), setback (from the block edge, default the margin),
              *   justify ('start' | 'center' | 'end', default 'center'), margin (clear of the block's other edges, default 30),
-             *   facing (default: towards the side's street)
+             *   facing (default: towards the side's street), span ([from, to]: the stretch of the side to use, world)
              * @returns {object[]} the placements (what didn't fit is left out, with a warning)
              */
             row(blockName, side, templateIds, options = {}) {
@@ -445,7 +445,9 @@
                 const along = side === 'south' || side === 'north';
                 const margin = options.margin ?? 30, gap = options.gap ?? 0, setback = options.setback ?? margin;
                 const items = templateIds.map(id => this.buildingTemplates[id]).filter(Boolean).map(t => ({ template: t, S: this._shape(t, {}) }));
-                const room = (along ? block.w : block.h) - margin * 2, depthRoom = (along ? block.h : block.w) - setback - margin;
+                // span: the stretch of the side to use (world [from, to] along it), by default the whole side inside the margin
+                const [from, to] = options.span || [(along ? block.x : block.y) + margin, (along ? block.x + block.w : block.y + block.h) - margin];
+                const room = to - from, depthRoom = (along ? block.h : block.w) - setback - margin;
                 const fits = [];
                 let len = 0;
                 for (const it of items) {
@@ -454,7 +456,7 @@
                     fits.push(it); len = next;
                 }
                 const justify = options.justify || 'center';
-                let cursor = (along ? block.x : block.y) + margin + (justify === 'end' ? room - len : justify === 'center' ? (room - len) / 2 : 0);
+                let cursor = from + (justify === 'end' ? room - len : justify === 'center' ? (room - len) / 2 : 0);
                 const spots = fits.map(it => {
                     const e = it.S.ext;
                     const x = along ? cursor : side === 'west' ? block.x + setback : block.x + block.w - setback - e.w;
@@ -469,7 +471,7 @@
                     return ok;
                 });
                 const facing = options.facing || { south: 'S', north: 'N', east: 'E', west: 'W' }[side];
-                const placed = clear.map(p => this._commit(p.it.template, blockName, p.it.S, p.x, p.y, { row: side, facing }));
+                const placed = clear.map(p => this._commit(p.it.template, blockName, p.it.S, p.x, p.y, { row: side, facing, ...(options.autoPlaced ? { autoPlaced: true } : {}) }));
                 for (const p of clear) this._addSafeZone(p.x - margin / 2, p.y - margin / 2, p.it.S.ext.w + margin, p.it.S.ext.h + margin, `Row: ${blockName} ${side}`);
                 return placed;
             }
@@ -580,6 +582,7 @@
                     : Object.values(this.buildingTemplates).filter(t => !t.unique);
                 
                 if (templates.length === 0) return [];
+                if (!options.scatter) return this._fillStreetFronts(block, templates, options);
                 
                 const density = options.density || 0.5;
                 const margin = options.margin || 40;
@@ -618,6 +621,56 @@
                 return placements;
             }
             
+            /** The sides of a block that front a road ('south' = a road along its bottom edge); a map edge isn't a street */
+            streetSides(block) {
+                const pw = this.pavementWidth, sides = [];
+                if (this.horizontalRoads.some(r => r.topPavement === block.y + block.h)) sides.push('south');
+                if (this.horizontalRoads.some(r => r.bottomPavement + pw === block.y)) sides.push('north');
+                if (this.verticalRoads.some(r => r.rightPavement + pw === block.x)) sides.push('west');
+                if (this.verticalRoads.some(r => r.leftPavement === block.x + block.w)) sides.push('east');
+                return sides;
+            }
+            
+            /**
+             * Fill a block the way a street grows: a row of buildings along each street it fronts, facing the road,
+             * mostly wall to wall (now and then an alley between them), the yard behind left open. North and south
+             * rows first, then west and east rows in what's left between them. options.fill (0–1, default 1): how
+             * much of each street front to build on.
+             */
+            _fillStreetFronts(block, templates, options = {}) {
+                const sides = this.streetSides(block), setback = options.setback ?? 12, margin = 30, alley = 30;
+                const placed = [], both = (a, b) => sides.includes(a) && sides.includes(b);
+                const pick = (room, maxDepth, alongW) => {                                   // a random run of buildings that fits
+                    const ids = [], ok = templates.filter(t => !t.unique && (alongW ? t.extent?.h ?? t.h : t.extent?.w ?? t.w) <= maxDepth);
+                    if (!ok.length) return ids;
+                    let len = 0;
+                    for (let tries = 0; tries < 24; tries++) {
+                        const t = this._selectWeightedTemplate(ok), l = alongW ? (t.extent?.w ?? t.w) : (t.extent?.h ?? t.h);
+                        if (len + l > room) continue;
+                        ids.push(t.id); len += l;
+                    }
+                    return ids;
+                };
+                const run = (side, span, maxDepth) => {
+                    const along = side === 'south' || side === 'north', gap = Math.random() < 0.65 ? 0 : alley;
+                    const room = (span[1] - span[0]) * (options.fill ?? 1);   // fill < 1 leaves part of each street front open (fewer buildings to draw)
+                    let ids = pick(room, maxDepth, along);
+                    while (ids.length > 1 && ids.reduce((n, id) => n + (along ? this.buildingTemplates[id].w : this.buildingTemplates[id].h), 0) + gap * (ids.length - 1) > room) ids.pop();
+                    if (!ids.length) return [];
+                    const row = this.row(block.name, side, ids, { gap, setback, span, margin, autoPlaced: true });
+                    placed.push(...row);
+                    return row;
+                };
+                const nsDepth = (both('north', 'south') ? (block.h - margin) / 2 : block.h - margin * 2) - setback;
+                const ns = { north: [], south: [] };
+                for (const side of ['south', 'north']) if (sides.includes(side)) ns[side] = run(side, [block.x + margin, block.x + block.w - margin], nsDepth);
+                const top = ns.north.length ? Math.max(...ns.north.map(p => p.extent.y + p.extent.h)) + alley : block.y + margin;
+                const bottom = ns.south.length ? Math.min(...ns.south.map(p => p.extent.y)) - alley : block.y + block.h - margin;
+                const weDepth = (both('west', 'east') ? (block.w - margin) / 2 : block.w - margin * 2) - setback;
+                if (bottom - top > 150) for (const side of ['west', 'east']) if (sides.includes(side)) run(side, [top, bottom], weDepth);
+                return placed;
+            }
+            
             autoFillAll(options = {}) {
                 const allPlacements = [];
                 for (let block of this.blocks) {
@@ -630,7 +683,8 @@
                             .filter(id => options.categories.includes(this.buildingTemplates[id].category));
                     }
                     
-                    allPlacements.push(...this.autoFillBlock(block.name, templateIds, options));
+                    const scatter = options.scatter === true || (Array.isArray(options.scatter) && options.scatter.includes(block.name));
+                    allPlacements.push(...this.autoFillBlock(block.name, templateIds, { ...options, scatter }));
                 }
                 return allPlacements;
             }
