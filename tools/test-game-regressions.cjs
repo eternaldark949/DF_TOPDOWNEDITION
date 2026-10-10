@@ -1596,11 +1596,12 @@ test('Street-front fill: auto-filled blocks grow rows along the streets they fro
   equal(r.edge, ['north', 'west'], 'a map edge is not a street');
 });
 
-test('Angled streets: Lantern Cut joins its roads at shaped junctions, with pavements, crossings, walks and buildings to match', env => {
+// An angled or curved street: its junctions, lanes, pavements, crossings, walks and buildings
+const angledStreet = (env, name, mouths) => {
   const r = value(env, `
-    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    game.story.update=()=>{}; game._doLoadMap('hub_949'); const NAME = ${JSON.stringify(name)};
     const map = game.activeMap, city = map.cityLayout, net = game.traffic.network;
-    const road = net.roads.find(x => x.name === 'Lantern Cut'), cl = city.angledRoads[0];
+    const road = net.roads.find(x => x.name === NAME), cl = city.angledRoads.find(x => x.name === NAME);
     const J = net.getIntersectionsForRoad(road);
     // Junctions: a T at each end, shaped, lit, every way in able to go every way out (bar U-turns)
     const junctions = J.map(ix => ({ roads: ix.roads.map(x => x.name).sort(), shaped: !!ix.poly, lit: !!JunctionSignal.make(ix),
@@ -1611,39 +1612,59 @@ test('Angled streets: Lantern Cut joins its roads at shaped junctions, with pave
     const seesAhead = road.lanes.every(l => l.intersectingZones.some(z => z.entryDist > l.length - 20));
     // Pavements: none on its carriageway; its own two run beside it
     const carriage = cl.carriageway, paveOnRoad = map.pavements.filter(p => p.poly ? Math.abs(Poly.area(Poly.clip(p.poly, carriage))) > 50 : Poly.hitsRect(carriage, p)).length;
-    const own = map.pavements.filter(p => p.road === 'Lantern Cut').length;
+    const own = map.pavements.filter(p => p.road === NAME).length;
     // Crossings: one over it at each end, on its carriageway, its walk lights on its own phase
-    const cws = map.crosswalks.filter(c => c.axis);
+    const cws = map.crosswalks.filter(c => c.road === NAME);
     const crossings = cws.map(c => { const s = JunctionSignal.atCrosswalk(c, net); return { onRoad: Poly.contains(carriage, c.x + c.w / 2, c.y + c.h / 2), phaseRoad: s && s.phases[c._sigPhase].road.name }; });
     // Walks: down both its pavements, and no walk but a crossing steps onto its carriageway
     const sw = game.pedestrians.network || game.pedestrians.sidewalkNetwork || city.generateSidewalkNetwork();
-    const nodes = sw.nodes, walks = nodes.filter(n => n.roadName === 'Lantern Cut').length;
+    const nodes = sw.nodes, walks = nodes.filter(n => n.roadName === NAME).length;
     let jaywalks = 0;
     for (const n of nodes) for (const id of n.connections) { const m = nodes[id]; if (id < n.id || (n.isCrosswalk && m.isCrosswalk)) continue;
       if (Poly.contains(carriage, (n.x + m.x) / 2, (n.y + m.y) / 2)) jaywalks++; }
-    const crossingEnds = nodes.filter(n => n.isCrosswalk && n.crosswalkData && n.crosswalkData.axis).every(n => n.connections.some(id => !nodes[id].isCrosswalk));
+    const crossingEnds = nodes.filter(n => n.isCrosswalk && n.crosswalkData && n.crosswalkData.road === NAME).every(n => n.connections.some(id => !nodes[id].isCrosswalk));
     // Buildings: some line it, facing it, none on it
-    const lining = city.placedBuildings.filter(p => p.options.angled === 'Lantern Cut');
+    const lining = city.placedBuildings.filter(p => p.options.angled === NAME);
     const facingIt = lining.every(p => { const f = CityLayout.facing(p), d = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[f];
-      const e = p.extent, side = Math.sign(road.worldToParam(e.x + e.w / 2, e.y + e.h / 2).lateral); return (d[0] * road.nx + d[1] * road.ny) * side < 0; });
+      const e = p.extent, cx = e.x + e.w / 2, cy = e.y + e.h / 2;   // looking out its front, the street is right there
+      for (let k = 0; k <= 500; k += 10) if (Poly.contains(cl.corridor, cx + d[0] * k, cy + d[1] * k)) return true;
+      return false; });
     const onIt = city.placedBuildings.filter(p => Poly.hitsRect(cl.corridor, p.extent || p)).length;
     return { junctions, keepRight, seesAhead, paveOnRoad, own, crossings, walks, jaywalks, crossingEnds, lining: lining.length, facingIt, onIt,
       mouths: cl.ends.map(e => e && e.road.name) };
   `);
-  equal(r.mouths, ['Clinic Way', 'East Ave'], 'Lantern Cut runs from Clinic Way to East Ave');
-  equal(r.junctions.map(j => j.roads.join(' + ')), ['Clinic Way + Lantern Cut', 'East Ave + Lantern Cut'], 'a junction at each end');
+  equal(r.mouths, mouths, `${name} runs from ${mouths[0]} to ${mouths[1]}`);
+  equal(r.junctions.map(j => j.roads.join(' + ')).sort(), mouths.map(m => [m, name].sort().join(' + ')).sort(), 'a junction at each end');
   ok(r.junctions.every(j => j.shaped && j.inside && j.lit), 'each junction has its real shape and its lights');
   ok(r.junctions.every(j => j.into && j.out), 'cars can turn into it and out of it at both ends');
   ok(r.keepRight, 'traffic keeps right on it');
   ok(r.seesAhead, 'its lanes see the junction ahead (for the lights)');
   equal(r.paveOnRoad, 0, 'no pavement on its carriageway');
   equal(r.own, 2, 'a pavement down each side');
-  equal(r.crossings, [{onRoad: true, phaseRoad: 'Lantern Cut'}, {onRoad: true, phaseRoad: 'Lantern Cut'}], 'a crossing over it at each end, on its own lights');
+  equal(r.crossings, [{onRoad: true, phaseRoad: name}, {onRoad: true, phaseRoad: name}], 'a crossing over it at each end, on its own lights');
   ok(r.walks >= 6, 'pedestrians walk down its pavements');
   equal(r.jaywalks, 0, 'no walk crosses it except at a crossing');
   ok(r.crossingEnds, 'its crossings join the walks');
   ok(r.lining >= 2 && r.facingIt, 'buildings line it, facing it');
   equal(r.onIt, 0, 'nothing built on it or its pavements');
+};
+
+test('Angled streets: Lantern Cut joins its roads at shaped junctions, with pavements, crossings, walks and buildings to match', env => angledStreet(env, 'Lantern Cut', ['Clinic Way', 'East Ave']));
+
+test('Curved streets: Halfmoon Bend joins its roads at shaped junctions, with pavements, crossings, walks and buildings round the bend', env => {
+  angledStreet(env, 'Halfmoon Bend', ['Skyline Ave', 'East Ave']);
+  const r = value(env, `
+    const road = game.traffic.network.roads.find(x => x.name === 'Halfmoon Bend'), cl = game.activeMap.cityLayout.angledRoads.find(x => x.name === 'Halfmoon Bend');
+    // its lanes follow the bend: pieces linked end to end, each lane's line on the curve
+    const bendLanes = road.lanes.filter(l => l.connections.length === 1);
+    const onCurve = road.lanes.every(l => [l.start, l.end].every(p => Math.abs(Math.abs(road.worldToParam(p.x, p.y).lateral) - Math.abs(road.worldToParam(l.start.x, l.start.y).lateral)) < 2));
+    const turned = Math.abs(road.frameAt(0).angle - road.frameAt(road.length).angle);
+    return { curved: road.isCurved && cl.curved, pieces: road.segments.length, linked: bendLanes.length, onCurve, turned };
+  `);
+  ok(r.curved, 'it is a curve');
+  ok(r.pieces >= 6 && r.linked >= (r.pieces - 1) * 2, 'its lanes run round the bend in short linked pieces');
+  ok(r.onCurve, 'each lane keeps its distance from the centre line round the bend');
+  ok(Math.abs(r.turned - Math.PI / 2) < 0.01, 'it turns a quarter circle, Skyline Ave to East Ave');
 });
 
 test('Angled streets: cars drive Lantern Cut and turn in and out at both ends', env => {
@@ -1659,6 +1680,31 @@ test('Angled streets: cars drive Lantern Cut and turn in and out at both ends', 
   const r = value(env, `return { used: globalThis.__lc.used.size, turns: [...globalThis.__lc.turns].length };`);
   ok(r.used >= 3, 'traffic uses it');
   ok(r.turns >= 3, 'cars turn into it and out of it');
+}, {affine:true});
+
+test('Curved streets: cars slow for Halfmoon Bend, keep to their lanes round it and turn in and out at both ends', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false; game.player.x = 3300; game.player.y = 5300;
+    globalThis.__hb = { road: game.traffic.network.roads.find(x => x.name === 'Halfmoon Bend'), used: new Set(), turns: new Set(), offs: [], fast: 0 }; __hb.bend = [__hb.road.path.bends()[0], __hb.road.path.bends().at(-1)];`);
+  for (let k = 0; k < 8; k++) env.run(`(() => { const S = globalThis.__hb;
+    for (let i = 0; i < 400; i++) { game.update();
+      for (const v of game.traffic.vehicles) {
+        const ln = v.currentLane;
+        if (ln && ln.road === S.road) {
+          S.used.add(v);
+          const along = S.road.worldToParam(v.x, v.y).along;
+          if (along > S.bend[0] && along < S.bend[1] && (!v.laneChangeState || v.laneChangeState === 'NONE')) {   // round the bend
+            S.offs.push(Math.abs((v.x - ln.start.x) * -ln.uy + (v.y - ln.start.y) * ln.ux));
+            if (Math.abs(v.speed) > 7.5) S.fast++;
+          }
+        }
+        const t = v.currentTurnPath; if (t && (t.toLane.road === S.road) !== (t.fromLane.road === S.road)) S.turns.add(t.intersectionId + (t.toLane.road === S.road ? ' in' : ' out'));
+      }
+    } })()`);
+  const r = value(env, `const S = globalThis.__hb, o = S.offs.sort((a, b) => a - b); return { used: S.used.size, turns: S.turns.size, n: o.length, p90: o[Math.floor(o.length * 0.9)], fast: S.fast };`);
+  ok(r.used >= 3, 'traffic uses it');
+  ok(r.turns >= 3, 'cars turn into it and out of it');
+  ok(r.n > 100 && r.p90 < 12, `cars keep to their lanes round the bend (90% within ${r.p90 | 0} px)`);
+  equal(r.fast, 0, 'nobody takes the bend flat out');
 }, {affine:true});
 
 test('Every bundled map loads, updates and draws without runtime errors', env => {

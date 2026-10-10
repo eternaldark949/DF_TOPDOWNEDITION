@@ -690,7 +690,7 @@
              * @param {number} lookAhead - How far ahead to look (in pixels)
              * @returns {{x: number, y: number, angle: number}} Target point and tangent angle
              */
-            static getLaneTarget(vehicle, lane, lookAhead = 60) {
+            static getLaneTarget(vehicle, lane, lookAhead = 60, maxLook = Infinity) {
                 if (!lane) return null;
                 
                 // Find current position along lane
@@ -700,12 +700,14 @@
                 
                 // Calculate look-ahead distance based on speed
                 const speedMod = Math.max(1, Math.abs(vehicle.speed) * 0.8);
-                const adjustedLookAhead = lookAhead * speedMod;
+                const adjustedLookAhead = Math.min(lookAhead * speedMod, maxLook);   // (shorter round a bend, or it cuts the corner)
                 
-                // Get target point ahead on lane
-                const targetDist = Math.min(currentDist + adjustedLookAhead, lane.length);
-                const t = targetDist / lane.length;
-                const point = lane.getPoint(t);
+                // Get target point ahead on lane (round a curve, on along the lanes it runs into: its pieces are short)
+                let ln = lane, targetDist = currentDist + adjustedLookAhead;
+                for (let hop = 0; targetDist > ln.length && ln.connections && ln.connections.length === 1 && hop < 24; hop++) { targetDist -= ln.length; ln = ln.connections[0]; }
+                targetDist = Math.min(targetDist, ln.length);
+                const t = targetDist / ln.length;
+                const point = ln.getPoint(t);
                 
                 return {
                     x: point.x,

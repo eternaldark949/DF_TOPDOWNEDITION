@@ -211,8 +211,8 @@
 
             /**
              * A road, painted from its geometry: asphalt with grain and repairs, wheel paths,
-             * lane dashes, the centre line, faint edges and its name. Works for any angle; a
-             * curved road would provide the same getCorners/paramToWorld along its path.
+             * lane dashes, the centre line, faint edges and its name. Works for any angle, and
+             * along a curve (each line follows its path: getCorners / paramToWorld / frameAt).
              */
             paintRoad(c, road, R, rnd) {
                 const L = GROUND_LOOK, corners = road.getCorners(), halfT = road.thickness / 2;
@@ -225,13 +225,14 @@
                 for (let k = 0; k < (w * h) / 60; k++) { c.fillStyle = rnd() < 0.5 ? 'rgba(255,240,255,0.03)' : 'rgba(0,0,0,0.18)'; c.fillRect(x + rnd() * w, y + rnd() * h, 1 + rnd() * 2, 1); }
                 for (let k = 0; k < (w * h) / 40000; k++) { c.fillStyle = L.asphaltHi; c.fillRect(x + rnd() * w, y + rnd() * h, 30 + rnd() * 70, 16 + rnd() * 30); }
                 const lanes = road.symmetrical ? road.numLanes * 2 : road.numLanes;
+                const stops = road.path ? [0, ...road.path.bends(), road.length] : [0, road.length];   // where a line along it turns
+                const trace = lat => { stops.forEach((s, k) => { const p = road.paramToWorld(s, lat); k ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y); }); };
                 c.lineWidth = 9; c.strokeStyle = 'rgba(0, 0, 0, 0.16)';
                 for (let l = 0; l < lanes; l++) for (const off of [-13, 13]) {
-                    const lat = -halfT + road.laneWidth * (l + 0.5) + off, a = road.paramToWorld(0, lat), b = road.paramToWorld(road.length, lat);
-                    c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+                    c.beginPath(); trace(-halfT + road.laneWidth * (l + 0.5) + off); c.stroke();
                 }
                 // Lane markings
-                const line = (lat, style) => { const a = road.paramToWorld(0, lat), b = road.paramToWorld(road.length, lat); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke(); };
+                const line = (lat, style) => { c.beginPath(); trace(lat); c.stroke(); };
                 for (let l = 1; l < lanes; l++) {
                     const lat = l * road.laneWidth - halfT;
                     if (road.symmetrical && l === road.numLanes) {                               // the centre: a double lavender line
@@ -247,7 +248,7 @@
                         const along = road.length * (k + 0.5) / n;
                         for (const s of road.symmetrical ? [-1, 1] : [1]) {
                             const p = road.paramToWorld(along, s * lat);
-                            c.save(); c.translate(p.x, p.y); c.rotate(road.angle + (s > 0 ? Math.PI : 0)); c.fillText(road.name.toUpperCase(), 0, 0); c.restore();
+                            c.save(); c.translate(p.x, p.y); c.rotate(road.frameAt(along).angle + (s > 0 ? Math.PI : 0)); c.fillText(road.name.toUpperCase(), 0, 0); c.restore();
                         }
                     }
                 }

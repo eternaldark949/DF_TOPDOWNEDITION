@@ -708,9 +708,10 @@
                 return false;
             }
 
-            /** The lanes beside ours on this stretch (same segment), nearest first */
+            /** The lanes beside ours on this stretch (same segment), nearest first (none on a curved road: no pulling out on a bend) */
             _sideLanes(opposing) {
                 const cur = this.currentLane, seg = cur.segment;
+                if (cur.road.isCurved) return [];
                 return cur.road.lanes.filter(l => l !== cur && (!seg || l.segment === seg) && (l.isOpposing !== cur.isOpposing) === opposing)
                     .sort((p, q) => Math.abs(this._latTo(p)) - Math.abs(this._latTo(q)));
             }
@@ -2198,6 +2199,16 @@
                         this.currentLane = nextLane;
                         const step = this._driveRoute?.transitions[this._driveRoute.index];
                         if (step && !step.turnPath && step.toLane === nextLane) this._driveRoute.index++;
+                        // Round a curve the lanes are short pieces: catch up with any we're already past, and steer on along
+                        // the new one this tick (a tick without steering at each piece would carry us wide)
+                        for (let hop = 0; hop < 24; hop++) {
+                            const ln = this.currentLane, next = ln.connections && ln.connections.length === 1 && !(ln.turnPaths && ln.turnPaths.length) ? ln.connections[0] : null;
+                            if (!next || (this.x - ln.start.x) * ln.ux + (this.y - ln.start.y) * ln.uy < ln.length - 10) break;
+                            this.currentLane = next;
+                            const st = this._driveRoute?.transitions[this._driveRoute.index];
+                            if (st && !st.turnPath && st.toLane === next) this._driveRoute.index++;
+                        }
+                        if (this.currentLane.road && this.currentLane.road.isCurved) return this.calculateNavigationSteering();
                     } else {
                         if (this.controlMode === 'AI' && (this.driverType === 'player' || this.driverType === 'zib')) {
                             if (this.driverType === 'zib') {
@@ -2217,8 +2228,12 @@
                     return { steer, maxSpeed };
                 }
                 
+                // Round a bend ahead: slow to take it, and aim closer in (a long look cuts the corner)
+                const R = this._bendAhead(this.currentLane, distAlongLane, 60 + Math.abs(this.speed) * 22);
+                if (R < Infinity) maxSpeed = Math.min(maxSpeed, Math.max(2.5, Math.sqrt(0.16 * R)));
+                
                 // Get look-ahead target on lane
-                const laneTarget = AIDriverSolver.getLaneTarget(this, this.currentLane, 50);
+                const laneTarget = AIDriverSolver.getLaneTarget(this, this.currentLane, 50, R * 0.6);
                 if (laneTarget) {
                     // Stepping aside within the lane to pass someone at its edge (traffic/traffic-people.js: sideStep)
                     const ln = this.currentLane, side = this._folkPlan ? this._folkPlan.sideStep : 0;
@@ -2234,6 +2249,20 @@
                 }
                 
                 return { steer, maxSpeed };
+            }
+            
+            /** How tight the road bends within `reach` px ahead, down the lanes we run into (a curve's lanes are short
+             *  straight pieces, each turned a little from the last): its smallest radius there, or Infinity if straight */
+            _bendAhead(lane, along, reach) {
+                let R = Infinity, ln = lane, d = -along;
+                for (let hop = 0; d < reach && hop < 24; hop++) {
+                    const next = ln.connections && ln.connections.length === 1 ? ln.connections[0] : null;
+                    if (!next) break;
+                    const turn = Math.abs(Math.atan2(ln.ux * next.uy - ln.uy * next.ux, ln.ux * next.ux + ln.uy * next.uy));
+                    if (turn > 0.02) R = Math.min(R, Math.min(ln.length, next.length) / turn);
+                    d += ln.length; ln = next;
+                }
+                return R;
             }
             
             /**

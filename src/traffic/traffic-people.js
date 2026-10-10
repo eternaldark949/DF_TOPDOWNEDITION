@@ -45,8 +45,8 @@
             _onCarriageway(x, y) {
                 const lane = this.currentLane || (this.currentTurnPath && this.currentTurnPath.toLane), road = lane && lane.road;
                 if (!road || !road.thickness) return true;
-                const mine = Math.abs((this.x - road.x1) * road.nx + (this.y - road.y1) * road.ny) + this.width / 2 + 18;
-                return Math.abs((x - road.x1) * road.nx + (y - road.y1) * road.ny) < Math.max(road.thickness / 2, mine);
+                const mine = Math.abs(road.worldToParam(this.x, this.y).lateral) + this.width / 2 + 18;
+                return Math.abs(road.worldToParam(x, y).lateral) < Math.max(road.thickness / 2, mine);
             },
 
             /**
