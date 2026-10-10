@@ -28797,7 +28797,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // The street it fronts: 'S' (default), 'N', 'E' or 'W'. Its door, sign awning, entrance lights,
                 // front wash and balconies go on that side. The landmarks draw their own fronts and stay south.
                 this.facing = BUILDING_LANDMARK_STYLES.includes(this.style) ? 'S' : (['N', 'E', 'W'].includes(config.facing) ? config.facing : 'S');
-                this._shopfront = this.facing === config.facing || !!config.shopfront;   // hand-placed with a facing: a front (sign, lights) even without a door
+                // hand-placed with a facing: a front (sign, lights) even without a door; shopfront 'pool': one light at the door
+                this._shopfront = config.shopfront === 'pool' ? 'pool' : this.facing === config.facing || !!config.shopfront;
                 
                 // Facade depth (3D effect on south/east walls)
                 this.facadeDepth = this.floors * 3;
@@ -29437,9 +29438,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const E = this._entrance();
                 if (E) {
                     const cx = E.cx, cy = E.cy, at = (u, n) => ({ x: cx + E.ux * u + E.nx * n, y: cy + E.uy * u + E.ny * n });
-                    // Entrance pair, warm pool at the door — purposeful light instead of a bulb grid
-                    this.attachedLights.push(new LampEntity({ ...at(-46, 0), lampType: 3, color: accent, lightRadius: 120 }));
-                    this.attachedLights.push(new LampEntity({ ...at(46, 0), lampType: 3, color: accent, lightRadius: 120 }));
+                    // Entrance pair, warm pool at the door — purposeful light instead of a bulb grid (a street-front
+                    // filler keeps just the pool: a whole row of them lit in pairs cost too much frame)
+                    if (this._shopfront !== 'pool') {
+                        this.attachedLights.push(new LampEntity({ ...at(-46, 0), lampType: 3, color: accent, lightRadius: 120 }));
+                        this.attachedLights.push(new LampEntity({ ...at(46, 0), lampType: 3, color: accent, lightRadius: 120 }));
+                    }
                     this.attachedLights.push(new LampEntity({ ...at(0, 26), lampType: 4, color: '#ffe2b8', lightRadius: this.style === 'silver_queen' ? 260 : 170 }));
                     if (this.style === 'silver_queen') {   // the hexagon wing lamps
                         this.attachedLights.push(new LampEntity({ x: cx - 150, y: cy, lampType: 3, color: '#c8a8ff', lightRadius: 190 }));
@@ -49020,7 +49024,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * @param {string[]} templateIds - in order: west to east along a south/north side, north to south along a west/east one
              * @param {object} [options] - gap (px between neighbours, default 0), setback (from the block edge, default the margin),
              *   justify ('start' | 'center' | 'end', default 'center'), margin (clear of the block's other edges, default 30),
-             *   facing (default: towards the side's street)
+             *   facing (default: towards the side's street), span ([from, to]: the stretch of the side to use, world)
              * @returns {object[]} the placements (what didn't fit is left out, with a warning)
              */
             row(blockName, side, templateIds, options = {}) {
@@ -49029,7 +49033,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const along = side === 'south' || side === 'north';
                 const margin = options.margin ?? 30, gap = options.gap ?? 0, setback = options.setback ?? margin;
                 const items = templateIds.map(id => this.buildingTemplates[id]).filter(Boolean).map(t => ({ template: t, S: this._shape(t, {}) }));
-                const room = (along ? block.w : block.h) - margin * 2, depthRoom = (along ? block.h : block.w) - setback - margin;
+                // span: the stretch of the side to use (world [from, to] along it), by default the whole side inside the margin
+                const [from, to] = options.span || [(along ? block.x : block.y) + margin, (along ? block.x + block.w : block.y + block.h) - margin];
+                const room = to - from, depthRoom = (along ? block.h : block.w) - setback - margin;
                 const fits = [];
                 let len = 0;
                 for (const it of items) {
@@ -49038,7 +49044,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     fits.push(it); len = next;
                 }
                 const justify = options.justify || 'center';
-                let cursor = (along ? block.x : block.y) + margin + (justify === 'end' ? room - len : justify === 'center' ? (room - len) / 2 : 0);
+                let cursor = from + (justify === 'end' ? room - len : justify === 'center' ? (room - len) / 2 : 0);
                 const spots = fits.map(it => {
                     const e = it.S.ext;
                     const x = along ? cursor : side === 'west' ? block.x + setback : block.x + block.w - setback - e.w;
@@ -49053,7 +49059,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     return ok;
                 });
                 const facing = options.facing || { south: 'S', north: 'N', east: 'E', west: 'W' }[side];
-                const placed = clear.map(p => this._commit(p.it.template, blockName, p.it.S, p.x, p.y, { row: side, facing }));
+                const placed = clear.map(p => this._commit(p.it.template, blockName, p.it.S, p.x, p.y, { row: side, facing, ...(options.autoPlaced ? { autoPlaced: true } : {}) }));
                 for (const p of clear) this._addSafeZone(p.x - margin / 2, p.y - margin / 2, p.it.S.ext.w + margin, p.it.S.ext.h + margin, `Row: ${blockName} ${side}`);
                 return placed;
             }
@@ -49164,6 +49170,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     : Object.values(this.buildingTemplates).filter(t => !t.unique);
                 
                 if (templates.length === 0) return [];
+                if (!options.scatter) return this._fillStreetFronts(block, templates, options);
                 
                 const density = options.density || 0.5;
                 const margin = options.margin || 40;
@@ -49202,6 +49209,56 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return placements;
             }
             
+            /** The sides of a block that front a road ('south' = a road along its bottom edge); a map edge isn't a street */
+            streetSides(block) {
+                const pw = this.pavementWidth, sides = [];
+                if (this.horizontalRoads.some(r => r.topPavement === block.y + block.h)) sides.push('south');
+                if (this.horizontalRoads.some(r => r.bottomPavement + pw === block.y)) sides.push('north');
+                if (this.verticalRoads.some(r => r.rightPavement + pw === block.x)) sides.push('west');
+                if (this.verticalRoads.some(r => r.leftPavement === block.x + block.w)) sides.push('east');
+                return sides;
+            }
+            
+            /**
+             * Fill a block the way a street grows: a row of buildings along each street it fronts, facing the road,
+             * mostly wall to wall (now and then an alley between them), the yard behind left open. North and south
+             * rows first, then west and east rows in what's left between them. options.fill (0–1, default 1): how
+             * much of each street front to build on.
+             */
+            _fillStreetFronts(block, templates, options = {}) {
+                const sides = this.streetSides(block), setback = options.setback ?? 12, margin = 30, alley = 30;
+                const placed = [], both = (a, b) => sides.includes(a) && sides.includes(b);
+                const pick = (room, maxDepth, alongW) => {                                   // a random run of buildings that fits
+                    const ids = [], ok = templates.filter(t => !t.unique && (alongW ? t.extent?.h ?? t.h : t.extent?.w ?? t.w) <= maxDepth);
+                    if (!ok.length) return ids;
+                    let len = 0;
+                    for (let tries = 0; tries < 24; tries++) {
+                        const t = this._selectWeightedTemplate(ok), l = alongW ? (t.extent?.w ?? t.w) : (t.extent?.h ?? t.h);
+                        if (len + l > room) continue;
+                        ids.push(t.id); len += l;
+                    }
+                    return ids;
+                };
+                const run = (side, span, maxDepth) => {
+                    const along = side === 'south' || side === 'north', gap = Math.random() < 0.65 ? 0 : alley;
+                    const room = (span[1] - span[0]) * (options.fill ?? 1);   // fill < 1 leaves part of each street front open (fewer buildings to draw)
+                    let ids = pick(room, maxDepth, along);
+                    while (ids.length > 1 && ids.reduce((n, id) => n + (along ? this.buildingTemplates[id].w : this.buildingTemplates[id].h), 0) + gap * (ids.length - 1) > room) ids.pop();
+                    if (!ids.length) return [];
+                    const row = this.row(block.name, side, ids, { gap, setback, span, margin, autoPlaced: true });
+                    placed.push(...row);
+                    return row;
+                };
+                const nsDepth = (both('north', 'south') ? (block.h - margin) / 2 : block.h - margin * 2) - setback;
+                const ns = { north: [], south: [] };
+                for (const side of ['south', 'north']) if (sides.includes(side)) ns[side] = run(side, [block.x + margin, block.x + block.w - margin], nsDepth);
+                const top = ns.north.length ? Math.max(...ns.north.map(p => p.extent.y + p.extent.h)) + alley : block.y + margin;
+                const bottom = ns.south.length ? Math.min(...ns.south.map(p => p.extent.y)) - alley : block.y + block.h - margin;
+                const weDepth = (both('west', 'east') ? (block.w - margin) / 2 : block.w - margin * 2) - setback;
+                if (bottom - top > 150) for (const side of ['west', 'east']) if (sides.includes(side)) run(side, [top, bottom], weDepth);
+                return placed;
+            }
+            
             autoFillAll(options = {}) {
                 const allPlacements = [];
                 for (let block of this.blocks) {
@@ -49214,7 +49271,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             .filter(id => options.categories.includes(this.buildingTemplates[id].category));
                     }
                     
-                    allPlacements.push(...this.autoFillBlock(block.name, templateIds, options));
+                    const scatter = options.scatter === true || (Array.isArray(options.scatter) && options.scatter.includes(block.name));
+                    allPlacements.push(...this.autoFillBlock(block.name, templateIds, { ...options, scatter }));
                 }
                 return allPlacements;
             }
@@ -61973,9 +62031,14 @@ engineMixin({
                     }
 
                     // 6. AUTO-FILL REMAINING BLOCKS
+                    // Rows along every street a block fronts, facing the road (world/city-layout.js _fillStreetFronts);
+                    // the Scrapyard keeps its scattered cover. fill: how much of each street front gets buildings
+                    // (lower it if the busier streets cost too much frame on a phone)
                     city.autoFillAll({
                         density: 0.4,
-                        categories: ['residential', 'shopping', 'commercial']
+                        fill: 1,
+                        categories: ['residential', 'shopping', 'commercial'],
+                        scatter: ['block_10_4']
                     });
                     
                     // 7. CREATE ROAD NETWORK
@@ -62006,7 +62069,7 @@ engineMixin({
                         if (t.isV2 && BuildingV2Registry.has(p.templateId)) {
                             const facing = p.options && (p.options.facing || p.options.row) ? CityLayout.facing(p) : undefined;
                             const building = BuildingV2Registry.create(p.templateId, p.originX ?? p.x, p.originY ?? p.y, { 
-                                doorTarget: t.door?.target, ...(facing ? { facing } : {})
+                                doorTarget: t.door?.target, ...(facing ? { facing } : {}), ...(p.options.autoPlaced && facing ? { shopfront: 'pool' } : {})
                             });
                             // Propagate mapCategory from template for map icons
                             if (t.mapCategory) building.mapCategory = t.mapCategory;
@@ -62315,7 +62378,7 @@ engineMixin({
                     }
                     // and the pavement in front of a row of shopfronts (city.row, whichever street it fronts): a street wall shows its fronts, its trees go elsewhere
                     for (const pl of city.placedBuildings) {
-                        if (!pl.options || !pl.options.row) continue;
+                        if (!pl.options || !pl.options.row || pl.options.autoPlaced) continue;   // (the auto-filled streets keep their trees)
                         const e = pl.extent, F = CityLayout.facing(pl), R = 140;   // the front, out across the pavement
                         const zone = { x: e.x - 30 - (F === 'W' ? R : 0), y: e.y - (F === 'N' ? R : 0), w: e.w + 60 + (F === 'E' || F === 'W' ? R : 0), h: e.h + (F === 'S' || F === 'N' ? R : 0) };
                         mapData.foliage = mapData.foliage.filter(f => !(f.x > zone.x && f.x < zone.x + zone.w && f.y > zone.y && f.y < zone.y + zone.h));

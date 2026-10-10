@@ -1547,7 +1547,7 @@ test('Doors any side: a building faces the street it is placed on, door, sign, l
   const r = value(env, `
     game.story.update=()=>{}; game._doLoadMap('hub_949');
     const map = game.activeMap, city = map.cityLayout, b = city.blockMap.block_0_4;
-    const west = map.buildings.filter((x, i) => city.placedBuildings[i].options.row === 'west');
+    const west = map.buildings.filter((x, i) => city.placedBuildings[i].blockName === 'block_0_4' && city.placedBuildings[i].options.row === 'west');
     const front = west.map(x => { const e = x._entrance(); return [x.facing, e && e.nx, e && e.ny, e && Math.round(e.cx - x.x)]; });
     const lit = west.every(x => x.attachedLights.some(l => l.x < x.x));
     // A building with a door, faced each way: the door stands outside that wall
@@ -1571,6 +1571,27 @@ test('Doors any side: a building faces the street it is placed on, door, sign, l
   equal(r.landmark, 'S', 'the landmarks keep their own fronts');
   equal(r.drop, ['Main Ave', 'west', 1500, 0], 'Zib drops off on the avenue it faces, level with the door');
   equal(r.mark, [r.px - 50, 0], 'its landmark is 50 px out from that wall');
+});
+
+test('Street-front fill: auto-filled blocks grow rows along the streets they front, facing the road', env => {
+  const r = value(env, `
+    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    const map = game.activeMap, city = map.cityLayout, rows = {}, wrong = [];
+    city.placedBuildings.forEach((p, i) => {
+      if (!p.options.autoPlaced || p.blockName === 'block_10_4') return;
+      const b = city.blockMap[p.blockName], sides = city.streetSides(b), f = map.buildings[i].facing;
+      if (!p.options.row || !sides.includes(p.options.row)) wrong.push(p.blockName + ' ' + p.templateId + ' ' + p.options.row);
+      if (f !== {south:'S', north:'N', west:'W', east:'E'}[p.options.row]) wrong.push(p.blockName + ' faces ' + f);
+      (rows[p.blockName] = rows[p.blockName] || new Set()).add(p.options.row);
+    });
+    const scatter = city.placedBuildings.filter(p => p.blockName === 'block_10_4').every(p => !p.options.row);
+    const edge = city.streetSides(city.blockMap.block_12_4);
+    return { wrong, blocks: Object.keys(rows).length, sides: Object.values(rows).reduce((n, s) => n + s.size, 0), scatter, edge };
+  `);
+  equal(r.wrong, [], 'every filler stands in a row on one of its block\'s streets, facing it');
+  ok(r.blocks >= 6 && r.sides >= r.blocks * 2, 'the filled blocks have rows on two or more streets');
+  ok(r.scatter, 'the Scrapyard keeps its scattered cover');
+  equal(r.edge, ['north', 'west'], 'a map edge is not a street');
 });
 
 test('Every bundled map loads, updates and draws without runtime errors', env => {
