@@ -1160,46 +1160,42 @@
                    vehicle read (maxSpeed + acceleration) instead of its spec. */
                 this.speed = this.vx * fwdX + this.vy * fwdY;
 
-                /* Axis-separated wall response.
-                   The old code reversed the WHOLE velocity vector on any contact,
-                   so clipping a wall at a shallow angle killed all forward
-                   momentum and threw the car backwards. Now the move is retried
-                   one axis at a time: whichever axis is clear still moves, so a
-                   glancing hit scrapes along the surface and keeps most of its
-                   speed. Only a genuine head-on (both axes blocked) bounces.
-
-                   checkEnvironmentCollision returns a bool rather than a contact
-                   normal, so these two probes ARE the normal detection — and they
-                   only run on frames where something was actually hit. */
+                /* Wall response: move, then push out of whatever it ends up in.
+                   The old axis-by-axis retry only asked "does it fit?", so once the car
+                   was inside a wall (rotation is never checked: steering while touching
+                   a wall turns a corner into it) every retry failed, the "head-on"
+                   branch flipped the velocity back toward the wall, and the car stayed
+                   stuck however the driver steered. Now each touching wall gives its
+                   contact normal and depth (SAT): the car is moved out along it, the
+                   speed going into the wall bounces back (WALL_BOUNCE_FACTOR) and the
+                   speed along it scrapes (WALL_SLIDE_FRICTION). Speed already leaving
+                   the wall is left alone, so the driver can always pull away. */
                 const w_ = walls || [], b_ = buildings || [];
-                const collided = this.checkEnvironmentCollision(nextX, nextY, this.angle, w_, b_);
                 if (player && this._crunchCd > 0) this._crunchCd--;
                 const vx0 = this.vx, vy0 = this.vy;
-                if (collided) {
-                    const blockedX = this.checkEnvironmentCollision(nextX, this.y, this.angle, w_, b_);
-                    const blockedY = this.checkEnvironmentCollision(this.x, nextY, this.angle, w_, b_);
-                    if (!blockedX) {
-                        this.x = nextX;                          // wall runs along X
-                        this.vx *= VA.WALL_SLIDE_FRICTION;
-                        this.vy *= VA.WALL_BOUNCE_FACTOR;
-                    } else if (!blockedY) {
-                        this.y = nextY;                          // wall runs along Y
-                        this.vy *= VA.WALL_SLIDE_FRICTION;
-                        this.vx *= VA.WALL_BOUNCE_FACTOR;
-                    } else {
-                        this.vx *= VA.WALL_BOUNCE_FACTOR;        // corner / head-on
-                        this.vy *= VA.WALL_BOUNCE_FACTOR;
-                        this.x += this.vx * VA.WALL_PUSHOUT;
-                        this.y += this.vy * VA.WALL_PUSHOUT;
+                this.x = nextX;
+                this.y = nextY;
+                let collided = false;
+                for (let pass = 0; pass < 4; pass++) {
+                    const c = this._wallContact(w_, b_);
+                    if (!c) break;
+                    collided = true;
+                    this.x += c.nx * (c.depth + 0.01);
+                    this.y += c.ny * (c.depth + 0.01);
+                    const vn = this.vx * c.nx + this.vy * c.ny;
+                    if (vn < 0) {
+                        const tx = this.vx - vn * c.nx, ty = this.vy - vn * c.ny;
+                        const vnOut = vn * VA.WALL_BOUNCE_FACTOR;
+                        this.vx = tx * VA.WALL_SLIDE_FRICTION + vnOut * c.nx;
+                        this.vy = ty * VA.WALL_SLIDE_FRICTION + vnOut * c.ny;
                     }
+                }
+                if (collided) {
                     // Re-derive forward speed from the corrected velocity so the
                     // HUD, engine audio and skid logic agree with what the car is
                     // actually doing after the impact.
                     this.speed = this.vx * fwdX + this.vy * fwdY;
                     if (player) this.onImpact(Math.hypot(this.vx - vx0, this.vy - vy0));
-                } else {
-                    this.x = nextX;
-                    this.y = nextY;
                 }
                 return collided;
             }
@@ -1282,22 +1278,36 @@
         
             checkEnvironmentCollision(nextX, nextY, angle, walls, buildings) {
                 const futureOBB = { x: nextX, y: nextY, angle: angle, length: this.length, width: this.width };
-                const bounds = { left: nextX - this.length, right: nextX + this.length, top: nextY - this.width, bottom: nextY + this.width };
-                const wallCandidates = _physicsSpatial.query(walls, bounds);
-                if (wallCandidates) {
-                    for (let w of wallCandidates) {
-                        if (nextX + this.length < w.x || nextX - this.length > w.x + w.w || nextY + this.width < w.y || nextY - this.width > w.y + w.h) continue;
-                        if (PhysicsSystem.checkOBBvsAABB(futureOBB, w)) return true;
-                    }
-                }
-                const buildingCandidates = _physicsSpatial.query(buildings, bounds);
-                if (buildingCandidates) {
-                    for (let b of buildingCandidates) {
-                        if (nextX + this.length < b.x || nextX - this.length > b.x + b.w || nextY + this.width < b.y || nextY - this.width > b.y + b.h) continue;
-                        if (PhysicsSystem.checkOBBvsAABB(futureOBB, b)) return true;
+                const r = Math.hypot(this.length, this.width) / 2;   // reaches the corners at any angle
+                const bounds = { left: nextX - r, right: nextX + r, top: nextY - r, bottom: nextY + r };
+                for (const list of [walls, buildings]) {
+                    const candidates = _physicsSpatial.query(list, bounds);
+                    if (!candidates) continue;
+                    for (let w of candidates) {
+                        if (nextX + r < w.x || nextX - r > w.x + w.w || nextY + r < w.y || nextY - r > w.y + w.h) continue;
+                        if (CollisionSystem._satCollision(futureOBB, CollisionSystem._aabbToOBB(w))) return true;
                     }
                 }
                 return false;
+            }
+
+            /** The deepest wall or building the car overlaps where it stands: { nx, ny, depth },
+             *  the normal pointing out of the wall (SAT), or null when it's clear */
+            _wallContact(walls, buildings) {
+                const obb = { x: this.x, y: this.y, angle: this.angle, length: this.length, width: this.width };
+                const r = Math.hypot(this.length, this.width) / 2;
+                const bounds = { left: this.x - r, right: this.x + r, top: this.y - r, bottom: this.y + r };
+                let best = null;
+                for (const list of [walls, buildings]) {
+                    const candidates = _physicsSpatial.query(list, bounds);
+                    if (!candidates) continue;
+                    for (let w of candidates) {
+                        if (this.x + r < w.x || this.x - r > w.x + w.w || this.y + r < w.y || this.y - r > w.y + w.h) continue;
+                        const c = CollisionSystem._satCollision(obb, CollisionSystem._aabbToOBB(w));
+                        if (c && (!best || c.depth > best.depth)) best = c;
+                    }
+                }
+                return best;
             }
         
             // --- MAIN UPDATE (AI & Logic) ---
