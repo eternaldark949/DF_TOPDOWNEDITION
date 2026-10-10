@@ -1044,7 +1044,7 @@
                     gas = this.pedal = p + clampU(gas - p, rate);
                 }
                 let decel = 0;
-                if (Math.abs(gas) > 0.1) {
+                if (Math.abs(gas) > (player && this._fineGas ? 0.02 : 0.1)) {
                     if (fwd0 * gas < 0 && Math.abs(fwd0) > revBelow) {
                         const sp = Math.hypot(this.vx, this.vy);
                         decel = Math.min(sp, Math.abs(gas) * (this.brake || 0.3));
@@ -1225,20 +1225,28 @@
              * the brake, straight; it only turns into reverse once nearly stopped.
              * The stick also eases off as the car's rotation builds (yawRate), the
              * way a driver unwinds before the car reaches the line they want.
+             * With Precise Stick the stick has already been shaped (its own dead
+             * centre and response curve, initJoystick), so any push steers, and
+             * how far it's pushed sets how hard: a light push off the nose is a
+             * gentle turn, a full push the old full lock.
              */
             driverInput(inputX, inputY, analog) {
                 const VD = CONFIG.VEHICLE_DRIVE;
                 const fwd = this.vx * Math.cos(this.angle) + this.vy * Math.sin(this.angle);
                 const rolling = fwd > VD.REVERSE_BELOW;
+                const precise = !!analog && typeof GameSettings !== 'undefined' && !!GameSettings.preciseStick;
+                this._fineGas = precise;   // applyDrivePhysics: a light throttle still pulls
                 let gas = 0, turn = 0;
                 if (analog) {
                     const carDirX = Math.cos(this.angle), carDirY = Math.sin(this.angle);
                     gas = inputX * carDirX + inputY * carDirY;
-                    if (Math.abs(inputX) > 0.1 || Math.abs(inputY) > 0.1) {
+                    const push = Math.hypot(inputX, inputY);
+                    if (precise ? push > 0 : (Math.abs(inputX) > 0.1 || Math.abs(inputY) > 0.1)) {
                         const angleDiff = normalizeAngle(Math.atan2(inputY, inputX) - this.angle);
                         if (rolling && Math.abs(angleDiff) > 1.9) turn = 0;          // hauling back: brake, not a spin
                         else {
-                            turn = clamp(angleDiff * 2.0 - (this.yawRate || 0) * VD.STICK_YAW_DAMP, -1, 1);
+                            const lock = precise ? VD.STICK_LIGHT_LOCK + (1 - VD.STICK_LIGHT_LOCK) * Math.min(1, push / VD.STICK_FULL_LOCK_PUSH) : 1;
+                            turn = clamp(clamp(angleDiff * 2.0, -1, 1) * lock - (this.yawRate || 0) * VD.STICK_YAW_DAMP, -1, 1);
                             if (Math.abs(turn) < 0.1 && Math.abs(angleDiff) < 0.05) turn = 0;
                         }
                     }

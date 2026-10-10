@@ -184,6 +184,39 @@ test('Held ring flick requires fresh outward speed, rearms deliberately and pres
   }
 }, {events:true});
 
+test('Precise Stick: dead centre, gentle response curve, and steering that grows with the push', env => {
+  const stick = value(env, `
+    const J=game.joystick, zone=document.getElementById('input-zone-left'); game.isDriving=false;
+    GameSettings.flitRing=false; GameSettings.flitFlick=false;
+    const at = (x, precise) => {
+      GameSettings.preciseStick = precise; J.active=false;
+      const send = (type, dx) => zone.dispatchEvent({type,changedTouches:[{identifier:7,clientX:300+dx,clientY:400,target:zone}],timeStamp:1,preventDefault(){}});
+      send('touchstart', 0); send('touchmove', x); const r = J.dx; send('touchend', x); return r;
+    };
+    return {dead:at(5,true), mid:at(30,true), full:at(60,true), past:at(200,true), classicMid:at(30,false), released:J.dx};
+  `);
+  equal(stick.dead, 0, 'a resting thumb inside the dead centre does nothing');
+  ok(stick.mid > 0.15 && stick.mid < 0.35, 'half way out is a slow walk (' + stick.mid + ')');
+  near(stick.full, 1, 'full speed at the stick edge'); near(stick.past, 1, 'and beyond it');
+  near(stick.classicMid, 0.5, 'Precise Stick off keeps the linear stick');
+  equal(stick.released, 0, 'letting go stops');
+  const car = value(env, `
+    game._doLoadMap('hub_949'); const car=game.ownedCar; GameSettings.preciseStick=true;
+    const steer = (push, precise) => {
+      GameSettings.preciseStick = precise;
+      Object.assign(car,{angle:0,vx:0,vy:0,speed:0,yawRate:0,steer:0,pedal:0});
+      const a = 0.4; car.driverInput(Math.cos(a)*push, Math.sin(a)*push, true); return car.manualTurn;
+    };
+    const light=steer(0.08,true), full=steer(1,true), classicFull=steer(1,false);
+    GameSettings.preciseStick=true; Object.assign(car,{angle:0,vx:0,vy:0,speed:0,yawRate:0,steer:0,pedal:0,handbrake:false,hasDriver:true,controlMode:'PLAYER'});
+    for (let i=0;i<60;i++) { car.driverInput(0.08, 0, true); car.updateManualDriving(game.activeMap.walls, [], game.weather, game.decals); }
+    return {light, full, classicFull, creep:Math.hypot(car.vx,car.vy)};
+  `);
+  ok(car.light > 0 && car.light < 0.5, 'a light push off the nose steers gently (' + car.light + ')');
+  near(car.full, car.classicFull, 'a full push steers as before');
+  ok(car.creep > 0.05, 'a light throttle still rolls the car (' + car.creep + ')');
+}, {events:true});
+
 function setupDrive(env, {taxi=false,lane='R0.S0.L2',destination='clinic',endpoint=false}={}) {
   env.run(`{
     game._doLoadMap('hub_949'); game.story.update=()=>{}; game.running=true; game.paused=false;

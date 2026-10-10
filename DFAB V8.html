@@ -3683,6 +3683,11 @@
                         <div class="row-center"><div class="menu-btn" id="lbl-sniperrelease">Sniper Fire on Release: ON</div></div>
                         <div class="row-right"><div class="input-prompt">enter</div></div>
                     </div>
+                    <div class="menu-item-row" id="btn-toggle-precisestick">
+                        <div class="row-left"><div class="desc-box">Move stick: a small dead centre, gentle pushes for slow walking and driving, light pushes steer gently.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-precisestick">Precise Stick: ON</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
                     <div class="menu-item-row" id="btn-toggle-scopeview">
                         <div class="row-left"><div class="desc-box">Snipers: the world narrows to your line of sight.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-scopeview">Scope View: ON</div></div>
@@ -4394,6 +4399,10 @@
                 <div class="settings-row">
                     <span class="settings-label">Sniper Fire on Release</span>
                     <span class="settings-value val-on" id="set-sniperrelease" data-key="sniperRelease">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Precise Stick</span>
+                    <span class="settings-value val-on" id="set-precisestick" data-key="preciseStick">ON</span>
                 </div>
                 </section>
                 
@@ -5146,6 +5155,8 @@
                 CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
                 CAM_ZOOM: { SPAN: 0.25, FLOOR: 0.75 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
                 STICK_YAW_DAMP: 5,
+                STICK_LIGHT_LOCK: 0.35,         // Precise Stick: wheel lock at the lightest push…
+                STICK_FULL_LOCK_PUSH: 0.6,      // …growing to full lock by this shaped push (about two-thirds out)
                 IMPACT_YAW: 0.9,                // Twist from an off-centre knock (onImpact)              // Touch stick unwinds by this × yawRate (no overshoot)
                 COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)
             }
@@ -8185,7 +8196,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // --- CONTROLS (touch) — flitting without letting go of the trigger ---
             // Kept in localStorage (dfab_controls) and in saves. See initJoystick.
             ...(() => {
-                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, scopeView: true, scopeSlow: true, cameraEdgeLock: true };   // cameraEdgeLock: the view never leaves the map (engine/draw.js _clampView)
+                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, preciseStick: true, scopeView: true, scopeSlow: true, cameraEdgeLock: true };   // cameraEdgeLock: the view never leaves the map (engine/draw.js _clampView)
                 try { Object.assign(d, JSON.parse(localStorage.getItem('dfab_controls') || '{}')); } catch (e) { /* private mode */ }
                 return d;
             })(),
@@ -8298,7 +8309,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Apply film grain visibility
             /** Store the control toggles and show or hide the ⚡ button. */
             applyControls() {
-                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, scopeView: this.scopeView, scopeSlow: this.scopeSlow, cameraEdgeLock: this.cameraEdgeLock })); } catch (e) { /* private mode */ }
+                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, preciseStick: this.preciseStick, scopeView: this.scopeView, scopeSlow: this.scopeSlow, cameraEdgeLock: this.cameraEdgeLock })); } catch (e) { /* private mode */ }
                 const b = document.getElementById('btn-flit');
                 if (b) b.classList.toggle('hidden-by-setting', !this.flitButton);
                 const r = document.getElementById('joystick-ring');
@@ -20068,7 +20079,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.playerCar) {
                     let gas = 0, turn = 0;
                     const inputMag = Math.hypot(inputX, inputY);
-                    if (inputMag > 0.15) {
+                    if (inputMag > (GameSettings.preciseStick && game.joystick && game.joystick.active ? 0.03 : 0.15)) {   // Precise Stick has its own dead centre
                         const inputAngle = Math.atan2(inputY, inputX);
                         let angleDiff = inputAngle - this.playerCar.angle;
                         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
@@ -39267,7 +39278,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     gas = this.pedal = p + clampU(gas - p, rate);
                 }
                 let decel = 0;
-                if (Math.abs(gas) > 0.1) {
+                if (Math.abs(gas) > (player && this._fineGas ? 0.02 : 0.1)) {
                     if (fwd0 * gas < 0 && Math.abs(fwd0) > revBelow) {
                         const sp = Math.hypot(this.vx, this.vy);
                         decel = Math.min(sp, Math.abs(gas) * (this.brake || 0.3));
@@ -39448,20 +39459,28 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * the brake, straight; it only turns into reverse once nearly stopped.
              * The stick also eases off as the car's rotation builds (yawRate), the
              * way a driver unwinds before the car reaches the line they want.
+             * With Precise Stick the stick has already been shaped (its own dead
+             * centre and response curve, initJoystick), so any push steers, and
+             * how far it's pushed sets how hard: a light push off the nose is a
+             * gentle turn, a full push the old full lock.
              */
             driverInput(inputX, inputY, analog) {
                 const VD = CONFIG.VEHICLE_DRIVE;
                 const fwd = this.vx * Math.cos(this.angle) + this.vy * Math.sin(this.angle);
                 const rolling = fwd > VD.REVERSE_BELOW;
+                const precise = !!analog && typeof GameSettings !== 'undefined' && !!GameSettings.preciseStick;
+                this._fineGas = precise;   // applyDrivePhysics: a light throttle still pulls
                 let gas = 0, turn = 0;
                 if (analog) {
                     const carDirX = Math.cos(this.angle), carDirY = Math.sin(this.angle);
                     gas = inputX * carDirX + inputY * carDirY;
-                    if (Math.abs(inputX) > 0.1 || Math.abs(inputY) > 0.1) {
+                    const push = Math.hypot(inputX, inputY);
+                    if (precise ? push > 0 : (Math.abs(inputX) > 0.1 || Math.abs(inputY) > 0.1)) {
                         const angleDiff = normalizeAngle(Math.atan2(inputY, inputX) - this.angle);
                         if (rolling && Math.abs(angleDiff) > 1.9) turn = 0;          // hauling back: brake, not a spin
                         else {
-                            turn = clamp(angleDiff * 2.0 - (this.yawRate || 0) * VD.STICK_YAW_DAMP, -1, 1);
+                            const lock = precise ? VD.STICK_LIGHT_LOCK + (1 - VD.STICK_LIGHT_LOCK) * Math.min(1, push / VD.STICK_FULL_LOCK_PUSH) : 1;
+                            turn = clamp(clamp(angleDiff * 2.0, -1, 1) * lock - (this.yawRate || 0) * VD.STICK_YAW_DAMP, -1, 1);
                             if (Math.abs(turn) < 0.1 && Math.abs(angleDiff) < 0.05) turn = 0;
                         }
                     }
@@ -61562,7 +61581,7 @@ engineMixin({
                         audioEnabled: GameSettings.audioEnabled,
                         flitRing: GameSettings.flitRing, flitFlick: GameSettings.flitFlick,
                         flitTwoFinger: GameSettings.flitTwoFinger, flitButton: GameSettings.flitButton,
-                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, scopeView: GameSettings.scopeView, scopeSlow: GameSettings.scopeSlow, cameraEdgeLock: GameSettings.cameraEdgeLock,
+                        aimBeforeFire: GameSettings.aimBeforeFire, sniperRelease: GameSettings.sniperRelease, preciseStick: GameSettings.preciseStick, scopeView: GameSettings.scopeView, scopeSlow: GameSettings.scopeSlow, cameraEdgeLock: GameSettings.cameraEdgeLock,
                         ambienceVolume: GameSettings.ambienceVolume,
                         musicVolume: GameSettings.musicVolume,
                         fullscreen: GameSettings.fullscreen,
@@ -62209,6 +62228,7 @@ engineMixin({
                         GameSettings.flitButton = save.settings.flitButton !== false;
                         GameSettings.aimBeforeFire = save.settings.aimBeforeFire !== false;
                         GameSettings.sniperRelease = save.settings.sniperRelease !== false;
+                        GameSettings.preciseStick = save.settings.preciseStick !== false;
                         GameSettings.scopeView = save.settings.scopeView !== false;
                         GameSettings.scopeSlow = save.settings.scopeSlow !== false;
                         GameSettings.cameraEdgeLock = save.settings.cameraEdgeLock !== false;
@@ -71411,6 +71431,13 @@ engineMixin({
                 // WALK: full speed at 60 px (was 35), so walking and driving get finer control on the way out.
                 // It stays inside RING_OUT, so a held full-speed thumb re-arms the ring. BASE: half the base disc (CSS #joystick-zone)
                 const J = this.joystick, WALK = 60, RING_IN = 82, RING_OUT = 65, EDGE = 100, BASE = 64;
+                // Precise Stick (setting, on): a dead centre of DEAD px, then a curve that spends the first
+                // half of the travel on the slowest ~30% of speed (full speed still at WALK). The dead centre
+                // also keeps a resting thumb's wobble from turning her or the wheel.
+                const DEAD = 7, shapePush = far => {
+                    const t = Math.max(0, Math.min(1, (far - DEAD) / (WALK - DEAD)));
+                    return 0.3 * t + 0.7 * Math.pow(t, 2.2);
+                };
                 // CSS-pixel radial travel: at least 24 px at 500 px/sec within 120 ms.
                 // A fixed ring buffer retains recent raw movement, independent of Flick to Flit.
                 const RING_WINDOW = 120, RING_TRAVEL = 24, RING_SPEED = 0.5;
@@ -71477,7 +71504,10 @@ engineMixin({
                         const distance = Math.min(far, WALK), angle = Math.atan2(deltaY, deltaX);
                         const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
                         knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
-                        J.dx = moveX / WALK; J.dy = moveY / WALK;
+                        if (GameSettings.preciseStick) {
+                            const push = shapePush(far);
+                            J.dx = Math.cos(angle) * push; J.dy = Math.sin(angle) * push;
+                        } else { J.dx = moveX / WALK; J.dy = moveY / WALK; }
                         // A held-touch ring flick needs fresh, substantial outward speed.
                         // Keep the standalone flick's existing shared latch/re-arm behavior.
                         if (far <= RING_OUT) J.armed = true;
@@ -74951,7 +74981,7 @@ engineMixin({
                 this._updateValueEl('set-lighting', GameSettings.lightingQuality);
                 this._updateValueEl('set-adaptive-lighting', GameSettings.adaptiveLighting ? 'on' : 'off');
                 this._updateValueEl('set-grain', GameSettings.filmGrain ? 'on' : 'off');
-                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease'], ['set-scopeview', 'scopeView'], ['set-scopeslow', 'scopeSlow'], ['set-camedge', 'cameraEdgeLock']])
+                for (const [id, key] of [['set-flitring', 'flitRing'], ['set-flitflick', 'flitFlick'], ['set-flittwo', 'flitTwoFinger'], ['set-flitbtn', 'flitButton'], ['set-aimfire', 'aimBeforeFire'], ['set-sniperrelease', 'sniperRelease'], ['set-precisestick', 'preciseStick'], ['set-scopeview', 'scopeView'], ['set-scopeslow', 'scopeSlow'], ['set-camedge', 'cameraEdgeLock']])
                     this._updateValueEl(id, GameSettings[key] ? 'on' : 'off');
                 this._updateValueEl('set-softshadows', GameSettings.softShadows ? 'on' : 'off');
                 this._updateValueEl('set-bloom', GameSettings.bloom ? 'on' : 'off');
@@ -75005,7 +75035,7 @@ engineMixin({
             _cycleSetting(el) {
                 const key = el.dataset.key;
                 
-                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'aimBeforeFire' || key === 'sniperRelease' || key === 'scopeView' || key === 'scopeSlow' || key === 'cameraEdgeLock') {
+                if (key === 'flitRing' || key === 'flitFlick' || key === 'flitTwoFinger' || key === 'flitButton' || key === 'aimBeforeFire' || key === 'sniperRelease' || key === 'preciseStick' || key === 'scopeView' || key === 'scopeSlow' || key === 'cameraEdgeLock') {
                     GameSettings[key] = !GameSettings[key];
                     GameSettings.applyControls();
                     this._updateValueEl(el.id, GameSettings[key] ? 'on' : 'off');
@@ -75357,6 +75387,7 @@ engineMixin({
             lbl('lbl-flitbtn', `Flit Button: ${onOff('flitButton')}`, onCol('flitButton'));
             lbl('lbl-aimfire', `Aim Before Firing: ${onOff('aimBeforeFire')}`, onCol('aimBeforeFire'));
             lbl('lbl-sniperrelease', `Sniper Fire on Release: ${onOff('sniperRelease')}`, onCol('sniperRelease'));
+            lbl('lbl-precisestick', `Precise Stick: ${onOff('preciseStick')}`, onCol('preciseStick'));
             lbl('lbl-scopeview', `Scope View: ${onOff('scopeView')}`, onCol('scopeView'));
             lbl('lbl-scopeslow', `Scope Slow-Mo: ${onOff('scopeSlow')}`, onCol('scopeSlow'));
             lbl('lbl-audio', `Master Audio: ${GameSettings.audioEnabled ? 'ON' : 'OFF'}`,
@@ -75451,7 +75482,7 @@ engineMixin({
         });
         
         // Flit controls (touch): ring, flick, two-finger tap, the ⚡ button
-        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton'], ['btn-toggle-aimfire', 'aimBeforeFire'], ['btn-toggle-sniperrelease', 'sniperRelease'], ['btn-toggle-scopeview', 'scopeView'], ['btn-toggle-scopeslow', 'scopeSlow']]) {
+        for (const [id, key] of [['btn-toggle-flitring', 'flitRing'], ['btn-toggle-flitflick', 'flitFlick'], ['btn-toggle-flittwo', 'flitTwoFinger'], ['btn-toggle-flitbtn', 'flitButton'], ['btn-toggle-aimfire', 'aimBeforeFire'], ['btn-toggle-sniperrelease', 'sniperRelease'], ['btn-toggle-precisestick', 'preciseStick'], ['btn-toggle-scopeview', 'scopeView'], ['btn-toggle-scopeslow', 'scopeSlow']]) {
             document.getElementById(id).addEventListener('click', () => {
                 GameSettings[key] = !GameSettings[key];
                 GameSettings.applyControls();
