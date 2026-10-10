@@ -197,6 +197,17 @@
                     add(l.x + (rnd() - 0.5) * 30, l.y + REFLECT.LAMP_H * postScale * (0.7 + rnd() * 0.6), (rnd() - 0.5) * 0.6, 26 + rnd() * 26);
                 }
                 for (const p of map.pavements || []) {
+                    if (p.poly) {                                                  // beside an angled road: along its kerb, inside its shape
+                        const e = p.poly.reduce((best, a, i) => { const b = p.poly[(i + 1) % p.poly.length], l = Math.hypot(b.x - a.x, b.y - a.y); return l > best.l ? { a, b, l } : best; }, { l: 0 });
+                        const n = Math.floor(e.l * 75 / 90000 + rnd() * 1.2), ang = Math.atan2(e.b.y - e.a.y, e.b.x - e.a.x);
+                        const cx = p.poly.reduce((s, q) => s + q.x, 0) / p.poly.length, cy = p.poly.reduce((s, q) => s + q.y, 0) / p.poly.length;
+                        for (let i = 0; i < n; i++) {
+                            const t = 0.1 + rnd() * 0.8, x = e.a.x + (e.b.x - e.a.x) * t, y = e.a.y + (e.b.y - e.a.y) * t;
+                            const px = x + (cx - x) * 0.5, py = y + (cy - y) * 0.5;   // halfway in from the long edge, towards the middle
+                            if (Poly.contains(p.poly, px, py)) add(px, py, ang, 14 + rnd() * 18);
+                        }
+                        continue;
+                    }
                     const n = Math.floor(p.w * p.h / 90000 + rnd() * 1.2);
                     for (let i = 0; i < n; i++) add(p.x + 20 + rnd() * Math.max(1, p.w - 40), p.y + 20 + rnd() * Math.max(1, p.h - 40), p.w > p.h ? 0 : Math.PI / 2, 14 + rnd() * 18);
                 }
@@ -265,7 +276,7 @@
                 mc.fillStyle = `rgba(255,255,255,${(REFLECT.PAVE * Math.min(1, wet * 1.3)).toFixed(3)})`;
                 if (wet >= 0.02) for (const p of this.activeMap.pavements || []) {
                     if (p.x > v.x + hw || p.x + p.w < v.x - hw || p.y > v.y + hh || p.y + p.h < v.y - hh) continue;
-                    mc.fillRect(p.x, p.y, p.w, p.h);
+                    if (p.poly) { mc.beginPath(); Poly.trace(mc, p.poly); mc.fill(); } else mc.fillRect(p.x, p.y, p.w, p.h);
                 }
                 let any = !!net || !!(wet >= 0.02 && this.activeMap.pavements && this.activeMap.pavements.length);
                 if (surf) {                                                    // polished floors and water

@@ -46,8 +46,8 @@
                 if (F) return F.def;
                 if (map.type === 'indoor') return 'wood';
                 // The city: crossings and pavements, roads, parks and plazas, lawns
-                for (const c of map.crosswalks || []) if (x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h) return 'concrete';
-                for (const p of map.pavements || []) if (x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h) return 'concrete';
+                for (const c of map.crosswalks || []) if (x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h && (!c.poly || Poly.contains(c.poly, x, y))) return 'concrete';
+                for (const p of map.pavements || []) if (x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h && (!p.poly || Poly.contains(p.poly, x, y))) return 'concrete';
                 const net = this.traffic && this.traffic.network;
                 if (net && map.id === 'hub_949') {
                     for (const ix of net.intersections) if (ix.containsPoint(x, y)) return 'asphalt';

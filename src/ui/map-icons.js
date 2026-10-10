@@ -226,7 +226,7 @@
                     }
                 }
                 // Pavements and crosswalks: faint gold
-                if (map.pavements) { ctx.fillStyle = MAP_PAL.pave; for (const p of map.pavements) if (hit(p.x, p.y, p.w, p.h)) ctx.fillRect(p.x, p.y, p.w, p.h); }
+                if (map.pavements) { ctx.fillStyle = MAP_PAL.pave; for (const p of map.pavements) if (hit(p.x, p.y, p.w, p.h)) { if (p.poly) { ctx.beginPath(); Poly.trace(ctx, p.poly); ctx.fill(); } else ctx.fillRect(p.x, p.y, p.w, p.h); } }
                 // Buildings and walls: violet, rimmed in gold
                 const solids = (map.buildings || []).concat(map.walls || []);
                 ctx.fillStyle = MAP_PAL.building; ctx.beginPath();
@@ -242,7 +242,7 @@
                 stroke(T * 0.85, 'rgba(255, 160, 60, 0.14)');
                 stroke(Math.max(T * 0.22, 2.5 * u), 'rgba(255, 207, 106, 0.75)');
                 stroke(Math.max(T * 0.05, 1.2 * u * (opts.dpr || 1)), 'rgba(255, 243, 207, 0.95)');
-                if (map.crosswalks) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = MAP_PAL.cross; for (const k of map.crosswalks) if (hit(k.x, k.y, k.w, k.h)) ctx.fillRect(k.x, k.y, k.w, k.h); }
+                if (map.crosswalks) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = MAP_PAL.cross; for (const k of map.crosswalks) if (hit(k.x, k.y, k.w, k.h)) { if (k.poly) { ctx.beginPath(); Poly.trace(ctx, k.poly); ctx.fill(); } else ctx.fillRect(k.x, k.y, k.w, k.h); } }
                 // Lamps: warm specks of light; glowing trees: violet motes
                 if (opts.lamps && opts.lamps.length && typeof glowSprite === 'function') {
                     const spr = glowSprite('255, 200, 110', 0.2), R = Math.max(14, Math.min(6 * u * (opts.dpr || 1), 46));   // specks when zoomed out (capped in map units, so they never pile into white)

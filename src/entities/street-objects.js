@@ -80,11 +80,17 @@
 
         // Pavement class - walkable areas lining streets
         class Pavement {
-            constructor(x, y, w, h) {
+            /** x, y, w, h: its bounds; poly (optional, convex [{x, y}]): its real shape, beside an angled road */
+            constructor(x, y, w, h, poly) {
                 this.x = x;
                 this.y = y;
                 this.w = w;
                 this.h = h;
+                if (poly) this.poly = poly;
+            }
+            
+            contains(x, y) {
+                return x >= this.x && x < this.x + this.w && y >= this.y && y < this.y + this.h && (!this.poly || Poly.contains(this.poly, x, y));
             }
         
             draw(ctx) {

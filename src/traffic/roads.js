@@ -70,6 +70,77 @@
             return points;
         }
 
+        /* --- CONVEX POLYGON HELPERS (angled roads: their junctions, pavements and crossings) ---
+           Polygons are arrays of {x, y}, convex, either winding. */
+        const Poly = {
+            /** The part of `poly` where nx·x + ny·y >= c (Sutherland–Hodgman against one line) */
+            clipHalf(poly, nx, ny, c) {
+                const out = [], n = poly.length;
+                for (let i = 0; i < n; i++) {
+                    const a = poly[i], b = poly[(i + 1) % n];
+                    const da = nx * a.x + ny * a.y - c, db = nx * b.x + ny * b.y - c;
+                    if (da >= 0) out.push(a);
+                    if ((da >= 0) !== (db >= 0)) { const t = da / (da - db); out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }); }
+                }
+                return out;
+            },
+            /** subject ∩ clip (both convex) */
+            clip(subject, clip) {
+                let out = subject;
+                const s = Poly.area(clip) >= 0 ? 1 : -1;
+                for (let i = 0; i < clip.length && out.length; i++) {
+                    const a = clip[i], b = clip[(i + 1) % clip.length];
+                    const nx = -(b.y - a.y) * s, ny = (b.x - a.x) * s;               // inward normal
+                    out = Poly.clipHalf(out, nx, ny, nx * a.x + ny * a.y);
+                }
+                return out;
+            },
+            /** Signed area (positive: clockwise on screen, y down) */
+            area(poly) {
+                let A = 0;
+                for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; A += a.x * b.y - b.x * a.y; }
+                return A / 2;
+            },
+            hull(points) {
+                const P = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+                if (P.length < 3) return P;
+                const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+                const lo = [], hi = [];
+                for (const p of P) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+                for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; while (hi.length >= 2 && cross(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p); }
+                return lo.slice(0, -1).concat(hi.slice(0, -1));
+            },
+            box(poly) {
+                let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+                for (const p of poly) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; }
+                return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+            },
+            contains(poly, x, y) {
+                let inside = false;
+                for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                    const a = poly[i], b = poly[j];
+                    if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+                }
+                return inside;
+            },
+            /** Do a rect ({x, y, w, h}) and a convex polygon overlap (more than touching)? */
+            hitsRect(poly, r) {
+                const rect = [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }];
+                return Math.abs(Poly.area(Poly.clip(poly, rect))) > 1;
+            },
+            /** Where segment 1→2 crosses the polygon's edges */
+            segHits(x1, y1, x2, y2, poly) {
+                const pts = [];
+                for (let i = 0; i < poly.length; i++) {
+                    const a = poly[i], b = poly[(i + 1) % poly.length], t = _segEdgeT(x1, y1, x2, y2, a.x, a.y, b.x, b.y);
+                    if (t >= 0) pts.push({ x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) });
+                }
+                return pts;
+            },
+            /** Trace it as a path on ctx */
+            trace(ctx, poly) { ctx.moveTo(poly[0].x, poly[0].y); for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y); ctx.closePath(); }
+        };
+
         /**
          * ================================================================================
          * ROAD NETWORK - SEGMENT-BASED ARCHITECTURE
@@ -374,6 +445,9 @@
                 this.centerX = x + width / 2;
                 this.centerY = y + height / 2;
                 
+                // Where an angled road meets another, the box is only its bounds: `poly` is the junction's real shape
+                this.poly = null;
+                
                 // === CONNECTED ROADS ===
                 this.roads = [];
                 this.roadIds = [];
@@ -482,12 +556,11 @@
             
             containsPoint(x, y) {
                 return x >= this.x && x <= this.x + this.width &&
-                       y >= this.y && y <= this.y + this.height;
+                       y >= this.y && y <= this.y + this.height && (!this.poly || Poly.contains(this.poly, x, y));
             }
             
             isVehicleInside(vehicle) {
-                return (vehicle.x >= this.x && vehicle.x <= this.x + this.width &&
-                        vehicle.y >= this.y && vehicle.y <= this.y + this.height);
+                return this.containsPoint(vehicle.x, vehicle.y);
             }
             
             // === QUEUE MANAGEMENT ===
@@ -788,23 +861,12 @@
                 for (let i = 0; i < totalLanes; i++) {
                     const laneOffset = (i * this.laneWidth) + (this.laneWidth / 2) - halfT;
                     
-                    // Direction convention:
-                    // First half of lanes (i < numLanes) sit on one side of the centerline,
-                    // second half on the other. Sign assignment per orientation:
+                    // Direction convention: traffic keeps right. The first half of the lanes (i < numLanes) sit on the
+                    // left of the road's own direction (x1,y1 → x2,y2) and run against it; the second half run with it.
                     //   H roads: top=-1 (right→left), bottom=1 (left→right)
-                    //   V roads: left=-1 (bottom→top), right=1 (top→bottom)  [INVERTED]
-                    //   D roads: left side=1, right side=-1
-                    let direction;
-                    if (this.symmetrical) {
-                        if (this.orientation === 'D') {
-                            direction = (i < this.numLanes ? 1 : -1);
-                        } else {
-                            // H and V share the same sign pattern after V inversion
-                            direction = (i < this.numLanes ? -1 : 1);
-                        }
-                    } else {
-                        direction = 1;
-                    }
+                    //   V roads: east=-1 (bottom→top), west=1 (top→bottom)
+                    //   angled roads the same, measured from their own direction
+                    const direction = this.symmetrical ? (i < this.numLanes ? -1 : 1) : 1;
                     
                     // Compute lane start/end in world coords using parametric projection
                     const laneStart = this.paramToWorld(segment.startCoord, laneOffset);
@@ -860,7 +922,8 @@
             }
             
             generateLamps(network, spacing = 200) {
-                if (!this.hasPavements || this.isDiagonal) return [];
+                if (!this.hasPavements) return [];
+                if (this.isDiagonal) return this._angledLamps(spacing);
             
                 const lamps = [];
                 const CROSSWALK_BUFFER = 45; 
@@ -940,6 +1003,33 @@
                     });
                 });
             
+                return lamps;
+            }
+            
+            /** An angled road's lamps: along both pavements, 20 px out from the kerb, clear of its junctions and crossings */
+            _angledLamps(spacing) {
+                const lamps = [], hT = this.thickness / 2, BUFFER = 45 + this.pavementWidth;
+                const ex = this.intersections.map(ix => {
+                    const a = (ix.poly || [{ x: ix.x, y: ix.y }, { x: ix.x + ix.width, y: ix.y + ix.height }]).map(q => this.worldToParam(q.x, q.y).along);
+                    return { start: Math.min(...a) - BUFFER, end: Math.max(...a) + BUFFER };
+                }).sort((a, b) => a.start - b.start);
+                const runs = [];
+                let cursor = 0;
+                for (const e of ex) { if (e.start > cursor) runs.push({ start: cursor, end: e.start }); cursor = Math.max(cursor, e.end); }
+                if (cursor < this.length) runs.push({ start: cursor, end: this.length });
+                for (const run of runs) {
+                    const len = run.end - run.start;
+                    if (len < 50) continue;
+                    const count = Math.max(1, Math.floor(len / spacing)), step = len / (count + 1);
+                    for (const side of [-1, 1]) {
+                        // the arm faces the road: angle = the way out from the kerb, less a quarter turn (as on the H/V roads)
+                        const angle = Math.atan2(this.ny * side, this.nx * side) - Math.PI / 2;
+                        for (let i = 1; i <= count; i++) {
+                            const p = this.paramToWorld(run.start + step * i, side * (hT + 20));
+                            lamps.push(new LampEntity({ x: p.x, y: p.y, lampType: 2, color: side < 0 ? '#ffaa00' : '#ffffff', angle }));
+                        }
+                    }
+                }
                 return lamps;
             }
             
@@ -1125,6 +1215,7 @@
                                 overlap.x - 5, overlap.y - 5,
                                 overlap.w + 10, overlap.h + 10
                             );
+                            if (overlap.poly) intersection.poly = overlap.poly;
                             
                             intersection.addRoad(r1);
                             intersection.addRoad(r2);
@@ -1167,58 +1258,39 @@
                     return { x, y, w, h };
                 }
                 
-                // At least one diagonal road — find centerline intersection point
-                // Project road center lines and find closest approach
-                const seg1 = { x1: r1.x1, y1: r1.y1, x2: r1.x2, y2: r1.y2 };
-                const seg2 = { x1: r2.x1, y1: r2.y1, x2: r2.x2, y2: r2.y2 };
-                
-                // Line-line intersection
-                const d1x = seg1.x2 - seg1.x1, d1y = seg1.y2 - seg1.y1;
-                const d2x = seg2.x2 - seg2.x1, d2y = seg2.y2 - seg2.y1;
-                const denom = d1x * d2y - d1y * d2x;
-                
-                let ix, iy;
-                if (Math.abs(denom) < 0.001) {
-                    // Parallel — use midpoint of overlap region
-                    ix = (Math.max(r1.x, r2.x) + Math.min(r1.x + r1.w, r2.x + r2.w)) / 2;
-                    iy = (Math.max(r1.y, r2.y) + Math.min(r1.y + r1.h, r2.y + r2.h)) / 2;
-                } else {
-                    const t = ((seg2.x1 - seg1.x1) * d2y - (seg2.y1 - seg1.y1) * d2x) / denom;
-                    ix = seg1.x1 + t * d1x;
-                    iy = seg1.y1 + t * d1y;
+                // An angled road: the junction is where the two carriageways overlap, widened to each road's full
+                // width over that stretch (so a T, where one ends on the other, takes in the far lanes too)
+                const P = Poly.clip(r1.getCorners(), r2.getCorners());
+                if (P.length < 3 || Math.abs(Poly.area(P)) < 100) return null;
+                const pts = [];
+                for (const r of [r1, r2]) {
+                    let a0 = Infinity, a1 = -Infinity;
+                    for (const q of P) { const a = r.worldToParam(q.x, q.y).along; if (a < a0) a0 = a; if (a > a1) a1 = a; }
+                    a0 = Math.max(0, a0); a1 = Math.min(r.length, a1);
+                    const hT = r.thickness / 2;
+                    pts.push(r.paramToWorld(a0, -hT), r.paramToWorld(a0, hT), r.paramToWorld(a1, -hT), r.paramToWorld(a1, hT));
                 }
-                
-                // Check that intersection point is within both roads' extents
-                const p1 = r1.worldToParam(ix, iy);
-                const p2 = r2.worldToParam(ix, iy);
-                const halfT1 = r1.thickness / 2 + 5;
-                const halfT2 = r2.thickness / 2 + 5;
-                
-                if (p1.along < -halfT1 || p1.along > r1.length + halfT1) return null;
-                if (p2.along < -halfT2 || p2.along > r2.length + halfT2) return null;
-                if (Math.abs(p1.lateral) > halfT1 + halfT2) return null;
-                if (Math.abs(p2.lateral) > halfT1 + halfT2) return null;
-                
-                // Create intersection box centered on the crossing point
-                const size = Math.max(r1.thickness, r2.thickness);
-                return { x: ix - size / 2, y: iy - size / 2, w: size, h: size };
+                const poly = Poly.hull(pts);
+                return { ...Poly.box(poly), poly };
             }
             
             _buildSegments() {
                 for (const road of this.roads) {
                     const intCoords = [];
                     for (const intersection of road.intersections) {
-                        // Project intersection AABB corners onto road axis to get parametric span
+                        // Project the junction's corners (its box, or its shape where an angled road meets) onto the road axis
                         const ix = intersection.x, iy = intersection.y;
                         const iw = intersection.width, ih = intersection.height;
-                        const corners = [
+                        const corners = intersection.poly ? intersection.poly.map(q => road.worldToParam(q.x, q.y)) : [
                             road.worldToParam(ix, iy),
                             road.worldToParam(ix + iw, iy),
                             road.worldToParam(ix, iy + ih),
                             road.worldToParam(ix + iw, iy + ih)
                         ];
-                        const minAlong = Math.min(...corners.map(c => c.along));
-                        const maxAlong = Math.max(...corners.map(c => c.along));
+                        // (a shape gets the same 5 px either side a box has, so its lanes end just outside it and cross its edge)
+                        const pad = intersection.poly ? 5 : 0;
+                        const minAlong = Math.min(...corners.map(c => c.along)) - pad;
+                        const maxAlong = Math.max(...corners.map(c => c.along)) + pad;
                         intCoords.push({ id: intersection.id, coord: minAlong, width: maxAlong - minAlong });
                     }
                     
@@ -1372,7 +1444,8 @@
                     lane.intersectingZones = [];
                     
                     for (let intersection of this.intersections) {
-                        const hits = getLineRectIntersections(
+                        // (a junction's shape sits 5 px past the lane's end: the line is run on 10 px to meet it)
+                        const hits = intersection.poly ? Poly.segHits(lane.start.x - lane.ux * 10, lane.start.y - lane.uy * 10, lane.end.x + lane.ux * 10, lane.end.y + lane.uy * 10, intersection.poly) : getLineRectIntersections(
                             lane.start.x, lane.start.y, lane.end.x, lane.end.y,
                             intersection.x, intersection.y, intersection.width, intersection.height
                         );
@@ -1382,7 +1455,7 @@
                             let entryDist = Infinity;
                             
                             for (let hit of hits) {
-                                const dist = Math.hypot(hit.x - lane.start.x, hit.y - lane.start.y);
+                                const dist = Math.max(0, (hit.x - lane.start.x) * lane.ux + (hit.y - lane.start.y) * lane.uy);
                                 if (dist < entryDist) {
                                     entryDist = dist;
                                     entryPoint = hit;
@@ -1581,10 +1654,7 @@
             }
             
             getIntersectionsForRoad(road) {
-                return this.intersections.filter(i => 
-                    i.x <= road.x + road.w && i.x + i.width >= road.x &&
-                    i.y <= road.y + road.h && i.y + i.height >= road.y
-                );
+                return this.intersections.filter(i => i.roads.includes(road));
             }
             
             generateCrosswalks(pavements) {

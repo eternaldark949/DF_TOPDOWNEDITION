@@ -357,6 +357,14 @@
                 if (RL.at('floors') && this._renderGridCrosswalks && !bakedGround) {
                     const visibleCrosswalks = this._renderGridCrosswalks.query(cullBounds.world, this._renderGridCrosswalks._drawResults || (this._renderGridCrosswalks._drawResults = new Set()));
                     for (const cw of visibleCrosswalks) {
+                        if (cw.axis) {                                                  // over an angled road: in its own frame
+                            const A = cw.axis, c = this.ctx;
+                            c.fillStyle = '#1a1a20'; c.beginPath(); Poly.trace(c, cw.poly); c.fill();
+                            c.save(); c.transform(A.ux, A.uy, A.nx, A.ny, A.ox, A.oy); c.fillStyle = '#ddd';
+                            for (let l = -A.hT + 8; l < A.hT - 8; l += 18) c.fillRect(A.a0 + 8, l, A.a1 - A.a0 - 16, 12);
+                            c.restore();
+                            continue;
+                        }
                         this.ctx.fillStyle = '#1a1a20';
                         this.ctx.fillRect(cw.x, cw.y, cw.w, cw.h);
                         
