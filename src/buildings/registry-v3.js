@@ -406,6 +406,7 @@
              * @param {object} metadata.sign - Sign config {text, color, size}
              * @param {object} metadata.door - Door config {target, label, lightColor}
              * @param {number} metadata.floors - Number of floors (for facade depth)
+             * @param {object} [metadata.apron] - {x, y, w, h} in the building's frame: forecourt it draws outside its sections
              */
             register(id, metadata) {
                 // Calculate bounding box from sections
@@ -417,6 +418,8 @@
                     sections: metadata.sections,
                     w: bounds.w,
                     h: bounds.h,
+                    ox: bounds.x, oy: bounds.y,       // where the sections start in the building's own frame (Double Nights' start at 50, 21)
+                    apron: metadata.apron || null,    // ground it draws outside its sections (portico, forecourt, drive), local: CityLayout keeps it in the block
                     accentColor: metadata.accentColor,
                     label: metadata.label,
                     type: metadata.type,
@@ -518,7 +521,8 @@
             category: 'residential',
             floors: 18,
             sign: { text: 'Silver Queen', color: '#8142ff', size: 32 },
-            door: { target: 'apt_949', label: 'Enter Apartment', lightColor: '#9900ff' }
+            door: { target: 'apt_949', label: 'Enter Apartment', lightColor: '#9900ff' },
+            apron: { x: -40, y: 880, w: 430, h: 150 }   // the portico, steps and carpet: _sqForecourt (buildings/silver-queen.js)
         });
         
         BuildingV2Registry.register('enni_cole', {
@@ -561,7 +565,8 @@
             category: 'hospitality',
             floors: 14,
             sign: { text: 'Double Nights', color: '#ff1a55', size: 32 },
-            door: { target: 'hotel_lobby', label: 'Enter Hotel', lightColor: '#ffdf80' }
+            door: { target: 'hotel_lobby', label: 'Enter Hotel', lightColor: '#ffdf80' },
+            apron: { x: -10, y: 380, w: 820, h: 480 }   // the drive, fountain and forecourt: _dnForecourt (buildings/double-nights.js)
         });
         
         BuildingV2Registry.register('moon_city', {
@@ -576,7 +581,8 @@
             category: 'entertainment',
             floors: 4,
             sign: { text: 'CLUB', color: '#c8a8ff', size: 40 },
-            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' }
+            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' },
+            apron: { x: 0, y: 490, w: 280, h: 194 }     // the court, the queue and the carpet's end: _mcForecourt (buildings/moon-city.js)
         });
         
         // Generic V2 buildings for auto-fill (not unique — can be placed multiple times)

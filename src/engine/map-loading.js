@@ -397,8 +397,8 @@ engineMixin({
                     
                     // 2. DEFINE ROAD GRID
                     // Horizontal roads (Y = center position)
-                    // First road pushed south to accommodate larger Silver Queen Apartments
-                    city.addHorizontalRoad(1200, 'Hotel Dr.', 2);
+                    // First road pushed south so the Silver Queen's portico and the Double Nights' drive stay off its pavement
+                    city.addHorizontalRoad(1260, 'Hotel Dr.', 2);
                     city.addHorizontalRoad(2500, 'Crimson Blvd', 3);     // Main artery
                     city.addHorizontalRoad(3800, 'Commerce Blvd', 2);
                     city.addHorizontalRoad(4900, 'Skyline Ave', 2);
@@ -423,7 +423,7 @@ engineMixin({
                     // Register V1 templates and override V2 landmarkIds where needed
                     city.registerTemplates({
                         // V2 buildings: just specify landmarkId (dimensions come from registry)
-                        silver_queen: { landmarkId: 'parking_spot' },
+                        silver_queen: { landmarkId: 'parking_spot', margin: 15 },   // portico and all, it's 1030 px deep: a narrower margin fits it in its block
                         enni_cole: { landmarkId: 'enni_cole' },
                         double_nights: { landmarkId: 'hotel_entrance' },
                         cozy_cafe: { landmarkId: 'cozy_cafe' },
@@ -463,7 +463,7 @@ engineMixin({
                     // Col 0 = west side, Col 2 = center, Col 4 = east side
                     
                     city.placeBuilding('silver_queen', 'block_0_0', { align: 'center' });   // Silver Queen Apartments - NW
-                    city.placeBuilding('double_nights', 'block_0_2', { align: 'center' });  // Double Nights Hotel - N center
+                    city.placeBuilding('double_nights', 'block_0_2', { align: 'bottom', margin: 5 });  // Double Nights Hotel - N center, its drive meeting the pavement
                     city.placeBuilding('moon_city', 'block_2_2', { align: 'center' });      // Moon City Nightclub - center
                     city.placeBuilding('enni_cole', 'block_2_4', { align: 'center' });      // Enni Cole - E side
                     city.placeBuilding('cozy_cafe', 'block_4_0', { align: 'center' });      // Cozy Cafe - W side
@@ -525,7 +525,7 @@ engineMixin({
                         
                         // Check BuildingV2Registry first (single source of truth)
                         if (t.isV2 && BuildingV2Registry.has(p.templateId)) {
-                            const building = BuildingV2Registry.create(p.templateId, p.x, p.y, { 
+                            const building = BuildingV2Registry.create(p.templateId, p.originX ?? p.x, p.originY ?? p.y, { 
                                 doorTarget: t.door?.target 
                             });
                             // Propagate mapCategory from template for map icons
@@ -829,8 +829,8 @@ engineMixin({
                     for (const b of mapData.buildings || []) {
                         const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : b.style === 'moon_city' ? b._mcForecourt() : null;
                         if (!court) continue;
-                        const inCourt = (o) => o.x > court.x && o.x < court.x + court.w && o.y > court.y && o.y < court.y + court.h;
-                        mapData.foliage = mapData.foliage.filter(f => !inCourt(f));
+                        const inCourt = (o, front = 0) => o.x > court.x && o.x < court.x + court.w && o.y > court.y && o.y < court.y + court.h + front;
+                        mapData.foliage = mapData.foliage.filter(f => !inCourt(f, 110));   // nor on the pavement in front, where a canopy would hide the steps
                         mapData.lamps = mapData.lamps.filter(l => !inCourt(l));
                     }
                     // The parks' trees and lanterns (their ground is painted by the ground baker)

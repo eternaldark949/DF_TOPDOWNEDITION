@@ -34156,6 +34156,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * @param {object} metadata.sign - Sign config {text, color, size}
              * @param {object} metadata.door - Door config {target, label, lightColor}
              * @param {number} metadata.floors - Number of floors (for facade depth)
+             * @param {object} [metadata.apron] - {x, y, w, h} in the building's frame: forecourt it draws outside its sections
              */
             register(id, metadata) {
                 // Calculate bounding box from sections
@@ -34167,6 +34168,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     sections: metadata.sections,
                     w: bounds.w,
                     h: bounds.h,
+                    ox: bounds.x, oy: bounds.y,       // where the sections start in the building's own frame (Double Nights' start at 50, 21)
+                    apron: metadata.apron || null,    // ground it draws outside its sections (portico, forecourt, drive), local: CityLayout keeps it in the block
                     accentColor: metadata.accentColor,
                     label: metadata.label,
                     type: metadata.type,
@@ -34268,7 +34271,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             category: 'residential',
             floors: 18,
             sign: { text: 'Silver Queen', color: '#8142ff', size: 32 },
-            door: { target: 'apt_949', label: 'Enter Apartment', lightColor: '#9900ff' }
+            door: { target: 'apt_949', label: 'Enter Apartment', lightColor: '#9900ff' },
+            apron: { x: -40, y: 880, w: 430, h: 150 }   // the portico, steps and carpet: _sqForecourt (buildings/silver-queen.js)
         });
         
         BuildingV2Registry.register('enni_cole', {
@@ -34311,7 +34315,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             category: 'hospitality',
             floors: 14,
             sign: { text: 'Double Nights', color: '#ff1a55', size: 32 },
-            door: { target: 'hotel_lobby', label: 'Enter Hotel', lightColor: '#ffdf80' }
+            door: { target: 'hotel_lobby', label: 'Enter Hotel', lightColor: '#ffdf80' },
+            apron: { x: -10, y: 380, w: 820, h: 480 }   // the drive, fountain and forecourt: _dnForecourt (buildings/double-nights.js)
         });
         
         BuildingV2Registry.register('moon_city', {
@@ -34326,7 +34331,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             category: 'entertainment',
             floors: 4,
             sign: { text: 'CLUB', color: '#c8a8ff', size: 40 },
-            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' }
+            door: { target: 'moon_city_nightclub', label: 'Enter Club', lightColor: '#ff3a6a' },
+            apron: { x: 0, y: 490, w: 280, h: 194 }     // the court, the queue and the carpet's end: _mcForecourt (buildings/moon-city.js)
         });
         
         // Generic V2 buildings for auto-fill (not unique — can be placed multiple times)
@@ -48880,6 +48886,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Check if this is a V2 building in the registry
                 if (typeof BuildingV2Registry !== 'undefined' && BuildingV2Registry.has(id)) {
                     const v2Data = BuildingV2Registry.get(id);
+                    // The sections' box and everything it draws on the ground (its apron), in its own frame
+                    const footprint = { x: v2Data.ox || 0, y: v2Data.oy || 0, w: v2Data.w, h: v2Data.h }, a = v2Data.apron;
+                    const extent = a ? (() => {
+                        const x = Math.min(footprint.x, a.x), y = Math.min(footprint.y, a.y);
+                        return { x, y, w: Math.max(footprint.x + footprint.w, a.x + a.w) - x, h: Math.max(footprint.y + footprint.h, a.y + a.h) - y };
+                    })() : footprint;
                     this.buildingTemplates[id] = {
                         id: id,
                         w: v2Data.w,
@@ -48895,7 +48907,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         margin: config.margin || 30,
                         landmarkId: config.landmarkId || null,
                         isV2: true,
-                        v2Id: id
+                        v2Id: id,
+                        footprint, extent
                     };
                     console.log(`CityLayout: Registered V2 building '${id}' from registry (${v2Data.w}x${v2Data.h})`);
                 } else {
@@ -48955,22 +48968,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const w = options.w || template.w;
                 const h = options.h || template.h;
                 const margin = options.margin || template.margin || 30;
+                // Fit everything it occupies (its sections and its apron: portico, forecourt, drive), not just the sections
+                const sized = options.w || options.h || !template.extent;
+                const ext = sized ? { x: 0, y: 0, w, h } : template.extent;
+                const foot = sized ? { x: 0, y: 0 } : template.footprint;
                 
-                const coords = this._calculateBuildingPosition(block, w, h, margin, options.align || 'center');
+                const coords = this._calculateBuildingPosition(block, ext.w, ext.h, margin, options.align || 'center');
                 if (!coords) { console.warn(`Not enough space in ${blockName} for ${templateId}`); return null; }
                 
-                if (this._intersectsSafeZone(coords.x, coords.y, w, h)) {
+                if (this._intersectsSafeZone(coords.x, coords.y, ext.w, ext.h)) {
                     console.warn(`Building ${templateId} intersects safe zone in ${blockName}`);
                     return null;
                 }
                 
+                // x, y, w, h: the sections' box in the world; originX/Y: where the building itself goes (its frame's 0, 0)
+                const originX = coords.x - ext.x, originY = coords.y - ext.y;
                 const placement = {
                     templateId, template, blockName,
-                    x: coords.x, y: coords.y, w, h, options
+                    x: originX + foot.x, y: originY + foot.y, w, h, originX, originY,
+                    extent: { x: coords.x, y: coords.y, w: ext.w, h: ext.h }, options
                 };
                 
                 this.placedBuildings.push(placement);
-                this._addSafeZone(coords.x - margin/2, coords.y - margin/2, w + margin, h + margin, `Building: ${template.label}`);
+                this._addSafeZone(coords.x - margin/2, coords.y - margin/2, ext.w + margin, ext.h + margin, `Building: ${template.label}`);
                 
                 // Auto-set block lamp color for V2 buildings from their accent color
                 if (template.isV2 && template.color) {
@@ -61655,8 +61675,8 @@ engineMixin({
                     
                     // 2. DEFINE ROAD GRID
                     // Horizontal roads (Y = center position)
-                    // First road pushed south to accommodate larger Silver Queen Apartments
-                    city.addHorizontalRoad(1200, 'Hotel Dr.', 2);
+                    // First road pushed south so the Silver Queen's portico and the Double Nights' drive stay off its pavement
+                    city.addHorizontalRoad(1260, 'Hotel Dr.', 2);
                     city.addHorizontalRoad(2500, 'Crimson Blvd', 3);     // Main artery
                     city.addHorizontalRoad(3800, 'Commerce Blvd', 2);
                     city.addHorizontalRoad(4900, 'Skyline Ave', 2);
@@ -61681,7 +61701,7 @@ engineMixin({
                     // Register V1 templates and override V2 landmarkIds where needed
                     city.registerTemplates({
                         // V2 buildings: just specify landmarkId (dimensions come from registry)
-                        silver_queen: { landmarkId: 'parking_spot' },
+                        silver_queen: { landmarkId: 'parking_spot', margin: 15 },   // portico and all, it's 1030 px deep: a narrower margin fits it in its block
                         enni_cole: { landmarkId: 'enni_cole' },
                         double_nights: { landmarkId: 'hotel_entrance' },
                         cozy_cafe: { landmarkId: 'cozy_cafe' },
@@ -61721,7 +61741,7 @@ engineMixin({
                     // Col 0 = west side, Col 2 = center, Col 4 = east side
                     
                     city.placeBuilding('silver_queen', 'block_0_0', { align: 'center' });   // Silver Queen Apartments - NW
-                    city.placeBuilding('double_nights', 'block_0_2', { align: 'center' });  // Double Nights Hotel - N center
+                    city.placeBuilding('double_nights', 'block_0_2', { align: 'bottom', margin: 5 });  // Double Nights Hotel - N center, its drive meeting the pavement
                     city.placeBuilding('moon_city', 'block_2_2', { align: 'center' });      // Moon City Nightclub - center
                     city.placeBuilding('enni_cole', 'block_2_4', { align: 'center' });      // Enni Cole - E side
                     city.placeBuilding('cozy_cafe', 'block_4_0', { align: 'center' });      // Cozy Cafe - W side
@@ -61783,7 +61803,7 @@ engineMixin({
                         
                         // Check BuildingV2Registry first (single source of truth)
                         if (t.isV2 && BuildingV2Registry.has(p.templateId)) {
-                            const building = BuildingV2Registry.create(p.templateId, p.x, p.y, { 
+                            const building = BuildingV2Registry.create(p.templateId, p.originX ?? p.x, p.originY ?? p.y, { 
                                 doorTarget: t.door?.target 
                             });
                             // Propagate mapCategory from template for map icons
@@ -62087,8 +62107,8 @@ engineMixin({
                     for (const b of mapData.buildings || []) {
                         const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : b.style === 'moon_city' ? b._mcForecourt() : null;
                         if (!court) continue;
-                        const inCourt = (o) => o.x > court.x && o.x < court.x + court.w && o.y > court.y && o.y < court.y + court.h;
-                        mapData.foliage = mapData.foliage.filter(f => !inCourt(f));
+                        const inCourt = (o, front = 0) => o.x > court.x && o.x < court.x + court.w && o.y > court.y && o.y < court.y + court.h + front;
+                        mapData.foliage = mapData.foliage.filter(f => !inCourt(f, 110));   // nor on the pavement in front, where a canopy would hide the steps
                         mapData.lamps = mapData.lamps.filter(l => !inCourt(l));
                     }
                     // The parks' trees and lanterns (their ground is painted by the ground baker)

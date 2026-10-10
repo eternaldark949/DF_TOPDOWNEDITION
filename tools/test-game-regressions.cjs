@@ -1496,6 +1496,32 @@ test('Visibility: her halo by day, by night and in night vision (and off with Pl
   for (const k of ['day', 'night', 'nv', 'nvOff', 'dayOff']) equal([r[k].heat, r[k].open, r[k].world], [0, false, true], `${k}: nothing is left switched on, and the world canvas is restored`);
 }, {affine:true});
 
+test('City: no building, portico, forecourt or drive in the hub reaches a pavement or road', env => {
+  const r = value(env, `
+    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    const map = game.activeMap, net = game.traffic.network;
+    const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    const street = [...map.pavements.map(p => ({x:p.x, y:p.y, w:p.w, h:p.h, what:'pavement'})),
+                    ...net.roads.map(p => ({x:p.x, y:p.y, w:p.w, h:p.h, what:'road ' + p.name}))];
+    const overlaps = [], aprons = {};
+    for (const b of map.buildings) {
+      const parts = (b.isV2 && b.getCollisionShapes ? b.getCollisionShapes() : [{x:b.x, y:b.y, w:b.w, h:b.h}]).map(s => ({...s, part:'walls'}));
+      const court = b.style === 'silver_queen' && b._sqForecourt ? b._sqForecourt() : b.style === 'double_nights' ? b._dnForecourt() : b.style === 'moon_city' ? b._mcForecourt() : null;
+      if (court) {
+        parts.push({...court, part:'forecourt'});
+        const a = BuildingV2Registry.get(b.id).apron;
+        aprons[b.id] = a && [a.x + b.x - court.x, a.y + b.y - court.y, a.w - court.w, a.h - court.h];
+      }
+      for (const s of parts) for (const z of street) if (hit(s, z)) overlaps.push(b.id + ' ' + s.part + ' on ' + z.what);
+    }
+    return {overlaps: [...new Set(overlaps)], aprons, count: map.buildings.length};
+  `);
+  ok(r.count > 9, 'the hub has its buildings');
+  equal(r.overlaps, [], 'nothing built on the street');
+  // The registry's aprons are what CityLayout keeps in the block: they must match what the landmarks draw
+  equal(r.aprons, {silver_queen:[0,0,0,0], double_nights:[0,0,0,0], moon_city:[0,0,0,0]}, 'aprons match the forecourts');
+});
+
 test('Every bundled map loads, updates and draws without runtime errors', env => {
   const maps = Object.keys(env.probe.MAPS);
   ok(maps.length >= 20, 'all bundled maps are present');
