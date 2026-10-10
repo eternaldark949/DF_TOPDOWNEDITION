@@ -8,7 +8,8 @@
            a moon pool, paths in from the gates, beds of pink, violet and white
            flowers, benches facing the water.
            ===================================================================== */
-        const HUB_PARKS = { block_6_4: 'Lotus Park', block_8_2: 'Violet Commons', block_12_0: 'Moonwell Gardens' };
+        const HUB_PARKS = { block_6_4: 'Lotus Park', block_8_2: 'Violet Commons', block_12_0: 'Moonwell Gardens',
+                            block_6_10: 'Nightshade Green', block_14_6: 'Starfall Commons', block_10_12: 'Eclipse Gardens' };
 
         function parkLayout(b) {
             if (b._park) return b._park;

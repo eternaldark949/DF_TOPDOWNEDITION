@@ -1066,11 +1066,23 @@
                 for (const o of out) { if (!o.markedForDestroy) o.destroy(); const i = this.pedestrians.indexOf(o); if (i >= 0) this.pedestrians.splice(i, 1); }
             }
 
+            /** The walk nodes within reach of a spawn round her (no crossings), listed again once she has moved 300 px */
+            _nodesNear(x, y) {
+                const c = this._near, all = this.network.nodes;
+                if (c && c.all === all && Math.abs(c.x - x) < 300 && Math.abs(c.y - y) < 300) return c.list;
+                const lo = this.spawnRadius.min - 450, hi = this.spawnRadius.max + 450;
+                const list = all.filter(n => { if (n.isCrosswalk) return false; const d = Math.hypot(n.x - x, n.y - y); return d > lo && d < hi; });
+                this._near = { all, x, y, list };
+                return list;
+            }
+
             _trySpawn(player, map) {
+                const pool = this._nodesNear(player.x, player.y);
+                if (!pool.length) return;
                 // Try a few times to find a good spawn point
                 for (let attempt = 0; attempt < 5; attempt++) {
-                    // Pick a random node in the network
-                    const node = this.network.nodes[Math.floor(Math.random() * this.network.nodes.length)];
+                    // Pick a random node near her
+                    const node = pool[Math.floor(Math.random() * pool.length)];
                     if (!node || node.isCrosswalk) continue; // Don't spawn on crosswalks
                     
                     const dist = Math.hypot(node.x - player.x, node.y - player.y);

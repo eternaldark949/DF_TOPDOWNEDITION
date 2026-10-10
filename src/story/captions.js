@@ -414,8 +414,8 @@
                 for (let npc of npcs) {
                     const dist = Math.hypot(player.x - npc.x, player.y - npc.y);
                     if (dist < greetingDistance) {
-                        // Special: Ms. Jean near cemetery (southern graveyard y > 8800)
-                        if (npc.name === 'Ms. Jean' && player.y > 8800) {
+                        // Special: Ms. Jean near cemetery (the southern graveyard, HUB_GRAVEYARD)
+                        if (npc.name === 'Ms. Jean' && player.y > HUB_GRAVEYARD.y) {
                             if (Math.random() < 0.015) {
                                 const line = this.getRandomLine('msJean', 'nearCemetery');
                                 if (line) this.show(npc.name, line, 4000);

@@ -41,6 +41,9 @@
         }
         // Fireplaces: where the art draws the fire, and where the ambience hears it crackle
         const HEARTHS = { apt_949: { x: 580, y: 432 }, keepers_parlor: { x: 450, y: 62 }, cozy_cafe_interior: { x: 90, y: 535 } };
+        // The city's graveyard, in the wide block on its southern edge (engine/map-loading.js 11d builds it; its music, candle glow,
+        // ghosts and Ms. Jean's lines all go by this)
+        const HUB_GRAVEYARD = Object.freeze({ x: 4750, y: 11360, w: 2700, h: 1760 });
 
         // ╔════════════════════════════════════════════════════════════════════════════╗
         // ║     DIMENSIONS: FREELANCER - PERFORMANCE INFRASTRUCTURE                    ║

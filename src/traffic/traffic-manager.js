@@ -235,17 +235,20 @@
                 // 2. SPAWN LOGIC
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
                     this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
-                    if (this.network.allLanes.length > 0) {
+                    const pool = this.network.allLanes.length ? this._lanesNear(player.x, player.y) : [];
+                    if (pool.length > 0) {
                         // Spawn out of sight where possible: the camera's view plus a margin
                         const gv = typeof game !== 'undefined' ? game.view : null, cv = typeof game !== 'undefined' ? game.canvas : null;
                         const hw = gv && cv ? cv.width / 2 / gv.zoom + 120 : 0, hh = gv && cv ? cv.height / 2 / gv.zoom + 120 : 0;
                         for(let k=0; k<14; k++) { 
-                            const spawnLane = this.network.allLanes[Math.floor(Math.random() * this.network.allLanes.length)];
+                            const spawnLane = pool[Math.floor(Math.random() * pool.length)];
                             // Choose the car first, so the check is made where it will actually appear
                             const brand = TrafficVehicle._selectRandomBrand(), model = TrafficVehicle._selectRandomModel(brand);
                             const md = VEHICLE_BRANDS[brand].models[model], len = md.length;
                             let clear = true;
-                            const spawnOffset = len * 2;              // TrafficVehicle places it two lengths in
+                            // two lengths in (TrafficVehicle's default), or further along a long lane that only passes near her
+                            const spawnOffset = this._spawnAlong(spawnLane, player, len);
+                            if (spawnOffset === null) continue;
                             const spawnX = spawnLane.start.x + spawnLane.ux * spawnOffset;
                             const spawnY = spawnLane.start.y + spawnLane.uy * spawnOffset;
                             const distToP = Math.hypot(player.x - spawnX, player.y - spawnY);
@@ -265,7 +268,7 @@
                             }
                             if (clear) {
                                 // Spawn new vehicle - it auto-registers via GameEntity queue
-                                const newVehicle = new TrafficVehicle(spawnLane, brand, model);
+                                const newVehicle = new TrafficVehicle(spawnLane, brand, model, 'AI', spawnOffset);
                                 newVehicle.fade = 0;
                                 this.vehicles.push(newVehicle);
                                 break; 
@@ -273,6 +276,42 @@
                         }
                     }
                 }
+            }
+            
+            /**
+             * The lanes starting within reach of a spawn round her (x, y), listed again once she has moved 300 px: on a big
+             * map most lanes are far off, and drawing from all of them would rarely find one in range.
+             */
+            _lanesNear(x, y) {
+                const c = this._near, all = this.network.allLanes;
+                if (c && c.all === all && Math.abs(c.x - x) < 300 && Math.abs(c.y - y) < 300) return c.list;
+                // any lane that passes through the ring round her (with slack for her moves since)
+                const lo = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN - 450, hi = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX + 450;
+                const list = all.filter(l => {
+                    const t = Math.max(0, Math.min(l.length, (x - l.start.x) * l.ux + (y - l.start.y) * l.uy));
+                    const near = Math.hypot(l.start.x + l.ux * t - x, l.start.y + l.uy * t - y);
+                    const far = Math.max(Math.hypot(l.start.x - x, l.start.y - y), Math.hypot(l.end.x - x, l.end.y - y));
+                    return near < hi && far > lo;
+                });
+                this._near = { all, x, y, list };
+                return list;
+            }
+            
+            /**
+             * How far along a lane to start a car of length len: two lengths in where that's in range of her (as ever),
+             * else (on a straight road) a random spot along it in range, clear of both its ends' junctions; null if none.
+             */
+            _spawnAlong(lane, player, len) {
+                const lo = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN, hi = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX;
+                const d0 = Math.hypot(lane.start.x + lane.ux * len * 2 - player.x, lane.start.y + lane.uy * len * 2 - player.y);
+                if (d0 >= lo && d0 <= hi) return len * 2;
+                if (lane.road && lane.road.isCurved) return null;   // (a lane round a bend is its chord: a car started partway would be off the road)
+                const t0 = (player.x - lane.start.x) * lane.ux + (player.y - lane.start.y) * lane.uy;
+                const lat = Math.abs((player.x - lane.start.x) * -lane.uy + (player.y - lane.start.y) * lane.ux);
+                const d = lo + Math.random() * (hi - lo);
+                if (lat >= d) return null;
+                const along = t0 + (Math.random() < 0.5 ? -1 : 1) * Math.sqrt(d * d - lat * lat);
+                return along >= len * 2 && along <= lane.length - len * 4 ? along : null;
             }
             
             /** Down to GameSettings' cap: the farthest cars out of view fade out (hers are never in the list; one rolling stays) */

@@ -4,7 +4,7 @@
         // ============================================================================
         const MAP_DATA = {
             'hub_949': {
-                id: 'hub_949', width: 4000, height: 11000, type: 'outdoor',
+                id: 'hub_949', width: 13200, height: 13200, type: 'outdoor',
                 label: 'Southern Dimensions City', floorColor: '#2a262e',
                 climate: 'city',   // Rain-heavy: clear sky is rare and short here
                 spawn: { x: 1200, y: 550 },
@@ -14,8 +14,8 @@
                     { x: 2000, y: 900, w: 1800, h: 1200, color: '#4a2a2a' },
                     { x: 50, y: 80, w: 800, h: 600, color: '#1a2518' },
                     { x: 200, y: 4500, w: 1500, h: 1200, color: '#3d3d3d' },
-                    { x: 1400, y: 3200, w: 1200, h: 400, color: '#222' },
-                    { x: 500, y: 8800, w: 3000, h: 2000, color: '#1a2e1a' },
+                    // (Biggs Park's dark forecourt goes with it: engine/map-loading.js)
+                    { ...HUB_GRAVEYARD, color: '#1a2e1a' },
                 ],
                 zones: [], buildings: [], walls: [], transitions: []
             },
