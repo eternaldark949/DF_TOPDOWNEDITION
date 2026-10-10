@@ -331,6 +331,12 @@
                 // Check if this is a V2 building in the registry
                 if (typeof BuildingV2Registry !== 'undefined' && BuildingV2Registry.has(id)) {
                     const v2Data = BuildingV2Registry.get(id);
+                    // The sections' box and everything it draws on the ground (its apron), in its own frame
+                    const footprint = { x: v2Data.ox || 0, y: v2Data.oy || 0, w: v2Data.w, h: v2Data.h }, a = v2Data.apron;
+                    const extent = a ? (() => {
+                        const x = Math.min(footprint.x, a.x), y = Math.min(footprint.y, a.y);
+                        return { x, y, w: Math.max(footprint.x + footprint.w, a.x + a.w) - x, h: Math.max(footprint.y + footprint.h, a.y + a.h) - y };
+                    })() : footprint;
                     this.buildingTemplates[id] = {
                         id: id,
                         w: v2Data.w,
@@ -346,7 +352,8 @@
                         margin: config.margin || 30,
                         landmarkId: config.landmarkId || null,
                         isV2: true,
-                        v2Id: id
+                        v2Id: id,
+                        footprint, extent
                     };
                     console.log(`CityLayout: Registered V2 building '${id}' from registry (${v2Data.w}x${v2Data.h})`);
                 } else {
@@ -406,22 +413,29 @@
                 const w = options.w || template.w;
                 const h = options.h || template.h;
                 const margin = options.margin || template.margin || 30;
+                // Fit everything it occupies (its sections and its apron: portico, forecourt, drive), not just the sections
+                const sized = options.w || options.h || !template.extent;
+                const ext = sized ? { x: 0, y: 0, w, h } : template.extent;
+                const foot = sized ? { x: 0, y: 0 } : template.footprint;
                 
-                const coords = this._calculateBuildingPosition(block, w, h, margin, options.align || 'center');
+                const coords = this._calculateBuildingPosition(block, ext.w, ext.h, margin, options.align || 'center');
                 if (!coords) { console.warn(`Not enough space in ${blockName} for ${templateId}`); return null; }
                 
-                if (this._intersectsSafeZone(coords.x, coords.y, w, h)) {
+                if (this._intersectsSafeZone(coords.x, coords.y, ext.w, ext.h)) {
                     console.warn(`Building ${templateId} intersects safe zone in ${blockName}`);
                     return null;
                 }
                 
+                // x, y, w, h: the sections' box in the world; originX/Y: where the building itself goes (its frame's 0, 0)
+                const originX = coords.x - ext.x, originY = coords.y - ext.y;
                 const placement = {
                     templateId, template, blockName,
-                    x: coords.x, y: coords.y, w, h, options
+                    x: originX + foot.x, y: originY + foot.y, w, h, originX, originY,
+                    extent: { x: coords.x, y: coords.y, w: ext.w, h: ext.h }, options
                 };
                 
                 this.placedBuildings.push(placement);
-                this._addSafeZone(coords.x - margin/2, coords.y - margin/2, w + margin, h + margin, `Building: ${template.label}`);
+                this._addSafeZone(coords.x - margin/2, coords.y - margin/2, ext.w + margin, ext.h + margin, `Building: ${template.label}`);
                 
                 // Auto-set block lamp color for V2 buildings from their accent color
                 if (template.isV2 && template.color) {

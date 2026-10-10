@@ -49,7 +49,7 @@ For editor/runtime batches that change static building or foliage geometry, reac
 | `world/parks.js` | **Parks** (`HUB_PARKS`: Lotus Park, Violet Commons, Moonwell Gardens): `parkLayout(block)` (seeded: hedge, gates, gravel walk, moon pool, flower beds, benches, lanterns, trees) and `paintParkGround` |
 | `world/map-entities.js` | `createMapEntities`: props, NPCs and lamps per map (the apartment suite's furniture is here). Shorthands shared by every map: `decorPropsIn(color)`, `softLight`, `areaLight`, `hiddenLamp` (each case aliases them F/S/A/L) |
 | `world/billboards.js` | `BILLBOARDS`: your artwork on tilted panels around the city. Add one by copying a line |
-| `world/city-layout.js` | `CityLayout`: blocks, roads and building placement for the city. `generateSidewalkNetwork`: the pavement walks and the crossings; a crossing's two ends sit on the kerbs either side of the road it crosses (a vertical road's crossing runs left to right) and join the pavement walks near them (within 130 px, else the nearest: never a dead end) |
+| `world/city-layout.js` | `CityLayout`: blocks, roads and building placement for the city. A landmark is placed by everything it occupies: its sections plus its `apron` (portico, forecourt, drive: `BuildingV2Registry.register`, buildings/registry-v3.js), so nothing it draws reaches the pavement; the placement's `x, y, w, h` is its sections' box, `originX/Y` where the building goes. `generateSidewalkNetwork`: the pavement walks and the crossings; a crossing's two ends sit on the kerbs either side of the road it crosses (a vertical road's crossing runs left to right) and join the pavement walks near them (within 130 px, else the nearest: never a dead end) |
 | `world/bokeh.js` | Screen-space bokeh effect |
 
 ## audio/
