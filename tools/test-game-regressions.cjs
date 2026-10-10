@@ -1353,6 +1353,31 @@ test('Junction lights: a red is stopped for at the line behind the crosswalk; am
   ok(r.amber.pushy.went, 'amber: the pushy go on through');
 }, {events:true});
 
+test('Junction lights: right turns only from the kerb lane, and a kerb right turn goes with the car going straight beside it', env => {
+  lightsScene(env);
+  const r = value(env, `
+    const sig = __reset(), mine = sig.cur;
+    // Each lane's own pick: right only from the kerb, left only from the inside, straight from any
+    const lanes = __phases[mine].gates.map(g => g.lane), picks = [];
+    for (const lane of lanes) {
+      const c = new TrafficVehicle(lane, 'Gelfash', 'sedan', 'AI'); c.driverType = 'civilian';
+      for (let i = 0; i < 60; i++) { const p = c.pickTrafficTurn(lane.turnPaths); if (p) picks.push({ type: p.turnType, ok: TrafficVehicle.laneMayTake(lane, p), rank: TrafficVehicle._laneRank(lane) }); }
+      c.destroy();
+    }
+    // Side by side at the line on the green: straight from the inside lane, right from the kerb lane
+    const a = __car(mine, 1, 0, 60, 'straight'), b = __car(mine, 1, 1, 60, 'right');
+    let both = -1;
+    for (let i = 0; i < 200; i++) { game.update(); if (both < 0 && __ix.occupants.includes(a) && __ix.occupants.includes(b)) both = i; }
+    return { wrong: picks.filter(p => !p.ok).length, rights: [...new Set(picks.filter(p => p.type === 'right').map(p => p.rank))], n: picks.length, both,
+      side: JunctionSignal.sideBySide(a._sigPath || a.plannedTurn || a.currentTurnPath, b._sigPath || b.plannedTurn || b.currentTurnPath) };
+  `);
+  ok(r.n > 100, 'every lane picks its turns');
+  equal(r.wrong, 0, 'no lane takes a turn it mustn\'t');
+  equal(r.rights, [1], 'right turns come only from the kerb lane');
+  ok(r.side, 'a kerb right turn and the straight beside it keep out of each other\'s way');
+  ok(r.both >= 0, `they go into the box together (${r.both} ticks)`);
+}, {events:true});
+
 test('Junction lights: a left turn waits for what is coming the other way; nobody goes into a box whose way out is full', env => {
   lightsScene(env);
   const r=value(env, `
@@ -1705,6 +1730,41 @@ test('Curved streets: cars slow for Halfmoon Bend, keep to their lanes round it 
   ok(r.turns >= 3, 'cars turn into it and out of it');
   ok(r.n > 100 && r.p90 < 12, `cars keep to their lanes round the bend (90% within ${r.p90 | 0} px)`);
   equal(r.fast, 0, 'nobody takes the bend flat out');
+}, {affine:true});
+
+test('Junction turns curve straight into the lane out: no swing the other way first, on square, angled and curved streets', env => {
+  const geo = value(env, `
+    game.story.update=()=>{}; game._doLoadMap('hub_949');
+    let n = 0, swing = 0, inErr = 0, outErr = 0;
+    for (const tp of game.traffic.network.turnPaths) {
+      if (tp.turnType === 'straight' || tp.fromLane.road === tp.toLane.road) continue;
+      const L = tp.fromLane, side = tp.turnType === 'right' ? 1 : -1; n++;
+      for (let i = 0; i <= 40; i++) { const p = tp.getPoint(i / 40); swing = Math.max(swing, -side * ((p.x - L.end.x) * -L.uy + (p.y - L.end.y) * L.ux)); }
+      inErr = Math.max(inErr, Math.abs(normalizeAngle(tp.getAngle(0) - L.angle)));
+      outErr = Math.max(outErr, Math.abs(normalizeAngle(tp.getAngle(1) - tp.toLane.angle)));
+    }
+    return { n, swing, inErr, outErr };
+  `);
+  ok(geo.n > 400, `every turn checked (${geo.n})`);
+  ok(geo.swing < 0.5, `no turn's curve swings out the other way first (${geo.swing.toFixed(1)} px)`);
+  ok(geo.inErr < 0.03 && geo.outErr < 0.03, 'each leaves along the lane in and arrives along the lane out');
+  env.run(`game.running=true; game.paused=false; GameSettings.getMaxTraffic=()=>40; globalThis.__tw = { trips: new Map(), swings: [] };`);
+  for (const [x, y] of [[2300, 6400], [3300, 5300], [2800, 4900]]) {
+    env.run(`game.player.x=${x}; game.player.y=${y};`);
+    for (let k = 0; k < 4; k++) env.run(`(() => { const S = globalThis.__tw;
+      for (let i = 0; i < 300; i++) { game.update();
+        for (const v of game.traffic.vehicles) { const tp = v.currentTurnPath, t = S.trips.get(v);
+          if (tp && tp.turnType !== 'straight') {
+            if (!t || t.tp !== tp) S.trips.set(v, { tp, swing: 0 });
+            const r = S.trips.get(v), L = tp.fromLane, side = tp.turnType === 'right' ? 1 : -1;
+            r.swing = Math.max(r.swing, -side * ((v.x - L.end.x) * -L.uy + (v.y - L.end.y) * L.ux));
+          } else if (t) { S.swings.push(t.swing); S.trips.delete(v); }
+        }
+      } })()`);
+  }
+  const r = value(env, `const s = globalThis.__tw.swings.sort((a, b) => a - b); return { n: s.length, p90: s[Math.floor(s.length * 0.9)] };`);
+  ok(r.n >= 30, `cars turn (${r.n})`);
+  ok(r.p90 < 4, `cars turn in from their lane without swinging out first (90% within ${r.p90.toFixed(1)} px)`);
 }, {affine:true});
 
 test('Every bundled map loads, updates and draws without runtime errors', env => {
