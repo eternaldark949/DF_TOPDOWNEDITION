@@ -85,6 +85,10 @@
                     const open = e => !nav || (nav.walkable(...W(e, Math.sign(ply || 1) * ew)) && nav.walkable(...W(e, side * ew)));
                     if (!open(ex) && open(-ex)) ex = -ex;
                     via.push(W(ex, Math.sign(ply || 1) * ew), W(ex, side * ew));
+                } else if (segmentHitsRect(plx, ply, hl * 0.2, side * (hw + 20), -(hl + 17), -(hw + 17), hl + 17, hw + 17)) {
+                    // Behind it or in front (either side): the straight line to the door cuts the corner, so round the
+                    // corner on the door's side of the end she's at first, then along the side to the door
+                    via.push(W(Math.sign(plx || -1) * (hl + 30), side * ew));
                 }
                 // Arrived, or stuck on the way but still beside it: in either way (the walk is how she gets in, not whether)
                 const getIn = () => { if (!this.isDriving && car.visible && Math.hypot(car.x - this.player.x, car.y - this.player.y) < 90) this.enterCar(car); };

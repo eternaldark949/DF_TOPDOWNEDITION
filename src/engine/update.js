@@ -1204,18 +1204,9 @@
                         if (inputX !== 0 || inputY !== 0) this.player.angle = Math.atan2(inputY, inputX);
                     }
                     
-                    // Apply movement via PlayerEntity (collision resolution via CollisionSystem)
-                    // Store pre-movement position for car collision check
-                    const prevX = this.player.x;
-                    const prevY = this.player.y;
-                    
+                    // Apply movement via PlayerEntity (collision resolution via CollisionSystem). Cars, hers included,
+                    // push her out along their side in resolveTrafficCollisions, so she slides along them
                     this.player.applyMovement(inputX, inputY);
-                    
-                    // Car collision (not in entity system yet) - revert if colliding
-                    if (this.checkPlayerCarCollision(this.player.x, this.player.y)) {
-                        this.player.x = prevX;
-                        this.player.y = prevY;
-                    }
                     
                     // Clamp player within map bounds
                     const boundsMargin = 15;

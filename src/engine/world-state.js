@@ -712,13 +712,6 @@
                 }
             },
 
-            checkPlayerCarCollision(px, py) {
-                if (!this.car.visible) return false;
-                const dx = px - this.car.x; const dy = py - this.car.y; const cos = Math.cos(-this.car.angle); const sin = Math.sin(-this.car.angle);
-                const localX = dx * cos - dy * sin; const localY = dx * sin + dy * cos; const halfLen = this.car.length / 2 + 15; const halfWid = this.car.width / 2 + 15;
-                if (Math.abs(localX) < halfLen && Math.abs(localY) < halfWid) return true; return false;
-            },
-
             updateTime(force = false) {
                 // Counted in sim ticks (not wall-clock) so the clock follows
                 // CONFIG.LOOP.GAME_SPEED along with everything else.

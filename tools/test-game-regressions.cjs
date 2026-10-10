@@ -1091,6 +1091,38 @@ test("Amber's van is sanctioned: never duplicated, parked where she leaves it, h
   equal([result.job, result.home, result.vans], ['delivery', result.homeWas, 1], 'a new job finds it by the cafe');
 }, {events:true});
 
+test('Her car on foot: Drive from behind or in front walks round the corner without a stall; walking into it slides along its side like any car', env => {
+  carsFixture(env);
+  const result=value(env, `
+    const own=game.ownedCar, lane=__lane, ca=Math.cos(lane.angle), sa=Math.sin(lane.angle);
+    Object.assign(game.deliveryVehicle,{x:-5000,y:-5000}); game.car=own; if(game.isDriving) game.toggleVehicle();
+    const park=(c,along)=>Object.assign(c,{x:lane.start.x+ca*along,y:lane.start.y+sa*along,angle:lane.angle,speed:0,vx:0,vy:0,visible:true,controlMode:'PARKED',hasDriver:false});
+    const walks={};
+    for (const [name,lx,ly] of [['behind',-72,0],['behind, door side',-70,-25],['behind, far side',-70,25],['in front',72,0]]) {
+      if(game.isDriving) game.toggleVehicle(); park(own,500);
+      game.player.x=own.x+lx*ca-ly*sa; game.player.y=own.y+lx*sa+ly*ca; game.update(); game.interact();
+      let t=0, still=0, stall=0, px=game.player.x, py=game.player.y;
+      for(;t<400&&!game.isDriving;t++){ game.update(); still=Math.hypot(game.player.x-px,game.player.y-py)<0.2?still+1:0; stall=Math.max(stall,still); px=game.player.x; py=game.player.y; }
+      walks[name]={in:game.isDriving, fast:t<90, stall:stall<20};
+    }
+    // On foot, pushing in at 45 degrees against the long side: her car, then a street car
+    const slide=c=>{
+      park(c,500); const nx=-sa, ny=ca; game.player.x=c.x+nx*60; game.player.y=c.y+ny*60;
+      const ix=(-nx+ca)/Math.SQRT2, iy=(-ny+sa)/Math.SQRT2, l0=(game.player.x-c.x)*ca+(game.player.y-c.y)*sa;
+      game.keys={ArrowLeft:ix<-0.3,ArrowRight:ix>0.3,ArrowUp:iy<-0.3,ArrowDown:iy>0.3};
+      for(let i=0;i<20;i++) game.update(); game.keys={};
+      return Math.round((game.player.x-c.x)*ca+(game.player.y-c.y)*sa-l0);
+    };
+    if(game.isDriving) game.toggleVehicle();
+    const mine=slide(own); Object.assign(own,{x:-5000,y:-4000});
+    GameSettings.getMaxTraffic=()=>20; const st=new TrafficVehicle(lane,'Gelfash','sedan','AI'); st.fade=1; game.traffic.vehicles.push(st);
+    return {walks, mine, street:slide(st)};
+  `);
+  for (const [k, w] of Object.entries(result.walks)) equal(w, {in:true, fast:true, stall:true}, `Drive from ${k}: round the corner and in, never standing against it`);
+  ok(result.mine > 40, `her car: she slides along it (${result.mine} px)`);
+  ok(Math.abs(result.mine - result.street) <= 4, `the same as a street car (${result.mine} vs ${result.street} px)`);
+}, {events:true});
+
 test('Markers: pins over what is on screen after the light; the compass round her for what is not; none indoors', env => {
   carsFixture(env);
   const draw=(setup)=>value(env, `
