@@ -47918,7 +47918,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         /** The body drawn into SilhouetteFX's capture (its contact shadow stays on the frame), then stamped back with its effect. */
         function _drawHumanoidSilhouette(ctx, entity, config, fx, lampSil) {
-            const g = SilhouetteFX.begin(ctx, fx === 'plain' ? CONFIG.HUMAN_SHADE.LAMP_SHADOW_CAP_R : undefined);
+            // The body itself is drawn through the capture, so the capture must hold all of it: a lamp shadow
+            // alone captures tightly (LAMP_SHADOW_CAP_R), unless a weapon in hand reaches past that (a sniper: ~65px)
+            const armed = (entity.type === 'player' && entity._game && entity._game.currentWeapon) || (config.weapon && config.weapon.id);
+            const g = SilhouetteFX.begin(ctx, fx === 'plain' && !armed ? CONFIG.HUMAN_SHADE.LAMP_SHADOW_CAP_R : undefined);
             if (!g) return _drawProceduralHumanoidTimed(ctx, entity, config);
             const noShadow = config.noShadow;
             try {
