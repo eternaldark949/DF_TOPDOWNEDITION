@@ -528,9 +528,8 @@
         BuildingV2Registry.register('enni_cole', {
             factory: createEnniCole,
             sections: [
-                { x: 0, y: 0, w: 900, h: 280 },
-                { x: 0, y: 280, w: 250, h: 420 },
-                { x: 650, y: 280, w: 250, h: 420 }
+                { x: 0, y: 0, w: 900, h: 600 },
+                { x: 320, y: 600, w: 260, h: 100 }
             ],
             accentColor: '#d0ac72',
             label: 'Enni Cole',
