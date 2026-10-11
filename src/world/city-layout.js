@@ -1384,6 +1384,15 @@
                                 node.roadName = hRoad.name;
                                 run.push(node);
                             }
+                            // and one at the run's far end, so it reaches the corner (and its crossings) like the near end does,
+                            // rather than stopping up to a spacing short and leaving walkers a dead end to turn round in
+                            const last = run[run.length - 1], endAt = seg.end - walkOffset;
+                            if (last && endAt - last.x > 40) {
+                                const node = createNode(endAt, walkY);
+                                node.side = side;
+                                node.roadName = hRoad.name;
+                                run.push(node);
+                            }
                             for (let i = 1; i < run.length; i++) connect(run[i-1], run[i]);
                         }
                     }
@@ -1423,6 +1432,15 @@
                             const run = [];
                             for (let y = seg.start + walkOffset; y < seg.end - walkOffset; y += nodeSpacing) {
                                 const node = createNode(walkX, y);
+                                node.side = side;
+                                node.roadName = vRoad.name;
+                                run.push(node);
+                            }
+                            // and one at the run's far end, so it reaches the corner (and its crossings) like the near end does,
+                            // rather than stopping up to a spacing short and leaving walkers a dead end to turn round in
+                            const last = run[run.length - 1], endAt = seg.end - walkOffset;
+                            if (last && endAt - last.y > 40) {
+                                const node = createNode(walkX, endAt);
                                 node.side = side;
                                 node.roadName = vRoad.name;
                                 run.push(node);
@@ -1539,6 +1557,20 @@
                             }
                         }
                     }
+                }
+                
+                // ====== LOOSE ENDS ======
+                // A walk that stops at an angled road's mouth has no corner group to join: link its end to the nearest
+                // crossing's kerb (or, failing that, a pavement node just round the corner) so walkers go on, not back
+                for (const n of nodes) {
+                    if (n.isCrosswalk || n.connections.length !== 1) continue;
+                    let best = null, bd = Infinity;
+                    for (const m of nodes) {
+                        if (m === n || n.connections.includes(m.id)) continue;
+                        const d = Math.hypot(m.x - n.x, m.y - n.y);
+                        if (d < (m.isCrosswalk ? 260 : 150) && d < bd) { bd = d; best = m; }
+                    }
+                    if (best) connect(n, best);
                 }
                 
                 return { nodes, crosswalks };
