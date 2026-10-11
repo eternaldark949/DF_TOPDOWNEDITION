@@ -135,7 +135,8 @@
                 }
             },
             'Chef Koda': { text: () => "Kitchen's closed to Freelancers. But if Ren likes you, the Amber's on the house.", buttons: () => ({ accept: null, decline: 'Leave' }) },
-            'Valentina': { text: () => "Welcome to Enni Cole, darling. The food hall is to your left, electronics to your right, and the furniture gallery is beyond the atrium. Take your time.", buttons: () => ({ accept: null, decline: 'Leave' }) },
+            'Valentina': { text: () => "Welcome to Enni Cole, darling. Fashion and the food hall are to your left, electronics and furniture to your right. Couture, the salon and Cuisine are up the grand staircase. Take your time.", buttons: () => ({ accept: null, decline: 'Leave' }) },
+            'Chef Amara': { text: () => "Cuisine seats at eight, darling, and the tasting menu changes with the moon. The food hall downstairs sells what I cook with.", buttons: () => ({ accept: null, decline: 'Leave' }) },
 
             // ── By role ──
             '@dancer': {

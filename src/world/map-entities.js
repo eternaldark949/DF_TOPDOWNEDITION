@@ -393,43 +393,109 @@
                 }
 
                 case 'enni_cole_interior': {
-                    // Food hall west, furnished room sets north, electronics east; the central promenade
-                    // and chandelier medallion are open floor. Dedicated art: drawEnniDecorProp.
+                    // The lobby: the grand staircase between its brass rails, perfume and flowers either side,
+                    // handbag tables and dressed forms round the chandelier's medallion, the desks by the door.
+                    // Each department is its own room (world/rooms.js). Art: drawEnniDecorProp (ec_*).
                     const F = decorPropsIn('#3c2530');
                     e.props = [
-                        F(95, 130, 395, 64, 'ec_wine'),
-                        F(95, 330, 160, 110, 'ec_produce'), F(330, 330, 160, 110, 'ec_produce', { variant: 1 }),
-                        F(95, 625, 160, 64, 'ec_grocery'), F(330, 625, 160, 64, 'ec_grocery', { variant: 1 }),
-                        F(95, 855, 395, 80, 'ec_cold'), F(95, 1060, 260, 78, 'ec_bakery'),
-                        // The furniture gallery: a living room, a dressed bedroom, a dining vignette.
-                        F(680, 165, 220, 70, 'ec_sofa'), F(1020, 175, 70, 70, 'ec_armchair', { face: 'W' }),
-                        F(840, 310, 130, 65, 'ec_lowtable'), F(692, 325, 60, 60, 'ec_side'),
-                        F(1160, 140, 160, 228, 'ec_bed'), F(1100, 155, 43, 50, 'ec_side'), F(1337, 155, 43, 50, 'ec_side'),
-                        F(1170, 485, 175, 105, 'ec_dining'),
-                        // Demo screens along the wall, then generous walk-around device islands.
-                        F(1510, 130, 380, 65, 'ec_tvwall'),
-                        F(1510, 355, 175, 88, 'ec_laptop'), F(1760, 355, 130, 88, 'ec_tablet'),
-                        F(1510, 695, 175, 88, 'ec_audio'), F(1760, 695, 130, 88, 'ec_tablet', { variant: 1 }),
-                        F(1510, 985, 380, 78, 'ec_appliances'),
-                        // Brass-framed, rose-stone structural piers leave wide, open department aisles.
-                        ...[260, 650, 1050].flatMap(y => [F(548, y, 40, 40, 'ec_column'), F(1412, y, 40, 40, 'ec_column')]),
-                        F(640, 1170, 190, 60, 'ec_checkout'), F(1170, 1170, 190, 60, 'ec_checkout', { variant: 1 }),
-                        F(80, 1210, 60, 60, 'ec_plant'), F(1860, 1210, 60, 60, 'ec_plant'),
-                        F(700, 1020, 45, 45, 'ec_plant'), F(1255, 1020, 45, 45, 'ec_plant'),
-                        F(1810, 1148, 44, 64, 'ec_vending', { interactionType: 'vending_machine' })
+                        F(846, 50, 16, 360, 'ec_balustrade'), F(1138, 50, 16, 360, 'ec_balustrade'),
+                        F(838, 404, 30, 30, 'ec_newel'), F(1132, 404, 30, 30, 'ec_newel'),
+                        F(690, 150, 96, 96, 'ec_perfume'), F(1214, 150, 96, 96, 'ec_perfume'),
+                        F(700, 500, 64, 64, 'ec_floral'), F(1236, 500, 64, 64, 'ec_floral'),
+                        F(668, 760, 84, 84, 'ec_display'), F(1248, 760, 84, 84, 'ec_display', { variant: 1 }),
+                        F(676, 960, 40, 40, 'ec_mannequin'), F(726, 1000, 40, 40, 'ec_mannequin', { variant: 2 }),
+                        F(1284, 960, 40, 40, 'ec_mannequin', { variant: 1 }), F(1234, 1000, 40, 40, 'ec_mannequin', { variant: 3 }),
+                        F(670, 1150, 170, 60, 'ec_checkout'), F(1160, 1150, 170, 60, 'ec_checkout', { variant: 1 }),
+                        F(800, 1272, 40, 40, 'ec_topiary'), F(1160, 1272, 40, 40, 'ec_topiary'),
+                        // The Food Hall: the cellar and the bakery on the north wall, produce and pantry islands,
+                        // the chilled cases, and La Cuisine's counter of prepared dishes
+                        F(70, 66, 300, 62, 'ec_wine'), F(392, 66, 210, 72, 'ec_bakery'),
+                        F(80, 180, 150, 100, 'ec_produce'), F(300, 180, 150, 100, 'ec_produce', { variant: 1 }),
+                        F(80, 330, 150, 60, 'ec_grocery'), F(300, 330, 150, 60, 'ec_grocery', { variant: 1 }),
+                        F(70, 440, 330, 76, 'ec_cold'), F(70, 572, 300, 80, 'ec_deli'),
+                        F(470, 456, 50, 50, 'ec_plant'),
+                        // Fashion: rails along the north wall, knitwear cubbies, folded tables and round rails,
+                        // and dressed forms in the street windows
+                        F(80, 726, 170, 36, 'ec_rack'), F(266, 726, 150, 36, 'ec_rack', { variant: 2 }),
+                        F(56, 820, 32, 290, 'ec_shelfwall'),
+                        F(140, 880, 130, 70, 'ec_fashion_table'), F(140, 1050, 130, 70, 'ec_fashion_table', { variant: 2 }),
+                        F(340, 860, 80, 80, 'ec_round_rack'), F(340, 1040, 80, 80, 'ec_round_rack', { variant: 3 }),
+                        F(470, 1150, 80, 80, 'ec_round_rack', { variant: 4 }),
+                        ...[0, 1, 2, 3, 4].map(i => F(98 + i * 100, 1268, 40, 40, 'ec_mannequin', { variant: i })),
+                        // Furniture: a living room, a dressed bedroom, a dining room, each on its rug
+                        F(1420, 100, 200, 64, 'ec_sofa'), F(1636, 176, 64, 64, 'ec_armchair', { face: 'W' }),
+                        F(1460, 210, 130, 62, 'ec_lowtable'), F(1648, 104, 40, 42, 'ec_side'),
+                        F(1770, 110, 140, 214, 'ec_bed'), F(1724, 116, 40, 42, 'ec_side'),
+                        F(1680, 496, 175, 105, 'ec_dining'),
+                        // Electronics: the cinema wall, device islands, hi-fi, appliances, the vending machine
+                        F(1556, 712, 380, 62, 'ec_tvwall'),
+                        F(1480, 860, 175, 88, 'ec_laptop'), F(1730, 860, 130, 88, 'ec_tablet'),
+                        F(1480, 1030, 175, 88, 'ec_audio'), F(1730, 1030, 130, 88, 'ec_tablet', { variant: 1 }),
+                        F(1450, 1196, 380, 78, 'ec_appliances'),
+                        F(1890, 1100, 44, 64, 'ec_vending', { interactionType: 'vending_machine' })
                     ];
-                    e.npcs = [ new NPC(750, 1250, "Valentina", 'vip'), new NPC(275, 500, "Model Kira", 'dancer'),
-                        new NPC(1740, 585, "Model Sienne", 'dancer'), new NPC(1100, 950, "Concierge Lux", 'robot_gold') ];
-                    e.npcs[0].angle = -Math.PI / 2; e.npcs[1].angle = Math.PI; e.npcs[2].angle = Math.PI; e.npcs[3].angle = Math.PI / 2;
+                    e.npcs = [ new NPC(755, 1238, "Valentina", 'vip'), new NPC(330, 1180, "Model Kira", 'dancer'),
+                        new NPC(1665, 975, "Concierge Lux", 'robot_gold') ];
+                    e.npcs[0].angle = -Math.PI / 2; e.npcs[1].angle = -Math.PI / 2; e.npcs[2].angle = Math.PI;
                     const L = hiddenLamp, S = softLight, A = areaLight;
-                    e.lamps = [ L(285, 520, '#ffe4b3', 450),
-                        L(1720, 520, '#e2ebff', 410), L(1000, 250, '#ffe2a9', 440), L(1000, 1180, '#ffdcaa', 360) ];
+                    e.lamps = [ L(1000, 820, '#ffe4b3', 520), L(1000, 260, '#ffe2a9', 380),
+                        L(330, 360, '#ffe4b3', 430), L(330, 1020, '#ffe6c2', 430),
+                        L(1665, 360, '#ffe2b2', 430), L(1665, 1020, '#e2ebff', 420) ];
                     e.softLights = [
-                        A(1000, 725, 1760, 1150, '#ffdcb3', 0.09),
-                        S(1000, 780, 285, '#ffe3a8', 0.18), S(1000, 250, 280, '#ffe2b2', 0.3),
-                        S(285, 280, 260, '#ffe3b2', 0.3), S(285, 920, 260, '#ffe6c2', 0.3),
-                        S(1710, 285, 260, '#e1eaff', 0.24), S(1710, 905, 280, '#ffe5ba', 0.22),
-                        S(740, 1190, 150, '#ffdaa0', 0.38), S(1265, 1190, 150, '#ffdaa0', 0.38)
+                        A(1000, 700, 700, 1260, '#ffdcb3', 0.09), S(1000, 820, 300, '#ffe3a8', 0.2),
+                        S(1000, 260, 220, '#ffe2b2', 0.22), S(853, 419, 70, '#fff0d0', 0.5), S(1147, 419, 70, '#fff0d0', 0.5),
+                        S(330, 300, 260, '#ffe3b2', 0.28), S(330, 560, 220, '#ffe6c2', 0.26),
+                        S(330, 1000, 280, '#ffe6c2', 0.28), S(330, 1290, 200, '#ffdcae', 0.32),
+                        S(1665, 360, 280, '#ffe2b2', 0.26), S(1665, 1000, 280, '#e1eaff', 0.24),
+                        S(755, 1180, 150, '#ffdaa0', 0.36), S(1245, 1180, 150, '#ffdaa0', 0.36)
+                    ];
+                    break;
+                }
+
+                case 'enni_cole_upper': {
+                    // The gallery round the void, the couture showroom in the curved glass, Cuisine and its kitchen,
+                    // the accessories salon and its fitting rooms. Art: drawEnniDecorProp (ec_*).
+                    const F = decorPropsIn('#3c2530');
+                    e.props = [
+                        // The gallery: the stairwell's rails, the void with the chandelier in it, forms and flowers
+                        F(854, 50, 16, 150, 'ec_balustrade'), F(1130, 50, 16, 150, 'ec_balustrade'),
+                        F(760, 250, 480, 300, 'ec_void'),
+                        F(676, 80, 40, 40, 'ec_mannequin', { variant: 5 }), F(1284, 80, 40, 40, 'ec_mannequin', { variant: 3 }),
+                        F(668, 572, 56, 56, 'ec_floral'), F(1276, 572, 56, 56, 'ec_floral'),
+                        // The showroom: gowns on their plinths along the curve of the glass, rails on the back wall
+                        ...[160, 135, 110, 90, 70, 45, 20].map((deg, i) => {
+                            const a = deg * Math.PI / 180;
+                            return F(1000 + Math.cos(a) * 270 - 22, 790 + Math.sin(a) * 200 - 22, 44, 44, 'ec_mannequin', { variant: i });
+                        }),
+                        F(670, 676, 180, 36, 'ec_rack', { variant: 1 }), F(1150, 676, 180, 36, 'ec_rack', { variant: 4 }),
+                        F(955, 800, 90, 90, 'ec_ottoman'),
+                        // Cuisine: banquettes along the window, round tables, the patisserie
+                        ...[400, 530, 660, 790, 920].map(y => F(56, y, 110, 60, 'ec_booth')),
+                        ...[[320, 450], [500, 600], [320, 680], [500, 780], [320, 910]].map(([cx, cy]) => F(cx - 55, cy - 55, 110, 110, 'ec_rtable')),
+                        F(400, 992, 200, 48, 'ec_dessert'),
+                        // The kitchen
+                        F(70, 60, 220, 56, 'ec_range'), F(320, 60, 120, 46, 'ec_ksink'), F(540, 60, 64, 84, 'ec_kfridge'),
+                        F(150, 170, 220, 56, 'ec_kprep'),
+                        // The salon: jewellery vitrines, the handbag and shoe walls, an island of heels, the chaise
+                        F(1430, 100, 160, 60, 'ec_jewel'), F(1430, 210, 160, 60, 'ec_jewel'),
+                        F(1904, 420, 36, 270, 'ec_bagwall'), F(1904, 720, 36, 270, 'ec_shoewall'),
+                        F(1690, 440, 84, 84, 'ec_display', { variant: 2 }), F(1690, 600, 160, 60, 'ec_shoes'),
+                        F(1680, 760, 140, 54, 'ec_chaise'), F(1730, 994, 96, 40, 'ec_mirror'),
+                        F(1460, 640, 84, 84, 'ec_display', { variant: 3 }), F(1540, 420, 44, 44, 'ec_mannequin', { variant: 2 }), F(1540, 500, 44, 44, 'ec_mannequin', { variant: 5 }), F(1430, 994, 160, 50, 'ec_jewel'),
+                        // The fitting rooms
+                        F(1670, 56, 270, 104, 'ec_fitting'), F(1690, 230, 56, 56, 'ec_ottoman')
+                    ];
+                    e.npcs = [ new NPC(1000, 745, "Model Sienne", 'dancer'), new NPC(230, 140, "Chef Amara") ];
+                    e.npcs[0].angle = Math.PI / 2; e.npcs[1].angle = -Math.PI / 2;
+                    const L = hiddenLamp, S = softLight, A = areaLight;
+                    e.lamps = [ L(1000, 400, '#ffe2a9', 460), L(1000, 860, '#ffe6c2', 420),
+                        L(330, 690, '#ffd9a0', 440), L(330, 170, '#fff1dc', 330),
+                        L(1510, 520, '#ffe4b3', 420), L(1800, 760, '#ffe4b3', 400), L(1800, 190, '#ffe0c0', 300) ];
+                    e.softLights = [
+                        A(1000, 345, 700, 560, '#ffdcb3', 0.08), S(1000, 400, 280, '#ffe3a8', 0.24),
+                        A(1000, 855, 700, 370, '#ffe6c2', 0.1), S(1000, 880, 240, '#fff0d6', 0.26),
+                        S(330, 680, 300, '#ffd9a0', 0.3), S(330, 175, 220, '#fff1dc', 0.3),
+                        S(1510, 300, 240, '#ffe4b3', 0.26), S(1800, 720, 260, '#ffe4b3', 0.26), S(1800, 190, 160, '#ffe0c0', 0.3)
                     ];
                     break;
                 }

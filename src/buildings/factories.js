@@ -80,8 +80,8 @@
                     [-85, -12, '#dd79a2', 130], [85, -12, '#dd79a2', 130],
                     [-44, 14, '#ffd69a', 135], [44, 14, '#ffd69a', 135]
                 ]) this.attachedLights.push(new LampEntity({ x: cx + dx, y: cy + dy, lampType: 3, color, lightRadius: radius }));
-                for (const dx of [330, 690]) this.attachedLights.push(new LampEntity({
-                    x: this.x + dx, y: this.y + 284, lampType: 3, color: '#f4c88b', lightRadius: 135
+                for (const dx of [200, 700]) this.attachedLights.push(new LampEntity({
+                    x: this.x + dx, y: this.y + 615, lampType: 3, color: '#f4c88b', lightRadius: 135
                 }));
             },
             _ecDrawBase(ctx) {
@@ -89,11 +89,7 @@
                 const sprite = K.sprite(this, 'ec_ground', this.x - 16, this.y - 12, 932, 784, 1, c => {
                     const x = this.x, y = this.y, T = ENNI_EXTERIOR;
                     for (const s of this.sections) { c.fillStyle = 'rgba(0,0,0,.43)'; c.fillRect(x+s.x+18,y+s.y+18,s.w,s.h); }
-                    // Inset stone courtyard and a small entry apron leave the existing pedestrian paths clear.
-                    c.fillStyle = '#30272e'; c.fillRect(x+252,y+283,396,414);
-                    c.strokeStyle = 'rgba(211,178,135,.14)'; c.lineWidth = 1; c.beginPath();
-                    for(let gx=270;gx<648;gx+=54){c.moveTo(x+gx,y+286);c.lineTo(x+gx,y+697);}
-                    for(let gy=300;gy<697;gy+=54){c.moveTo(x+254,y+gy);c.lineTo(x+646,y+gy);}c.stroke();
+                    // The entry steps and the clipped cypresses either side of the door, as in the photo.
                     const t = this.attachedTransition, cx=t.x+t.w/2, yy=t.y-10;
                     c.fillStyle='#61515a';c.beginPath();c.roundRect(cx-116,yy-5,232,54,[5,5,16,16]);c.fill();
                     c.strokeStyle='rgba(208,172,114,.55)';c.lineWidth=1;c.stroke();
@@ -148,15 +144,25 @@
                         }
                         c.strokeStyle=T.stone;c.lineWidth=8;for(const f of this._leanFaces()){c.beginPath();c.moveTo(f.x1,f.y1);c.lineTo(f.x2,f.y2);c.stroke();}
                         c.strokeStyle='rgba(230,199,153,.70)';c.lineWidth=1.4;for(const f of this._leanFaces()){c.beginPath();c.moveTo(f.x1,f.y1);c.lineTo(f.x2,f.y2);c.stroke();}
-                        // A rose stone entrance cap echoes the reference's grand corner bay.
-                        c.fillStyle='#663046';c.beginPath();c.roundRect(x+28,y+635,194,62,[10,10,27,27]);c.fill();
-                        c.strokeStyle='rgba(214,165,130,.65)';c.lineWidth=1.5;c.stroke();
                     }
-                    glass(x+54,y+37,792,202,2,6);
-                    glass(x+41,y+323,168,281,3,2);glass(x+691,y+323,168,321,3,2);
-                    // Roof-top brass medallion in the quiet courtyard-facing stone band.
-                    if(!emissive){
-                        c.strokeStyle='rgba(208,172,114,.40)';c.lineWidth=.8;c.beginPath();c.moveTo(x+280,y+261);c.lineTo(x+349,y+261);c.moveTo(x+551,y+261);c.lineTo(x+620,y+261);c.stroke();
+                    // The atrium's glass over the lobby and its chandelier, lanterns over the two wings
+                    glass(x+300,y+40,300,490,3,2);
+                    glass(x+40,y+50,220,470,3,2);glass(x+640,y+50,220,470,3,2);
+                    // The curved-glass showroom on top of the entrance bay: gowns lit inside, tiny lights overhead
+                    const bx=x+332,by=y+606,bw=236,bh=86,R=[0,0,40,40];
+                    c.save();c.beginPath();c.roundRect(bx,by,bw,bh,R);c.clip();
+                    if(!emissive){const g=c.createLinearGradient(bx,by,bx,by+bh);g.addColorStop(0,'#2b2730');g.addColorStop(1,'#4a3a33');c.fillStyle=g;c.fillRect(bx,by,bw,bh);}
+                    else{c.fillStyle='rgba(255,196,120,.22)';c.fillRect(bx,by,bw,bh);}
+                    for(let i=0;i<7;i++){const mx=bx+24+i*31,my=by+50+Math.sin(i/6*Math.PI)*12;
+                        c.fillStyle=emissive?'rgba(255,214,150,.55)':['#e9d3a6','#1c1a1f','#b0475f','#f3ece0','#2f5a4d','#7b3fa0','#e9d3a6'][i];c.beginPath();c.arc(mx,my,7,0,Math.PI*2);c.fill();
+                        if(!emissive){c.fillStyle='#efe4d6';c.beginPath();c.arc(mx,my-2,2.4,0,Math.PI*2);c.fill();}}
+                    c.fillStyle=emissive?'#fff2cf':'#d9b77a';for(let i=0;i<34;i++){const px=bx+8+(i*53%220),py=by+6+(i*29%70);c.fillRect(px,py,emissive?1.6:1,emissive?1.6:1);}
+                    if(!emissive){c.strokeStyle='rgba(29,32,40,.9)';c.lineWidth=2;c.beginPath();for(let i=1;i<8;i++){c.moveTo(bx+bw*i/8,by);c.lineTo(bx+bw*i/8,by+bh);}c.stroke();}
+                    c.restore();
+                    c.beginPath();c.roundRect(bx,by,bw,bh,R);c.lineWidth=emissive?1:3;c.strokeStyle=emissive?'rgba(237,187,123,.4)':T.steel;c.stroke();
+                    if(!emissive){c.beginPath();c.roundRect(bx+3,by+3,bw-6,bh-6,[0,0,37,37]);c.lineWidth=1;c.strokeStyle='rgba(208,172,114,.7)';c.stroke();
+                        // brass rules either side of the roof's wordmark
+                        c.strokeStyle='rgba(208,172,114,.40)';c.lineWidth=.8;c.beginPath();c.moveTo(x+250,y+566);c.lineTo(x+349,y+566);c.moveTo(x+551,y+566);c.lineTo(x+650,y+566);c.stroke();
                     }
                 });
             },
@@ -173,7 +179,7 @@
                 };
                 const fill=(path,style)=>{ctx.fillStyle=style;ctx.fill(path);};
                 const stroke=(path,style,width)=>{ctx.strokeStyle=style;ctx.lineWidth=width;ctx.stroke(path);};
-                const entrance=f.side==='S'&&Math.abs(f.y1-(this.y+700))<1&&f.x1<this.x+250;
+                const entrance=f.side==='S'&&Math.abs(f.y1-(this.y+700))<1;
                 const n=Math.max(2,Math.round(L/77)),pad=8/L,bands=[[4,H*.48],[H*.59,H-4]];
                 if(!emissive){
                     fill(quad(new Path2D(),0,1,0,H*.55),T.stoneLo);fill(quad(new Path2D(),0,1,H*.55,H),T.steel);
@@ -209,7 +215,7 @@
                 }
                 if(entrance&&!emissive){
                     // Arched transom: use the wall's own u/z projection rather than screen-space decoration.
-                    const mid=.5,wide=.19,zbase=5,zspring=H*.26,zpeak=H*.48;
+                    const mid=.5,wide=.3,zbase=5,zspring=H*.26,zpeak=H*.48;
                     ctx.beginPath();ctx.moveTo(...P(mid-wide,zbase));ctx.lineTo(...P(mid+wide,zbase));ctx.lineTo(...P(mid+wide,zspring));
                     for(let i=0;i<=16;i++){const a=i*Math.PI/16;ctx.lineTo(...P(mid+Math.cos(a)*wide,zspring+Math.sin(a)*(zpeak-zspring)));}ctx.closePath();
                     ctx.fillStyle='#8b5737';ctx.fill();ctx.strokeStyle=T.gold;ctx.lineWidth=2;ctx.stroke();
@@ -221,7 +227,7 @@
                     c.textAlign='center';c.textBaseline='middle';
                     c.font='35px "Great Vibes", "URW Chancery L", "Z003", cursive';
                     c.fillStyle=emissive?'rgba(255,230,173,.88)':ENNI_EXTERIOR.goldHi;
-                    c.fillText('Enni Cole',this.x+450,this.y+263);
+                    c.fillText('Enni Cole',this.x+450,this.y+566);
                 });
             },
             _ecCanopy(ctx, emissive=false) {
@@ -235,7 +241,7 @@
                     }else{c.strokeStyle='rgba(245,205,143,.70)';c.lineWidth=1;c.stroke();}
                     c.textAlign='center';c.textBaseline='middle';c.font='38px "Great Vibes", "URW Chancery L", "Z003", cursive';
                     c.fillStyle=emissive?'rgba(255,230,173,.96)':T.goldHi;c.fillText('Enni Cole',cx,sy+12);
-                    if(!emissive){c.font='6.6px Montserrat, sans-serif';c.fillStyle='#bba889';c.fillText('G R O C E R Y   ·   H O M E   ·   T E C H',cx,sy+33);}
+                    if(!emissive){c.font='6.2px Montserrat, sans-serif';c.fillStyle='#bba889';c.fillText('F A S H I O N  ·  F O O D  ·  H O M E  ·  T E C H',cx,sy+33);}
                 });
             },
             _ecDrawTop(ctx) {
@@ -256,14 +262,14 @@
             }
         });
 
-        /** Enni Cole luxury department store: the original U-shaped city footprint is preserved. */
+        /** Enni Cole luxury department store: one block of rose stone and dark glass, the arched entrance bay
+            stepping out from the middle of its front, the curved-glass showroom on top of it (as in the photo). */
         function createEnniCole(x, y, config = {}) {
             return new BuildingV2({
                 id: 'enni_cole', x, y, label: 'Enni Cole', type: 'shopping', style: 'enni_cole', floors: 6,
                 sections: [
-                    { x: 0, y: 0, w: 900, h: 280 },
-                    { x: 0, y: 280, w: 250, h: 420 },
-                    { x: 650, y: 280, w: 250, h: 420 }
+                    { x: 0, y: 0, w: 900, h: 600 },
+                    { x: 320, y: 600, w: 260, h: 100 }
                 ],
                 roofColor: '#2d242c', roofLightColor: '#463541',
                 wallColor: '#71354d', wallLightColor: '#8b4760', accentColor: '#d0ac72',

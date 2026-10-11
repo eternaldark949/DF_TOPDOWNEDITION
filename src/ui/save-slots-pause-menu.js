@@ -25,6 +25,7 @@
                     'moon_city_nightclub': 'Nightclub',
                     'church_boss': 'Abandoned Church',
                     'enni_cole_interior': 'Enni Cole',
+                    'enni_cole_upper': 'Enni Cole, Upper Floor',
                     'cozy_cafe_interior': 'Cozy Café',
                     'auto_shop': 'Torque Auto',
                     'neural_sys_interior': 'Neural Systems',

@@ -96,6 +96,11 @@
                                   top: { type: 'tshirt', color: '#f1ece2' }, bottom: { type: 'apron', color: '#e9e2d4', under: '#2a2a30' },
                                   shoes: { type: 'sneakers', color: '#2a2a2a' }, pose: 'polish' },
 
+            // Enni Cole's chef, in her kitchen behind Cuisine upstairs
+            'Chef Amara':       { skinColor: '#8a5a3c', gender: 'female', hair: { type: 'braids', color: '#1a0f0a' }, eyeColor: '#4a2a1a',
+                                  top: { type: 'tshirt', color: '#f4efe6' }, bottom: { type: 'apron', color: '#efe7da', under: '#2a2228' },
+                                  shoes: { type: 'shoes', color: '#2a2a2a' }, pose: 'polish' },
+
             // The Empereal Lord's scientist and medic; she keeps Stella and 747 running
             'Dr. Yin': { skinColor: '#e8d0b8', gender: 'female', build: 'slim', hair: { type: 'short', color: '#222222' }, eyeColor: '#7a7394',
                          top: { type: 'lab_coat', inner: '#1a3a4a' }, bottom: { type: 'pants', color: '#1a3a4a' },
