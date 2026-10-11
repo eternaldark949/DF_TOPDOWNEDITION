@@ -9,7 +9,8 @@
            ring of the moon's eight phases on a gold sunburst, the gold crescent on
            its plinth, two searchlight turrets. On the VIP wing, a roof terrace: a
            crescent pool lit violet, rose-velvet cabanas, loungers, festoon lights.
-           "Moon City" in script neon. At the door: a rising-moon canopy in rose
+           "Moon City" in script neon on a gold-framed marquee board over the
+           door, above a rising-moon canopy in rose
            velvet on gold posts, a sunburst forecourt, a red carpet, velvet ropes
            on gold stanchions, topiary, a crimson pool of light, a little low
            mist, a bouncer in black and gold, and a queue that moves.
@@ -147,7 +148,7 @@
                     pool: { x: X + wing.x + wing.w * 0.56, y: Y + wing.y + wing.h * 0.5, r: Math.min(wing.w, wing.h) * 0.29 },
                     cabanas: [[X + wing.x + 20, Y + wing.y + 26, 42, 36], [X + wing.x + 20, Y + wing.y + wing.h - 62, 42, 36]],
                     loungers: [0, 1, 2, 3].map(i => [X + wing.x + wing.w - 44, Y + wing.y + 28 + i * 38, 26, 13]),
-                    sign: { x: X + hall.x + (wing.w + hall.w) / 2, y: Y + hall.y + hall.h + 10 },
+                    sign: { x: dx, y: wb + 16 },                                          // the marquee board over the door
                     court: { x: dx - 110, y: wb, w: 220, h: 104 },
                     queue: [0, 1, 2, 3, 4, 5].map(i => [dx + 64, wb + 22 + i * 17])
                 });
@@ -439,12 +440,11 @@
                             const a = Math.PI * i / 14, x = cx + Math.cos(a) * (R - 4), y = cy + Math.sin(a) * (R - 4);
                             c.globalAlpha = 0.55 + 0.45 * Math.sin(t * 3 + i * 1.3); c.drawImage(bulb, x - br, y - br, br * 2, br * 2);
                         }
-                        c.globalAlpha = 0.9; c.fillStyle = 'rgba(255, 241, 194, 0.8)'; _mcCrescent(c, cx, cy + 30, 9); c.fill();
                     }
                 });
             },
 
-            /** The canopy's velvet, ribs, scalloped rim and crescent, in its own plane (still: PlaneSprites paints it once) */
+            /** The canopy's velvet, ribs and scalloped rim (the marquee board hangs over its top half), in its own plane (still: PlaneSprites paints it once) */
             _mcCanopyPlane(c) {
                 const G = this._mcGeo(), C = MCX.C, R = MCX.CANOPY_R, cx = G.door.x, cy = G.door.y - 4, N = 14;
                 const rim = (r0, bulge) => {
@@ -465,38 +465,46 @@
                 c.beginPath(); c.arc(cx, cy, 20, 0, Math.PI); c.closePath(); c.fillStyle = '#100a16'; c.fill();   // a lacquer half-disc at the door
                 c.strokeStyle = C.gold; c.lineWidth = 1.2; c.stroke();
                 c.beginPath(); c.arc(cx, cy, R - 10, 0, Math.PI); c.strokeStyle = 'rgba(232, 194, 122, 0.6)'; c.lineWidth = 0.8; c.stroke();
-                c.fillStyle = C.gold; _mcCrescent(c, cx, cy + 30, 9); c.fill();                         // the crescent on the canopy
             },
 
-            /** "Moon City" in script neon on the hall's front, the crescent beside it, NIGHTCLUB in gold beneath between gold rules. */
+            /** The marquee board over the door, above the canopy: lacquer in a gold frame, "Moon City" in script neon
+                with the crescent before it, NIGHTCLUB in gold beneath between gold rules. */
             _mcDrawSign(ctx, emissive, dark = 0) {
                 const G = this._mcGeo(), C = MCX.C, k = LandmarkKit.k(MCX.SIGN_Z), x = G.sign.x, y = G.sign.y;
                 const t = _frameTime / 1000, flick = (t % 7.3) < 0.12 ? 0.35 : (t % 11.1) < 0.06 ? 0.6 : 1;
-                const rules = (c) => { c.beginPath(); for (const s of [-1, 1]) { c.moveTo(x + s * 50, y + 26); c.lineTo(x + s * 92, y + 26); } c.stroke();
-                    for (const s of [-1, 1]) { c.beginPath(); c.moveTo(x + s * 96, y + 23); c.lineTo(x + s * 99, y + 26); c.lineTo(x + s * 96, y + 29); c.lineTo(x + s * 93, y + 26); c.closePath(); c.fill(); } };
+                const W = 108, ty = y - 4, cx = x - 78;                                                  // half the board's width, the script's line, the crescent
+                const board = (c) => { c.beginPath(); c.roundRect(x - W, y - 22, W * 2, 46, [6, 6, 14, 14]); };
+                const rules = (c) => { c.beginPath(); for (const s of [-1, 1]) { c.moveTo(x + s * 38, y + 15); c.lineTo(x + s * 70, y + 15); } c.stroke();
+                    for (const s of [-1, 1]) { c.beginPath(); c.moveTo(x + s * 74, y + 12.5); c.lineTo(x + s * 76.5, y + 15); c.lineTo(x + s * 74, y + 17.5); c.lineTo(x + s * 71.5, y + 15); c.closePath(); c.fill(); } };
                 LandmarkKit.flat(ctx, k, (c) => {
                     c.textAlign = 'center'; c.textBaseline = 'middle';
-                    c.font = "46px 'Great Vibes', cursive";
                     if (!emissive) {
-                        c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillText('Moon City', x + 2, y + 3);
-                        c.fillStyle = '#d8c8f0'; c.fillText('Moon City', x, y);
-                        c.fillStyle = C.gold; _mcCrescent(c, x - 118, y - 4, 13); c.fill();
-                        c.font = '600 9px Montserrat, sans-serif'; c.fillStyle = C.goldDk;
-                        c.fillText('N I G H T C L U B', x, y + 26);
-                        c.strokeStyle = C.goldDk; c.lineWidth = 1; rules(c);
+                        c.save(); c.translate(3, 4); board(c); c.fillStyle = 'rgba(0,0,0,0.45)'; c.fill(); c.restore();
+                        board(c);
+                        c.fillStyle = LandmarkKit.grad(this, 'mcboard', () => { const g = c.createLinearGradient(0, y - 22, 0, y + 24); g.addColorStop(0, '#1d1328'); g.addColorStop(1, C.lacquer); return g; });
+                        c.fill(); c.strokeStyle = C.gold; c.lineWidth = 2; c.stroke();
+                        c.beginPath(); c.roundRect(x - W + 4, y - 18, W * 2 - 8, 38, [4, 4, 11, 11]); c.strokeStyle = 'rgba(255, 241, 194, 0.3)'; c.lineWidth = 0.8; c.stroke();
+                        c.font = "34px 'Great Vibes', cursive";
+                        c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillText('Moon City', x + 6 + 1.5, ty + 2);
+                        c.fillStyle = '#d8c8f0'; c.fillText('Moon City', x + 6, ty);
+                        c.fillStyle = C.gold; _mcCrescent(c, cx, ty - 2, 9); c.fill();
+                        c.font = '600 6.5px Montserrat, sans-serif'; c.fillStyle = C.gold;
+                        c.fillText('N I G H T C L U B', x, y + 15);
+                        c.strokeStyle = C.goldDk; c.fillStyle = C.goldDk; c.lineWidth = 0.8; rules(c);
                         return;
                     }
                     const a = Math.max(0.15, Math.min(1, dark * 1.3)) * flick;
                     c.globalCompositeOperation = 'lighter';
-                    if (_zoomLOD < 1) { c.globalAlpha = a * 0.5; drawGlow(c, x, y, 150, '255, 120, 180', 0); }
-                    c.globalAlpha = a; c.shadowColor = C.rose; c.shadowBlur = _zoomLOD < 1 ? 16 : 0;
-                    c.fillStyle = '#ffb8d4'; c.fillText('Moon City', x, y);
-                    c.shadowBlur = 0; c.fillStyle = 'rgba(255, 244, 250, 0.9)'; c.fillText('Moon City', x, y);
-                    c.fillStyle = C.goldLt; _mcCrescent(c, x - 118, y - 4, 13); c.fill();
-                    if (_zoomLOD < 1) { c.globalAlpha = a * 0.6; drawGlow(c, x - 118, y - 4, 26, '232, 194, 122', 0); }
-                    c.globalAlpha = a * 0.85; c.font = '600 9px Montserrat, sans-serif'; c.fillStyle = C.gold;
-                    c.fillText('N I G H T C L U B', x, y + 26);
-                    c.strokeStyle = C.gold; c.lineWidth = 1; rules(c);
+                    if (_zoomLOD < 1) { c.globalAlpha = a * 0.25; drawGlow(c, x, y, 100, '255, 120, 180', 0); }
+                    c.globalAlpha = a * 0.6; board(c); c.strokeStyle = C.rose; c.lineWidth = 1.2; c.stroke();         // the frame's neon edge
+                    c.globalAlpha = a; c.font = "34px 'Great Vibes', cursive"; c.shadowColor = C.rose; c.shadowBlur = _zoomLOD < 1 ? 14 : 0;
+                    c.fillStyle = '#ffb8d4'; c.fillText('Moon City', x + 6, ty);
+                    c.shadowBlur = 0; c.fillStyle = 'rgba(255, 244, 250, 0.9)'; c.fillText('Moon City', x + 6, ty);
+                    c.fillStyle = C.goldLt; _mcCrescent(c, cx, ty - 2, 9); c.fill();
+                    if (_zoomLOD < 1) { c.globalAlpha = a * 0.6; drawGlow(c, cx, ty - 2, 20, '232, 194, 122', 0); }
+                    c.globalAlpha = a * 0.85; c.font = '600 6.5px Montserrat, sans-serif'; c.fillStyle = C.gold;
+                    c.fillText('N I G H T C L U B', x, y + 15);
+                    c.strokeStyle = C.gold; c.lineWidth = 0.8; rules(c);
                 });
             },
 
