@@ -1151,6 +1151,8 @@
         function drawHumanContactShadow(ctx, entity) {
             if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
             const C = CONFIG.HUMAN_SHADE, sp = glowSprite(_SHADOW_RGB, 0.45), a0 = ctx.globalAlpha;
+            // Lamp shadows from dusk (the lamps are lit while the sun's shadow fades), not only once it's gone
+            if (entity && entity.x !== undefined && _lampShadowLevel() && sunNow().night > 0.3) _noteLampShadowBody(entity, C);
             ctx.save();
             ctx.translate(-4, 0);
             if (typeof _sunShadow !== 'undefined' && _sunShadow.on) {
@@ -1160,7 +1162,6 @@
                 ctx.globalAlpha = a0 * (C.SHADOW_NIGHT + (C.SHADOW_DAY - C.SHADOW_NIGHT) * _sunShadow.k);
                 ctx.drawImage(sp, -32, -32);
             } else {
-                if (entity && entity.x !== undefined && _lampShadowLevel()) _noteLampShadowBody(entity, C);
                 ctx.scale(12 / 32, 10 / 32); ctx.globalAlpha = a0 * C.SHADOW_NIGHT;
                 ctx.drawImage(sp, -32, -32);
             }
