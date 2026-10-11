@@ -273,7 +273,7 @@ for (const taxi of [false, true]) test(`${taxi ? 'Zib' : 'Player'} autodrive fol
   ok(Math.hypot(env.probe.game.car.x-start.x, env.probe.game.car.y-start.y) > 100, 'occupants do not block their car');
   const timerStart = env.pendingTimers.length;
   const result = value(env, `
-    let arrived=-1; for(let i=0;i<2400;i++) {
+    let arrived=-1; for(let i=0;i<3600;i++) {   // room for the lights: walkers now get round the city to ask for the walk
       game.update(); if(${taxi ? '!game.zibSystem.isPassenger' : '!game.navDestination'}) {arrived=i;break;}
     }
     return {arrived,distance:Math.hypot(__driveCar.x-__driveTarget.x,__driveCar.y-__driveTarget.y),
@@ -1544,6 +1544,39 @@ test('Junction lights: a left turn waits for what is coming the other way; nobod
   ok(!r.held.inBox && r.held.light === 'green' && r.held.gap > 0, `on a green it waits at the line while the way out is full (${JSON.stringify(r.held)})`);
   ok(r.held.went, 'and goes once there is room');
 }, {events:true});
+
+test('Pedestrians walk on down the street: they only turn back at a dead end, never re-cross straight back, and every block end joins the corner', env => {
+  env.run(`{
+    let s=4242; Math.random=()=>(s=(s*16807)%2147483647)/2147483647;
+    game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=true; game.paused=false;
+    game.keys={}; game.joystick.active=false; globalThis.__hops=new Map();
+  }`);
+  for (let c = 0; c < 6; c++) env.run(`{
+    for(let t=0;t<500;t++){ game.update();
+      for(const p of game.pedestrians.pedestrians){ let L=__hops.get(p); if(!L) __hops.set(p,L=[]);
+        if(L[L.length-1]!==p.currentNodeId) L.push(p.currentNodeId); } }
+  }`);
+  const r = value(env, `
+    const nodes=game.pedestrians.network.nodes;
+    let hops=0, turned=0, crossed=0, recrossed=0;
+    for(const L of __hops.values()) { let last=null;
+      for(let i=1;i<L.length;i++){ hops++; const a=nodes[L[i-1]], b=nodes[L[i]];
+        if(i>=2 && L[i]===L[i-2] && a.connections.length>1) turned++;
+        if(a.isCrosswalk && b.isCrosswalk && a.crosswalkData===b.crosswalkData){ crossed++;
+          if(last && last.to===a.id && i-last.i<=4) recrossed++; last={to:b.id,i}; } } }
+    // a pavement node with one link is the end of a walk: only at the city's edge
+    const xs=nodes.map(n=>n.x), ys=nodes.map(n=>n.y), x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+    const inner=nodes.filter(n=>n.connections.length===1 && n.x>x0+5 && n.x<x1-5 && n.y>y0+5 && n.y<y1-5).length;
+    const ends=nodes.filter(n=>n.connections.length===1).length;
+    return {hops, turned, crossed, recrossed, inner, ends, total:nodes.length};
+  `);
+  ok(r.hops > 1000, `they walk (${r.hops} node to node)`);
+  equal(r.turned, 0, 'nobody turns round where the walk goes on');
+  ok(r.crossed > 20, `they cross the street (${r.crossed} crossings)`);
+  equal(r.recrossed, 0, 'nobody crosses straight back over');
+  // (3 still stop at the wide mouth of a diagonal: its pavement and crossing are 400+ px off, past buildings)
+  ok(r.inner <= 3, `pavement walks end at the city's edge, not short of a corner (${r.inner} of ${r.ends} ends inside)`);
+});
 
 test('Walkers at junction lights wait at the kerb for the walk (asking for it), then cross; crossings join the pavement', env => {
   lightsScene(env);

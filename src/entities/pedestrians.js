@@ -54,6 +54,7 @@
                 this.network = network;
                 this.currentNodeId = null;
                 this.targetNodeId = null;
+                this.prevNodeId = null;     // the node they came from (so they don't turn straight back)
                 this.pathProgress = 0;
                 
                 // State machine
@@ -119,6 +120,7 @@
                 
                 if (nearest) {
                     this.currentNodeId = nearest.id;
+                    this.prevNodeId = null;
                     this._pickNextTarget();
                 }
             }
@@ -129,16 +131,32 @@
                 const currentNode = this.network.nodes[this.currentNodeId];
                 if (!currentNode || currentNode.connections.length === 0) return;
                 
-                // Avoid backtracking when possible
-                let candidates = currentNode.connections.filter(id => id !== this.targetNodeId);
+                // Keep going: never straight back to the node they came from, and where there's a choice,
+                // nothing that doubles back on the way they were heading (a kerb node links to the pavement
+                // either side of it, so "not the last node" alone still lets them zigzag). Only a dead end
+                // turns them round.
+                const prev = this._getNode(this.prevNodeId);
+                let candidates = currentNode.connections.filter(id => id !== this.prevNodeId);
                 if (candidates.length === 0) candidates = currentNode.connections;
+                if (prev && candidates.length > 1) {
+                    const hx = currentNode.x - prev.x, hy = currentNode.y - prev.y, hl = Math.hypot(hx, hy);
+                    if (hl > 1) {
+                        const ahead = candidates.filter(id => {
+                            const n = this.network.nodes[id];
+                            const cx = n.x - currentNode.x, cy = n.y - currentNode.y, cl = Math.hypot(cx, cy);
+                            return cl < 1 || (hx * cx + hy * cy) / (hl * cl) > -0.3;
+                        });
+                        if (ahead.length > 0) candidates = ahead;
+                    }
+                }
                 
                 // Crosswalk bias — uniform random weighted heavily toward sidewalk
                 // continuations means peds rarely picked the lone crosswalk option
                 // and shuffled along one side of the street forever. Now: when a
                 // crosswalk option exists among candidates, ~50% chance to take it.
-                // No bias if currently on a crosswalk (already mid-cross, just finish).
-                if (!currentNode.isCrosswalk) {
+                // No bias if currently on a crosswalk (already mid-cross, just finish),
+                // or just off one (else at a corner they'd cross the next road at once, and round and round).
+                if (!currentNode.isCrosswalk && !(prev && prev.isCrosswalk)) {
                     const crosswalkOptions = candidates.filter(id => {
                         const n = this.network.nodes[id];
                         return n && n.isCrosswalk;
@@ -557,6 +575,7 @@
                 } else {
                     // Reached target node
                     const oldTarget = this.targetNodeId;
+                    this.prevNodeId = this.currentNodeId;
                     this.currentNodeId = this.targetNodeId;
                     this._pickNextTarget();
                     
@@ -610,7 +629,8 @@
                 if (this.waitTimer > (lit ? 900 : 300)) {
                     const currentNode = this._getNode(this.currentNodeId);
                     if (currentNode && currentNode.connections.length > 1) {
-                        const alternatives = currentNode.connections.filter(id => id !== this.targetNodeId);
+                        let alternatives = currentNode.connections.filter(id => id !== this.targetNodeId && id !== this.prevNodeId);
+                        if (alternatives.length === 0) alternatives = currentNode.connections.filter(id => id !== this.targetNodeId);
                         if (alternatives.length > 0) {
                             this.targetNodeId = alternatives[Math.floor(Math.random() * alternatives.length)];
                         }
@@ -644,6 +664,7 @@
                     this.crossingTimer++;
                 } else {
                     // Made it across! (or to the kerb: with the far side next, look again before stepping out)
+                    this.prevNodeId = this.currentNodeId;
                     this.currentNodeId = this.targetNodeId;
                     this._pickNextTarget();
                     this.state = 'walking';
