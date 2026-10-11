@@ -212,7 +212,9 @@ engineMixin({
                 this._ultraMoverBuffer = this._ultraExtraRecords = this._ultraActorSeen = null;
                 this._ultraCars = this._ultraCarSeen = this._ultraFoliageCandidates = null;
                 this._ultraWalkerProxies = null;
-                this._reflDetailCv = this._ultraWalkerCanvas = this._ultraCarScratch = null;   // Ultra's canvases (rebuilt on demand)
+                this._reflDetailCv = this._ultraArt = this._ultraArtFree = null;   // Ultra's canvases (rebuilt on demand)
+                this._ultraWet = null;
+                if (this._releasePuddleArt) this._releasePuddleArt();   // (baked puddles: the old map's)
                 this._refl = null;
             },
 

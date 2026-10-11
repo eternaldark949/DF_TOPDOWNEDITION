@@ -36,6 +36,12 @@
                 return (c.pose || '') + '|' + held + '|' + hat + '|' + hair + '|' + stride + '|' + wet;
             },
 
+            /** The same look as bake `b` in every part but the stride */
+            _sameButStride(b, sig) {
+                const p = sig.split('|');
+                return !!b.parts && p.length === 6 && p.every((v, i) => i === 4 || v === b.parts[i]);
+            },
+
             /** Bake the strip: frame 0 standing, 1..FRAMES the walk cycle, in the body's own frame (facing +x) */
             _bake(e, c, sig) {
                 const F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R, Q = CROWD_BAKE.Q, cell = Math.ceil(R * 2 * Q);
@@ -62,16 +68,19 @@
                 return { sig, parts, stride: sp, cv, cell, used: _frameTime };
             },
 
-            /** Draw from the bake if there is one (true), else false (the caller draws it live) */
-            draw(ctx, e, c) {
+            /** Draw from the bake if there is one (true), else false (the caller draws it live).
+                `owner`: whose bake it is (a reflection draws a stand-in of `owner`, and shares its bake).
+                `anyStride`: a walking bake does for any pace (reflections: faint and rippling, a stride a little
+                long or short can't be seen, and a pedestrian easing in and out of a stroll doesn't rebake). */
+            draw(ctx, e, c, owner = e, anyStride = false) {
                 if (c.pose === 'dance' || c.pose === 'die') return false;          // poses that keep moving: live
                 syncHumanoidGait(e);                                                // the walk (and its footsteps) as the live draw would
-                let b = this.cache.get(e);
+                let b = this.cache.get(owner);
                 const sig = this._sig(e, c, b);
-                if (!b || b.sig !== sig) {
+                if (!b || b.sig !== sig && !(anyStride && b.stride > 0 && this._sameButStride(b, sig))) {
                     if (this._bakedFrame !== _frameTime) { this._bakedFrame = _frameTime; this._bakes = 0; }
                     if (this._bakes >= CROWD_BAKE.PER_FRAME) return false;          // one look a frame; live until then
-                    if (!b && this.cache.size >= CROWD_BAKE.MAX) {                   // full: make room from whoever was seen longest ago —
+                    if (!this.cache.has(owner) && this.cache.size >= CROWD_BAKE.MAX) {                   // full: make room from whoever was seen longest ago —
                         let oldK = null, oldT = Infinity;                              // never someone on screen this frame (no thrash)
                         for (const [k, v] of this.cache) if (v.used < oldT) { oldT = v.used; oldK = k; }
                         if (oldK === null || oldT >= _frameTime) return false;
@@ -80,7 +89,7 @@
                     this._bakes++;
                     b = this._bake(e, c, sig);
                     if (!b) return false;
-                    this.cache.set(e, b);
+                    this.cache.set(owner, b);
                 }
                 b.used = _frameTime;
                 const g = e._gait, F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R;

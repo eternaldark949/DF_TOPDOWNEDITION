@@ -914,6 +914,58 @@ test('Ultra reflections: lights at half size, detail at full size and only where
   ok(ops.every(o => o[5] === 200 && o[9] === 200), 'each only 200 px wide, the rect\'s columns');
 }, {affine: true});
 
+test('Ultra reflections: art repaints on a cadence, crowd bakes are shared and pace-proof, puddles bake once, rects never overlap', env => {
+  env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=false; game.enterWorld(); game.loop=()=>{};
+    const W = game.weather; W.triggerLightning = () => {}; if (W.lockSchedule) W.lockSchedule('rain'); W.setCondition('rain', null, true);
+    GameSettings.reflections = 'ultra'; GameSettings.adaptiveLighting = false;
+    for (let i = 0; i < 3; i++) { W.wetness = 1; game.worldMinutes = 22 * 60; game.player.x = 1200; game.player.y = 2400; _frameTime += 16; game.draw(); }`);
+  const r = value(env, `
+    const out = {};
+    // a stand-in actor: painted the first frame, then every ULTRA_REPAINT_MS; Stella every frame
+    const e = {}, dues = [], live = [];
+    for (let i = 0; i < 7; i++) {
+      game._renderDrawId++; _frameTime += 16;
+      const a = game._ultraArtFor(e, 20, 20, false); if (!i) a.seq = 0; dues.push(a.due); if (a.due) game._ultraArtPainted(a);
+      live.push(game._ultraArtFor(game.player, 20, 20, true).due);
+    }
+    out.dues = dues; out.live = live;
+    game._renderDrawId++; game._ultraArtSweep(); out.swept = game._ultraArt.has(e);
+    // rects: overlapping boxes join, far ones stay apart, none overlap
+    const v = { x: 0, y: 0, zoom: 1 };
+    const rects = game._ultraRects([0, 0, 50, 50, 40, 40, 90, 90, 400, 0, 450, 50], v, 1, 1280, 720);
+    out.rects = rects.length;
+    out.disjoint = rects.every((a, i) => rects.every((c, j) => i === j || !(a.x0 < c.x1 && c.x0 < a.x1 && a.y0 < c.y1 && c.y0 < a.y1)));
+    // wet test: a box on nothing wet is skipped
+    game._ultraWet = [0, 0, 100, 100]; out.wetIn = game._ultraOnWet(50, 50, 60, 60); out.wetOut = game._ultraOnWet(500, 500, 600, 600);
+    // the crowd's walk bake: owned by the actor, reused by a reflection at another pace
+    const ped = { x: 1200, y: 2300, angle: 0, look: { skinColor: '#c68642', gender: 'female', top: { type: 'tshirt', color: '#335' },
+      bottom: { type: 'pants', color: '#222' }, shoes: { type: 'boots', color: '#111' }, hair: { type: 'short', color: '#111' } } };
+    CrowdImpostors.clear(); CrowdImpostors._bakedFrame = -1;
+    const cfg = { ...ped.look, stance: 'idle', noShadow: true }, ctx = document.createElement('canvas').getContext('2d');
+    syncHumanoidGait(ped); ped._gait.speed = 1;
+    _frameTime += 16; CrowdImpostors.draw(ctx, ped, cfg);
+    const baked = CrowdImpostors.cache.get(ped);
+    ped._gait.speed = 2.5; _frameTime += 16; CrowdImpostors._bakedFrame = -1;
+    out.reused = CrowdImpostors.draw(ctx, ped, cfg, ped, true) && CrowdImpostors.cache.get(ped) === baked;
+    game._ultraWet = null; _frameTime += 16; game.draw();
+    out.puddleCanvases = [..._puddleArts.values()].flatMap(rec => Object.values(rec).map(x => x.cv._probeID));
+    return out;`);
+  equal(r.dues, [true, false, false, true, false, false, true], 'painted, then every 3rd 16 ms frame');
+  ok(r.live.every(Boolean), 'Stella\'s reflection repaints every frame');
+  equal(r.swept, false, 'art not reflected this frame gives up its canvas');
+  equal([r.rects, r.disjoint], [2, true], 'overlapping boxes join, a far one stays its own rect');
+  equal([r.wetIn, r.wetOut], [true, false], 'art over nothing wet is skipped');
+  ok(r.reused, 'a reflection reuses its owner\'s walk bake at another pace');
+  ok(r.puddleCanvases.length > 0, 'the puddles in view are baked');
+  env.setTrace(true);
+  env.run(`_frameTime += 16; game.draw();`);
+  const ids = new Set(r.puddleCanvases), drawn = env.trace.filter(o => o[1] === 'drawImage' && o[2] && ids.has(o[2].canvas)).length;
+  const repainted = env.trace.filter(o => ids.has(o[0]) && o[1] !== 'set').length;
+  env.setTrace(false);
+  ok(drawn > 0, 'and laid down from their bakes');
+  equal(repainted, 0, 'the same wetness again: no puddle is painted again');
+}, {affine: true});
+
 test('Adaptive reflections: slow frames step Ultra down to High then Medium (never Off), steady frames bring it back, the saved choice untouched', env => {
   env.run(`game.story.update=()=>{}; game._doLoadMap('hub_949'); game.running=false; game.enterWorld(); game.loop=()=>{};`);
   const r = value(env, `
