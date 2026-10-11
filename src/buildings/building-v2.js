@@ -17,7 +17,7 @@
         // ...and how far the glow pass draws past it without the beams (lamp halos, portico mist, the crown):
         // past this, only the beams can reach the screen (drawEmissive's beamsOnly)
         const SQ_GLOW_REACH = 240, MC_GLOW_REACH = 100;
-        const BUILDING_LANDMARK_STYLES = ['silver_queen', 'double_nights', 'moon_city', 'enni_cole'];
+        const BUILDING_LANDMARK_STYLES = ['silver_queen', 'double_nights', 'moon_city', 'enni_cole', 'cozy_cafe'];
 
         class BuildingV2 {
             constructor(config) {
@@ -177,7 +177,7 @@
             }
             
             _setupSign(signConfig) {
-                if (this.style === 'double_nights' || this.style === 'moon_city' || this.style === 'enni_cole') { this.attachedSign = null; return; }   // these landmarks draw their own script signs
+                if (this.style === 'double_nights' || this.style === 'moon_city' || this.style === 'enni_cole' || this.style === 'cozy_cafe') { this.attachedSign = null; return; }   // these landmarks draw their own script signs
                 const mainSection = this.sections[0];
                 const titleCase = (str) => str.replace(/\w\S*/g, (txt) => 
                     txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
@@ -307,6 +307,7 @@
             drawBase(ctx) {
                 if (this.style === 'double_nights') { this._dnDrawBase(ctx); return; }   // buildings/double-nights.js
                 if (this.style === 'enni_cole') { this._ecDrawBase(ctx); return; }
+                if (this.style === 'cozy_cafe') { this._ccDrawBase(ctx); return; }   // buildings/cozy-cafe.js
                 ctx.save();
                 
                 // Draw shadow for each section
@@ -339,6 +340,7 @@
             drawTop(ctx, worldMinutes = 1260) {
                 if (this.style === 'double_nights' && typeof game !== 'undefined' && game.camera) { this._dnDrawTop(ctx); return; }
                 if (this.style === 'enni_cole' && typeof game !== 'undefined' && game.camera) { this._ecDrawTop(ctx); return; }
+                if (this.style === 'cozy_cafe' && typeof game !== 'undefined' && game.camera) { this._ccDrawTop(ctx); return; }
                 if (CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera) { this._drawLeanTop(ctx); return; }
                 ctx.save();
                 
@@ -677,6 +679,10 @@
                     this.roofFeatures = []; this.facadeFeature = 'moon_city'; this.emissiveReach = 600;   // fins, skylight, searchlights (buildings/moon-city.js)
                     this.topReach = MC_TOP_REACH;                           // base and roof passes: the canopy and sign
                     this.glowReach = MC_GLOW_REACH;                         // glow pass, all but the searchlights
+                } else if (this.style === 'cozy_cafe') {
+                    this.roofFeatures = [];                                // hip roof, terrace and chimney (buildings/cozy-cafe.js)
+                    this.topReach = 60;                                    // base and top passes: awnings, signboard, the bistro tables
+                    this.crownZ = 120;                                     // the chimney and its smoke stand over the roof
                 } else if (this.style === 'silver_queen') {
                     this.roofFeatures = ['penthouse'];                     // the rest of the roof is _sqDrawRoof
                     this.facadeFeature = 'silver_queen';
@@ -696,6 +702,7 @@
                 if (this.style === 'double_nights') { this._dnLights(); return; }
                 if (this.style === 'moon_city') { this._mcLights(); return; }
                 if (this.style === 'enni_cole') { this._ecLights(); return; }
+                if (this.style === 'cozy_cafe') { this._ccLights(); return; }
                 const E = this._entrance();
                 if (E) {
                     const cx = E.cx, cy = E.cy, at = (u, n) => ({ x: cx + E.ux * u + E.nx * n, y: cy + E.uy * u + E.ny * n });
@@ -970,6 +977,7 @@
             /** Emissive layer (after lighting): lit windows, neon trim, rooftop lights. dark = ambient darkness 0..1 */
             drawEmissive(ctx, dark, beamsOnly) {
                 if (this.style === 'enni_cole' && typeof game !== 'undefined' && game.camera) { this._ecDrawEmissive(ctx, dark); return; }
+                if (this.style === 'cozy_cafe' && typeof game !== 'undefined' && game.camera) { this._ccDrawEmissive(ctx, dark); return; }
                 if (!(CONFIG.BUILDINGS.LEAN && typeof game !== 'undefined' && game.camera)) return;
                 if (this.style === 'double_nights') { this._dnDrawEmissive(ctx, dark); return; }
                 if (beamsOnly) {   // all but the beams is past glowReach, off screen (world-state.js drawEmissivePass)

@@ -282,62 +282,20 @@
             });
         }
 
-        /**
-         * Factory function to create Cozy Cafe.
-         * Simple square building with warm, inviting brown and amber aesthetic.
-         */
+        /** The Cozy Cafe: a brick corner house with a shingled hip roof, the hearth's chimney, a roof terrace with
+            parasols and string lights, striped awnings and a signboard over the door (buildings/cozy-cafe.js). */
         function createCozyCafe(x, y, config = {}) {
             return new BuildingV2({
-                id: 'cozy_cafe',
-                x: x,
-                y: y,
-                label: 'Cozy Cafe',
-                type: 'cafe',
-                floors: 3,
-                
-                // Simple square cafe
+                id: 'cozy_cafe', x, y, label: 'Cozy Cafe', type: 'cafe', style: 'cozy_cafe', floors: 3,
                 sections: [
                     { x: 0, y: 0, w: 350, h: 350 },
                 ],
-                
-                // Cozy small windows
-                windowWidth: 10,
-                windowHeight: 14,
-                windowSpacingX: 26,
-                windowSpacingY: 22,
-                windowMarginX: 18,
-                windowMarginY: 12,
-                
-                // Colors - warm coffee house tones
-                roofColor: '#4a3028',           // Warm espresso roof
-                roofLightColor: '#5a3a30',      // Lighter brown highlight
-                wallColor: '#382525',           // Deep mahogany walls
-                wallLightColor: '#463030',      // Warm brown
-                accentColor: '#ffaa00',         // Amber accent (matches lamps)
-                windowColor: '#1a1208',         // Warm dark glass
-                windowLitColor: '#ffe0a0',      // Warm candlelight glow
-                windowFrameColor: '#2a1a0a',    // Dark wood frames
-                balconyColor: '#3e2723',        // Espresso railings
-                
-                // Small awning over entrance
-                balconies: [
-                    { section: 0, side: 'south', startX: 95, width: 160, floors: [1] },
-                ],
-                
-                // Minimal roof props
-                roofProps: [
-                    { type: 'vent', section: 0, x: 280, y: 40, w: 35, h: 35 },
-                    { type: 'vent', section: 0, x: 40, y: 280, w: 25, h: 25 },
-                ],
-                
-                // Attachments
+                roofColor: '#4a3028', roofLightColor: '#5a3a30',
+                wallColor: '#6a3426', wallLightColor: '#7d4130', accentColor: '#ffaa00',
+                windowColor: '#2a1b14', windowLitColor: '#ffe0a0', windowFrameColor: '#efdcb6',
+                balconyColor: '#3e2723', balconies: [],
                 sign: { text: 'Cozy Cafe', color: '#ffaa00', size: 28 },
-                door: {
-                    target: config.doorTarget || 'cozy_cafe_interior',
-                    label: 'Enter Cafe',
-                    lightColor: '#ffaa00'
-                },
-                
+                door: { target: config.doorTarget || 'cozy_cafe_interior', label: 'Enter Cafe', lightColor: null },   // (lit by _ccLights)
                 ...config
             });
         }
