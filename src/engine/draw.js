@@ -434,7 +434,8 @@
                         this._forecourtCandidates || (this._forecourtCandidates = []));
                     for (const entry of candidates) {
                         const b = entry.item;
-                        const ground = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : b.style === 'moon_city' ? b._mcDrawGround : null;
+                        const ground = b.style === 'silver_queen' ? b._sqDrawGround : b.style === 'double_nights' ? b._dnDrawGround : b.style === 'moon_city' ? b._mcDrawGround
+                                     : b.variant && b._vOn() ? b._vBase : null;   // a street variant's stoop, carpet, buckets (street-variants.js)
                         if (!ground) continue;
                         if (b.x + b.w + 60 < cbW.left || b.x - 60 > cbW.right || b.y > cbW.bottom || b.y + b.h + 480 < cbW.top) continue;
                         ground.call(b, this.ctx);
