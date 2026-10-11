@@ -1757,7 +1757,7 @@
                 }
                 case 'ec_bakery': {
                     plinth();rr(x+6,y+6,w-12,h-15,4,'#c4a782');
-                    for(let i=0;i<10;i++)for(let j=0;j<2;j++) {
+                    for(let i=0;i<Math.floor((w-20)/23);i++)for(let j=0;j<2;j++) {
                         const X=x+17+i*23,Y=y+23+j*24;ctx.fillStyle=(i+j)%2?'#d6ac6c':'#a36b42';ctx.beginPath();ctx.ellipse(X,Y,9,5,-.2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#efd4a4';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(X-4,Y-2);ctx.lineTo(X-2,Y+2);ctx.moveTo(X+1,Y-2);ctx.lineTo(X+3,Y+2);ctx.stroke();
                     }
                     rr(x+5,y+5,w-10,h-14,4,'rgba(222,244,245,.08)','rgba(255,248,225,.55)',1);text('BAKERY & PATISSERIE',x+w/2,y+h-4,8);break;
@@ -1831,6 +1831,182 @@
                 case 'ec_plant': {
                     shadow();dot(x+w/2,y+h/2,Math.min(w,h)*.43,'#a78a51',C.brass);dot(x+w/2,y+h/2,Math.min(w,h)*.34,'#3a3525');
                     for(let i=0;i<9;i++){const a=i*Math.PI*2/9,rx=w*.24;ctx.save();ctx.translate(x+w/2+Math.cos(a)*rx*.35,y+h/2+Math.sin(a)*rx*.35);ctx.rotate(a);ctx.fillStyle=i%2?'#3b6140':'#537948';ctx.beginPath();ctx.ellipse(rx*.45,0,rx,.18*w,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(163,186,126,.35)';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(rx*1.3,0);ctx.stroke();ctx.restore();}break;
+                }
+                // ── The lobby ──
+                case 'ec_balustrade': {                                // the staircase's brass rail on rose stone
+                    const v=h>w;shadow();rr(x,y,w,h,3,'#7d4b5a',C.brass,1.2);
+                    ctx.fillStyle=C.bright;if(v)ctx.fillRect(x+w/2-1,y+2,2,h-4);else ctx.fillRect(x+2,y+h/2-1,w-4,2);
+                    ctx.fillStyle='#5b3341';for(let k=8;k<(v?h:w)-4;k+=12){if(v)dot(x+w/2,y+k,2.2,'#d8bd84');else dot(x+k,y+h/2,2.2,'#d8bd84');}
+                    break;
+                }
+                case 'ec_newel': {                                     // a newel post with a frosted globe lamp
+                    shadow();rr(x,y,w,h,4,'#6a3a4a',C.brass,1.5);rr(x+4,y+4,w-8,h-8,3,'#8a5362');
+                    dot(x+w/2,y+h/2,w*.3,'#f6ead0',C.brass);dot(x+w/2,y+h/2,w*.16,'#fff8e6');break;
+                }
+                case 'ec_perfume': {                                   // a round glass counter of perfume bottles
+                    shadow();dot(x+w/2,y+h/2,w/2,C.rose,C.brass);dot(x+w/2,y+h/2,w/2-6,'#efe2cf','#c4ac91');
+                    const cols=['#f0c9a8','#d79bb1','#c9d6e8','#e8d58f','#b9e0cf','#f4dfe9'];
+                    for(let i=0;i<10;i++){const a=i*Math.PI/5,R=w*.3,X=x+w/2+Math.cos(a)*R,Y=y+h/2+Math.sin(a)*R;rr(X-4,Y-5,8,10,2,cols[i%6],'#8c7457',.6);dot(X,Y-6,1.8,C.brass);}
+                    dot(x+w/2,y+h/2,9,'#f7f0e2',C.brass);dot(x+w/2,y+h/2,3.5,'#e7b6c2');break;
+                }
+                case 'ec_floral': {                                    // a tall urn of pale roses
+                    shadow();dot(x+w/2,y+h/2,w*.46,'#b59a63',C.dark);dot(x+w/2,y+h/2,w*.38,'#3e4a35');
+                    for(let i=0;i<14;i++){const a=i*2.39996,R=w*.32*Math.sqrt((i+.5)/14),X=x+w/2+Math.cos(a)*R,Y=y+h/2+Math.sin(a)*R;dot(X,Y,w*.085,['#f3d6dc','#e9b3c0','#fbefe6','#d98ea3'][i%4]);dot(X,Y,w*.03,'rgba(140,60,80,.4)');}
+                    break;
+                }
+                case 'ec_topiary': {                                   // a clipped cypress in a black planter, as at the door
+                    shadow();rr(x,y,w,h,4,'#232126',C.brass,1);dot(x+w/2,y+h/2,w*.4,'#2e4a31');dot(x+w/2,y+h/2,w*.28,'#3e6440');dot(x+w/2-2,y+h/2-2,w*.14,'#5c8a55');break;
+                }
+                case 'ec_display': {                                   // a round walnut table of handbags and scarves
+                    shadow();dot(x+w/2,y+h/2,w/2,C.walnut,C.brass);dot(x+w/2,y+h/2,w/2-5,'#70523d');
+                    const cols=['#7b2f45','#e6d2b4','#1f1b20','#c58f6a'];
+                    for(let i=0;i<4;i++){const a=i*Math.PI/2+.4,R=w*.24,X=x+w/2+Math.cos(a)*R,Y=y+h/2+Math.sin(a)*R;rr(X-9,Y-6,18,12,3,cols[(i+variant)%4],C.brass,.7);ctx.strokeStyle=C.bright;ctx.lineWidth=1;ctx.beginPath();ctx.arc(X,Y-6,5,Math.PI,0);ctx.stroke();}
+                    dot(x+w/2,y+h/2,6,'#f0e2c4',C.brass);break;
+                }
+                case 'ec_mannequin': {                                 // a dressed form on a marble plinth, seen from above
+                    const dress=['#e9d3a6','#1c1a1f','#b0475f','#f3ece0','#2f5a4d','#7b3fa0'][variant%6],cx=x+w/2,cy=y+h/2,s=w/40;
+                    shadow();dot(cx,cy,w/2,'#5b3341',C.brass);dot(cx,cy,w/2-3,'#7d4b5a');
+                    // the gown's skirt, scalloped into folds, then the bodice and shoulders, the head turned to the room
+                    ctx.fillStyle=dress;ctx.beginPath();
+                    for(let i=0;i<=24;i++){const a=i*Math.PI/12,R=(14+(i%2?1.6:0))*s;ctx.lineTo(cx+Math.cos(a)*R,cy+2*s+Math.sin(a)*R*.92);}
+                    ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(0,0,0,.28)';ctx.lineWidth=.7;ctx.stroke();
+                    ctx.strokeStyle='rgba(255,240,215,.28)';ctx.lineWidth=.8;
+                    for(let i=0;i<12;i++){const a=i*Math.PI/6;ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*5*s,cy+2*s+Math.sin(a)*5*s);ctx.lineTo(cx+Math.cos(a)*13*s,cy+2*s+Math.sin(a)*12*s);ctx.stroke();}
+                    ctx.fillStyle=dress;ctx.beginPath();ctx.ellipse(cx,cy-1*s,10*s,5*s,0,0,Math.PI*2);ctx.fill();
+                    ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(cx,cy-1*s,10*s,5*s,0,0,Math.PI*2);ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=.8;ctx.stroke();
+                    dot(cx-10*s,cy-1*s,2.2*s,'#e6dccd');dot(cx+10*s,cy-1*s,2.2*s,'#e6dccd');                                // the form's arms
+                    dot(cx,cy-1.5*s,3.4*s,'#f1e7da','#a8957a');
+                    if(variant%2===0){ctx.strokeStyle=C.bright;ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy-1*s,5*s,.3,Math.PI-.3);ctx.stroke();}   // a necklace
+                    break;
+                }
+                // ── Fashion ──
+                case 'ec_rack': {                                      // a brass rail of hung clothes
+                    shadow();rr(x,y,w,h,4,'rgba(42,35,40,.55)',C.brass,1.2);
+                    ctx.fillStyle=C.brass;ctx.fillRect(x+4,y+h/2-1,w-8,2);
+                    const n=Math.floor((w-12)/9),cols=['#e9d3a6','#1c1a1f','#b0475f','#f3ece0','#6d5a8a','#c58f6a','#2f5a4d'];
+                    for(let i=0;i<n;i++){const X=x+7+i*9;rr(X,y+4,7,h-8,2,cols[(i*3+variant)%7],'rgba(0,0,0,.25)',.5);ctx.fillStyle='rgba(255,245,225,.18)';ctx.fillRect(X+1,y+5,1,h-10);}
+                    break;
+                }
+                case 'ec_round_rack': {                                // a round rack of dresses
+                    shadow();dot(x+w/2,y+h/2,w/2,'rgba(42,35,40,.5)',C.brass);
+                    const cols=['#e9d3a6','#b0475f','#f3ece0','#1c1a1f','#d79bb1','#7b3fa0'];
+                    for(let i=0;i<16;i++){const a=i*Math.PI/8,X=x+w/2+Math.cos(a)*w*.36,Y=y+h/2+Math.sin(a)*w*.36;ctx.save();ctx.translate(X,Y);ctx.rotate(a);rr(-7,-3.5,14,7,2,cols[(i+variant)%6],'rgba(0,0,0,.25)',.5);ctx.restore();}
+                    ctx.strokeStyle=C.brass;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x+w/2,y+h/2,w*.36,0,Math.PI*2);ctx.stroke();
+                    dot(x+w/2,y+h/2,5,C.brass,C.dark);break;
+                }
+                case 'ec_shelfwall': {                                 // cubbies of folded knits along the wall
+                    plinth();const v=h>w,n=Math.floor(((v?h:w)-12)/26),cols=['#e8ddd0','#c9a98c','#7b2f45','#3a3540','#d7b7c0','#9aa38a'];
+                    for(let i=0;i<n;i++){const X=v?x+5:x+6+i*26,Y=v?y+6+i*26:y+5,W=v?w-10:22,H=v?22:h-10;rr(X,Y,W,H,2,'#563c2d',C.brass,.6);for(let k=0;k<3;k++){const c=cols[(i+k)%6];if(v)rr(X+3,Y+2+k*6,W-6,5,1,c);else rr(X+2+k*6,Y+3,5,H-6,1,c);}}
+                    break;
+                }
+                case 'ec_fashion_table': {                             // a walnut table of folded shirts, belts and a vase
+                    shadow();rr(x,y,w,h,6,C.walnut,C.brass,1.4);rr(x+4,y+4,w-8,h-8,4,'#70523d');
+                    const cols=['#f3ece0','#b0475f','#c9a98c','#3a3540','#e9d3a6','#6d5a8a'];
+                    for(let i=0;i<3;i++)for(let j=0;j<2;j++){const X=x+12+i*((w-24)/3),Y=y+10+j*((h-20)/2);rr(X,Y,(w-24)/3-8,(h-20)/2-6,2,cols[(i+j*3+variant)%6],'rgba(0,0,0,.2)',.6);ctx.fillStyle='rgba(0,0,0,.12)';ctx.fillRect(X+2,Y+((h-20)/2-6)/2,(w-24)/3-12,1);}
+                    break;
+                }
+                // ── The Food Hall ──
+                case 'ec_deli': {                                      // La Cuisine: the chef's counter of prepared dishes
+                    plinth('#495458');rr(x+6,y+6,w-12,h-18,3,'#cfd9d6');
+                    const n=Math.floor((w-20)/46);
+                    for(let i=0;i<n;i++){const X=x+12+i*46;rr(X,y+12,40,h-34,3,'#f1ece2','#9aa3a0',.8);
+                        const food=[['#c86a3a','#7a9a4a'],['#e2c06a','#b04a3a'],['#8a5a3a','#d8c8a0'],['#5f8a4a','#e8d8b0'],['#c84a5a','#f0e0c8']][i%5];
+                        ctx.fillStyle=food[0];ctx.beginPath();ctx.ellipse(X+20,y+12+(h-34)/2,14,(h-34)/2-5,0,0,Math.PI*2);ctx.fill();
+                        for(let k=0;k<4;k++)dot(X+12+k*5,y+14+(h-34)/2+(k%2?3:-3),2,food[1]);}
+                    ctx.fillStyle='rgba(232,250,255,.18)';ctx.fillRect(x+8,y+8,w-16,4);
+                    text('LA CUISINE  •  TRAITEUR',x+w/2,y+h-5,8);break;
+                }
+                // ── Upstairs: the gallery's void over the lobby ──
+                case 'ec_void': {
+                    // Looking down into the lobby: its marble far below, the medallion's ring, the rail all round.
+                    // The chandelier hanging in it is drawEnniUpperGlow's.
+                    const g=ctx.createRadialGradient(x+w/2,y+h/2,20,x+w/2,y+h/2,Math.max(w,h)*.62);
+                    g.addColorStop(0,'#8a7768');g.addColorStop(.6,'#4d3a3c');g.addColorStop(1,'#241820');
+                    rr(x,y,w,h,40,g);
+                    ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,40);ctx.clip();
+                    ctx.strokeStyle='rgba(30,18,22,.25)';ctx.lineWidth=1;for(let X=x+20;X<x+w;X+=46){ctx.beginPath();ctx.moveTo(X,y);ctx.lineTo(X,y+h);ctx.stroke();}for(let Y=y+20;Y<y+h;Y+=46){ctx.beginPath();ctx.moveTo(x,Y);ctx.lineTo(x+w,Y);ctx.stroke();}
+                    ctx.strokeStyle='rgba(198,163,101,.45)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x+w/2,y+h/2,Math.min(w,h)*.38,0,Math.PI*2);ctx.stroke();
+                    ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x,y,w,14);ctx.fillRect(x,y,14,h);   // the floor's lip throws its shadow
+                    ctx.restore();
+                    ctx.strokeStyle='#5b3341';ctx.lineWidth=9;ctx.beginPath();ctx.roundRect(x+3,y+3,w-6,h-6,38);ctx.stroke();
+                    ctx.strokeStyle=C.brass;ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(x+3,y+3,w-6,h-6,38);ctx.stroke();
+                    ctx.strokeStyle=C.bright;ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(x+2,y+2,w-4,h-4,39);ctx.stroke();
+                    break;
+                }
+                case 'ec_ottoman': {                                   // a round buttoned ottoman
+                    shadow();dot(x+w/2,y+h/2,w/2,'#7d4b5a',C.brass);dot(x+w/2,y+h/2,w/2-6,'#a46a7b');
+                    for(let i=0;i<8;i++){const a=i*Math.PI/4;dot(x+w/2+Math.cos(a)*w*.25,y+h/2+Math.sin(a)*w*.25,1.6,'#5b3341');}
+                    dot(x+w/2,y+h/2,2.5,C.brass);break;
+                }
+                // ── Cuisine, the restaurant ──
+                case 'ec_rtable': {                                    // a round table for four, linen and candle
+                    shadow();
+                    for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4,X=x+w/2+Math.cos(a)*w*.38,Y=y+h/2+Math.sin(a)*h*.38;dot(X,Y,w*.11,C.rose,C.brass);dot(X,Y,w*.07,'#94586b');}
+                    dot(x+w/2,y+h/2,w*.3,'#f6efe3','#c9b597');
+                    for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4,X=x+w/2+Math.cos(a)*w*.19,Y=y+h/2+Math.sin(a)*h*.19;dot(X,Y,5.5,'#fffaf0','#c8b89a');dot(X,Y,2.5,'#e8dcc4');}
+                    dot(x+w/2,y+h/2,4,C.brass);dot(x+w/2,y+h/2,1.6,'#fff1c9');break;
+                }
+                case 'ec_booth': {                                     // a rose velvet banquette with its table for two
+                    shadow();rr(x,y,30,h,8,'#713f52',C.brass,1.2);rr(x+4,y+4,22,h-8,6,'#94586b');
+                    rr(x+38,y+8,w-62,h-16,4,'#f6efe3','#c9b597');dot(x+38+(w-62)/2,y+h/2-9,5.5,'#fffaf0','#c8b89a');dot(x+38+(w-62)/2,y+h/2+9,5.5,'#fffaf0','#c8b89a');dot(x+38+(w-62)/2+10,y+h/2,2,C.brass);
+                    dot(x+w-12,y+h/2,11,C.rose,C.brass);dot(x+w-12,y+h/2,7,'#94586b');break;
+                }
+                case 'ec_dessert': {                                   // the patisserie trolley-counter
+                    plinth();rr(x+6,y+6,w-12,h-16,4,'#efe2cf');
+                    const n=Math.floor((w-20)/26),cols=['#e9b3c0','#7b4a32','#f4ead6','#c9d79a','#d98ea3'];
+                    for(let i=0;i<n;i++){const X=x+16+i*26,Y=y+6+(h-16)/2;dot(X,Y,9,'#fffaf2','#c9b597');dot(X,Y,6,cols[i%5]);dot(X,Y-2,1.6,'#b8303e');}
+                    text('PATISSERIE',x+w/2,y+h-4,8);break;
+                }
+                // ── The kitchen ──
+                case 'ec_range': {
+                    shadow();rr(x,y,w,h,3,'#2c2e31','#8f9396',1.2);
+                    const n=Math.floor((w-10)/36);for(let i=0;i<n;i++)for(let j=0;j<1;j++){const X=x+22+i*36,Y=y+h/2;dot(X,Y,13,'#18191b','#5a5d60');dot(X,Y,7,'#2b2d30','#6d7074');}
+                    ctx.fillStyle='#b9bdc0';ctx.fillRect(x+4,y+h-6,w-8,3);break;
+                }
+                case 'ec_kprep': {
+                    shadow();rr(x,y,w,h,3,'#aab0b3','#5f6467',1.2);rr(x+4,y+4,w-8,h-8,2,'#c9ced0');
+                    rr(x+14,y+12,40,26,3,'#c99a6a','#7b5a3a',.8);for(let k=0;k<5;k++)dot(x+70+k*12,y+h/2,4,['#b04a3a','#e2c06a','#5f8a4a','#f0e0c8','#c86a3a'][k]);
+                    ctx.fillStyle='#4a4d50';ctx.fillRect(x+w-40,y+14,26,3);ctx.fillRect(x+w-40,y+22,22,3);break;
+                }
+                case 'ec_kfridge': {
+                    shadow();rr(x,y,w,h,3,'#c4c9cb','#5f6467',1.2);ctx.fillStyle='#8a8f92';ctx.fillRect(x+w/2-.5,y+4,1,h-8);ctx.fillRect(x+w/2-6,y+h/2-8,2,16);ctx.fillRect(x+w/2+4,y+h/2-8,2,16);break;
+                }
+                case 'ec_ksink': {
+                    shadow();rr(x,y,w,h,3,'#b7bcbf','#5f6467',1.2);rr(x+8,y+8,w/2-12,h-16,4,'#7d8487','#4f5558');rr(x+w/2+4,y+8,w/2-12,h-16,4,'#7d8487','#4f5558');dot(x+w/2,y+6,3,'#e0e3e5','#4f5558');break;
+                }
+                // ── The salon ──
+                case 'ec_jewel': {                                     // a glass vitrine of rings and necklaces on velvet
+                    plinth();rr(x+6,y+6,w-12,h-12,3,'#3a1f2c');
+                    const n=Math.floor((w-20)/22);for(let i=0;i<n;i++){const X=x+16+i*22;ctx.strokeStyle=i%2?C.bright:'#e0e6ec';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(X,y+h/2-4,6,0,Math.PI);ctx.stroke();dot(X,y+h/2+3,2.2,['#ff7aa8','#9ad8ff','#f4e2a0','#b8f0c8'][i%4]);dot(X,y+h/2+12,2.6,'#e9dcc0',C.brass);}
+                    ctx.fillStyle='rgba(232,250,255,.16)';ctx.fillRect(x+7,y+7,w-14,3);ctx.strokeStyle='rgba(255,248,225,.5)';ctx.lineWidth=1;ctx.strokeRect(x+5.5,y+5.5,w-11,h-11);break;
+                }
+                case 'ec_bagwall': case 'ec_shoewall': {               // wall shelves: handbags, or heels in pairs
+                    plinth();const v=h>w,n=Math.floor(((v?h:w)-12)/34),bag=p.decorType==='ec_bagwall';
+                    for(let i=0;i<n;i++){const X=v?x+w/2:x+20+i*34,Y=v?y+20+i*34:y+h/2;
+                        if(bag){const c=['#7b2f45','#e6d2b4','#1f1b20','#c58f6a','#d79bb1'][i%5];rr(X-10,Y-8,20,16,3,c,C.brass,.7);ctx.strokeStyle=C.bright;ctx.lineWidth=1;ctx.beginPath();ctx.arc(X,Y-8,6,Math.PI,0);ctx.stroke();}
+                        else{const c=['#b0475f','#1c1a1f','#e9d3a6','#c9a98c','#7b3fa0'][i%5];ctx.fillStyle=c;for(const dx of [-5,5]){ctx.beginPath();ctx.ellipse(X+dx,Y,3.5,10,0,0,Math.PI*2);ctx.fill();}ctx.fillStyle=C.bright;dot(X-5,Y+8,1.2,C.bright);dot(X+5,Y+8,1.2,C.bright);}}
+                    break;
+                }
+                case 'ec_shoes': {                                     // a low island of heels
+                    shadow();rr(x,y,w,h,8,'#efe2cf',C.brass,1.4);
+                    const n=Math.floor((w-16)/26);for(let i=0;i<n;i++){const X=x+16+i*26,c=['#b0475f','#1c1a1f','#e9d3a6','#c58f6a','#7b3fa0'][(i+variant)%5];ctx.fillStyle=c;for(const dx of [-4,4]){ctx.beginPath();ctx.ellipse(X+dx,y+h/2,3.2,9,0,0,Math.PI*2);ctx.fill();}}
+                    break;
+                }
+                case 'ec_chaise': {                                    // a rose velvet chaise
+                    shadow();rr(x,y,w,h,14,'#713f52',C.brass,1.4);rr(x+6,y+6,w-12,h-12,10,'#a46a7b');rr(x+4,y+4,26,h-8,10,'#8a5362');
+                    for(let i=0;i<4;i++)dot(x+44+i*((w-56)/3),y+h/2,1.5,'#5b3341');break;
+                }
+                case 'ec_mirror': {                                    // a gilt three-way mirror
+                    shadow();for(let i=0;i<3;i++){const X=x+i*w/3;rr(X+1,y,w/3-2,h,3,C.brass,C.dark,.8);const g=ctx.createLinearGradient(X,y,X+w/3,y+h);g.addColorStop(0,'#cfd8dc');g.addColorStop(.5,'#f4f7f8');g.addColorStop(1,'#9fb0b6');rr(X+4,y+4,w/3-8,h-8,2,g);}
+                    break;
+                }
+                case 'ec_fitting': {                                   // curtained cubicles, each with its mirror and stool
+                    const n=Math.max(1,Math.floor(w/90)),cw=w/n;
+                    for(let i=0;i<n;i++){const X=x+i*cw;rr(X+2,y,cw-4,h,3,'#e9dfd2','#b59a75',1.2);
+                        rr(X+8,y+4,cw-16,8,2,'#cfd8dc',C.brass,.8);dot(X+cw/2,y+h*.45,8,'#a46a7b',C.brass);
+                        ctx.fillStyle=i===1?'#a46a7b':'#7d4b5a';for(let k=0;k<(i===1?3:8);k++)rr(X+4+k*(cw-8)/8,y+h-14,(cw-8)/8-1,12,2,ctx.fillStyle);   // the curtain, one drawn back
+                        ctx.fillStyle=C.brass;ctx.fillRect(X+4,y+h-16,cw-8,2);}
+                    break;
                 }
                 case 'ec_vending': {
                     shadow();rr(x,y,w,h,4,'#4a353d',C.brass,1.2);rr(x+5,y+6,w-15,h-18,2,'#273032','#a4987f',.7);

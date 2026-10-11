@@ -7,7 +7,7 @@
             house_of_death: ['_houseFloor'], hotel_lobby: ['_lobbyFloor'], church_boss: ['_sanctumFloor'],
             hotel_suite: ['_suiteFloor'], moon_city_nightclub: ['_clubFloor'], demoness_palace: ['_palaceFloor'],
             apt_949: ['_cityView', '_aptFloor'], van_interior: ['_vanCabin'], cozy_cafe_interior: ['_cafeFloor'],
-            enni_cole_interior: ['_enniFloor'],
+            enni_cole_interior: ['_enniFloor'], enni_cole_upper: ['_enniUpperFloor'],
             keepers_hill: ['_keeperHill', '_keeperHouse', '_keeperParlor'], keepers_parlor: ['_keeperHill', '_keeperHouse', '_keeperParlor']
         };
 
@@ -107,6 +107,8 @@ engineMixin({
                     hotel_suite: [['_suiteFloor', '_paintSuiteFloor']],
                     moon_city_nightclub: [['_clubFloor', '_paintClubFloor']],
                     cozy_cafe_interior: [['_cafeFloor', '_paintCafeFloor']],
+                    enni_cole_interior: [['_enniFloor', '_paintEnniFloor']],
+                    enni_cole_upper: [['_enniUpperFloor', '_paintEnniUpperFloor']],
                     apt_949: [['_aptFloor', '_paintAptFloor']],
                     demoness_palace: [['_palaceFloor', '_paintPalaceFloor']],
                     keepers_hill: [['_keeperHill', '_paintKeeperHill'], ['_keeperHouse', '_paintKeeperHouse']],

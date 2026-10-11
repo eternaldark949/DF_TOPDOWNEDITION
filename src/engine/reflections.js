@@ -107,7 +107,11 @@
             house_of_death: { rects: [[574, 1014, 652, 486, 0.42], [574, 444, 652, 556, 0.58], [1574, 14, 212, 416, 0.38]],
                               cutCircles: [[900, 720, 152]], cuts: [[840, 1014, 120, 486]], waterProps: 'hod_fountain', glowShift: 58 },
             moon_city_nightclub: { rects: [[590, 310, 420, 380, 0.55]], glowShift: 40 },
-            enni_cole_interior: { rects: [[50, 50, 1900, 1300, 0.3]], cuts: [[870, 1000, 260, 350], [650, 120, 450, 290], [1105, 100, 290, 320], [1120, 435, 270, 200]], mirror: true, glowShift: 42 },
+            // Enni Cole: the marble lobby, gallery, showroom and salon shine; the wood less; rugs, runners, stairs and the void not at all
+            enni_cole_interior: { rects: [[640, 50, 720, 1300, 0.32], [50, 50, 570, 630, 0.16], [50, 700, 570, 650, 0.14], [1380, 50, 570, 630, 0.12], [1380, 700, 570, 650, 0.34]],
+                                  cuts: [[870, 1030, 260, 320], [838, 50, 324, 400], [1400, 80, 326, 276], [1706, 86, 226, 268], [1620, 448, 296, 206], [68, 1246, 540, 84]], mirror: true, glowShift: 42 },
+            enni_cole_upper: { rects: [[640, 50, 720, 590, 0.3], [640, 660, 720, 390, 0.32], [50, 320, 570, 730, 0.12], [1380, 50, 260, 1000, 0.26], [1640, 360, 310, 690, 0.26]],
+                               cuts: [[760, 250, 480, 300], [862, 50, 276, 150]], mirror: true, glowShift: 42 },
             ethereal_plane: { rects: [[100, 100, 1000, 1000, 0.85]], mirror: true, glowShift: 70 },
             demoness_palace: { rects: [[600, 380, 600, 606, 0.6], [600, 1000, 600, 386, 0.5], [900, 14, 486, 352, 0.4]],
                                cuts: [[860, 760, 80, 226], [860, 1000, 80, 386]], water: [[900, 695, 70], [450, 190, 34]], glowShift: 60 }

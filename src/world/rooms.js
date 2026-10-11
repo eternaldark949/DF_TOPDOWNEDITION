@@ -1209,12 +1209,52 @@
                     { x: 880, y: 790, w: 20, h: 80, type: 'hinged', orientation: 'V', rooms: ['bay', 'parts'], color: '#555a60', hingeSide: 'left', triggerRadius: 60 },
                 ]
             },
-            // Enni Cole is an open luxury department hall: no sealed wings or hidden aisles.
+            // Enni Cole: the lobby under the chandelier, a department behind a wide arch in each corner;
+            // upstairs the gallery, the couture showroom, the Cuisine restaurant (its kitchen behind a
+            // swing door) and the accessories salon (its fitting rooms behind another).
             'enni_cole_interior': {
-                rooms: { atrium: { x: 50, y: 50, w: 1900, h: 1300, type: 'indoor', label: 'Enni Cole' } },
+                rooms: {
+                    lobby:       { x: 640,  y: 50,  w: 720, h: 1300, type: 'indoor', label: 'Lobby' },
+                    food:        { x: 50,   y: 50,  w: 570, h: 630,  type: 'indoor', label: 'Food Hall' },
+                    fashion:     { x: 50,   y: 700, w: 570, h: 650,  type: 'indoor', label: 'Fashion' },
+                    furniture:   { x: 1380, y: 50,  w: 570, h: 630,  type: 'indoor', label: 'Furniture' },
+                    electronics: { x: 1380, y: 700, w: 570, h: 650,  type: 'indoor', label: 'Electronics' }
+                },
+                doors: [
+                    { x: 620,  y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'food'] },
+                    { x: 620,  y: 950, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'fashion'] },
+                    { x: 1360, y: 300, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'furniture'] },
+                    { x: 1360, y: 950, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['lobby', 'electronics'] },
+                    { x: 440,  y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['food', 'fashion'] },
+                    { x: 1400, y: 680, w: 160, h: 20,  type: 'arch', orientation: 'H', rooms: ['furniture', 'electronics'] }
+                ],
                 windows: [
-                    { x: 80, y: 1334, w: 690, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' },
-                    { x: 1230, y: 1334, w: 690, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' }
+                    { x: 80, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' },
+                    { x: 1400, y: 1334, w: 520, h: 16, facing: 'N', projectionLength: 160, tint: '255, 216, 164' }
+                ]
+            },
+            'enni_cole_upper': {
+                rooms: {
+                    gallery:  { x: 640,  y: 50,  w: 720, h: 590, type: 'indoor', label: 'Gallery' },
+                    showroom: { x: 640,  y: 660, w: 720, h: 390, type: 'indoor', label: 'Couture Showroom' },
+                    cuisine:  { x: 50,   y: 320, w: 570, h: 730, type: 'indoor', label: 'Cuisine' },
+                    kitchen:  { x: 50,   y: 50,  w: 570, h: 250, type: 'indoor', label: 'Kitchen' },
+                    salon:    { rects: [{ x: 1380, y: 50, w: 260, h: 1000 }, { x: 1640, y: 360, w: 310, h: 690 }], type: 'indoor', label: 'Accessories Salon' },
+                    fitting:  { x: 1660, y: 50,  w: 290, h: 290, type: 'indoor', label: 'Fitting Rooms' }
+                },
+                doors: [
+                    { x: 620,  y: 380, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['gallery', 'cuisine'] },
+                    { x: 1360, y: 380, w: 20,  h: 160, type: 'arch', orientation: 'V', rooms: ['gallery', 'salon'] },
+                    { x: 880,  y: 640, w: 240, h: 20,  type: 'arch', orientation: 'H', rooms: ['gallery', 'showroom'] },
+                    { x: 620,  y: 820, w: 20,  h: 150, type: 'arch', orientation: 'V', rooms: ['showroom', 'cuisine'] },
+                    { x: 1360, y: 820, w: 20,  h: 150, type: 'arch', orientation: 'V', rooms: ['showroom', 'salon'] },
+                    { x: 420,  y: 300, w: 90,  h: 20,  type: 'hinged', orientation: 'H', rooms: ['cuisine', 'kitchen'], color: '#5a3442', hingeSide: 'left', triggerRadius: 60 },
+                    { x: 1750, y: 340, w: 90,  h: 20,  type: 'hinged', orientation: 'H', rooms: ['salon', 'fitting'], color: '#5a3442', hingeSide: 'left', triggerRadius: 60 }
+                ],
+                windows: [
+                    { x: 680, y: 1034, w: 640, h: 16, facing: 'N', projectionLength: 170, tint: '255, 214, 170' },
+                    { x: 34, y: 420, w: 16, h: 560, facing: 'E', projectionLength: 150, tint: '255, 216, 164' },
+                    { x: 1950, y: 420, w: 16, h: 560, facing: 'W', projectionLength: 150, tint: '255, 216, 164' }
                 ]
             },
             // Neural Systems: the showroom, a small foyer at the door, the consultation and server rooms off it.

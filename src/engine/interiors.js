@@ -19,6 +19,7 @@
             hub_949:             { glow: (g, c) => g.drawGraveyardGlow(c) },
             ethereal_plane:      { glow: (g, c) => g.drawEtherealGlow(c) },
             enni_cole_interior:  { floor: (g, c) => g.drawEnniInterior(c),    glow: (g, c) => g.drawEnniGlow(c) },
+            enni_cole_upper:     { floor: (g, c) => g.drawEnniUpperInterior(c), glow: (g, c) => g.drawEnniUpperGlow(c) },
             cozy_cafe_interior:  { floor: (g, c) => g.drawCafeInterior(c),    glow: (g, c) => g.drawCafeGlow(c) },     // the hearth, candles, pendants, steam
             demoness_palace:     { floor: (g, c) => g.drawPalaceInterior(c), glow: (g, c) => g.drawPalaceGlow(c) }   // engine/palace-art.js      // engine/reflections.js: its mirror floor gives this back
         };
@@ -725,42 +726,80 @@
                 ctx.restore();
             },
 
-            /** Enni Cole: rose stone, cream marble and champagne inlay. Painted once and released on exit. */
+            /** Enni Cole: champagne marble, rose stone and brass. Each floor painted once and released on exit. */
             drawEnniInterior(ctx) {
                 if (!this._enniFloor) this._enniFloor = this._paintEnniFloor();
                 ctx.drawImage(this._enniFloor, 0, 0);
             },
+            drawEnniUpperInterior(ctx) {
+                if (!this._enniUpperFloor) this._enniUpperFloor = this._paintEnniUpperFloor();
+                ctx.drawImage(this._enniUpperFloor, 0, 0);
+            },
+
+            /** The painting kit both floors share: slabs, parquet, tiles, rugs, titles, thresholds and stairs. */
+            _enniKit(c, r) {
+                const GOLD = '#c6a365';
+                const rr = (x,y,w,h,rad,col,stroke,lw=1)=>{c.beginPath();c.roundRect(x,y,w,h,rad);if(col){c.fillStyle=col;c.fill();}if(stroke){c.strokeStyle=stroke;c.lineWidth=lw;c.stroke();}};
+                const clip = (x,y,w,h,fn)=>{c.save();c.beginPath();c.rect(x,y,w,h);c.clip();fn();c.restore();};
+                // Honed marble slabs with soft veins; `tone` the base colour
+                const marble = (x,y,w,h,tone=[206,196,183],size=100,veins=true)=>clip(x,y,w,h,()=>{
+                    for(let Y=y;Y<y+h;Y+=size)for(let X=x;X<x+w;X+=size){const v=r()*10|0;c.fillStyle=`rgb(${tone[0]+v},${tone[1]+v},${tone[2]+v})`;c.fillRect(X,Y,size,size);
+                        c.strokeStyle='rgba(104,84,69,.18)';c.lineWidth=.7;c.strokeRect(X+.5,Y+.5,size-1,size-1);}
+                    if(veins)for(let i=0;i<w*h/22000;i++){let X=x+r()*w,Y=y+r()*h;c.strokeStyle=`rgba(117,88,84,${.045+r()*.08})`;c.lineWidth=.5+r()*1.6;c.beginPath();c.moveTo(X,Y);
+                        for(let k=0;k<4;k++){const nx=X+(r()-.45)*130,ny=Y+(r()-.55)*100;c.quadraticCurveTo(X+30,Y-22,nx,ny);X=nx;Y=ny;}c.stroke();}
+                });
+                // Oak or walnut herringbone
+                const parquet = (x,y,w,h,base,dark)=>clip(x,y,w,h,()=>{
+                    c.fillStyle=base;c.fillRect(x,y,w,h);
+                    const L=44,T=11;
+                    for(let Y=y-L;Y<y+h+L;Y+=T*2)for(let X=x-L,k=0;X<x+w+L;X+=L,k++){
+                        const v=(r()*14|0)-7;c.fillStyle=`rgba(${v>0?255:0},${v>0?240:0},${v>0?220:0},${Math.abs(v)/90})`;
+                        c.save();c.translate(X,Y+(k%2)*T);c.rotate(k%2?Math.PI/4:-Math.PI/4);c.fillRect(0,0,L,T);c.strokeStyle=dark;c.lineWidth=.6;c.strokeRect(0,0,L,T);c.restore();
+                    }
+                });
+                // Square tiles in two colours
+                const checker = (x,y,w,h,a,b,size=50)=>clip(x,y,w,h,()=>{
+                    for(let Y=y,j=0;Y<y+h;Y+=size,j++)for(let X=x,i=0;X<x+w;X+=size,i++){c.fillStyle=(i+j)%2?a:b;c.fillRect(X,Y,size,size);}
+                    c.strokeStyle='rgba(60,40,40,.12)';c.lineWidth=.6;for(let X=x;X<x+w;X+=size){c.beginPath();c.moveTo(X+.5,y);c.lineTo(X+.5,y+h);c.stroke();}for(let Y=y;Y<y+h;Y+=size){c.beginPath();c.moveTo(x,Y+.5);c.lineTo(x+w,Y+.5);c.stroke();}
+                });
+                // A brass-edged border just inside a room
+                const border = (x,y,w,h,col='#8a5966',lw=14)=>{c.strokeStyle=col;c.lineWidth=lw;c.strokeRect(x+lw/2+8,y+lw/2+8,w-lw-16,h-lw-16);
+                    c.strokeStyle=GOLD;c.lineWidth=1.5;c.strokeRect(x+lw+10,y+lw+10,w-2*lw-20,h-2*lw-20);};
+                const rug = (x,y,w,h,col,edge='#b59a75')=>{
+                    rr(x+3,y+4,w,h,7,'rgba(56,30,34,.2)');rr(x,y,w,h,7,col,edge,2);
+                    c.strokeStyle='rgba(228,203,164,.6)';c.lineWidth=1;c.strokeRect(x+9,y+9,w-18,h-18);
+                    c.fillStyle='rgba(246,225,192,.1)';for(let yy=y+19;yy<y+h-15;yy+=15)for(let xx=x+20;xx<x+w-15;xx+=15){c.beginPath();c.arc(xx,yy,.8,0,Math.PI*2);c.fill();}
+                };
+                const title = (str,x,y,sub,size=20,col='#694450')=>{c.textAlign='center';c.textBaseline='middle';c.font=`${size}px Georgia, serif`;c.fillStyle=col;c.fillText(str,x,y);
+                    if(sub){c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText(sub,x,y+size*.9+4);}};
+                // A marble threshold under an arch, brass at both edges
+                const threshold = d=>{const v=d.h>d.w;c.fillStyle='#e4d8c6';c.fillRect(d.x-(v?6:0),d.y-(v?0:6),d.w+(v?12:0),d.h+(v?0:12));c.fillStyle=GOLD;
+                    if(v){c.fillRect(d.x-6,d.y,1.5,d.h);c.fillRect(d.x+d.w+4.5,d.y,1.5,d.h);}else{c.fillRect(d.x,d.y-6,d.w,1.5);c.fillRect(d.x,d.y+d.h+4.5,d.w,1.5);}};
+                // A flight of stairs: `n` treads from y0 to y1, lit from `lightTop` (going up) or darker as they fall
+                const stairs = (x,y0,w,y1,up)=>{
+                    const n=Math.round((y1-y0)/16);
+                    for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n,H=(y1-y0)/n,k=up?i/n:1-i/n,v=168+70*k|0;
+                        c.fillStyle=`rgb(${v},${v-10|0},${v-22|0})`;c.fillRect(x,Y,w,H);c.fillStyle='rgba(60,36,40,.45)';c.fillRect(x,Y+H-2,w,2);c.fillStyle='rgba(255,246,225,.35)';c.fillRect(x,Y,w,1);}
+                    // the rose runner and its brass rods
+                    const rx=x+w*.27,rw=w*.46;c.fillStyle='#7a3a52';c.fillRect(rx,y0,rw,y1-y0);c.fillStyle='rgba(0,0,0,.18)';for(let i=0;i<n;i++)c.fillRect(rx,y0+i*(y1-y0)/n+(y1-y0)/n-2,rw,2);
+                    c.fillStyle=GOLD;for(let i=0;i<n;i++){const Y=y0+i*(y1-y0)/n+(y1-y0)/n-3;c.fillRect(rx-3,Y,rw+6,1.2);}
+                    c.fillStyle='rgba(224,191,130,.6)';c.fillRect(rx+3,y0,1,y1-y0);c.fillRect(rx+rw-4,y0,1,y1-y0);
+                };
+                // Shopfront glass along a stretch of the south wall: charcoal mullions, warm reflected light
+                const shopGlass = (x0,x1,Y)=>{for(let x=x0;x+94<=x1;x+=100){
+                    rr(x,Y,94,28,1,'#31333a',GOLD,.8);const g=c.createLinearGradient(x,Y+1,x+90,Y+23);g.addColorStop(0,'#6b6267');g.addColorStop(.6,'#aa8f77');g.addColorStop(1,'#4c464f');rr(x+4,Y+3,86,22,1,g);
+                    c.fillStyle='rgba(249,226,180,.4)';c.fillRect(x+8,Y+4,2,19);c.fillStyle='#302c32';c.fillRect(x+46,Y+3,3,22);}};
+                return { GOLD, rr, clip, marble, parquet, checker, border, rug, title, threshold, stairs, shopGlass };
+            },
 
             _paintEnniFloor() {
                 const cv = document.createElement('canvas'); cv.width=2000; cv.height=1400;
-                const c=cv.getContext('2d'),r=seededRandom(1849),GOLD='#c6a365',CREAM='#e8ded1';
-                const rr=(x,y,w,h,rad,col,stroke,lw=1)=>{c.beginPath();c.roundRect(x,y,w,h,rad);c.fillStyle=col;c.fill();if(stroke){c.strokeStyle=stroke;c.lineWidth=lw;c.stroke();}};
+                const c=cv.getContext('2d'),r=seededRandom(1849),K=this._enniKit(c,r),GOLD=K.GOLD;
                 c.fillStyle='#432630';c.fillRect(0,0,2000,1400);
-                // Large honed marble slabs: light enough to read the displays, soft warm-grey joints.
-                for(let y=50,row=0;y<1350;y+=100,row++)for(let x=50,col=0;x<1950;x+=100,col++) {
-                    const v=r()*10|0;c.fillStyle=`rgb(${204+v},${194+v},${181+v})`;c.fillRect(x,y,100,100);
-                    c.strokeStyle='rgba(104,84,69,.18)';c.lineWidth=.7;c.strokeRect(x+.5,y+.5,99,99);
-                }
-                c.save();c.beginPath();c.rect(50,50,1900,1300);c.clip();
-                for(let i=0;i<105;i++){
-                    let x=50+r()*1900,y=50+r()*1300;c.strokeStyle=`rgba(117,88,84,${.045+r()*.08})`;c.lineWidth=.5+r()*1.7;c.beginPath();c.moveTo(x,y);
-                    for(let k=0;k<4;k++){const nx=x+(r()-.45)*130,ny=y+(r()-.55)*100;c.quadraticCurveTo(x+30,y-22,nx,ny);x=nx;y=ny;}c.stroke();
-                }
-                // The rose/burgundy perimeter and dark polished brass-bordered promenade.
-                c.strokeStyle='#8a5966';c.lineWidth=23;c.strokeRect(73,73,1854,1254);
-                c.strokeStyle=GOLD;c.lineWidth=2;c.strokeRect(88,88,1824,1224);
-                c.strokeStyle='rgba(246,231,199,.65)';c.lineWidth=1;c.strokeRect(92,92,1816,1216);
-                for(const x of [605,1395]){c.fillStyle='#4b3b3f';c.fillRect(x-12,95,24,1210);c.fillStyle=GOLD;c.fillRect(x-14,95,2,1210);c.fillRect(x+12,95,2,1210);}
-                for(const y of [565,1085]){c.fillStyle='#4b3b3f';c.fillRect(95,y-8,1810,16);c.fillStyle=GOLD;c.fillRect(95,y-9,1810,1);c.fillRect(95,y+8,1810,1);}
-                // Showroom rugs are actual matte islands in the reflection mask, never obstacles.
-                const rug=(x,y,w,h,col)=>{
-                    rr(x+3,y+4,w,h,7,'rgba(56,30,34,.2)');rr(x,y,w,h,7,col,'#b59a75',2);
-                    c.strokeStyle='rgba(228,203,164,.7)';c.lineWidth=1;c.strokeRect(x+9,y+9,w-18,h-18);
-                    c.fillStyle='rgba(246,225,192,.11)';for(let yy=y+19;yy<y+h-15;yy+=15)for(let xx=x+20;xx<x+w-15;xx+=15){c.beginPath();c.arc(xx,yy,.8,0,Math.PI*2);c.fill();}
-                };
-                rug(650,120,450,290,'#8c796b');rug(1105,100,290,320,'#684552');rug(1120,435,270,200,'#9b8973');
-                // Dark stone surrounds the open atrium medallion; the EC monogram lies in champagne metal.
-                const mx=1000,my=780;
+                // The lobby: cream marble, a rose border, the medallion under the chandelier
+                K.marble(640,50,720,1300,[210,199,185]);
+                K.border(640,50,720,1300);
+                const mx=1000,my=820;
                 c.fillStyle='#40353c';c.beginPath();c.arc(mx,my,196,0,Math.PI*2);c.fill();
                 const mg=c.createRadialGradient(mx-55,my-65,10,mx,my,187);mg.addColorStop(0,'#eee4d3');mg.addColorStop(1,'#c7b49d');
                 c.fillStyle=mg;c.beginPath();c.arc(mx,my,187,0,Math.PI*2);c.fill();
@@ -769,71 +808,154 @@
                 c.textAlign='center';c.textBaseline='middle';c.font='italic 100px Georgia, serif';c.fillStyle='#895965';c.fillText('EC',mx,my+2);
                 c.font='13px Georgia, serif';c.fillStyle='#725238';c.fillText('ENNI COLE',mx,my+83);
                 c.font='10px Georgia, serif';c.fillText('LIVING EXCEPTIONALLY',mx,my+103);
-                // A deep rose runner announces the front door while the entire middle aisle stays clear.
-                rr(870,1000,260,350,6,'#71364d','#b89a66',2);c.strokeStyle='rgba(235,209,165,.7)';c.lineWidth=1;c.strokeRect(879,1010,242,330);
-                c.fillStyle='rgba(207,161,165,.14)';for(let y=1018;y<1340;y+=17)for(let x=889;x<1115;x+=17){c.beginPath();c.arc(x,y,1,0,Math.PI*2);c.fill();}
+                // The rose runner from the door to the medallion
+                K.rr(870,1030,260,320,6,'#71364d','#b89a66',2);c.strokeStyle='rgba(235,209,165,.7)';c.lineWidth=1;c.strokeRect(879,1040,242,300);
+                c.fillStyle='rgba(207,161,165,.14)';for(let y=1048;y<1340;y+=17)for(let x=889;x<1115;x+=17){c.beginPath();c.arc(x,y,1,0,Math.PI*2);c.fill();}
                 c.font='italic 40px Georgia, serif';c.fillStyle='#ead4a5';c.fillText('Enni Cole',1000,1265);
-                c.font='10px Georgia, serif';c.fillText('FOOD  •  HOME  •  TECHNOLOGY',1000,1300);
-                // Departments are set into the floor; no floating game labels or new shopping UI.
-                const title=(str,x,y,sub)=>{c.font='22px Georgia, serif';c.fillStyle='#694450';c.fillText(str,x,y);c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText(sub,x,y+22);};
-                title('THE FOOD HALL',285,250,'FRESH  •  FINE FOODS  •  THE CELLAR');
-                title('TECHNOLOGY',1710,250,'PERSONAL  •  AUDIO  •  HOME');
-                c.font='17px Georgia, serif';c.fillStyle='#735663';c.fillText('LIVING & INTERIORS',1000,510);
-                c.font='italic 12px Georgia, serif';c.fillStyle='#8c715a';c.fillText('Customer Services',740,1142);c.fillText('Concierge & Collection',1265,1142);
-                // Low shopfront glass on each side of the open arched entrance: charcoal mullions,
-                // warm reflected city light and small champagne handles.
-                for(const [x0,x1]of[[80,780],[1220,1920]])for(let x=x0;x<x1;x+=100){
-                    rr(x,1317,94,28,1,'#31333a',GOLD,.8);const g=c.createLinearGradient(x,1318,x+90,1340);g.addColorStop(0,'#6b6267');g.addColorStop(.6,'#aa8f77');g.addColorStop(1,'#4c464f');rr(x+4,1320,86,22,1,g);
-                    c.fillStyle='rgba(249,226,180,.4)';c.fillRect(x+8,1321,2,19);c.fillStyle='#302c32';c.fillRect(x+46,1320,3,22);
-                }
-                c.restore();return cv;
+                c.font='10px Georgia, serif';c.fillText('FASHION  •  FOOD  •  HOME  •  TECHNOLOGY',1000,1300);
+                // The grand staircase: treads rising north to the salons, a flared first step, the newels' shadows
+                c.fillStyle='rgba(40,22,28,.35)';c.fillRect(856,50,288,370);
+                K.stairs(862,50,276,410,false);
+                c.fillStyle='#e9dfcf';c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.lineTo(1162,404);c.lineTo(838,404);c.fill();
+                c.strokeStyle=GOLD;c.lineWidth=1.5;c.beginPath();c.moveTo(838,410);c.quadraticCurveTo(1000,452,1162,410);c.stroke();
+                c.fillStyle='#7a3a52';c.beginPath();c.moveTo(937,404);c.lineTo(1063,404);c.lineTo(1063,428);c.quadraticCurveTo(1000,436,937,428);c.fill();
+                c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText('THE SALONS  •  COUTURE  •  CUISINE',1000,462);
+                // The Food Hall: cream and rose-grey tiles
+                K.checker(50,50,570,630,'#d9cdbd','#c9b7a8');K.border(50,50,570,630,'#8a5966',8);
+                K.title('THE FOOD HALL',535,230,null,17);c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText('FRESH  •  FINE FOODS',535,252);c.fillText('CELLAR  •  LA CUISINE',535,266);
+                // Fashion: pale oak herringbone, the window stage along the glass
+                K.parquet(50,700,570,650,'#cdb294','rgba(110,80,52,.35)');K.border(50,700,570,650,'#8a5966',8);
+                K.rr(68,1246,540,84,4,'#5b2f40',GOLD,1.5);K.rr(74,1252,528,72,3,'#6e3a4e');
+                K.title('FASHION',520,1000,'WOMEN  •  MEN  •  KNITWEAR',20);
+                // Furniture: walnut herringbone and the room sets' rugs
+                K.parquet(1380,50,570,630,'#8d6a4f','rgba(50,30,20,.4)');K.border(1380,50,570,630,'#6e4a52',8);
+                K.rug(1400,80,326,276,'#8c796b');K.rug(1706,86,226,268,'#684552');K.rug(1620,448,296,206,'#9b8973');
+                K.title('FURNITURE',1490,440,'LIVING  •  SLEEP  •  DINING',19,'#f0dcc0');
+                // Electronics: dark polished stone with a cool inlay line
+                K.marble(1380,700,570,650,[58,54,62],80,false);
+                c.strokeStyle='rgba(150,190,230,.35)';c.lineWidth=1.5;c.strokeRect(1400,720,530,610);
+                K.title('ELECTRONICS',1470,806,'SCREENS  •  SOUND  •  HOME',17,'#d9e4f0');
+                // Thresholds under the arches, the shopfront glass either side of the door
+                for(const d of [{x:620,y:300,w:20,h:160},{x:620,y:950,w:20,h:160},{x:1360,y:300,w:20,h:160},{x:1360,y:950,w:20,h:160},{x:440,y:680,w:160,h:20},{x:1400,y:680,w:160,h:20}])K.threshold(d);
+                for(const [a,b] of [[70,610],[650,846],[1156,1350],[1390,1930]])K.shopGlass(a,b,1317);
+                return cv;
             },
 
-            /** Warm chandelier bulbs and restrained cabinet lighting, above the darkness layer. */
-            drawEnniGlow(ctx) {
-                const t=_frameTime/1000;
-                ctx.save();ctx.globalCompositeOperation='lighter';
-                glowA(ctx,1000,780,190,'255,218,162',.025);
-                // Compact warm halos leave the marble and individual crystal fittings readable.
+            _paintEnniUpperFloor() {
+                const cv = document.createElement('canvas'); cv.width=2000; cv.height=1100;
+                const c=cv.getContext('2d'),r=seededRandom(2203),K=this._enniKit(c,r),GOLD=K.GOLD;
+                c.fillStyle='#432630';c.fillRect(0,0,2000,1100);
+                // The gallery round the void, and the stairwell falling away north to the lobby
+                K.marble(640,50,720,590,[212,201,186]);K.border(640,50,720,590);
+                c.fillStyle='rgba(40,22,28,.5)';c.fillRect(862,50,276,150);
+                K.stairs(870,50,260,200,true);
+                c.fillStyle='rgba(20,10,16,.45)';c.fillRect(870,50,260,40);c.fillStyle='rgba(20,10,16,.25)';c.fillRect(870,90,260,40);
+                c.textAlign='center';c.textBaseline='middle';c.font='9px Georgia, serif';c.fillStyle='#816d56';c.fillText('TO THE LOBBY',1000,214);
+                // The couture showroom: champagne marble in the curve of the glass, a sunburst inlay
+                c.fillStyle='#2e1c24';c.fillRect(640,660,720,390);
+                c.save();c.beginPath();c.roundRect(640,660,720,390,[0,0,150,150]);c.clip();
+                K.marble(640,660,720,390,[222,206,180],90);
+                const sx=1000,sy=860;
+                for(let i=0;i<32;i++){const a=i*Math.PI/16;c.fillStyle=i%2?'rgba(198,163,101,.16)':'rgba(137,89,101,.12)';c.beginPath();c.moveTo(sx,sy);c.arc(sx,sy,250,a,a+Math.PI/16);c.closePath();c.fill();}
+                c.strokeStyle=GOLD;c.lineWidth=2;c.beginPath();c.arc(sx,sy,250,0,Math.PI*2);c.stroke();c.lineWidth=1;c.beginPath();c.arc(sx,sy,90,0,Math.PI*2);c.stroke();
+                c.restore();
+                // the curved glass: mullions round the bay
+                c.strokeStyle='#31333a';c.lineWidth=10;c.beginPath();c.roundRect(645,665,710,380,[0,0,145,145]);c.stroke();
+                c.strokeStyle='rgba(255,226,180,.55)';c.lineWidth=2;c.beginPath();c.moveTo(645,800);c.lineTo(645,900);c.arcTo(645,1045,790,1045,145);c.lineTo(1210,1045);c.arcTo(1355,1045,1355,900,145);c.lineTo(1355,800);c.stroke();
+                c.font='13px Georgia, serif';c.fillStyle='#694450';c.fillText('ENNI COLE COUTURE',1000,940);
+                // Cuisine: walnut herringbone; the kitchen in quarry tiles
+                K.parquet(50,320,570,730,'#6a4a3a','rgba(30,16,12,.45)');K.border(50,320,570,730,'#7a3a52',8);
+                K.title('CUISINE',515,362,null,20,'#ead4a5');c.font='italic 10px Georgia, serif';c.fillStyle='#d8bd94';c.fillText('the restaurant at Enni Cole',515,384);
+                K.checker(50,50,570,250,'#9b8a7c','#857466',40);
+                // The salon: blush marble with a rose diamond; the fitting rooms carpeted
+                K.marble(1380,50,570,1000,[222,203,196]);
+                K.border(1380,50,260,1000,'#8a5966',8);
+                c.save();c.beginPath();c.rect(1640,360,310,690);c.clip();c.strokeStyle='rgba(137,89,101,.18)';c.lineWidth=1;for(let k=-700;k<700;k+=40){c.beginPath();c.moveTo(1640+k,360);c.lineTo(1640+k+690,1050);c.moveTo(1950-k,360);c.lineTo(1950-k-690,1050);c.stroke();}c.restore();
+                K.title('THE SALON',1510,360,'JEWELLERY  •  BAGS  •  SHOES',19);
+                c.fillStyle='#b98c97';c.fillRect(1660,50,290,290);c.fillStyle='rgba(255,240,240,.06)';for(let y=54;y<340;y+=6)c.fillRect(1660,y,290,2);
+                // Thresholds under the arches
+                for(const d of [{x:620,y:380,w:20,h:160},{x:1360,y:380,w:20,h:160},{x:880,y:640,w:240,h:20},{x:620,y:820,w:20,h:150},{x:1360,y:820,w:20,h:150}])K.threshold(d);
+                return cv;
+            },
+
+            /** One crystal chandelier, centre (cx, cy), `s` its size: halos, then opaque brass and crystal over them. */
+            _enniChandelier(ctx, cx, cy, s, t) {
+                ctx.globalCompositeOperation='lighter';
+                glowA(ctx,cx,cy,190*s,'255,218,162',.025);
                 for(const [R,n]of[[87,24],[57,16]])for(let i=0;i<n;i++){
                     const a=i*Math.PI*2/n;
-                    glowA(ctx,1000+Math.cos(a)*R,780+Math.sin(a)*R,8.5,'255,222,176',.075);
+                    glowA(ctx,cx+Math.cos(a)*R*s,cy+Math.sin(a)*R*s,8.5*s,'255,222,176',.075);
                 }
-                // Small warm pendant shades over each department and both service counters.
-                for(const [X,Y,R]of[[285,280,12],[285,790,12],[1710,280,12],[1710,870,12],[740,1190,9],[1265,1190,9]]){
-                    ctx.globalCompositeOperation='lighter';glowA(ctx,X,Y,75,'255,220,169',.075);
-                    ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
-                    ctx.fillStyle='#b69b65';ctx.strokeStyle='#5d4933';ctx.lineWidth=1;ctx.beginPath();ctx.arc(X,Y,R,0,Math.PI*2);ctx.fill();ctx.stroke();
-                    ctx.fillStyle='#fff1cf';ctx.beginPath();ctx.arc(X,Y,3,0,Math.PI*2);ctx.fill();
+                // glowA changes globalAlpha: reset it before the solid hardware, which stays legible in reflections
+                ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+                for(const R of [87,57]){
+                    ctx.strokeStyle='#79623f';ctx.lineWidth=3.5*s;ctx.beginPath();ctx.arc(cx,cy,R*s,0,Math.PI*2);ctx.stroke();
+                    ctx.strokeStyle='#cfb889';ctx.lineWidth=1.5*s;ctx.beginPath();ctx.arc(cx,cy,R*s-.7,-Math.PI*.95,Math.PI*.65);ctx.stroke();
                 }
-                // Faint practical illumination remains attached to the actual case/display coordinates.
+                for(let i=0;i<12;i++){
+                    const a=i*Math.PI/6;ctx.strokeStyle='#a98c5b';ctx.lineWidth=1.6*s;ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*15*s,cy+Math.sin(a)*15*s);ctx.lineTo(cx+Math.cos(a)*87*s,cy+Math.sin(a)*87*s);ctx.stroke();
+                }
+                ctx.fillStyle='#96784b';ctx.strokeStyle='#ecd5a4';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,10*s,0,Math.PI*2);ctx.fill();ctx.stroke();
+                for(const [R,n]of[[87,24],[57,16]])for(let i=0;i<n;i++){
+                    const a=i*Math.PI*2/n,X=cx+Math.cos(a)*R*s,Y=cy+Math.sin(a)*R*s;
+                    ctx.fillStyle='#ab8b54';ctx.beginPath();ctx.arc(X,Y,3.4*s,0,Math.PI*2);ctx.fill();
+                    ctx.fillStyle='#fff0c9';ctx.beginPath();ctx.arc(X,Y,2.15*s,0,Math.PI*2);ctx.fill();
+                    ctx.strokeStyle='rgba(248,233,204,.85)';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(X,Y+3*s);ctx.lineTo(X-2*s,Y+8*s);ctx.lineTo(X,Y+12*s);ctx.lineTo(X+2*s,Y+8*s);ctx.closePath();ctx.stroke();
+                    if(Math.sin(t*.8+i*2.17)>.985){ctx.strokeStyle='#fffdf2';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(X-4,Y);ctx.lineTo(X+4,Y);ctx.moveTo(X,Y-4);ctx.lineTo(X,Y+4);ctx.stroke();}
+                }
+            },
+
+            /** A brass pendant shade and its warm pool */
+            _enniPendant(ctx, X, Y, R, rgb='255,220,169') {
+                ctx.globalCompositeOperation='lighter';glowA(ctx,X,Y,75,rgb,.075);
+                if(!R)return;                                                                       // a hidden downlight: its pool only
+                ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+                ctx.fillStyle='#b69b65';ctx.strokeStyle='#5d4933';ctx.lineWidth=1;ctx.beginPath();ctx.arc(X,Y,R,0,Math.PI*2);ctx.fill();ctx.stroke();
+                ctx.fillStyle='#fff1cf';ctx.beginPath();ctx.arc(X,Y,3,0,Math.PI*2);ctx.fill();
+            },
+
+            /** The lobby's chandelier, the newel globes, pendants over each department, the window stage's spots. */
+            drawEnniGlow(ctx) {
+                const t=_frameTime/1000;
+                ctx.save();
+                for(const [X,Y,R]of[[155,230,0],[375,230,0],[220,612,0],[205,915,0],[205,1085,0],[1520,240,12],[1767,548,12],[1840,215,10],[755,1180,9],[1245,1180,9]])this._enniPendant(ctx,X,Y,R);
+                ctx.globalCompositeOperation='lighter';
+                for(const [X,Y] of [[853,419],[1147,419]])glowA(ctx,X,Y,46,'255,236,200',.16);
+                for(let i=0;i<5;i++)glowA(ctx,118+i*100,1288,34,'255,214,170',.12);       // the window stage's spotlights
                 for(const p of this.props){
                     if(p.decorType==='ec_cold'){
                         ctx.globalCompositeOperation='lighter';ctx.globalAlpha=1;ctx.strokeStyle='rgba(218,245,247,.65)';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(p.x+8,p.y+8);ctx.lineTo(p.x+p.width-8,p.y+8);ctx.stroke();
                     }else if(p.decorType==='ec_tvwall'){
                         ctx.globalCompositeOperation='lighter';glowA(ctx,p.x+p.width/2,p.y+p.height/2,85,'163,193,224',.055);
-                    }else if(p.decorType==='ec_side'){
-                        ctx.globalCompositeOperation='lighter';glowA(ctx,p.x+p.width/2,p.y+p.height/2,28,'255,219,161',.1);
+                    }else if(p.decorType==='ec_side'||p.decorType==='ec_perfume'){
+                        ctx.globalCompositeOperation='lighter';glowA(ctx,p.x+p.width/2,p.y+p.height/2,p.width*.6,'255,219,161',.1);
                     }
                 }
-                // Paint opaque champagne hardware last: glowA changes globalAlpha, so explicitly reset
-                // it before this solid fixture pass. The same pass stays legible in floor reflections.
-                ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
-                for(const R of [87,57]){
-                    ctx.strokeStyle='#79623f';ctx.lineWidth=3.5;ctx.beginPath();ctx.arc(1000,780,R,0,Math.PI*2);ctx.stroke();
-                    ctx.strokeStyle='#cfb889';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(1000,780,R-.7,-Math.PI*.95,Math.PI*.65);ctx.stroke();
+                this._enniChandelier(ctx,1000,820,1,t);
+                ctx.restore();
+            },
+
+            /**
+             * Upstairs: the chandelier hanging in the void, seen from above; the showroom's ceiling of tiny
+             * lights, twinkling; candles on Cuisine's tables; pendants in the salon; the vitrines' glow.
+             */
+            drawEnniUpperGlow(ctx) {
+                const t=_frameTime/1000;
+                ctx.save();
+                ctx.globalCompositeOperation='lighter';
+                if(!this._enniTwinkles){const r=seededRandom(77),out=[];
+                    while(out.length<150){const x=650+r()*700,y=665+r()*380;const dx=Math.max(0,Math.abs(x-1000)-215),dy=Math.max(0,y-900);if(dx*dx+dy*dy<145*145||y<900)out.push([x,y,r()*6.28,.6+r()*.8]);}
+                    this._enniTwinkles=out;}
+                for(const [x,y,ph,k] of this._enniTwinkles){const f=.55+.45*Math.sin(t*(1.3+k)+ph);glowA(ctx,x,y,4.5*k,'255,226,176',.16*f);ctx.globalAlpha=.7*f;ctx.fillStyle='#fff6dc';ctx.fillRect(x-.8,y-.8,1.6,1.6);}
+                for(const p of this.props){
+                    const cx=p.x+p.width/2,cy=p.y+p.height/2;
+                    if(p.decorType==='ec_rtable'||p.decorType==='ec_booth'){const X=p.decorType==='ec_booth'?p.x+38+(p.width-62)/2+10:cx,f=.8+.2*Math.sin(t*9+cx)*Math.sin(t*3.7+cy);glowA(ctx,X,cy,42,'255,190,120',.22*f);}
+                    else if(p.decorType==='ec_jewel')glowA(ctx,cx,cy,p.width*.55,'255,236,210',.1);
+                    else if(p.decorType==='ec_mannequin'&&p.y>650)glowA(ctx,cx,cy,30,'255,222,180',.1);
                 }
-                for(let i=0;i<12;i++){
-                    const a=i*Math.PI/6;ctx.strokeStyle='#a98c5b';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(1000+Math.cos(a)*15,780+Math.sin(a)*15);ctx.lineTo(1000+Math.cos(a)*87,780+Math.sin(a)*87);ctx.stroke();
-                }
-                ctx.fillStyle='#96784b';ctx.strokeStyle='#ecd5a4';ctx.lineWidth=1;ctx.beginPath();ctx.arc(1000,780,10,0,Math.PI*2);ctx.fill();ctx.stroke();
-                for(const [R,n]of[[87,24],[57,16]])for(let i=0;i<n;i++){
-                    const a=i*Math.PI*2/n,X=1000+Math.cos(a)*R,Y=780+Math.sin(a)*R;
-                    ctx.fillStyle='#ab8b54';ctx.beginPath();ctx.arc(X,Y,3.4,0,Math.PI*2);ctx.fill();
-                    ctx.fillStyle='#fff0c9';ctx.beginPath();ctx.arc(X,Y,2.15,0,Math.PI*2);ctx.fill();
-                    ctx.strokeStyle='rgba(248,233,204,.85)';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(X,Y+3);ctx.lineTo(X-2,Y+8);ctx.lineTo(X,Y+12);ctx.lineTo(X+2,Y+8);ctx.closePath();ctx.stroke();
-                    if(Math.sin(t*.8+i*2.17)>.985){ctx.strokeStyle='#fffdf2';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(X-4,Y);ctx.lineTo(X+4,Y);ctx.moveTo(X,Y-4);ctx.lineTo(X,Y+4);ctx.stroke();}
-                }
+                for(const [X,Y,R]of[[330,170,10],[1510,135,10],[1510,240,10],[1730,640,11],[1805,200,10]])this._enniPendant(ctx,X,Y,R);
+                // The chandelier in the void, larger for being nearer
+                this._enniChandelier(ctx,1000,400,1.25,t);
                 ctx.restore();
             },
 

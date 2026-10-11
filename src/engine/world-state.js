@@ -369,6 +369,8 @@
                         'hub_949': "CITY SECTOR 9",
                         'auto_shop': "TORQUE AUTO",
                         'neural_sys_interior': "NEURAL SYSTEMS",
+                        'enni_cole_interior': "ENNI COLE",
+                        'enni_cole_upper': "ENNI COLE, UPPER FLOOR",
                         'biggs_arena': "BIGGS AMUSEMENT PARK",
                         'house_of_death': 'THE HOUSE OF DEATH',
                         'demoness_palace': 'THE DEMONESS PALACE'
@@ -384,8 +386,10 @@
                     }
                     
                     // --- FLAVOR TEXT ---
-                    if (t.target === 'hotel_lobby' && this.activeMap.id === 'hotel_suite') {
+                    if ((t.target === 'hotel_lobby' && this.activeMap.id === 'hotel_suite') || (t.target === 'enni_cole_interior' && this.activeMap.id === 'enni_cole_upper')) {
                         showMessage("GOING DOWN...");
+                    } else if (t.target === 'enni_cole_upper') {
+                        showMessage("GOING UP...");
                     } else if (this.activeMap.id === 'church_boss') {
                         showMessage("RETURNING TO REALITY...");
                     } else {

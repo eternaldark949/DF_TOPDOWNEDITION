@@ -177,6 +177,13 @@
                     { id: 'boss_spawn', x: 600, y: 400 }
                 ]
             },
+            // Enni Cole, ground floor: a double-height lobby under the crystal chandelier, the grand staircase
+            // up to the salons at its head, Fashion and the Food Hall to the west, Electronics and Furniture
+            // to the east, each its own room behind a wide arch (world/rooms.js). Floor: _paintEnniFloor;
+            // chandelier and pendants: drawEnniGlow; displays: drawEnniDecorProp (ec_*).
+            //   Food Hall  |                     | Furniture
+            //   -----------|  Lobby + staircase  |-----------
+            //   Fashion    |   (chandelier)      | Electronics
             'enni_cole_interior': {
                 id: 'enni_cole_interior', width: 2000, height: 1400, type: 'indoor',
                 label: 'Enni Cole', floorColor: '#c7bcae', ambientDarkness: 0.36,
@@ -185,16 +192,48 @@
                 walls: [
                     { x: 0, y: 0, w: 2000, h: 50 }, { x: 0, y: 1350, w: 850, h: 50 },
                     { x: 1150, y: 1350, w: 850, h: 50 }, { x: 0, y: 0, w: 50, h: 1400 },
-                    { x: 1950, y: 0, w: 50, h: 1400 }
+                    { x: 1950, y: 0, w: 50, h: 1400 },
+                    // The wings: a wall down each side of the lobby, each wing split in two
+                    { x: 620, y: 50, w: 20, h: 1300 }, { x: 1360, y: 50, w: 20, h: 1300 },
+                    { x: 50, y: 680, w: 570, h: 20 }, { x: 1380, y: 680, w: 570, h: 20 }
                 ],
-                transitions: [ { x: 850, y: 1320, w: 300, h: 80, target: 'hub_949', label: 'Exit to City' } ],
+                transitions: [
+                    { x: 850, y: 1320, w: 300, h: 80, target: 'hub_949', label: 'Exit to City' },
+                    { x: 880, y: 50, w: 240, h: 60, target: 'enni_cole_upper', label: 'Upstairs', quiet: true }
+                ],
                 landmarks: [
-                    { id: 'enni_cole_exit', x: 1000, y: 1370 }, { id: 'enni_cole_atrium', x: 1000, y: 780 },
+                    { id: 'enni_cole_exit', x: 1000, y: 1370 }, { id: 'enni_cole_atrium', x: 1000, y: 820 },
+                    { id: 'enni_cole_stairs', x: 1000, y: 470 }, { id: 'enni_cole_fashion', x: 330, y: 1000 },
+                    { id: 'enni_cole_food', x: 540, y: 600 },
                     // The original IDs remain aliases for scenes and existing saves.
-                    { id: 'enni_cole_couture', x: 285, y: 760 }, { id: 'enni_cole_accessories', x: 1740, y: 590 },
-                    { id: 'enni_cole_checkout', x: 1000, y: 1150 }, { id: 'enni_cole_gallery', x: 1000, y: 90 },
-                    { id: 'enni_cole_groceries', x: 285, y: 760 }, { id: 'enni_cole_electronics', x: 1740, y: 590 },
-                    { id: 'enni_cole_furniture', x: 1000, y: 450 }
+                    { id: 'enni_cole_couture', x: 330, y: 1000 }, { id: 'enni_cole_accessories', x: 1665, y: 1000 },
+                    { id: 'enni_cole_checkout', x: 1000, y: 1150 }, { id: 'enni_cole_gallery', x: 1000, y: 470 },
+                    { id: 'enni_cole_groceries', x: 540, y: 600 }, { id: 'enni_cole_electronics', x: 1665, y: 1000 },
+                    { id: 'enni_cole_furniture', x: 1665, y: 360 }
+                ]
+            },
+            // Enni Cole, upper floor: the gallery round the lobby's void (the chandelier hangs in it), the
+            // couture showroom in the curved glass over the entrance under a ceiling of tiny lights, the
+            // Cuisine restaurant and its kitchen to the west, the accessories salon and fitting rooms east.
+            // Floor: _paintEnniUpperFloor; lights: drawEnniUpperGlow; displays: drawEnniDecorProp (ec_*).
+            'enni_cole_upper': {
+                id: 'enni_cole_upper', width: 2000, height: 1100, type: 'indoor',
+                label: 'Enni Cole | Upper Floor', floorColor: '#d2c4b0', ambientDarkness: 0.4,
+                navProps: 'all', wallStyle: { fill: '#44232f', stroke: 'rgba(229,192,131,0.65)' },
+                spawn: { x: 1000, y: 200 }, zones: [],
+                walls: [
+                    { x: 0, y: 0, w: 2000, h: 50 }, { x: 0, y: 1050, w: 2000, h: 50 },
+                    { x: 0, y: 0, w: 50, h: 1100 }, { x: 1950, y: 0, w: 50, h: 1100 },
+                    { x: 620, y: 50, w: 20, h: 1000 }, { x: 1360, y: 50, w: 20, h: 1000 },
+                    { x: 50, y: 300, w: 570, h: 20 },                                   // the kitchen
+                    { x: 640, y: 640, w: 720, h: 20 },                                  // the showroom
+                    { x: 1640, y: 50, w: 20, h: 290 }, { x: 1640, y: 340, w: 310, h: 20 }   // the fitting rooms
+                ],
+                transitions: [ { x: 900, y: 50, w: 200, h: 70, target: 'enni_cole_interior', label: 'Downstairs', quiet: true } ],
+                landmarks: [
+                    { id: 'enni_cole_upper_stairs', x: 1000, y: 160 }, { id: 'enni_cole_showroom', x: 880, y: 880 },
+                    { id: 'enni_cole_cuisine', x: 410, y: 790 }, { id: 'enni_cole_kitchen', x: 450, y: 200 },
+                    { id: 'enni_cole_salon', x: 1510, y: 800 }, { id: 'enni_cole_fitting', x: 1800, y: 200 }
                 ]
             },
             'cozy_cafe_interior': {
