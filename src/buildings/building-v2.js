@@ -60,6 +60,8 @@
                 this.facing = BUILDING_LANDMARK_STYLES.includes(this.style) ? 'S' : (['N', 'E', 'W'].includes(config.facing) ? config.facing : 'S');
                 // hand-placed with a facing: a front (sign, lights) even without a door; shopfront 'pool': one light at the door
                 this._shopfront = config.shopfront === 'pool' ? 'pool' : this.facing === config.facing || !!config.shopfront;
+                // The generic shops and apartments: which of the street variants it is (buildings/street-variants.js)
+                if (this._pickVariant) this._pickVariant(config);
                 
                 // Facade depth (3D effect on south/east walls)
                 this.facadeDepth = this.floors * 3;
@@ -407,6 +409,7 @@
             _paintSign(ctx) {
                 if (this.style === 'double_nights') { if (typeof game !== 'undefined' && game.camera) this._dnDrawSign(ctx); return; }
                 if (this.style === 'moon_city') { if (typeof game !== 'undefined' && game.camera) { this._mcDrawCanopy(ctx, false); this._mcDrawSign(ctx, false); } return; }
+                if (this.variant && this.variant.kind === 'shop' && this._vOn()) { this._vFront(ctx, false); return; }   // awnings, canopy, signboard (street-variants.js)
                 const E = this.attachedSign && this._entrance();
                 if (!E) return;
                 
@@ -899,7 +902,7 @@
                 const faces = this._visibleFaces(cam);
                 ctx.save();
                 // --- Walls ---
-                const wall = this.colors.wall;
+                const wall = this.colors.wall, V = this.variant && this._vOn();
                 for (const f of faces) {
                     const [ax, ay] = [f.x1, f.y1], [bx, by] = [f.x2, f.y2];
                     const [cx, cy] = P(bx, by), [dx, dy] = P(ax, ay);
@@ -910,9 +913,11 @@
                     ctx.fillStyle = g;
                     ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath(); ctx.fill();
                     ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+                    if (V) this._vFaceUnder(ctx, f, P);                                     // brick, stone, timber, lacquer
                     this._drawFaceWindows(ctx, f, P, false);
                     this._drawFaceFeature(ctx, f, P, false);
                 }
+                if (V) this._vFaceOver(ctx, faces, P);                                     // shopfronts, lintels, ledges, pilasters
                 if (this.style === 'silver_queen') this._sqDrawPortico(ctx);
                 this._paintSign(ctx);                                                          // the sign, before the roof (so the roof can hide it)
                 if (this.style === 'silver_queen') this._sqDrawColumns(ctx);                   // the lantern columns stand in front of the portico
@@ -930,6 +935,7 @@
 
             /** The roof in the roof plane (ctx already scaled about the camera): sections, seams, parapets, features */
             _leanRoof(ctx, sq) {
+                if (this.variant && this.variant.kind === 'shop' && this._vOn()) { if (PropPass.seg(false)) this._vShopRoof(ctx); return; }   // its variant's roof, painted once (street-variants.js)
                 if (PropPass.seg(false)) this.sections.forEach((section, si) => {
                     const sx = this.x + section.x, sy = this.y + section.y;
                     if (sq) {                                                                  // lavender slab with a soft sheen (world-space gradients, made once)
@@ -951,6 +957,7 @@
                     if (sq) { ctx.strokeStyle = 'rgba(45,29,89,0.45)'; ctx.lineWidth = 1; if (outline) ctx.stroke(this._roofPath(section, si, 6)); else ctx.strokeRect(sx + 6, sy + 6, section.w - 12, section.h - 12); }
                 });
                 if (sq && PropPass.seg(false)) this._sqRoofEdgeLights(ctx, false);
+                if (this.variant && this._vOn() && PropPass.seg(false)) this._vAptRoof(ctx);    // its variant's roof trim, under the features
                 if (this.style) this._drawRoofFeatures(ctx, false);
                 else this._drawRoofProps(ctx);
             },
@@ -995,6 +1002,7 @@
                     if (this.style && f.side === this.facing && this._entrance()) this._drawFrontWash(ctx, f, P);
                     this._drawFaceWindows(ctx, f, P, true); this._drawFaceFeature(ctx, f, P, true);
                 }
+                if (this.variant && this._vOn()) this._vGlow(ctx, this._visibleFaces(cam), P, dark);
                 if (this.style === 'silver_queen') { this._sqEmissiveStructure(ctx, dark, glow); ctx.globalAlpha = glow; ctx.globalCompositeOperation = 'source-over'; }
                 if (this.style === 'moon_city') { this._mcDrawCanopy(ctx, true); this._mcDrawSign(ctx, true, dark); ctx.globalAlpha = glow; ctx.globalCompositeOperation = 'source-over'; }
                 // Roof: rim light along parapets reads the silhouette at night, plus neon/rooftop lights
@@ -1004,6 +1012,7 @@
                 if (this.style) { ctx.shadowColor = rim; ctx.shadowBlur = 8; }
                 this.sections.forEach(section => ctx.strokeRect(this.x + section.x + 1, this.y + section.y + 1, section.w - 2, section.h - 2));
                 ctx.shadowBlur = 0; ctx.globalAlpha = glow;
+                if (this.variant && this._vOn()) this._vRoofGlow(ctx);
                 if (this.style === 'silver_queen') this._sqRoofEdgeLights(ctx, true);
                 if (this.style === 'moon_city') this._mcDrawRoof(ctx, true);
                 if (this.style) this._drawRoofFeatures(ctx, true);
@@ -1087,7 +1096,7 @@
                     }
                 }
                 const lit = this.colors.windowLit || '#ffe2a8';
-                const mask = this.facadeFeature === 'silver_queen' ? this._sqWindowMask(f) : null;
+                const mask = this.facadeFeature === 'silver_queen' ? this._sqWindowMask(f) : this.variant ? this._vWindowMask(f) : null;
                 const sun = emissive ? null : sunNow(), day = sun ? sun.day : 0;
                 let skyA = 0, sheenA = 0, uc = 0.5;
                 if (day > 0.03) {
@@ -1302,7 +1311,7 @@
                     }
                 }
                 const lit = this.colors.windowLit || '#ffe2a8';
-                const mask = this.facadeFeature === 'silver_queen' ? this._sqWindowMask(f) : null;
+                const mask = this.facadeFeature === 'silver_queen' ? this._sqWindowMask(f) : this.variant ? this._vWindowMask(f) : null;
                 // By day the glass holds the sky, brightest on faces turned to the sun, a sheen sliding along with it
                 const sun = emissive ? null : sunNow(), day = sun ? sun.day : 0;
                 let skyA = 0, sheenA = 0, uc = 0.5;

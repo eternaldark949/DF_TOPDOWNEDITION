@@ -78,6 +78,7 @@ const SCRIPTS = [
     'buildings/double-nights.js',
     'buildings/moon-city.js',
     'buildings/cozy-cafe.js',
+    'buildings/street-variants.js',
     'buildings/sky-layer.js',
     'buildings/factories.js',
     'buildings/city-view.js',
