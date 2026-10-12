@@ -75,7 +75,7 @@
                 let shoe;
                 if (isHer) { const cc = this.cosmetics && this.cosmetics.getRenderConfig ? this.cosmetics.getRenderConfig() : null; shoe = cc && cc.outfit && cc.outfit.shoes && cc.outfit.shoes.type; }
                 else { const L = e.look || e.appearance; shoe = L && L.shoes && L.shoes.type; }
-                shoe = shoe === 'shoes' || !shoe ? 'loafers' : shoe;
+                shoe = shoe === 'shoes' || !shoe ? 'loafers' : shoe === 'thigh_heels' ? 'heels' : shoe;
                 const outside = this.activeMap.type === 'outdoor' || (this.roomSystem && this.roomSystem.active && this.roomSystem.outdoorness > 0.5);
                 const wet = outside && this.weather && this.weather.isRaining && mat !== 'grass';
                 const pace = Math.min(1, speed / 3);

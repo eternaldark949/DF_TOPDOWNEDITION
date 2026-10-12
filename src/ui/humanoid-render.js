@@ -2047,7 +2047,11 @@
             // 2. Calves
             drawLimb(lKneeX, lKneeY, lFootX, lFootY, BC.calf, legColor, legs === 'full' && botGloss);
             drawLimb(rKneeX, rKneeY, rFootX, rFootY, BC.calf, legColor, legs === 'full' && botGloss);
-            if (shoeP && shoeP.calf) {                                   // boots come up the calf
+            if (shoeP && shoeP.thigh) {                                  // thigh-high boots: the calf, snug and whole
+                const bootColor = darken(clothes.shoes.color, 0.45), T = BC.calf, S = [T[0] + 0.3, T[1] + 0.3, T[2], T[3] + 0.3];
+                drawLimb(lKneeX, lKneeY, lFootX, lFootY, S, bootColor, shoeP.gloss);
+                drawLimb(rKneeX, rKneeY, rFootX, rFootY, S, bootColor, shoeP.gloss);
+            } else if (shoeP && shoeP.calf) {                            // boots come up the calf
                 const bootColor = darken(clothes.shoes.color, 0.45), c = shoeP.calf;
                 drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, BOOT_SHAFT, bootColor);
                 drawLimb(rFootX, rFootY, rFootX + (rKneeX - rFootX) * c, rFootY + (rKneeY - rFootY) * c, BOOT_SHAFT, bootColor);
@@ -2061,6 +2065,20 @@
                 for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
             }
             if (botP && botP.detail) botP.detail(ctx, g, clothes.bottom);   // cuffs, pockets, stripes
+            if (shoeP && shoeP.thigh) {                                  // ...and on up the thigh, from the knee
+                const bootColor = darken(clothes.shoes.color, 0.45), T = BC.thigh, f = shoeP.thigh;
+                const S = [T[3] + 0.3, bodyLimbRadius(T, 1 - f / 2) + 0.3, 0.5, bodyLimbRadius(T, 1 - f) + 0.3];
+                drawLimb(lKneeX, lKneeY, lKneeX + (lHipX - lKneeX) * f, lKneeY + (lHipY - lKneeY) * f, S, bootColor, shoeP.gloss);
+                drawLimb(rKneeX, rKneeY, rKneeX + (rHipX - rKneeX) * f, rKneeY + (rHipY - rKneeY) * f, S, bootColor, shoeP.gloss);
+                ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.5;   // the welt round the top of each
+                for (const [kx, ky, hx, hy] of [[lKneeX, lKneeY, lHipX, lHipY], [rKneeX, rKneeY, rHipX, rHipY]]) {
+                    const tx = kx + (hx - kx) * f, ty = ky + (hy - ky) * f, a = Math.atan2(hy - ky, hx - kx);
+                    ctx.beginPath(); bodyRingHalf(ctx, tx, ty, S[3], a, 1, 1); ctx.stroke();
+                }
+            }
+            if (clothes.jewelry && WD) for (const j of clothes.jewelry) {  // thigh bands
+                const p = WD.jewelry[j.type]; if (p && p.at === 'thighs') p.draw(ctx, g, j);
+            }
         
             // 4. Hips & Skirt
             ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(hipRotation);

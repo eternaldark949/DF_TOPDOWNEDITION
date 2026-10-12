@@ -193,6 +193,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'outfit_sorcerer':     { id: 'outfit_sorcerer',     category: 'outfit', name: 'Street Sorcerer',     desc: 'Sabrina\'s look. Midnight violet top, black skirt, plum heels.', price: 400, data: { top: { type: 'sports_bra', color: '#1a0a2a' }, bottom: { type: 'skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
             'outfit_sorcerer_long': { id: 'outfit_sorcerer_long', category: 'outfit', name: 'Street Sorcerer (Long Sleeve)', desc: 'Sabrina\'s look, sleeved. Midnight violet long-sleeve top, fitted black pencil skirt, plum heels.', price: 400, data: { top: { type: 'sleeved_crop', color: '#1a0a2a' }, bottom: { type: 'pencil_skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
             'outfit_academy':      { id: 'outfit_academy',      category: 'outfit', name: 'Moonlit Academy',     desc: 'A crisp white blouse and a pleated midnight-violet circle skirt with a frilled hem. Black loafers.', price: 350, data: { top: { type: 'tshirt', color: '#f4f0f8' }, bottom: { type: 'pleated_skirt', color: '#3a2a6a', trim: '#f4eee6' }, shoes: { type: 'loafers', color: '#141018' }, train: null, held: null } },
+            'outfit_academy_mono': { id: 'outfit_academy_mono', category: 'outfit', name: 'Moonlit Academy (Black & White)', desc: 'The Academy look in monochrome. A crisp white blouse and a pleated jet-black circle skirt with a white frilled hem. Black loafers.', price: 350, data: { top: { type: 'tshirt', color: '#f6f6f6' }, bottom: { type: 'pleated_skirt', color: '#232323', trim: '#f6f6f6' }, shoes: { type: 'loafers', color: '#0c0c0c' }, train: null, held: null } },
 
             // ── HATS (one at a time, optional) ──
             'hat_wide_brim':       { id: 'hat_wide_brim',       category: 'hat', name: 'Wine Wide Brim',       desc: 'A wide wine-red brim. Arrives before you do.',         price: 350,  data: { type: 'wide_brim', color: '#590e18', crownColor: '#70121e' } },
@@ -208,6 +209,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'jew_hoops':           { id: 'jew_hoops',           category: 'jewelry', name: 'Gold Hoops',       desc: 'Classic gold hoop earrings.',                          price: 200,  data: { type: 'hoops', color: '#e8c27a' } },
             'jew_necklace':        { id: 'jew_necklace',        category: 'jewelry', name: 'Silver Pendant',   desc: 'A fine silver chain with a diamond drop.',             price: 250,  data: { type: 'necklace', color: '#d8d8e0' } },
             'jew_sunglasses':      { id: 'jew_sunglasses',      category: 'jewelry', name: 'Night Shades',     desc: 'Dark lenses. Wear them after sundown anyway.',         price: 250,  data: { type: 'sunglasses', color: '#141414' } },
+
+            // ── LEGWEAR (wear any of them over any outfit). Pieces with `shoes` replace the outfit's shoes;
+            //    the rest draw on the legs like jewelry (ui/wardrobe.js jewelry, at: 'thighs').
+            'leg_thigh_bands':     { id: 'leg_thigh_bands',     category: 'legwear', name: 'Thigh Bands',      desc: 'A pair of black satin bands high on the thighs, a fine gold edge.', price: 200, data: { type: 'thigh_bands', color: '#141014', trim: '#e8c27a' } },
+            'leg_thigh_heels':     { id: 'leg_thigh_heels',     category: 'legwear', name: 'Thigh High Heels', desc: 'Glossy black stiletto boots that climb past the knee. Go with any outfit.', price: 400, data: { color: '#141016', shoes: { type: 'thigh_heels', color: '#141016' } } },
         };
 
         // ============================================================================
@@ -227,6 +233,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedAccessory = null;      // optional slot (null = none)
                 this.equippedHat = null;            // optional slot (null = none)
                 this.equippedJewelry = [];          // any number at once
+                this.equippedLegwear = [];          // any number at once (thigh bands, thigh-high heels)
                 this.accessoryOptions = {};         // per-accessory choices, e.g. { acc_glass: { drink: 'red_wine' } }
                 this.maskMode = 'auto';             // 949's field mask (Neu.Me): 'auto' (in the field, off at home) | 'on' | 'off'
                 // Grant defaults
@@ -274,6 +281,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 else if (entry.category === 'accessory') this.equippedAccessory = id;
                 else if (entry.category === 'hat') this.equippedHat = id;
                 else if (entry.category === 'jewelry') { if (!this.equippedJewelry.includes(id)) this.equippedJewelry.push(id); }
+                else if (entry.category === 'legwear') {
+                    // One pair of shoes at a time: new shoes take the place of any already on
+                    if (entry.data.shoes) this.equippedLegwear = this.equippedLegwear.filter(l => !COSMETICS_REGISTRY[l]?.data.shoes);
+                    if (!this.equippedLegwear.includes(id)) this.equippedLegwear.push(id);
+                }
                 return true;
             }
 
@@ -283,11 +295,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** Take off one piece of jewelry. */
             unequipJewelry(id) { this.equippedJewelry = this.equippedJewelry.filter(j => j !== id); }
 
+            /** Take off one piece of legwear. */
+            unequipLegwear(id) { this.equippedLegwear = this.equippedLegwear.filter(l => l !== id); }
+
+            /** Take off any piece worn in a wear-many slot (jewelry, legwear). */
+            unequipWorn(id) { const c = COSMETICS_REGISTRY[id]?.category; if (c === 'legwear') this.unequipLegwear(id); else this.unequipJewelry(id); }
+
             /** Is this cosmetic currently worn? (works for every category) */
             isEquipped(id) {
                 const entry = COSMETICS_REGISTRY[id];
                 if (!entry) return false;
                 if (entry.category === 'jewelry') return this.equippedJewelry.includes(id);
+                if (entry.category === 'legwear') return this.equippedLegwear.includes(id);
                 const slot = { wig: 'equippedWig', skin: 'equippedSkin', vocal: 'equippedVocal', outfit: 'equippedOutfit', accessory: 'equippedAccessory', hat: 'equippedHat' }[entry.category];
                 return !!slot && this[slot] === id;
             }
@@ -322,11 +341,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 const hat = this.equippedHat ? COSMETICS_REGISTRY[this.equippedHat] : null;
                 const jewelry = this.equippedJewelry.map(id => COSMETICS_REGISTRY[id]).filter(Boolean).map(e => e.data);
+                // Legwear: shoes take the outfit's place; bands and the like ride along with the jewelry
+                let outfitData = outfit ? outfit.data : COSMETICS_REGISTRY.outfit_casual.data;
+                for (const id of this.equippedLegwear) {
+                    const leg = COSMETICS_REGISTRY[id];
+                    if (!leg) continue;
+                    if (leg.data.shoes) outfitData = { ...outfitData, shoes: leg.data.shoes };
+                    else jewelry.push(leg.data);
+                }
                 return {
                     // Without a cosmetic, she's herself (APPEARANCES['949'], core/appearances.js) in Street Casual
                     hair: wig ? { type: wig.data.type, color: wig.data.color } : APPEARANCES['949'].hair,
                     skinColor: skin ? skin.data.skinColor : APPEARANCES['949'].skinColor,
-                    outfit: outfit ? outfit.data : COSMETICS_REGISTRY.outfit_casual.data,
+                    outfit: outfitData,
                     hat: hat ? hat.data : null,
                     jewelry,
                     held
@@ -349,6 +376,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     equippedAccessory: this.equippedAccessory,
                     equippedHat: this.equippedHat,
                     equippedJewelry: [...this.equippedJewelry],
+                    equippedLegwear: [...this.equippedLegwear],
                     accessoryOptions: JSON.parse(JSON.stringify(this.accessoryOptions)),
                     maskMode: this.maskMode
                 };
@@ -366,6 +394,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Saves from before hats and jewelry simply have none on
                 this.equippedHat = COSMETICS_REGISTRY[data.equippedHat] ? data.equippedHat : null;
                 this.equippedJewelry = (data.equippedJewelry || []).filter(id => COSMETICS_REGISTRY[id]);
+                this.equippedLegwear = (data.equippedLegwear || []).filter(id => COSMETICS_REGISTRY[id]);
                 if (data.equippedAccessory !== undefined) {
                     this.equippedAccessory = data.equippedAccessory || null;
                 } else {

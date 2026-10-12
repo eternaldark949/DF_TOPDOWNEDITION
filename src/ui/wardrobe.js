@@ -490,7 +490,17 @@
                         ctx.beginPath(); ctx.moveTo(x + 1, y + (i ? 0.1 : -0.1)); ctx.lineTo(x + 6, y + (i ? 0.55 : -0.55)); ctx.stroke();
                     }
                 } },
-                boots:    { calf: 0.45, draw(ctx, g, c) { for (let i = 0; i < 2; i++) soleFoot(ctx, g, i, g.darken(c.color, 0.5)); } }
+                boots:    { calf: 0.45, draw(ctx, g, c) { for (let i = 0; i < 2; i++) soleFoot(ctx, g, i, g.darken(c.color, 0.5)); } },
+                // Stiletto boots past the knee: a pointed pump on the foot, a glossy shaft up the whole calf and
+                // `thigh` of the way up the thigh (the renderer draws the shafts, ui/humanoid-render.js).
+                thigh_heels: { calf: 1, thigh: 0.6, gloss: true, draw(ctx, g, c) {
+                    for (let i = 0; i < 2; i++) {
+                        const [x, y] = g.feet[i], side = i ? 1 : -1;
+                        ctx.fillStyle = g.darken(c.color, 0.5); drawBodyFoot(ctx, x, y, side, 0.45, true, g.body.foot);
+                        ctx.fillStyle = 'rgba(255,255,255,0.28)';            // a shine along the toe
+                        ctx.beginPath(); ctx.ellipse(x + 4.4, y + side * 0.35, 1.7, 0.45, side * 0.08, 0, Math.PI * 2); ctx.fill();
+                    }
+                } }
             };
             shoes.shoes = shoes.loafers;                                      // old generic id
 
@@ -628,6 +638,17 @@
                     } },
                 // The wrist goes through them: `under` draws the half that passes beneath the wrist
                 // (before the forearm, which hides it), `draw` the half over the top.
+                // A satin band round each thigh, a little above the knee, edged top and bottom in gold.
+                // Drawn over the thigh (and any stocking), under the skirt (ui/humanoid-render.js).
+                thigh_bands: { at: 'thighs', draw(ctx, g, c) {
+                    const T = g.body.thigh, band = c.color || '#141014', edge = c.trim || '#e8c27a';
+                    for (let i = 0; i < 2; i++) {
+                        const [hx, hy] = g.hipPt[i], [kx, ky] = g.knees[i], at = t => [hx + (kx - hx) * t, hy + (ky - hy) * t];
+                        const r = t => bodyLimbRadius(T, t) + 0.5, [ax, ay] = at(0.71), [bx, by] = at(0.87);
+                        ctx.fillStyle = edge; bodyLimbPath(ctx, ...at(0.66), ...at(0.92), [r(0.66) + 0.15, r(0.79) + 0.15, 0.5, r(0.92) + 0.15]); ctx.fill(); ctx.beginPath();
+                        ctx.fillStyle = band; bodyLimbPath(ctx, ax, ay, bx, by, [r(0.71), r(0.79), 0.5, r(0.87)]); ctx.fill(); ctx.beginPath();
+                    }
+                }, portrait() {} },
                 bangles: { at: 'wrists', under(ctx, g, c) { bangleHalves(ctx, g, g.darken(c.color || '#e8c27a', 0.35), -1); },
                     draw(ctx, g, c) { bangleHalves(ctx, g, c.color || '#e8c27a', 1); }, portrait() {} }
             };
