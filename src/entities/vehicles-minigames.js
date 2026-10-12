@@ -1137,8 +1137,8 @@
                 // Header
                 popup.innerHTML = `
                     <div style="text-align:center; margin-bottom: 16px;">
-                        <div style="font-size:0.5rem; letter-spacing:4px; color:#555; margin-bottom:6px;">CRASH ROYALE</div>
-                        <div style="font-size:1.1rem; letter-spacing:3px; color:${medalColor}; 
+                        <div style="font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:4px; color:#555; margin-bottom:6px;">CRASH ROYALE</div>
+                        <div style="font-size:max(6px, 1.1rem - var(--font-trim)); letter-spacing:3px; color:${medalColor}; 
                             text-shadow: 0 0 12px ${medalGlow};">${prizeLabel}</div>
                     </div>
                 `;
@@ -1149,13 +1149,13 @@
                         padding:10px; background:rgba(255,255,255,0.02); border-radius:6px;
                         border:1px solid rgba(255,255,255,0.05);">
                         <div style="text-align:center;">
-                            <div style="font-size:0.4rem; color:#666; letter-spacing:2px;">YOUR HITS</div>
-                            <div style="font-size:1rem; color:#ddd; margin-top:2px;">${playerHits}</div>
+                            <div style="font-size:max(6px, 0.4rem - var(--font-trim)); color:#666; letter-spacing:2px;">YOUR HITS</div>
+                            <div style="font-size:max(6px, 1rem - var(--font-trim)); color:#ddd; margin-top:2px;">${playerHits}</div>
                         </div>
                         <div style="width:1px; background:rgba(255,255,255,0.06);"></div>
                         <div style="text-align:center;">
-                            <div style="font-size:0.4rem; color:#666; letter-spacing:2px;">PRIZE</div>
-                            <div style="font-size:1rem; color:#d4af37; margin-top:2px;">+${prizePP} <span style="font-size:0.5rem;">PP</span></div>
+                            <div style="font-size:max(6px, 0.4rem - var(--font-trim)); color:#666; letter-spacing:2px;">PRIZE</div>
+                            <div style="font-size:max(6px, 1rem - var(--font-trim)); color:#d4af37; margin-top:2px;">+${prizePP} <span style="font-size:max(6px, 0.5rem - var(--font-trim));">PP</span></div>
                         </div>
                     </div>
                 `;
@@ -1182,10 +1182,10 @@
                         <div style="display:flex; align-items:center; gap:8px; padding:5px 8px;
                             background:${bg}; border:1px solid ${borderCol}; border-radius:4px;
                             margin-bottom:3px; animation: bumperSlideIn 0.3s ease ${i * 0.06}s both;">
-                            <span style="font-size:0.55rem; color:${rankColor}; min-width:16px; font-weight:bold;">${rank}</span>
-                            <span style="font-size:0.5rem; color:${nameCol}; letter-spacing:1px; flex:1;
+                            <span style="font-size:max(6px, 0.55rem - var(--font-trim)); color:${rankColor}; min-width:16px; font-weight:bold;">${rank}</span>
+                            <span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${nameCol}; letter-spacing:1px; flex:1;
                                 overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
-                            <span style="font-size:0.55rem; color:#ddd; font-weight:bold;">${car.hitScore}</span>
+                            <span style="font-size:max(6px, 0.55rem - var(--font-trim)); color:#ddd; font-weight:bold;">${car.hitScore}</span>
                         </div>`;
                 });
                 boardHTML += `</div>`;
@@ -1195,7 +1195,7 @@
                 popup.innerHTML += `
                     <div style="text-align:center;">
                         <button id="bumper-results-close" style="
-                            font-family:Orbitron,monospace; font-size:0.55rem; letter-spacing:3px;
+                            font-family:Orbitron,monospace; font-size:max(6px, 0.55rem - var(--font-trim)); letter-spacing:3px;
                             color:#d4af37; background:rgba(212,175,55,0.08);
                             border:1px solid rgba(212,175,55,0.3); border-radius:20px;
                             padding:8px 28px; cursor:pointer;
@@ -1247,7 +1247,7 @@
                 this.hudTimer.id = 'bumper-timer';
                 this.hudTimer.style.cssText = `
                     position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
-                    font-family: Orbitron, monospace; color: #d4af37; font-size: 0.85rem;
+                    font-family: Orbitron, monospace; color: #d4af37; font-size: max(6px, 0.85rem - var(--font-trim));
                     letter-spacing: 3px; text-align: center; z-index: 100;
                     background: rgba(10, 5, 15, 0.75); padding: 6px 18px;
                     border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px;
@@ -1261,7 +1261,7 @@
                 this.hudBoard.style.cssText = `
                     position: fixed; top: 45px; right: 8px; width: 140px;
                     z-index: 100; pointer-events: none;
-                    font-family: Orbitron, monospace; font-size: 0.55rem;
+                    font-family: Orbitron, monospace; font-size: max(6px, 0.55rem - var(--font-trim));
                 `;
                 document.body.appendChild(this.hudBoard);
                 
@@ -1269,7 +1269,7 @@
                 const header = document.createElement('div');
                 header.style.cssText = `
                     color: #888; letter-spacing: 2px; text-align: center;
-                    margin-bottom: 4px; font-size: 0.45rem;
+                    margin-bottom: 4px; font-size: max(6px, 0.45rem - var(--font-trim));
                 `;
                 header.textContent = 'CRASH ROYALE';
                 this.hudBoard.appendChild(header);
@@ -1311,7 +1311,7 @@
                     const nameEl = document.createElement('span');
                     nameEl.style.cssText = `
                         color: ${isPlayer ? '#d4af37' : '#aaa'};
-                        letter-spacing: 1px; font-size: 0.5rem;
+                        letter-spacing: 1px; font-size: max(6px, 0.5rem - var(--font-trim));
                         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                         max-width: 90px;
                     `;
@@ -1320,7 +1320,7 @@
                     const scoreEl = document.createElement('span');
                     scoreEl.style.cssText = `
                         color: ${isPlayer ? '#ffd700' : '#ddd'};
-                        font-size: 0.6rem; font-weight: bold;
+                        font-size: max(6px, 0.6rem - var(--font-trim)); font-weight: bold;
                         min-width: 16px; text-align: right;
                     `;
                     scoreEl.textContent = '0';

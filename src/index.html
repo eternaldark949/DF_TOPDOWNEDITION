@@ -86,10 +86,10 @@
     <!-- GAUNTLET MAP PICKER (Grum North) — filled from GAUNTLET_MAPS by openGauntletMenu -->
     <div id="gauntlet-menu" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(14,4,18,0.95); z-index:300; font-family:Montserrat,sans-serif; color:#ddd; overflow-y:auto;">
         <div style="max-width:500px; margin:40px auto; padding:20px 16px;">
-            <div style="font-family:Orbitron,sans-serif; font-size:1.1rem; letter-spacing:4px; color:#e8c27a; text-shadow:0 0 14px rgba(232,194,122,0.45); margin-bottom:2px;">THE GAUNTLET</div>
-            <div style="font-size:0.55rem; color:#8a7a92; letter-spacing:2px; margin-bottom:16px;">GRUM NORTH — PICK YOUR KILLING GROUND</div>
+            <div style="font-family:Orbitron,sans-serif; font-size:max(6px, 1.1rem - var(--font-trim)); letter-spacing:4px; color:#e8c27a; text-shadow:0 0 14px rgba(232,194,122,0.45); margin-bottom:2px;">THE GAUNTLET</div>
+            <div style="font-size:max(6px, 0.55rem - var(--font-trim)); color:#8a7a92; letter-spacing:2px; margin-bottom:16px;">GRUM NORTH — PICK YOUR KILLING GROUND</div>
             <div id="gauntlet-maps"></div>
-            <button id="gauntlet-close" style="font-family:Orbitron,sans-serif; font-size:0.6rem; letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.12); color:#888; cursor:pointer; width:100%; margin-top:14px;">LEAVE</button>
+            <button id="gauntlet-close" style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.6rem - var(--font-trim)); letter-spacing:2px; padding:10px 24px; background:transparent; border:1px solid rgba(255,255,255,0.12); color:#888; cursor:pointer; width:100%; margin-top:14px;">LEAVE</button>
         </div>
     </div>
 
@@ -102,7 +102,7 @@
             <div id="note-header" style="text-align:center; padding:20px 24px 10px;"></div>
             <div id="note-body" style="padding:0 28px 16px; line-height:1.7;"></div>
             <div id="note-signature" style="text-align:right; padding:0 28px 20px;"></div>
-            <div id="note-close-hint" style="text-align:center; padding:8px 0 16px; font-size:0.55rem; letter-spacing:3px; opacity:0.4;">TAP ANYWHERE TO CLOSE</div>
+            <div id="note-close-hint" style="text-align:center; padding:8px 0 16px; font-size:max(6px, 0.55rem - var(--font-trim)); letter-spacing:3px; opacity:0.4;">TAP ANYWHERE TO CLOSE</div>
         </div>
     </div>
 
@@ -269,6 +269,11 @@
                         <div class="row-center"><div class="menu-btn amb-slider-wrap"><span id="lbl-music">Music: 70</span><input type="range" class="ggp-slider amb-slider" id="main-music" min="0" max="100" step="5" value="70"></div></div>
                         <div class="row-right"><div class="input-prompt">slide</div></div>
                     </div>
+                    <div class="menu-item-row" id="btn-toggle-basezoom">
+                        <div class="row-left"><div class="desc-box">Lower shows more of the world around her.<span class="arrow">▶</span></div></div>
+                        <div class="row-center"><div class="menu-btn" id="lbl-basezoom">Base Zoom: 100%</div></div>
+                        <div class="row-right"><div class="input-prompt">enter</div></div>
+                    </div>
                     <div class="menu-item-row" id="btn-toggle-fps">
                         <div class="row-left"><div class="desc-box">Cap frame rate to save power.<span class="arrow">▶</span></div></div>
                         <div class="row-center"><div class="menu-btn" id="lbl-fps">FPS Limit: NONE</div></div>
@@ -416,7 +421,7 @@
             <div id="btn-flit">⚡</div>
             <div id="btn-autodrive">AUTO<br>DRIVE</div>
             <div id="btn-handbrake" aria-label="Handbrake"><span>HAND<br>BRAKE</span></div>
-            <div id="btn-zib-skip" style="display:none;">SKIP<br><span style="font-size:0.5rem;opacity:0.7">(T)</span></div>
+            <div id="btn-zib-skip" style="display:none;">SKIP<br><span style="font-size:max(6px, 0.5rem - var(--font-trim));opacity:0.7">(T)</span></div>
             <div id="btn-holster">HOLSTER</div>
             <div id="btn-sneak" aria-label="Sneak">SNEAK</div>
             <div id="btn-nv">👁️</div>
@@ -522,7 +527,7 @@
                             </div>
                             <div class="phone-app-content">
                                 <canvas id="phone-map-canvas"></canvas>
-                                <p style="color: #888; font-size: 0.7rem; text-align: center; margin-top: 10px;">🔴 You Are Here</p>
+                                <p style="color: #888; font-size: max(6px, 0.7rem - var(--font-trim)); text-align: center; margin-top: 10px;">🔴 You Are Here</p>
                             </div>
                         </div>
                         
@@ -579,16 +584,16 @@
                             </div>
                             <div class="phone-app-content" style="display:flex; flex-direction:column; align-items:center; gap:12px; padding-top:12px;">
                                 <div style="width:100px; height:100px; background:#111; border:2px solid #ff00ff; border-radius:50%; display:flex; justify-content:center; align-items:center; overflow:hidden; box-shadow:0 0 20px rgba(255,0,255,0.3);">
-                                    <div id="neume-preview" style="font-size:2.5rem;">🧬</div>
+                                    <div id="neume-preview" style="font-size:max(6px, 2.5rem - var(--font-trim));">🧬</div>
                                 </div>
-                                <div style="text-align:center; color:#fff; font-family:'Montserrat'; font-size:0.7rem;">
-                                    IDENTITY PROTOCOLS<br><span style="color:#888; font-size:0.6rem;">Mix & match from owned cosmetics</span>
+                                <div style="text-align:center; color:#fff; font-family:'Montserrat'; font-size:max(6px, 0.7rem - var(--font-trim));">
+                                    IDENTITY PROTOCOLS<br><span style="color:#888; font-size:max(6px, 0.6rem - var(--font-trim));">Mix & match from owned cosmetics</span>
                                 </div>
 
                                 <!-- Cosmetics loadout slots -->
                                 <div id="neume-loadout" style="width:100%; padding:0 10px; display:flex; flex-direction:column; gap:6px;"></div>
                                 
-                                <div id="neume-status" style="color:#ff00ff; font-size:0.65rem; margin-top:4px; opacity:0; transition:opacity 0.5s;">
+                                <div id="neume-status" style="color:#ff00ff; font-size:max(6px, 0.65rem - var(--font-trim)); margin-top:4px; opacity:0; transition:opacity 0.5s;">
                                     RE-SEQUENCING DNA...
                                 </div>
                             </div>
@@ -804,12 +809,12 @@
         <h2 style="color:#fff; font-family:'Orbitron'; margin-top:0; margin-bottom:20px; letter-spacing:3px; text-shadow:0 0 10px #a469ff;">REST MODE</h2>
         
         <div style="margin-bottom:30px; background:rgba(255,255,255,0.05); padding:20px; border-radius:10px;">
-            <label style="color:#aaa; font-family:'Montserrat'; display:block; margin-bottom:15px; font-size:0.8rem; text-transform:uppercase;">Wake up time</label>
+            <label style="color:#aaa; font-family:'Montserrat'; display:block; margin-bottom:15px; font-size:max(6px, 0.8rem - var(--font-trim)); text-transform:uppercase;">Wake up time</label>
             <input type="range" id="sleep-slider" min="0" max="23" value="8" style="width:100%; height:4px; background:#444; outline:none; -webkit-appearance:none; margin-bottom:15px;">
-            <div id="sleep-time-display" style="color:#ffd700; font-family:'Orbitron'; font-size:2.5rem; text-shadow:0 0 15px #ffaa00;">08:00</div>
+            <div id="sleep-time-display" style="color:#ffd700; font-family:'Orbitron'; font-size:max(6px, 2.5rem - var(--font-trim)); text-shadow:0 0 15px #ffaa00;">08:00</div>
         </div>
         
-        <button id="btn-sleep-confirm" class="game-btn" style="width:100%; margin-bottom:10px; border-color:#00f3ff; color:#00f3ff; padding:15px; font-size:1rem;">SLEEP</button>
+        <button id="btn-sleep-confirm" class="game-btn" style="width:100%; margin-bottom:10px; border-color:#00f3ff; color:#00f3ff; padding:15px; font-size:max(6px, 1rem - var(--font-trim));">SLEEP</button>
         <button id="btn-sleep-cancel" class="game-btn" style="width:100%; border-color:#555; color:#aaa;">CANCEL</button>
     </div>
     
@@ -818,47 +823,47 @@
         <div style="background:rgba(5, 2, 15, 0.96); border:1px solid rgba(0, 243, 255, 0.3); border-radius:16px; padding:0; width:320px; box-shadow:0 0 40px rgba(0,0,0,0.9), 0 0 15px rgba(0,243,255,0.1); overflow:hidden;">
             <!-- Header -->
             <div style="background:linear-gradient(180deg, rgba(0,243,255,0.08) 0%, transparent 100%); padding:18px 20px 14px; border-bottom:1px solid rgba(0,243,255,0.1);">
-                <div style="font-family:'Orbitron'; font-size:0.65rem; letter-spacing:4px; color:rgba(0,243,255,0.5); text-transform:uppercase; margin-bottom:4px;">Vending Machine</div>
-                <div style="font-family:'Montserrat'; font-size:1.1rem; font-weight:700; color:#fff; letter-spacing:1px;">SELECT DRINK</div>
+                <div style="font-family:'Orbitron'; font-size:max(6px, 0.65rem - var(--font-trim)); letter-spacing:4px; color:rgba(0,243,255,0.5); text-transform:uppercase; margin-bottom:4px;">Vending Machine</div>
+                <div style="font-family:'Montserrat'; font-size:max(6px, 1.1rem - var(--font-trim)); font-weight:700; color:#fff; letter-spacing:1px;">SELECT DRINK</div>
             </div>
             
             <!-- Items -->
             <div style="padding:12px 14px;">
                 <!-- Bubble Tea -->
                 <div id="vend-item-bubble" class="vend-item" style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; cursor:pointer; transition:background 0.2s; margin-bottom:8px; border:1px solid rgba(255,255,255,0.04);">
-                    <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #7B2FBE, #00C9FF); display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0;">🧋</div>
+                    <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #7B2FBE, #00C9FF); display:flex; align-items:center; justify-content:center; font-size:max(6px, 1.3rem - var(--font-trim)); flex-shrink:0;">🧋</div>
                     <div style="flex:1; min-width:0;">
-                        <div style="font-family:'Montserrat'; font-size:0.8rem; font-weight:600; color:#e0e0e0; margin-bottom:3px;">Bubble Tea</div>
-                        <div style="font-family:'Montserrat'; font-size:0.6rem; color:#888; line-height:1.3;">Stella's little shtick. Loves it so much it gives her wings...figuratively.</div>
+                        <div style="font-family:'Montserrat'; font-size:max(6px, 0.8rem - var(--font-trim)); font-weight:600; color:#e0e0e0; margin-bottom:3px;">Bubble Tea</div>
+                        <div style="font-family:'Montserrat'; font-size:max(6px, 0.6rem - var(--font-trim)); color:#888; line-height:1.3;">Stella's little shtick. Loves it so much it gives her wings...figuratively.</div>
                     </div>
-                    <div style="font-family:'Orbitron'; font-size:0.75rem; color:#ffd700; text-shadow:0 0 6px rgba(255,215,0,0.3); flex-shrink:0; white-space:nowrap;">30 ¤</div>
+                    <div style="font-family:'Orbitron'; font-size:max(6px, 0.75rem - var(--font-trim)); color:#ffd700; text-shadow:0 0 6px rgba(255,215,0,0.3); flex-shrink:0; white-space:nowrap;">30 ¤</div>
                 </div>
                 
                 <!-- Ms. Jean Soda -->
                 <div id="vend-item-jean" class="vend-item" style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; cursor:pointer; transition:background 0.2s; margin-bottom:8px; border:1px solid rgba(255,255,255,0.04);">
-                    <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #D4447C, #FFB6C1); display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0;">💋</div>
+                    <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #D4447C, #FFB6C1); display:flex; align-items:center; justify-content:center; font-size:max(6px, 1.3rem - var(--font-trim)); flex-shrink:0;">💋</div>
                     <div style="flex:1; min-width:0;">
-                        <div style="font-family:'Montserrat'; font-size:0.8rem; font-weight:600; color:#e0e0e0; margin-bottom:3px;">Ms. Jean <span style="font-size:0.6rem; color:#999; font-weight:400;">(Vanilla Crème)</span></div>
-                        <div style="font-family:'Montserrat'; font-size:0.6rem; color:#888; line-height:1.3;">Classic, refreshing, lovely cream soda.</div>
+                        <div style="font-family:'Montserrat'; font-size:max(6px, 0.8rem - var(--font-trim)); font-weight:600; color:#e0e0e0; margin-bottom:3px;">Ms. Jean <span style="font-size:max(6px, 0.6rem - var(--font-trim)); color:#999; font-weight:400;">(Vanilla Crème)</span></div>
+                        <div style="font-family:'Montserrat'; font-size:max(6px, 0.6rem - var(--font-trim)); color:#888; line-height:1.3;">Classic, refreshing, lovely cream soda.</div>
                     </div>
-                    <div style="font-family:'Orbitron'; font-size:0.75rem; color:#ffd700; text-shadow:0 0 6px rgba(255,215,0,0.3); flex-shrink:0; white-space:nowrap;">20 ¤</div>
+                    <div style="font-family:'Orbitron'; font-size:max(6px, 0.75rem - var(--font-trim)); color:#ffd700; text-shadow:0 0 6px rgba(255,215,0,0.3); flex-shrink:0; white-space:nowrap;">20 ¤</div>
                 </div>
                 
                 <!-- Stellar Lemonade (shows after 5 completed bounties: CONSUMABLES.stellarLemonade.unlockCheck) -->
                 <div id="vend-item-stellar" class="vend-item" style="display:none; align-items:center; gap:12px; padding:12px; border-radius:10px; cursor:pointer; transition:background 0.2s; margin-bottom:4px; border:1px solid rgba(255,215,0,0.15);">
-                    <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #FFD700, #FFA500); display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0;">⭐</div>
+                    <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #FFD700, #FFA500); display:flex; align-items:center; justify-content:center; font-size:max(6px, 1.3rem - var(--font-trim)); flex-shrink:0;">⭐</div>
                     <div style="flex:1; min-width:0;">
-                        <div style="font-family:'Montserrat'; font-size:0.8rem; font-weight:600; color:#FFD700; margin-bottom:3px;">Stellar Lemonade</div>
-                        <div style="font-family:'Montserrat'; font-size:0.6rem; color:#b89730; line-height:1.3;">Blazing speed, razor reflexes. Burns bright, burns fast. Golden shield included.</div>
+                        <div style="font-family:'Montserrat'; font-size:max(6px, 0.8rem - var(--font-trim)); font-weight:600; color:#FFD700; margin-bottom:3px;">Stellar Lemonade</div>
+                        <div style="font-family:'Montserrat'; font-size:max(6px, 0.6rem - var(--font-trim)); color:#b89730; line-height:1.3;">Blazing speed, razor reflexes. Burns bright, burns fast. Golden shield included.</div>
                     </div>
-                    <div style="font-family:'Orbitron'; font-size:0.75rem; color:#ffd700; text-shadow:0 0 6px rgba(255,215,0,0.3); flex-shrink:0; white-space:nowrap;">75 ¤</div>
+                    <div style="font-family:'Orbitron'; font-size:max(6px, 0.75rem - var(--font-trim)); color:#ffd700; text-shadow:0 0 6px rgba(255,215,0,0.3); flex-shrink:0; white-space:nowrap;">75 ¤</div>
                 </div>
             </div>
             
             <!-- Footer -->
             <div style="padding:8px 14px 14px; border-top:1px solid rgba(255,255,255,0.04);">
-                <div id="vend-balance" style="font-family:'Orbitron'; font-size:0.65rem; color:#ffd700; text-align:center; margin-bottom:10px; letter-spacing:1px;"></div>
-                <button id="btn-vend-close" style="width:100%; padding:10px; background:transparent; border:1px solid rgba(255,255,255,0.12); border-radius:6px; color:#777; font-family:'Montserrat'; font-size:0.75rem; font-weight:500; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all 0.2s;">CLOSE</button>
+                <div id="vend-balance" style="font-family:'Orbitron'; font-size:max(6px, 0.65rem - var(--font-trim)); color:#ffd700; text-align:center; margin-bottom:10px; letter-spacing:1px;"></div>
+                <button id="btn-vend-close" style="width:100%; padding:10px; background:transparent; border:1px solid rgba(255,255,255,0.12); border-radius:6px; color:#777; font-family:'Montserrat'; font-size:max(6px, 0.75rem - var(--font-trim)); font-weight:500; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all 0.2s;">CLOSE</button>
             </div>
         </div>
     </div>
@@ -867,7 +872,7 @@
     <div id="pause-menu">
         <div class="pause-backdrop"></div>
         <div class="pause-content">
-            <!-- Left: what's playing, quick access, objectives (after ETERNAL's pause mock-up) -->
+            <!-- Left: what's playing (hidden for now), objectives, quick access (after ETERNAL's pause mock-up) -->
             <div class="pause-left">
                 <div class="pause-np" id="pause-np">
                     <div class="pause-np-disc" id="pause-np-disc" title="Change station"><span id="pause-np-station">LADY</span></div>
@@ -878,12 +883,6 @@
                         <div class="pause-np-sub">Music Player</div>
                     </div>
                     <div class="pause-np-node"></div>
-                </div>
-                <div class="pause-quick">
-                    <div class="pause-quick-title">QUICK ACCESS</div>
-                    <div class="pause-quick-item" data-action="equip" tabindex="0">EQUIP ITEMS</div>
-                    <div class="pause-quick-item" data-action="cinematic" tabindex="0">CINEMATIC VIEW</div>
-                    <div class="pause-quick-item" data-action="drop" tabindex="0">DROP ITEMS</div>
                 </div>
                 <div class="pause-mission" id="pause-mission">
                     <div class="pause-mission-label">OBJECTIVES</div>
@@ -902,9 +901,15 @@
                         <div class="pause-obj-label">SIDE MISSION</div>
                         <div class="pause-obj-text" id="pause-obj-side-text"><span class="pause-obj-none">—</span></div>
                         <div id="pause-mission-cancel" style="display:none; margin-top: 6px;">
-                            <button id="btn-abandon-mission" style="background: transparent; border: 1px solid rgba(255,50,50,0.3); color: #ff5555; padding: 3px 10px; cursor: pointer; font-family: 'Montserrat', sans-serif; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; border-radius: 3px;">ABANDON</button>
+                            <button id="btn-abandon-mission" style="background: transparent; border: 1px solid rgba(255,50,50,0.3); color: #ff5555; padding: 3px 10px; cursor: pointer; font-family: 'Montserrat', sans-serif; font-size: max(6px, 0.55rem - var(--font-trim)); text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; border-radius: 3px;">ABANDON</button>
                         </div>
                     </div>
+                </div>
+                <div class="pause-quick">
+                    <div class="pause-quick-title">QUICK ACCESS</div>
+                    <div class="pause-quick-item" data-action="equip" tabindex="0">EQUIP ITEMS</div>
+                    <div class="pause-quick-item" data-action="cinematic" tabindex="0">CINEMATIC VIEW</div>
+                    <div class="pause-quick-item" data-action="drop" tabindex="0">DROP ITEMS</div>
                 </div>
             </div>
             <!-- Right: the menu (or the settings panel) -->
@@ -971,6 +976,10 @@
                 <div class="settings-row">
                     <span class="settings-label">Scope Slow-Mo</span>
                     <span class="settings-value val-on" id="set-scopeslow" data-key="scopeSlow">ON</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-label">Base Zoom</span>
+                    <span class="settings-value" id="set-basezoom" data-key="baseZoom">100%</span>
                 </div>
                 <div class="settings-row">
                     <span class="settings-label">Camera Edge Lock</span>

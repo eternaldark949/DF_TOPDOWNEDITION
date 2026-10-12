@@ -37,14 +37,14 @@
         body.landscape .dialogue-inner { padding: 10px 16px 10px 20px; gap: 12px; }
         body.landscape #dialogue-portrait { width: 48px; height: 48px; min-width: 48px; }
         body.landscape #npc-text { margin-bottom: 8px; line-height: 1.45; }
-        body.landscape #npc-name { font-size: 1.05rem; margin-bottom: 3px; }
+        body.landscape #npc-name { font-size: max(6px, 1.05rem - var(--font-trim)); margin-bottom: 3px; }
         body.landscape #dialogue-caption { bottom: 70px; }
         body.landscape #message-modal { bottom: 60px; }
 
         /* --- Cinema --- */
         body.landscape #cinematic-bars.active .cine-bar { height: 9vh; }
         body.landscape #boss-title { bottom: 13%; }
-        body.landscape #boss-title .bt-main { font-size: clamp(1.4rem, 4.4vw, 2.3rem); }
+        body.landscape #boss-title .bt-main { font-size: max(6px, clamp(1.4rem, 4.4vw, 2.3rem) - var(--font-trim)); }
 
         /* --- Panels on a short screen --- */
         /* Inventory and map sidebars: collapsed behind their diamond handles, as on a narrow phone */
@@ -59,13 +59,16 @@
         body.landscape #sleep-menu, body.landscape #vending-menu { max-height: 94vh; overflow-y: auto; box-sizing: border-box; padding: 16px 24px !important; }
         body.landscape .save-slot-panel { max-height: 92vh; overflow-y: auto; }
         body.landscape #main-menu { margin-top: 5vh; padding-bottom: 20px; }
-        body.landscape .title-script { font-size: 3.6rem; }
-        body.landscape .title-sub { font-size: 1.05rem; letter-spacing: 0.8rem; margin-bottom: 24px; }
+        body.landscape .title-script { font-size: max(6px, 3.6rem - var(--font-trim)); }
+        body.landscape .title-sub { font-size: max(6px, 1.05rem - var(--font-trim)); letter-spacing: 0.8rem; margin-bottom: 24px; }
         body.landscape #tap-to-begin .title-sub { margin-bottom: 30px; }
-        body.landscape #tap-to-begin .ttb-cta { font-size: 1.3rem; }
+        body.landscape #tap-to-begin .ttb-cta { font-size: max(6px, 1.3rem - var(--font-trim)); }
         body.landscape .menu-list-container { gap: 6px; min-height: 0; }
         body.landscape .menu-item-row { min-height: 34px; padding: 2px 0; }
-        body.landscape .death-text { font-size: 3.6rem; letter-spacing: 12px; }
+        body.landscape #main-menu:not(.menu-long) { margin-top: 0; padding-bottom: 0; }
+        body.landscape #main-menu:not(.menu-long) .menu-list-container { gap: 2px; }
+        body.landscape #main-menu:not(.menu-long) .menu-item-row { min-height: 28px; padding: 1px 0; }
+        body.landscape .death-text { font-size: max(6px, 3.6rem - var(--font-trim)); letter-spacing: 12px; }
 
         /* --- Pause: the same two columns, tightened for a short screen --- */
         body.landscape .pause-content { padding: 12px 5% 12px 3%; align-items: center; }
@@ -73,12 +76,12 @@
         body.landscape .pause-right { max-height: calc(100vh - 24px); }
         body.landscape .pause-menu-list, body.landscape .pause-settings-panel { max-height: calc(100vh - 110px); overflow-y: auto; }
         body.landscape .pause-header { margin-bottom: 8px; }
-        body.landscape .pause-title { font-size: 2.4rem; padding-bottom: 8px; }
-        body.landscape .pause-menu-item { padding: 6px 20px; font-size: 0.66rem; }
+        body.landscape .pause-title { font-size: max(6px, 2.4rem - var(--font-trim)); padding-bottom: 8px; }
+        body.landscape .pause-menu-item { padding: 6px 20px; font-size: max(6px, 0.66rem - var(--font-trim)); }
         body.landscape .pause-menu-item.active::before { height: 26px; }
         body.landscape .pause-np { height: 52px; }
         body.landscape .pause-np-disc { height: 52px; width: 80px; }
         body.landscape .pause-np-play { height: 52px; }
-        body.landscape .pause-quick-title, body.landscape .pause-mission-label { margin-bottom: 4px; font-size: 0.68rem; }
+        body.landscape .pause-quick-title, body.landscape .pause-mission-label { margin-bottom: 4px; font-size: max(6px, 0.68rem - var(--font-trim)); }
         body.landscape .pause-quick-item { padding: 4px 10px; }
         body.landscape .pause-obj-block { padding: 4px 10px; }

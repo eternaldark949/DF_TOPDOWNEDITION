@@ -1556,7 +1556,7 @@ engineMixin({
                 resetHumanoidAnim(this.player);
                 this.teammates.forEach(t => resetHumanoidAnim(t));
 
-                this.camera.zoom = 1; 
+                this.camera.zoom = GameSettings.baseZoom || 1;   // from the player's Base Zoom, so a new map doesn't open with a zoom out
                 this.resize();
             },
             

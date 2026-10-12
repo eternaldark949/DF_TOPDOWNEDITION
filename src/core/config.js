@@ -177,7 +177,8 @@
                 DEFAULT_ZOOM: 1.0,
                 HOLSTER_ZOOM: 1.18,             // on foot, gun away: 18% closer (engine/update.js camera)
                 INDOOR_ZOOM: 1.20,              // indoors: 20% closer (stacks with holstered)
-                INTERACT_ZOOM: 1.05,            // by something to use, or talking: 5% closer than that
+                INTERACT_ZOOM: 1.05 * 1.15,     // by something to use, or talking: ~21% closer than that (was 5%, raised 15%)
+                BASE_ZOOMS: [1, 0.9, 0.75, 0.6],  // Settings → Base Zoom steps (GameSettings.baseZoom), multiplying every camera zoom above
                 CINE_PAN: 450, CINE_ZOOM: [0.5, 2.5],       // Cinematic View: pan radius (world px) and zoom limits
                 SHAKE_DECAY: 0.9,
                 SHAKE_MIN_THRESHOLD: 0.5
