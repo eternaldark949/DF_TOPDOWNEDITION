@@ -14,22 +14,28 @@
         body.landscape #ui-currency, body.landscape #ui-scrap { font-size: 0.78rem; }
 
         /* --- The cat's paw: the same arc, sat low near the bottom edge (--paw-drop) so it fits a short screen
-               and rests under the thumb, and moved in from the edge by a thumb's width (--paw-shift) --- */
-        body.landscape { --paw-shift: 56px; --paw-drop: -34px; }
-        body.landscape #btn-fire, body.landscape #btn-emote { bottom: calc(50px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(60px + var(--paw-shift)); }
-        body.landscape #btn-heal, body.landscape #emote-smile { bottom: calc(145px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(78px + var(--paw-shift)); }
-        body.landscape #btn-nv, body.landscape #emote-zany { bottom: calc(125px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(130px + var(--paw-shift)); }
-        body.landscape #btn-flit, body.landscape #emote-cry { bottom: calc(65px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(150px + var(--paw-shift)); }
+               and rests under the thumb, and moved in from the edge by a thumb's width (--paw-shift).
+               Keyed off body.phone-wide (any screen wider than tall, ui/phone.js), not body.landscape:
+               a tablet, a foldable or a desktop window is wider than tall but taller than 540px --- */
+        body.phone-wide { --paw-shift: 56px; --paw-drop: -34px; }
+        body.phone-wide #btn-fire, body.phone-wide #btn-emote { bottom: calc(50px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(60px + var(--paw-shift)); }
+        body.phone-wide #btn-heal, body.phone-wide #emote-smile { bottom: calc(145px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(78px + var(--paw-shift)); }
+        body.phone-wide #btn-nv, body.phone-wide #emote-zany { bottom: calc(125px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(130px + var(--paw-shift)); }
+        body.phone-wide #btn-flit, body.phone-wide #emote-cry { bottom: calc(65px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(150px + var(--paw-shift)); }
         /* the handbrake already sits lowest: it drops only as far as the edge allows */
-        body.landscape #btn-handbrake { bottom: calc(max(4px, 30px + var(--paw-drop)) + env(safe-area-inset-bottom, 0px)); right: calc(6px + var(--paw-shift)); width: 50px; height: 50px; font-size: 0.5rem; }
-        body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
-        body.landscape #btn-holster, body.landscape #emote-frown { bottom: calc(120px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(25px + var(--paw-shift)); }
-        body.landscape #btn-sneak { bottom: calc(172px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(25px + var(--paw-shift)); }
+        body.phone-wide #btn-handbrake { bottom: calc(max(4px, 30px + var(--paw-drop)) + env(safe-area-inset-bottom, 0px)); right: calc(6px + var(--paw-shift)); width: 50px; height: 50px; font-size: 0.5rem; }
+        body.phone-wide #btn-autodrive, body.phone-wide #btn-zib-skip,
+        body.phone-wide #btn-holster, body.phone-wide #emote-frown { bottom: calc(120px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(25px + var(--paw-shift)); }
+        body.phone-wide #btn-sneak { bottom: calc(172px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(25px + var(--paw-shift)); }
+
+        /* a wide screen taller than a phone keeps the portrait HUD, whose location name sits bottom-right
+           under the paw: it moves to the bottom-left */
+        body.phone-wide:not(.landscape) #ui-location { right: auto; left: 22px; }
 
         /* --- The action dock: beside the arc, not above it --- */
-        body.landscape #action-dock { right: calc(212px + var(--paw-shift)); bottom: 18px; }
-        body.landscape #action-dock .action-pill { height: 42px; min-width: 112px; max-width: 34vw; }
-        body.landscape #action-dock .ap-name { max-width: 20vw; }
+        body.phone-wide #action-dock { right: calc(212px + var(--paw-shift)); bottom: 18px; }
+        body.phone-wide #action-dock .action-pill { height: 42px; min-width: 112px; max-width: 34vw; }
+        body.phone-wide #action-dock .ap-name { max-width: 20vw; }
 
         /* --- The move stick: the left of the screen, below the bars --- */
         body.landscape #input-zone-left { top: 22%; height: 78%; width: 45%; }
