@@ -426,10 +426,19 @@
                 // (Lamp shadow shapes are in world space: no rebake needed on resize.)
 
                 // A phone on its side: short and wide. Everything landscape keys off this one class
-                // (styles/landscape.css); portrait never sees it.
-                const land = cssW > cssH && cssH <= 540;
+                // (styles/landscape.css); portrait never sees it. Browser zoom changes the CSS height
+                // (a 411px-tall phone reads 548px at 75%), but not the shape: a touch screen at least
+                // 1.7× as wide as tall is a phone on its side at any zoom. With the Orientation setting on
+                // Landscape, any wide screen takes the landscape layout.
+                const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+                const land = cssW > cssH && (cssH <= 540 || GameSettings.orientation === 'landscape' || (coarse && cssW / cssH >= 1.7));
                 this.isLandscape = land;
                 document.body.classList.toggle('landscape', land);
+                // The HUD scales with the screen's height (--hud, styles/landscape.css), so it keeps the
+                // same places and share of the screen at any zoom. 548px tall is 1:1 (a phone at 75% zoom);
+                // with a mouse (a desktop window) it never grows past 1:1.
+                this.hudScale = land ? Math.max(0.4, Math.min(coarse ? 2 : 1, cssH / 548)) : 1;
+                document.documentElement.style.setProperty('--hud', this.hudScale.toFixed(3));
                 if (typeof phoneSystem !== 'undefined') phoneSystem.fit();   // the phone turns and scales to fit (ui/phone.js)
             },
 

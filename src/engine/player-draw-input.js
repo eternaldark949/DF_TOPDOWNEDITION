@@ -470,7 +470,8 @@
                         if (touch.identifier !== F.id) continue;
                         if (F.remembered && Math.hypot(touch.clientX - F.landX, touch.clientY - F.landY) < DRAG) break;   // still on the remembered aim
                         F.remembered = false;
-                        const deltaX = touch.clientX - F.originX, deltaY = touch.clientY - F.originY, far = Math.hypot(deltaX, deltaY);
+                        // In the stick's own pixels: the paw is zoomed by --hud (hudScale), so its ring is too
+                        const k = this.hudScale || 1, deltaX = (touch.clientX - F.originX) / k, deltaY = (touch.clientY - F.originY) / k, far = Math.hypot(deltaX, deltaY);
                         const MAX = aimMode() ? 74 : 35, distance = Math.min(far, MAX), angle = Math.atan2(deltaY, deltaX);
                         setKnob(Math.cos(angle) * distance, Math.sin(angle) * distance);
                         if (aimMode()) {

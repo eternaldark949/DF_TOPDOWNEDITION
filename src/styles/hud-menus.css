@@ -162,7 +162,6 @@
         #ui-equipment.low-ammo #equipment-ammo-fill { background: #e7b07b; }
         #ui-equipment.holstered #equipment-art { opacity: 0.65; }
         #equipment-ammo-track[hidden] { display: none; }
-        body.landscape #game-ui #ui-location { top: 173px; }
         @media (orientation: portrait) { body:not(.landscape) #ui-ride { top: 184px; } }
         /* A tall phone: the readout under the top HUD (badge, portrait, PP), the stealth word and the ride tag beneath it */
         @media (orientation: portrait) {

@@ -1,38 +1,36 @@
         /* =========================================
            LANDSCAPE (a phone on its side)
            body.landscape is set by resize() (engine/combat-effects.js) when the window is wider
-           than tall and at most 540px tall. Portrait never sees these rules.
+           than tall and short, shaped like a phone on its side, or set to Landscape. Portrait never
+           sees these rules.
            ========================================= */
 
-        /* --- Top-left: bars and phone stay; the location name sits under them --- */
-        body.landscape #ui-location { top: 110px; bottom: auto; left: 22px; right: auto; font-size: 1.1rem; }
+        /* --- The HUD: the portrait layout, scaled with the screen's height (--hud, set in resize()) so it
+               looks the same at any browser zoom: 548px tall is 1:1. Only three changes from portrait:
+               the equipped item sits in the lower-left corner, and the cat's paw and the action dock
+               beside it sit a thumb's width (--paw-drop) lower --- */
+        body.landscape { --paw-drop: 56px; }
+        body.landscape #ui-health, body.landscape #ui-shield-bar, body.landscape #ui-flit-bar-container,
+        body.landscape #btn-phone, body.landscape #ui-equipment, body.landscape #ui-location,
+        body.landscape #btn-pause, body.landscape #ui-stats, body.landscape #ui-ride,
+        body.landscape #ui-stealth-indicator, body.landscape #ui-wave, body.landscape #ui-objective,
+        body.landscape #btn-fire, body.landscape #btn-emote, body.landscape #btn-heal, body.landscape #emote-smile,
+        body.landscape #btn-nv, body.landscape #emote-zany, body.landscape #btn-flit, body.landscape #emote-cry,
+        body.landscape #btn-handbrake, body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
+        body.landscape #btn-holster, body.landscape #emote-frown, body.landscape #btn-sneak,
+        body.landscape #action-dock { zoom: var(--hud, 1); }
 
-        /* --- Top-right: pause, the stats under it (tighter), the ⚙ dock to its left opening sideways --- */
-        body.landscape #btn-pause { top: 12px; right: 16px; }
-        body.landscape #ui-stats { top: 64px; right: 18px; }
-        body.landscape #ui-time { font-size: 1rem; margin-bottom: 2px; }
-        body.landscape #ui-currency, body.landscape #ui-scrap { font-size: 0.78rem; }
+        body.landscape #ui-equipment { top: auto; bottom: 20px; left: 22px; }
 
-        /* --- The cat's paw: the same arc, sat low near the bottom edge (--paw-drop) so it fits a short screen
-               and rests under the thumb, and moved in from the edge by a thumb's width (--paw-shift) --- */
-        body.landscape { --paw-shift: 56px; --paw-drop: -34px; }
-        body.landscape #btn-fire, body.landscape #btn-emote { bottom: calc(50px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(60px + var(--paw-shift)); }
-        body.landscape #btn-heal, body.landscape #emote-smile { bottom: calc(145px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(78px + var(--paw-shift)); }
-        body.landscape #btn-nv, body.landscape #emote-zany { bottom: calc(125px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(130px + var(--paw-shift)); }
-        body.landscape #btn-flit, body.landscape #emote-cry { bottom: calc(65px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(150px + var(--paw-shift)); }
-        /* the handbrake already sits lowest: it drops only as far as the edge allows */
-        body.landscape #btn-handbrake { bottom: calc(max(4px, 30px + var(--paw-drop)) + env(safe-area-inset-bottom, 0px)); right: calc(6px + var(--paw-shift)); width: 50px; height: 50px; font-size: 0.5rem; }
+        body.landscape #btn-fire, body.landscape #btn-emote { bottom: calc(140px - var(--paw-drop)); }
+        body.landscape #btn-heal, body.landscape #emote-smile { bottom: calc(235px - var(--paw-drop)); }
+        body.landscape #btn-nv, body.landscape #emote-zany { bottom: calc(215px - var(--paw-drop)); }
+        body.landscape #btn-flit, body.landscape #emote-cry { bottom: calc(155px - var(--paw-drop)); }
+        body.landscape #btn-handbrake { bottom: calc(72px - var(--paw-drop)); }
         body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
-        body.landscape #btn-holster, body.landscape #emote-frown { bottom: calc(120px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(25px + var(--paw-shift)); }
-        body.landscape #btn-sneak { bottom: calc(172px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(25px + var(--paw-shift)); }
-
-        /* --- The action dock: beside the arc, not above it --- */
-        body.landscape #action-dock { right: calc(212px + var(--paw-shift)); bottom: 18px; }
-        body.landscape #action-dock .action-pill { height: 42px; min-width: 112px; max-width: 34vw; }
-        body.landscape #action-dock .ap-name { max-width: 20vw; }
-
-        /* --- The move stick: the left of the screen, below the bars --- */
-        body.landscape #input-zone-left { top: 22%; height: 78%; width: 45%; }
+        body.landscape #btn-holster, body.landscape #emote-frown { bottom: calc(210px - var(--paw-drop)); }
+        body.landscape #btn-sneak { bottom: calc(232px - var(--paw-drop)); }
+        body.landscape #action-dock { bottom: calc(300px - var(--paw-drop)); }
 
         /* --- Dialogue: narrower and lower, so the scene stays in view --- */
         body.landscape #dialogue-box { bottom: 8px; width: 62%; max-width: 640px; }
@@ -42,18 +40,6 @@
         body.landscape #npc-name { font-size: 1.05rem; margin-bottom: 3px; }
         body.landscape #dialogue-caption { bottom: 70px; }
         body.landscape #message-modal { bottom: 60px; }
-
-        /* --- Top-centre notices, clear of the corners --- */
-        body.landscape #comms-bar { left: 22%; right: 22%; height: 54px; }
-        body.landscape #comms-bar.active { top: 10px; }
-        body.landscape #ui-stealth-indicator { top: 30px; font-size: 0.95rem; }
-        body.landscape #ui-wave { top: 12px; }
-        body.landscape #ui-wave .w-line { font-size: 0.64rem; }
-        body.landscape.wave-hud #ui-stealth-indicator { top: 60px; }
-        body.landscape #ui-objective { top: 10px; padding: 4px 14px 5px; }
-        body.landscape #ui-objective .o-line { font-size: 0.56rem; }
-        body.landscape #ui-objective .o-step { font-size: 0.54rem; }
-        body.landscape.objective-hud #ui-stealth-indicator { top: 64px; }
 
         /* --- Cinema --- */
         body.landscape #cinematic-bars.active .cine-bar { height: 9vh; }

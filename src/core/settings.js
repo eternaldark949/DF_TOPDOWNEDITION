@@ -124,6 +124,7 @@
                 GameSettings.orientation = order[(order.indexOf(GameSettings.orientation) + 1) % order.length];
                 try { localStorage.setItem('dfab_orientation', GameSettings.orientation); } catch (e) { /* private mode */ }
                 this.apply();
+                if (typeof game !== 'undefined' && game && game.resize) game.resize();   // the layout follows the setting
             },
             label() { return this.supported() ? GameSettings.orientation : 'auto (phone)'; }
         };
