@@ -426,10 +426,17 @@
                 // (Lamp shadow shapes are in world space: no rebake needed on resize.)
 
                 // A phone on its side: short and wide. Everything landscape keys off this one class
-                // (styles/landscape.css); portrait never sees it.
-                const land = cssW > cssH && cssH <= 540;
+                // (styles/landscape.css); portrait never sees it. Browser zoom changes the CSS height
+                // (a 411px-tall phone reads 548px at 75%), but not the shape: a touch screen at least
+                // 1.7× as wide as tall is a phone on its side at any zoom.
+                const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+                const land = cssW > cssH && (cssH <= 540 || (coarse && cssW / cssH >= 1.7));
                 this.isLandscape = land;
                 document.body.classList.toggle('landscape', land);
+                // The cat's paw scales with the screen's height (--hud, styles/landscape.css), so it keeps
+                // the same place and share of the screen at any zoom. 390px tall is 1:1.
+                this.hudScale = land ? Math.max(0.5, Math.min(2.2, cssH / 390)) : 1;
+                document.documentElement.style.setProperty('--hud', this.hudScale.toFixed(3));
                 if (typeof phoneSystem !== 'undefined') phoneSystem.fit();   // the phone turns and scales to fit (ui/phone.js)
             },
 

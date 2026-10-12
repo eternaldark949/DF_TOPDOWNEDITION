@@ -3377,6 +3377,13 @@
                Keyed off body.phone-wide (any screen wider than tall, ui/phone.js), not body.landscape:
                a tablet, a foldable or a desktop window is wider than tall but taller than 540px --- */
         body.phone-wide { --paw-shift: 56px; --paw-drop: -34px; }
+        /* in landscape the whole paw and the dock beside it scale with the screen's height (--hud, set in
+           resize()): offsets and sizes together, so the paw keeps its place at any browser zoom */
+        body.landscape #btn-fire, body.landscape #btn-emote, body.landscape #btn-heal, body.landscape #emote-smile,
+        body.landscape #btn-nv, body.landscape #emote-zany, body.landscape #btn-flit, body.landscape #emote-cry,
+        body.landscape #btn-handbrake, body.landscape #btn-autodrive, body.landscape #btn-zib-skip,
+        body.landscape #btn-holster, body.landscape #emote-frown, body.landscape #btn-sneak,
+        body.landscape #action-dock { zoom: var(--hud, 1); }
         body.phone-wide #btn-fire, body.phone-wide #btn-emote { bottom: calc(50px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(60px + var(--paw-shift)); }
         body.phone-wide #btn-heal, body.phone-wide #emote-smile { bottom: calc(145px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(78px + var(--paw-shift)); }
         body.phone-wide #btn-nv, body.phone-wide #emote-zany { bottom: calc(125px + var(--paw-drop) + env(safe-area-inset-bottom, 0px)); right: calc(130px + var(--paw-shift)); }
@@ -57546,10 +57553,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // (Lamp shadow shapes are in world space: no rebake needed on resize.)
 
                 // A phone on its side: short and wide. Everything landscape keys off this one class
-                // (styles/landscape.css); portrait never sees it.
-                const land = cssW > cssH && cssH <= 540;
+                // (styles/landscape.css); portrait never sees it. Browser zoom changes the CSS height
+                // (a 411px-tall phone reads 548px at 75%), but not the shape: a touch screen at least
+                // 1.7× as wide as tall is a phone on its side at any zoom.
+                const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+                const land = cssW > cssH && (cssH <= 540 || (coarse && cssW / cssH >= 1.7));
                 this.isLandscape = land;
                 document.body.classList.toggle('landscape', land);
+                // The cat's paw scales with the screen's height (--hud, styles/landscape.css), so it keeps
+                // the same place and share of the screen at any zoom. 390px tall is 1:1.
+                this.hudScale = land ? Math.max(0.5, Math.min(2.2, cssH / 390)) : 1;
+                document.documentElement.style.setProperty('--hud', this.hudScale.toFixed(3));
                 if (typeof phoneSystem !== 'undefined') phoneSystem.fit();   // the phone turns and scales to fit (ui/phone.js)
             },
 
@@ -73894,7 +73908,8 @@ engineMixin({
                         if (touch.identifier !== F.id) continue;
                         if (F.remembered && Math.hypot(touch.clientX - F.landX, touch.clientY - F.landY) < DRAG) break;   // still on the remembered aim
                         F.remembered = false;
-                        const deltaX = touch.clientX - F.originX, deltaY = touch.clientY - F.originY, far = Math.hypot(deltaX, deltaY);
+                        // In the stick's own pixels: the paw is zoomed by --hud (hudScale), so its ring is too
+                        const k = this.hudScale || 1, deltaX = (touch.clientX - F.originX) / k, deltaY = (touch.clientY - F.originY) / k, far = Math.hypot(deltaX, deltaY);
                         const MAX = aimMode() ? 74 : 35, distance = Math.min(far, MAX), angle = Math.atan2(deltaY, deltaX);
                         setKnob(Math.cos(angle) * distance, Math.sin(angle) * distance);
                         if (aimMode()) {
