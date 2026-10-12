@@ -1409,6 +1409,7 @@
                 { label: 'V.O.C.A.L', category: 'vocal', equipped: game.cosmetics.equippedVocal },
                 { label: 'H.A.T', category: 'hat', equipped: game.cosmetics.equippedHat },
                 { label: 'J.E.W.E.L.R.Y', category: 'jewelry', equipped: null },
+                { label: 'L.E.G.S', category: 'legwear', equipped: null },
                 { label: 'A.C.C.E.S.S.O.R.Y', category: 'accessory', equipped: game.cosmetics.equippedAccessory }
             ];
 
@@ -1427,7 +1428,7 @@
                     else if (slot.category === 'skin') chipColor = item.data.skinColor;
                     else if (slot.category === 'vocal') chipColor = item.data.captionColor;
                     else if (slot.category === 'outfit') chipColor = item.data.top.color;
-                    else if (slot.category === 'hat' || slot.category === 'jewelry') chipColor = item.data.color;
+                    else if (slot.category === 'hat' || slot.category === 'jewelry' || slot.category === 'legwear') chipColor = item.data.color;
                     else if (slot.category === 'accessory' && item.data.held === 'umbrella') chipColor = item.data.color;
                     else if (slot.category === 'accessory') chipColor = (GLASS_DRINKS[game.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne).liquid;
                     
@@ -1460,8 +1461,8 @@
                     const none = !slot.equipped;
                     html += `<div class="neume-chip" data-id="" data-cat="hat" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:0.5rem; color:${none ? '#fff' : '#999'};">None</span></div>`;
                 }
-                if (slot.category === 'jewelry' && !owned.length) {
-                    html += `<span style="font-size:0.45rem; color:#777;">None owned yet. Find jewelry at Neural Systems.</span>`;
+                if ((slot.category === 'jewelry' || slot.category === 'legwear') && !owned.length) {
+                    html += `<span style="font-size:0.45rem; color:#777;">None owned yet. Find ${slot.category === 'jewelry' ? 'jewelry' : 'legwear'} at Neural Systems.</span>`;
                 }
                 html += `</div></div>`;
             }
@@ -1486,7 +1487,7 @@
                     const id = chip.dataset.id, cat = chip.dataset.cat;
                     if (cat === 'accessory' && !id) game.cosmetics.unequipAccessory();
                     else if (cat === 'hat' && !id) game.cosmetics.unequipHat();
-                    else if (cat === 'jewelry' && game.cosmetics.isEquipped(id)) game.cosmetics.unequipJewelry(id);   // jewelry toggles
+                    else if ((cat === 'jewelry' || cat === 'legwear') && game.cosmetics.isEquipped(id)) game.cosmetics.unequipWorn(id);   // jewelry and legwear toggle
                     else game.cosmetics.equip(id);
                     triggerSequencingEffect();
                 });

@@ -251,8 +251,8 @@
         function getOwnedInventoryEntries(game) {
             const result = [], cosmetics = game?.cosmetics;
             const registry = typeof COSMETICS_REGISTRY !== 'undefined' ? COSMETICS_REGISTRY : {};
-            const icons = { wig: '≋', skin: '◉', vocal: '♪', outfit: '✦', accessory: '◇', hat: '⌂', jewelry: '◆' };
-            const labels = { wig: 'Wig', skin: 'Skin', vocal: 'Voice', outfit: 'Outfit', accessory: 'Accessory', hat: 'Hat', jewelry: 'Jewelry' };
+            const icons = { wig: '≋', skin: '◉', vocal: '♪', outfit: '✦', accessory: '◇', hat: '⌂', jewelry: '◆', legwear: '♢' };
+            const labels = { wig: 'Wig', skin: 'Skin', vocal: 'Voice', outfit: 'Outfit', accessory: 'Accessory', hat: 'Hat', jewelry: 'Jewelry', legwear: 'Legwear' };
             const seen = new Set();
             for (const sourceId of Array.isArray(cosmetics?.owned) ? cosmetics.owned : []) {
                 const entry = registry[sourceId];
@@ -469,7 +469,7 @@
                 if (cosmetics.isEquipped(entry.sourceId)) {
                     if (definition.category === 'accessory') cosmetics.unequipAccessory();
                     else if (definition.category === 'hat') cosmetics.unequipHat();
-                    else if (definition.category === 'jewelry') cosmetics.unequipJewelry(entry.sourceId);
+                    else if (definition.category === 'jewelry' || definition.category === 'legwear') cosmetics.unequipWorn(entry.sourceId);
                     else return;
                 } else cosmetics.equip(entry.sourceId);
                 audioSys.sfx('ui');
@@ -560,7 +560,7 @@
                     actions.push({ className: 'drop-btn', label: 'DROP', run: () => this._dropCarriedItem(entry.item) });
                 } else if (entry.source === 'cosmetic') {
                     const definition = COSMETICS_REGISTRY[entry.sourceId];
-                    const optional = ['accessory', 'hat', 'jewelry'].includes(definition?.category);
+                    const optional = ['accessory', 'hat', 'jewelry', 'legwear'].includes(definition?.category);
                     if (!entry.isEquipped || optional) actions.push({
                         className: 'use-btn', label: entry.isEquipped ? 'REMOVE' : 'EQUIP',
                         run: () => this._cosmeticAction(entry)

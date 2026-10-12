@@ -166,6 +166,22 @@
             ctx.bezierCurveTo(x1 + ux * c2 + nx * w2, y1 + uy * c2 + ny * w2, x1 + ux * c1 + nx * w1, y1 + uy * c1 + ny * w1, x1 + nx * r0, y1 + ny * r0);
             ctx.closePath();
         }
+        /** Fill the stretch of a limb from t0 to t1 of the way along it (a band, a stocking's top), cut square
+         *  across at both ends: the limb's outline grown by `grow`, clipped to the span. t outside 0..1 takes
+         *  in the joint's round end. gloss: a soft sheen down the span. */
+        function fillLimbSpan(ctx, x1, y1, x2, y2, T, t0, t1, grow, fill, gloss) {
+            const G = [T[0] + grow, T[1] + grow, T[2], T[3] + grow], R = Math.max(G[0], G[1], G[3]) + 1;
+            const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1e-6, nx = -dy / L * R, ny = dx / L * R;
+            const ax = x1 + dx * t0, ay = y1 + dy * t0, bx = x1 + dx * t1, by = y1 + dy * t1;
+            ctx.save(); bodyLimbPath(ctx, x1, y1, x2, y2, G); ctx.clip();
+            ctx.beginPath(); ctx.moveTo(ax + nx, ay + ny); ctx.lineTo(bx + nx, by + ny); ctx.lineTo(bx - nx, by - ny); ctx.lineTo(ax - nx, ay - ny); ctx.closePath();
+            ctx.fillStyle = fill; ctx.fill();
+            if (gloss) {
+                ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.beginPath();
+                ctx.ellipse((ax + bx) / 2 - nx * 0.35, (ay + by) / 2 - ny * 0.35, Math.max(0.5, Math.hypot(bx - ax, by - ay) * 0.42), R * 0.22, Math.atan2(dy, dx), 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.restore(); ctx.beginPath();
+        }
         /** A limb's radius a fraction t of the way along it (for bangles, cuffs). */
         function bodyLimbRadius(T, t) {
             return t <= T[2] ? T[0] + (T[1] - T[0]) * t / T[2] : T[1] + (T[3] - T[1]) * (t - T[2]) / (1 - T[2]);

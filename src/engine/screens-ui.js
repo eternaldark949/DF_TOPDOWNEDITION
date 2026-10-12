@@ -554,7 +554,7 @@
                 const tabs = overlay.querySelectorAll('.cosmetics-tab');
                 const content = document.getElementById('cosmetics-shop-content');
                 const C = this.cosmetics;
-                const LABEL = { wig: 'W.I.G.s', skin: 'S.K.I.N.s', outfit: 'O.U.T.F.I.T.s', vocal: 'V.O.C.A.L.s', accessory: 'A.C.C.E.S.S.', hat: 'H.A.T.s', jewelry: 'J.E.W.E.L.s' };
+                const LABEL = { wig: 'W.I.G.s', skin: 'S.K.I.N.s', outfit: 'O.U.T.F.I.T.s', vocal: 'V.O.C.A.L.s', accessory: 'A.C.C.E.S.S.', hat: 'H.A.T.s', jewelry: 'J.E.W.E.L.s', legwear: 'L.E.G.s' };
                 let activeTab = this._cosmeticsTab || 'wig';
 
                 /** The item's look as a round swatch */
@@ -563,7 +563,7 @@
                     if (category === 'wig') return `background:${d.color}`;
                     if (category === 'skin') return `background:${d.skinColor}`;
                     if (category === 'outfit') return `background:linear-gradient(135deg, ${d.top.color} 50%, ${d.bottom.color} 50%)`;
-                    if (category === 'hat' || category === 'jewelry') return `background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${d.color} 45%)`;
+                    if (category === 'hat' || category === 'jewelry' || category === 'legwear') return `background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${d.color} 45%)`;
                     if (category === 'vocal') return `background:${d.captionColor};opacity:0.8`;
                     if (category === 'accessory' && d.held === 'umbrella') return `background:conic-gradient(${d.color} 0 12.5%, ${d.trim} 12.5% 14%, ${d.color} 14% 25%, ${d.trim} 25% 26.5%, ${d.color} 26.5% 100%)`;
                     if (category === 'accessory') { const g = GLASS_DRINKS[C.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne; return `background:radial-gradient(circle at 35% 35%, #fff 0 12%, ${g.liquid} 30%, ${g.liquid2 || g.liquid} 100%)`; }
@@ -574,7 +574,7 @@
                     activeTab = this._cosmeticsTab = category;
                     tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === category));
                     const items = Object.values(COSMETICS_REGISTRY).filter(e => e.category === category);
-                    const optional = category === 'accessory' || category === 'hat' || category === 'jewelry';   // these can be taken off
+                    const optional = category === 'accessory' || category === 'hat' || category === 'jewelry' || category === 'legwear';   // these can be taken off
                     const ownedN = items.filter(it => C.isOwned(it.id)).length;
                     let html = `<div class="df-section"><span><span class="glint">◆</span>${LABEL[category] || category}</span><span class="count">${ownedN} / ${items.length} owned</span></div>`;
                     for (const item of items) {
@@ -615,7 +615,7 @@
                             if (kind === 'remove') {
                                 if (entry.category === 'accessory') C.unequipAccessory();
                                 else if (entry.category === 'hat') C.unequipHat();
-                                else C.unequipJewelry(id);
+                                else C.unequipWorn(id);
                                 audioSys.sfx('ui'); renderTab(activeTab);
                             } else if (kind === 'equip') {
                                 C.equip(id); audioSys.sfx('ui'); renderTab(activeTab);
@@ -633,7 +633,7 @@
                         // A tap on an owned card equips it (or takes an optional piece off)
                         card.addEventListener('click', () => {
                             if (!C.isOwned(id)) return;
-                            act(C.isEquipped(id) ? (['accessory', 'hat', 'jewelry'].includes(entry.category) ? 'remove' : null) : 'equip');
+                            act(C.isEquipped(id) ? (['accessory', 'hat', 'jewelry', 'legwear'].includes(entry.category) ? 'remove' : null) : 'equip');
                         });
                     });
                 };
@@ -934,6 +934,7 @@
                 html += row('V.O.C.A.L', cos ? nm(cos.equippedVocal) : '—');
                 html += row('H.A.T', cos && cos.equippedHat ? nm(cos.equippedHat) : '—');
                 html += row('J.E.W.E.L.R.Y', cos && cos.equippedJewelry.length ? cos.equippedJewelry.map(id => COSMETICS_REGISTRY[id]?.name).filter(Boolean).join(', ') : '—');
+                html += row('L.E.G.S', cos && cos.equippedLegwear?.length ? cos.equippedLegwear.map(id => COSMETICS_REGISTRY[id]?.name).filter(Boolean).join(', ') : '—');
                 html += `</div></div>`;
 
                 // ══════════════════════════════════════════════════

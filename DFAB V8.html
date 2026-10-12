@@ -3495,7 +3495,7 @@
                 <div class="df-shop-titles"><div class="df-shop-title">Neural Systems</div><div class="df-shop-sub">Identity Sequencing Lab · Southern Dimensions City</div></div>
                 <div class="df-shop-balance" id="cosmetics-shop-balance"></div>
             </div>
-            <div class="df-tabs df-shop-tabs-scroll" id="cosmetics-shop-tabs"><span class="df-tab small cosmetics-tab" data-tab="wig">Wigs</span><span class="df-tab small cosmetics-tab" data-tab="skin">Skins</span><span class="df-tab small cosmetics-tab" data-tab="outfit">Outfits</span><span class="df-tab small cosmetics-tab" data-tab="vocal">Vocals</span><span class="df-tab small cosmetics-tab" data-tab="accessory">Carry</span><span class="df-tab small cosmetics-tab" data-tab="hat">Hats</span><span class="df-tab small cosmetics-tab" data-tab="jewelry">Jewels</span></div>
+            <div class="df-tabs df-shop-tabs-scroll" id="cosmetics-shop-tabs"><span class="df-tab small cosmetics-tab" data-tab="wig">Wigs</span><span class="df-tab small cosmetics-tab" data-tab="skin">Skins</span><span class="df-tab small cosmetics-tab" data-tab="outfit">Outfits</span><span class="df-tab small cosmetics-tab" data-tab="vocal">Vocals</span><span class="df-tab small cosmetics-tab" data-tab="accessory">Carry</span><span class="df-tab small cosmetics-tab" data-tab="hat">Hats</span><span class="df-tab small cosmetics-tab" data-tab="jewelry">Jewels</span><span class="df-tab small cosmetics-tab" data-tab="legwear">Legs</span></div>
             <div class="df-shop-body" id="cosmetics-shop-content"></div>
             <div class="df-shop-foot"><button class="screen-back-btn df-shop-close" id="cosmetics-shop-close"><span class="btn-arrow">◀</span> Back</button></div>
         </div>
@@ -5435,6 +5435,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'outfit_sorcerer':     { id: 'outfit_sorcerer',     category: 'outfit', name: 'Street Sorcerer',     desc: 'Sabrina\'s look. Midnight violet top, black skirt, plum heels.', price: 400, data: { top: { type: 'sports_bra', color: '#1a0a2a' }, bottom: { type: 'skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
             'outfit_sorcerer_long': { id: 'outfit_sorcerer_long', category: 'outfit', name: 'Street Sorcerer (Long Sleeve)', desc: 'Sabrina\'s look, sleeved. Midnight violet long-sleeve top, fitted black pencil skirt, plum heels.', price: 400, data: { top: { type: 'sleeved_crop', color: '#1a0a2a' }, bottom: { type: 'pencil_skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
             'outfit_academy':      { id: 'outfit_academy',      category: 'outfit', name: 'Moonlit Academy',     desc: 'A crisp white blouse and a pleated midnight-violet circle skirt with a frilled hem. Black loafers.', price: 350, data: { top: { type: 'tshirt', color: '#f4f0f8' }, bottom: { type: 'pleated_skirt', color: '#3a2a6a', trim: '#f4eee6' }, shoes: { type: 'loafers', color: '#141018' }, train: null, held: null } },
+            'outfit_academy_mono': { id: 'outfit_academy_mono', category: 'outfit', name: 'Moonlit Academy (Black & White)', desc: 'The Academy look in monochrome. A crisp white blouse and a pleated circle skirt striped jet-black and white, a white frilled hem. Black loafers.', price: 350, data: { top: { type: 'tshirt', color: '#f6f6f6' }, bottom: { type: 'pleated_skirt', color: '#1c1c1c', stripe: '#f6f6f6', trim: '#f6f6f6' }, shoes: { type: 'loafers', color: '#0c0c0c' }, train: null, held: null } },
 
             // ── HATS (one at a time, optional) ──
             'hat_wide_brim':       { id: 'hat_wide_brim',       category: 'hat', name: 'Wine Wide Brim',       desc: 'A wide wine-red brim. Arrives before you do.',         price: 350,  data: { type: 'wide_brim', color: '#590e18', crownColor: '#70121e' } },
@@ -5450,6 +5451,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'jew_hoops':           { id: 'jew_hoops',           category: 'jewelry', name: 'Gold Hoops',       desc: 'Classic gold hoop earrings.',                          price: 200,  data: { type: 'hoops', color: '#e8c27a' } },
             'jew_necklace':        { id: 'jew_necklace',        category: 'jewelry', name: 'Silver Pendant',   desc: 'A fine silver chain with a diamond drop.',             price: 250,  data: { type: 'necklace', color: '#d8d8e0' } },
             'jew_sunglasses':      { id: 'jew_sunglasses',      category: 'jewelry', name: 'Night Shades',     desc: 'Dark lenses. Wear them after sundown anyway.',         price: 250,  data: { type: 'sunglasses', color: '#141414' } },
+
+            // ── LEGWEAR (wear any of them over any outfit). Pieces with `shoes` replace the outfit's shoes;
+            //    the rest draw on the legs like jewelry (ui/wardrobe.js jewelry, at: 'thighs').
+            'leg_thigh_bands':     { id: 'leg_thigh_bands',     category: 'legwear', name: 'Thigh Bands',      desc: 'A pair of black satin bands high on the thighs, a fine gold edge.', price: 200, data: { type: 'thigh_bands', color: '#141014', trim: '#e8c27a' } },
+            'leg_thigh_heels':     { id: 'leg_thigh_heels',     category: 'legwear', name: 'Thigh High Heels', desc: 'Glossy black stiletto boots that climb past the knee. Go with any outfit.', price: 400, data: { color: '#141016', shoes: { type: 'thigh_heels', color: '#141016' } } },
         };
 
         // ============================================================================
@@ -5469,6 +5475,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.equippedAccessory = null;      // optional slot (null = none)
                 this.equippedHat = null;            // optional slot (null = none)
                 this.equippedJewelry = [];          // any number at once
+                this.equippedLegwear = [];          // any number at once (thigh bands, thigh-high heels)
                 this.accessoryOptions = {};         // per-accessory choices, e.g. { acc_glass: { drink: 'red_wine' } }
                 this.maskMode = 'auto';             // 949's field mask (Neu.Me): 'auto' (in the field, off at home) | 'on' | 'off'
                 // Grant defaults
@@ -5516,6 +5523,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 else if (entry.category === 'accessory') this.equippedAccessory = id;
                 else if (entry.category === 'hat') this.equippedHat = id;
                 else if (entry.category === 'jewelry') { if (!this.equippedJewelry.includes(id)) this.equippedJewelry.push(id); }
+                else if (entry.category === 'legwear') {
+                    // One pair of shoes at a time: new shoes take the place of any already on
+                    if (entry.data.shoes) this.equippedLegwear = this.equippedLegwear.filter(l => !COSMETICS_REGISTRY[l]?.data.shoes);
+                    if (!this.equippedLegwear.includes(id)) this.equippedLegwear.push(id);
+                }
                 return true;
             }
 
@@ -5525,11 +5537,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** Take off one piece of jewelry. */
             unequipJewelry(id) { this.equippedJewelry = this.equippedJewelry.filter(j => j !== id); }
 
+            /** Take off one piece of legwear. */
+            unequipLegwear(id) { this.equippedLegwear = this.equippedLegwear.filter(l => l !== id); }
+
+            /** Take off any piece worn in a wear-many slot (jewelry, legwear). */
+            unequipWorn(id) { const c = COSMETICS_REGISTRY[id]?.category; if (c === 'legwear') this.unequipLegwear(id); else this.unequipJewelry(id); }
+
             /** Is this cosmetic currently worn? (works for every category) */
             isEquipped(id) {
                 const entry = COSMETICS_REGISTRY[id];
                 if (!entry) return false;
                 if (entry.category === 'jewelry') return this.equippedJewelry.includes(id);
+                if (entry.category === 'legwear') return this.equippedLegwear.includes(id);
                 const slot = { wig: 'equippedWig', skin: 'equippedSkin', vocal: 'equippedVocal', outfit: 'equippedOutfit', accessory: 'equippedAccessory', hat: 'equippedHat' }[entry.category];
                 return !!slot && this[slot] === id;
             }
@@ -5564,11 +5583,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 const hat = this.equippedHat ? COSMETICS_REGISTRY[this.equippedHat] : null;
                 const jewelry = this.equippedJewelry.map(id => COSMETICS_REGISTRY[id]).filter(Boolean).map(e => e.data);
+                // Legwear: shoes take the outfit's place; bands and the like ride along with the jewelry
+                let outfitData = outfit ? outfit.data : COSMETICS_REGISTRY.outfit_casual.data;
+                for (const id of this.equippedLegwear) {
+                    const leg = COSMETICS_REGISTRY[id];
+                    if (!leg) continue;
+                    if (leg.data.shoes) outfitData = { ...outfitData, shoes: leg.data.shoes };
+                    else jewelry.push(leg.data);
+                }
                 return {
                     // Without a cosmetic, she's herself (APPEARANCES['949'], core/appearances.js) in Street Casual
                     hair: wig ? { type: wig.data.type, color: wig.data.color } : APPEARANCES['949'].hair,
                     skinColor: skin ? skin.data.skinColor : APPEARANCES['949'].skinColor,
-                    outfit: outfit ? outfit.data : COSMETICS_REGISTRY.outfit_casual.data,
+                    outfit: outfitData,
                     hat: hat ? hat.data : null,
                     jewelry,
                     held
@@ -5591,6 +5618,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     equippedAccessory: this.equippedAccessory,
                     equippedHat: this.equippedHat,
                     equippedJewelry: [...this.equippedJewelry],
+                    equippedLegwear: [...this.equippedLegwear],
                     accessoryOptions: JSON.parse(JSON.stringify(this.accessoryOptions)),
                     maskMode: this.maskMode
                 };
@@ -5608,6 +5636,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Saves from before hats and jewelry simply have none on
                 this.equippedHat = COSMETICS_REGISTRY[data.equippedHat] ? data.equippedHat : null;
                 this.equippedJewelry = (data.equippedJewelry || []).filter(id => COSMETICS_REGISTRY[id]);
+                this.equippedLegwear = (data.equippedLegwear || []).filter(id => COSMETICS_REGISTRY[id]);
                 if (data.equippedAccessory !== undefined) {
                     this.equippedAccessory = data.equippedAccessory || null;
                 } else {
@@ -46847,6 +46876,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.bezierCurveTo(x1 + ux * c2 + nx * w2, y1 + uy * c2 + ny * w2, x1 + ux * c1 + nx * w1, y1 + uy * c1 + ny * w1, x1 + nx * r0, y1 + ny * r0);
             ctx.closePath();
         }
+        /** Fill the stretch of a limb from t0 to t1 of the way along it (a band, a stocking's top), cut square
+         *  across at both ends: the limb's outline grown by `grow`, clipped to the span. t outside 0..1 takes
+         *  in the joint's round end. gloss: a soft sheen down the span. */
+        function fillLimbSpan(ctx, x1, y1, x2, y2, T, t0, t1, grow, fill, gloss) {
+            const G = [T[0] + grow, T[1] + grow, T[2], T[3] + grow], R = Math.max(G[0], G[1], G[3]) + 1;
+            const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1e-6, nx = -dy / L * R, ny = dx / L * R;
+            const ax = x1 + dx * t0, ay = y1 + dy * t0, bx = x1 + dx * t1, by = y1 + dy * t1;
+            ctx.save(); bodyLimbPath(ctx, x1, y1, x2, y2, G); ctx.clip();
+            ctx.beginPath(); ctx.moveTo(ax + nx, ay + ny); ctx.lineTo(bx + nx, by + ny); ctx.lineTo(bx - nx, by - ny); ctx.lineTo(ax - nx, ay - ny); ctx.closePath();
+            ctx.fillStyle = fill; ctx.fill();
+            if (gloss) {
+                ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.beginPath();
+                ctx.ellipse((ax + bx) / 2 - nx * 0.35, (ay + by) / 2 - ny * 0.35, Math.max(0.5, Math.hypot(bx - ax, by - ay) * 0.42), R * 0.22, Math.atan2(dy, dx), 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.restore(); ctx.beginPath();
+        }
         /** A limb's radius a fraction t of the way along it (for bangles, cuffs). */
         function bodyLimbRadius(T, t) {
             return t <= T[2] ? T[0] + (T[1] - T[0]) * t / T[2] : T[1] + (T[3] - T[1]) * (t - T[2]) / (1 - T[2]);
@@ -47714,12 +47759,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.stroke();
                 } },
                 // A full circle of pleats all the way round, simulated as cloth: it swirls out as she turns and
-                // bells behind her as she runs. Alternating pleat shades, a trim band, a frilled hem of scallops.
+                // bells behind her as she runs. Alternating pleat shades (or, with `stripe`, every other pleat in
+                // that colour), a trim band, a frilled hem of scallops.
                 pleated_skirt: { legs: 'bare', hips(ctx, g, c) {
                     const cx = g.hip.x + g.hip.w / 2, N = 16;
                     const ch = g.cloth('pleated_skirt', pieceSpec('pleated_skirt', cx, 0, 0, pleatedSpec));
                     const tip = k => ch[k % N][ch[k % N].length - 1], root = k => ch[k % N][0];
-                    const base = g.darken(c.color, 0.12), deep = g.darken(c.color, 0.34), trim = c.trim || '#f4eee6';
+                    const base = g.darken(c.color, 0.12), deep = c.stripe ? g.darken(c.stripe, 0.08) : g.darken(c.color, 0.34), trim = c.trim || '#f4eee6';
                     // Pleats: alternating wedges from the waist to the hem
                     for (let i = 0; i < N; i++) {
                         const a0 = root(i), a1 = root(i + 1), t0 = tip(i), t1 = tip(i + 1);
@@ -47739,7 +47785,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     for (let i = 0; i <= N; i++) { const t = tip(i); ctx[i ? 'lineTo' : 'moveTo'](t.x, t.y); }
                     ctx.stroke();
                     // The waistband
-                    ctx.fillStyle = deep; ctx.beginPath(); ctx.ellipse(cx, 0, 7.5, 11, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = g.darken(c.color, 0.34); ctx.beginPath(); ctx.ellipse(cx, 0, 7.5, 11, 0, 0, Math.PI * 2); ctx.fill();
                 } },
                 long_skirt: { legs: 'full', shade: 0.25, hips(ctx, g, c) {
                     // The hem swings around the legs: a ring of chains from one front side, round the back, to the other
@@ -47771,7 +47817,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.beginPath(); ctx.moveTo(x + 1, y + (i ? 0.1 : -0.1)); ctx.lineTo(x + 6, y + (i ? 0.55 : -0.55)); ctx.stroke();
                     }
                 } },
-                boots:    { calf: 0.45, draw(ctx, g, c) { for (let i = 0; i < 2; i++) soleFoot(ctx, g, i, g.darken(c.color, 0.5)); } }
+                boots:    { calf: 0.45, draw(ctx, g, c) { for (let i = 0; i < 2; i++) soleFoot(ctx, g, i, g.darken(c.color, 0.5)); } },
+                // Stiletto boots past the knee: a pointed pump on the foot, a glossy shaft up the whole calf and
+                // `thigh` of the way up the thigh (the renderer draws the shafts, ui/humanoid-render.js).
+                thigh_heels: { calf: 1, thigh: 0.6, gloss: true, draw(ctx, g, c) {
+                    for (let i = 0; i < 2; i++) {
+                        const [x, y] = g.feet[i], side = i ? 1 : -1;
+                        ctx.fillStyle = g.darken(c.color, 0.5); drawBodyFoot(ctx, x, y, side, 0.45, true, g.body.foot);
+                        ctx.fillStyle = 'rgba(255,255,255,0.28)';            // a shine along the toe
+                        ctx.beginPath(); ctx.ellipse(x + 4.4, y + side * 0.35, 1.7, 0.45, side * 0.08, 0, Math.PI * 2); ctx.fill();
+                    }
+                } }
             };
             shoes.shoes = shoes.loafers;                                      // old generic id
 
@@ -47909,6 +47965,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     } },
                 // The wrist goes through them: `under` draws the half that passes beneath the wrist
                 // (before the forearm, which hides it), `draw` the half over the top.
+                // A satin band round each thigh, a little above the knee, edged top and bottom in gold.
+                // Drawn over the thigh (and any stocking), under the skirt (ui/humanoid-render.js).
+                thigh_bands: { at: 'thighs', draw(ctx, g, c) {
+                    const T = g.body.thigh, band = c.color || '#141014', edge = c.trim || '#e8c27a';
+                    for (let i = 0; i < 2; i++) {
+                        const [hx, hy] = g.hipPt[i], [kx, ky] = g.knees[i];
+                        if (Math.hypot(kx - hx, ky - hy) > 7) {               // the thigh reaching out: a band across it
+                            fillLimbSpan(ctx, hx, hy, kx, ky, T, 0.74, 0.98, 0.45, edge);
+                            fillLimbSpan(ctx, hx, hy, kx, ky, T, 0.77, 0.95, 0.5, band);
+                        } else {                                              // seen end-on from above: the band rings it
+                            const x = hx + (kx - hx) * 0.75, y = hy + (ky - hy) * 0.75, r = bodyLimbRadius(T, 0.75);
+                            ctx.lineWidth = 1.5; ctx.strokeStyle = band; ctx.beginPath(); ctx.arc(x, y, r + 0.55, 0, Math.PI * 2); ctx.stroke();
+                            ctx.lineWidth = 0.45; ctx.strokeStyle = edge; ctx.beginPath(); ctx.arc(x, y, r + 1.3, 0, Math.PI * 2); ctx.stroke();
+                        }
+                    }
+                }, portrait() {} },
                 bangles: { at: 'wrists', under(ctx, g, c) { bangleHalves(ctx, g, g.darken(c.color || '#e8c27a', 0.35), -1); },
                     draw(ctx, g, c) { bangleHalves(ctx, g, c.color || '#e8c27a', 1); }, portrait() {} }
             };
@@ -50315,7 +50387,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // 2. Calves
             drawLimb(lKneeX, lKneeY, lFootX, lFootY, BC.calf, legColor, legs === 'full' && botGloss);
             drawLimb(rKneeX, rKneeY, rFootX, rFootY, BC.calf, legColor, legs === 'full' && botGloss);
-            if (shoeP && shoeP.calf) {                                   // boots come up the calf
+            if (shoeP && shoeP.thigh) {                                  // thigh-high boots: the calf, snug and whole
+                const bootColor = darken(clothes.shoes.color, 0.45), T = BC.calf, S = [T[0] + 0.3, T[1] + 0.3, T[2], T[3] + 0.3];
+                drawLimb(lKneeX, lKneeY, lFootX, lFootY, S, bootColor, shoeP.gloss);
+                drawLimb(rKneeX, rKneeY, rFootX, rFootY, S, bootColor, shoeP.gloss);
+            } else if (shoeP && shoeP.calf) {                            // boots come up the calf
                 const bootColor = darken(clothes.shoes.color, 0.45), c = shoeP.calf;
                 drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, BOOT_SHAFT, bootColor);
                 drawLimb(rFootX, rFootY, rFootX + (rKneeX - rFootX) * c, rFootY + (rKneeY - rFootY) * c, BOOT_SHAFT, bootColor);
@@ -50329,6 +50405,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
             }
             if (botP && botP.detail) botP.detail(ctx, g, clothes.bottom);   // cuffs, pockets, stripes
+            if (shoeP && shoeP.thigh) {                                  // ...and on up the thigh, from the knee
+                const bootColor = darken(clothes.shoes.color, 0.45), welt = darken(clothes.shoes.color, 0.6), t0 = 1 - shoeP.thigh;
+                for (const [hx, hy, kx, ky] of [[lHipX, lHipY, lKneeX, lKneeY], [rHipX, rHipY, rKneeX, rKneeY]]) {
+                    fillLimbSpan(ctx, hx, hy, kx, ky, BC.thigh, t0, 1.25, 0.3, bootColor, shoeP.gloss);   // cut square at the top
+                    fillLimbSpan(ctx, hx, hy, kx, ky, BC.thigh, t0, t0 + 0.05, 0.35, welt);            // the welt round it
+                }
+            }
+            if (clothes.jewelry && WD) for (const j of clothes.jewelry) {  // thigh bands
+                const p = WD.jewelry[j.type]; if (p && p.at === 'thighs') p.draw(ctx, g, j);
+            }
         
             // 4. Hips & Skirt
             ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(hipRotation);
@@ -52973,8 +53059,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         function getOwnedInventoryEntries(game) {
             const result = [], cosmetics = game?.cosmetics;
             const registry = typeof COSMETICS_REGISTRY !== 'undefined' ? COSMETICS_REGISTRY : {};
-            const icons = { wig: '≋', skin: '◉', vocal: '♪', outfit: '✦', accessory: '◇', hat: '⌂', jewelry: '◆' };
-            const labels = { wig: 'Wig', skin: 'Skin', vocal: 'Voice', outfit: 'Outfit', accessory: 'Accessory', hat: 'Hat', jewelry: 'Jewelry' };
+            const icons = { wig: '≋', skin: '◉', vocal: '♪', outfit: '✦', accessory: '◇', hat: '⌂', jewelry: '◆', legwear: '♢' };
+            const labels = { wig: 'Wig', skin: 'Skin', vocal: 'Voice', outfit: 'Outfit', accessory: 'Accessory', hat: 'Hat', jewelry: 'Jewelry', legwear: 'Legwear' };
             const seen = new Set();
             for (const sourceId of Array.isArray(cosmetics?.owned) ? cosmetics.owned : []) {
                 const entry = registry[sourceId];
@@ -53191,7 +53277,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (cosmetics.isEquipped(entry.sourceId)) {
                     if (definition.category === 'accessory') cosmetics.unequipAccessory();
                     else if (definition.category === 'hat') cosmetics.unequipHat();
-                    else if (definition.category === 'jewelry') cosmetics.unequipJewelry(entry.sourceId);
+                    else if (definition.category === 'jewelry' || definition.category === 'legwear') cosmetics.unequipWorn(entry.sourceId);
                     else return;
                 } else cosmetics.equip(entry.sourceId);
                 audioSys.sfx('ui');
@@ -53282,7 +53368,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     actions.push({ className: 'drop-btn', label: 'DROP', run: () => this._dropCarriedItem(entry.item) });
                 } else if (entry.source === 'cosmetic') {
                     const definition = COSMETICS_REGISTRY[entry.sourceId];
-                    const optional = ['accessory', 'hat', 'jewelry'].includes(definition?.category);
+                    const optional = ['accessory', 'hat', 'jewelry', 'legwear'].includes(definition?.category);
                     if (!entry.isEquipped || optional) actions.push({
                         className: 'use-btn', label: entry.isEquipped ? 'REMOVE' : 'EQUIP',
                         run: () => this._cosmeticAction(entry)
@@ -59956,7 +60042,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 let shoe;
                 if (isHer) { const cc = this.cosmetics && this.cosmetics.getRenderConfig ? this.cosmetics.getRenderConfig() : null; shoe = cc && cc.outfit && cc.outfit.shoes && cc.outfit.shoes.type; }
                 else { const L = e.look || e.appearance; shoe = L && L.shoes && L.shoes.type; }
-                shoe = shoe === 'shoes' || !shoe ? 'loafers' : shoe;
+                shoe = shoe === 'shoes' || !shoe ? 'loafers' : shoe === 'thigh_heels' ? 'heels' : shoe;
                 const outside = this.activeMap.type === 'outdoor' || (this.roomSystem && this.roomSystem.active && this.roomSystem.outdoorness > 0.5);
                 const wet = outside && this.weather && this.weather.isRaining && mat !== 'grass';
                 const pace = Math.min(1, speed / 3);
@@ -62743,7 +62829,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const tabs = overlay.querySelectorAll('.cosmetics-tab');
                 const content = document.getElementById('cosmetics-shop-content');
                 const C = this.cosmetics;
-                const LABEL = { wig: 'W.I.G.s', skin: 'S.K.I.N.s', outfit: 'O.U.T.F.I.T.s', vocal: 'V.O.C.A.L.s', accessory: 'A.C.C.E.S.S.', hat: 'H.A.T.s', jewelry: 'J.E.W.E.L.s' };
+                const LABEL = { wig: 'W.I.G.s', skin: 'S.K.I.N.s', outfit: 'O.U.T.F.I.T.s', vocal: 'V.O.C.A.L.s', accessory: 'A.C.C.E.S.S.', hat: 'H.A.T.s', jewelry: 'J.E.W.E.L.s', legwear: 'L.E.G.s' };
                 let activeTab = this._cosmeticsTab || 'wig';
 
                 /** The item's look as a round swatch */
@@ -62752,7 +62838,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (category === 'wig') return `background:${d.color}`;
                     if (category === 'skin') return `background:${d.skinColor}`;
                     if (category === 'outfit') return `background:linear-gradient(135deg, ${d.top.color} 50%, ${d.bottom.color} 50%)`;
-                    if (category === 'hat' || category === 'jewelry') return `background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${d.color} 45%)`;
+                    if (category === 'hat' || category === 'jewelry' || category === 'legwear') return `background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55) 0 14%, ${d.color} 45%)`;
                     if (category === 'vocal') return `background:${d.captionColor};opacity:0.8`;
                     if (category === 'accessory' && d.held === 'umbrella') return `background:conic-gradient(${d.color} 0 12.5%, ${d.trim} 12.5% 14%, ${d.color} 14% 25%, ${d.trim} 25% 26.5%, ${d.color} 26.5% 100%)`;
                     if (category === 'accessory') { const g = GLASS_DRINKS[C.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne; return `background:radial-gradient(circle at 35% 35%, #fff 0 12%, ${g.liquid} 30%, ${g.liquid2 || g.liquid} 100%)`; }
@@ -62763,7 +62849,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     activeTab = this._cosmeticsTab = category;
                     tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === category));
                     const items = Object.values(COSMETICS_REGISTRY).filter(e => e.category === category);
-                    const optional = category === 'accessory' || category === 'hat' || category === 'jewelry';   // these can be taken off
+                    const optional = category === 'accessory' || category === 'hat' || category === 'jewelry' || category === 'legwear';   // these can be taken off
                     const ownedN = items.filter(it => C.isOwned(it.id)).length;
                     let html = `<div class="df-section"><span><span class="glint">◆</span>${LABEL[category] || category}</span><span class="count">${ownedN} / ${items.length} owned</span></div>`;
                     for (const item of items) {
@@ -62804,7 +62890,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             if (kind === 'remove') {
                                 if (entry.category === 'accessory') C.unequipAccessory();
                                 else if (entry.category === 'hat') C.unequipHat();
-                                else C.unequipJewelry(id);
+                                else C.unequipWorn(id);
                                 audioSys.sfx('ui'); renderTab(activeTab);
                             } else if (kind === 'equip') {
                                 C.equip(id); audioSys.sfx('ui'); renderTab(activeTab);
@@ -62822,7 +62908,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // A tap on an owned card equips it (or takes an optional piece off)
                         card.addEventListener('click', () => {
                             if (!C.isOwned(id)) return;
-                            act(C.isEquipped(id) ? (['accessory', 'hat', 'jewelry'].includes(entry.category) ? 'remove' : null) : 'equip');
+                            act(C.isEquipped(id) ? (['accessory', 'hat', 'jewelry', 'legwear'].includes(entry.category) ? 'remove' : null) : 'equip');
                         });
                     });
                 };
@@ -63123,6 +63209,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 html += row('V.O.C.A.L', cos ? nm(cos.equippedVocal) : '—');
                 html += row('H.A.T', cos && cos.equippedHat ? nm(cos.equippedHat) : '—');
                 html += row('J.E.W.E.L.R.Y', cos && cos.equippedJewelry.length ? cos.equippedJewelry.map(id => COSMETICS_REGISTRY[id]?.name).filter(Boolean).join(', ') : '—');
+                html += row('L.E.G.S', cos && cos.equippedLegwear?.length ? cos.equippedLegwear.map(id => COSMETICS_REGISTRY[id]?.name).filter(Boolean).join(', ') : '—');
                 html += `</div></div>`;
 
                 // ══════════════════════════════════════════════════
@@ -75737,6 +75824,7 @@ engineMixin({
                 { label: 'V.O.C.A.L', category: 'vocal', equipped: game.cosmetics.equippedVocal },
                 { label: 'H.A.T', category: 'hat', equipped: game.cosmetics.equippedHat },
                 { label: 'J.E.W.E.L.R.Y', category: 'jewelry', equipped: null },
+                { label: 'L.E.G.S', category: 'legwear', equipped: null },
                 { label: 'A.C.C.E.S.S.O.R.Y', category: 'accessory', equipped: game.cosmetics.equippedAccessory }
             ];
 
@@ -75755,7 +75843,7 @@ engineMixin({
                     else if (slot.category === 'skin') chipColor = item.data.skinColor;
                     else if (slot.category === 'vocal') chipColor = item.data.captionColor;
                     else if (slot.category === 'outfit') chipColor = item.data.top.color;
-                    else if (slot.category === 'hat' || slot.category === 'jewelry') chipColor = item.data.color;
+                    else if (slot.category === 'hat' || slot.category === 'jewelry' || slot.category === 'legwear') chipColor = item.data.color;
                     else if (slot.category === 'accessory' && item.data.held === 'umbrella') chipColor = item.data.color;
                     else if (slot.category === 'accessory') chipColor = (GLASS_DRINKS[game.cosmetics.getAccessoryOption(item.id, 'drink')] || GLASS_DRINKS.champagne).liquid;
                     
@@ -75788,8 +75876,8 @@ engineMixin({
                     const none = !slot.equipped;
                     html += `<div class="neume-chip" data-id="" data-cat="hat" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:0.5rem; color:${none ? '#fff' : '#999'};">None</span></div>`;
                 }
-                if (slot.category === 'jewelry' && !owned.length) {
-                    html += `<span style="font-size:0.45rem; color:#777;">None owned yet. Find jewelry at Neural Systems.</span>`;
+                if ((slot.category === 'jewelry' || slot.category === 'legwear') && !owned.length) {
+                    html += `<span style="font-size:0.45rem; color:#777;">None owned yet. Find ${slot.category === 'jewelry' ? 'jewelry' : 'legwear'} at Neural Systems.</span>`;
                 }
                 html += `</div></div>`;
             }
@@ -75814,7 +75902,7 @@ engineMixin({
                     const id = chip.dataset.id, cat = chip.dataset.cat;
                     if (cat === 'accessory' && !id) game.cosmetics.unequipAccessory();
                     else if (cat === 'hat' && !id) game.cosmetics.unequipHat();
-                    else if (cat === 'jewelry' && game.cosmetics.isEquipped(id)) game.cosmetics.unequipJewelry(id);   // jewelry toggles
+                    else if ((cat === 'jewelry' || cat === 'legwear') && game.cosmetics.isEquipped(id)) game.cosmetics.unequipWorn(id);   // jewelry and legwear toggle
                     else game.cosmetics.equip(id);
                     triggerSequencingEffect();
                 });

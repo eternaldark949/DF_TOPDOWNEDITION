@@ -433,12 +433,13 @@
                     ctx.stroke();
                 } },
                 // A full circle of pleats all the way round, simulated as cloth: it swirls out as she turns and
-                // bells behind her as she runs. Alternating pleat shades, a trim band, a frilled hem of scallops.
+                // bells behind her as she runs. Alternating pleat shades (or, with `stripe`, every other pleat in
+                // that colour), a trim band, a frilled hem of scallops.
                 pleated_skirt: { legs: 'bare', hips(ctx, g, c) {
                     const cx = g.hip.x + g.hip.w / 2, N = 16;
                     const ch = g.cloth('pleated_skirt', pieceSpec('pleated_skirt', cx, 0, 0, pleatedSpec));
                     const tip = k => ch[k % N][ch[k % N].length - 1], root = k => ch[k % N][0];
-                    const base = g.darken(c.color, 0.12), deep = g.darken(c.color, 0.34), trim = c.trim || '#f4eee6';
+                    const base = g.darken(c.color, 0.12), deep = c.stripe ? g.darken(c.stripe, 0.08) : g.darken(c.color, 0.34), trim = c.trim || '#f4eee6';
                     // Pleats: alternating wedges from the waist to the hem
                     for (let i = 0; i < N; i++) {
                         const a0 = root(i), a1 = root(i + 1), t0 = tip(i), t1 = tip(i + 1);
@@ -458,7 +459,7 @@
                     for (let i = 0; i <= N; i++) { const t = tip(i); ctx[i ? 'lineTo' : 'moveTo'](t.x, t.y); }
                     ctx.stroke();
                     // The waistband
-                    ctx.fillStyle = deep; ctx.beginPath(); ctx.ellipse(cx, 0, 7.5, 11, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = g.darken(c.color, 0.34); ctx.beginPath(); ctx.ellipse(cx, 0, 7.5, 11, 0, 0, Math.PI * 2); ctx.fill();
                 } },
                 long_skirt: { legs: 'full', shade: 0.25, hips(ctx, g, c) {
                     // The hem swings around the legs: a ring of chains from one front side, round the back, to the other
@@ -490,7 +491,17 @@
                         ctx.beginPath(); ctx.moveTo(x + 1, y + (i ? 0.1 : -0.1)); ctx.lineTo(x + 6, y + (i ? 0.55 : -0.55)); ctx.stroke();
                     }
                 } },
-                boots:    { calf: 0.45, draw(ctx, g, c) { for (let i = 0; i < 2; i++) soleFoot(ctx, g, i, g.darken(c.color, 0.5)); } }
+                boots:    { calf: 0.45, draw(ctx, g, c) { for (let i = 0; i < 2; i++) soleFoot(ctx, g, i, g.darken(c.color, 0.5)); } },
+                // Stiletto boots past the knee: a pointed pump on the foot, a glossy shaft up the whole calf and
+                // `thigh` of the way up the thigh (the renderer draws the shafts, ui/humanoid-render.js).
+                thigh_heels: { calf: 1, thigh: 0.6, gloss: true, draw(ctx, g, c) {
+                    for (let i = 0; i < 2; i++) {
+                        const [x, y] = g.feet[i], side = i ? 1 : -1;
+                        ctx.fillStyle = g.darken(c.color, 0.5); drawBodyFoot(ctx, x, y, side, 0.45, true, g.body.foot);
+                        ctx.fillStyle = 'rgba(255,255,255,0.28)';            // a shine along the toe
+                        ctx.beginPath(); ctx.ellipse(x + 4.4, y + side * 0.35, 1.7, 0.45, side * 0.08, 0, Math.PI * 2); ctx.fill();
+                    }
+                } }
             };
             shoes.shoes = shoes.loafers;                                      // old generic id
 
@@ -628,6 +639,22 @@
                     } },
                 // The wrist goes through them: `under` draws the half that passes beneath the wrist
                 // (before the forearm, which hides it), `draw` the half over the top.
+                // A satin band round each thigh, a little above the knee, edged top and bottom in gold.
+                // Drawn over the thigh (and any stocking), under the skirt (ui/humanoid-render.js).
+                thigh_bands: { at: 'thighs', draw(ctx, g, c) {
+                    const T = g.body.thigh, band = c.color || '#141014', edge = c.trim || '#e8c27a';
+                    for (let i = 0; i < 2; i++) {
+                        const [hx, hy] = g.hipPt[i], [kx, ky] = g.knees[i];
+                        if (Math.hypot(kx - hx, ky - hy) > 7) {               // the thigh reaching out: a band across it
+                            fillLimbSpan(ctx, hx, hy, kx, ky, T, 0.74, 0.98, 0.45, edge);
+                            fillLimbSpan(ctx, hx, hy, kx, ky, T, 0.77, 0.95, 0.5, band);
+                        } else {                                              // seen end-on from above: the band rings it
+                            const x = hx + (kx - hx) * 0.75, y = hy + (ky - hy) * 0.75, r = bodyLimbRadius(T, 0.75);
+                            ctx.lineWidth = 1.5; ctx.strokeStyle = band; ctx.beginPath(); ctx.arc(x, y, r + 0.55, 0, Math.PI * 2); ctx.stroke();
+                            ctx.lineWidth = 0.45; ctx.strokeStyle = edge; ctx.beginPath(); ctx.arc(x, y, r + 1.3, 0, Math.PI * 2); ctx.stroke();
+                        }
+                    }
+                }, portrait() {} },
                 bangles: { at: 'wrists', under(ctx, g, c) { bangleHalves(ctx, g, g.darken(c.color || '#e8c27a', 0.35), -1); },
                     draw(ctx, g, c) { bangleHalves(ctx, g, c.color || '#e8c27a', 1); }, portrait() {} }
             };
