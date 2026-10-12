@@ -5435,7 +5435,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             'outfit_sorcerer':     { id: 'outfit_sorcerer',     category: 'outfit', name: 'Street Sorcerer',     desc: 'Sabrina\'s look. Midnight violet top, black skirt, plum heels.', price: 400, data: { top: { type: 'sports_bra', color: '#1a0a2a' }, bottom: { type: 'skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
             'outfit_sorcerer_long': { id: 'outfit_sorcerer_long', category: 'outfit', name: 'Street Sorcerer (Long Sleeve)', desc: 'Sabrina\'s look, sleeved. Midnight violet long-sleeve top, fitted black pencil skirt, plum heels.', price: 400, data: { top: { type: 'sleeved_crop', color: '#1a0a2a' }, bottom: { type: 'pencil_skirt', color: '#0a0a1a' }, shoes: { type: 'heels', color: '#2a1a3a' }, train: null, held: null } },
             'outfit_academy':      { id: 'outfit_academy',      category: 'outfit', name: 'Moonlit Academy',     desc: 'A crisp white blouse and a pleated midnight-violet circle skirt with a frilled hem. Black loafers.', price: 350, data: { top: { type: 'tshirt', color: '#f4f0f8' }, bottom: { type: 'pleated_skirt', color: '#3a2a6a', trim: '#f4eee6' }, shoes: { type: 'loafers', color: '#141018' }, train: null, held: null } },
-            'outfit_academy_mono': { id: 'outfit_academy_mono', category: 'outfit', name: 'Moonlit Academy (Black & White)', desc: 'The Academy look in monochrome. A crisp white blouse and a pleated jet-black circle skirt with a white frilled hem. Black loafers.', price: 350, data: { top: { type: 'tshirt', color: '#f6f6f6' }, bottom: { type: 'pleated_skirt', color: '#232323', trim: '#f6f6f6' }, shoes: { type: 'loafers', color: '#0c0c0c' }, train: null, held: null } },
+            'outfit_academy_mono': { id: 'outfit_academy_mono', category: 'outfit', name: 'Moonlit Academy (Black & White)', desc: 'The Academy look in monochrome. A crisp white blouse and a pleated circle skirt striped jet-black and white, a white frilled hem. Black loafers.', price: 350, data: { top: { type: 'tshirt', color: '#f6f6f6' }, bottom: { type: 'pleated_skirt', color: '#1c1c1c', stripe: '#f6f6f6', trim: '#f6f6f6' }, shoes: { type: 'loafers', color: '#0c0c0c' }, train: null, held: null } },
 
             // ── HATS (one at a time, optional) ──
             'hat_wide_brim':       { id: 'hat_wide_brim',       category: 'hat', name: 'Wine Wide Brim',       desc: 'A wide wine-red brim. Arrives before you do.',         price: 350,  data: { type: 'wide_brim', color: '#590e18', crownColor: '#70121e' } },
@@ -46876,6 +46876,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.bezierCurveTo(x1 + ux * c2 + nx * w2, y1 + uy * c2 + ny * w2, x1 + ux * c1 + nx * w1, y1 + uy * c1 + ny * w1, x1 + nx * r0, y1 + ny * r0);
             ctx.closePath();
         }
+        /** Fill the stretch of a limb from t0 to t1 of the way along it (a band, a stocking's top), cut square
+         *  across at both ends: the limb's outline grown by `grow`, clipped to the span. t outside 0..1 takes
+         *  in the joint's round end. gloss: a soft sheen down the span. */
+        function fillLimbSpan(ctx, x1, y1, x2, y2, T, t0, t1, grow, fill, gloss) {
+            const G = [T[0] + grow, T[1] + grow, T[2], T[3] + grow], R = Math.max(G[0], G[1], G[3]) + 1;
+            const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1e-6, nx = -dy / L * R, ny = dx / L * R;
+            const ax = x1 + dx * t0, ay = y1 + dy * t0, bx = x1 + dx * t1, by = y1 + dy * t1;
+            ctx.save(); bodyLimbPath(ctx, x1, y1, x2, y2, G); ctx.clip();
+            ctx.beginPath(); ctx.moveTo(ax + nx, ay + ny); ctx.lineTo(bx + nx, by + ny); ctx.lineTo(bx - nx, by - ny); ctx.lineTo(ax - nx, ay - ny); ctx.closePath();
+            ctx.fillStyle = fill; ctx.fill();
+            if (gloss) {
+                ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.beginPath();
+                ctx.ellipse((ax + bx) / 2 - nx * 0.35, (ay + by) / 2 - ny * 0.35, Math.max(0.5, Math.hypot(bx - ax, by - ay) * 0.42), R * 0.22, Math.atan2(dy, dx), 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.restore(); ctx.beginPath();
+        }
         /** A limb's radius a fraction t of the way along it (for bangles, cuffs). */
         function bodyLimbRadius(T, t) {
             return t <= T[2] ? T[0] + (T[1] - T[0]) * t / T[2] : T[1] + (T[3] - T[1]) * (t - T[2]) / (1 - T[2]);
@@ -47743,12 +47759,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.stroke();
                 } },
                 // A full circle of pleats all the way round, simulated as cloth: it swirls out as she turns and
-                // bells behind her as she runs. Alternating pleat shades, a trim band, a frilled hem of scallops.
+                // bells behind her as she runs. Alternating pleat shades (or, with `stripe`, every other pleat in
+                // that colour), a trim band, a frilled hem of scallops.
                 pleated_skirt: { legs: 'bare', hips(ctx, g, c) {
                     const cx = g.hip.x + g.hip.w / 2, N = 16;
                     const ch = g.cloth('pleated_skirt', pieceSpec('pleated_skirt', cx, 0, 0, pleatedSpec));
                     const tip = k => ch[k % N][ch[k % N].length - 1], root = k => ch[k % N][0];
-                    const base = g.darken(c.color, 0.12), deep = g.darken(c.color, 0.34), trim = c.trim || '#f4eee6';
+                    const base = g.darken(c.color, 0.12), deep = c.stripe ? g.darken(c.stripe, 0.08) : g.darken(c.color, 0.34), trim = c.trim || '#f4eee6';
                     // Pleats: alternating wedges from the waist to the hem
                     for (let i = 0; i < N; i++) {
                         const a0 = root(i), a1 = root(i + 1), t0 = tip(i), t1 = tip(i + 1);
@@ -47768,7 +47785,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     for (let i = 0; i <= N; i++) { const t = tip(i); ctx[i ? 'lineTo' : 'moveTo'](t.x, t.y); }
                     ctx.stroke();
                     // The waistband
-                    ctx.fillStyle = deep; ctx.beginPath(); ctx.ellipse(cx, 0, 7.5, 11, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = g.darken(c.color, 0.34); ctx.beginPath(); ctx.ellipse(cx, 0, 7.5, 11, 0, 0, Math.PI * 2); ctx.fill();
                 } },
                 long_skirt: { legs: 'full', shade: 0.25, hips(ctx, g, c) {
                     // The hem swings around the legs: a ring of chains from one front side, round the back, to the other
@@ -47953,10 +47970,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 thigh_bands: { at: 'thighs', draw(ctx, g, c) {
                     const T = g.body.thigh, band = c.color || '#141014', edge = c.trim || '#e8c27a';
                     for (let i = 0; i < 2; i++) {
-                        const [hx, hy] = g.hipPt[i], [kx, ky] = g.knees[i], at = t => [hx + (kx - hx) * t, hy + (ky - hy) * t];
-                        const r = t => bodyLimbRadius(T, t) + 0.5, [ax, ay] = at(0.71), [bx, by] = at(0.87);
-                        ctx.fillStyle = edge; bodyLimbPath(ctx, ...at(0.66), ...at(0.92), [r(0.66) + 0.15, r(0.79) + 0.15, 0.5, r(0.92) + 0.15]); ctx.fill(); ctx.beginPath();
-                        ctx.fillStyle = band; bodyLimbPath(ctx, ax, ay, bx, by, [r(0.71), r(0.79), 0.5, r(0.87)]); ctx.fill(); ctx.beginPath();
+                        const [hx, hy] = g.hipPt[i], [kx, ky] = g.knees[i];
+                        if (Math.hypot(kx - hx, ky - hy) > 7) {               // the thigh reaching out: a band across it
+                            fillLimbSpan(ctx, hx, hy, kx, ky, T, 0.74, 0.98, 0.45, edge);
+                            fillLimbSpan(ctx, hx, hy, kx, ky, T, 0.77, 0.95, 0.5, band);
+                        } else {                                              // seen end-on from above: the band rings it
+                            const x = hx + (kx - hx) * 0.75, y = hy + (ky - hy) * 0.75, r = bodyLimbRadius(T, 0.75);
+                            ctx.lineWidth = 1.5; ctx.strokeStyle = band; ctx.beginPath(); ctx.arc(x, y, r + 0.55, 0, Math.PI * 2); ctx.stroke();
+                            ctx.lineWidth = 0.45; ctx.strokeStyle = edge; ctx.beginPath(); ctx.arc(x, y, r + 1.3, 0, Math.PI * 2); ctx.stroke();
+                        }
                     }
                 }, portrait() {} },
                 bangles: { at: 'wrists', under(ctx, g, c) { bangleHalves(ctx, g, g.darken(c.color || '#e8c27a', 0.35), -1); },
@@ -50384,14 +50406,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             if (botP && botP.detail) botP.detail(ctx, g, clothes.bottom);   // cuffs, pockets, stripes
             if (shoeP && shoeP.thigh) {                                  // ...and on up the thigh, from the knee
-                const bootColor = darken(clothes.shoes.color, 0.45), T = BC.thigh, f = shoeP.thigh;
-                const S = [T[3] + 0.3, bodyLimbRadius(T, 1 - f / 2) + 0.3, 0.5, bodyLimbRadius(T, 1 - f) + 0.3];
-                drawLimb(lKneeX, lKneeY, lKneeX + (lHipX - lKneeX) * f, lKneeY + (lHipY - lKneeY) * f, S, bootColor, shoeP.gloss);
-                drawLimb(rKneeX, rKneeY, rKneeX + (rHipX - rKneeX) * f, rKneeY + (rHipY - rKneeY) * f, S, bootColor, shoeP.gloss);
-                ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.5;   // the welt round the top of each
-                for (const [kx, ky, hx, hy] of [[lKneeX, lKneeY, lHipX, lHipY], [rKneeX, rKneeY, rHipX, rHipY]]) {
-                    const tx = kx + (hx - kx) * f, ty = ky + (hy - ky) * f, a = Math.atan2(hy - ky, hx - kx);
-                    ctx.beginPath(); bodyRingHalf(ctx, tx, ty, S[3], a, 1, 1); ctx.stroke();
+                const bootColor = darken(clothes.shoes.color, 0.45), welt = darken(clothes.shoes.color, 0.6), t0 = 1 - shoeP.thigh;
+                for (const [hx, hy, kx, ky] of [[lHipX, lHipY, lKneeX, lKneeY], [rHipX, rHipY, rKneeX, rKneeY]]) {
+                    fillLimbSpan(ctx, hx, hy, kx, ky, BC.thigh, t0, 1.25, 0.3, bootColor, shoeP.gloss);   // cut square at the top
+                    fillLimbSpan(ctx, hx, hy, kx, ky, BC.thigh, t0, t0 + 0.05, 0.35, welt);            // the welt round it
                 }
             }
             if (clothes.jewelry && WD) for (const j of clothes.jewelry) {  // thigh bands

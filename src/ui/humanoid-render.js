@@ -2066,14 +2066,10 @@
             }
             if (botP && botP.detail) botP.detail(ctx, g, clothes.bottom);   // cuffs, pockets, stripes
             if (shoeP && shoeP.thigh) {                                  // ...and on up the thigh, from the knee
-                const bootColor = darken(clothes.shoes.color, 0.45), T = BC.thigh, f = shoeP.thigh;
-                const S = [T[3] + 0.3, bodyLimbRadius(T, 1 - f / 2) + 0.3, 0.5, bodyLimbRadius(T, 1 - f) + 0.3];
-                drawLimb(lKneeX, lKneeY, lKneeX + (lHipX - lKneeX) * f, lKneeY + (lHipY - lKneeY) * f, S, bootColor, shoeP.gloss);
-                drawLimb(rKneeX, rKneeY, rKneeX + (rHipX - rKneeX) * f, rKneeY + (rHipY - rKneeY) * f, S, bootColor, shoeP.gloss);
-                ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.5;   // the welt round the top of each
-                for (const [kx, ky, hx, hy] of [[lKneeX, lKneeY, lHipX, lHipY], [rKneeX, rKneeY, rHipX, rHipY]]) {
-                    const tx = kx + (hx - kx) * f, ty = ky + (hy - ky) * f, a = Math.atan2(hy - ky, hx - kx);
-                    ctx.beginPath(); bodyRingHalf(ctx, tx, ty, S[3], a, 1, 1); ctx.stroke();
+                const bootColor = darken(clothes.shoes.color, 0.45), welt = darken(clothes.shoes.color, 0.6), t0 = 1 - shoeP.thigh;
+                for (const [hx, hy, kx, ky] of [[lHipX, lHipY, lKneeX, lKneeY], [rHipX, rHipY, rKneeX, rKneeY]]) {
+                    fillLimbSpan(ctx, hx, hy, kx, ky, BC.thigh, t0, 1.25, 0.3, bootColor, shoeP.gloss);   // cut square at the top
+                    fillLimbSpan(ctx, hx, hy, kx, ky, BC.thigh, t0, t0 + 0.05, 0.35, welt);            // the welt round it
                 }
             }
             if (clothes.jewelry && WD) for (const j of clothes.jewelry) {  // thigh bands
