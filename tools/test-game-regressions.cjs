@@ -1578,6 +1578,47 @@ test('Pedestrians walk on down the street: they only turn back at a dead end, ne
   ok(r.inner <= 3, `pavement walks end at the city's edge, not short of a corner (${r.inner} of ${r.ends} ends inside)`);
 });
 
+test('Junction lights: a turn arrow lets waiting turns go before the straight-on traffic, and frees a left turn stuck on a green', env => {
+  lightsScene(env);
+  const r=value(env, `
+    // A left turn out onto the other road (not the U-turn back)
+    const left=c=>{ const l=c.currentLane, ts=l.turnPaths.filter(t=>t.turnType==='left'&&t.toLane.road!==l.road);
+      c.plannedTurn=ts.find(t=>TrafficVehicle._laneRank(t.toLane)===0)||ts[0]; return c; };
+    // At a red: a left turn and the straight-on car facing it both wait at the line
+    let sig=__reset(); const p=sig.cur; sig.cur=1-p;
+    const L=left(__car(p,1,0,110,'left')), S=__car(p,-1,1,110,'straight');
+    let arrowAt=-1, lIn=-1, sIn=-1, sOnArrow=false, touch=0;
+    for(let i=0;i<700;i++){ game.update();
+      if(arrowAt<0 && sig.state==='arrow') arrowAt=i;
+      const sin=__ix.isVehicleInside(S)||!!S.currentTurnPath;
+      if(lIn<0 && (__ix.isVehicleInside(L)||L.currentTurnPath)) lIn=i; if(sIn<0 && sin) sIn=i;
+      if(sin && sig.state==='arrow') sOnArrow=true; if(__obbHit(L,S)) touch++; }
+    const lead={arrowAt, lIn, sIn, sOnArrow, touch, light:sig.lightFor(S.currentLane)};
+    // On a resting green with a steady stream coming the other way (never a gap for the left turn), with and without the arrow
+    const stall=on=>{
+      sig=__reset(); SIGNAL.ARROW=on; const q=sig.cur;
+      const T=left(__car(q,1,0,110,'left')), all=[T]; let tIn=-1, arrows=0, was='', hits=0;
+      for(let i=0;i<900;i++){
+        if(i%45===0) for(const rank of [0,1]) all.push(__car(q,-1,rank,430,'straight',{speed:6}));
+        game.update();
+        if(sig.state==='arrow' && was!=='arrow') arrows++; was=sig.state;
+        if(tIn<0 && (__ix.isVehicleInside(T)||T.currentTurnPath)) tIn=i;
+        for(const c of all) if(c!==T && !c.dead && __obbHit(T,c)) hits++;
+      }
+      SIGNAL.ARROW=true;
+      return {tIn, arrows, hits};
+    };
+    return {lead, off:stall(false), on:stall(true)};
+  `);
+  ok(r.lead.arrowAt >= 0, `its road's turn comes with the arrow first (${JSON.stringify(r.lead)})`);
+  ok(r.lead.lIn > r.lead.arrowAt && r.lead.lIn >= 0, 'the left turn goes on the arrow');
+  ok(r.lead.sIn > r.lead.lIn && !r.lead.sOnArrow, 'the straight-on car facing it waits for the green');
+  equal(r.lead.touch, 0, 'no contact');
+  equal(r.off.tIn, -1, `without the arrow, a left turn facing a steady stream never goes (${JSON.stringify(r.off)})`);
+  ok(r.on.tIn > 0 && r.on.arrows >= 1, `with it, the green gives way to an arrow and it goes (${JSON.stringify(r.on)})`);
+  equal(r.on.hits, 0, 'without touching anyone');
+}, {events:true});
+
 test('Walkers at junction lights wait at the kerb for the walk (asking for it), then cross; crossings join the pavement', env => {
   lightsScene(env);
   const r=value(env, `
