@@ -2065,6 +2065,36 @@ test('Every bundled map loads, updates and draws without runtime errors', env =>
   }
 }, {affine:true});
 
+test('Thigh-high finishes buy, replace footwear and persist alongside thigh bands', env => {
+  const result = value(env, `
+    const C = new CosmeticsSystem(), wallet = { currency: 10000 };
+    C.buy('leg_thigh_bands', wallet); C.equip('leg_thigh_bands');
+    const items = Object.values(COSMETICS_REGISTRY).filter(e => e.data.shoes?.type === 'thigh_heels');
+    const results = items.map(item => {
+      const before = wallet.currency, bought = C.buy(item.id, wallet), paid = before - wallet.currency;
+      const again = C.buy(item.id, wallet), equipped = C.equip(item.id);
+      const saved = new CosmeticsSystem(); saved.deserialize(C.serialize());
+      const cfg = saved.getRenderConfig();
+      return { id: item.id, bought, paid, price: item.price, again, equipped,
+        worn: saved.equippedLegwear, shoes: cfg.outfit.shoes, expected: item.data.shoes,
+        bands: cfg.jewelry.some(j => j.type === 'thigh_bands') };
+    });
+    C.unequipLegwear(items.at(-1).id);
+    const restored = C.getRenderConfig().outfit.shoes;
+    const legacy = new CosmeticsSystem(); legacy.deserialize({owned:['leg_thigh_heels'], equippedLegwear:['leg_thigh_heels']});
+    return { results, restored, legacy: legacy.getRenderConfig().outfit.shoes };
+  `);
+  equal(result.results.length, 6, 'original plus five variants');
+  for (const r of result.results) {
+    equal([r.bought, r.again, r.equipped, r.bands], [true, false, true, true], r.id);
+    equal(r.paid, r.price, r.id + ' price');
+    equal(r.worn, ['leg_thigh_bands', r.id], r.id + ' replaces previous boots, preserving bands');
+    equal(r.shoes, r.expected, r.id + ' finish survives save/load');
+  }
+  equal(result.restored.type, 'sneakers', 'removal restores outfit footwear');
+  equal(result.legacy, {type:'thigh_heels',color:'#141016'}, 'existing saves keep their original black boots');
+});
+
 const failures = results.filter(r => r.status === 'failed');
 console.log(JSON.stringify({file:gameFile,passed:results.length-failures.length,failed:failures.length,assertions,results},null,2));
 if (failures.length) process.exitCode = 1;

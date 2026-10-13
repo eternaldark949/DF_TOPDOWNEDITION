@@ -5484,6 +5484,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             //    the rest draw on the legs like jewelry (ui/wardrobe.js jewelry, at: 'thighs').
             'leg_thigh_bands':     { id: 'leg_thigh_bands',     category: 'legwear', name: 'Thigh Bands',      desc: 'A pair of black satin bands high on the thighs, a fine gold edge.', price: 200, data: { type: 'thigh_bands', color: '#141014', trim: '#e8c27a' } },
             'leg_thigh_heels':     { id: 'leg_thigh_heels',     category: 'legwear', name: 'Thigh High Heels', desc: 'Glossy black stiletto boots that climb past the knee. Go with any outfit.', price: 400, data: { color: '#141016', shoes: { type: 'thigh_heels', color: '#141016' } } },
+            'leg_thigh_heels_stardust': { id: 'leg_thigh_heels_stardust', category: 'legwear', name: 'Stardust Thigh Highs', desc: 'Silver stiletto boots dusted with slowly twinkling crystals.', price: 550, data: { color: '#cbd2ed', shoes: { type: 'thigh_heels', color: '#cbd2ed', finish: 'sparkle' } } },
+            'leg_thigh_heels_velvet_red': { id: 'leg_thigh_heels_velvet_red', category: 'legwear', name: 'Crimson Velvet Thigh Highs', desc: 'Deep red velvet stilettos. Soft nap, rich color, no patent shine.', price: 500, data: { color: '#b93250', shoes: { type: 'thigh_heels', color: '#b93250', finish: 'velvet' } } },
+            'leg_thigh_heels_violet': { id: 'leg_thigh_heels_violet', category: 'legwear', name: 'Violet Patent Thigh Highs', desc: 'Electric violet stiletto boots with a glossy patent finish.', price: 450, data: { color: '#b88aff', shoes: { type: 'thigh_heels', color: '#b88aff', finish: 'gloss' } } },
+            'leg_thigh_heels_pearl': { id: 'leg_thigh_heels_pearl', category: 'legwear', name: 'Pearl Patent Thigh Highs', desc: 'Ivory pearl stilettos with a polished glossy finish.', price: 450, data: { color: '#fff3e5', shoes: { type: 'thigh_heels', color: '#fff3e5', finish: 'gloss' } } },
+            'leg_thigh_heels_emerald': { id: 'leg_thigh_heels_emerald', category: 'legwear', name: 'Emerald Velvet Thigh Highs', desc: 'Jewel-green velvet stiletto boots with a soft fabric finish.', price: 500, data: { color: '#329676', shoes: { type: 'thigh_heels', color: '#329676', finish: 'velvet' } } },
         };
 
         // ============================================================================
@@ -46924,6 +46929,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.beginPath(); ctx.moveTo(ax + nx, ay + ny); ctx.lineTo(bx + nx, by + ny); ctx.lineTo(bx - nx, by - ny); ctx.lineTo(ax - nx, ay - ny); ctx.closePath();
             ctx.fillStyle = fill; ctx.fill();
             if (gloss) {
+                ctx.clip(); // keep the sheen inside the cuff as well as the limb outline
                 ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.beginPath();
                 ctx.ellipse((ax + bx) / 2 - nx * 0.35, (ay + by) / 2 - ny * 0.35, Math.max(0.5, Math.hypot(bx - ax, by - ay) * 0.42), R * 0.22, Math.atan2(dy, dx), 0, Math.PI * 2); ctx.fill();
             }
@@ -47372,7 +47378,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                bottom: { type, color, trim? },
                (any piece can carry finish: 'gloss' | 'matte' — shading is matte unless the item
                 or its WARDROBE piece says gloss, e.g. leggings)
-               shoes:  { type, color },
+               shoes:  { type, color, finish? },   // thigh_heels: gloss (default), sparkle, velvet
                hat:    { type, color, trim? } | null,
                jewelry: [ { type, color? }, ... ],
                train, held }
@@ -47843,6 +47849,48 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (rim) { ctx.fillStyle = rim; drawBodyFoot(ctx, x, y, side, 1.1, false, g.body.foot); }
                 ctx.fillStyle = color; drawBodyFoot(ctx, x, y, side, 0.45, false, g.body.foot);
             };
+            // Surface detail stays clipped to the actual boot pieces. Velvet has a broad soft nap;
+            // stardust has fixed flecks with a slow glint, rather than random per-frame noise.
+            const bootSurface = (ctx, c, length, radius, seed) => {
+                if (c.finish === 'velvet') {
+                    const nap = ctx.createLinearGradient(0, -radius, 0, radius);
+                    nap.addColorStop(0, 'rgba(0,0,0,0.18)');
+                    nap.addColorStop(0.4, 'rgba(255,220,225,0.13)');
+                    nap.addColorStop(1, 'rgba(0,0,0,0.24)');
+                    ctx.fillStyle = nap; ctx.fillRect(-radius, -radius, length + radius * 2, radius * 2);
+                    if (_zoomLOD > 0) return;
+                    ctx.strokeStyle = 'rgba(255,230,230,0.07)'; ctx.lineWidth = 0.18; ctx.beginPath();
+                    for (let i = 0; i < 8; i++) {
+                        const x = (i / 7) * length, y = (((i * 3 + seed) % 7) / 7 - 0.5) * radius * 1.4;
+                        ctx.moveTo(x, y); ctx.lineTo(x + 0.7, y + 0.45);
+                    }
+                    ctx.stroke();
+                } else if (c.finish === 'sparkle' && _zoomLOD < 2) {
+                    const count = _zoomLOD ? 5 : 12;
+                    for (let i = 0; i < count; i++) {
+                        const x = ((i * 7 + seed) % 13) / 13 * length;
+                        const y = (((i * 5 + seed) % 11) / 11 - 0.5) * radius * 1.55;
+                        const pulse = 0.5 + 0.5 * Math.sin(_gameTimeSec * 2.2 + i * 1.7 + seed);
+                        ctx.fillStyle = i % 3 ? 'rgba(250,248,255,' + (0.35 + pulse * 0.5) + ')' : 'rgba(184,190,255,0.8)';
+                        ctx.beginPath(); ctx.arc(x, y, 0.13 + pulse * 0.12, 0, Math.PI * 2); ctx.fill();
+                        if (!_zoomLOD && i % 5 === 0) {
+                            const r = 0.35 + pulse * 0.45;
+                            ctx.beginPath(); ctx.moveTo(x - r, y); ctx.lineTo(x - 0.15, y - 0.15);
+                            ctx.lineTo(x, y - r); ctx.lineTo(x + 0.15, y - 0.15);
+                            ctx.lineTo(x + r, y); ctx.lineTo(x + 0.15, y + 0.15);
+                            ctx.lineTo(x, y + r); ctx.lineTo(x - 0.15, y + 0.15); ctx.closePath(); ctx.fill();
+                        }
+                    }
+                }
+            };
+            const bootFabricSpan = (ctx, c, a, b, T, start, seed) => {
+                const G = [T[0] + 0.3, T[1] + 0.3, T[2], T[3] + 0.3];
+                const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy), R = Math.max(G[0], G[1], G[3]) + 1;
+                ctx.save(); bodyLimbPath(ctx, a[0], a[1], b[0], b[1], G); ctx.clip();
+                ctx.translate(a[0], a[1]); ctx.rotate(Math.atan2(dy, dx));
+                ctx.beginPath(); ctx.rect(start === null ? -R : len * start, -R, len + R * 2, R * 2); ctx.clip();
+                bootSurface(ctx, c, len, R, seed); ctx.restore(); ctx.beginPath();
+            };
             const shoes = {
                 heels:    { draw(ctx, g, c) { ctx.fillStyle = g.darken(c.color, 0.55); for (let i = 0; i < 2; i++) drawBodyFoot(ctx, g.feet[i][0], g.feet[i][1], i ? 1 : -1, 0.35, true, g.body.foot); } },
                 loafers:  { draw(ctx, g, c) { for (let i = 0; i < 2; i++) { soleFoot(ctx, g, i, g.darken(c.color, 0.55)); const [x, y] = g.feet[i]; ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(x + 4.6, y - 1 + (i ? 0.45 : -0.45), 2.5, 2); } } },
@@ -47858,11 +47906,26 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Stiletto boots past the knee: a pointed pump on the foot, a glossy shaft up the whole calf and
                 // `thigh` of the way up the thigh (the renderer draws the shafts, ui/humanoid-render.js).
                 thigh_heels: { calf: 1, thigh: 0.6, gloss: true, draw(ctx, g, c) {
+                    const velvet = c.finish === 'velvet', sparkle = c.finish === 'sparkle';
                     for (let i = 0; i < 2; i++) {
                         const [x, y] = g.feet[i], side = i ? 1 : -1;
-                        ctx.fillStyle = g.darken(c.color, 0.5); drawBodyFoot(ctx, x, y, side, 0.45, true, g.body.foot);
-                        ctx.fillStyle = 'rgba(255,255,255,0.28)';            // a shine along the toe
-                        ctx.beginPath(); ctx.ellipse(x + 4.4, y + side * 0.35, 1.7, 0.45, side * 0.08, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = g.darken(c.color, velvet ? 0.2 : c.finish ? 0.26 : 0.5);
+                        drawBodyFoot(ctx, x, y, side, 0.45, true, g.body.foot);
+                        if (!velvet) {
+                            ctx.fillStyle = 'rgba(255,255,255,0.28)';
+                            ctx.beginPath(); ctx.ellipse(x + 4.4, y + side * 0.35, 1.7, 0.45, side * 0.08, 0, Math.PI * 2); ctx.fill();
+                        }
+                        if (velvet || sparkle) {
+                            ctx.save();
+                            ctx.translate(x, y); ctx.clip(bodyFootPath(side, 0.45, true, g.body.foot));
+                            bootSurface(ctx, c, 8, 3, i + 3); ctx.restore(); ctx.beginPath();
+                        }
+                    }
+                }, fabric(ctx, g, c) {
+                    if (c.finish !== 'velvet' && c.finish !== 'sparkle') return;
+                    for (let i = 0; i < 2; i++) {
+                        bootFabricSpan(ctx, c, g.knees[i], g.feet[i], g.body.calf, null, i * 3);
+                        bootFabricSpan(ctx, c, g.hipPt[i], g.knees[i], g.body.thigh, 0.4, i * 3 + 1);
                     }
                 } }
             };
@@ -50424,11 +50487,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // 2. Calves
             drawLimb(lKneeX, lKneeY, lFootX, lFootY, BC.calf, legColor, legs === 'full' && botGloss);
             drawLimb(rKneeX, rKneeY, rFootX, rFootY, BC.calf, legColor, legs === 'full' && botGloss);
-            if (shoeP && shoeP.thigh) {                                  // thigh-high boots: the calf, snug and whole
-                const bootColor = darken(clothes.shoes.color, 0.45), T = BC.calf, S = [T[0] + 0.3, T[1] + 0.3, T[2], T[3] + 0.3];
-                drawLimb(lKneeX, lKneeY, lFootX, lFootY, S, bootColor, shoeP.gloss);
-                drawLimb(rKneeX, rKneeY, rFootX, rFootY, S, bootColor, shoeP.gloss);
-            } else if (shoeP && shoeP.calf) {                            // boots come up the calf
+            if (shoeP && shoeP.calf && !shoeP.thigh) {                    // boots come up the calf
                 const bootColor = darken(clothes.shoes.color, 0.45), c = shoeP.calf;
                 drawLimb(lFootX, lFootY, lFootX + (lKneeX - lFootX) * c, lFootY + (lKneeY - lFootY) * c, BOOT_SHAFT, bootColor);
                 drawLimb(rFootX, rFootY, rFootX + (rKneeX - rFootX) * c, rFootY + (rKneeY - rFootY) * c, BOOT_SHAFT, bootColor);
@@ -50442,12 +50501,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for (const [x, y] of [[lKneeX, lKneeY], [rKneeX, rKneeY]]) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.stroke(); }
             }
             if (botP && botP.detail) botP.detail(ctx, g, clothes.bottom);   // cuffs, pockets, stripes
-            if (shoeP && shoeP.thigh) {                                  // ...and on up the thigh, from the knee
-                const bootColor = darken(clothes.shoes.color, 0.45), welt = darken(clothes.shoes.color, 0.6), t0 = 1 - shoeP.thigh;
+            if (shoeP && shoeP.thigh) {
+                // Paint the entire boot AFTER both bare leg segments: the rounded thigh end must
+                // not cover the calf's knee cap. Extend the thigh span by the actual joint radius,
+                // not a fraction of the projected length (which approaches zero mid-step).
+                const shoe = clothes.shoes, finish = shoe.finish || 'gloss', gloss = finish === 'gloss' || finish === 'sparkle';
+                const shade = finish === 'velvet' ? 0.16 : shoe.finish ? 0.22 : 0.45;
+                const bootColor = darken(shoe.color, shade), welt = darken(shoe.color, shade + 0.12), t0 = 1 - shoeP.thigh;
+                const T = BC.calf, S = [T[0] + 0.3, T[1] + 0.3, T[2], T[3] + 0.3];
+                // A limb seen end-on collapses its tapered outline. Keep the complete knee
+                // covered even in the passing pose, where hip, knee and ankle coincide.
+                ctx.fillStyle = bootColor; ctx.beginPath();
+                const kneeR = Math.max(BC.thigh[3], BC.calf[0]) + 0.3;
+                ctx.arc(lKneeX, lKneeY, kneeR, 0, Math.PI * 2);
+                ctx.moveTo(rKneeX + kneeR, rKneeY); ctx.arc(rKneeX, rKneeY, kneeR, 0, Math.PI * 2);
+                ctx.fill(); ctx.beginPath();
+                drawLimb(lKneeX, lKneeY, lFootX, lFootY, S, bootColor, gloss);
+                drawLimb(rKneeX, rKneeY, rFootX, rFootY, S, bootColor, gloss);
                 for (const [hx, hy, kx, ky] of [[lHipX, lHipY, lKneeX, lKneeY], [rHipX, rHipY, rKneeX, rKneeY]]) {
-                    fillLimbSpan(ctx, hx, hy, kx, ky, BC.thigh, t0, 1.25, 0.3, bootColor, shoeP.gloss);   // cut square at the top
-                    fillLimbSpan(ctx, hx, hy, kx, ky, BC.thigh, t0, t0 + 0.05, 0.35, welt);            // the welt round it
+                    const end = 1 + (BC.thigh[3] + 0.3) / Math.max(1e-6, Math.hypot(kx - hx, ky - hy));
+                    fillLimbSpan(ctx, hx, hy, kx, ky, BC.thigh, t0, end, 0.3, bootColor, gloss);
+                    fillLimbSpan(ctx, hx, hy, kx, ky, BC.thigh, t0, t0 + 0.05, 0.35, welt);
                 }
+                if (shoeP.fabric) shoeP.fabric(ctx, g, shoe);
             }
             if (clothes.jewelry && WD) for (const j of clothes.jewelry) {  // thigh bands
                 const p = WD.jewelry[j.type]; if (p && p.at === 'thighs') p.draw(ctx, g, j);
