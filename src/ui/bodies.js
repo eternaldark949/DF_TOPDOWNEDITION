@@ -177,6 +177,7 @@
             ctx.beginPath(); ctx.moveTo(ax + nx, ay + ny); ctx.lineTo(bx + nx, by + ny); ctx.lineTo(bx - nx, by - ny); ctx.lineTo(ax - nx, ay - ny); ctx.closePath();
             ctx.fillStyle = fill; ctx.fill();
             if (gloss) {
+                ctx.clip(); // keep the sheen inside the cuff as well as the limb outline
                 ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.beginPath();
                 ctx.ellipse((ax + bx) / 2 - nx * 0.35, (ay + by) / 2 - ny * 0.35, Math.max(0.5, Math.hypot(bx - ax, by - ay) * 0.42), R * 0.22, Math.atan2(dy, dx), 0, Math.PI * 2); ctx.fill();
             }

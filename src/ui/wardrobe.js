@@ -9,7 +9,7 @@
                bottom: { type, color, trim? },
                (any piece can carry finish: 'gloss' | 'matte' — shading is matte unless the item
                 or its WARDROBE piece says gloss, e.g. leggings)
-               shoes:  { type, color },
+               shoes:  { type, color, finish? },   // thigh_heels: gloss (default), sparkle, velvet
                hat:    { type, color, trim? } | null,
                jewelry: [ { type, color? }, ... ],
                train, held }
@@ -480,6 +480,48 @@
                 if (rim) { ctx.fillStyle = rim; drawBodyFoot(ctx, x, y, side, 1.1, false, g.body.foot); }
                 ctx.fillStyle = color; drawBodyFoot(ctx, x, y, side, 0.45, false, g.body.foot);
             };
+            // Surface detail stays clipped to the actual boot pieces. Velvet has a broad soft nap;
+            // stardust has fixed flecks with a slow glint, rather than random per-frame noise.
+            const bootSurface = (ctx, c, length, radius, seed) => {
+                if (c.finish === 'velvet') {
+                    const nap = ctx.createLinearGradient(0, -radius, 0, radius);
+                    nap.addColorStop(0, 'rgba(0,0,0,0.18)');
+                    nap.addColorStop(0.4, 'rgba(255,220,225,0.13)');
+                    nap.addColorStop(1, 'rgba(0,0,0,0.24)');
+                    ctx.fillStyle = nap; ctx.fillRect(-radius, -radius, length + radius * 2, radius * 2);
+                    if (_zoomLOD > 0) return;
+                    ctx.strokeStyle = 'rgba(255,230,230,0.07)'; ctx.lineWidth = 0.18; ctx.beginPath();
+                    for (let i = 0; i < 8; i++) {
+                        const x = (i / 7) * length, y = (((i * 3 + seed) % 7) / 7 - 0.5) * radius * 1.4;
+                        ctx.moveTo(x, y); ctx.lineTo(x + 0.7, y + 0.45);
+                    }
+                    ctx.stroke();
+                } else if (c.finish === 'sparkle' && _zoomLOD < 2) {
+                    const count = _zoomLOD ? 5 : 12;
+                    for (let i = 0; i < count; i++) {
+                        const x = ((i * 7 + seed) % 13) / 13 * length;
+                        const y = (((i * 5 + seed) % 11) / 11 - 0.5) * radius * 1.55;
+                        const pulse = 0.5 + 0.5 * Math.sin(_gameTimeSec * 2.2 + i * 1.7 + seed);
+                        ctx.fillStyle = i % 3 ? 'rgba(250,248,255,' + (0.35 + pulse * 0.5) + ')' : 'rgba(184,190,255,0.8)';
+                        ctx.beginPath(); ctx.arc(x, y, 0.13 + pulse * 0.12, 0, Math.PI * 2); ctx.fill();
+                        if (!_zoomLOD && i % 5 === 0) {
+                            const r = 0.35 + pulse * 0.45;
+                            ctx.beginPath(); ctx.moveTo(x - r, y); ctx.lineTo(x - 0.15, y - 0.15);
+                            ctx.lineTo(x, y - r); ctx.lineTo(x + 0.15, y - 0.15);
+                            ctx.lineTo(x + r, y); ctx.lineTo(x + 0.15, y + 0.15);
+                            ctx.lineTo(x, y + r); ctx.lineTo(x - 0.15, y + 0.15); ctx.closePath(); ctx.fill();
+                        }
+                    }
+                }
+            };
+            const bootFabricSpan = (ctx, c, a, b, T, start, seed) => {
+                const G = [T[0] + 0.3, T[1] + 0.3, T[2], T[3] + 0.3];
+                const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy), R = Math.max(G[0], G[1], G[3]) + 1;
+                ctx.save(); bodyLimbPath(ctx, a[0], a[1], b[0], b[1], G); ctx.clip();
+                ctx.translate(a[0], a[1]); ctx.rotate(Math.atan2(dy, dx));
+                ctx.beginPath(); ctx.rect(start === null ? -R : len * start, -R, len + R * 2, R * 2); ctx.clip();
+                bootSurface(ctx, c, len, R, seed); ctx.restore(); ctx.beginPath();
+            };
             const shoes = {
                 heels:    { draw(ctx, g, c) { ctx.fillStyle = g.darken(c.color, 0.55); for (let i = 0; i < 2; i++) drawBodyFoot(ctx, g.feet[i][0], g.feet[i][1], i ? 1 : -1, 0.35, true, g.body.foot); } },
                 loafers:  { draw(ctx, g, c) { for (let i = 0; i < 2; i++) { soleFoot(ctx, g, i, g.darken(c.color, 0.55)); const [x, y] = g.feet[i]; ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(x + 4.6, y - 1 + (i ? 0.45 : -0.45), 2.5, 2); } } },
@@ -495,11 +537,26 @@
                 // Stiletto boots past the knee: a pointed pump on the foot, a glossy shaft up the whole calf and
                 // `thigh` of the way up the thigh (the renderer draws the shafts, ui/humanoid-render.js).
                 thigh_heels: { calf: 1, thigh: 0.6, gloss: true, draw(ctx, g, c) {
+                    const velvet = c.finish === 'velvet', sparkle = c.finish === 'sparkle';
                     for (let i = 0; i < 2; i++) {
                         const [x, y] = g.feet[i], side = i ? 1 : -1;
-                        ctx.fillStyle = g.darken(c.color, 0.5); drawBodyFoot(ctx, x, y, side, 0.45, true, g.body.foot);
-                        ctx.fillStyle = 'rgba(255,255,255,0.28)';            // a shine along the toe
-                        ctx.beginPath(); ctx.ellipse(x + 4.4, y + side * 0.35, 1.7, 0.45, side * 0.08, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = g.darken(c.color, velvet ? 0.2 : c.finish ? 0.26 : 0.5);
+                        drawBodyFoot(ctx, x, y, side, 0.45, true, g.body.foot);
+                        if (!velvet) {
+                            ctx.fillStyle = 'rgba(255,255,255,0.28)';
+                            ctx.beginPath(); ctx.ellipse(x + 4.4, y + side * 0.35, 1.7, 0.45, side * 0.08, 0, Math.PI * 2); ctx.fill();
+                        }
+                        if (velvet || sparkle) {
+                            ctx.save();
+                            ctx.translate(x, y); ctx.clip(bodyFootPath(side, 0.45, true, g.body.foot));
+                            bootSurface(ctx, c, 8, 3, i + 3); ctx.restore(); ctx.beginPath();
+                        }
+                    }
+                }, fabric(ctx, g, c) {
+                    if (c.finish !== 'velvet' && c.finish !== 'sparkle') return;
+                    for (let i = 0; i < 2; i++) {
+                        bootFabricSpan(ctx, c, g.knees[i], g.feet[i], g.body.calf, null, i * 3);
+                        bootFabricSpan(ctx, c, g.hipPt[i], g.knees[i], g.body.thigh, 0.4, i * 3 + 1);
                     }
                 } }
             };

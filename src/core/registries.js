@@ -214,6 +214,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             //    the rest draw on the legs like jewelry (ui/wardrobe.js jewelry, at: 'thighs').
             'leg_thigh_bands':     { id: 'leg_thigh_bands',     category: 'legwear', name: 'Thigh Bands',      desc: 'A pair of black satin bands high on the thighs, a fine gold edge.', price: 200, data: { type: 'thigh_bands', color: '#141014', trim: '#e8c27a' } },
             'leg_thigh_heels':     { id: 'leg_thigh_heels',     category: 'legwear', name: 'Thigh High Heels', desc: 'Glossy black stiletto boots that climb past the knee. Go with any outfit.', price: 400, data: { color: '#141016', shoes: { type: 'thigh_heels', color: '#141016' } } },
+            'leg_thigh_heels_stardust': { id: 'leg_thigh_heels_stardust', category: 'legwear', name: 'Stardust Thigh Highs', desc: 'Silver stiletto boots dusted with slowly twinkling crystals.', price: 550, data: { color: '#cbd2ed', shoes: { type: 'thigh_heels', color: '#cbd2ed', finish: 'sparkle' } } },
+            'leg_thigh_heels_velvet_red': { id: 'leg_thigh_heels_velvet_red', category: 'legwear', name: 'Crimson Velvet Thigh Highs', desc: 'Deep red velvet stilettos. Soft nap, rich color, no patent shine.', price: 500, data: { color: '#b93250', shoes: { type: 'thigh_heels', color: '#b93250', finish: 'velvet' } } },
+            'leg_thigh_heels_violet': { id: 'leg_thigh_heels_violet', category: 'legwear', name: 'Violet Patent Thigh Highs', desc: 'Electric violet stiletto boots with a glossy patent finish.', price: 450, data: { color: '#b88aff', shoes: { type: 'thigh_heels', color: '#b88aff', finish: 'gloss' } } },
+            'leg_thigh_heels_pearl': { id: 'leg_thigh_heels_pearl', category: 'legwear', name: 'Pearl Patent Thigh Highs', desc: 'Ivory pearl stilettos with a polished glossy finish.', price: 450, data: { color: '#fff3e5', shoes: { type: 'thigh_heels', color: '#fff3e5', finish: 'gloss' } } },
+            'leg_thigh_heels_emerald': { id: 'leg_thigh_heels_emerald', category: 'legwear', name: 'Emerald Velvet Thigh Highs', desc: 'Jewel-green velvet stiletto boots with a soft fabric finish.', price: 500, data: { color: '#329676', shoes: { type: 'thigh_heels', color: '#329676', finish: 'velvet' } } },
         };
 
         // ============================================================================
