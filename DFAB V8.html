@@ -3416,15 +3416,19 @@
         body.landscape #boss-title .bt-main { font-size: max(6px, clamp(1.4rem, 4.4vw, 2.3rem) - var(--font-trim)); }
 
         /* --- Panels on a short screen --- */
-        /* Inventory and map sidebars: collapsed behind their diamond handles, as on a narrow phone */
-        body.landscape .screen-sidebar-left { overflow-y: auto; padding: 16px 20px; }
+        /* Inventory and map sidebars. Wide enough (ui/sidebars.js LANDSCAPE_ROOM): both open, a little narrower,
+           the content between them. Narrower: collapsed behind their diamond handles (.overlay), as on a narrow phone */
+        body.landscape .screen-sidebar-left { overflow-y: auto; padding: 16px 20px; width: 230px; }
+        body.landscape .screen-sidebar-right { width: 180px; padding: 16px 20px; }
         body.landscape .screen-sidebar-left.auto-collapse { transform: translateX(-100%); }
         body.landscape .screen-sidebar-right.auto-collapse { transform: translateX(100%); }
-        body.landscape .screen-main-content { margin-left: 44px; margin-right: 44px; padding: 14px 20px; }
+        body.landscape .screen-main-content { margin-left: 230px; margin-right: 180px; padding: 14px 20px; }
+        body.landscape #freelancer-menu.no-filter .screen-main-content { margin-right: 24px; }
+        body.landscape .screen-main-content.overlay { margin-left: 44px; margin-right: 44px; }
         body.landscape .sidebar-handle.mobile-visible { opacity: 1; pointer-events: auto; }
         /* opened over the content on a small screen: a solid backdrop so the list doesn't show through, its inner edge still soft */
-        body.landscape .screen-sidebar-left { background: linear-gradient(270deg, transparent 0, rgba(5, 1, 3, 0.9) 56px, rgba(5, 1, 3, 0.97) 40%); }
-        body.landscape .screen-sidebar-right { background: linear-gradient(90deg, transparent 0, rgba(5, 1, 3, 0.9) 56px, rgba(5, 1, 3, 0.97) 40%); }
+        body.landscape .screen-sidebar-left.overlay { background: linear-gradient(270deg, transparent 0, rgba(5, 1, 3, 0.9) 56px, rgba(5, 1, 3, 0.97) 40%); }
+        body.landscape .screen-sidebar-right.overlay { background: linear-gradient(90deg, transparent 0, rgba(5, 1, 3, 0.9) 56px, rgba(5, 1, 3, 0.97) 40%); }
         body.landscape #sleep-menu, body.landscape #vending-menu { max-height: 94vh; overflow-y: auto; box-sizing: border-box; padding: 16px 24px !important; }
         body.landscape .save-slot-panel { max-height: 92vh; overflow-y: auto; }
         body.landscape #main-menu { margin-top: 5vh; padding-bottom: 20px; }
@@ -76169,6 +76173,7 @@ engineMixin({
         // Manages collapsible sidebars for map and inventory screens
         
         class SidebarController {
+            static LANDSCAPE_ROOM = 860;   // checkMobile: a phone on its side at least this wide keeps both sidebars open
             constructor(config) {
                 this.leftSidebar = document.getElementById(config.leftId);
                 this.rightSidebar = document.getElementById(config.rightId);
@@ -76252,7 +76257,12 @@ engineMixin({
             }
             
             checkMobile() {
-                const isMobile = window.innerWidth <= this.mobileBreakpoint || (window.innerWidth > window.innerHeight && window.innerHeight <= 540);   // or a phone on its side
+                // A narrow screen, or a phone on its side too narrow for both sidebars and the content between them
+                // (LANDSCAPE_ROOM CSS px: two sidebars, 410, plus ~450 of content). Wider, the sidebars stay open
+                // beside the content, as they did when the game was played at 75% browser zoom.
+                const shortLandscape = window.innerWidth > window.innerHeight && window.innerHeight <= 540;
+                const isMobile = window.innerWidth <= this.mobileBreakpoint || (shortLandscape && window.innerWidth < SidebarController.LANDSCAPE_ROOM);
+                for (const el of [this.leftSidebar, this.rightSidebar, this.mainContent]) el?.classList.toggle('overlay', isMobile);   // opened over the content (styles/landscape.css)
                 
                 if (isMobile) {
                     // Auto-collapse on mobile

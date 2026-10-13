@@ -2,6 +2,7 @@
         // Manages collapsible sidebars for map and inventory screens
         
         class SidebarController {
+            static LANDSCAPE_ROOM = 860;   // checkMobile: a phone on its side at least this wide keeps both sidebars open
             constructor(config) {
                 this.leftSidebar = document.getElementById(config.leftId);
                 this.rightSidebar = document.getElementById(config.rightId);
@@ -85,7 +86,12 @@
             }
             
             checkMobile() {
-                const isMobile = window.innerWidth <= this.mobileBreakpoint || (window.innerWidth > window.innerHeight && window.innerHeight <= 540);   // or a phone on its side
+                // A narrow screen, or a phone on its side too narrow for both sidebars and the content between them
+                // (LANDSCAPE_ROOM CSS px: two sidebars, 410, plus ~450 of content). Wider, the sidebars stay open
+                // beside the content, as they did when the game was played at 75% browser zoom.
+                const shortLandscape = window.innerWidth > window.innerHeight && window.innerHeight <= 540;
+                const isMobile = window.innerWidth <= this.mobileBreakpoint || (shortLandscape && window.innerWidth < SidebarController.LANDSCAPE_ROOM);
+                for (const el of [this.leftSidebar, this.rightSidebar, this.mainContent]) el?.classList.toggle('overlay', isMobile);   // opened over the content (styles/landscape.css)
                 
                 if (isMobile) {
                     // Auto-collapse on mobile
