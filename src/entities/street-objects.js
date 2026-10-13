@@ -49,6 +49,8 @@
             constructor(x, y, type) { this.x = x; this.y = y; this.type = type; this.bobOffset = Math.random() * Math.PI * 2; }
             draw(ctx) {
                 const bobY = Math.sin(_gameTimeSec * 6 + this.bobOffset) * 2;  // game time: same speed at any frame rate
+                const r = this.type === 'salvage_crate' ? 18 : 9;
+                drawGroundContactShadow(ctx, this.x, this.y, r, r * 0.7);
                 ctx.save(); ctx.translate(this.x, this.y + bobY);
                 if (this.type === 'scrap') { ctx.fillStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(6, -6); ctx.lineTo(6, 6); ctx.lineTo(-6, 6); ctx.fill(); ctx.strokeStyle = '#555'; ctx.stroke(); } 
                 else if (this.type === 'pp') { ctx.fillStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 5; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill(); } 

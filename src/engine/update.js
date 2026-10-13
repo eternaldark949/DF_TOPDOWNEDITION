@@ -204,9 +204,7 @@
                 
                 // Velvet Cat AI
                 if (this.velvetCat && this.velvetCat.visible && !this.velvetCat.inCar) {
-                    if (this.questState.hasVelvetCat) {
-                        this.velvetCat.update(this.player, 1);
-                    }
+                    this.velvetCat.update(this.player, 1, this.activeMap, !!this.questState.hasVelvetCat);
                 }
             
                 this.profiler.start('Logic:Stealth');

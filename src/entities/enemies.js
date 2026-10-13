@@ -125,7 +125,7 @@
                     invincibleDuration: 999
                 });
                 this.name = 'Velvet';
-                this.state = 'idle';       // idle, following, sitting, sleeping
+                this.state = 'idle';       // idle / following; explicit sitting / sleeping poses also supported
                 this.inCar = false;
                 this.visible = true;
                 this.coatPalette = 'default'; // Reserved for future customization; current appearance is unchanged.
@@ -133,8 +133,12 @@
                 // Animation
                 this.walkPhase = 0;
                 this.tailPhase = Math.random() * Math.PI * 2;
+                this._randomSeed = (this.tailPhase * 1e8) | 0 || 1;
                 this.idleTimer = 0;
-                this.idleBehavior = null;   // 'sit', 'look', 'groom'
+                this.idleBehavior = null;   // sit, look, groom, sleep
+                this.animationSpeed = 0;
+                this._moveSpeed = 0;
+                this._pose = 0;
                 this.lookTarget = null;
                 this.curiosityTimer = 0;
                 this.angle = 0;
@@ -144,82 +148,81 @@
                 this._wanderTimer = 0;
             }
             
-            update(player, dt) {
+            // Cosmetic choices must not change the traffic / loot simulation's RNG stream.
+            _random() {
+                let n = this._randomSeed;
+                n ^= n << 13; n ^= n >>> 17; n ^= n << 5;
+                this._randomSeed = n;
+                return (n >>> 0) / 4294967296;
+            }
+
+            update(player, dt = 1, map = null, adopted = true) {
                 if (!this.visible || this.inCar) return;
-                
-                const dx = player.x - this.x;
-                const dy = player.y - this.y;
-                const dist = Math.hypot(dx, dy);
-                
-                // Wander offset — drifts the follow target left/right
-                this._wanderTimer += dt || 1;
-                if (this._wanderTimer > 120) {
-                    this._wanderAngle += (Math.random() - 0.5) * 1.2;
+                dt = Number.isFinite(dt) ? Math.max(0, Math.min(3, dt)) : 1;
+                if (!dt) return;
+                const nav = map ? NavGrid.for(map) : null;
+                const dist = Math.hypot(player.x - this.x, player.y - this.y);
+                this._wanderTimer += dt;
+                if (this._wanderTimer > 180) {
+                    this._wanderAngle += (this._random() - 0.5) * 0.7;
                     this._wanderTimer = 0;
                 }
-                
-                // Target point: behind and slightly to the side of player
-                const behindDist = 60;
-                const targetX = player.x - Math.cos(player.angle) * behindDist + Math.sin(this._wanderAngle) * 25;
-                const targetY = player.y - Math.sin(player.angle) * behindDist + Math.cos(this._wanderAngle) * 25;
-                const tDist = Math.hypot(this.x - targetX, this.y - targetY);
-                
-                if (dist > 500) {
-                    // Teleport if too far (map transition, etc.)
-                    this.x = player.x - Math.cos(player.angle) * 40;
-                    this.y = player.y - Math.sin(player.angle) * 40;
-                    this.state = 'following';
-                } else if (tDist > 200) {
-                    // Sprint to catch up — exceeds player speed so the cat can close gaps
-                    this.state = 'following';
-                    const angle = Math.atan2(targetY - this.y, targetX - this.x);
-                    this.angle = angle;
-                    this.x += Math.cos(angle) * 6.5;
-                    this.y += Math.sin(angle) * 6.5;
-                    this.walkPhase += 0.45;
-                    this.idleTimer = 0;
-                } else if (tDist > 120) {
-                    // Trot at player speed — keeps up while moving
-                    this.state = 'following';
-                    const angle = Math.atan2(targetY - this.y, targetX - this.x);
-                    this.angle = angle;
-                    this.x += Math.cos(angle) * 5.2;
-                    this.y += Math.sin(angle) * 5.2;
-                    this.walkPhase += 0.35;
-                    this.idleTimer = 0;
-                } else if (tDist > 40) {
-                    // Lazy walk — natural feline saunter when keeping pace at close range
-                    this.state = 'following';
-                    const angle = Math.atan2(targetY - this.y, targetX - this.x);
-                    this.angle = angle;
-                    this.x += Math.cos(angle) * 2.4;
-                    this.y += Math.sin(angle) * 2.4;
-                    this.walkPhase += 0.2;
-                    this.idleTimer = 0;
-                } else {
-                    // Close enough — idle behaviors
-                    this.state = 'idle';
-                    this.walkPhase *= 0.9;
-                    this.idleTimer++;
-                    
-                    if (this.idleTimer > 180 && !this.idleBehavior) {
-                        // Pick a random idle behavior
-                        const roll = Math.random();
-                        if (roll < 0.4) this.idleBehavior = 'sit';
-                        else if (roll < 0.7) this.idleBehavior = 'groom';
-                        else this.idleBehavior = 'look';
-                    }
-                    
-                    if (this.idleTimer > 400) {
-                        this.idleBehavior = null;
-                        this.idleTimer = 100; // Reset cycle
-                    }
+                // Keep a stable flank behind the player, rather than orbiting their feet.
+                const facing = player.angle || 0, flank = 22 + Math.sin(this._wanderAngle) * 12;
+                let gx = player.x - Math.cos(facing) * 60 - Math.sin(facing) * flank;
+                let gy = player.y - Math.sin(facing) * 60 + Math.cos(facing) * flank;
+                if (nav && !nav.walkable(gx, gy)) {
+                    const i = nav.nearestFree(gx, gy);
+                    if (i !== null) { gx = nav.cx(i); gy = nav.cy(i); }
+                    else { gx = player.x; gy = player.y; }
                 }
-                
-                // Tail always animates
-                this.tailPhase += 0.04;
+                const gap = Math.hypot(gx - this.x, gy - this.y);
+                // Hysteresis gives her time to settle; a departing player always interrupts rest.
+                const follow = adopted && (dist > 125 || gap > (this.state === 'following' ? 16 : 55));
+                let moved = 0;
+                if (follow) {
+                    const wp = navWaypoint(this, gx, gy, map);
+                    const det = detourAroundPlayer(this, wp.x, wp.y, player);
+                    const useDet = !wp.blocked && (!nav || (nav.walkable(det.x, det.y) && nav.lineWalkable(this.x, this.y, det.x, det.y)));
+                    const tx = useDet ? det.x : wp.x, ty = useDet ? det.y : wp.y;
+                    const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy);
+                    const desired = Math.atan2(dy, dx);
+                    const turn = Math.atan2(Math.sin(desired - this.angle), Math.cos(desired - this.angle));
+                    const top = dist > 220 ? 6.5 : dist > 130 ? 5.2 : 2.4;
+                    const turnRate = (top > 5 ? 0.18 : 0.12) * dt;
+                    if (!wp.blocked && d > 0.5) this.angle += Math.max(-turnRate, Math.min(turnRate, turn));
+                    const error = Math.atan2(Math.sin(desired - this.angle), Math.cos(desired - this.angle));
+                    const targetSpeed = wp.blocked || d < 0.5 || Math.abs(error) > 0.9 ? 0
+                        : Math.min(top, wp.finalLeg ? d * 0.16 : d / dt) * Math.max(0.35, Math.cos(error));
+                    const change = (targetSpeed > (this._moveSpeed || 0) ? 0.2 : 0.38) * dt;
+                    this._moveSpeed = Math.max(0, (this._moveSpeed || 0) + Math.max(-change, Math.min(change, targetSpeed - (this._moveSpeed || 0))));
+                    const step = targetSpeed ? Math.min(this._moveSpeed * dt, d) : 0;
+                    const vx = Math.cos(this.angle) * step, vy = Math.sin(this.angle) * step;
+                    if (step && (!nav || nav.lineWalkable(this.x, this.y, this.x + vx, this.y + vy))) {
+                        this.x += vx; this.y += vy; moved = step;
+                    } else if (step) {
+                        // Turn toward the clear path at a tight corner before taking another step.
+                        this._moveSpeed = 0;
+                        this.angle += Math.max(-turnRate, Math.min(turnRate, error));
+                    }
+                    this.state = 'following';
+                    this.idleBehavior = null; this.idleTimer = 0;
+                } else {
+                    this._moveSpeed = 0; this._navPath = null;
+                    this.state = 'idle'; this.idleTimer += dt;
+                    if (this.idleTimer > 180 && !this.idleBehavior) {
+                        const roll = this._random();
+                        this.idleBehavior = roll < 0.35 ? 'sit' : roll < 0.65 ? 'groom' : roll < 0.85 ? 'look' : 'sleep';
+                    }
+                    if (this.idleTimer > 540) { this.idleBehavior = null; this.idleTimer = 100; }
+                }
+                this.animationSpeed = moved / dt;
+                // Phase follows distance actually travelled: blocked cats never run in place.
+                this.walkPhase += moved * 0.115;
+                this.tailPhase += (moved ? 0.055 : 0.025) * dt;
+                this._pose = (this._pose || 0) + ((this.idleBehavior === 'sit' || this.idleBehavior === 'groom' || this.idleBehavior === 'sleep' ? 1 : 0) - (this._pose || 0)) * Math.min(1, 0.1 * dt);
             }
-            
+
             draw(ctx) {
                 if (!this.visible || this.inCar) return;
 
@@ -228,30 +231,27 @@
                     ? VELVET_CAT_PALETTES[this.coatPalette].colors : VELVET_CAT_PALETTES.default.colors;
 
                 const phase = Number.isFinite(this.tailPhase) ? this.tailPhase : 0;
-                const sleeping = this.state === 'sleeping';
+                const sleeping = this.state === 'sleeping' || (this.state === 'idle' && this.idleBehavior === 'sleep');
                 const sitting = this.state === 'sitting' || (this.state === 'idle' && this.idleBehavior === 'sit');
                 const grooming = this.state === 'idle' && this.idleBehavior === 'groom';
                 const looking = this.state === 'idle' && this.idleBehavior === 'look';
-                const walking = this.state === 'following';
-                const stride = walking ? Math.sin(this.walkPhase) * 2.5 : 0;
-                const lift = walking ? Math.cos(this.walkPhase) : 0;
-                const length = sitting ? 12 : 16;
+                const walking = (this.animationSpeed || 0) > 0.05;
+                const running = walking && this.animationSpeed > 5.5;
+                const strideSize = walking ? Math.min(4.8, 1.8 + this.animationSpeed * 0.45) : 0;
+                const length = 16 - (this._pose ?? (sitting ? 1 : 0)) * 4;
                 const headX = sleeping ? 5.3 : length - 2;
                 const headY = sleeping ? 2.1 : 0;
-                const headTurn = sleeping ? .77 : grooming ? -.17 + Math.sin(phase * 3.2) * .045 : looking ? Math.sin(phase * .7) * .15 : 0;
+                const headTurn = sleeping ? .77 : grooming ? -.17 + Math.sin(phase * 3.2) * .045 : looking ? Math.sin(phase * .7) * .28 : walking ? Math.sin(this.walkPhase) * .035 : 0;
+                const blink = !walking && Math.cos(phase * 0.83) > 0.993;
 
+                // Ground contact is independent of body facing, gait and tail movement.
+                drawGroundContactShadow(ctx, this.x, this.y, sleeping ? 16 : 20, sleeping ? 11 : 10);
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
                 ctx.shadowBlur = 0;
-
-                // A compact ground shadow; the feline outline itself stays smooth and short-haired.
-                ctx.fillStyle = 'rgba(0,0,0,.27)';
-                ctx.beginPath();
-                ctx.ellipse(sleeping ? -3 : -1, 2.5, sleeping ? 13 : length + 1, sleeping ? 9 : 7.2, 0, 0, Math.PI * 2);
-                ctx.fill();
 
                 // Supple, tapering tail, painted behind the rump. All motion comes from update's phase.
                 const sway = Math.sin(phase) * 5.3;
@@ -313,19 +313,28 @@
                         for (const side of [-1, 1]) {
                             for (const front of [false, true]) {
                                 if (grooming && front && side === -1) continue;
-                                const sign = (front ? 1 : -1) * side;
+                                // Four-beat walk, diagonal trot, then paired fore/hind bounds.
+                                const offset = running ? (front ? 0 : Math.PI) + side * 0.22
+                                    : this.animationSpeed > 3 ? (front ? 0 : Math.PI) + (side > 0 ? Math.PI : 0)
+                                    : (front ? 0 : Math.PI * 0.5) + (side > 0 ? Math.PI : 0);
+                                const phase = this.walkPhase + offset;
+                                const swing = walking ? Math.max(0, Math.cos(phase)) : 0;
                                 const jointX = front ? 7.8 : -9.1;
-                                const footX = (front ? 9.4 : -10.5) + stride * sign;
-                                const footY = side * (front ? 6.6 : 6.1) + side * Math.max(0, lift * sign) * .38;
+                                const footX = (front ? 9.4 : -10.5) + Math.sin(phase) * strideSize;
+                                const footY = side * (front ? 6.6 : 6.1) + side * swing * 0.85;
                                 ctx.strokeStyle = coatColors.legShade;ctx.lineWidth = 3;
                                 ctx.beginPath();ctx.moveTo(jointX, side * 4.1);ctx.quadraticCurveTo(footX - .8, side * 5.2, footX, footY);ctx.stroke();
-                                paw(footX, footY, front ? 2.65 : 2.95, 1.8);
+                                paw(footX, footY, (front ? 2.65 : 2.95) * (1 - swing * 0.12), 1.8, swing > 0.4);
                             }
                         }
                     }
                 }
 
                 // Rounded haunches, a small waist, and muscular shoulders replace the capsule body.
+                ctx.save();
+                const breath = sleeping ? Math.sin(phase * 0.7) * 0.025 : 0;
+                const bob = walking ? Math.sin(this.walkPhase * 2) * (running ? 0.055 : 0.018) : 0;
+                ctx.scale(1 + bob, 1 - bob * 0.45 + breath);
                 const body = new Path2D();
                 if (sleeping) {
                     body.moveTo(-15, 1);
@@ -377,6 +386,8 @@
                 else {ctx.moveTo(-length + 2, -3.4);ctx.bezierCurveTo(-length + 5, -7.2, -6, -6.3, -3.8, -5.4);}
                 ctx.stroke();
 
+                ctx.restore(); // body breathing / shoulder motion
+
                 // The face turns slightly for existing look/groom states; no animation state is written here.
                 ctx.save();ctx.translate(headX, headY);ctx.rotate(headTurn);
                 for (const side of [-1, 1]) {
@@ -412,7 +423,7 @@
                 ctx.stroke();
                 for (const side of [-1, 1]) {
                     ctx.save();ctx.translate(2.55, side * 2.42);ctx.rotate(side * .22);
-                    if (sleeping) {
+                    if (sleeping || blink) {
                         ctx.strokeStyle = '#b18abc';ctx.lineWidth = .65;
                         ctx.beginPath();ctx.moveTo(-1.35, 0);ctx.quadraticCurveTo(0, .58, 1.3, -.04);ctx.stroke();
                     } else {
