@@ -16727,6 +16727,28 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
 
+        // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
+        // before artwork transforms and never baked into a rotating furniture sprite.
+        function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
+            let cv = drawGroundContactShadow.sprite;
+            if (!cv) {
+                cv = drawGroundContactShadow.sprite = document.createElement('canvas');
+                cv.width = cv.height = 64;
+                const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+                g.addColorStop(0, 'rgba(0,0,0,0.30)');
+                g.addColorStop(0.65, 'rgba(0,0,0,0.24)');
+                g.addColorStop(0.85, 'rgba(0,0,0,0.12)');
+                g.addColorStop(1, 'rgba(0,0,0,0)');
+                c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+            }
+            if (angle) {
+                // The contact footprint follows the base. Its centre never gains a
+                // facing-dependent light offset like the old displaced silhouette.
+                ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+                ctx.drawImage(cv, -rx, -ry, rx * 2, ry * 2); ctx.restore();
+            } else ctx.drawImage(cv, x - rx, y - ry, rx * 2, ry * 2);
+        }
+
         // =====================================================================
         //  ENTITY SUBCLASSES
         // =====================================================================
@@ -16745,9 +16767,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     isStatic: true
                 });
             }
-            
+
             update() { }
-            
+
             draw(ctx) {
                 if (!this.visible) return;
                 ctx.fillStyle = this.data.color || '#444';
@@ -16789,7 +16811,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (fill) { ctx.fillStyle = fill; ctx.fill(); }
                 if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
             };
-            const shadow = () => rr(x + 3, y + 3, w, h, 5, 'rgba(0,0,0,0.28)');
+
             const lampShade = (cx, cy, r) => { circ(cx, cy, r, A.cream, A.creamDk, 1); circ(cx, cy, r * 0.35, '#ffd9b0'); };
             const counterTop = (X, Y, W, H) => {                          // cream quartz with a walnut front edge (north side)
                 rr(X, Y, W, H, 2, A.cream);
@@ -16803,7 +16825,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const tx = x + w * 0.44, ty = y + 11, tw = w * 0.3, th = h * 0.42;
                     // (PropPass segments, entities/prop-sprites.js: the still runs are painted once, the scanline and the ember stay live)
                     if (PropPass.seg(false)) {
-                        rr(x + 3, y + 4, w, h, 3, 'rgba(0,0,0,0.34)');
                         for (const [lx, ly] of [[x + 1, y + 1], [x + w - 5, y + 1], [x + 1, y + h - 5], [x + w - 5, y + h - 5]]) rr(lx, ly, 4, 4, 1, '#5a5e6a');
                         rr(x, y, w, h, 3, A.walnut, '#2a201a', 1);
                         ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 0.6; ctx.beginPath();          // grain
@@ -16847,7 +16868,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'apt_sofa': {                                         // faces north: back along the bottom edge
-                    shadow();
                     rr(x, y, w, h, 10, A.wine);
                     rr(x + 2, y + h - 20, w - 4, 18, 8, A.wineDk);                                   // back
                     rr(x, y + 4, 16, h - 6, 7, A.wineDk); rr(x + w - 16, y + 4, 16, h - 6, 7, A.wineDk);   // arms
@@ -16870,25 +16890,25 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'apt_side': case 'apt_nightstand': {
-                    shadow(); rr(x, y, w, h, 5, A.walnut, A.walnutLt, 1);
+                    rr(x, y, w, h, 5, A.walnut, A.walnutLt, 1);
                     lampShade(x + w * 0.42, y + h * 0.45, Math.min(w, h) * 0.3);
                     if (p.decorType === 'apt_nightstand') { ctx.fillStyle = A.brass; ctx.fillRect(x + w / 2 - 3, y + h - 3, 6, 1.5); }
                     break;
                 }
                 case 'apt_coffee': {
-                    shadow(); rr(x, y, w, h, h / 2, A.walnut, A.walnutLt, 1);
+                    rr(x, y, w, h, h / 2, A.walnut, A.walnutLt, 1);
                     rr(x + 5, y + 4, w - 10, h - 8, (h - 8) / 2, 'rgba(255,240,230,0.08)');
                     rr(x + 8, y + 8, 16, 11, 1, A.cream); rr(x + 10, y + 10, 16, 11, 1, A.blush);           // books
                     circ(x + w - 16, y + h / 2, 5, '#d8cbbd'); for (let i = 0; i < 5; i++) circ(x + w - 16 + Math.cos(i * 1.26) * 4, y + h / 2 + Math.sin(i * 1.26) * 4, 2.2, i % 2 ? A.blushLt : '#f3e3ea');   // vase of flowers
                     break;
                 }
                 case 'apt_chair': {
-                    shadow(); rr(x, y, w, h, 12, A.blush);
+                    rr(x, y, w, h, 12, A.blush);
                     rr(x + 5, y + 5, w - 10, h - 14, 9, '#e6c3c2'); rr(x + 3, y + h - 10, w - 6, 8, 4, '#b27a82');
                     break;
                 }
                 case 'apt_bookshelf': {
-                    shadow(); rr(x, y, w, h, 2, A.walnut);
+                    rr(x, y, w, h, 2, A.walnut);
                     const cols = [A.wine, A.cream, A.blush, A.leaf, A.brass, '#8c6d5e', A.wineLt];
                     let bx = x + 3, i = 0;
                     while (bx < x + w - 4) {
@@ -16901,7 +16921,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 case 'apt_console': {
                     const cx = x + w / 2 - 6, cy = y + h / 2;                                           // turntable
                     if (PropPass.seg(false)) {
-                        shadow(); rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
+                        rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
                         ctx.fillStyle = '#2a2020'; ctx.fillRect(x + 6, y + 4, 26, h - 8); ctx.fillRect(x + w - 32, y + 4, 26, h - 8);   // speakers
                         ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 4; i++) { ctx.fillRect(x + 8, y + 6 + i * 3.5, 22, 1); ctx.fillRect(x + w - 30, y + 6 + i * 3.5, 22, 1); }
                         circ(cx, cy, 9, A.ink); circ(cx, cy, 3, A.wineLt);
@@ -16912,7 +16932,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'apt_plant': {
                     const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2;
-                    circ(cx + 2, cy + 2, r * 0.62, 'rgba(0,0,0,0.3)'); circ(cx, cy, r * 0.6, A.cream, A.creamDk, 1);
+                    circ(cx, cy, r * 0.6, A.cream, A.creamDk, 1);
                     for (let i = 0; i < 7; i++) {
                         const a = i * 0.9 + (x % 7), sway = Math.sin(t * 0.8 + i) * 0.05;
                         ctx.fillStyle = i % 2 ? A.leaf : A.leafLt;
@@ -16922,11 +16942,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'apt_floor_lamp': {
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx + 2, cy + 2, w / 2, 'rgba(0,0,0,0.25)'); circ(cx, cy, w / 2, A.cream, A.brass, 1.5); circ(cx, cy, w / 5, '#ffd9b0');
+                    circ(cx, cy, w / 2, A.cream, A.brass, 1.5); circ(cx, cy, w / 5, '#ffd9b0');
                     break;
                 }
                 case 'apt_fridge': {
-                    shadow(); rr(x, y, w, h, 2, '#8e8986'); rr(x + 2, y + 2, w - 4, h - 4, 1.5, '#b6b1ad');
+                    rr(x, y, w, h, 2, '#8e8986'); rr(x + 2, y + 2, w - 4, h - 4, 1.5, '#b6b1ad');
                     ctx.fillStyle = A.brass; ctx.fillRect(x + 4, y + 3, w - 8, 1.6);
                     ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x + w / 2 - 0.5, y + 4, 1, h - 8);
                     break;
@@ -16956,7 +16976,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'apt_island': {                                       // open bar: quartz top, waterfall ends, overhang on the seating side
-                    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(x + 4, y + 4, w, h);
+
                     counterTop(x, y, w, h);
                     ctx.fillStyle = A.creamDk; ctx.fillRect(x, y, 6, h); ctx.fillRect(x + w - 6, y, 6, h);                   // waterfall edges
                     ctx.fillStyle = A.walnut; ctx.fillRect(x + 6, y + h - 4, w - 12, 4);
@@ -16966,11 +16986,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'apt_stool': {
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx + 1.5, cy + 1.5, w / 2, 'rgba(0,0,0,0.3)'); circ(cx, cy, w / 2, A.brass); circ(cx, cy, w / 2 - 2.5, A.wine);
+                    circ(cx, cy, w / 2, A.brass); circ(cx, cy, w / 2 - 2.5, A.wine);
                     break;
                 }
                 case 'apt_bed': {                                          // queen bed, headboard against the top wall
-                    shadow(); rr(x - 2, y, w + 4, h, 5, A.walnut);
+                    rr(x - 2, y, w + 4, h, 5, A.walnut);
                     rr(x - 4, y - 2, w + 8, 12, 4, A.blush);                                          // channel-tufted headboard
                     ctx.strokeStyle = 'rgba(90,34,48,0.35)'; ctx.lineWidth = 1; ctx.beginPath();
                     for (let i = 1; i < 8; i++) { ctx.moveTo(x - 4 + (w + 8) * i / 8, y - 1); ctx.lineTo(x - 4 + (w + 8) * i / 8, y + 9); }
@@ -16987,13 +17007,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'apt_wardrobe': {
-                    shadow(); rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
+                    rr(x, y, w, h, 2, A.walnut, A.walnutLt, 1);
                     ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(x + 2, y + h / 2 - 0.5, w - 4, 1);
                     ctx.fillStyle = A.brass; ctx.fillRect(x + 4, y + h / 2 - 6, 1.5, 5); ctx.fillRect(x + 4, y + h / 2 + 1, 1.5, 5);
                     break;
                 }
                 case 'apt_vanity': {                                       // against the east wall: round mirror, stool in front
-                    shadow(); rr(x + 14, y, w - 14, h, 3, A.walnut, A.walnutLt, 1);
+                    rr(x + 14, y, w - 14, h, 3, A.walnut, A.walnutLt, 1);
                     const mx = x + w - 6, my = y + h / 2;
                     circ(mx, my, 16, A.brass); circ(mx, my, 14, '#d9d6de');
                     ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(mx - 2, my - 1, 8, 1.9, 4.2); ctx.stroke();   // the one crescent
@@ -17003,7 +17023,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'apt_tub': {                                          // freestanding oval tub with petals
                     if (PropPass.seg(false)) {
-                        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 3, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+
                         ctx.fillStyle = '#f7f4f0'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
                         ctx.fillStyle = '#cfe0e6'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 7, h / 2 - 7, 0, 0, Math.PI * 2); ctx.fill();
                     }
@@ -17015,7 +17035,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'apt_bath_vanity': {                                  // double marble vanity against the south wall
-                    shadow(); rr(x, y, w, h, 2, A.stone, '#c9c4c0', 1);
+                    rr(x, y, w, h, 2, A.stone, '#c9c4c0', 1);
                     ctx.fillStyle = '#cfd6da'; ctx.fillRect(x + 4, y + h - 4, w - 8, 3);                  // mirror edge on the wall
                     for (const u of [0.28, 0.72]) {
                         ctx.fillStyle = '#d4d0cc'; ctx.beginPath(); ctx.ellipse(x + w * u, y + h * 0.45, 18, 9, 0, 0, Math.PI * 2); ctx.fill();
@@ -17040,7 +17060,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'apt_lounger': {                                      // veranda lounger, head toward the railing (north)
-                    shadow(); rr(x, y, w, h, 4, A.walnut);
+                    rr(x, y, w, h, 4, A.walnut);
                     rr(x + 2, y + 2, w - 4, h - 4, 4, A.cream); rr(x + 3, y + 3, w - 6, 16, 4, '#fbf6f0');
                     rr(x + 1, y + h - 22, w - 2, 14, 3, A.blush);
                     break;
@@ -17048,7 +17068,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 case 'apt_bistro': {
                     const cx = x + w / 2, cy = y + h / 2;
                     for (const s of [-1, 1]) { circ(cx + s * 24, cy + 2, 8, A.ink, A.brass, 1); }
-                    circ(cx + 2, cy + 2, 13, 'rgba(0,0,0,0.3)'); circ(cx, cy, 13, A.stone, A.brass, 1.5);
+                    circ(cx, cy, 13, A.stone, A.brass, 1.5);
                     circ(cx - 3, cy - 2, 3, '#f3e3ea'); circ(cx + 4, cy + 2, 2.5, A.blush);
                     break;
                 }
@@ -17062,7 +17082,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'apt_planter': {
-                    shadow(); rr(x, y, w, h, 3, '#8c7f76', '#a79a90', 1); rr(x + 3, y + 3, w - 6, h - 6, 2, '#3a2a24');
+                    rr(x, y, w, h, 3, '#8c7f76', '#a79a90', 1); rr(x + 3, y + 3, w - 6, h - 6, 2, '#3a2a24');
                     for (let i = 0; i < 6; i++) {
                         const lx = x + 6 + i * (w - 12) / 5;
                         ctx.fillStyle = i % 2 ? A.leaf : A.leafLt; ctx.beginPath(); ctx.ellipse(lx, y + h / 2, 6, 4, i, 0, Math.PI * 2); ctx.fill();
@@ -17093,7 +17113,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (fill) { ctx.fillStyle = fill; ctx.fill(); }
                 if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
             };
-            const shadow = (r = 4) => rr(x + 3, y + 3, w, h, r, 'rgba(0,0,0,0.32)');
+
             const flame = (fx, fy, s = 1, k = 0) => {                     // a candle: wax, then a breathing flame
                 circ(fx, fy, 2.2 * s, C.bone);
                 const f = 0.75 + 0.25 * Math.sin(t * 11 + fx * 0.3 + k);
@@ -17102,7 +17122,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             switch (p.decorType) {
                 case 'hod_candelabra': {                                  // wrought iron, five candles
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx + 2, cy + 2, w / 2, 'rgba(0,0,0,0.3)');
                     circ(cx, cy, w / 2 - 1, null, C.gold, 1.4);
                     ctx.strokeStyle = C.gold; ctx.lineWidth = 1.2; ctx.beginPath();
                     ctx.moveTo(cx - w / 2 + 3, cy); ctx.lineTo(cx + w / 2 - 3, cy); ctx.moveTo(cx, cy - h / 2 + 3); ctx.lineTo(cx, cy + h / 2 - 3); ctx.stroke();
@@ -17110,7 +17129,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'hod_table': {                                       // oxblood table, gold inlay; a runner and candles when laid
-                    shadow(5); rr(x, y, w, h, 5, C.wood, C.woodLt, 1.2);
+                    rr(x, y, w, h, 5, C.wood, C.woodLt, 1.2);
                     rr(x + 4, y + 4, w - 8, h - 8, 3, null, 'rgba(201,164,106,0.45)', 0.8);
                     if (d.candles) {
                         rr(x + 12, y + h / 2 - 8, w - 24, 16, 2, C.crimson);
@@ -17125,7 +17144,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'hod_chair': {                                       // gothic high back, pointed crest (back on the far side from `face`)
-                    shadow(3); rr(x, y, w, h, 3, C.crimson, C.wine, 1);
+                    rr(x, y, w, h, 3, C.crimson, C.wine, 1);
                     const f = d.face || 'S';
                     ctx.fillStyle = C.wood;
                     if (f === 'S') ctx.fillRect(x - 1, y - 4, w + 2, 6); else if (f === 'N') ctx.fillRect(x - 1, y + h - 2, w + 2, 6);
@@ -17136,14 +17155,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'hod_pew': {
-                    shadow(3); rr(x, y, w, h, 3, C.wood, C.woodLt, 1);
+                    rr(x, y, w, h, 3, C.wood, C.woodLt, 1);
                     ctx.fillStyle = C.woodLt; ctx.fillRect(x + 2, y + h - 5, w - 4, 4);            // backrest
                     ctx.fillStyle = 'rgba(0,0,0,0.25)'; for (let i = 1; i < 4; i++) ctx.fillRect(x + i * w / 4, y + 2, 1, h - 7);
                     ctx.fillStyle = C.gold; ctx.fillRect(x - 1, y + 2, 2, h - 4); ctx.fillRect(x + w - 1, y + 2, 2, h - 4);
                     break;
                 }
                 case 'hod_organ': {                                       // gold pipes over a black console
-                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1);
+                    rr(x, y, w, h, 3, C.ink, C.gold, 1);
                     const n = 15;
                     for (let i = 0; i < n; i++) {
                         const px = x + 6 + i * (w - 12) / (n - 1), tall = 0.45 + 0.55 * Math.abs(Math.sin(i * 0.55 + 0.4));
@@ -17154,7 +17173,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'hod_altar': {                                       // black stone, a violet cloth, a Dark Element crystal glowing
-                    shadow(4); rr(x, y, w, h, 3, C.marble, C.marbleLt, 1.5);
+                    rr(x, y, w, h, 3, C.marble, C.marbleLt, 1.5);
                     rr(x + w * 0.3, y - 2, w * 0.4, h + 4, 1, '#3b1f6a');
                     ctx.fillStyle = C.gold; ctx.fillRect(x + w * 0.3, y + h + 1, w * 0.4, 1.5);
                     const pulse = 0.75 + 0.25 * Math.sin(t * 2.2);
@@ -17167,7 +17186,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'hod_bookcase': {                                    // dark shelves of spines, gold-edged
-                    shadow(2); rr(x, y, w, h, 2, C.ink, C.gold, 0.8);
+                    rr(x, y, w, h, 2, C.ink, C.gold, 0.8);
                     const cols = ['#5a1a2a', '#2c2248', '#1f3a33', '#4a3a28', '#6a4a8a', '#3a1a1a'];
                     const along = d.vertical ? h : w, across = d.vertical ? w : h;
                     for (let i = 0, k = 0; i < along - 6; k++) {
@@ -17179,7 +17198,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'hod_console': {                                     // a steel plinth with a turning hologram
-                    shadow(4); rr(x, y, w, h, 5, C.steel, C.steelLt, 1);
+                    rr(x, y, w, h, 5, C.steel, C.steelLt, 1);
                     const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) * 0.32;
                     ctx.save(); ctx.globalAlpha = 0.75 + 0.2 * Math.sin(t * 3);
                     circ(cx, cy, r, 'rgba(127,224,255,0.18)', C.holo, 1);
@@ -17190,8 +17209,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'hod_piano': {                                       // a black grand, lid open, gold strings
-                    ctx.save(); ctx.translate(3, 3); ctx.fillStyle = 'rgba(0,0,0,0.32)';
-                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * 0.55, y); ctx.bezierCurveTo(x + w, y, x + w, y + h * 0.4, x + w * 0.8, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill(); ctx.restore();
+
                     ctx.fillStyle = '#0b0a0e'; ctx.strokeStyle = C.gold; ctx.lineWidth = 1;
                     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * 0.55, y); ctx.bezierCurveTo(x + w, y, x + w, y + h * 0.4, x + w * 0.8, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill(); ctx.stroke();
                     ctx.strokeStyle = 'rgba(236,208,154,0.35)'; ctx.beginPath();
@@ -17202,14 +17220,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'hod_column': {                                      // a black marble column, gold capital ring
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx + 3, cy + 3, w / 2, 'rgba(0,0,0,0.35)');
                     circ(cx, cy, w / 2, C.marble, C.gold, 1.5); circ(cx, cy, w / 2 - 5, C.marbleLt);
                     ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, w / 2 - 8, -2.4, -0.8); ctx.stroke();
                     break;
                 }
                 case 'hod_fountain': {                                    // a round basin, rain rippling, an obsidian spire
                     const cx = x + w / 2, cy = y + h / 2, R = w / 2;
-                    circ(cx + 3, cy + 3, R, 'rgba(0,0,0,0.3)');
                     circ(cx, cy, R, '#3a3a44', C.gold, 1.2); circ(cx, cy, R - 7, '#1a2a3a');
                     ctx.strokeStyle = 'rgba(170,200,255,0.3)'; ctx.lineWidth = 1;
                     for (let i = 0; i < 3; i++) { const ph = (t * 0.5 + i / 3) % 1; ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.arc(cx, cy, 12 + ph * (R - 20), 0, Math.PI * 2); ctx.stroke(); }
@@ -17233,14 +17249,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'hod_bust': {                                        // a marble head on a black plinth
-                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1);
+                    rr(x, y, w, h, 3, C.ink, C.gold, 1);
                     circ(x + w / 2, y + h / 2 + 2, w * 0.3, '#cfc8c0'); circ(x + w / 2, y + h / 2 - 2, w * 0.2, C.bone);
                     break;
                 }
                 case 'hod_coffin': {                                      // a hexagonal coffin under violet glass, gold cross-bands
                     const pts = [[0, 0.5], [0.18, 0], [0.8, 0.1], [1, 0.5], [0.8, 0.9], [0.18, 1]];
                     const path = (dx = 0, dy = 0) => { ctx.beginPath(); pts.forEach(([u, v], i) => ctx[i ? 'lineTo' : 'moveTo'](x + dx + u * w, y + dy + v * h)); ctx.closePath(); };
-                    path(3, 3); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+
                     path(); ctx.fillStyle = '#120a14'; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 1.5; ctx.stroke();
                     const pulse = 0.6 + 0.4 * Math.sin(t * 1.7);
                     ctx.save(); ctx.globalAlpha = 0.35 + 0.25 * pulse; ctx.fillStyle = C.violet;
@@ -17249,7 +17265,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'hod_reliquary': {                                   // a glass case on a gold stand, a relic floating inside
-                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1.2);
+                    rr(x, y, w, h, 3, C.ink, C.gold, 1.2);
                     rr(x + 4, y + 4, w - 8, h - 8, 2, 'rgba(180,150,255,0.14)', 'rgba(220,200,255,0.5)', 0.8);
                     const bob = Math.sin(t * 2 + x) * 1.5;
                     circ(x + w / 2, y + h / 2 + bob, 4, (x + y) % 2 ? '#ff8a6a' : C.violetLt);
@@ -17281,7 +17297,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (fill) { ctx.fillStyle = fill; ctx.fill(); }
                 if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
             };
-            const shadow = (r = 5) => rr(x + 3, p.y + 4, w, h, r, floats ? `rgba(0,0,0,${0.22 - bob * 0.01})` : 'rgba(0,0,0,0.3)');
+
             if (floats) {                                                  // the hover-glow beneath
                 ctx.save(); ctx.globalAlpha = 0.35 + 0.1 * Math.sin(t * 3 + x);
                 ctx.fillStyle = 'rgba(232,194,122,0.5)'; ctx.beginPath(); ctx.ellipse(x + w / 2, p.y + h / 2 + 2, w * 0.45, h * 0.35, 0, 0, Math.PI * 2); ctx.fill();
@@ -17290,7 +17306,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             switch (p.decorType) {
                 case 'dn_fountain': {                                      // black-marble basin, water sheeting down a glass column round a turning rift
                     const cx = x + w / 2, cy = y + h / 2, R = w / 2;
-                    circ(cx + 3, cy + 4, R, 'rgba(0,0,0,0.35)');
                     circ(cx, cy, R, C.marble, C.gold, 2); circ(cx, cy, R - 5, null, 'rgba(223,230,255,0.35)', 1);
                     circ(cx, cy, R - 8, '#0f1a2a');
                     ctx.strokeStyle = 'rgba(180,210,255,0.35)'; ctx.lineWidth = 1;
@@ -17309,8 +17324,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'dn_desk': {                                          // curved black marble, gold edge; bell, key rack, ledger
                     const cx = x + w / 2;
-                    ctx.save(); ctx.translate(3, 4); ctx.fillStyle = 'rgba(0,0,0,0.35)';
-                    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(cx, y + h * 0.9, x + w, y); ctx.lineTo(x + w, y + h * 0.5); ctx.quadraticCurveTo(cx, y + h * 1.5, x, y + h * 0.5); ctx.closePath(); ctx.fill(); ctx.restore();
+
                     ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(cx, y + h * 0.9, x + w, y); ctx.lineTo(x + w, y + h * 0.5); ctx.quadraticCurveTo(cx, y + h * 1.5, x, y + h * 0.5); ctx.closePath();
                     ctx.fillStyle = C.marbleLt; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 2.5; ctx.stroke();
                     ctx.strokeStyle = 'rgba(223,230,255,0.22)'; ctx.lineWidth = 1; ctx.beginPath();          // silver veins
@@ -17322,7 +17336,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'dn_sofa': {                                          // red velvet, buttoned, gold feet
-                    shadow(10); rr(x, y, w, h, 10, C.velvet);
+                    rr(x, y, w, h, 10, C.velvet);
                     const back = p.y < 800 ? 'N' : 'S';                    // faces into the lounge
                     rr(x + 2, back === 'N' ? y : y + h - 16, w - 4, 16, 8, '#4a0814');
                     rr(x, y + 4, 14, h - 8, 6, '#4a0814'); rr(x + w - 14, y + 4, 14, h - 8, 6, '#4a0814');
@@ -17333,13 +17347,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'dn_wingback': {
-                    shadow(6); rr(x, y, w, h, 6, C.velvet);
+                    rr(x, y, w, h, 6, C.velvet);
                     rr(x + 2, y + (p.y < 950 ? h - 12 : 0), w - 4, 12, 5, '#4a0814'); rr(x, y + 4, 8, h - 8, 4, '#4a0814'); rr(x + w - 8, y + 4, 8, h - 8, 4, '#4a0814');
                     rr(x + 10, y + 8, w - 20, h - 20, 4, C.crimsonLt);
                     break;
                 }
                 case 'dn_table': {                                         // marble top on gold legs, champagne and a vase
-                    shadow(h / 2); rr(x, y, w, h, h / 2, '#e9e4ea', C.gold, 2);
+                    rr(x, y, w, h, h / 2, '#e9e4ea', C.gold, 2);
                     ctx.strokeStyle = 'rgba(120,110,130,0.35)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x + 10, y + 8); ctx.quadraticCurveTo(x + w / 2, y + h * 0.7, x + w - 12, y + 10); ctx.stroke();
                     circ(x + w * 0.3, y + h / 2, 3, 'rgba(255,240,200,0.9)', C.gold, 0.8); circ(x + w * 0.42, y + h / 2 + 3, 3, 'rgba(255,240,200,0.9)', C.gold, 0.8);   // flutes
                     circ(x + w * 0.72, y + h / 2, 6, C.ink, C.gold, 1); for (let i = 0; i < 5; i++) circ(x + w * 0.72 + Math.cos(i * 1.26) * 4, y + h / 2 + Math.sin(i * 1.26) * 4, 2, i % 2 ? '#e8b4b8' : C.crimsonLt);
@@ -17347,12 +17361,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'dn_lamp': {                                          // a champagne-gold floor lamp
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx + 2, cy + 3, w / 2, 'rgba(0,0,0,0.3)'); circ(cx, cy, w / 2, C.cream, C.gold, 1.5); circ(cx, cy, w * 0.18, '#fff0c8');
+                    circ(cx, cy, w / 2, C.cream, C.gold, 1.5); circ(cx, cy, w * 0.18, '#fff0c8');
                     break;
                 }
                 case 'dn_palm': {                                          // a potted palm in a gold urn
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx + 2, cy + 3, w / 2, 'rgba(0,0,0,0.3)'); circ(cx, cy, w * 0.32, C.ink, C.gold, 1.5);
+                    circ(cx, cy, w * 0.32, C.ink, C.gold, 1.5);
                     for (let i = 0; i < 7; i++) {
                         const a = i * 0.9 + Math.sin(t * 0.8 + i) * 0.04, L = w * 0.62;
                         ctx.strokeStyle = i % 2 ? C.leafLt : C.leaf; ctx.lineWidth = 4; ctx.lineCap = 'round';
@@ -17362,19 +17376,18 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'dn_float_chaise': {                                  // a chaise hanging in the air, silver-edged
-                    shadow(10); rr(x, y, w, h, 12, '#2a0a14', C.silver, 1.2);
+                    rr(x, y, w, h, 12, '#2a0a14', C.silver, 1.2);
                     rr(x + 4, y + 4, w * 0.3, h - 8, 8, C.crimsonLt); rr(x + w * 0.34, y + 6, w * 0.6, h - 12, 6, C.velvet);
                     ctx.fillStyle = 'rgba(223,230,255,0.25)'; ctx.fillRect(x + 12, y + 2, w - 24, 1);
                     break;
                 }
                 case 'dn_float_chair': {
-                    shadow(8); rr(x, y, w, h, 8, '#2a0a14', C.gold, 1.2);
+                    rr(x, y, w, h, 8, '#2a0a14', C.gold, 1.2);
                     rr(x + 6, y + 6, w - 12, h - 12, 6, C.crimsonLt);
                     break;
                 }
                 case 'dn_lost_luggage': {                                  // a hard case; open (and empty) once searched
                     const open = p._searched;
-                    shadow(3);
                     rr(x, y, w, h, 3, '#3a2a4a', C.gold, 1);
                     if (open) { rr(x - 2, y - h * 0.55, w + 4, h * 0.55, 3, '#2a1e38', C.goldDk, 1); rr(x + 3, y + 3, w - 6, h - 6, 2, '#1a1224'); }
                     else { ctx.fillStyle = C.gold; ctx.fillRect(x + w / 2 - 4, y - 2, 8, 3); ctx.fillRect(x + 4, y + h / 2 - 0.5, w - 8, 1);
@@ -17396,7 +17409,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const wx = x + 4, wy = y + 13, ww = w - 8, wh = h * 0.5;
             ctx.save();
             if (PropPass.seg(false)) {
-                ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+
                 ctx.fillStyle = '#0d0d12'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
             }
             if (PropPass.seg(true)) {
@@ -17442,7 +17455,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const sy = ry + rh + 3, sh = h - (sy - y) - 5;
             ctx.save();
             if (PropPass.seg(false)) {
-                ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 4, w, h, 4); ctx.fill();
+
                 ctx.fillStyle = '#eceef2'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
                 ctx.strokeStyle = '#6a1a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 4); ctx.stroke();
             }
@@ -17497,11 +17510,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (fill) { ctx.fillStyle = fill; ctx.fill(); }
                 if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
             };
-            const shadow = (r = 4) => rr(x + 3, y + 4, w, h, r, 'rgba(0,0,0,0.36)');
+
             const tufts = (X, Y, W, H, n, m, col) => { ctx.fillStyle = col; for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) { ctx.beginPath(); ctx.arc(X + (i + 0.5) * W / n, Y + (j + 0.5) * H / m, 1.1, 0, Math.PI * 2); ctx.fill(); } };
             switch (p.decorType) {
                 case 'mc_stage': {                                         // raised black stage, a gold lip, lavender LED strip on the front edge
-                    shadow(6); rr(x, y, w, h, 6, C.lacquer, C.goldDk, 1.5);
+                    rr(x, y, w, h, 6, C.lacquer, C.goldDk, 1.5);
                     ctx.strokeStyle = 'rgba(200,168,255,0.08)'; ctx.lineWidth = 1; ctx.beginPath();
                     for (let px = x + 20; px < x + w; px += 20) { ctx.moveTo(px, y + 2); ctx.lineTo(px, y + h - 6); } ctx.stroke();
                     rr(x + 4, y + h - 6, w - 8, 3, 1.5, `rgba(200,168,255,${0.55 + 0.4 * pulse})`);
@@ -17511,7 +17524,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'mc_dj': {                                            // the booth: two decks, a mixer, a laptop, LED strip
-                    shadow(4); rr(x, y, w, h, 4, '#120c18', C.chromeDk, 1);
+                    rr(x, y, w, h, 4, '#120c18', C.chromeDk, 1);
                     rr(x + 2, y + h - 5, w - 4, 3, 1.5, `rgba(255,90,138,${0.5 + 0.5 * pulse})`);
                     for (const cx of [x + 26, x + w - 26]) {
                         circ(cx, y + 17, 13, '#1e1a24', C.chromeDk, 1); circ(cx, y + 17, 11, '#0a080c');
@@ -17525,7 +17538,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'mc_speaker': {                                       // a stack: two woofers breathing on the kick, a tweeter
-                    shadow(3); rr(x, y, w, h, 3, '#141018', '#2e2838', 1.2);
+                    rr(x, y, w, h, 3, '#141018', '#2e2838', 1.2);
                     const k = 1 + 0.08 * pulse;
                     for (const cy of [y + h * 0.33, y + h * 0.72]) { circ(x + w / 2, cy, w * 0.34 * k, '#1f1a26', C.chromeDk, 1); circ(x + w / 2, cy, w * 0.16 * k, '#0a080c'); circ(x + w / 2, cy, w * 0.05, C.chromeDk); }
                     circ(x + w / 2, y + 7, 3, '#2a2632', C.chromeDk, 0.6);
@@ -17533,33 +17546,31 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'mc_pole': {                                          // a chrome pole on a lit plinth (the plinth ring is floor art; the glow in drawClubGlow)
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx + 2, cy + 3, 6, 'rgba(0,0,0,0.4)');
                     const g = ctx.createRadialGradient(cx - 1.5, cy - 1.5, 0.5, cx, cy, 5); g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, C.chrome); g.addColorStop(1, C.chromeDk);
                     circ(cx, cy, 5, g); circ(cx, cy, 5, null, C.gold, 1);
                     break;
                 }
                 case 'mc_hightop': {                                       // round high-top: marble on a chrome ring, a cocktail, a candle
                     const cx = x + w / 2, cy = y + h / 2, R = w / 2;
-                    circ(cx + 2, cy + 3, R, 'rgba(0,0,0,0.36)'); circ(cx, cy, R, C.marble, C.gold, 1.5);
+                    circ(cx, cy, R, C.marble, C.gold, 1.5);
                     ctx.strokeStyle = 'rgba(120,100,140,0.35)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(cx - R + 4, cy - 3); ctx.quadraticCurveTo(cx, cy + 4, cx + R - 5, cy - 6); ctx.stroke();
                     circ(cx - 4, cy + 2, 3.2, 'rgba(255,90,138,0.8)', C.chrome, 0.7); circ(cx + 5, cy - 3, 2.2, '#fff2d8');
                     break;
                 }
                 case 'mc_booth': {                                         // a curved velvet booth round a marble table; faces north
-                    shadow(14);
                     ctx.fillStyle = C.velvetDk; ctx.beginPath(); ctx.moveTo(x, y + 10); ctx.quadraticCurveTo(x, y + h, x + 20, y + h); ctx.lineTo(x + w - 20, y + h); ctx.quadraticCurveTo(x + w, y + h, x + w, y + 10);
                     ctx.lineTo(x + w - 16, y + 10); ctx.quadraticCurveTo(x + w - 16, y + h - 16, x + w - 30, y + h - 16); ctx.lineTo(x + 30, y + h - 16); ctx.quadraticCurveTo(x + 16, y + h - 16, x + 16, y + 10); ctx.closePath(); ctx.fill();
                     ctx.strokeStyle = C.gold; ctx.lineWidth = 1; ctx.stroke();
                     tufts(x + 24, y + h - 13, w - 48, 10, 6, 1, 'rgba(255,190,220,0.35)');
                     ctx.fillStyle = C.velvetLt; ctx.beginPath(); ctx.moveTo(x + 16, y + 10); ctx.quadraticCurveTo(x + 16, y + h - 16, x + 30, y + h - 16); ctx.lineTo(x + w - 30, y + h - 16); ctx.quadraticCurveTo(x + w - 16, y + h - 16, x + w - 16, y + 10);
                     ctx.lineTo(x + w - 26, y + 10); ctx.quadraticCurveTo(x + w - 26, y + h - 26, x + w - 36, y + h - 26); ctx.lineTo(x + 36, y + h - 26); ctx.quadraticCurveTo(x + 26, y + h - 26, x + 26, y + 10); ctx.closePath(); ctx.fill();
-                    ctx.beginPath(); ctx.ellipse(x + w / 2 + 2, y + 18, 26, 13, 0, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill();
+
                     ctx.beginPath(); ctx.ellipse(x + w / 2, y + 16, 26, 13, 0, 0, Math.PI * 2); ctx.fillStyle = C.marble; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 1.3; ctx.stroke();
                     circ(x + w / 2 - 8, y + 16, 2.8, 'rgba(255,240,200,0.9)', C.gold, 0.7); circ(x + w / 2 + 2, y + 13, 2.8, 'rgba(255,240,200,0.9)', C.gold, 0.7); circ(x + w / 2 + 12, y + 18, 2, '#fff2d8');
                     break;
                 }
                 case 'mc_backbar': {                                       // mirrored back bar: shelves of bottles, lit from beneath
-                    shadow(2); rr(x, y, w, h, 2, '#150e1c', C.goldDk, 1);
+                    rr(x, y, w, h, 2, '#150e1c', C.goldDk, 1);
                     rr(x + 2, y + 2, 6, h - 4, 1, 'rgba(200,168,255,0.18)');           // the mirror strip against the wall
                     const cols = ['#b8f0c0', '#ffd08a', '#ff8ab0', '#c8a8ff', '#9ad8ff', '#fff2d8', '#e8a060'];
                     for (let by = y + 8, i = 0; by < y + h - 6; by += 9, i++) {
@@ -17570,7 +17581,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'mc_bar': {                                           // the counter: black marble veined gold, a curved gold rail, a row of gold taps
-                    shadow(10);
                     ctx.fillStyle = '#2a2234'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w - 14, y); ctx.quadraticCurveTo(x + w, y + h / 2, x + w - 14, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
                     ctx.strokeStyle = C.goldDk; ctx.lineWidth = 1; ctx.stroke();
                     ctx.strokeStyle = 'rgba(232,194,122,0.3)'; ctx.lineWidth = 0.7; ctx.beginPath();
@@ -17585,7 +17595,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'mc_stool': {                                         // chrome and velvet
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx + 2, cy + 3, w / 2, 'rgba(0,0,0,0.35)'); circ(cx, cy, w / 2, C.chromeDk, C.chrome, 1.2); circ(cx, cy, w / 2 - 3, C.velvetLt);
+                    circ(cx, cy, w / 2, C.chromeDk, C.chrome, 1.2); circ(cx, cy, w / 2 - 3, C.velvetLt);
                     circ(cx - 2, cy - 2, 2.5, 'rgba(255,190,220,0.3)');
                     break;
                 }
@@ -17594,7 +17604,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.strokeStyle = C.chromeDk; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + 6, y - 9); ctx.lineTo(x + w - 6, y - 9); ctx.stroke();
                     const coats = ['#2a1a36', '#5a0c34', '#1e2a3a', '#3a3040', '#8a1a52', '#1a1a1e', '#4a3a60'];
                     for (let i = 0; i < 11; i++) rr(x + 8 + i * 12.5, y - 13, 9, 9, 3, coats[i % coats.length], 'rgba(255,255,255,0.08)', 0.6);
-                    shadow(4); rr(x, y, w, h, 4, C.lacquerLt, C.gold, 1.5);
+                    rr(x, y, w, h, 4, C.lacquerLt, C.gold, 1.5);
                     rr(x + 4, y + 4, w - 8, h - 8, 3, C.lacquer);
                     circ(x + 22, y + h / 2, 4.5, C.gold, C.goldLt, 0.8); circ(x + 22, y + h / 2, 1.3, C.goldLt);
                     for (let i = 0; i < 4; i++) rr(x + 50 + i * 12, y + h / 2 - 5, 9, 10, 1, i % 2 ? C.lilac : C.goldLt, 'rgba(0,0,0,0.3)', 0.5);
@@ -17611,17 +17621,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         ctx.strokeStyle = 'rgba(255,160,200,0.35)'; ctx.lineWidth = 1; ctx.stroke();
                     }
                     ctx.lineCap = 'butt';
-                    for (let i = 0; i < posts; i++) { const [px, py] = P(i); circ(px + 1.5, py + 2, 5, 'rgba(0,0,0,0.35)'); circ(px, py, 5, C.chromeDk, C.chrome, 1); circ(px, py, 2.4, C.gold); }
+                    for (let i = 0; i < posts; i++) { const [px, py] = P(i); circ(px, py, 5, C.chromeDk, C.chrome, 1); circ(px, py, 2.4, C.gold); }
                     break;
                 }
                 case 'mc_bench': {                                         // a buttoned velvet bench on gold feet
-                    shadow(8); rr(x, y, w, h, 8, C.velvet, C.gold, 1);
+                    rr(x, y, w, h, 8, C.velvet, C.gold, 1);
                     rr(x + 4, y + 4, w - 8, h - 8, 6, C.velvetLt); tufts(x + 6, y + 6, w - 12, h - 12, 7, 2, 'rgba(255,190,220,0.4)');
                     break;
                 }
                 case 'mc_orb': {                                           // a moon orb floating over a black plinth, turning slowly
                     const cx = x + w / 2, cy = y + h / 2, bob = Math.sin(t * 1.5 + x) * 2;
-                    circ(cx + 2, cy + 3, w / 2, 'rgba(0,0,0,0.35)'); circ(cx, cy, w / 2, C.lacquer, C.goldDk, 1.2);
+                    circ(cx, cy, w / 2, C.lacquer, C.goldDk, 1.2);
                     const R = w * 0.3, oy = cy - 3 + bob;
                     const g = ctx.createRadialGradient(cx - R * 0.35, oy - R * 0.35, 1, cx, oy, R); g.addColorStop(0, '#ffffff'); g.addColorStop(0.6, C.lilac); g.addColorStop(1, '#9a86c8');
                     circ(cx, oy, R, g);
@@ -17633,7 +17643,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const my = north ? y - 4 : y + h - 2;
                     rr(x, my, w, 6, 2, 'rgba(200,190,230,0.55)', C.gold, 1);
                     for (let bx = x + 8; bx < x + w - 4; bx += 16) circ(bx, my + 3, 1.7, `rgba(255,236,200,${0.8 + 0.2 * Math.sin(t * 2 + bx)})`);
-                    shadow(3); rr(x, y, w, h, 3, C.marble, C.goldDk, 1);
+                    rr(x, y, w, h, 3, C.marble, C.goldDk, 1);
                     ctx.strokeStyle = 'rgba(140,120,160,0.25)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let vx = x + 10; vx < x + w; vx += 38) { ctx.moveTo(vx, y + 2); ctx.quadraticCurveTo(vx + 12, y + h / 2, vx + 4, y + h - 2); } ctx.stroke();
                     const n = Math.max(2, Math.floor(w / 55));
                     for (let i = 0; i < n; i++) {
@@ -17646,7 +17656,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'mc_stall': {                                         // a lacquer stall against the west wall, door (east side) ajar a hair
-                    shadow(2);
                     rr(x, y, w, h, 2, '#dcd6e4');                           // tile inside
                     ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let gx = x + 10; gx < x + w; gx += 10) { ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); } for (let gy = y + 10; gy < y + h; gy += 10) { ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); } ctx.stroke();
                     ctx.beginPath(); ctx.ellipse(x + 20, y + h / 2, 12, 9, 0, 0, Math.PI * 2); ctx.fillStyle = C.porcelain; ctx.fill(); ctx.strokeStyle = C.marbleDk; ctx.lineWidth = 0.8; ctx.stroke();   // the bowl
@@ -17659,7 +17668,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'mc_urinal': {                                        // wall-hung porcelain, a gold flush plate
-                    rr(x + 2, y + 3, w, h, 6, 'rgba(0,0,0,0.3)');
                     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w - 2, y + h * 0.6); ctx.quadraticCurveTo(x + w / 2, y + h + 2, x + 2, y + h * 0.6); ctx.closePath();
                     ctx.fillStyle = C.porcelain; ctx.fill(); ctx.strokeStyle = C.marbleDk; ctx.lineWidth = 0.8; ctx.stroke();
                     ctx.beginPath(); ctx.ellipse(x + w / 2, y + h * 0.5, w * 0.28, h * 0.28, 0, 0, Math.PI * 2); ctx.fillStyle = '#c8d4e8'; ctx.fill();
@@ -17667,20 +17675,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'mc_dryer': {                                         // chrome hand dryer, a blue ready-light
-                    shadow(3); rr(x, y, w, h, 4, C.chromeDk, C.chrome, 1);
+                    rr(x, y, w, h, 4, C.chromeDk, C.chrome, 1);
                     if (d.vertical) { rr(x + 3, y + 6, w - 6, h - 12, 3, '#2a2e3a'); circ(x + w / 2, y + 4, 1.4, '#7fd0ff'); }
                     else { rr(x + 6, y + 3, w - 12, h - 6, 3, '#2a2e3a'); circ(x + 4, y + h / 2, 1.4, '#7fd0ff'); }
                     break;
                 }
                 case 'mc_settee': {                                        // a blush chaise, tufted, gold-footed (back against the east side)
-                    shadow(10); rr(x, y, w, h, 12, '#c96a8e', C.gold, 1);
+                    rr(x, y, w, h, 12, '#c96a8e', C.gold, 1);
                     rr(x + w - 12, y + 4, 10, h - 8, 5, '#a84e72'); rr(x + 4, y + 4, w - 18, 20, 8, '#a84e72');
                     tufts(x + 6, y + 28, w - 20, h - 34, 2, 5, 'rgba(255,220,235,0.55)');
                     rr(x + 8, y + h - 34, 16, 12, 4, C.lilac);                   // a cushion
                     break;
                 }
                 case 'mc_crescent_sofa': {                                 // Mirabel's: a crescent of wine velvet, back to the north wall
-                    rr(x + 3, y + 5, w, h, 30, 'rgba(0,0,0,0.36)');
                     ctx.fillStyle = C.velvetDk; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.quadraticCurveTo(x + w, y + h, x + w / 2, y + h); ctx.quadraticCurveTo(x, y + h, x, y); ctx.fill();
                     ctx.strokeStyle = C.gold; ctx.lineWidth = 1.5; ctx.stroke();
                     ctx.fillStyle = C.velvetLt; ctx.beginPath(); ctx.moveTo(x + 14, y + 12); ctx.lineTo(x + w - 14, y + 12); ctx.quadraticCurveTo(x + w - 16, y + h - 12, x + w / 2, y + h - 10); ctx.quadraticCurveTo(x + 16, y + h - 12, x + 14, y + 12); ctx.fill();
@@ -17690,7 +17697,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'mc_lowtable': {                                      // black glass on gold, champagne on ice, two flutes, rose petals
-                    shadow(6); rr(x, y, w, h, 6, 'rgba(20,14,28,0.92)', C.gold, 1.5);
+                    rr(x, y, w, h, 6, 'rgba(20,14,28,0.92)', C.gold, 1.5);
                     ctx.fillStyle = 'rgba(200,168,255,0.12)'; ctx.fillRect(x + 4, y + 3, w - 8, 1.5);
                     const cx = x + w / 2, cy = y + h / 2;
                     circ(cx, cy, Math.min(w, h) * 0.22, C.chrome, C.chromeDk, 1); circ(cx, cy, Math.min(w, h) * 0.16, '#e8f0ff');   // the ice bucket
@@ -17703,7 +17710,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 case 'mc_lost_clutch': {                                   // a sequined envelope clutch on a gold chain
                     const open = p._searched;
                     ctx.strokeStyle = C.gold; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x + 2, y + 2); ctx.quadraticCurveTo(x + w / 2, y - 7, x + w - 2, y + 2); ctx.stroke();
-                    rr(x + 1.5, y + 2, w, h, 2, 'rgba(0,0,0,0.35)');
                     rr(x, y, w, h, 2, p.noteId === 'club_gents' ? '#1e2a44' : '#5a1440', C.goldDk, 0.8);
                     ctx.fillStyle = 'rgba(255,235,250,0.55)';
                     for (let i = 0; i < 9; i++) { const sx = x + 2 + ((i * 7) % (w - 4)), sy = y + 2 + ((i * 5) % (h - 4)), tw = 0.5 + 0.5 * Math.sin(t * 5 + i * 2 + x); ctx.globalAlpha = 0.3 + 0.7 * tw; ctx.fillRect(sx, sy, 1, 1); }
@@ -17714,7 +17720,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'mc_lost_coat': {                                     // a plum coat with a fur collar, draped over the bench
                     const open = p._searched;
-                    rr(x + 2, y + 3, w, h, 6, 'rgba(0,0,0,0.35)');
                     ctx.fillStyle = '#3e1a4a'; ctx.beginPath(); ctx.moveTo(x + 4, y + 4); ctx.lineTo(x + w - 4, y + 4); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
                     ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x + w / 2, y + 6); ctx.lineTo(x + w / 2, y + h - 1); ctx.stroke();
                     rr(x + 1, y + h - 8, 7, 10, 3, '#34143e'); rr(x + w - 8, y + h - 8, 7, 10, 3, '#34143e');       // sleeves over the edge
@@ -17725,7 +17730,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'mc_lost_purse': {                                    // rose velvet, quilted, a gold crescent clasp
                     const open = p._searched;
-                    rr(x + 2, y + 3, w, h, 4, 'rgba(0,0,0,0.35)');
                     rr(x, y, w, h, 4, '#a8305a', C.goldDk, 0.8);
                     ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.clip();
                     ctx.strokeStyle = 'rgba(60,0,20,0.4)'; ctx.lineWidth = 0.6; ctx.beginPath();
@@ -17737,7 +17741,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'mc_lost_handbag': {                                  // black patent, a gold chain strap
                     const open = p._searched;
-                    rr(x + 2, y + 3, w, h, 3, 'rgba(0,0,0,0.35)');
                     rr(x, y, w, h, 3, '#0e0c12', '#4a4458', 0.8);
                     ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(x + 2, y + 2, w - 6, 1.2);           // the patent shine
                     ctx.strokeStyle = C.gold; ctx.lineWidth = 0.9; ctx.setLineDash([1.5, 1]); ctx.beginPath(); ctx.moveTo(x + 2, y + 2); ctx.bezierCurveTo(x - 6, y + h + 6, x + w + 6, y + h + 6, x + w - 2, y + 2); ctx.stroke(); ctx.setLineDash([]);
@@ -17746,7 +17749,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'mc_suite_couch': {                                   // a long velvet couch, back against the east wall, facing west
-                    shadow(12); rr(x, y, w, h, 12, C.velvetDk, C.gold, 1.2);
+                    rr(x, y, w, h, 12, C.velvetDk, C.gold, 1.2);
                     rr(x + w - 16, y + 4, 14, h - 8, 7, C.velvet);
                     rr(x + 4, y + 4, w - 22, 16, 7, C.velvet); rr(x + 4, y + h - 20, w - 22, 16, 7, C.velvet);
                     rr(x + 6, y + 22, w - 24, h - 44, 6, C.velvetLt); tufts(x + w - 15, y + 8, 12, h - 16, 1, 9, 'rgba(255,190,220,0.4)');
@@ -17796,7 +17799,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             const [lt, mid, dk] = TONES[L.tone], letter = L.tone === 'black' ? 'rgba(232,194,122,0.85)' : 'rgba(20,16,26,0.55)';
             const base = h - 8, cx = w / 2;
             // The shadow the moon throws, down and to the right
-            c.fillStyle = 'rgba(0,0,0,0.38)'; c.beginPath(); c.ellipse(cx + 4, h - 1, w * 0.55, 5, 0, 0, Math.PI * 2); c.fill();
+
             if (L.v !== 5 && L.v !== 4) { c.fillStyle = '#2a2632'; c.beginPath(); c.roundRect(0, base, w, 8, 1.5); c.fill(); c.fillStyle = 'rgba(255,255,255,0.08)'; c.fillRect(1, base, w - 2, 1); }
             // The silhouette
             const body = new Path2D();
@@ -17913,12 +17916,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (fill) { ctx.fillStyle = fill; ctx.fill(); }
                 if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
             };
-            const shadow = (r = 5) => rr(x + 3, y + 4, w, h, r, 'rgba(0,0,0,0.34)');
+
             const glass = (gx, gy, drunk) => { circ(gx, gy, 3, drunk ? 'rgba(255,240,220,0.35)' : 'rgba(150,20,40,0.85)', C.silver, 0.7); if (!drunk) circ(gx - 0.8, gy - 0.8, 0.8, 'rgba(255,200,210,0.6)'); };
             const candle = (cx, cy) => { circ(cx, cy, 2.2, C.cream, C.goldDk, 0.5); };
             switch (p.decorType) {
                 case 'ps_console': {                                       // by the elevator: the visitor book, a crescent seal
-                    shadow(3); rr(x, y, w, h, 3, C.ink, C.gold, 1.2);
+                    rr(x, y, w, h, 3, C.ink, C.gold, 1.2);
                     rr(x + 5, y + 10, w - 10, 22, 1, C.cream, C.goldDk, 0.6); ctx.fillStyle = C.crimson; ctx.fillRect(x + w / 2 - 0.5, y + 10, 1, 22);
                     ctx.strokeStyle = 'rgba(40,20,30,0.5)'; ctx.lineWidth = 0.5; ctx.beginPath(); for (let i = 0; i < 4; i++) { ctx.moveTo(x + 7, y + 14 + i * 4); ctx.lineTo(x + w / 2 - 2, y + 14 + i * 4); } ctx.stroke();
                     circ(x + w / 2, y + h - 18, 5, C.crimsonLt, '#5a0a18', 0.8); ctx.save(); circ(x + w / 2, y + h - 18, 2.6, '#ffd0d8'); ctx.globalCompositeOperation = 'destination-out'; circ(x + w / 2 + 1.2, y + h - 18.6, 2.3, '#000'); ctx.restore();
@@ -17926,10 +17929,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'ps_pit_sofa': {                                      // one half of the round crimson pit, curving about the table
                     const up = d.face === 'N', cx = x + w / 2;
-                    ctx.save(); ctx.translate(3, 4); ctx.fillStyle = 'rgba(0,0,0,0.34)'; ctx.beginPath();
-                    if (up) { ctx.moveTo(x, y); ctx.quadraticCurveTo(cx, y + h * 1.9, x + w, y); ctx.lineTo(x + w - 18, y); ctx.quadraticCurveTo(cx, y + h * 1.1, x + 18, y); }
-                    else { ctx.moveTo(x, y + h); ctx.quadraticCurveTo(cx, y - h * 0.9, x + w, y + h); ctx.lineTo(x + w - 18, y + h); ctx.quadraticCurveTo(cx, y - h * 0.1, x + 18, y + h); }
-                    ctx.fill(); ctx.restore();
+
                     const band = (off, col) => { ctx.fillStyle = col; ctx.beginPath();
                         if (up) { ctx.moveTo(x + off, y); ctx.quadraticCurveTo(cx, y + h * 1.9 - off * 1.6, x + w - off, y); ctx.lineTo(x + w - 18, y); ctx.quadraticCurveTo(cx, y + h * 1.1, x + 18, y); }
                         else { ctx.moveTo(x + off, y + h); ctx.quadraticCurveTo(cx, y - h * 0.9 + off * 1.6, x + w - off, y + h); ctx.lineTo(x + w - 18, y + h); ctx.quadraticCurveTo(cx, y - h * 0.1, x + 18, y + h); }
@@ -17943,7 +17943,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ps_pit_table': {                                     // black marble oval, a bottle, two glasses (one drunk)
-                    ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 4, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.34)'; ctx.fill();
+
                     ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fillStyle = C.marble; ctx.fill(); ctx.strokeStyle = C.gold; ctx.lineWidth = 1.5; ctx.stroke();
                     ctx.strokeStyle = 'rgba(223,230,255,0.2)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(x + 12, y + 14); ctx.quadraticCurveTo(x + w / 2, y + h * 0.7, x + w - 10, y + 16); ctx.stroke();
                     circ(x + w / 2, y + h / 2, 4, '#1e3a24', C.gold, 0.8); glass(x + w / 2 - 14, y + h / 2 + 6, true); glass(x + w / 2 + 15, y + h / 2 - 4, false);
@@ -17953,7 +17953,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 case 'ps_piano': {                                         // a silver-lacquered grand, lid up, a page of music left open
                     const P = new Path2D(); P.moveTo(x, y + 8); P.lineTo(x + w * 0.55, y + 8); P.bezierCurveTo(x + w * 0.9, y + 6, x + w, y + h * 0.45, x + w * 0.8, y + h * 0.75);
                     P.bezierCurveTo(x + w * 0.6, y + h, x + w * 0.2, y + h, x + 6, y + h - 6); P.closePath();
-                    ctx.save(); ctx.translate(3, 4); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill(P); ctx.restore();
+
                     const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#e8ecf6'); g.addColorStop(0.5, '#a8aec0'); g.addColorStop(1, '#6a7082');
                     ctx.fillStyle = g; ctx.fill(P); ctx.strokeStyle = C.gold; ctx.lineWidth = 1; ctx.stroke(P);
                     ctx.strokeStyle = 'rgba(20,20,30,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + 10, y + 16); ctx.lineTo(x + w * 0.72, y + h * 0.7); ctx.stroke();   // the lid's prop
@@ -17965,7 +17965,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ps_fireplace': {                                     // black marble surround, gold fender, embers and burnt pages
-                    shadow(3); rr(x, y, w, h, 3, C.marbleLt, C.gold, 1.5);
+                    rr(x, y, w, h, 3, C.marbleLt, C.gold, 1.5);
                     rr(x + 16, y + 6, w - 32, h - 12, 3, '#0a0608');
                     for (let i = 0; i < 7; i++) { const f = 0.6 + 0.4 * Math.sin(t * 6 + i * 1.9); circ(x + 26 + i * (w - 52) / 6, y + h / 2 + Math.sin(i) * 3, 3 + f * 1.5, `rgba(255,${90 + 60 * f | 0},40,${0.55 + 0.35 * f})`); }
                     for (const [px, py, r] of [[x + 38, y + 12, 0.3], [x + w - 52, y + 15, -0.4]]) { ctx.save(); ctx.translate(px, py); ctx.rotate(r); rr(0, 0, 12, 8, 1, '#3a2a20'); ctx.fillStyle = 'rgba(255,120,40,0.6)'; ctx.fillRect(0, 7, 12, 1); ctx.restore(); }
@@ -17973,14 +17973,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ps_bar': {                                           // black lacquer bar against the west wall, a wine wall behind
-                    shadow(3); rr(x, y, w, h, 3, '#140e14', C.gold, 1.2);
+                    rr(x, y, w, h, 3, '#140e14', C.gold, 1.2);
                     for (let j = 0; j < 12; j++) for (let i = 0; i < 2; i++) circ(x + 8 + i * 9, y + 10 + j * 15, 3, j % 3 ? '#4a0c1c' : '#1e3a24', 'rgba(0,0,0,0.5)', 0.5);
                     rr(x + w - 14, y + 4, 12, h - 8, 2, C.marble, C.goldDk, 0.6);
                     glass(x + w - 8, y + 40, false); glass(x + w - 8, y + h - 50, true); circ(x + w - 8, y + h / 2, 3.6, '#e8f0ff', C.silver, 0.8);   // a decanter
                     break;
                 }
                 case 'ps_dining': {                                        // a marble table for two: candles, the plates, one glass drunk and one not
-                    shadow(8); rr(x, y, w, h, 8, '#ece8ee', C.gold, 2);
+                    rr(x, y, w, h, 8, '#ece8ee', C.gold, 2);
                     ctx.strokeStyle = 'rgba(120,110,130,0.3)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(x + 12, y + 10); ctx.quadraticCurveTo(x + w / 2, y + h * 0.8, x + w - 10, y + 12); ctx.stroke();
                     rr(x + w / 2 - 6, y + 6, 12, h - 12, 3, C.crimson);                                             // a runner
                     for (const px of [x + 18, x + w - 18]) { circ(px, y + h / 2, 10, '#fafafa', C.silverDk, 0.8); circ(px, y + h / 2, 6.5, null, C.gold, 0.6); }
@@ -17992,13 +17992,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'ps_chair': {                                         // a velvet dining chair, gold frame; faces its table
                     const f = d.face || 'S';
-                    shadow(5); rr(x, y, w, h, 5, C.velvet, C.gold, 1);
+                    rr(x, y, w, h, 5, C.velvet, C.gold, 1);
                     const bk = f === 'E' ? [x, y + 2, 7, h - 4] : f === 'W' ? [x + w - 7, y + 2, 7, h - 4] : f === 'N' ? [x + 2, y + h - 7, w - 4, 7] : [x + 2, y, w - 4, 7];
                     rr(...bk, 3, '#4a0814'); rr(x + 5, y + 5, w - 10, h - 10, 4, C.crimsonLt);
                     break;
                 }
                 case 'ps_bed': {                                           // canopy king: black posts, crimson drapes, the covers thrown back
-                    shadow(6); rr(x, y, w, h, 6, '#140e14', C.gold, 1.5);
+                    rr(x, y, w, h, 6, '#140e14', C.gold, 1.5);
                     rr(x + 4, y + 2, w - 8, 18, 5, '#2a0a14', C.goldDk, 0.8);                                         // headboard
                     rr(x + 10, y + 22, w - 20, h - 30, 6, '#f1ece6');                                                // sheets
                     rr(x + 18, y + 26, 60, 26, 10, '#fbf8f4', 'rgba(0,0,0,0.12)', 0.6); rr(x + w - 78, y + 26, 60, 26, 10, '#fbf8f4', 'rgba(0,0,0,0.12)', 0.6);
@@ -18012,13 +18012,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ps_chaise': {                                        // a velvet chaise under the window
-                    shadow(10); rr(x, y, w, h, 12, '#3a0a1c', C.gold, 1);
+                    rr(x, y, w, h, 12, '#3a0a1c', C.gold, 1);
                     rr(x + 4, y + 4, 22, h - 8, 9, C.velvet); rr(x + 28, y + 6, w - 34, h - 12, 7, C.crimsonLt);
                     rr(x + 40, y + 12, 18, 14, 5, C.gold);                                                          // a cushion
                     break;
                 }
                 case 'ps_desk': {                                          // his writing desk: chess mid-game, a crescent seal, candle stubs, the 10/10 card
-                    shadow(4); rr(x, y, w, h, 4, '#2a1a1e', C.gold, 1.4);
+                    rr(x, y, w, h, 4, '#2a1a1e', C.gold, 1.4);
                     ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let gy = y + 8; gy < y + h; gy += 6) { ctx.moveTo(x + 3, gy); ctx.lineTo(x + w - 3, gy); } ctx.stroke();
                     const bx = x + 10, by = y + 10, sq = 5;                                                          // the chessboard
                     for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { ctx.fillStyle = (i + j) % 2 ? '#1a1418' : '#e8e0d0'; ctx.fillRect(bx + i * sq, by + j * sq, sq, sq); }
@@ -18034,7 +18034,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ps_wardrobe': {                                      // standing open, empty hangers on the rail
-                    shadow(3); rr(x, y, w, h, 3, '#140e14', C.gold, 1.2);
+                    rr(x, y, w, h, 3, '#140e14', C.gold, 1.2);
                     rr(x + 4, y + 4, w - 8, h - 8, 2, '#0a070a');
                     ctx.strokeStyle = C.silverDk; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w / 2, y + 6); ctx.lineTo(x + w / 2, y + h - 6); ctx.stroke();
                     ctx.strokeStyle = C.gold; ctx.lineWidth = 0.8; for (let i = 0; i < 7; i++) { const hy = y + 14 + i * 19; ctx.beginPath(); ctx.moveTo(x + w / 2 - 9, hy + 3); ctx.lineTo(x + w / 2, hy); ctx.lineTo(x + w / 2 + 9, hy + 3); ctx.stroke(); }
@@ -18043,7 +18043,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'ps_suitcase': {                                      // his monogrammed case, left open; rifled once searched today
                     const rifled = p._searched;
-                    shadow(3); rr(x, y, w, h, 3, '#3a2418', C.gold, 1);
+                    rr(x, y, w, h, 3, '#3a2418', C.gold, 1);
                     rr(x - 1, y - h * 0.62, w + 2, h * 0.6, 3, '#4a2e1e', C.gold, 1);                                // the open lid
                     ctx.fillStyle = C.gold; ctx.font = 'bold 7px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('D·M', x + w / 2, y - h * 0.32);
                     rr(x + 3, y + 3, w - 6, h - 6, 2, '#6a1020');                                                     // crimson lining
@@ -18052,20 +18052,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ps_tub': {                                           // a round marble tub, rose petals floating
-                    circ(x + w / 2 + 3, y + h / 2 + 4, w / 2, 'rgba(0,0,0,0.3)'); circ(x + w / 2, y + h / 2, w / 2, '#f4f2f6', C.gold, 1.5);
+                    circ(x + w / 2, y + h / 2, w / 2, '#f4f2f6', C.gold, 1.5);
                     circ(x + w / 2, y + h / 2, w / 2 - 7, '#b8d0e8');
                     for (let i = 0; i < 8; i++) { const a = i * 0.8 + t * 0.05, r = 10 + (i * 7) % 22; ctx.fillStyle = i % 2 ? '#c42a52' : '#e04a6e'; ctx.beginPath(); ctx.ellipse(x + w / 2 + Math.cos(a) * r, y + h / 2 + Math.sin(a) * r, 2.6, 1.6, a, 0, Math.PI * 2); ctx.fill(); }
                     rr(x + w / 2 - 4, y - 1, 8, 6, 2, C.gold);                                                        // the spout
                     break;
                 }
                 case 'ps_vanity': {                                        // a marble vanity along the east wall, a basin, a perfume
-                    shadow(2); rr(x, y, w, h, 2, '#f0ecf2', C.goldDk, 1);
+                    rr(x, y, w, h, 2, '#f0ecf2', C.goldDk, 1);
                     ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, 7, 11, 0, 0, Math.PI * 2); ctx.fillStyle = '#d8dce8'; ctx.fill(); ctx.strokeStyle = C.silverDk; ctx.lineWidth = 0.6; ctx.stroke();
                     circ(x + w / 2, y + 10, 2.6, '#e8b4c8', C.gold, 0.5); circ(x + w / 2, y + h - 10, 2.2, C.gold);
                     break;
                 }
                 case 'ps_pool': {                                          // the plunge pool: tiled edge, water with a slow ripple
-                    shadow(10); rr(x, y, w, h, 10, '#d8d0c4', C.gold, 1.2);
+                    rr(x, y, w, h, 10, '#d8d0c4', C.gold, 1.2);
                     const g = ctx.createLinearGradient(x, y, x, y + h); g.addColorStop(0, '#1e5a7a'); g.addColorStop(1, '#0e2a44');
                     rr(x + 6, y + 6, w - 12, h - 12, 7, g);
                     ctx.strokeStyle = 'rgba(160,230,255,0.35)'; ctx.lineWidth = 0.8;
@@ -18074,7 +18074,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ps_lounger': {                                       // a white lounger, a folded towel
-                    shadow(6); rr(x, y, w, h, 6, '#e8e4dc', C.goldDk, 1);
+                    rr(x, y, w, h, 6, '#e8e4dc', C.goldDk, 1);
                     rr(x + 3, y + 3, w - 6, 24, 5, '#f8f6f2'); ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let ly = y + 32; ly < y + h - 4; ly += 6) { ctx.moveTo(x + 4, ly); ctx.lineTo(x + w - 4, ly); } ctx.stroke();
                     rr(x + 6, y + h - 22, w - 12, 14, 2, C.crimsonLt);
                     break;
@@ -18106,7 +18106,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             switch (p.decorType) {
                 case 'sc_pillar': {                                        // a round stone column seen from above: capital, fluting, moss
                     const cx = x + w / 2, cy = y + h / 2, R = w / 2;
-                    circ(cx + 4, cy + 5, R, 'rgba(0,0,0,0.4)');
+
                     const g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, 2, cx, cy, R); g.addColorStop(0, '#8a8290'); g.addColorStop(0.7, '#4a4452'); g.addColorStop(1, '#2a2630');
                     circ(cx, cy, R, g, '#1a161e', 1.2);
                     ctx.strokeStyle = 'rgba(20,16,24,0.45)'; ctx.lineWidth = 0.8;
@@ -18116,7 +18116,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'sc_fallen': {                                        // a toppled column in pieces across the aisle
-                    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 4, y + 6, w, h);
+
                     const seg = (sx, sw, tilt) => { ctx.save(); ctx.translate(sx + sw / 2, y + h / 2); ctx.rotate(tilt); const g = ctx.createLinearGradient(0, -h / 2, 0, h / 2); g.addColorStop(0, '#7a7282'); g.addColorStop(0.5, '#5a5262'); g.addColorStop(1, '#2e2a34'); rr(-sw / 2, -h / 2, sw, h, 6, g, '#1a161e', 1); ctx.strokeStyle = 'rgba(20,16,24,0.4)'; ctx.lineWidth = 0.7; for (let k = -sw / 2 + 6; k < sw / 2; k += 7) { ctx.beginPath(); ctx.moveTo(k, -h / 2 + 3); ctx.lineTo(k, h / 2 - 3); ctx.stroke(); } ctx.restore(); };
                     seg(x, w * 0.45, -0.06); seg(x + w * 0.5, w * 0.5, 0.08);
                     for (let i = 0; i < 6; i++) circ(x + w * 0.47 + (i % 3) * 3 - 3, y + h + 3 + (i / 3 | 0) * 3, 2, '#4a4452');   // rubble
@@ -18125,14 +18125,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'sc_pew': case 'sc_pew_broken': {                     // a dark wooden pew; the broken ones snapped and splintered
                     const broken = p.decorType === 'sc_pew_broken';
-                    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 3, y + 4, w, h);
+
                     const wood = (X, W) => { rr(X, y, W, h, 2, '#2e1e1a', '#140c0a', 1); rr(X + 2, y + 2, W - 4, 7, 1.5, '#3e2822'); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let k = y + 12; k < y + h - 2; k += 4) { ctx.moveTo(X + 2, k); ctx.lineTo(X + W - 2, k); } ctx.stroke(); };
                     if (!broken) wood(x, w);
                     else { wood(x, w * 0.45); ctx.save(); ctx.translate(x + w * 0.72, y + h / 2); ctx.rotate(0.35); wood(-w * 0.25, w * 0.45); ctx.restore(); ctx.strokeStyle = '#6a4a3a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w * 0.45, y + 2); ctx.lineTo(x + w * 0.5, y + 6); ctx.lineTo(x + w * 0.45, y + 10); ctx.stroke(); }
                     break;
                 }
                 case 'sc_altar': {                                         // black stone, a crimson cloth, a gold chalice, candles guttering
-                    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x + 4, y + 6, w, h);
+
                     rr(x, y, w, h, 3, '#1c1822', '#8a6a3a', 1.5);
                     rr(x + w * 0.2, y - 2, w * 0.6, h + 4, 2, '#6a0c1c'); ctx.fillStyle = '#e8c27a'; ctx.fillRect(x + w * 0.2, y + h - 3, w * 0.6, 1.5); ctx.fillRect(x + w * 0.2, y - 2, w * 0.6, 1.5);
                     ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.globalAlpha = 0.7; ctx.strokeStyle = '#e8c27a'; ctx.lineWidth = 1;   // the three rings, stitched
@@ -18143,14 +18143,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'sc_organ': {                                         // a ruined pipe organ: a rank of pipes, some fallen
-                    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 3, y + 5, w, h);
+
                     rr(x, y + h * 0.55, w, h * 0.45, 2, '#241c1a', '#8a6a3a', 1);
                     for (let i = 0; i < 11; i++) { const px = x + 5 + i * (w - 10) / 10, r = 3.2 - Math.abs(i - 5) * 0.18, bentOff = (i === 3 || i === 8) ? 1 : 0; const g = ctx.createRadialGradient(px - 1, y + 10 - 1, 0.5, px, y + 10, r); g.addColorStop(0, '#d8d0c0'); g.addColorStop(1, '#6a5a3a'); if (!bentOff) circ(px, y + 10 + Math.abs(i - 5) * 1.2, r, g, '#3a2e1e', 0.6); }
                     ctx.save(); ctx.translate(x + w * 0.35, y + h * 0.3); ctx.rotate(1.1); rr(-2, 0, 4, 22, 2, '#8a7a5a', '#3a2e1e', 0.6); ctx.restore();   // a fallen pipe
                     break;
                 }
                 case 'sc_candles': {                                       // an iron stand of pillar candles, wax spilled
-                    circ(x + w / 2 + 2, y + h / 2 + 3, w / 2 + 2, 'rgba(0,0,0,0.4)');
                     circ(x + w / 2, y + h / 2, w / 2 + 1, '#1a161a', '#4a4452', 1);
                     ctx.fillStyle = 'rgba(230,221,208,0.5)'; ctx.beginPath(); ctx.ellipse(x + w / 2 + 3, y + h / 2 + 5, 6, 3, 0.4, 0, Math.PI * 2); ctx.fill();
                     for (const [dx, dy, k] of [[-4, -3, 0], [4, -2, 1], [0, 4, 2]]) flame(x + w / 2 + dx, y + h / 2 + dy, k);
@@ -18158,7 +18157,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'sc_brazier': {                                       // an iron bowl of coals on three legs, burning
                     const cx = x + w / 2, cy = y + h / 2;
-                    circ(cx + 3, cy + 4, w / 2, 'rgba(0,0,0,0.4)');
                     ctx.strokeStyle = '#2a2630'; ctx.lineWidth = 2; ctx.beginPath(); for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3 + 0.5; ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * (w / 2 + 3), cy + Math.sin(a) * (w / 2 + 3)); } ctx.stroke();
                     circ(cx, cy, w / 2 - 2, '#1a161a', '#6a5a4a', 1.5);
                     for (let i = 0; i < 9; i++) { const a = i * 2.4, r = (i % 3) * 3.5 + 2, f = 0.6 + 0.4 * Math.sin(t * 7 + i * 1.9); circ(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 2.6 + f, `rgba(255,${80 + 90 * f | 0},30,${0.6 + 0.35 * f})`); }
@@ -18193,8 +18191,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (fill) { ctx.fillStyle = fill; ctx.fill(); }
                 if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
             };
-            const shadow = (r = 4, X = x, Y = y, W = w, H = h) => rr(X + 3, Y + 4, W, H, r, 'rgba(0,0,0,0.32)');
-            const cup = (cx, cy, col = C.cream, coffee = '#6b4423') => { circ(cx + 1, cy + 1.5, 4.6, 'rgba(0,0,0,0.3)'); circ(cx, cy, 4.6, C.linen, 'rgba(120,90,60,0.6)', 0.6); circ(cx, cy, 3.4, col); circ(cx, cy, 2.6, coffee); circ(cx - 0.6, cy - 0.6, 1, 'rgba(240,220,190,0.75)'); ctx.fillStyle = C.linen; ctx.fillRect(cx + 4, cy - 1, 2.2, 2); };
+
+            const cup = (cx, cy, col = C.cream, coffee = '#6b4423') => { circ(cx, cy, 4.6, C.linen, 'rgba(120,90,60,0.6)', 0.6); circ(cx, cy, 3.4, col); circ(cx, cy, 2.6, coffee); circ(cx - 0.6, cy - 0.6, 1, 'rgba(240,220,190,0.75)'); ctx.fillStyle = C.linen; ctx.fillRect(cx + 4, cy - 1, 2.2, 2); };
             const candleJar = (cx, cy) => { circ(cx, cy, 4.2, 'rgba(255,214,160,0.35)', 'rgba(255,230,190,0.6)', 0.7); circ(cx, cy, 2.2, '#f6ead6'); circ(cx, cy, 0.9, '#3a2410'); };
             /** Draw facing south in a local frame (w × h as it stands when facing S), turned to `face` */
             const turned = (face, fn) => {
@@ -18203,7 +18201,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             };
             switch (p.decorType) {
                 case 'cc_counter': {                                       // walnut bar, honey edge, slatted front, the register, a pastry case at the end
-                    shadow(4);
                     if (d.vertical) {
                         rr(x, y, w, h, 4, C.walnut, C.walnutDk, 1.2); rr(x + 3, y + 3, w - 6, h - 6, 3, C.walnutLt);
                         ctx.fillStyle = 'rgba(0,0,0,0.18)'; for (let yy = y + 10; yy < y + h - 4; yy += 9) ctx.fillRect(x + w - 6, yy, 4, 5);   // the slats on the room side
@@ -18234,7 +18231,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'cc_espresso': {                                      // brass and steel: two group heads, cups warming on top, a pressure gauge
-                    shadow(5); rr(x, y, w, h, 6, C.steelDk, '#2a2c32', 1); rr(x + 3, y + 3, w - 6, h - 10, 5, C.steel);
+                    rr(x, y, w, h, 6, C.steelDk, '#2a2c32', 1); rr(x + 3, y + 3, w - 6, h - 10, 5, C.steel);
                     rr(x + 3, y + 3, w - 6, 5, 3, C.brass);
                     for (const gx of [x + 18, x + w - 18]) { circ(gx, y + h - 9, 6, '#2a2c32', C.brass, 1.2); circ(gx, y + h - 9, 2.5, '#111'); }
                     circ(x + w / 2, y + 18, 5, '#f4efe6', C.brass, 1); ctx.strokeStyle = '#a3241a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w / 2, y + 18); ctx.lineTo(x + w / 2 + 3 * Math.cos(t), y + 18 + 3 * Math.sin(t)); ctx.stroke();
@@ -18242,7 +18239,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'cc_grinder': {
-                    shadow(3); rr(x + 3, y + 8, w - 6, h - 8, 3, '#2a2026', '#14100f', 1);
+                    rr(x + 3, y + 8, w - 6, h - 8, 3, '#2a2026', '#14100f', 1);
                     ctx.fillStyle = 'rgba(120,80,50,0.85)'; ctx.beginPath(); ctx.moveTo(x + 2, y + 10); ctx.lineTo(x + w - 2, y + 10); ctx.lineTo(x + w - 6, y); ctx.lineTo(x + 6, y); ctx.closePath(); ctx.fill();
                     for (let i = 0; i < 6; i++) circ(x + 7 + (i % 3) * 6, y + 3 + (i / 3 | 0) * 3, 1.3, '#3a2214');
                     break;
@@ -18255,7 +18252,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'cc_plant': {                                         // a terracotta pot, leaves fanned out (variant 1: a big fern)
                     const cx = x + w / 2, cy = y + h / 2, big = d.variant === 1, R = Math.min(w, h) / 2;
-                    circ(cx + 2, cy + 3, R * 0.62, 'rgba(0,0,0,0.3)'); circ(cx, cy, R * 0.58, C.pot, '#7a3e22', 1.2); circ(cx, cy, R * 0.44, '#3a2416');
+                    circ(cx, cy, R * 0.58, C.pot, '#7a3e22', 1.2); circ(cx, cy, R * 0.44, '#3a2416');
                     const n = big ? 13 : 9, sway = Math.sin(t * 0.8 + x) * 0.05;
                     for (let i = 0; i < n; i++) {
                         const a = i / n * Math.PI * 2 + sway + hsh(i) * 0.3, L = R * (big ? 1.25 : 0.95) * (0.75 + hsh(i + 9) * 0.35);
@@ -18265,7 +18262,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'cc_fireplace': {                                     // brick surround on the west wall, a stone hearth, logs in the firebox
-                    shadow(3); rr(x, y, w, h, 3, C.brick, C.brickDk, 1.5);
+                    rr(x, y, w, h, 3, C.brick, C.brickDk, 1.5);
                     ctx.strokeStyle = 'rgba(40,12,8,0.55)'; ctx.lineWidth = 1; ctx.beginPath();
                     for (let yy = y + 8, row = 0; yy < y + h; yy += 8, row++) { ctx.moveTo(x, yy); ctx.lineTo(x + w, yy); for (let xx = x + (row % 2 ? 6 : 12); xx < x + w; xx += 12) { ctx.moveTo(xx, yy - 8); ctx.lineTo(xx, yy); } }
                     ctx.stroke();
@@ -18281,7 +18278,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 case 'cc_armchair': case 'cc_loveseat': {                  // tufted velvet (rust or sage), deep arms, a cushion; a throw on some
                     const sofa = p.decorType === 'cc_loveseat', col = sofa ? C.sage : (hsh(1) > 0.5 ? C.rust : C.mustard), dk = sofa ? C.sageDk : (col === C.rust ? C.rustDk : '#8a6424');
                     turned(d.face || 'S', (X, Y, W, H) => {
-                        rr(X + 3, Y + 4, W, H, 10, 'rgba(0,0,0,0.32)');
                         rr(X, Y, W, H, 10, dk); rr(X, Y, W, H * 0.34, 9, col, dk, 1);                                     // the back
                         rr(X, Y + 4, W * 0.18, H - 6, 6, col, dk, 1); rr(X + W * 0.82, Y + 4, W * 0.18, H - 6, 6, col, dk, 1);   // arms
                         const seats = sofa ? 2 : 1, sw = (W * 0.64) / seats;
@@ -18295,13 +18291,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'cc_lowtable': {                                      // a low round table: a stack of books, two mugs, a candle
                     const cx = x + w / 2, cy = y + h / 2, R = Math.min(w, h) / 2;
-                    circ(cx + 3, cy + 4, R, 'rgba(0,0,0,0.3)'); circ(cx, cy, R, C.walnut, C.walnutDk, 1.5); circ(cx, cy, R - 4, C.walnutLt);
+                    circ(cx, cy, R, C.walnut, C.walnutDk, 1.5); circ(cx, cy, R - 4, C.walnutLt);
                     rr(cx - 16, cy - 10, 20, 14, 1, '#7a3b2e'); rr(cx - 15, cy - 13, 18, 4, 1, '#d9c8a6'); rr(cx - 14, cy - 17, 16, 4, 1, '#3e5a6e');
                     cup(cx + 10, cy - 6); cup(cx + 6, cy + 10, '#e2c7a2'); candleJar(cx - 8, cy + 10);
                     break;
                 }
                 case 'cc_bookshelf': {                                     // a walnut case of well-read spines
-                    shadow(2); rr(x, y, w, h, 2, C.walnutDk, '#1a0f08', 1);
+                    rr(x, y, w, h, 2, C.walnutDk, '#1a0f08', 1);
                     const cols = ['#7a3b2e', '#3e5a6e', '#c0903a', '#5f7a5a', '#d9c8a6', '#4a3a5e', '#9a5a3a', '#2e4a3a'];
                     let bx = x + 3;
                     while (bx < x + w - 4) { const bw = 3 + (hsh(bx) * 4 | 0), lean = hsh(bx + 1) > 0.88; ctx.fillStyle = cols[(bx * 7 | 0) % cols.length]; if (lean) { ctx.save(); ctx.translate(bx, y + h - 3); ctx.rotate(-0.25); ctx.fillRect(0, -(h - 7), bw, h - 7); ctx.restore(); } else ctx.fillRect(bx, y + 3, bw, h - 6); bx += bw + 0.6; }
@@ -18309,7 +18305,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'cc_record': {                                        // a sideboard, a turntable turning, a stack of sleeves
-                    shadow(3); rr(x, y, w, h, 3, C.walnut, C.walnutDk, 1);
+                    rr(x, y, w, h, 3, C.walnut, C.walnutDk, 1);
                     rr(x + 3, y + 3, h - 6, h - 6, 2, '#2a2026'); const cx = x + 3 + (h - 6) / 2, cy = y + h / 2;
                     circ(cx, cy, (h - 10) / 2, '#0e0c10'); circ(cx, cy, 3, '#c0903a');
                     ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(cx, cy, 7, t * 3.5, t * 3.5 + 1.2); ctx.stroke();
@@ -18319,7 +18315,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'cc_round_table': {                                   // a walnut round, a candle jar, cups and saucers, a sprig in a bud vase
                     const cx = x + w / 2, cy = y + h / 2, R = Math.min(w, h) / 2;
-                    circ(cx + 3, cy + 4, R, 'rgba(0,0,0,0.3)'); circ(cx, cy, R, C.walnut, C.walnutDk, 1.4); circ(cx, cy, R - 4, C.walnutLt);
+                    circ(cx, cy, R, C.walnut, C.walnutDk, 1.4); circ(cx, cy, R - 4, C.walnutLt);
                     ctx.strokeStyle = 'rgba(255,220,170,0.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R - 10, 0, Math.PI * 2); ctx.stroke();
                     candleJar(cx, cy);
                     const k = hsh(5);
@@ -18331,7 +18327,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'cc_chair': {                                         // a bentwood chair: a round seat, a curved back
                     turned(d.face || 'S', (X, Y, W, H) => {
-                        circ(X + W / 2 + 2, Y + H / 2 + 3, W / 2, 'rgba(0,0,0,0.28)');
                         circ(X + W / 2, Y + H / 2 + 1, W / 2 - 1, C.walnutLt, C.walnutDk, 1.2);
                         circ(X + W / 2, Y + H / 2 + 1, W / 2 - 5, hsh(2) > 0.5 ? C.rust : C.sage);
                         ctx.strokeStyle = C.walnut; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X + W / 2, Y + H / 2 + 1, W / 2 - 1, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
@@ -18340,7 +18335,6 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'cc_booth': {                                         // a padded bench, its back to the wall
                     turned(d.face || 'S', (X, Y, W, H) => {
-                        rr(X + 3, Y + 4, W, H, 8, 'rgba(0,0,0,0.3)');
                         rr(X, Y, W, H, 8, C.walnutDk); rr(X + 2, Y + 1, W - 4, H * 0.38, 7, C.sage, C.sageDk, 1);
                         for (let i = 0; i < 3; i++) rr(X + 3 + i * (W - 6) / 3, Y + H * 0.36, (W - 6) / 3 - 2, H * 0.56, 5, C.sage, 'rgba(0,0,0,0.25)', 0.8);
                         ctx.fillStyle = 'rgba(0,0,0,0.2)'; for (let i = 1; i < 6; i++) { ctx.beginPath(); ctx.arc(X + W * i / 6, Y + H * 0.18, 1.1, 0, Math.PI * 2); ctx.fill(); }
@@ -18349,7 +18343,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'cc_booth_table': case 'cc_side_table': {
                     const side = p.decorType === 'cc_side_table';
-                    shadow(side ? 10 : 4); rr(x, y, w, h, side ? Math.min(w, h) / 2 : 4, C.walnut, C.walnutDk, 1.4); rr(x + 3, y + 3, w - 6, h - 6, side ? Math.min(w, h) / 2 - 3 : 3, C.walnutLt);
+                    rr(x, y, w, h, side ? Math.min(w, h) / 2 : 4, C.walnut, C.walnutDk, 1.4); rr(x + 3, y + 3, w - 6, h - 6, side ? Math.min(w, h) / 2 - 3 : 3, C.walnutLt);
                     if (side) { cup(x + w / 2 - 5, y + h / 2); circ(x + w / 2 + 8, y + h / 2 - 3, 2, 'rgba(220,235,255,0.5)'); break; }
                     candleJar(x + w / 2, y + h / 2);
                     cup(x + 14, y + 14); if (hsh(4) > 0.4) cup(x + w - 14, y + h - 14, '#e2c7a2');
@@ -18358,7 +18352,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'cc_bench': {                                         // a window bench: cushions in three colours, pillows, a folded blanket
                     turned(d.face || 'S', (X, Y, W, H) => {
-                        rr(X + 3, Y + 4, W, H, 6, 'rgba(0,0,0,0.3)'); rr(X, Y, W, H, 6, C.walnutDk, '#1a0f08', 1);
+                        rr(X, Y, W, H, 6, C.walnutDk, '#1a0f08', 1);
                         const cols = [C.rust, C.sage, C.mustard, C.linen];
                         const n = Math.max(2, Math.round(W / 62));
                         for (let i = 0; i < n; i++) rr(X + 3 + i * (W - 6) / n, Y + 3, (W - 6) / n - 3, H - 6, 6, cols[(i + (x | 0)) % cols.length], 'rgba(0,0,0,0.22)', 0.8);
@@ -18367,32 +18361,32 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'cc_easel': {                                         // a chalkboard on legs: today's special
-                    shadow(2); rr(x, y, w, h, 2, C.walnutLt, C.walnutDk, 1); rr(x + 2, y + 2, w - 4, h - 4, 1, C.chalk);
+                    rr(x, y, w, h, 2, C.walnutLt, C.walnutDk, 1); rr(x + 2, y + 2, w - 4, h - 4, 1, C.chalk);
                     ctx.fillStyle = 'rgba(240,235,220,0.85)'; ctx.font = '600 5px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.fillText('honey', x + w / 2, y + h / 2 - 3); ctx.fillText('latte ♥', x + w / 2, y + h / 2 + 4);
                     break;
                 }
                 case 'cc_stove': {                                         // the range: four burners, a pot simmering, a copper pan
-                    shadow(3); rr(x, y, w, h, 3, C.steelDk, '#202228', 1); rr(x + 3, y + 3, w - 6, h - 8, 2, '#2c2e34');
+                    rr(x, y, w, h, 3, C.steelDk, '#202228', 1); rr(x + 3, y + 3, w - 6, h - 8, 2, '#2c2e34');
                     for (let i = 0; i < 4; i++) { const bx = x + 18 + i * 32, by = y + h / 2 - 2; circ(bx, by, 10, '#16171b', '#55585f', 1); if (i === 1) circ(bx, by, 8, `rgba(80,140,255,${0.35 + 0.15 * Math.sin(t * 9)})`); }
                     circ(x + 50, y + h / 2 - 2, 11, C.steel, '#3a3c42', 1); circ(x + 50, y + h / 2 - 2, 8, '#c27b4a');            // the soup
                     circ(x + 114, y + h / 2 - 2, 10, C.copper, '#6e3a1a', 1); ctx.fillStyle = C.copper; ctx.fillRect(x + 123, y + h / 2 - 4, 10, 3);
                     for (let i = 0; i < 4; i++) circ(x + 18 + i * 32, y + h - 3, 2, '#c9c9c9');
                     break;
                 }
-                case 'cc_sink': { shadow(3); rr(x, y, w, h, 3, C.steel, C.steelDk, 1); rr(x + 6, y + 5, w / 2 - 9, h - 10, 4, '#5a5e66'); rr(x + w / 2 + 3, y + 5, w / 2 - 9, h - 10, 4, '#5a5e66'); circ(x + w / 2, y + 4, 2.5, '#d0d2d8'); break; }
+                case 'cc_sink': { rr(x, y, w, h, 3, C.steel, C.steelDk, 1); rr(x + 6, y + 5, w / 2 - 9, h - 10, 4, '#5a5e66'); rr(x + w / 2 + 3, y + 5, w / 2 - 9, h - 10, 4, '#5a5e66'); circ(x + w / 2, y + 4, 2.5, '#d0d2d8'); break; }
                 case 'cc_prep': {                                          // a butcher-block table: a loaf, a board, a knife, a bowl of lemons
-                    shadow(3); rr(x, y, w, h, 3, '#b07a44', '#6e4628', 1.2);
+                    rr(x, y, w, h, 3, '#b07a44', '#6e4628', 1.2);
                     ctx.strokeStyle = 'rgba(80,50,25,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); for (let xx = x + 10; xx < x + w; xx += 10) { ctx.moveTo(xx, y + 2); ctx.lineTo(xx, y + h - 2); } ctx.stroke();
                     ctx.fillStyle = '#c8894a'; ctx.beginPath(); ctx.ellipse(x + 30, y + h / 2, 18, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#8a5428'; ctx.beginPath(); for (let k = -10; k <= 10; k += 6) { ctx.moveTo(x + 30 + k - 2, y + h / 2 - 6); ctx.lineTo(x + 30 + k + 2, y + h / 2 + 6); } ctx.stroke();
                     rr(x + 64, y + 10, 30, 22, 3, '#e3c38e'); ctx.fillStyle = '#cfd2d8'; ctx.fillRect(x + 70, y + 20, 18, 2);
                     circ(x + 122, y + h / 2, 12, '#e8e2d4', '#b0a890', 1); for (let i = 0; i < 4; i++) circ(x + 118 + (i % 2) * 8, y + h / 2 - 3 + (i >> 1) * 6, 3.4, '#f2cf45');
                     break;
                 }
-                case 'cc_fridge': { shadow(3); rr(x, y, w, h, 4, '#d6d8de', '#8a8d95', 1); ctx.fillStyle = '#9a9da5'; ctx.fillRect(x + 3, y + h * 0.42, w - 6, 1.5); rr(x + w - 9, y + 8, 3, 18, 1, '#6a6d75'); rr(x + w - 9, y + h * 0.5, 3, 22, 1, '#6a6d75');
+                case 'cc_fridge': { rr(x, y, w, h, 4, '#d6d8de', '#8a8d95', 1); ctx.fillStyle = '#9a9da5'; ctx.fillRect(x + 3, y + h * 0.42, w - 6, 1.5); rr(x + w - 9, y + 8, 3, 18, 1, '#6a6d75'); rr(x + w - 9, y + h * 0.5, 3, 22, 1, '#6a6d75');
                     rr(x + 8, y + 10, 14, 10, 1, '#f5e9a8'); rr(x + 26, y + 30, 12, 12, 1, '#a8d8f5'); break; }       // notes and a drawing on the door
                 case 'cc_shelf': {                                         // shelves of jars and tins
-                    shadow(2); rr(x, y, w, h, 2, C.walnutDk, '#1a0f08', 1);
+                    rr(x, y, w, h, 2, C.walnutDk, '#1a0f08', 1);
                     const jars = ['#d9a36a', '#f4dcae', '#8a4b2e', '#6d8a64', '#c0903a', '#e8dcc4'];
                     const along = d.vertical ? h : w, across = d.vertical ? w : h;
                     for (let i = 0; i * 12 + 8 < along; i++) for (let j = 0; j < 2; j++) {
@@ -18402,7 +18396,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'cc_crate': {                                         // a crate of coffee beans, stencilled
-                    shadow(3); rr(x, y, w, h, 2, '#8a5a32', '#4a2c14', 1.2);
+                    rr(x, y, w, h, 2, '#8a5a32', '#4a2c14', 1.2);
                     ctx.strokeStyle = 'rgba(40,20,8,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.moveTo(x, y); ctx.lineTo(x + w, y + h); ctx.stroke();
                     ctx.fillStyle = 'rgba(30,14,6,0.55)'; ctx.font = '700 7px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(d.variant ? 'COCOA' : 'BEANS', x + w / 2, y + h / 2);
                     break;
@@ -18426,8 +18420,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             };
             const dot = (X,Y,R,col,stroke) => {ctx.beginPath();ctx.arc(X,Y,R,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=.8;ctx.stroke();}};
             const text = (str,X,Y,size=9,col=C.bright) => {ctx.save();ctx.font=`${size}px Georgia, serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=col;ctx.fillText(str,X,Y);ctx.restore();};
-            const shadow = () => rr(x+4,y+5,w,h,7,'rgba(20,13,14,.23)');
-            const plinth = (col=C.walnut) => {shadow();rr(x,y,w,h,7,col,C.brass,1.5);rr(x+5,y+5,w-10,h-10,4,'#201e21');};
+
+            const plinth = (col=C.walnut) => {rr(x,y,w,h,7,col,C.brass,1.5);rr(x+5,y+5,w-10,h-10,4,'#201e21');};
             const bottle = (X,Y,col) => {rr(X-3,Y-7,6,16,2,col);rr(X-1.3,Y-12,2.6,6,1,C.dark);rr(X-2.5,Y-3,5,5,.5,'#d6c3a2');ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(X-2,Y-6,1,12);};
             const screen = (X,Y,W,H,variant=0) => {
                 rr(X,Y,W,H,3,C.dark,C.brass,1.2);
@@ -18446,7 +18440,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             };
             switch(p.decorType) {
                 case 'ec_column': {
-                    shadow();rr(x,y,w,h,3,C.brass,C.dark,1);rr(x+4,y+4,w-8,h-8,2,'#8a5362','#ad7b86',1);
+                    rr(x,y,w,h,3,C.brass,C.dark,1);rr(x+4,y+4,w-8,h-8,2,'#8a5362','#ad7b86',1);
                     rr(x+8,y+8,w-16,h-16,2,'#663747');ctx.fillStyle='rgba(255,220,210,.15)';ctx.fillRect(x+6,y+6,2,h-12);break;
                 }
                 case 'ec_wine': {
@@ -18492,7 +18486,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     rr(x+5,y+5,w-10,h-14,4,'rgba(222,244,245,.08)','rgba(255,248,225,.55)',1);text('BAKERY & PATISSERIE',x+w/2,y+h-4,8);break;
                 }
                 case 'ec_sofa': case 'ec_armchair': {
-                    shadow();turned((X,Y,W,H)=>{
+                    turned((X,Y,W,H)=>{
                         rr(X,Y,W,H,10,'#695549',C.brass,1.5);rr(X+5,Y+5,W-10,H-10,8,C.cream);
                         rr(X+6,Y+4,W-12,14,5,'#cdb8a6','#af9279',.6);
                         const n=p.decorType==='ec_sofa'?3:1,cw=(W-26)/n;
@@ -18502,16 +18496,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     });break;
                 }
                 case 'ec_lowtable': {
-                    shadow();rr(x,y,w,h,12,C.brass,C.dark,1.2);rr(x+3,y+3,w-6,h-6,10,'#efded0');
+                    rr(x,y,w,h,12,C.brass,C.dark,1.2);rr(x+3,y+3,w-6,h-6,10,'#efded0');
                     ctx.strokeStyle='rgba(143,104,98,.18)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+11,y+h-10);ctx.bezierCurveTo(x+w*.4,y-2,x+w*.52,y+h,x+w-8,y+8);ctx.stroke();
                     rr(x+16,y+16,25,20,1,'#765963',C.brass,.6);rr(x+20,y+13,25,20,1,'#b39a83');dot(x+w-25,y+h/2,9,'#d4bd9a',C.brass);dot(x+w-25,y+h/2,4,'#4f5c41');break;
                 }
                 case 'ec_side': {
-                    shadow();rr(x,y,w,h,5,C.walnut,C.brass,1);rr(x+3,y+3,w-6,h-6,4,'#70523d');
+                    rr(x,y,w,h,5,C.walnut,C.brass,1);rr(x+3,y+3,w-6,h-6,4,'#70523d');
                     dot(x+w/2,y+h/2,Math.min(w,h)*.24,'#eee2c7',C.brass);dot(x+w/2,y+h/2,Math.min(w,h)*.15,'#d8c8a9',C.brass);dot(x+w/2,y+h/2,3,'#fff2cb');break;
                 }
                 case 'ec_bed': {
-                    shadow();rr(x,y,w,h,9,'#65404b',C.brass,1.5);rr(x+5,y+7,w-10,h-13,7,C.ivory);
+                    rr(x,y,w,h,9,'#65404b',C.brass,1.5);rr(x+5,y+7,w-10,h-13,7,C.ivory);
                     rr(x+3,y+3,w-6,23,8,'#875768','#b17d89');
                     rr(x+15,y+35,w/2-22,33,7,'#ece2d7','#c1ad9b',.7);rr(x+w/2+7,y+35,w/2-22,33,7,'#ece2d7','#c1ad9b',.7);
                     rr(x+9,y+79,w-18,h-89,4,'#c5b4a5');rr(x+9,y+h*.6,w-18,h*.24,2,'#714555');
@@ -18520,7 +18514,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 case 'ec_dining': {
                     // Every chair is inside the collision footprint, so guests route around the full set.
-                    shadow();for(let i=0;i<3;i++){rr(x+14+i*55,y,33,24,6,C.rose,C.brass);rr(x+14+i*55,y+h-24,33,24,6,C.rose,C.brass);}
+                    for(let i=0;i<3;i++){rr(x+14+i*55,y,33,24,6,C.rose,C.brass);rr(x+14+i*55,y+h-24,33,24,6,C.rose,C.brass);}
                     rr(x+4,y+22,w-8,h-44,18,C.walnut,C.brass,1.3);rr(x+8,y+26,w-16,h-52,16,'#73503b');
                     for(let i=0;i<3;i++)for(const Y of [y+37,y+h-37]){const X=x+29+i*55;dot(X,Y,8,'#e8ddc7',C.brass);dot(X,Y,5,'#f4ead6');}
                     dot(x+w/2,y+h/2,9,'#bda26b',C.brass);dot(x+w/2,y+h/2,5,'#627446');break;
@@ -18552,49 +18546,49 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     }text('DESIGNED FOR HOME',x+w/2,y+h-7,8,C.dark);break;
                 }
                 case 'ec_checkout': {
-                    shadow();rr(x,y,w,h,9,C.rose,C.brass,1.5);rr(x+5,y+5,w-10,h-15,6,'#eadccc','#c4ac91',.8);
+                    rr(x,y,w,h,9,C.rose,C.brass,1.5);rr(x+5,y+5,w-10,h-15,6,'#eadccc','#c4ac91',.8);
                     ctx.strokeStyle='rgba(157,105,110,.2)';ctx.beginPath();ctx.moveTo(x+12,y+15);ctx.lineTo(x+w-23,y+35);ctx.stroke();
                     screen(x+22,y+12,32,20,2);rr(x+26,y+32,24,8,1,'#68615c');rr(x+w-40,y+18,17,25,3,'#35353a',C.brass);ctx.fillStyle='#8aa8a3';ctx.fillRect(x+w-37,y+22,11,7);dot(x+w/2,y+22,8,'#bfa470',C.brass);dot(x+w/2,y+22,5,'#4f6845');
                     text(variant?'CUSTOMER SERVICES':'CHECKOUT',x+w/2,y+h-5,8);break;
                 }
                 case 'ec_plant': {
-                    shadow();dot(x+w/2,y+h/2,Math.min(w,h)*.43,'#a78a51',C.brass);dot(x+w/2,y+h/2,Math.min(w,h)*.34,'#3a3525');
+                    dot(x+w/2,y+h/2,Math.min(w,h)*.43,'#a78a51',C.brass);dot(x+w/2,y+h/2,Math.min(w,h)*.34,'#3a3525');
                     for(let i=0;i<9;i++){const a=i*Math.PI*2/9,rx=w*.24;ctx.save();ctx.translate(x+w/2+Math.cos(a)*rx*.35,y+h/2+Math.sin(a)*rx*.35);ctx.rotate(a);ctx.fillStyle=i%2?'#3b6140':'#537948';ctx.beginPath();ctx.ellipse(rx*.45,0,rx,.18*w,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(163,186,126,.35)';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(rx*1.3,0);ctx.stroke();ctx.restore();}break;
                 }
                 // ── The lobby ──
                 case 'ec_balustrade': {                                // the staircase's brass rail on rose stone
-                    const v=h>w;shadow();rr(x,y,w,h,3,'#7d4b5a',C.brass,1.2);
+                    const v=h>w;rr(x,y,w,h,3,'#7d4b5a',C.brass,1.2);
                     ctx.fillStyle=C.bright;if(v)ctx.fillRect(x+w/2-1,y+2,2,h-4);else ctx.fillRect(x+2,y+h/2-1,w-4,2);
                     ctx.fillStyle='#5b3341';for(let k=8;k<(v?h:w)-4;k+=12){if(v)dot(x+w/2,y+k,2.2,'#d8bd84');else dot(x+k,y+h/2,2.2,'#d8bd84');}
                     break;
                 }
                 case 'ec_newel': {                                     // a newel post with a frosted globe lamp
-                    shadow();rr(x,y,w,h,4,'#6a3a4a',C.brass,1.5);rr(x+4,y+4,w-8,h-8,3,'#8a5362');
+                    rr(x,y,w,h,4,'#6a3a4a',C.brass,1.5);rr(x+4,y+4,w-8,h-8,3,'#8a5362');
                     dot(x+w/2,y+h/2,w*.3,'#f6ead0',C.brass);dot(x+w/2,y+h/2,w*.16,'#fff8e6');break;
                 }
                 case 'ec_perfume': {                                   // a round glass counter of perfume bottles
-                    shadow();dot(x+w/2,y+h/2,w/2,C.rose,C.brass);dot(x+w/2,y+h/2,w/2-6,'#efe2cf','#c4ac91');
+                    dot(x+w/2,y+h/2,w/2,C.rose,C.brass);dot(x+w/2,y+h/2,w/2-6,'#efe2cf','#c4ac91');
                     const cols=['#f0c9a8','#d79bb1','#c9d6e8','#e8d58f','#b9e0cf','#f4dfe9'];
                     for(let i=0;i<10;i++){const a=i*Math.PI/5,R=w*.3,X=x+w/2+Math.cos(a)*R,Y=y+h/2+Math.sin(a)*R;rr(X-4,Y-5,8,10,2,cols[i%6],'#8c7457',.6);dot(X,Y-6,1.8,C.brass);}
                     dot(x+w/2,y+h/2,9,'#f7f0e2',C.brass);dot(x+w/2,y+h/2,3.5,'#e7b6c2');break;
                 }
                 case 'ec_floral': {                                    // a tall urn of pale roses
-                    shadow();dot(x+w/2,y+h/2,w*.46,'#b59a63',C.dark);dot(x+w/2,y+h/2,w*.38,'#3e4a35');
+                    dot(x+w/2,y+h/2,w*.46,'#b59a63',C.dark);dot(x+w/2,y+h/2,w*.38,'#3e4a35');
                     for(let i=0;i<14;i++){const a=i*2.39996,R=w*.32*Math.sqrt((i+.5)/14),X=x+w/2+Math.cos(a)*R,Y=y+h/2+Math.sin(a)*R;dot(X,Y,w*.085,['#f3d6dc','#e9b3c0','#fbefe6','#d98ea3'][i%4]);dot(X,Y,w*.03,'rgba(140,60,80,.4)');}
                     break;
                 }
                 case 'ec_topiary': {                                   // a clipped cypress in a black planter, as at the door
-                    shadow();rr(x,y,w,h,4,'#232126',C.brass,1);dot(x+w/2,y+h/2,w*.4,'#2e4a31');dot(x+w/2,y+h/2,w*.28,'#3e6440');dot(x+w/2-2,y+h/2-2,w*.14,'#5c8a55');break;
+                    rr(x,y,w,h,4,'#232126',C.brass,1);dot(x+w/2,y+h/2,w*.4,'#2e4a31');dot(x+w/2,y+h/2,w*.28,'#3e6440');dot(x+w/2-2,y+h/2-2,w*.14,'#5c8a55');break;
                 }
                 case 'ec_display': {                                   // a round walnut table of handbags and scarves
-                    shadow();dot(x+w/2,y+h/2,w/2,C.walnut,C.brass);dot(x+w/2,y+h/2,w/2-5,'#70523d');
+                    dot(x+w/2,y+h/2,w/2,C.walnut,C.brass);dot(x+w/2,y+h/2,w/2-5,'#70523d');
                     const cols=['#7b2f45','#e6d2b4','#1f1b20','#c58f6a'];
                     for(let i=0;i<4;i++){const a=i*Math.PI/2+.4,R=w*.24,X=x+w/2+Math.cos(a)*R,Y=y+h/2+Math.sin(a)*R;rr(X-9,Y-6,18,12,3,cols[(i+variant)%4],C.brass,.7);ctx.strokeStyle=C.bright;ctx.lineWidth=1;ctx.beginPath();ctx.arc(X,Y-6,5,Math.PI,0);ctx.stroke();}
                     dot(x+w/2,y+h/2,6,'#f0e2c4',C.brass);break;
                 }
                 case 'ec_mannequin': {                                 // a dressed form on a marble plinth, seen from above
                     const dress=['#e9d3a6','#1c1a1f','#b0475f','#f3ece0','#2f5a4d','#7b3fa0'][variant%6],cx=x+w/2,cy=y+h/2,s=w/40;
-                    shadow();dot(cx,cy,w/2,'#5b3341',C.brass);dot(cx,cy,w/2-3,'#7d4b5a');
+                    dot(cx,cy,w/2,'#5b3341',C.brass);dot(cx,cy,w/2-3,'#7d4b5a');
                     // the gown's skirt, scalloped into folds, then the bodice and shoulders, the head turned to the room
                     ctx.fillStyle=dress;ctx.beginPath();
                     for(let i=0;i<=24;i++){const a=i*Math.PI/12,R=(14+(i%2?1.6:0))*s;ctx.lineTo(cx+Math.cos(a)*R,cy+2*s+Math.sin(a)*R*.92);}
@@ -18610,14 +18604,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 // ── Fashion ──
                 case 'ec_rack': {                                      // a brass rail of hung clothes
-                    shadow();rr(x,y,w,h,4,'rgba(42,35,40,.55)',C.brass,1.2);
+                    rr(x,y,w,h,4,'rgba(42,35,40,.55)',C.brass,1.2);
                     ctx.fillStyle=C.brass;ctx.fillRect(x+4,y+h/2-1,w-8,2);
                     const n=Math.floor((w-12)/9),cols=['#e9d3a6','#1c1a1f','#b0475f','#f3ece0','#6d5a8a','#c58f6a','#2f5a4d'];
                     for(let i=0;i<n;i++){const X=x+7+i*9;rr(X,y+4,7,h-8,2,cols[(i*3+variant)%7],'rgba(0,0,0,.25)',.5);ctx.fillStyle='rgba(255,245,225,.18)';ctx.fillRect(X+1,y+5,1,h-10);}
                     break;
                 }
                 case 'ec_round_rack': {                                // a round rack of dresses
-                    shadow();dot(x+w/2,y+h/2,w/2,'rgba(42,35,40,.5)',C.brass);
+                    dot(x+w/2,y+h/2,w/2,'rgba(42,35,40,.5)',C.brass);
                     const cols=['#e9d3a6','#b0475f','#f3ece0','#1c1a1f','#d79bb1','#7b3fa0'];
                     for(let i=0;i<16;i++){const a=i*Math.PI/8,X=x+w/2+Math.cos(a)*w*.36,Y=y+h/2+Math.sin(a)*w*.36;ctx.save();ctx.translate(X,Y);ctx.rotate(a);rr(-7,-3.5,14,7,2,cols[(i+variant)%6],'rgba(0,0,0,.25)',.5);ctx.restore();}
                     ctx.strokeStyle=C.brass;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x+w/2,y+h/2,w*.36,0,Math.PI*2);ctx.stroke();
@@ -18629,7 +18623,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ec_fashion_table': {                             // a walnut table of folded shirts, belts and a vase
-                    shadow();rr(x,y,w,h,6,C.walnut,C.brass,1.4);rr(x+4,y+4,w-8,h-8,4,'#70523d');
+                    rr(x,y,w,h,6,C.walnut,C.brass,1.4);rr(x+4,y+4,w-8,h-8,4,'#70523d');
                     const cols=['#f3ece0','#b0475f','#c9a98c','#3a3540','#e9d3a6','#6d5a8a'];
                     for(let i=0;i<3;i++)for(let j=0;j<2;j++){const X=x+12+i*((w-24)/3),Y=y+10+j*((h-20)/2);rr(X,Y,(w-24)/3-8,(h-20)/2-6,2,cols[(i+j*3+variant)%6],'rgba(0,0,0,.2)',.6);ctx.fillStyle='rgba(0,0,0,.12)';ctx.fillRect(X+2,Y+((h-20)/2-6)/2,(w-24)/3-12,1);}
                     break;
@@ -18663,20 +18657,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ec_ottoman': {                                   // a round buttoned ottoman
-                    shadow();dot(x+w/2,y+h/2,w/2,'#7d4b5a',C.brass);dot(x+w/2,y+h/2,w/2-6,'#a46a7b');
+                    dot(x+w/2,y+h/2,w/2,'#7d4b5a',C.brass);dot(x+w/2,y+h/2,w/2-6,'#a46a7b');
                     for(let i=0;i<8;i++){const a=i*Math.PI/4;dot(x+w/2+Math.cos(a)*w*.25,y+h/2+Math.sin(a)*w*.25,1.6,'#5b3341');}
                     dot(x+w/2,y+h/2,2.5,C.brass);break;
                 }
                 // ── Cuisine, the restaurant ──
                 case 'ec_rtable': {                                    // a round table for four, linen and candle
-                    shadow();
                     for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4,X=x+w/2+Math.cos(a)*w*.38,Y=y+h/2+Math.sin(a)*h*.38;dot(X,Y,w*.11,C.rose,C.brass);dot(X,Y,w*.07,'#94586b');}
                     dot(x+w/2,y+h/2,w*.3,'#f6efe3','#c9b597');
                     for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4,X=x+w/2+Math.cos(a)*w*.19,Y=y+h/2+Math.sin(a)*h*.19;dot(X,Y,5.5,'#fffaf0','#c8b89a');dot(X,Y,2.5,'#e8dcc4');}
                     dot(x+w/2,y+h/2,4,C.brass);dot(x+w/2,y+h/2,1.6,'#fff1c9');break;
                 }
                 case 'ec_booth': {                                     // a rose velvet banquette with its table for two
-                    shadow();rr(x,y,30,h,8,'#713f52',C.brass,1.2);rr(x+4,y+4,22,h-8,6,'#94586b');
+                    rr(x,y,30,h,8,'#713f52',C.brass,1.2);rr(x+4,y+4,22,h-8,6,'#94586b');
                     rr(x+38,y+8,w-62,h-16,4,'#f6efe3','#c9b597');dot(x+38+(w-62)/2,y+h/2-9,5.5,'#fffaf0','#c8b89a');dot(x+38+(w-62)/2,y+h/2+9,5.5,'#fffaf0','#c8b89a');dot(x+38+(w-62)/2+10,y+h/2,2,C.brass);
                     dot(x+w-12,y+h/2,11,C.rose,C.brass);dot(x+w-12,y+h/2,7,'#94586b');break;
                 }
@@ -18688,20 +18681,20 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 // ── The kitchen ──
                 case 'ec_range': {
-                    shadow();rr(x,y,w,h,3,'#2c2e31','#8f9396',1.2);
+                    rr(x,y,w,h,3,'#2c2e31','#8f9396',1.2);
                     const n=Math.floor((w-10)/36);for(let i=0;i<n;i++)for(let j=0;j<1;j++){const X=x+22+i*36,Y=y+h/2;dot(X,Y,13,'#18191b','#5a5d60');dot(X,Y,7,'#2b2d30','#6d7074');}
                     ctx.fillStyle='#b9bdc0';ctx.fillRect(x+4,y+h-6,w-8,3);break;
                 }
                 case 'ec_kprep': {
-                    shadow();rr(x,y,w,h,3,'#aab0b3','#5f6467',1.2);rr(x+4,y+4,w-8,h-8,2,'#c9ced0');
+                    rr(x,y,w,h,3,'#aab0b3','#5f6467',1.2);rr(x+4,y+4,w-8,h-8,2,'#c9ced0');
                     rr(x+14,y+12,40,26,3,'#c99a6a','#7b5a3a',.8);for(let k=0;k<5;k++)dot(x+70+k*12,y+h/2,4,['#b04a3a','#e2c06a','#5f8a4a','#f0e0c8','#c86a3a'][k]);
                     ctx.fillStyle='#4a4d50';ctx.fillRect(x+w-40,y+14,26,3);ctx.fillRect(x+w-40,y+22,22,3);break;
                 }
                 case 'ec_kfridge': {
-                    shadow();rr(x,y,w,h,3,'#c4c9cb','#5f6467',1.2);ctx.fillStyle='#8a8f92';ctx.fillRect(x+w/2-.5,y+4,1,h-8);ctx.fillRect(x+w/2-6,y+h/2-8,2,16);ctx.fillRect(x+w/2+4,y+h/2-8,2,16);break;
+                    rr(x,y,w,h,3,'#c4c9cb','#5f6467',1.2);ctx.fillStyle='#8a8f92';ctx.fillRect(x+w/2-.5,y+4,1,h-8);ctx.fillRect(x+w/2-6,y+h/2-8,2,16);ctx.fillRect(x+w/2+4,y+h/2-8,2,16);break;
                 }
                 case 'ec_ksink': {
-                    shadow();rr(x,y,w,h,3,'#b7bcbf','#5f6467',1.2);rr(x+8,y+8,w/2-12,h-16,4,'#7d8487','#4f5558');rr(x+w/2+4,y+8,w/2-12,h-16,4,'#7d8487','#4f5558');dot(x+w/2,y+6,3,'#e0e3e5','#4f5558');break;
+                    rr(x,y,w,h,3,'#b7bcbf','#5f6467',1.2);rr(x+8,y+8,w/2-12,h-16,4,'#7d8487','#4f5558');rr(x+w/2+4,y+8,w/2-12,h-16,4,'#7d8487','#4f5558');dot(x+w/2,y+6,3,'#e0e3e5','#4f5558');break;
                 }
                 // ── The salon ──
                 case 'ec_jewel': {                                     // a glass vitrine of rings and necklaces on velvet
@@ -18717,16 +18710,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ec_shoes': {                                     // a low island of heels
-                    shadow();rr(x,y,w,h,8,'#efe2cf',C.brass,1.4);
+                    rr(x,y,w,h,8,'#efe2cf',C.brass,1.4);
                     const n=Math.floor((w-16)/26);for(let i=0;i<n;i++){const X=x+16+i*26,c=['#b0475f','#1c1a1f','#e9d3a6','#c58f6a','#7b3fa0'][(i+variant)%5];ctx.fillStyle=c;for(const dx of [-4,4]){ctx.beginPath();ctx.ellipse(X+dx,y+h/2,3.2,9,0,0,Math.PI*2);ctx.fill();}}
                     break;
                 }
                 case 'ec_chaise': {                                    // a rose velvet chaise
-                    shadow();rr(x,y,w,h,14,'#713f52',C.brass,1.4);rr(x+6,y+6,w-12,h-12,10,'#a46a7b');rr(x+4,y+4,26,h-8,10,'#8a5362');
+                    rr(x,y,w,h,14,'#713f52',C.brass,1.4);rr(x+6,y+6,w-12,h-12,10,'#a46a7b');rr(x+4,y+4,26,h-8,10,'#8a5362');
                     for(let i=0;i<4;i++)dot(x+44+i*((w-56)/3),y+h/2,1.5,'#5b3341');break;
                 }
                 case 'ec_mirror': {                                    // a gilt three-way mirror
-                    shadow();for(let i=0;i<3;i++){const X=x+i*w/3;rr(X+1,y,w/3-2,h,3,C.brass,C.dark,.8);const g=ctx.createLinearGradient(X,y,X+w/3,y+h);g.addColorStop(0,'#cfd8dc');g.addColorStop(.5,'#f4f7f8');g.addColorStop(1,'#9fb0b6');rr(X+4,y+4,w/3-8,h-8,2,g);}
+                    for(let i=0;i<3;i++){const X=x+i*w/3;rr(X+1,y,w/3-2,h,3,C.brass,C.dark,.8);const g=ctx.createLinearGradient(X,y,X+w/3,y+h);g.addColorStop(0,'#cfd8dc');g.addColorStop(.5,'#f4f7f8');g.addColorStop(1,'#9fb0b6');rr(X+4,y+4,w/3-8,h-8,2,g);}
                     break;
                 }
                 case 'ec_fitting': {                                   // curtained cubicles, each with its mirror and stool
@@ -18738,7 +18731,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     break;
                 }
                 case 'ec_vending': {
-                    shadow();rr(x,y,w,h,4,'#4a353d',C.brass,1.2);rr(x+5,y+6,w-15,h-18,2,'#273032','#a4987f',.7);
+                    rr(x,y,w,h,4,'#4a353d',C.brass,1.2);rr(x+5,y+6,w-15,h-18,2,'#273032','#a4987f',.7);
                     for(let i=0;i<3;i++)for(let j=0;j<3;j++)rr(x+8+i*8,y+12+j*12,6,8,1,['#ab8260','#92705a','#bfd0b0'][(i+j)%3]);
                     rr(x+w-8,y+16,5,10,1,'#a5b6a5');ctx.fillStyle=C.brass;ctx.fillRect(x+w-8,y+31,5,3);rr(x+8,y+h-10,w-19,5,1,'#1b2021');break;
                 }
@@ -18872,7 +18865,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     restitution: config.restitution || 0.3,
                     angularVel: config.angularVel || 0
                 });
-                
+
                 this.color = config.color || '#00CED1';
                 this.interactionType = config.interactionType || null;
                 this.decorType = config.decorType || null;       // custom furniture art (clinic)
@@ -18890,12 +18883,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Fixtures never turn: wall-mounted things, thin wall pieces, and anything too heavy to shift
                 this.fixedRotation = config.fixedRotation ?? (this.noNav || this.mass >= 1e4
                     || ['light_switch', 'armory', 'medbay_refill', 'tv_screen', 'vending_machine'].includes(this.interactionType));
-                
+
                 // Legacy compatibility: expose w and h
                 this.w = this.width;
                 this.h = this.height;
             }
-            
+
             /**
              * Get OBB for SAT collision.
              * Center-based for accurate rotation.
@@ -18912,7 +18905,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     vy: this.vy
                 };
             }
-            
+
             /**
              * Get center position (for OBB collision)
              */
@@ -18922,7 +18915,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     y: this.y + this.height / 2 
                 };
             }
-            
+
             /**
              * Get AABB bounding box for broadphase collision.
              * Props use corner-based positioning (x,y = top-left), so we must
@@ -18938,7 +18931,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const cy = this.y + this.height / 2;
                 return { x: cx - w / 2, y: cy - h / 2, w: w, h: h };
             }
-            
+
             /**
              * Update prop physics - velocity, rotation, and friction.
              * Wall and prop-prop collisions are handled by CollisionSystem.
@@ -18970,15 +18963,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Apply velocity
                 this.x += this.vx;
                 this.y += this.vy;
-                
+
                 // Apply rotation
                 this.angle += this.angularVel;
-                
+
                 // Apply friction
                 this.vx *= this.friction;
                 this.vy *= this.friction;
                 this.angularVel *= this.angularFriction;
-                
+
                 // Stop if very slow (prevents micro-drift)
                 if (Math.abs(this.vx) < 0.1) this.vx = 0;
                 if (Math.abs(this.vy) < 0.1) this.vy = 0;
@@ -18987,24 +18980,30 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._still = (this.vx || this.vy || this.angularVel) ? 0 : (this._still || 0) + 1;
                 if (!this._good) this._good = {};
                 this._good.x = this.x; this._good.y = this.y; this._good.angle = this.angle;
-                
+
                 // Keep w/h in sync for legacy compatibility
                 this.w = this.width;
                 this.h = this.height;
             }
-            
-            
+
+
             draw(ctx) {
                 if (!this.visible) return;
+                // Painting or replaying a split run draws body art only. The outer pass
+                // adds exactly one ground shadow, including vector fallback and live props.
+                if (PropPass.mode === 0) {
+                    drawGroundContactShadow(ctx, this.x + this.width / 2, this.y + this.height / 2,
+                        this.width / 2 + 5, this.height / 2 + 5, this.angle || 0);
+                }
                 if (PropSprites.stamp(ctx, this)) return;      // painted once, stamped (entities/prop-sprites.js)
-                
+
                 ctx.save();
                 const center = this.getCenter();
                 ctx.translate(center.x, center.y);
                 ctx.rotate(this.angle);
-                
+
                 ctx.fillStyle = this.color;
-                
+
                 if (this.decorType) {
                     ctx.translate(-center.x, -center.y);
                     drawClinicDecorProp(ctx, this);
@@ -19014,17 +19013,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 } else if (this.interactionType === 'armory') {
                     // === ARMORY LOCKER (wall-mounted weapons rack) ===
                     ctx.translate(-center.x, -center.y);
-                    
+
                     const ax = this.x, ay = this.y, aw = this.width, ah = this.height;
-                    
+
                     // Dark metal casing
                     ctx.fillStyle = '#1a1a22';
                     ctx.fillRect(ax, ay, aw, ah);
-                    
+
                     // Inner panel (dark violet)
                     ctx.fillStyle = '#1a0f2a';
                     ctx.fillRect(ax + 3, ay + 3, aw - 6, ah - 6);
-                    
+
                     // Weapon silhouettes — three horizontal bars representing guns
                     ctx.fillStyle = '#444';
                     const barH = 3;
@@ -19035,14 +19034,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         // Small grip nub
                         ctx.fillRect(ax + barInset + 4, by - 2, 5, barH + 4);
                     }
-                    
+
                     // Pulsing violet glow (indicates interactable)
                     const armPulse = 0.5 + Math.sin(_frameTime / 500) * 0.4;
                     ctx.shadowColor = '#a469ff';
                     ctx.shadowBlur = 12 * armPulse;
                     ctx.fillStyle = `rgba(164, 105, 255, ${0.1 * armPulse})`;
                     ctx.fillRect(ax + 2, ay + 2, aw - 4, ah - 4);
-                    
+
                     // "LOADOUT" label
                     ctx.shadowBlur = 0;
                     ctx.fillStyle = `rgba(164, 105, 255, ${0.5 + armPulse * 0.3})`;
@@ -19050,94 +19049,94 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.textAlign = 'center';
                     ctx.fillText('LOADOUT', ax + aw / 2, ay + ah - 5);
                     ctx.textAlign = 'start';
-                    
+
                 } else if (this.interactionType === 'vending_machine') {
                     ctx.translate(-center.x, -center.y);
                     drawMiniSpree(ctx, this);
                 } else if (this.interactionType === 'bed_sleep') {
                     // --- NEW: SMALLER BED RENDERER ---
                     ctx.translate(-center.x, -center.y);
-                    
+
                     // Mattress
                     ctx.fillStyle = '#202025'; 
                     ctx.fillRect(this.x, this.y, this.width, this.height);
-                    
+
                     // Pillow (White rect at top)
                     ctx.fillStyle = '#dddddd';
                     ctx.fillRect(this.x + 3, this.y + 3, this.width - 6, 15);
-                    
+
                     // Blanket (Colored rect covering bottom 3/4)
                     ctx.fillStyle = this.color; 
                     ctx.fillRect(this.x, this.y + 25, this.width, this.height - 25);
-                    
+
                     // Fold/Detail line
                     ctx.fillStyle = 'rgba(0,0,0,0.2)';
                     ctx.fillRect(this.x, this.y + 25, this.width, 3);
-                    
+
                 } else if (this.interactionType === 'couch_two_seater') {
                     // --- TWO SEATER COUCH (Top-down view) ---
                     ctx.translate(-center.x, -center.y);
-                    
+
                     // Couch base/frame (darker)
                     ctx.fillStyle = '#1a1215';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
-                    
+
                     // Back rest (top portion, slightly raised look)
                     ctx.fillStyle = this.color;
                     ctx.fillRect(this.x + 4, this.y + 4, this.width - 8, 18);
-                    
+
                     // Seat cushions (two side by side)
                     const cushionGap = 4;
                     const cushionWidth = (this.width - 12 - cushionGap) / 2;
                     ctx.fillStyle = this.color;
                     ctx.fillRect(this.x + 6, this.y + 26, cushionWidth, this.height - 34);
                     ctx.fillRect(this.x + 6 + cushionWidth + cushionGap, this.y + 26, cushionWidth, this.height - 34);
-                    
+
                     // Cushion detail lines (subtle indent)
                     ctx.fillStyle = 'rgba(0,0,0,0.2)';
                     ctx.fillRect(this.x + 6, this.y + 26, cushionWidth, 3);
                     ctx.fillRect(this.x + 6 + cushionWidth + cushionGap, this.y + 26, cushionWidth, 3);
-                    
+
                     // Arm rests (left and right sides)
                     ctx.fillStyle = '#0d0a0c';
                     ctx.fillRect(this.x, this.y + 20, 6, this.height - 24);
                     ctx.fillRect(this.x + this.width - 6, this.y + 20, 6, this.height - 24);
-                    
+
                 } else if (this.interactionType === 'tv_screen') {
                     // --- TV SCREEN (Top-down, warm glow for fireplace effect) ---
                     ctx.translate(-center.x, -center.y);
-                    
+
                     // TV frame (black border)
                     ctx.fillStyle = '#0a0a0a';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
-                    
+
                     // Screen with warm glow (simulating fireplace video)
                     ctx.shadowColor = this.color || '#ff6622';
                     ctx.shadowBlur = 25;
                     ctx.fillStyle = this.color || '#ff6622';
                     ctx.fillRect(this.x + 4, this.y + 4, this.width - 8, this.height - 8);
-                    
+
                     // Inner flame detail (lighter center)
                     ctx.fillStyle = '#ffaa44';
                     ctx.fillRect(this.x + 8, this.y + 6, this.width - 16, this.height - 14);
-                    
+
                     // Flickering core (brightest)
                     ctx.fillStyle = '#ffdd88';
                     const flicker = Math.sin(_frameTime / 200) * 2;
                     ctx.fillRect(this.x + 12 + flicker, this.y + 8, this.width - 26, this.height - 18);
-                    
+
                     ctx.shadowBlur = 0;
-                    
+
                 } else if (this.interactionType === 'light_switch') {
                     // --- LIGHT SWITCH (Wall-mounted panel with LED indicator) ---
                     ctx.translate(-center.x, -center.y);
-                    
+
                     const sx = this.x, sy = this.y, sw = this.width, sh = this.height;
-                    
+
                     // Wall plate (dark gray housing)
                     ctx.fillStyle = '#1a1a1a';
                     ctx.fillRect(sx, sy, sw, sh);
-                    
+
                     // Plate border highlight
                     ctx.fillStyle = 'rgba(255,255,255,0.06)';
                     ctx.fillRect(sx, sy, sw, 1);
@@ -19145,11 +19144,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fillStyle = 'rgba(0,0,0,0.3)';
                     ctx.fillRect(sx + sw - 1, sy, 1, sh);
                     ctx.fillRect(sx, sy + sh - 1, sw, 1);
-                    
+
                     // Toggle rocker (raised rectangle)
                     ctx.fillStyle = '#2a2a2a';
                     ctx.fillRect(sx + 2, sy + 3, sw - 4, sh - 6);
-                    
+
                     // LED indicator
                     const ledColor = this._switchState ? '#44ff88' : '#ff3333';
                     const ledGlow = this._switchState ? 'rgba(68, 255, 136, 0.6)' : 'rgba(255, 51, 51, 0.4)';
@@ -19160,30 +19159,30 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.arc(sx + sw / 2, sy + sh - 3, 1.5, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.shadowBlur = 0;
-                    
+
                 } else if (this.interactionType === 'bedside_table') {
                     // --- BEDSIDE TABLE (Top-down, small square table) ---
                     ctx.translate(-center.x, -center.y);
-                    
+
                     // Table top
                     ctx.fillStyle = this.color || '#2a1f1a';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
-                    
+
                     // Wood grain detail (subtle lines)
                     ctx.fillStyle = 'rgba(0,0,0,0.15)';
                     ctx.fillRect(this.x + 5, this.y + 3, 2, this.height - 6);
                     ctx.fillRect(this.x + 12, this.y + 3, 1, this.height - 6);
                     ctx.fillRect(this.x + this.width - 8, this.y + 3, 2, this.height - 6);
-                    
+
                     // Highlight edge (top)
                     ctx.fillStyle = 'rgba(255,255,255,0.08)';
                     ctx.fillRect(this.x, this.y, this.width, 3);
-                    
+
                     // Shadow edge (bottom/right)
                     ctx.fillStyle = 'rgba(0,0,0,0.25)';
                     ctx.fillRect(this.x, this.y + this.height - 3, this.width, 3);
                     ctx.fillRect(this.x + this.width - 3, this.y, 3, this.height);
-                    
+
                 } else if (this.color === '#555') {
                     // Gravestones (no rotation for gravestones)
                     ctx.translate(-center.x, -center.y);
@@ -19195,7 +19194,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fill();
                     ctx.strokeStyle = '#222';
                     ctx.stroke();
-                    
+
                 } else {
                     // Default prop with 3D highlights (rotated)
                     const hw = this.width / 2;
@@ -19208,7 +19207,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ctx.fillStyle = 'rgba(0,0,0,0.3)';
                     ctx.fillRect(hw - 5, -hh, 5, this.height);
                 }
-                
+
                 ctx.restore();
             }
         }
@@ -22992,6 +22991,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             constructor(x, y, type) { this.x = x; this.y = y; this.type = type; this.bobOffset = Math.random() * Math.PI * 2; }
             draw(ctx) {
                 const bobY = Math.sin(_gameTimeSec * 6 + this.bobOffset) * 2;  // game time: same speed at any frame rate
+                const r = this.type === 'salvage_crate' ? 18 : 9;
+                drawGroundContactShadow(ctx, this.x, this.y, r, r * 0.7);
                 ctx.save(); ctx.translate(this.x, this.y + bobY);
                 if (this.type === 'scrap') { ctx.fillStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(6, -6); ctx.lineTo(6, 6); ctx.lineTo(-6, 6); ctx.fill(); ctx.strokeStyle = '#555'; ctx.stroke(); } 
                 else if (this.type === 'pp') { ctx.fillStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 5; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill(); } 
@@ -26596,7 +26597,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     invincibleDuration: 999
                 });
                 this.name = 'Velvet';
-                this.state = 'idle';       // idle, following, sitting, sleeping
+                this.state = 'idle';       // idle / following; explicit sitting / sleeping poses also supported
                 this.inCar = false;
                 this.visible = true;
                 this.coatPalette = 'default'; // Reserved for future customization; current appearance is unchanged.
@@ -26604,8 +26605,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Animation
                 this.walkPhase = 0;
                 this.tailPhase = Math.random() * Math.PI * 2;
+                this._randomSeed = (this.tailPhase * 1e8) | 0 || 1;
                 this.idleTimer = 0;
-                this.idleBehavior = null;   // 'sit', 'look', 'groom'
+                this.idleBehavior = null;   // sit, look, groom, sleep
+                this.animationSpeed = 0;
+                this._moveSpeed = 0;
+                this._pose = 0;
                 this.lookTarget = null;
                 this.curiosityTimer = 0;
                 this.angle = 0;
@@ -26615,82 +26620,81 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._wanderTimer = 0;
             }
             
-            update(player, dt) {
+            // Cosmetic choices must not change the traffic / loot simulation's RNG stream.
+            _random() {
+                let n = this._randomSeed;
+                n ^= n << 13; n ^= n >>> 17; n ^= n << 5;
+                this._randomSeed = n;
+                return (n >>> 0) / 4294967296;
+            }
+
+            update(player, dt = 1, map = null, adopted = true) {
                 if (!this.visible || this.inCar) return;
-                
-                const dx = player.x - this.x;
-                const dy = player.y - this.y;
-                const dist = Math.hypot(dx, dy);
-                
-                // Wander offset — drifts the follow target left/right
-                this._wanderTimer += dt || 1;
-                if (this._wanderTimer > 120) {
-                    this._wanderAngle += (Math.random() - 0.5) * 1.2;
+                dt = Number.isFinite(dt) ? Math.max(0, Math.min(3, dt)) : 1;
+                if (!dt) return;
+                const nav = map ? NavGrid.for(map) : null;
+                const dist = Math.hypot(player.x - this.x, player.y - this.y);
+                this._wanderTimer += dt;
+                if (this._wanderTimer > 180) {
+                    this._wanderAngle += (this._random() - 0.5) * 0.7;
                     this._wanderTimer = 0;
                 }
-                
-                // Target point: behind and slightly to the side of player
-                const behindDist = 60;
-                const targetX = player.x - Math.cos(player.angle) * behindDist + Math.sin(this._wanderAngle) * 25;
-                const targetY = player.y - Math.sin(player.angle) * behindDist + Math.cos(this._wanderAngle) * 25;
-                const tDist = Math.hypot(this.x - targetX, this.y - targetY);
-                
-                if (dist > 500) {
-                    // Teleport if too far (map transition, etc.)
-                    this.x = player.x - Math.cos(player.angle) * 40;
-                    this.y = player.y - Math.sin(player.angle) * 40;
-                    this.state = 'following';
-                } else if (tDist > 200) {
-                    // Sprint to catch up — exceeds player speed so the cat can close gaps
-                    this.state = 'following';
-                    const angle = Math.atan2(targetY - this.y, targetX - this.x);
-                    this.angle = angle;
-                    this.x += Math.cos(angle) * 6.5;
-                    this.y += Math.sin(angle) * 6.5;
-                    this.walkPhase += 0.45;
-                    this.idleTimer = 0;
-                } else if (tDist > 120) {
-                    // Trot at player speed — keeps up while moving
-                    this.state = 'following';
-                    const angle = Math.atan2(targetY - this.y, targetX - this.x);
-                    this.angle = angle;
-                    this.x += Math.cos(angle) * 5.2;
-                    this.y += Math.sin(angle) * 5.2;
-                    this.walkPhase += 0.35;
-                    this.idleTimer = 0;
-                } else if (tDist > 40) {
-                    // Lazy walk — natural feline saunter when keeping pace at close range
-                    this.state = 'following';
-                    const angle = Math.atan2(targetY - this.y, targetX - this.x);
-                    this.angle = angle;
-                    this.x += Math.cos(angle) * 2.4;
-                    this.y += Math.sin(angle) * 2.4;
-                    this.walkPhase += 0.2;
-                    this.idleTimer = 0;
-                } else {
-                    // Close enough — idle behaviors
-                    this.state = 'idle';
-                    this.walkPhase *= 0.9;
-                    this.idleTimer++;
-                    
-                    if (this.idleTimer > 180 && !this.idleBehavior) {
-                        // Pick a random idle behavior
-                        const roll = Math.random();
-                        if (roll < 0.4) this.idleBehavior = 'sit';
-                        else if (roll < 0.7) this.idleBehavior = 'groom';
-                        else this.idleBehavior = 'look';
-                    }
-                    
-                    if (this.idleTimer > 400) {
-                        this.idleBehavior = null;
-                        this.idleTimer = 100; // Reset cycle
-                    }
+                // Keep a stable flank behind the player, rather than orbiting their feet.
+                const facing = player.angle || 0, flank = 22 + Math.sin(this._wanderAngle) * 12;
+                let gx = player.x - Math.cos(facing) * 60 - Math.sin(facing) * flank;
+                let gy = player.y - Math.sin(facing) * 60 + Math.cos(facing) * flank;
+                if (nav && !nav.walkable(gx, gy)) {
+                    const i = nav.nearestFree(gx, gy);
+                    if (i !== null) { gx = nav.cx(i); gy = nav.cy(i); }
+                    else { gx = player.x; gy = player.y; }
                 }
-                
-                // Tail always animates
-                this.tailPhase += 0.04;
+                const gap = Math.hypot(gx - this.x, gy - this.y);
+                // Hysteresis gives her time to settle; a departing player always interrupts rest.
+                const follow = adopted && (dist > 125 || gap > (this.state === 'following' ? 16 : 55));
+                let moved = 0;
+                if (follow) {
+                    const wp = navWaypoint(this, gx, gy, map);
+                    const det = detourAroundPlayer(this, wp.x, wp.y, player);
+                    const useDet = !wp.blocked && (!nav || (nav.walkable(det.x, det.y) && nav.lineWalkable(this.x, this.y, det.x, det.y)));
+                    const tx = useDet ? det.x : wp.x, ty = useDet ? det.y : wp.y;
+                    const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy);
+                    const desired = Math.atan2(dy, dx);
+                    const turn = Math.atan2(Math.sin(desired - this.angle), Math.cos(desired - this.angle));
+                    const top = dist > 220 ? 6.5 : dist > 130 ? 5.2 : 2.4;
+                    const turnRate = (top > 5 ? 0.18 : 0.12) * dt;
+                    if (!wp.blocked && d > 0.5) this.angle += Math.max(-turnRate, Math.min(turnRate, turn));
+                    const error = Math.atan2(Math.sin(desired - this.angle), Math.cos(desired - this.angle));
+                    const targetSpeed = wp.blocked || d < 0.5 || Math.abs(error) > 0.9 ? 0
+                        : Math.min(top, wp.finalLeg ? d * 0.16 : d / dt) * Math.max(0.35, Math.cos(error));
+                    const change = (targetSpeed > (this._moveSpeed || 0) ? 0.2 : 0.38) * dt;
+                    this._moveSpeed = Math.max(0, (this._moveSpeed || 0) + Math.max(-change, Math.min(change, targetSpeed - (this._moveSpeed || 0))));
+                    const step = targetSpeed ? Math.min(this._moveSpeed * dt, d) : 0;
+                    const vx = Math.cos(this.angle) * step, vy = Math.sin(this.angle) * step;
+                    if (step && (!nav || nav.lineWalkable(this.x, this.y, this.x + vx, this.y + vy))) {
+                        this.x += vx; this.y += vy; moved = step;
+                    } else if (step) {
+                        // Turn toward the clear path at a tight corner before taking another step.
+                        this._moveSpeed = 0;
+                        this.angle += Math.max(-turnRate, Math.min(turnRate, error));
+                    }
+                    this.state = 'following';
+                    this.idleBehavior = null; this.idleTimer = 0;
+                } else {
+                    this._moveSpeed = 0; this._navPath = null;
+                    this.state = 'idle'; this.idleTimer += dt;
+                    if (this.idleTimer > 180 && !this.idleBehavior) {
+                        const roll = this._random();
+                        this.idleBehavior = roll < 0.35 ? 'sit' : roll < 0.65 ? 'groom' : roll < 0.85 ? 'look' : 'sleep';
+                    }
+                    if (this.idleTimer > 540) { this.idleBehavior = null; this.idleTimer = 100; }
+                }
+                this.animationSpeed = moved / dt;
+                // Phase follows distance actually travelled: blocked cats never run in place.
+                this.walkPhase += moved * 0.115;
+                this.tailPhase += (moved ? 0.055 : 0.025) * dt;
+                this._pose = (this._pose || 0) + ((this.idleBehavior === 'sit' || this.idleBehavior === 'groom' || this.idleBehavior === 'sleep' ? 1 : 0) - (this._pose || 0)) * Math.min(1, 0.1 * dt);
             }
-            
+
             draw(ctx) {
                 if (!this.visible || this.inCar) return;
 
@@ -26699,30 +26703,27 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     ? VELVET_CAT_PALETTES[this.coatPalette].colors : VELVET_CAT_PALETTES.default.colors;
 
                 const phase = Number.isFinite(this.tailPhase) ? this.tailPhase : 0;
-                const sleeping = this.state === 'sleeping';
+                const sleeping = this.state === 'sleeping' || (this.state === 'idle' && this.idleBehavior === 'sleep');
                 const sitting = this.state === 'sitting' || (this.state === 'idle' && this.idleBehavior === 'sit');
                 const grooming = this.state === 'idle' && this.idleBehavior === 'groom';
                 const looking = this.state === 'idle' && this.idleBehavior === 'look';
-                const walking = this.state === 'following';
-                const stride = walking ? Math.sin(this.walkPhase) * 2.5 : 0;
-                const lift = walking ? Math.cos(this.walkPhase) : 0;
-                const length = sitting ? 12 : 16;
+                const walking = (this.animationSpeed || 0) > 0.05;
+                const running = walking && this.animationSpeed > 5.5;
+                const strideSize = walking ? Math.min(4.8, 1.8 + this.animationSpeed * 0.45) : 0;
+                const length = 16 - (this._pose ?? (sitting ? 1 : 0)) * 4;
                 const headX = sleeping ? 5.3 : length - 2;
                 const headY = sleeping ? 2.1 : 0;
-                const headTurn = sleeping ? .77 : grooming ? -.17 + Math.sin(phase * 3.2) * .045 : looking ? Math.sin(phase * .7) * .15 : 0;
+                const headTurn = sleeping ? .77 : grooming ? -.17 + Math.sin(phase * 3.2) * .045 : looking ? Math.sin(phase * .7) * .28 : walking ? Math.sin(this.walkPhase) * .035 : 0;
+                const blink = !walking && Math.cos(phase * 0.83) > 0.993;
 
+                // Ground contact is independent of body facing, gait and tail movement.
+                drawGroundContactShadow(ctx, this.x, this.y, sleeping ? 16 : 20, sleeping ? 11 : 10);
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
                 ctx.shadowBlur = 0;
-
-                // A compact ground shadow; the feline outline itself stays smooth and short-haired.
-                ctx.fillStyle = 'rgba(0,0,0,.27)';
-                ctx.beginPath();
-                ctx.ellipse(sleeping ? -3 : -1, 2.5, sleeping ? 13 : length + 1, sleeping ? 9 : 7.2, 0, 0, Math.PI * 2);
-                ctx.fill();
 
                 // Supple, tapering tail, painted behind the rump. All motion comes from update's phase.
                 const sway = Math.sin(phase) * 5.3;
@@ -26784,19 +26785,28 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         for (const side of [-1, 1]) {
                             for (const front of [false, true]) {
                                 if (grooming && front && side === -1) continue;
-                                const sign = (front ? 1 : -1) * side;
+                                // Four-beat walk, diagonal trot, then paired fore/hind bounds.
+                                const offset = running ? (front ? 0 : Math.PI) + side * 0.22
+                                    : this.animationSpeed > 3 ? (front ? 0 : Math.PI) + (side > 0 ? Math.PI : 0)
+                                    : (front ? 0 : Math.PI * 0.5) + (side > 0 ? Math.PI : 0);
+                                const phase = this.walkPhase + offset;
+                                const swing = walking ? Math.max(0, Math.cos(phase)) : 0;
                                 const jointX = front ? 7.8 : -9.1;
-                                const footX = (front ? 9.4 : -10.5) + stride * sign;
-                                const footY = side * (front ? 6.6 : 6.1) + side * Math.max(0, lift * sign) * .38;
+                                const footX = (front ? 9.4 : -10.5) + Math.sin(phase) * strideSize;
+                                const footY = side * (front ? 6.6 : 6.1) + side * swing * 0.85;
                                 ctx.strokeStyle = coatColors.legShade;ctx.lineWidth = 3;
                                 ctx.beginPath();ctx.moveTo(jointX, side * 4.1);ctx.quadraticCurveTo(footX - .8, side * 5.2, footX, footY);ctx.stroke();
-                                paw(footX, footY, front ? 2.65 : 2.95, 1.8);
+                                paw(footX, footY, (front ? 2.65 : 2.95) * (1 - swing * 0.12), 1.8, swing > 0.4);
                             }
                         }
                     }
                 }
 
                 // Rounded haunches, a small waist, and muscular shoulders replace the capsule body.
+                ctx.save();
+                const breath = sleeping ? Math.sin(phase * 0.7) * 0.025 : 0;
+                const bob = walking ? Math.sin(this.walkPhase * 2) * (running ? 0.055 : 0.018) : 0;
+                ctx.scale(1 + bob, 1 - bob * 0.45 + breath);
                 const body = new Path2D();
                 if (sleeping) {
                     body.moveTo(-15, 1);
@@ -26848,6 +26858,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 else {ctx.moveTo(-length + 2, -3.4);ctx.bezierCurveTo(-length + 5, -7.2, -6, -6.3, -3.8, -5.4);}
                 ctx.stroke();
 
+                ctx.restore(); // body breathing / shoulder motion
+
                 // The face turns slightly for existing look/groom states; no animation state is written here.
                 ctx.save();ctx.translate(headX, headY);ctx.rotate(headTurn);
                 for (const side of [-1, 1]) {
@@ -26883,7 +26895,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 ctx.stroke();
                 for (const side of [-1, 1]) {
                     ctx.save();ctx.translate(2.55, side * 2.42);ctx.rotate(side * .22);
-                    if (sleeping) {
+                    if (sleeping || blink) {
                         ctx.strokeStyle = '#b18abc';ctx.lineWidth = .65;
                         ctx.beginPath();ctx.moveTo(-1.35, 0);ctx.quadraticCurveTo(0, .58, 1.3, -.04);ctx.stroke();
                     } else {
@@ -67909,9 +67921,7 @@ engineMixin({
                 
                 // Velvet Cat AI
                 if (this.velvetCat && this.velvetCat.visible && !this.velvetCat.inCar) {
-                    if (this.questState.hasVelvetCat) {
-                        this.velvetCat.update(this.player, 1);
-                    }
+                    this.velvetCat.update(this.player, 1, this.activeMap, !!this.questState.hasVelvetCat);
                 }
             
                 this.profiler.start('Logic:Stealth');

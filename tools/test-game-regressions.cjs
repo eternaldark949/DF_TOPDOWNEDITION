@@ -608,6 +608,65 @@ test('Baseline layer panel: each layer gated and billed; with Baseline off nothi
   ok(r.after.stella && r.after.lighting && r.after.bld > 0, 'and every layer draws again');
 });
 
+test('Velvet routes around walls without teleporting or walking through geometry', env => {
+  const r = value(env, `
+    const map = {width:800,height:600,walls:[{x:300,y:80,width:40,height:350}],buildings:[]};
+    const player = {x:650,y:220,angle:0,radius:12}, cat = new VelvetCat(150,220), nav = NavGrid.for(map);
+    let unsafe=0, maxStep=0, detoured=false;
+    for(let i=0;i<650;i++) {
+      _simTick++; const x=cat.x,y=cat.y; cat.update(player,1,map);
+      if(!nav.lineWalkable(x,y,cat.x,cat.y)) unsafe++;
+      maxStep=Math.max(maxStep,Math.hypot(cat.x-x,cat.y-y));
+      if(cat.y>430 || cat.y<80) detoured=true;
+    }
+    return {unsafe,maxStep,detoured,arrived:Math.hypot(cat.x-590,cat.y-242)<30};
+  `);
+  equal(r.unsafe, 0, 'every step clears the body sweep');
+  ok(r.maxStep <= 6.500001, 'long distances never teleport the cat');
+  ok(r.detoured && r.arrived, 'cat goes around the wall and settles near the player');
+});
+
+test('Velvet waits at unreachable routes and leaves rest when the player departs', env => {
+  const r = value(env, `
+    const map={width:800,height:600,walls:[{x:300,y:0,width:40,height:600}],buildings:[]};
+    const player={x:650,y:220,angle:0,radius:12},cat=new VelvetCat(150,220);
+    for(let i=0;i<100;i++){_simTick++;cat.update(player,1,map);}
+    const blocked=cat.x===150 && cat.y===220 && cat.walkPhase===0 && cat.animationSpeed===0;
+    const before=[cat.x,cat.y,cat.tailPhase];cat.update(player,0,map);
+    const zeroDt=before.every((v,i)=>v===[cat.x,cat.y,cat.tailPhase][i]);
+    const rest=new VelvetCat(200,220),near={x:260,y:198,angle:0,radius:12};
+    for(let i=0;i<220;i++){_simTick++;rest.update(near,1,null,false);}
+    const unadopted=rest.x===200 && rest.y===220 && rest.animationSpeed===0 && !!rest.idleBehavior;
+    rest.idleBehavior='sleep';near.x=430;rest.update(near,1,null,true);
+    return {blocked,zeroDt,unadopted,woke:rest.state==='following' && rest.idleBehavior===null};
+  `);
+  equal(r, {blocked:true,zeroDt:true,unadopted:true,woke:true});
+});
+
+test('Contact shadows stay on the ground across rotation, bobbing, vector and sprite passes', env => {
+  const r=value(env, `
+    game._doLoadMap('apt_949'); const ctx=game.ctx, original=ctx.drawImage, shots=[];
+    drawGroundContactShadow(ctx,0,0,1,1);
+    ctx.drawImage=function(cv,...args){if(cv===drawGroundContactShadow.sprite){const m=this.getTransform();shots.push({args,m:[m.a,m.b,m.c,m.d,m.e,m.f]});}return original.call(this,cv,...args);};
+    const cat=new VelvetCat(150,180);cat.angle=0;cat.draw(ctx);cat.angle=2;cat.draw(ctx);
+    const catFixed=JSON.stringify(shots[0])===JSON.stringify(shots[1]);
+    const balanced=ctx._stack.length===0;
+    shots.length=0; const loot=new Loot(100,120,'scrap');_gameTimeSec=0;loot.draw(ctx);_gameTimeSec=1;loot.draw(ctx);
+    const lootFixed=JSON.stringify(shots[0])===JSON.stringify(shots[1]);
+    const sofa=game.props.find(p=>p.decorType==='apt_sofa');
+    shots.length=0;GameSettings.propSprites=false;sofa.angle=0.7;sofa.draw(ctx);
+    const vector=shots.length===1 && shots[0].m[4]===sofa.x+sofa.width/2 && shots[0].m[5]===sofa.y+sofa.height/2 && shots[0].args[0]===-sofa.width/2-5 && shots[0].args[1]===-sofa.height/2-5;
+    shots.length=0;GameSettings.propSprites=true;PropSprites.frame(1.4);sofa.draw(ctx);sofa.draw(ctx);
+    const stamped=shots.length===2;
+    const craft=game.props.find(p=>p.decorType==='apt_craft');shots.length=0;craft.draw(ctx);craft.draw(ctx);
+    const split=shots.length===2;
+    shots.length=0;PropSprites._canvas(sofa,PropSprites._plan(sofa,null),0);
+    const notBaked=shots.length===0;
+    ctx.drawImage=original;return {catFixed,balanced,lootFixed,vector,stamped,split,notBaked};
+  `);
+  equal(r,{catFixed:true,balanced:true,lootFixed:true,vector:true,stamped:true,split:true,notBaked:true});
+}, {affine:true});
+
 test('Furniture sprites: painted runs never change over time, loops repeat per period, stamps follow state', env => {
   env.run('game.story.update=()=>{};');
   // Every painted-once run of every prop on every bundled map draws the same at any time (an animation left
@@ -657,7 +716,7 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
     const desk = game.props.find(p => p.decorType === 'ps_desk'); PropSprites.frame(1.4); calls(desk);
     return {firstSofa, sofaCalls, turned, craftCalls, craftRuns, craftSplit, swRepainted, closeUp, vectorOff, bytes, floor, released, deskNever: !!(desk._spr && desk._spr.never)};
   `);
-  equal([r.sofaCalls, r.turned], [1, 5], 'a still piece stamps in one call, five when turned');
+  equal([r.sofaCalls, r.turned], [2, 10], 'a still piece stamps its art plus one ground shadow');
   ok(r.firstSofa > 5, 'the first draw paints it');
   equal([r.craftRuns, r.craftSplit], [2, true], 'the workbench: two still runs round its live scanline and ember');
   ok(r.craftCalls < 15, `the workbench stamps its runs and draws only what moves (${r.craftCalls} calls)`);
