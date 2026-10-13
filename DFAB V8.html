@@ -5051,7 +5051,8 @@
                 HL_NIGHT: 0.13,         // … and at night (lavender moonlight)
                 HL_RAIN: 0.12,          // extra shine when wet
                 SHADE: 0.22,            // the torso's side away from the light
-                SHADOW_DAY: 0.34, SHADOW_NIGHT: 0.3,    // contact shadow alphas
+                SHADOW_DAY: 0.34, SHADOW_NIGHT: 0.3,    // sun cast alphas
+                CONTACT_RX: 18, CONTACT_RY: 14,        // centred ground contact radii
                 RIM_R: 180,             // a lamp this close (px) rims them in its colour
                 RIM_A: 0.6,
                 RIM_PEDS: 8,            // pedestrians rimmed per frame (named characters always are)
@@ -49591,8 +49592,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             return S;
         }
 
-        /** A soft shadow under the feet: cast along the sun by day, a round pool at night and indoors,
-         *  and at night one cast away from each of the (up to two) nearest burning lamps. */
+        /** Centred ground contact at every facing, plus a sun-directed cast by day.
+         * Lamp casts are noted here and painted on their separate ground/light layers. */
         let _contactShadowX, _contactShadowY, _contactShadowAngle = 0;
         function _contactShadowDirection(x, y) {
             if (!Object.is(x, _contactShadowX) || !Object.is(y, _contactShadowY)) {
@@ -49600,23 +49601,36 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
             return _contactShadowAngle;
         }
+        let _humanContactSprite = null;
         function drawHumanContactShadow(ctx, entity) {
             if (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) return;
-            const C = CONFIG.HUMAN_SHADE, sp = glowSprite(_SHADOW_RGB, 0.45), a0 = ctx.globalAlpha;
-            // Lamp shadows from dusk (the lamps are lit while the sun's shadow fades), not only once it's gone
+            const C = CONFIG.HUMAN_SHADE, a0 = ctx.globalAlpha;
+            if (!_humanContactSprite) {
+                const cv = _humanContactSprite = document.createElement('canvas');
+                cv.width = cv.height = 96;
+                const c = cv.getContext('2d'), g = c.createRadialGradient(48, 48, 0, 48, 48, 48);
+                g.addColorStop(0, 'rgba(0,0,0,.58)');
+                g.addColorStop(.55, 'rgba(0,0,0,.40)');
+                g.addColorStop(.8, 'rgba(0,0,0,.18)');
+                g.addColorStop(1, 'rgba(0,0,0,0)');
+                c.fillStyle = g; c.fillRect(0, 0, 96, 96);
+            }
+            // Lamp shadows from dusk, while the sun's cast fades.
             if (entity && entity.x !== undefined && _lampShadowLevel() && sunNow().night > 0.3) _noteLampShadowBody(entity, C);
             ctx.save();
-            ctx.translate(-4, 0);
+            // Undo the body facing once: neither the contact ellipse nor the sun's
+            // anchor should acquire a rotating local offset. Keep parent scale/alpha.
+            ctx.rotate(-_bodyRot);
             if (typeof _sunShadow !== 'undefined' && _sunShadow.on) {
                 const L = Math.min(1.6, _sunShadow.len) * _sunShadow.k;
-                ctx.rotate(_contactShadowDirection(_sunShadow.dx, _sunShadow.dy) - _bodyRot);
+                ctx.save();
+                ctx.rotate(_contactShadowDirection(_sunShadow.dx, _sunShadow.dy));
                 ctx.translate(2 + 5 * L, 0); ctx.scale((11 + 9 * L) / 32, 9 / 32);
                 ctx.globalAlpha = a0 * (C.SHADOW_NIGHT + (C.SHADOW_DAY - C.SHADOW_NIGHT) * _sunShadow.k);
-                ctx.drawImage(sp, -32, -32);
-            } else {
-                ctx.scale(12 / 32, 10 / 32); ctx.globalAlpha = a0 * C.SHADOW_NIGHT;
-                ctx.drawImage(sp, -32, -32);
+                ctx.drawImage(glowSprite(_SHADOW_RGB, 0.45), -32, -32);
+                ctx.restore();
             }
+            ctx.drawImage(_humanContactSprite, -C.CONTACT_RX, -C.CONTACT_RY, C.CONTACT_RX * 2, C.CONTACT_RY * 2);
             ctx.restore();
         }
         /** Lamp shadows (Settings → Graphics → Lamp Shadows): cast away from the nearest burning lamps at night.
@@ -51039,7 +51053,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const walking = g && g.speed > CONFIG.GAIT.STOP_SPEED && b.stride > 0;
                 const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
                 const f = walking ? 1 + (Math.round(ph / (Math.PI * 2) * F) % F) : 0;
-                // the contact shadow, live (it follows the sun and their facing)
+                // Contact and sun casts stay live, outside the rotating body sprite.
                 if (!c.noShadow && !c.isDriving && _zoomLOD < 2) { const t = ctx.getTransform(); _bodyRot = Math.atan2(t.b, t.a); drawHumanContactShadow(ctx, e); }
                 ctx.drawImage(b.cv, b.cell * f, 0, b.cell, b.cell, -R, -R, R * 2, R * 2);
                 RenderStats.bodies++; RenderStats.cachedBodies++;

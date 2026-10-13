@@ -667,6 +667,30 @@ test('Contact shadows stay on the ground across rotation, bobbing, vector and sp
   equal(r,{catFixed:true,balanced:true,lootFixed:true,vector:true,stamped:true,split:true,notBaked:true});
 }, {affine:true});
 
+test('Humanoid contact and sun shadows keep their world placement as bodies turn', env => {
+  const r=value(env, `
+    game._doLoadMap('apt_949'); GameSettings.lampShadows='off'; _zoomLOD=0; SilhouetteFX.glow=false;
+    const ctx=game.ctx, original=ctx.drawImage, shots=[];
+    ctx.drawImage=function(cv,...args){const m=this.getTransform();shots.push({contact:cv===_humanContactSprite,args,m:[m.a,m.b,m.c,m.d,m.e,m.f].map(v=>Math.round(v*1e6)/1e6),alpha:this.globalAlpha});return original.call(this,cv,...args);};
+    const capture=(angle,sun)=>{
+      _sunShadow={on:sun,dx:0.6,dy:0.8,len:1,k:0.7};shots.length=0;
+      ctx.save();ctx.translate(90,110);ctx.scale(2,2);ctx.rotate(angle);ctx.globalAlpha=0.45;_bodyRot=angle;
+      drawHumanContactShadow(ctx,game.player);ctx.restore();return structuredClone(shots);
+    };
+    const indoor=[0,Math.PI/2,Math.PI].map(a=>capture(a,false));
+    const day=[0,Math.PI/2,Math.PI].map(a=>capture(a,true));
+    const stable=xs=>xs.every(x=>JSON.stringify(x)===JSON.stringify(xs[0]));
+    const ground=indoor[0][0];
+    const placement=ground.contact && JSON.stringify(ground.m)===JSON.stringify([2,0,0,2,90,110]) && JSON.stringify(ground.args)===JSON.stringify([-18,-14,36,28]) && ground.alpha===0.45;
+    const sunKept=day[0].length===2 && !day[0][0].contact && day[0][1].contact;
+    _sunShadow.on=false;shots.length=0;drawProceduralHumanoid(ctx,game.player,{noShadow:true});const suppressed=shots.every(s=>!s.contact);
+    shots.length=0;drawProceduralHumanoid(ctx,game.player,{isDriving:true});const driver=shots.every(s=>!s.contact);
+    shots.length=0;_zoomLOD=2;drawHumanContactShadow(ctx,game.player);const far=shots.length===0;
+    ctx.drawImage=original;return {indoor:stable(indoor),day:stable(day),placement,sunKept,suppressed,driver,far,balanced:ctx._stack.length===0};
+  `);
+  equal(r,{indoor:true,day:true,placement:true,sunKept:true,suppressed:true,driver:true,far:true,balanced:true});
+}, {affine:true});
+
 test('Furniture sprites: painted runs never change over time, loops repeat per period, stamps follow state', env => {
   env.run('game.story.update=()=>{};');
   // Every painted-once run of every prop on every bundled map draws the same at any time (an animation left

@@ -403,7 +403,8 @@
                 HL_NIGHT: 0.13,         // … and at night (lavender moonlight)
                 HL_RAIN: 0.12,          // extra shine when wet
                 SHADE: 0.22,            // the torso's side away from the light
-                SHADOW_DAY: 0.34, SHADOW_NIGHT: 0.3,    // contact shadow alphas
+                SHADOW_DAY: 0.34, SHADOW_NIGHT: 0.3,    // sun cast alphas
+                CONTACT_RX: 18, CONTACT_RY: 14,        // centred ground contact radii
                 RIM_R: 180,             // a lamp this close (px) rims them in its colour
                 RIM_A: 0.6,
                 RIM_PEDS: 8,            // pedestrians rimmed per frame (named characters always are)

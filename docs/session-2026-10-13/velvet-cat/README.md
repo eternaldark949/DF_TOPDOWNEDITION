@@ -9,3 +9,9 @@ Props draw one soft, centered contact shadow outside their cached or live artwor
 ![Browser preview of Velvet poses, turned furniture and pickups](preview.png)
 
 Validation: generated HTML build consistency, navigation and ground-shadow regression checks, the complete game regression suite, and a Chromium canvas preview. The enlarged still preview shows poses; movement feel and frame rate on target devices still need playtesting.
+
+## Approved humanoid contact shadow
+
+Procedural humanoids and cached crowd characters now use the approved 36 × 28 px centred black contact ellipse with a stronger soft falloff. Facing is removed from the ground pass, so the ellipse and sun anchor stay fixed as the body turns. Existing sun and lamp casts remain, and cached crowds continue to draw shadows live. The normal detail/driver/reflection exclusions remain in effect.
+
+![Current versus approved humanoid contact shadows on light and dark floors](humanoid-shadows-before-after.png)
