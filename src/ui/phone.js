@@ -1269,8 +1269,8 @@
 
                 // Current active car indicator
                 const activeName = game.garage.getDisplayName(game.garage.activeIndex);
-                html += `<div style="font-family:Orbitron,sans-serif; font-size:0.6rem; color:#ff8800; letter-spacing:2px; margin-bottom:4px;">MY GARAGE</div>`;
-                html += `<div style="font-size:0.65rem; color:#888; margin-bottom:12px;">Active: <span style="color:#ddd;">${activeName}</span></div>`;
+                html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.6rem - var(--font-trim)); color:#ff8800; letter-spacing:2px; margin-bottom:4px;">MY GARAGE</div>`;
+                html += `<div style="font-size:max(6px, 0.65rem - var(--font-trim)); color:#888; margin-bottom:12px;">Active: <span style="color:#ddd;">${activeName}</span></div>`;
 
                 for (let i = 0; i < game.garage.count; i++) {
                     const car = game.garage.get(i);
@@ -1284,25 +1284,25 @@
                     html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">`;
                     html += `<div style="display:flex; align-items:center; gap:6px;">`;
                     html += `<div style="width:14px; height:9px; border-radius:2px; background:${car.paintColor}; border:1px solid rgba(255,255,255,0.15);"></div>`;
-                    html += `<span style="font-family:Orbitron,sans-serif; font-size:0.7rem; color:#ddd; letter-spacing:1px;">${name}</span>`;
-                    if (car.isDefault) html += `<span style="font-size:0.4rem; color:#d4af37; letter-spacing:1px; border:1px solid rgba(212,175,55,0.3); padding:1px 4px; border-radius:2px;">DEFAULT</span>`;
+                    html += `<span style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.7rem - var(--font-trim)); color:#ddd; letter-spacing:1px;">${name}</span>`;
+                    if (car.isDefault) html += `<span style="font-size:max(6px, 0.4rem - var(--font-trim)); color:#d4af37; letter-spacing:1px; border:1px solid rgba(212,175,55,0.3); padding:1px 4px; border-radius:2px;">DEFAULT</span>`;
                     html += `</div>`;
-                    html += `<span style="font-size:0.45rem; color:${isActive ? '#00ff88' : '#555'};">${isActive ? '● ACTIVE' : ''}</span>`;
+                    html += `<span style="font-size:max(6px, 0.45rem - var(--font-trim)); color:${isActive ? '#00ff88' : '#555'};">${isActive ? '● ACTIVE' : ''}</span>`;
                     html += `</div>`;
 
                     // Action buttons
                     html += `<div style="display:flex; gap:5px;">`;
                     if (!isActive) {
-                        html += `<button class="carme-activate" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:1px; padding:6px; background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.25); color:#00ff88; border-radius:4px; cursor:pointer;">SET ACTIVE</button>`;
+                        html += `<button class="carme-activate" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:1px; padding:6px; background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.25); color:#00ff88; border-radius:4px; cursor:pointer;">SET ACTIVE</button>`;
                     }
-                    html += `<button class="carme-summon" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:0.5rem; letter-spacing:1px; padding:6px; background:rgba(255,136,0,0.1); border:1px solid rgba(255,136,0,0.3); color:#ff8800; border-radius:4px; cursor:pointer;${noSummon ? ' opacity:0.3; pointer-events:none;' : ''}">SUMMON</button>`;
+                    html += `<button class="carme-summon" data-index="${i}" style="flex:1; font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:1px; padding:6px; background:rgba(255,136,0,0.1); border:1px solid rgba(255,136,0,0.3); color:#ff8800; border-radius:4px; cursor:pointer;${noSummon ? ' opacity:0.3; pointer-events:none;' : ''}">SUMMON</button>`;
                     html += `</div>`;
 
                     html += `</div>`;
                 }
 
                 if (noSummon) {
-                    html += `<div style="font-size:0.6rem; color:#555; text-align:center; margin-top:8px; font-style:italic;">${isIndoor ? 'Cannot summon vehicles indoors.' : 'No road out here to bring it to.'}</div>`;
+                    html += `<div style="font-size:max(6px, 0.6rem - var(--font-trim)); color:#555; text-align:center; margin-top:8px; font-style:italic;">${isIndoor ? 'Cannot summon vehicles indoors.' : 'No road out here to bring it to.'}</div>`;
                 }
 
                 container.innerHTML = html;
@@ -1418,7 +1418,7 @@
                 const current = COSMETICS_REGISTRY[slot.equipped];
                 
                 html += `<div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,0,255,0.15); border-radius:6px; padding:8px 10px;">`;
-                html += `<div style="font-family:Orbitron,sans-serif; font-size:0.5rem; color:#ff00ff; letter-spacing:2px; margin-bottom:4px;">${slot.label}</div>`;
+                html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); color:#ff00ff; letter-spacing:2px; margin-bottom:4px;">${slot.label}</div>`;
                 html += `<div style="display:flex; gap:4px; flex-wrap:wrap;">`;
                 
                 for (const item of owned) {
@@ -1435,14 +1435,14 @@
                     const borderStyle = isEquipped ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)';
                     html += `<div class="neume-chip" data-id="${item.id}" data-cat="${slot.category}" style="display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:12px; border:${borderStyle}; cursor:pointer; background:${isEquipped ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'}; transition:border 0.2s;">`;
                     html += `<div style="width:10px;height:10px;border-radius:50%;background:${chipColor};flex-shrink:0;"></div>`;
-                    html += `<span style="font-size:0.5rem; color:${isEquipped ? '#fff' : '#999'}; white-space:nowrap;">${item.name}</span>`;
+                    html += `<span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${isEquipped ? '#fff' : '#999'}; white-space:nowrap;">${item.name}</span>`;
                     html += `</div>`;
                 }
                 
                 if (slot.category === 'accessory') {
                     // "None" chip, then the drink row when the glass is in hand
                     const none = !slot.equipped;
-                    html += `<div class="neume-chip" data-id="" data-cat="accessory" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:0.5rem; color:${none ? '#fff' : '#999'};">None</span></div>`;
+                    html += `<div class="neume-chip" data-id="" data-cat="accessory" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${none ? '#fff' : '#999'};">None</span></div>`;
                     html += `</div>`;
                     const accEntry = COSMETICS_REGISTRY[slot.equipped];
                     if (accEntry && accEntry.data.held === 'glass') {
@@ -1450,7 +1450,7 @@
                         html += `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:6px;">`;
                         for (const [key, d] of Object.entries(GLASS_DRINKS)) {
                             const on = key === cur;
-                            html += `<div class="neume-drink" data-acc="${accEntry.id}" data-drink="${key}" style="display:flex; align-items:center; gap:3px; padding:3px 6px; border-radius:10px; border:${on ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.12)'}; cursor:pointer;"><div style="width:8px;height:8px;border-radius:50%;background:${d.liquid};"></div><span style="font-size:0.45rem; color:${on ? '#fff' : '#999'};">${d.name}</span></div>`;
+                            html += `<div class="neume-drink" data-acc="${accEntry.id}" data-drink="${key}" style="display:flex; align-items:center; gap:3px; padding:3px 6px; border-radius:10px; border:${on ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.12)'}; cursor:pointer;"><div style="width:8px;height:8px;border-radius:50%;background:${d.liquid};"></div><span style="font-size:max(6px, 0.45rem - var(--font-trim)); color:${on ? '#fff' : '#999'};">${d.name}</span></div>`;
                         }
                         html += `</div>`;
                     }
@@ -1459,20 +1459,20 @@
                 }
                 if (slot.category === 'hat') {
                     const none = !slot.equipped;
-                    html += `<div class="neume-chip" data-id="" data-cat="hat" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:0.5rem; color:${none ? '#fff' : '#999'};">None</span></div>`;
+                    html += `<div class="neume-chip" data-id="" data-cat="hat" style="display:flex; align-items:center; padding:4px 8px; border-radius:12px; border:${none ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${none ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${none ? '#fff' : '#999'};">None</span></div>`;
                 }
                 if ((slot.category === 'jewelry' || slot.category === 'legwear') && !owned.length) {
-                    html += `<span style="font-size:0.45rem; color:#777;">None owned yet. Find ${slot.category === 'jewelry' ? 'jewelry' : 'legwear'} at Neural Systems.</span>`;
+                    html += `<span style="font-size:max(6px, 0.45rem - var(--font-trim)); color:#777;">None owned yet. Find ${slot.category === 'jewelry' ? 'jewelry' : 'legwear'} at Neural Systems.</span>`;
                 }
                 html += `</div></div>`;
             }
             // M.A.S.K: her field mask: Auto (on in the field, off at home), always On, or Off
             const mm = game.cosmetics.maskMode || 'auto';
             html += `<div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,0,255,0.15); border-radius:6px; padding:8px 10px;">`;
-            html += `<div style="font-family:Orbitron,sans-serif; font-size:0.5rem; color:#ff00ff; letter-spacing:2px; margin-bottom:4px;">M.A.S.K</div><div style="display:flex; gap:4px; flex-wrap:wrap;">`;
+            html += `<div style="font-family:Orbitron,sans-serif; font-size:max(6px, 0.5rem - var(--font-trim)); color:#ff00ff; letter-spacing:2px; margin-bottom:4px;">M.A.S.K</div><div style="display:flex; gap:4px; flex-wrap:wrap;">`;
             for (const [mode, label, dot] of [['auto', 'Auto', 'linear-gradient(90deg,#6a2a7a 50%,#888 50%)'], ['on', 'On', '#6a2a7a'], ['off', 'Off', '#555']]) {
                 const on = mm === mode;
-                html += `<div class="neume-mask" data-mode="${mode}" style="display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:12px; border:${on ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${on ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><div style="width:10px;height:10px;border-radius:50%;background:${dot};flex-shrink:0;"></div><span style="font-size:0.5rem; color:${on ? '#fff' : '#999'};">${label}</span></div>`;
+                html += `<div class="neume-mask" data-mode="${mode}" style="display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:12px; border:${on ? '2px solid #ff00ff' : '1px solid rgba(255,255,255,0.15)'}; cursor:pointer; background:${on ? 'rgba(255,0,255,0.1)' : 'rgba(255,255,255,0.03)'};"><div style="width:10px;height:10px;border-radius:50%;background:${dot};flex-shrink:0;"></div><span style="font-size:max(6px, 0.5rem - var(--font-trim)); color:${on ? '#fff' : '#999'};">${label}</span></div>`;
             }
             html += `</div></div>`;
             loadout.innerHTML = html;

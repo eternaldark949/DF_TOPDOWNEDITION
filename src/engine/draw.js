@@ -194,10 +194,12 @@
                 // zoomLOD 0 = full quality, 1 = reduced, 2 = minimal. Each step has a band
                 // (CONFIG.LOD_ZOOM: drop below `in`, come back above `out`), so the small zoom
                 // wobble of a car cruising near a threshold doesn't flicker detail on and off.
-                const zoom = this.camera.zoom, LZ = CONFIG.LOD_ZOOM;
+                // Measured against the player's Base Zoom (GameSettings.baseZoom), so choosing to see more of the
+                // world doesn't by itself drop detail; zooming out from there (driving) still does.
+                const zoom = this.camera.zoom, LZ = CONFIG.LOD_ZOOM, lodZoom = zoom / (GameSettings.baseZoom || 1);
                 let lodNow = this._zoomLOD || 0;
-                while (lodNow < 2 && zoom < LZ[lodNow].in) lodNow++;
-                while (lodNow > 0 && zoom > LZ[lodNow - 1].out) lodNow--;
+                while (lodNow < 2 && lodZoom < LZ[lodNow].in) lodNow++;
+                while (lodNow > 0 && lodZoom > LZ[lodNow - 1].out) lodNow--;
                 _zoomLOD = lodNow;
                 
                 // Vehicle LOD threshold scales with zoom — entities that are small on screen skip effects

@@ -1246,18 +1246,18 @@
                 
                 // Close affordance (top-right). Inline X — small, doesn't compete with
                 // the note's typographic header.
-                inner += `<div class="collection-note-inline-close" style="position:absolute; top:8px; right:10px; font-size:0.85rem; opacity:0.4; cursor:pointer; padding:4px 8px; line-height:1;">✕</div>`;
+                inner += `<div class="collection-note-inline-close" style="position:absolute; top:8px; right:10px; font-size:max(6px, 0.85rem - var(--font-trim)); opacity:0.4; cursor:pointer; padding:4px 8px; line-height:1;">✕</div>`;
                 
                 // Header (mirrors fullscreen overlay structure but tighter spacing).
                 inner += `<div id="note-header" style="text-align:center; padding: 4px 8px 8px;">`;
-                if (note.icon) inner += `<div style="font-size:1.4rem; margin-bottom:6px; opacity:0.6;">${note.icon}</div>`;
-                if (note.headerDetail) inner += `<div style="font-size:0.5rem; letter-spacing:3px; opacity:0.4; margin-bottom:5px;">${note.headerDetail.toUpperCase()}</div>`;
-                inner += `<div style="font-size:0.9rem; letter-spacing:2px; margin-bottom:3px;">${note.title}</div>`;
-                if (note.author) inner += `<div style="font-size:0.6rem; opacity:0.5; letter-spacing:1px;">by ${note.author}</div>`;
+                if (note.icon) inner += `<div style="font-size:max(6px, 1.4rem - var(--font-trim)); margin-bottom:6px; opacity:0.6;">${note.icon}</div>`;
+                if (note.headerDetail) inner += `<div style="font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:3px; opacity:0.4; margin-bottom:5px;">${note.headerDetail.toUpperCase()}</div>`;
+                inner += `<div style="font-size:max(6px, 0.9rem - var(--font-trim)); letter-spacing:2px; margin-bottom:3px;">${note.title}</div>`;
+                if (note.author) inner += `<div style="font-size:max(6px, 0.6rem - var(--font-trim)); opacity:0.5; letter-spacing:1px;">by ${note.author}</div>`;
                 inner += `</div>`;
                 
                 // Body — preserve line breaks, same logic as fullscreen openNote.
-                inner += `<div id="note-body" style="padding: 6px 6px 8px; line-height:1.65; font-size:0.85rem;">`;
+                inner += `<div id="note-body" style="padding: 6px 6px 8px; line-height:1.65; font-size:max(6px, 0.85rem - var(--font-trim));">`;
                 inner += note.body.split('\n').map(line => 
                     line.trim() === '' ? '<br>' : `<p style="margin:0 0 8px;">${line}</p>`
                 ).join('');
@@ -1265,7 +1265,7 @@
                 
                 // Signature
                 if (note.signature) {
-                    inner += `<div id="note-signature" style="text-align:right; padding: 0 6px 8px; font-size:0.8rem;">${note.signature}</div>`;
+                    inner += `<div id="note-signature" style="text-align:right; padding: 0 6px 8px; font-size:max(6px, 0.8rem - var(--font-trim));">${note.signature}</div>`;
                 }
                 
                 inner += `</div></div>`;
@@ -1322,10 +1322,10 @@
 
                 // Header
                 let headerHtml = '';
-                if (note.icon) headerHtml += `<div style="font-size:1.8rem; margin-bottom:8px; opacity:0.6;">${note.icon}</div>`;
-                if (note.headerDetail) headerHtml += `<div style="font-size:0.5rem; letter-spacing:3px; opacity:0.4; margin-bottom:6px;">${note.headerDetail.toUpperCase()}</div>`;
-                headerHtml += `<div style="font-size:1rem; letter-spacing:2px; margin-bottom:4px;">${note.title}</div>`;
-                if (note.author) headerHtml += `<div style="font-size:0.6rem; opacity:0.5; letter-spacing:1px;">by ${note.author}</div>`;
+                if (note.icon) headerHtml += `<div style="font-size:max(6px, 1.8rem - var(--font-trim)); margin-bottom:8px; opacity:0.6;">${note.icon}</div>`;
+                if (note.headerDetail) headerHtml += `<div style="font-size:max(6px, 0.5rem - var(--font-trim)); letter-spacing:3px; opacity:0.4; margin-bottom:6px;">${note.headerDetail.toUpperCase()}</div>`;
+                headerHtml += `<div style="font-size:max(6px, 1rem - var(--font-trim)); letter-spacing:2px; margin-bottom:4px;">${note.title}</div>`;
+                if (note.author) headerHtml += `<div style="font-size:max(6px, 0.6rem - var(--font-trim)); opacity:0.5; letter-spacing:1px;">by ${note.author}</div>`;
                 header.innerHTML = headerHtml;
 
                 // Body — preserve line breaks
@@ -1334,7 +1334,7 @@
                 ).join('');
 
                 // Signature
-                sig.innerHTML = note.signature ? `<span style="font-size:0.85rem;">${note.signature}</span>` : '';
+                sig.innerHTML = note.signature ? `<span style="font-size:max(6px, 0.85rem - var(--font-trim));">${note.signature}</span>` : '';
 
                 // Show
                 overlay.style.display = 'block';

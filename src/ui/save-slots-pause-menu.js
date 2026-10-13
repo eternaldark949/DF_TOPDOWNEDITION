@@ -1090,6 +1090,7 @@
                     ? 'n/a' : (FullscreenManager.isActive() ? 'on' : 'off'));
                 this._updateValueEl('set-orientation', OrientationManager.label());
                 this._updateValueEl('set-fps', GameSettings.fpsLimit === 0 ? 'none' : String(GameSettings.fpsLimit));
+                this._updateValueEl('set-basezoom', GameSettings.baseZoomLabel());
             }
             
             /** The Audio Buffer setting, with a note while it waits for a restart */
@@ -1258,6 +1259,10 @@
                     this.closeSettings(); this.close();
                     PerfBench.run();
                     
+                } else if (key === 'baseZoom') {
+                    GameSettings.cycleBaseZoom();
+                    this._updateValueEl(el.id, GameSettings.baseZoomLabel());
+
                 } else if (key === 'fpsLimit') {
                     // Cycle: NONE → 60 → 30 → NONE
                     if (GameSettings.fpsLimit === 0) GameSettings.fpsLimit = 60;

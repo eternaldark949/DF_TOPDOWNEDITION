@@ -1374,7 +1374,7 @@
                     const speedRatio = Math.abs(this.car.speed) / this.car.maxSpeed, CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
                     targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
                 } else {
-                    // On foot: in a little closer with the gun away, and again indoors; by something to use (or talking), 5% closer still
+                    // On foot: in a little closer with the gun away, and again indoors; by something to use (or talking), closer still (INTERACT_ZOOM)
                     const C = CONFIG.CAMERA, holstered = this.weaponHolstered || this.weaponMode === 'none';
                     let base = 1.0;
                     if (holstered) base *= C.HOLSTER_ZOOM;
@@ -1382,6 +1382,7 @@
                     targetZoom = nearInteractable ? base * C.INTERACT_ZOOM : base;
                 }
                 if (this.isLandscape) targetZoom *= 0.9;          // a short screen: a little more ground above and below her
+                targetZoom *= GameSettings.baseZoom || 1;         // Settings → Base Zoom: the player's own step back (100/90/75/60%)
                 
                 const diff = targetZoom - this.camera.zoom;
                 if (Math.abs(diff) > 0.005) this.camera.zoom += diff * 0.05;

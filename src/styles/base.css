@@ -7,6 +7,9 @@
            Usage: var(--variable-name)
            ========================================= */
         :root {
+            /* Every UI font size is written max(6px, size - var(--font-trim)): one place to make all the text
+               smaller or larger (2px smaller at ETERNAL's ask), never below 6px. New font sizes follow the pattern. */
+            --font-trim: 2px;
             --glow-color: #a469ff;        /* Main purple accent */
             --text-color: #e0e0e0;        /* Default text (light gray) */
             --bg-color: #030005;          /* Deep black background */
@@ -87,7 +90,7 @@
             box-shadow: 0 8px 40px rgba(0,0,0,0.6), inset 0 0 60px rgba(120,80,30,0.06);
             color: #c8b090;
             font-family: Georgia, 'Times New Roman', serif;
-            font-size: 0.85rem;
+            font-size: max(6px, 0.85rem - var(--font-trim));
         }
         #note-document.note-letter #note-header { color: #d4af37; font-family: Georgia, serif; }
         #note-document.note-letter #note-signature { color: #aa8844; font-style: italic; font-family: Georgia, serif; }
@@ -100,7 +103,7 @@
             box-shadow: 0 8px 40px rgba(0,0,0,0.6), inset 0 0 60px rgba(60,80,140,0.04);
             color: #a0a8c0;
             font-family: 'Courier New', Courier, monospace;
-            font-size: 0.78rem;
+            font-size: max(6px, 0.78rem - var(--font-trim));
         }
         #note-document.note-briefing #note-header { color: #6688cc; font-family: Orbitron, sans-serif; }
         #note-document.note-briefing #note-signature { color: #556688; font-family: 'Courier New', monospace; }
@@ -113,7 +116,7 @@
             box-shadow: 0 8px 40px rgba(0,0,0,0.6), inset 0 0 60px rgba(120,40,180,0.05);
             color: #b898c8;
             font-family: Georgia, 'Times New Roman', serif;
-            font-size: 0.82rem;
+            font-size: max(6px, 0.82rem - var(--font-trim));
             font-style: italic;
         }
         #note-document.note-ancient #note-header { color: #cc88ff; }
@@ -127,7 +130,7 @@
             box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 30px rgba(0,140,255,0.05);
             color: #88ccdd;
             font-family: 'Courier New', Courier, monospace;
-            font-size: 0.78rem;
+            font-size: max(6px, 0.78rem - var(--font-trim));
         }
         #note-document.note-digital #note-header { color: #00bbff; font-family: Orbitron, sans-serif; }
         #note-document.note-digital #note-signature { color: #336688; }
@@ -172,7 +175,7 @@
             opacity: 0; transition: opacity 2s ease-in-out;
         }
         .intro-main {
-            font-family: 'Montserrat', sans-serif; font-size: 3rem; font-weight: 700;
+            font-family: 'Montserrat', sans-serif; font-size: max(6px, 3rem - var(--font-trim)); font-weight: 700;
             letter-spacing: 5px;
             background: linear-gradient(180deg, #FFF4C4 0%, #FFD700 35%, #DAA520 65%, #B8860B 100%);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
@@ -190,7 +193,7 @@
         /* --- INTRO SUBTITLE UPDATE --- */
         .intro-sub {
             font-family: 'Montserrat', sans-serif; 
-            font-size: 1rem; 
+            font-size: max(6px, 1rem - var(--font-trim)); 
             font-weight: 400;
             letter-spacing: 3px; 
             text-transform: uppercase; 

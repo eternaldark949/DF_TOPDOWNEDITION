@@ -125,12 +125,14 @@
         document.getElementById('btn-settings').addEventListener('click', () => {
             mainMenuList.classList.add('hidden');
             settingsList.classList.remove('hidden');
+            mainMenuDiv.classList.add('menu-long');        // a long list: title on top, the list scrolling (styles/panels-phone.css)
         });
         
         // Back Button
         document.getElementById('btn-settings-back').addEventListener('click', () => {
             settingsList.classList.add('hidden');
             mainMenuList.classList.remove('hidden');
+            mainMenuDiv.classList.remove('menu-long');
         });
         
         // --- SETTINGS CYCLE HELPER ---
@@ -175,6 +177,7 @@
             lbl('lbl-scopeslow', `Scope Slow-Mo: ${onOff('scopeSlow')}`, onCol('scopeSlow'));
             lbl('lbl-audio', `Master Audio: ${GameSettings.audioEnabled ? 'ON' : 'OFF'}`,
                 GameSettings.audioEnabled ? '' : '#666');
+            lbl('lbl-basezoom', `Base Zoom: ${GameSettings.baseZoomLabel()}`, GameSettings.baseZoom < 1 ? '#4CAF50' : '');
             lbl('lbl-fps', `FPS Limit: ${GameSettings.fpsLimit === 0 ? 'NONE' : GameSettings.fpsLimit}`,
                 GameSettings.fpsLimit > 0 ? '#4CAF50' : '');
             syncAmbienceSliders();
@@ -279,6 +282,12 @@
             syncMainMenuLabels();
         });
         
+        // Base Zoom: the camera's own step back (core/settings.js cycleBaseZoom)
+        document.getElementById('btn-toggle-basezoom').addEventListener('click', () => {
+            GameSettings.cycleBaseZoom();
+            syncMainMenuLabels();
+        });
+
         // Toggle FPS Limit
         document.getElementById('btn-toggle-fps').addEventListener('click', () => {
             if (GameSettings.fpsLimit === 0) GameSettings.fpsLimit = 60;

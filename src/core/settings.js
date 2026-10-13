@@ -204,10 +204,19 @@
             // --- CONTROLS (touch) — flitting without letting go of the trigger ---
             // Kept in localStorage (dfab_controls) and in saves. See initJoystick.
             ...(() => {
-                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, preciseStick: true, scopeView: true, scopeSlow: true, cameraEdgeLock: true };   // cameraEdgeLock: the view never leaves the map (engine/draw.js _clampView)
+                const d = { flitRing: true, flitFlick: false, flitTwoFinger: false, flitButton: true, aimBeforeFire: true, sniperRelease: true, preciseStick: true, scopeView: true, scopeSlow: true, cameraEdgeLock: true, baseZoom: 1 };   // baseZoom: Settings → Base Zoom (engine/update.js camera). cameraEdgeLock: the view never leaves the map (engine/draw.js _clampView)
                 try { Object.assign(d, JSON.parse(localStorage.getItem('dfab_controls') || '{}')); } catch (e) { /* private mode */ }
+                d.baseZoom = CONFIG.CAMERA.BASE_ZOOMS.includes(d.baseZoom) ? d.baseZoom : 1;
                 return d;
             })(),
+            /** Base Zoom as the settings show it, e.g. '75%' */
+            baseZoomLabel() { return Math.round((this.baseZoom || 1) * 100) + '%'; },
+            /** Settings → Base Zoom: the next step out (100 → 90 → 75 → 60 → 100%), kept with the controls */
+            cycleBaseZoom() {
+                const Z = CONFIG.CAMERA.BASE_ZOOMS;
+                this.baseZoom = Z[(Z.indexOf(this.baseZoom) + 1) % Z.length];
+                this.applyControls();
+            },
             
             // --- DISPLAY ---
             // Preference, not live state. FullscreenManager syncs it back down
@@ -317,7 +326,7 @@
             // Apply film grain visibility
             /** Store the control toggles and show or hide the ⚡ button. */
             applyControls() {
-                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, preciseStick: this.preciseStick, scopeView: this.scopeView, scopeSlow: this.scopeSlow, cameraEdgeLock: this.cameraEdgeLock })); } catch (e) { /* private mode */ }
+                try { localStorage.setItem('dfab_controls', JSON.stringify({ flitRing: this.flitRing, flitFlick: this.flitFlick, flitTwoFinger: this.flitTwoFinger, flitButton: this.flitButton, aimBeforeFire: this.aimBeforeFire, sniperRelease: this.sniperRelease, preciseStick: this.preciseStick, scopeView: this.scopeView, scopeSlow: this.scopeSlow, cameraEdgeLock: this.cameraEdgeLock, baseZoom: this.baseZoom })); } catch (e) { /* private mode */ }
                 const b = document.getElementById('btn-flit');
                 if (b) b.classList.toggle('hidden-by-setting', !this.flitButton);
                 const r = document.getElementById('joystick-ring');
