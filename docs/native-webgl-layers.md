@@ -38,7 +38,7 @@ they do not choose another rendering backend.
 
 ## Animated characters and shape shadows
 
-The build identifier is `native-webgl-rain-v8`. **Canvas look** enables
+The build identifier is `native-webgl-driving-v9`. **Canvas look** enables
 all 47 switches. **Lighting + shadows** also enables continuous character
 animation, silhouette shadows, high shadow detail and curtains.
 
@@ -256,3 +256,30 @@ On the A53, record the same rainy city view with both caches enabled and only
 GPU rain quads changed. Keep quality and population steady. Then walk past
 lamps with City depth sorting on and off. Window droplets and wet reflections
 are the next separate effects; NPC silhouette casts remain outstanding.
+
+## Driven vehicle body and occupants in v9
+
+The authored vehicle `draw()` deliberately skips body/lights when the player
+is driving. Canvas paints occupants first, then calls `drawOccupantOverlay()`
+to put the roof and door frame over them. The native fork previously omitted
+that second pass, causing the driven car to disappear.
+
+Native rendering now groups the driver sprite, live seated passenger poses,
+and authored vehicle overlay in that order. The group follows the car's world
+Y when City depth sorting is enabled; the broad-order comparison also works.
+Vehicles hides the full vehicle group; People controls passenger poses, while
+Player still controls the driver. Exiting removes the extra pass. Its context
+participates in image retirement, map cleanup, GPU recovery and gradient memory
+accounting. Profiles add `world.timings.drivenCarMs`.
+
+[Driving evidence](native-webgl-driving-checks.json) covers real entry/exit,
+movement and camera following, both depth modes, passengers, vehicle hiding,
+zero warmed uploads/bakes, map changes and GPU recovery. The tested body mask
+has approximately 99.9% intersection-over-union against the authored Canvas
+overlay; this does not establish parity for every vehicle/model/state.
+
+Full-game parity still requires complete object/indoor/roof depth ordering,
+remaining dynamic shadow casters, glass droplets and wet/reflection materials,
+and an audit/port of special render passes (scopes, abilities, ghosts, emotes,
+quips and cinematic effects). Those need reference captures across maps and
+states, beyond the apartment and stationary city fixtures.

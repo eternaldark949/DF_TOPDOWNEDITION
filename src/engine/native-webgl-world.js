@@ -5,25 +5,49 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.groundContext=new NativeVectorContext(this);this.floorArt.addChild(this.groundContext.root);
         this.buildingBaseStage=new PIXI.Container();this.world.addChildAt(this.buildingBaseStage,this.world.getChildIndex(this.objects));
         this.peopleContext=new NativeVectorContext(this);this.objects.addChild(this.peopleContext.root);
+        this.drivenCarStage=new PIXI.Container();this.occupantContext=new NativeVectorContext(this);this.objects.addChild(this.drivenCarStage);
         this.trafficContext=new NativeVectorContext(this);this.world.addChildAt(this.trafficContext.root,this.world.getChildIndex(this.objects));
         this.streetContext=new NativeVectorContext(this);this.world.addChildAt(this.streetContext.root,this.world.getChildIndex(this.objects));
         this.roofStage=new PIXI.Container();this.world.addChild(this.roofStage);this.roofDetailContext=new NativeVectorContext(this);this.roofStage.addChild(this.roofDetailContext.root);
         this.cityGlowContext=new NativeVectorContext(this);this.emissive.addChild(this.cityGlowContext.root);
         this.worldCueContext=new NativeVectorContext(this);this.stage.addChild(this.worldCueContext.root);
-        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext'])this[key].label=key;
+        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext','occupantContext'])this[key].label=key;
     },
     clearWorld(){
         if(!this.nativeBuildings)return;
         if(this.playerSprite)this.objects.addChild(this.playerSprite);for(const r of this.fixtureNodes.values())this.fixtures.addChild(r.node);
         this.crowdAtlas.clear();this.rainBatch.clear();
         for(const r of this.nativeBuildings.values()){this.clearBuildingGlow(r);r.base.destroy();r.top.destroy();}this.nativeBuildings.clear();
-        for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','rainContext','roofDetailContext'])this[key].destroy();
+        for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','rainContext','roofDetailContext','occupantContext'])this[key].destroy();
+        this.drivenCarStage.destroy();
         this.roofStage.destroy();this.buildingBaseStage.destroy();this.nativeBuildings=null;
+    },
+    syncDrivenCar(game){
+        const ctx=this.occupantContext,stage=this.drivenCarStage,car=game.car;ctx.begin();stage.removeChildren();
+        stage.visible=!!(this.layers.vehicles&&game.isDriving&&car?.visible&&car.drawOccupantOverlay);
+        if(!stage.visible){this.objects.addChild(stage);return;}
+        // The authored car draw deliberately omits its body while driving.
+        // Seated bodies precede the door/roof pass, so lean-out poses stay inside.
+        stage.addChild(this.playerSprite,ctx.root);
+        if(this.layers.people)for(let i=1;i<(car.seatLayout?.length||0);i++){
+            const occ=car.seatOccupants[i];if(!occ||occ===true||!occ.inCar)continue;
+            const seat=car.getSeatWorldPos(i),shooting=occ.cooldown!==undefined&&occ.cooldown>0;
+            const {pose,idleAngle,...look}=lookFor(occ)||{};
+            const angle=occ.combatTargetTimer>0&&occ.combatTargetAngle!==undefined?occ.combatTargetAngle:car.angle;
+            ctx.save();ctx.translate(seat.x,seat.y);ctx.rotate(angle);
+            drawProceduralHumanoid(ctx,occ,{...look,gender:look.gender||occ.gender||'female',isDriving:true,
+                isShootingFromCar:shooting,carAngle:car.angle,recoil:shooting?.5:0,stance:shooting?'pistol':'idle',held:null});
+            ctx.restore();
+        }
+        car.drawOccupantOverlay(ctx);
+        stage.zIndex=car.y;
+        const parent=this.peopleContext.root.sortableChildren?this.peopleContext.root:this.objects;
+        parent.addChild(stage);if(parent.sortableChildren)parent.sortChildren();
     },
     syncWorld(game,view){
         const start=performance.now();let lap=start;const timings={};this.crowdAtlas.begin();this.buildingStats={hits:0,rasterizations:0,rasterMs:0,livePaths:0,fallbacks:0};const L=this.layers,map=game.activeMap;
-        for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext])ctx.canvas=game.canvas;
-        for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext])ctx.sceneFrame=_worldMatrix;
+        for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext,this.occupantContext])ctx.canvas=game.canvas;
+        for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext,this.occupantContext])ctx.sceneFrame=_worldMatrix;
         const vw=game.canvas.width/(2*view.zoom),vh=game.canvas.height/(2*view.zoom);
         const bounds={left:view.x-vw-100,right:view.x+vw+100,top:view.y-vh-100,bottom:view.y+vh+100};
         const visible=(o,pad=60)=>o.visible!==false&&o.x>=bounds.left-pad&&o.x<=bounds.right+pad&&o.y>=bounds.top-pad&&o.y<=bounds.bottom+pad;
@@ -68,6 +92,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         }
         if(actors.root.sortableChildren){this.playerSprite.zIndex=game.player.y;actors.root.addChild(this.playerSprite);actors.root.sortChildren();}
         timings.peopleMs=performance.now()-lap;lap=performance.now();
+        this.syncDrivenCar(game);timings.drivenCarMs=performance.now()-lap;lap=performance.now();
         const glow=this.cityGlowContext;glow.begin();const keep=new Set();
         const topBounds={left:view.x-vw,right:view.x+vw,top:view.y-vh,bottom:view.y+vh};
         for(const b of map.buildings||[]){
@@ -89,7 +114,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             if(map.ferrisWheel&&ferrisPaintInView(map.ferrisWheel,roofs,topBounds,view.zoom,true)){map.ferrisWheel.drawBase(street);map.ferrisWheel.drawTop(roofs);}
         }
         this.roofStage.visible=this.buildingBaseStage.visible=L.buildings;
-        for(const ctx of [street,traffic,actors,glow,roofs]){
+        for(const ctx of [street,traffic,actors,glow,roofs,this.occupantContext]){
             const used=new Set(ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture));
             for(const [image,t]of ctx.images)if(!used.has(t.baseTexture)){ctx.images.delete(image);this.releaseImage(t);}
         }

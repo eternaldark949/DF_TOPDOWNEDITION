@@ -58472,7 +58472,7 @@ class NativeWebGLRenderer {
                 this.lost=false;this.gpuTimer.extension=this.renderer.gl.getExtension('EXT_disjoint_timer_query_webgl2');this.contextRestores=(this.contextRestores||0)+1;
                 // Render-texture pixels cannot survive context loss. CPU geometry
                 // remains valid, but every cached GPU light image must be redrawn.
-                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;this.crowdAtlas?.clear();for(const r of this.nativeBuildings?.values()||[])r.key=r.glowKey=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
+                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;this.crowdAtlas?.clear();for(const r of this.nativeBuildings?.values()||[])r.key=r.glowKey=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
                 this.frames=[];this.warmFrames=15;this.lastStart=this.lastEnd=0;this.capture=this.completedCapture=null;this.message('');
             });
             this.gpuTimer=new NativeGpuTimer(gl);this.frameId=0;this.initLayers();this.initDetails();this.initWorld();
@@ -58573,7 +58573,7 @@ class NativeWebGLRenderer {
     report() {
         const frames=this.frames.slice(),intervals=frames.map(f=>f.intervalMs).filter(v=>v>0),sum=intervals.reduce((a,b)=>a+b,0);
         const sorted=intervals.slice().sort((a,b)=>a-b);
-        return {renderer:'native-webgl-apartment',build:'native-webgl-rain-v8',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
+        return {renderer:'native-webgl-apartment',build:'native-webgl-driving-v9',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
             settings:this.settings,resolution:[this.canvas.width,this.canvas.height],lighting:this.lightsOn,warmFramesRemaining:this.warmFrames,frames,
             animationSummary:{changedFrames:frames.filter(f=>f.animation?.changed).length,geometryMeanMs:frames.length?frames.reduce((n,f)=>n+(f.animation?.geometryMs||0),0)/frames.length:0,
                 shadowRefreshFrames:frames.filter(f=>f.shadows.dynamicRebuilds>0).length,dynamicRebuilds:frames.reduce((n,f)=>n+(f.shadows.dynamicRebuilds||0),0),staticRebuilds:frames.reduce((n,f)=>n+(f.shadows.staticRebuilds||0),0)},
@@ -58588,7 +58588,7 @@ class NativeWebGLRenderer {
             timing:this.gpuTimer.extension?'CPU submission, actual frame cadence, and optional asynchronous GPU samples':'CPU render submission and frame cadence; GPU timer unavailable',
             shadowCache:this.shadowStats,layerStages:this.layerStages,animation:this.actorStats,startup:this.startup,entryTiming:this.entryTiming,initializationMs:this.initializationMs,
             gpu:{status:this.gpuTimer.status,pending:this.gpuTimer.pending.length,samples:this.gpuTimer.samples.filter(s=>s.frame>=(frames[0]?.frame??Infinity))},
-            gradientTargetBytes:[this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext)].filter(Boolean).reduce((n,c)=>n+c.gradients.length*128*128*4,0),
+            gradientTargetBytes:[this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext)].filter(Boolean).reduce((n,c)=>n+c.gradients.length*128*128*4,0),
             veilTargetBytes:this.veilTarget?this.veilTarget.baseTexture.realWidth*this.veilTarget.baseTexture.realHeight*4:0,
             characterTargetBytes:this.actorTexture?this.actorTexture.baseTexture.realWidth*this.actorTexture.baseTexture.realHeight*4:0,
             shadowTextureBytes:this.shadowBytes(),
@@ -59189,25 +59189,49 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.groundContext=new NativeVectorContext(this);this.floorArt.addChild(this.groundContext.root);
         this.buildingBaseStage=new PIXI.Container();this.world.addChildAt(this.buildingBaseStage,this.world.getChildIndex(this.objects));
         this.peopleContext=new NativeVectorContext(this);this.objects.addChild(this.peopleContext.root);
+        this.drivenCarStage=new PIXI.Container();this.occupantContext=new NativeVectorContext(this);this.objects.addChild(this.drivenCarStage);
         this.trafficContext=new NativeVectorContext(this);this.world.addChildAt(this.trafficContext.root,this.world.getChildIndex(this.objects));
         this.streetContext=new NativeVectorContext(this);this.world.addChildAt(this.streetContext.root,this.world.getChildIndex(this.objects));
         this.roofStage=new PIXI.Container();this.world.addChild(this.roofStage);this.roofDetailContext=new NativeVectorContext(this);this.roofStage.addChild(this.roofDetailContext.root);
         this.cityGlowContext=new NativeVectorContext(this);this.emissive.addChild(this.cityGlowContext.root);
         this.worldCueContext=new NativeVectorContext(this);this.stage.addChild(this.worldCueContext.root);
-        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext'])this[key].label=key;
+        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext','occupantContext'])this[key].label=key;
     },
     clearWorld(){
         if(!this.nativeBuildings)return;
         if(this.playerSprite)this.objects.addChild(this.playerSprite);for(const r of this.fixtureNodes.values())this.fixtures.addChild(r.node);
         this.crowdAtlas.clear();this.rainBatch.clear();
         for(const r of this.nativeBuildings.values()){this.clearBuildingGlow(r);r.base.destroy();r.top.destroy();}this.nativeBuildings.clear();
-        for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','rainContext','roofDetailContext'])this[key].destroy();
+        for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','rainContext','roofDetailContext','occupantContext'])this[key].destroy();
+        this.drivenCarStage.destroy();
         this.roofStage.destroy();this.buildingBaseStage.destroy();this.nativeBuildings=null;
+    },
+    syncDrivenCar(game){
+        const ctx=this.occupantContext,stage=this.drivenCarStage,car=game.car;ctx.begin();stage.removeChildren();
+        stage.visible=!!(this.layers.vehicles&&game.isDriving&&car?.visible&&car.drawOccupantOverlay);
+        if(!stage.visible){this.objects.addChild(stage);return;}
+        // The authored car draw deliberately omits its body while driving.
+        // Seated bodies precede the door/roof pass, so lean-out poses stay inside.
+        stage.addChild(this.playerSprite,ctx.root);
+        if(this.layers.people)for(let i=1;i<(car.seatLayout?.length||0);i++){
+            const occ=car.seatOccupants[i];if(!occ||occ===true||!occ.inCar)continue;
+            const seat=car.getSeatWorldPos(i),shooting=occ.cooldown!==undefined&&occ.cooldown>0;
+            const {pose,idleAngle,...look}=lookFor(occ)||{};
+            const angle=occ.combatTargetTimer>0&&occ.combatTargetAngle!==undefined?occ.combatTargetAngle:car.angle;
+            ctx.save();ctx.translate(seat.x,seat.y);ctx.rotate(angle);
+            drawProceduralHumanoid(ctx,occ,{...look,gender:look.gender||occ.gender||'female',isDriving:true,
+                isShootingFromCar:shooting,carAngle:car.angle,recoil:shooting?.5:0,stance:shooting?'pistol':'idle',held:null});
+            ctx.restore();
+        }
+        car.drawOccupantOverlay(ctx);
+        stage.zIndex=car.y;
+        const parent=this.peopleContext.root.sortableChildren?this.peopleContext.root:this.objects;
+        parent.addChild(stage);if(parent.sortableChildren)parent.sortChildren();
     },
     syncWorld(game,view){
         const start=performance.now();let lap=start;const timings={};this.crowdAtlas.begin();this.buildingStats={hits:0,rasterizations:0,rasterMs:0,livePaths:0,fallbacks:0};const L=this.layers,map=game.activeMap;
-        for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext])ctx.canvas=game.canvas;
-        for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext])ctx.sceneFrame=_worldMatrix;
+        for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext,this.occupantContext])ctx.canvas=game.canvas;
+        for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext,this.occupantContext])ctx.sceneFrame=_worldMatrix;
         const vw=game.canvas.width/(2*view.zoom),vh=game.canvas.height/(2*view.zoom);
         const bounds={left:view.x-vw-100,right:view.x+vw+100,top:view.y-vh-100,bottom:view.y+vh+100};
         const visible=(o,pad=60)=>o.visible!==false&&o.x>=bounds.left-pad&&o.x<=bounds.right+pad&&o.y>=bounds.top-pad&&o.y<=bounds.bottom+pad;
@@ -59252,6 +59276,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         }
         if(actors.root.sortableChildren){this.playerSprite.zIndex=game.player.y;actors.root.addChild(this.playerSprite);actors.root.sortChildren();}
         timings.peopleMs=performance.now()-lap;lap=performance.now();
+        this.syncDrivenCar(game);timings.drivenCarMs=performance.now()-lap;lap=performance.now();
         const glow=this.cityGlowContext;glow.begin();const keep=new Set();
         const topBounds={left:view.x-vw,right:view.x+vw,top:view.y-vh,bottom:view.y+vh};
         for(const b of map.buildings||[]){
@@ -59273,7 +59298,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             if(map.ferrisWheel&&ferrisPaintInView(map.ferrisWheel,roofs,topBounds,view.zoom,true)){map.ferrisWheel.drawBase(street);map.ferrisWheel.drawTop(roofs);}
         }
         this.roofStage.visible=this.buildingBaseStage.visible=L.buildings;
-        for(const ctx of [street,traffic,actors,glow,roofs]){
+        for(const ctx of [street,traffic,actors,glow,roofs,this.occupantContext]){
             const used=new Set(ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture));
             for(const [image,t]of ctx.images)if(!used.has(t.baseTexture)){ctx.images.delete(image);this.releaseImage(t);}
         }
@@ -81270,7 +81295,7 @@ engineMixin({
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v8-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v9-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;
