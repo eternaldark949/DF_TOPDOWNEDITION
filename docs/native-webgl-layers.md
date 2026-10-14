@@ -38,7 +38,7 @@ they do not choose another rendering backend.
 
 ## Animated characters and shape shadows
 
-The build identifier is `native-webgl-heat-cache-v15`. **Canvas look** enables
+The build identifier is `native-webgl-travel-cache-v16`. **Canvas look** enables
 all 84 switches. **Lighting + shadows** also enables continuous character
 animation, silhouette shadows, high shadow detail and curtains.
 
@@ -509,3 +509,24 @@ forced captures and dropped work. These are device tests; desktop SwiftShader
 checks establish correctness, not A53 frame-rate gains.
 
 [Implementation, budgets and automated evidence](native-webgl-fork.md#hostile-heat-and-city-cache-budgets-in-v15).
+
+
+## Repeated flitting in v16
+
+Use the same bloom-off, rainy cafe setup as the v15 reports. Record one
+stationary 20s sample, then another repeatedly flitting along the same route
+away and back. Keep the same zoom, resolution, texture and reflection quality.
+Return trips within 30 seconds should have fewer building image transfers and
+new glow allocations; pressure and expiry can still evict resources.
+
+The independent **GPU building glow cache** and **GPU crowd animation cache**
+switches remain available. The latter now uses lighter live GPU crowd shading
+while a new appearance warms up; player animation remains unchanged.
+`world.buildingCache` now separates returns, evictions, target creation/pool
+reuse/borrowing, base/top rebuilds and retained storage. `world.crowd.liveMs`
+shows the remaining uncached crowd cost.
+
+Do not judge this pass only by the total upload count: compare the image and
+allocation origins/bytes, frame intervals and build stages. Allocation totals
+are cumulative requests, not current memory. NV heat remains a separate test.
+[Budgets and validation](native-webgl-fork.md#building-retention-and-crowd-arrival-work-in-v16).

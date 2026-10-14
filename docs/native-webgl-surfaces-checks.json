@@ -81,7 +81,7 @@
       "foliage": 0,
       "liveBuildings": 0,
       "bytes": 1450240,
-      "cpuMs": 32.400000005960464
+      "cpuMs": 108.29999999701977
     },
     "floor": 140,
     "rug": 0,
@@ -143,9 +143,9 @@
         "foliage": 9,
         "liveBuildings": 0,
         "bytes": 1087680,
-        "cpuMs": 0.7000000029802322
+        "cpuMs": 0.5999999940395355
       },
-      "cpuMs": 1.1000000089406967
+      "cpuMs": 0.7999999970197678
     },
     "wet": {
       "pads": 0,
@@ -191,9 +191,9 @@
         "foliage": 9,
         "liveBuildings": 1,
         "bytes": 1450240,
-        "cpuMs": 1.7999999970197678
+        "cpuMs": 14.399999991059303
       },
-      "cpuMs": 2
+      "cpuMs": 14.5
     },
     "sunPixels": 6694,
     "roofPixels": 4096,
@@ -207,7 +207,7 @@
   "controls": {
     "changed": 12,
     "total": 84,
-    "build": "native-webgl-heat-cache-v15"
+    "build": "native-webgl-travel-cache-v16"
   },
   "recovery": {
     "lost": false,

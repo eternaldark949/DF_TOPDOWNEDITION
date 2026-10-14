@@ -725,3 +725,71 @@ also cover this pass. Tests use Chromium/SwiftShader, not the phone GPU.
 Lightning lighting response and Golden Child attached damage orbs remain
 pending, alongside previously documented fine blur/dash and optical/reflection
 approximations. NV heat and NV lighting response are now implemented.
+
+
+## Building retention and crowd arrival work in v16
+
+Build `native-webgl-travel-cache-v16` keeps the 84 switches and the v15 NV heat.
+The v15 A53 stationary report reached 8.88 FPS / 69.6ms mean render, but repeated
+flitting reached 2.81 FPS / 256.6ms. That recording requested 124.94MB of texture
+allocations, including 77.46MB for building glow targets. These are cumulative
+allocation estimates, not simultaneous memory or measured GPU bus traffic.
+The larger route is not a controlled regression comparison with v14 roaming.
+
+Leaving the viewport now hides a building's base, top, emissive and wet-roof
+work rather than immediately destroying all its resources. Recently seen
+records retain imported artwork, gradient storage, geometry pools and, where
+space permits, their glow snapshots. The inactive cache is bounded to 12
+buildings, 24MiB estimated texture storage, 12,000 pooled display objects, and
+30 seconds since last seen. This byte estimate deduplicates textures inside a
+record and conservatively counts sharing across different records; geometry
+buffers, driver overhead and CPU allocations are not included in it. Visible
+records remain necessary scene work and are outside the inactive-record budget.
+
+All building glow snapshots plus free glow targets share the existing 24MiB
+glow-target cap. The free pool holds at most two targets / 4MiB. When the
+inactive cache exceeds its byte budget, discard reconstructible snapshots
+before imported artwork; when glow storage is full, a newly visible building
+can borrow a matching inactive target. Reuse always repaints the target before
+showing it. When there is room, preserve useful snapshots instead of borrowing
+and repeatedly repainting them. Expiry, count/object limits and remaining byte
+pressure evict whole records. Map changes release records and the free pool.
+Requested logical size/resolution keys handle fractional pixel rounding.
+
+V2 ground-plane bases use a geometry/LOD/settings/font key independent of
+camera position. Facades, roofs, signs and glow composition still follow exact
+camera positions; this pass does not quantize their projection. Artwork and
+gradient allocations can survive those reprojections, and unused imported
+images are released on rebuild. Retained off-screen records cannot contribute
+to wet-roof or reflection rendering. Context recovery invalidates base/top/glow
+images and rebuilds required GPU pixels.
+
+With **GPU crowd animation cache** on, an uncached crowd body temporarily uses
+the original medium-detail procedural shading (flat shading, resting hair and
+cloth), still as native GPU paths. This avoids full-detail fallback work while
+the bounded pose painter catches up. Pose/facing, interactions and simulation
+remain live; the player and non-crowd enemies retain their original animation
+paths. The normal cached appearance resumes as its poses become ready. Turning
+the crowd cache off still tests the full live path. This is a bounded pose
+construction pass, not a hard time cap on every procedural draw.
+
+New `world.buildingCache` counters are `returns`, `evictions`, `targetCreates`,
+`targetReuses` (free pool), `targetBorrows` (inactive donor), `baseRebuilds`,
+`topRebuilds`, `visible`, `retained`, `retainedBytes`, `retainedNodes` and
+`poolBytes`. Existing `bytes` counts attached glow targets; add `poolBytes` to
+assess the shared glow cap. `world.crowd.liveLiteBodies/liveMs` expose the
+remaining uncached crowd work, independently of `poseMs`.
+
+`tools/test-native-webgl-travel-cache-browser.cjs` checks repeated cafe/far-city
+round trips, inactive visibility, roof exclusion, target identity/reuse,
+projection after camera movement, fresh-cache pixel comparison, bounded cache
+pressure, expiry, fractional sizes, viewport resize, crowd warmup and context
+recovery. Six warmed alternating cafe/far-city trips (three round trips) require
+zero building-art transfers, new glow allocations or glow-cache repaints in the
+fixture. Pressure across 18 viewpoints reaches the 12-record limit and releases
+all inactive records on expiry. Retained/fresh scene pixels have mean RGBA
+error below .03/255; a small pan rebuilds tops and reuses ground bases.
+See [recorded evidence](native-webgl-travel-cache-checks.json). Browser
+checks use Chromium/SwiftShader; phone frame-time gains still require a device
+capture. New terrain, new buildings and a camera moving continuously through
+new views still require work, even when warm return trips can reuse resources.

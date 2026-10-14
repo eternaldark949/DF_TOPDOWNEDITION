@@ -15,7 +15,7 @@ class NativeCrowdPoseMesh extends PIXI.Mesh {
 }
 class NativeCrowdAtlas {
     constructor(owner){this.owner=owner;this.entries=new Map();this.built=0;this.stats={};}
-    begin(){this.built=0;this.painted=0;this.stats={hits:0,misses:0,atlasesBuilt:0,spriteBodies:0,liveBodies:0,posesRasterized:0,poseMs:0,deferredPoses:0,partialBodies:0};}
+    begin(){this.built=0;this.painted=0;this.stats={hits:0,misses:0,atlasesBuilt:0,spriteBodies:0,liveBodies:0,liveLiteBodies:0,liveMs:0,posesRasterized:0,poseMs:0,deferredPoses:0,partialBodies:0};}
     draw(ctx,e,c){
         if(c.pose==='dance'||c.pose==='die'||c.isDriving||c.stance&&c.stance!=='idle')return false;
         syncHumanoidGait(e);

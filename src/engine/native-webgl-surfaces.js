@@ -131,7 +131,7 @@ class NativeWorldSurfaces{
             const clock=r.layers.decorAnimation?_gameTimeSec:0,key=clock+':'+wet;
             if(this.roofTileKey!==key){this.roofTileMesh.shader.uniforms.clock=clock;this.roofTileMesh.shader.uniforms.wet=wet;r.renderer.render(this.roofTileStage,{renderTexture:this.roofTile,clear:true});this.roofTileKey=key;}
         }
-        if(wet>.01)for(const [b,record]of r.nativeBuildings){if(!b._footprint||!b._leanScale)continue;let rec=this.roofs.get(b);if(!rec)this.roofs.set(b,rec={meshes:[]});rec.used=r.frameId;
+        if(wet>.01)for(const [b,record]of r.nativeBuildings){if(!record.active||!b._footprint||!b._leanScale)continue;let rec=this.roofs.get(b);if(!rec)this.roofs.set(b,rec={meshes:[]});rec.used=r.frameId;
             const k=1+b._leanScale(),key=[record.key,k].join(':');
             for(let i=0;i<b.sections.length;i++){
                 if(count>=48){dropped++;continue;}let mesh=rec.meshes[i];if(!mesh)mesh=rec.meshes[i]=new NativeWetRoof();

@@ -5,7 +5,9 @@
     PauseMenuController.prototype.saveCinePicture=function(){if(!renderer.failure&&!renderer.lost)renderer.renderer.render(renderer.stage);return originalPicture.call(this);};
     const inBodyGroup=(ctx,e,paint)=>ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.layers.depthSort&&e&&!e.dead&&!e._reflectionProxy&&ctx.container._nativeEntity!==e?ctx.withDepth(e,paint):paint();
     const liveCrowd=drawCrowdHumanoid;
-    drawCrowdHumanoid=(ctx,e,c)=>{if(ctx.nativeVector&&!ctx.owner.layers.contactShadows)c={...c,noShadow:true};return inBodyGroup(ctx,e,()=>{if(ctx.nativeVector&&ctx.owner.layers.crowdSprites&&ctx.owner.crowdAtlas?.draw(ctx,e,c))return;return liveCrowd(ctx,e,c);});};
+    drawCrowdHumanoid=(ctx,e,c)=>{if(ctx.nativeVector&&!ctx.owner.layers.contactShadows)c={...c,noShadow:true};return inBodyGroup(ctx,e,()=>{if(ctx.nativeVector&&ctx.owner.layers.crowdSprites&&ctx.owner.crowdAtlas?.draw(ctx,e,c))return;if(ctx.nativeVector&&ctx.owner.layers.crowdSprites){const atlas=ctx.owner.crowdAtlas,start=performance.now(),lite=_crowdLite;_crowdLite=true;
+            try{atlas.stats.liveLiteBodies++;return liveCrowd(ctx,e,c);}finally{_crowdLite=lite;atlas.stats.liveMs+=performance.now()-start;}}
+        return liveCrowd(ctx,e,c);});};
     // Keep a body's paths and atlas mesh together before sorting by its feet.
     for(const Type of [NPC,Pedestrian,Ganger,GatlingGunner,Drone,VelvetCat,SceneActor]){
         const draw=Type.prototype.draw;if(!draw)continue;
@@ -89,7 +91,7 @@
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v15-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v16-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;
