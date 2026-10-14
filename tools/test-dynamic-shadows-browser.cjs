@@ -40,8 +40,45 @@ const { chromium } = require('playwright');
     assert.ok(Math.abs(r.second - r.secondReference) <= 3, 'another lamp keeps its light in that shadow');
     assert.ok(r.both < r.second && r.both < r.shadow, 'overlapping lamps fill the shadow');
     assert.ok(Math.abs(r.body - r.bodyReference) <= 3, 'a vehicle receives its own lamp light');
+    const extended = await page.evaluate(() => {
+      _zoomLOD = 0; GameSettings.lampShadows = 'high';
+      const lamp = { x: 230, y: 100, radius: 260, color: '#fff' };
+      const door = new IndoorDoor({ x: 180, y: 180, w: 80, h: 8, type: 'hinged' });
+      const model = { activeMap: { width: 600, height: 400, walls: [], buildings: [] }, lamps: [lamp], roomSystem: { active: true, doors: [door] }, getAmbientDarkness: () => .8 };
+      const doorPixel = () => {
+        DynamicShadows.begin(model);
+        const cv = document.createElement('canvas'); cv.width = 600; cv.height = 400;
+        const c = cv.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, 600, 400); c.globalCompositeOperation = 'destination-out';
+        if (!DynamicShadows.drawLight(c, lamp, 'hole')) {
+          const g = c.createRadialGradient(lamp.x, lamp.y, 10, lamp.x, lamp.y, lamp.radius); g.addColorStop(0, '#fff'); g.addColorStop(1, 'rgba(255,255,255,0)');
+          c.fillStyle = g; c.fillRect(0, 0, 600, 400);
+        }
+        return c.getImageData(230, 270, 1, 1).data[3];
+      };
+      const shut = doorPixel(); door.angle = Math.PI / 2; door.openAmount = 1; const swung = doorPixel();
+      const glass = new IndoorDoor({ x: 180, y: 180, w: 80, h: 8, type: 'sliding' }); model.roomSystem.doors = [glass];
+      const transmitted = doorPixel(); glass.openAmount = 1; const retracted = doorPixel();
+      game.activeMap = { width: 600, height: 350, walls: [], buildings: [] }; game.lamps = []; game.roomSystem.active = false; game.getAmbientDarkness = () => .8;
+      const owner = { x: 100, y: 150, angle: 0, length: 60, width: 24 };
+      const beam = { owner, cx: 130, cy: 150, L: 250, W: 60, color: '#fff' };
+      const beamPixel = (casterY) => {
+        DynamicShadows.begin(game); DynamicShadows.noteVehicle(owner); DynamicShadows.noteHuman({ x: 220, y: casterY, angle: 0 });
+        const cv = document.createElement('canvas'); cv.width = 600; cv.height = 350;
+        const c = cv.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, 600, 350); c.globalCompositeOperation = 'destination-out';
+        game.lightCtx = c; game._drawBeam(beam);
+        const source = DynamicShadows.sources.get(owner).get('headlight'), state = DynamicShadows.lights.get(source);
+        return { alpha: c.getImageData(320, 150, 1, 1).data[3], bytes: state ? state.bytes : 0, paired: DynamicShadows.stats.pairs };
+      };
+      const inCone = beamPixel(150), outsideCone = beamPixel(280);
+      return { shut, swung, transmitted, retracted, inCone, outsideCone };
+    });
+    assert.ok(extended.shut > extended.swung + 40, 'hinged leaf rotates its actual shadow');
+    assert.ok(extended.transmitted > extended.retracted + 15 && extended.transmitted < extended.shut - 15, 'glass attenuates light and retraction removes its cast');
+    assert.ok(extended.inCone.alpha > extended.outsideCone.alpha + 20, 'headlight caster darkens the beam only when inside its cone');
+    assert.ok(extended.inCone.paired === 1 && extended.outsideCone.paired === 0, 'emitter is excluded and off-axis casters are filtered');
+    assert.ok(extended.inCone.bytes < 100000, 'tight beam bounds and shared hole/color bitmap limit storage');
     assert.deepEqual(errors, [], 'no browser runtime errors');
-    console.log(JSON.stringify({ passed: true, pixels: r }, null, 2));
+    console.log(JSON.stringify({ passed: true, pixels: r, extended }, null, 2));
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

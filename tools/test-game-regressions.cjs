@@ -766,6 +766,56 @@ test('Shared lamp shadows bound light count and reject stale cache fallbacks', e
   equal(r,{capped:true,noStale:true,recovered:true,edited:true,invalid:true});
 });
 
+test('Door leaves cast at their live pose, transmit glass light, and disappear when retracted', env => {
+  const r=value(env, `
+    _zoomLOD=0;GameSettings.lampShadows='low';
+    const d=new IndoorDoor({x:180,y:180,w:80,h:8,type:'hinged'}),lamp={x:180,y:100,radius:260,color:'#fff'},body={x:240,y:240,angle:0};
+    const model={activeMap:{width:500,height:400,walls:[],buildings:[]},lamps:[lamp],roomSystem:{active:true,doors:[d],doorBlocks:()=>false},getAmbientDarkness:()=>.8};
+    DynamicShadows.begin(model);DynamicShadows.noteHuman(body);DynamicShadows.prepare(lamp);
+    const closed=DynamicShadows.stats.doors===1 && DynamicShadows.stats.pairs===1 && DynamicShadows.stats.blocked===1;
+    const first=DynamicShadows.casters.find(e=>e.door),oldAngle=first.angle;
+    d.angle=Math.PI/2;d.openAmount=1;DynamicShadows.begin(model);DynamicShadows.noteHuman(body);DynamicShadows.prepare(lamp);
+    const swing=DynamicShadows.stats.doors===1 && DynamicShadows.stats.pairs===2 && first.angle!==oldAngle && DynamicShadows.stats.builds===1;
+    const cachedBodyRay=DynamicShadows.stats.rays===1;
+    const glass=new IndoorDoor({x:180,y:180,w:80,h:8,type:'sliding'});model.roomSystem.doors=[glass];
+    DynamicShadows.begin(model);DynamicShadows.noteHuman(body);DynamicShadows.prepare(lamp);
+    const transmits=DynamicShadows.stats.doors===2 && DynamicShadows.stats.pairs===3 && DynamicShadows.casters.filter(e=>e.door).every(e=>e.opacity===.35);
+    glass.openAmount=1;DynamicShadows.begin(model);DynamicShadows.noteHuman(body);DynamicShadows.prepare(lamp);
+    const retract=DynamicShadows.stats.doors===0 && DynamicShadows.stats.pairs===1;
+    model.roomSystem.doors=[new IndoorDoor({x:180,y:180,type:'arch'})];DynamicShadows.begin(model);const arch=DynamicShadows.stats.doors===0;
+    return {closed,swing,cachedBodyRay,transmits,retract,arch};
+  `);
+  equal(r,{closed:true,swing:true,cachedBodyRay:true,transmits:true,retract:true,arch:true});
+});
+
+test('Custom light sources keep authored bounds, modes, material caches and source ownership', env => {
+  const r=value(env, `
+    _zoomLOD=0;GameSettings.lampShadows='low';
+    const model={activeMap:{width:500,height:400,walls:[],buildings:[]},lamps:[],roomSystem:{active:false},getAmbientDarkness:()=>.8};
+    const body={x:210,y:150,angle:0};DynamicShadows.begin(model);DynamicShadows.noteHuman(body);
+    const results=[];
+    for(const family of ['headlight','interior','decor','neon','fire','transient']){
+      const owner={},source=DynamicShadows.source(owner,family,{x:150,y:150,radius:150,bounds:{x:120,y:100,w:200,h:100},style:'one',samePaint:family==='fire',
+        paint:(g,mode)=>{g.fillStyle=mode==='hole'?'#fff':'#ff8800';g.fillRect(120,100,200,100);}});
+      const state=DynamicShadows.prepare(source);results.push(!!state && state.w===200 && state.h===100 && state.hole.width===50 && state.hole.height===25 && (family!=='fire'||state.hole===state.color));
+    }
+    const families=results.every(Boolean) && DynamicShadows.stats.builds===6 && DynamicShadows.stats.sources===6;
+    const first=[...DynamicShadows.lights.keys()][0];DynamicShadows.begin(model);DynamicShadows.noteHuman(body);const repeat=DynamicShadows.prepare(first);
+    const reused=!!repeat && DynamicShadows.stats.hits===1 && DynamicShadows.stats.rays===0;
+    first.style='two';DynamicShadows.begin(model);DynamicShadows.noteHuman(body);DynamicShadows.prepare(first);const material=DynamicShadows.stats.builds===1;
+    const car={x:220,y:150,angle:0,length:60,width:24};DynamicShadows.begin(model);DynamicShadows.noteVehicle(car);
+    const own=DynamicShadows.source(car,'headlight',{x:250,y:150,radius:200,paint:g=>g.fillRect(200,50,200,200)});
+    const excludesOwner=DynamicShadows.prepare(own)===null;
+    model.activeMap={width:500,height:400,walls:[{x:130,y:0,w:10,h:400}],buildings:[]};DynamicShadows.begin(model);DynamicShadows.noteHuman(body);
+    const internal=DynamicShadows.source({},'interior',{x:100,y:150,radius:200,noWorldWalls:true,segments:[],paint:g=>g.fillRect(0,0,500,400)});
+    const building=!!DynamicShadows.prepare(internal);
+    internal.segments=[{x1:150,y1:0,x2:150,y2:400}];DynamicShadows.begin(model);DynamicShadows.noteHuman(body);
+    const interiorWall=DynamicShadows.prepare(internal)===null;
+    return {families,reused,material,excludesOwner,building,interiorWall};
+  `);
+  equal(r,{families:true,reused:true,material:true,excludesOwner:true,building:true,interiorWall:true});
+});
+
 test('Furniture sprites: painted runs never change over time, loops repeat per period, stamps follow state', env => {
   env.run('game.story.update=()=>{};');
   // Every painted-once run of every prop on every bundled map draws the same at any time (an animation left

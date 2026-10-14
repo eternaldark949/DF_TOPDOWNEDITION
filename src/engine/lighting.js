@@ -1,4 +1,5 @@
         // Shared immutable falloff tables; softArea only reads these stops.
+        const INTERIOR_EMPTY_SEGS = Object.freeze([]);
         const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
         const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
         // One warm, wide falloff reused for the fireball and its dying flame stream.
@@ -19,6 +20,57 @@
         // GameEngine — Lighting, bloom, wet reflections, atmosphere.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
+            _drawTransientSource(ctx, owner, mode, muzzle = false) {
+                const radius = muzzle ? owner.radius * 1.6 : 50, colorRadius = muzzle ? owner.radius * 1.4 : 40;
+                const color = typeof owner.color === 'string' && /^#[0-9a-f]{6}$/i.test(owner.color) ? owner.color : muzzle ? '#ffcc88' : '#ffd9a0';
+                this._shadowSource(ctx, owner, 'transient', { x: owner.x, y: owner.y, radius, elevation: 12, style: [color, colorRadius].join('|') }, mode,
+                    (g, phase) => drawGlow(g, owner.x, owner.y, phase === 'hole' ? radius : colorRadius,
+                        phase === 'hole' ? '255, 255, 255' : color, phase === 'hole' ? 0.3 : 0.25));
+            },
+            _drawPropGlow(ctx, record, mode, radius) {
+                const p = record.p, color = record.medbay ? '#00ff00' : '#00f3ff';
+                this._shadowSource(ctx, p, 'propGlow', { family: 'decor', owner: p, x: record.x, y: record.y, radius: 180, elevation: 30,
+                    style: [radius, color].join('|') }, mode,
+                    (g, phase) => drawGlow(g, record.x, record.y, phase === 'hole' ? radius : 180,
+                        phase === 'hole' ? '255, 255, 255' : color, phase === 'hole' ? 0.4 : 0.3));
+            },
+            /** Preserve a source's authored falloff; occlude only its own contribution. */
+            _shadowSource(ctx, owner, family, description, mode, paint) {
+                const source = DynamicShadows.source(owner, family, { ...description, paint });
+                if (DynamicShadows.drawLight(ctx, source, mode)) return;
+                ctx.save();
+                // Budget / Off fallback retains the authored source path. Beams,
+                // fire and interior sprites already supply their static wall clip;
+                // don't introduce a fresh visibility solve for every skipped spark.
+                paint(ctx, mode); ctx.restore();
+            },
+            _paintSoftLight(ctx, s, mode) {
+                const src = s.src, color = mode === 'color', rgb = src.color || '#ffd9b0';
+                const stops = color ? [[0, rgb], [0.55, rgb], [1, 'rgba(0,0,0,0)']] : src.soft ? HOLE_AREA_SOFT : HOLE_AREA;
+                if (!src.w) {
+                    const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
+                    if (color) { g.addColorStop(0, rgb); g.addColorStop(1, 'rgba(0,0,0,0)'); }
+                    else { g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.45, 'rgba(255,255,255,.45)'); g.addColorStop(1, 'rgba(255,255,255,0)'); }
+                    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill(); return;
+                }
+                const hw = src.w / 2, hh = src.h / 2, r = Math.min(hw, src.round ?? hh), x0 = s.x - hw + r, x1 = s.x + hw - r;
+                const band = ctx.createLinearGradient(0, s.y - hh, 0, s.y + hh);
+                for (const [o, c] of stops) { band.addColorStop(.5 - o / 2, c); band.addColorStop(.5 + o / 2, c); }
+                ctx.fillStyle = band; ctx.fillRect(x0, s.y - hh, x1 - x0, hh * 2);
+                for (const side of [-1, 1]) {
+                    ctx.save(); ctx.beginPath(); ctx.rect(side < 0 ? x0 - r : x1, s.y - hh, r, hh * 2); ctx.clip();
+                    ctx.translate(side < 0 ? x0 : x1, s.y); ctx.scale(r, hh);
+                    const cap = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+                    for (const [o, c] of stops) cap.addColorStop(o, c);
+                    ctx.fillStyle = cap; ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                }
+            },
+            _drawSoftSource(ctx, s, mode) {
+                const src = s.src, radius = src.w ? Math.hypot(src.w, src.h) / 2 : s.r;
+                const bounds = src.w ? { x: s.x - src.w / 2, y: s.y - src.h / 2, w: src.w, h: src.h } : undefined;
+                this._shadowSource(ctx, src, 'decor', { x: s.x, y: s.y, radius, bounds, owner: s.owner || src, elevation: src.elevation ?? 44,
+                    style: [src.color, src.w, src.h, src.round, src.soft].join('|') }, mode, (g, phase) => this._paintSoftLight(g, s, phase));
+            },
             /**
              * Clip the light canvas to what a headlight beam can reach: a visibility polygon cast
              * from where the beam's edges meet (just behind the bumper), ignoring anything nearer
@@ -29,7 +81,8 @@
                 const back = 15 / slope, half = Math.atan(slope) + 0.02;
                 const c = owner._beamCache, tick = _simTick;
                 let poly, dx = 0, dy = 0;
-                const same = c && c.L === beamLength && c.map === this.activeMap;
+                const revision = DynamicShadows.map === this.activeMap ? DynamicShadows.wallRevision : 0;
+                const same = c && c.L === beamLength && c.map === this.activeMap && c.revision === revision;
                 if (same && Math.abs(c.x - cx) < 1.5 && Math.abs(c.y - cy) < 1.5 && Math.abs(c.a - a) < 0.01) poly = c.poly;
                 // A moving car: reuse its last shape (slid along with it) for a couple of ticks
                 else if (same && tick - c.tick < 3 && Math.hypot(c.x - cx, c.y - cy) < 30 && Math.abs(c.a - a) < 0.08) { poly = c.poly; dx = cx - c.x; dy = cy - c.y; }
@@ -38,11 +91,15 @@
                     poly = computeVisibilityPoly(ax, ay, beamLength + back, getOccluders(this.activeMap),
                         { aMin: a - half, aMax: a + half, arcStep: 0.1, minDist: back });
                     poly.ax = ax; poly.ay = ay;
-                    owner._beamCache = { x: cx, y: cy, a, L: beamLength, map: this.activeMap, poly, tick };
+                    owner._beamCache = { x: cx, y: cy, a, L: beamLength, map: this.activeMap, poly, tick, revision };
                 }
-                ctx.beginPath(); ctx.moveTo(poly.ax + dx, poly.ay + dy);
-                for (const pt of poly) ctx.lineTo(pt.x + dx, pt.y + dy);
-                ctx.closePath(); ctx.clip();
+                let stored = owner._beamPath;
+                if (!stored || stored.poly !== poly || stored.dx !== dx || stored.dy !== dy) {
+                    const path = new Path2D(); path.moveTo(poly.ax + dx, poly.ay + dy);
+                    for (const pt of poly) path.lineTo(pt.x + dx, pt.y + dy); path.closePath();
+                    stored = owner._beamPath = { poly, dx, dy, path };
+                }
+                ctx.clip(stored.path); return stored.path;
             },
 
             /** A headlight beam, pre-rendered once per colour and size: fades along its length and toward its edges. */
@@ -69,17 +126,23 @@
 
             /** Stamp one headlight beam (clipped by walls and buildings) into the light layer. */
             _drawBeam(b) {
-                const ctx = this.lightCtx;
-                ctx.save();
-                this._clipBeam(ctx, b.owner, b.cx, b.cy, b.L, b.W);
-                ctx.translate(b.cx, b.cy); ctx.rotate(b.owner.angle);
-                ctx.drawImage(this._beamSprite(b.color, b.L, b.W), 0, -b.W, b.L, 2 * b.W);
+                const ctx = this.lightCtx, angle = b.owner.angle, c = Math.cos(angle), s = Math.sin(angle);
+                const points = [[0, -b.W], [b.L, -b.W], [b.L, b.W], [0, b.W]].map(([x, y]) => [b.cx + x * c - y * s, b.cy + x * s + y * c]);
+                const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+                const bounds = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+                const sprite = this._beamSprite(b.color, b.L, b.W), cx = b.cx, cy = b.cy, L = b.L, W = b.W;
+                ctx.save(); const clipPath = this._clipBeam(ctx, b.owner, cx, cy, L, W);
+                this._shadowSource(ctx, b.owner, 'headlight', { x: cx, y: cy, radius: Math.hypot(L, W), bounds, elevation: 8,
+                    samePaint: true, baseRef: sprite, clipPath, style: [angle, L, W, b.color].join('|'),
+                    acceptCaster: e => { const dx = e.x - cx, dy = e.y - cy, forward = dx * c + dy * s, lateral = -dx * s + dy * c, pad = Math.hypot(e.width, e.depth) / 2;
+                        return forward >= -pad && forward <= L + pad && Math.abs(lateral) <= 15 + (W - 15) * Math.max(0, forward) / L + pad; }
+                }, 'hole', g => { g.save(); g.translate(cx, cy); g.rotate(angle); g.drawImage(sprite, 0, -W, L, W * 2); g.restore(); });
                 ctx.restore();
             },
 
             /** Firelight follows the same opaque walls/buildings as vehicle headlights. */
             _clipFireLight(ctx, owner, x, y, r) {
-                const map = this.activeMap, revision = map._renderSpatialRevision || 0;
+                const map = this.activeMap, revision = (map._renderSpatialRevision || 0) + ':' + (DynamicShadows.map === map ? DynamicShadows.wallRevision : 0);
                 // Runtime geometry edits invalidate the joined obstacle list as well as the clip.
                 if (map._fireLightOccluderRevision !== revision) { map._occluderCache = null; map._fireLightOccluderRevision = revision; }
                 const occluders = getOccluders(map);
@@ -106,7 +169,8 @@
                     ctx.save();
                     this._clipFireLight(ctx, owner, x, y, r);
                     ctx.globalAlpha = Math.min(1, strength * gain);
-                    ctx.drawImage(sprite, x - r, y - r, r * 2, r * 2);
+                    this._shadowSource(ctx, owner, 'fire', { x, y, radius: r, elevation: 6, samePaint: true, baseRef: sprite, clipPath: owner._fireLightClip.path }, mode,
+                        g => g.drawImage(sprite, x - r, y - r, r * 2, r * 2));
                     ctx.restore();
                 };
                 for (const p of this.projectiles) {
@@ -148,7 +212,9 @@
              * a hole sprite and a colour sprite. Each light only ever shadows its own light.
              */
             _interiorLightSprites(lamp, segs) {
-                if (lamp._sprites) return lamp._sprites;
+                const key = [lamp.x, lamp.y, lamp.radius, lamp.colorRadius, lamp.color, lamp.intensity, this.activeMap._renderSpatialRevision || 0, segs.map(s => [s.x1, s.y1, s.x2, s.y2].join(',')).join(';')].join('|');
+                if (lamp._sprites && lamp._spritesKey === key && lamp._spritesSegs === segs) return lamp._sprites;
+                lamp._spritesKey = key; lamp._spritesSegs = segs;
                 const R = Math.max(lamp.radius, lamp.colorRadius || 0), S = 0.5, size = Math.max(2, Math.ceil(2 * R * S));
                 const wedges = new Path2D(), ext = lamp.radius * 1.2;
                 for (const seg of segs) {
@@ -181,6 +247,13 @@
                 return (lamp._sprites = { hole, color, x: lamp.x - R, y: lamp.y - R, d: 2 * R });
             },
 
+            _drawInteriorSource(ctx, lamp, mode) {
+                const segs = (this.activeMap._interiorShadowSegs || {})[lamp.level] || INTERIOR_EMPTY_SEGS;
+                const sp = this._interiorLightSprites(lamp, segs);
+                this._shadowSource(ctx, lamp, 'interior', { x: lamp.x, y: lamp.y, radius: sp.d / 2, bounds: { x: sp.x, y: sp.y, w: sp.d, h: sp.d },
+                    noWorldWalls: true, segments: segs, baseRef: sp, elevation: lamp.elevation ?? 84 }, mode,
+                    (g, phase) => g.drawImage(sp[phase], sp.x, sp.y, sp.d, sp.d));
+            },
             /* =====================================================================
                LIGHTING — the darkness layer
                ---------------------------------------------------------------------
@@ -233,7 +306,7 @@
             /** Scratch records never retain a map's lights or vehicles between frames. */
             _releaseLightingScratch(scratch) {
                 for (const b of scratch.beams) b.owner = null;
-                for (const s of scratch.softLights) s.src = null;
+                for (const s of scratch.softLights) { s.src = null; s.owner = null; }
                 for (const g of scratch.propGlows) g.p = null;
                 scratch.iVisible.length = scratch.litLamps.length = scratch.visibleLamps.length = 0;
                 scratch.beams.length = scratch.softLights.length = scratch.propGlows.length = 0;
@@ -376,8 +449,8 @@
                     lc.globalCompositeOperation = 'destination-out';
                     for (const lamp of iLights) {
                         if (!inView(lamp.x, lamp.y, lamp.radius)) continue;
-                        const sp = this._interiorLightSprites(lamp, iSegsByLevel[lamp.level] || []);
-                        lc.drawImage(sp.hole, sp.x, sp.y, sp.d, sp.d);
+                        const sp = this._interiorLightSprites(lamp, iSegsByLevel[lamp.level] || INTERIOR_EMPTY_SEGS);
+                        this._drawInteriorSource(lc, lamp, 'hole');
                         iVisible.push(lamp);
                     }
                 }
@@ -425,12 +498,11 @@
                 }
             
                 // 5. DYNAMIC HOLES — shots and muzzle flashes light softly around them
-                const white = glowSprite('255, 255, 255', 0.3);
-                for (const p of this.projectiles) if (!p.isFireball && inView(p.x, p.y, 50)) lc.drawImage(white, p.x - 50, p.y - 50, 100, 100);
+                                for (const p of this.projectiles) if (!p.isFireball && inView(p.x, p.y, 50)) this._drawTransientSource(lc, p, 'hole');
                 this._drawFireLights(lc, 'hole', inView);
                 for (const f of this.muzzleFlashes) {
                     const r = f.radius * 1.6;
-                    if (inView(f.x, f.y, r)) lc.drawImage(white, f.x - r, f.y - r, r * 2, r * 2);
+                    if (inView(f.x, f.y, r)) this._drawTransientSource(lc, f, 'hole', true);
                 }
                 // Reflections in the wet street lift the dark where they shine (engine/reflections.js)
                 this.liftReflections(lc, lw, lh);
@@ -482,8 +554,9 @@
                     lc.globalAlpha = 0.55;
                     for (const v of cars) {
                         if (!v.glowColor || !v.visible || v.dead || !v.length || !inView(v.x, v.y, 80)) continue;
-                        lc.save(); lc.translate(v.x, v.y); lc.rotate(v.angle);
-                        lc.drawImage(soft, -v.length / 2 - 16, -v.width / 2 - 16, v.length + 32, v.width + 32); lc.restore();
+                        lc.save();
+                        this._shadowSource(lc, v, 'underglow', { family: 'decor', x: v.x, y: v.y, radius: Math.hypot(v.length + 32, v.width + 32) / 2, elevation: 6, samePaint: true, baseRef: soft, style: [v.angle, v.length, v.width].join('|') }, 'hole',
+                            g => { g.save(); g.translate(v.x, v.y); g.rotate(v.angle); g.drawImage(soft, -v.length / 2 - 16, -v.width / 2 - 16, v.length + 32, v.width + 32); g.restore(); }); lc.restore();
                     }
                     lc.globalAlpha = 1;
                 }
@@ -498,7 +571,7 @@
                 const softLights = scratch.softLights, propGlows = scratch.propGlows;
                 {
                     const tNow = _frameTime / 1000;
-                    const push = (src, x, y) => {
+                    const push = (src, x, y, owner = src) => {
                         if (!src.radius) src.radius = Math.max(src.w || 0, src.h || 0) / 2;
                         const r = src.radius || Math.max(src.w, src.h) / 2;
                         if (!inView(x, y, r)) return;
@@ -507,11 +580,11 @@
                         const f = src.flicker ? 0.82 + 0.18 * Math.sin(tNow * src.flicker + x * 0.7) * Math.sin(tNow * src.flicker * 0.37 + y) : 1;
                         const s = scratch.softPool[softLights.length] || (scratch.softPool[softLights.length] = {});
                         softLights.push(s);
-                        s.src = src; s.x = x; s.y = y; s.r = r; s.a = (src.intensity ?? 0.8) * f * k;
+                        s.src = src; s.owner = owner; s.x = x; s.y = y; s.r = r; s.a = (src.intensity ?? 0.8) * f * k;
                     };
                     for (const s of (this.activeMap.softLights || [])) push(s, s.x, s.y);
                     for (const p of this.props) {
-                        if (p.light && p.visible !== false) { const c = p.getCenter(); push(p.light, c.x + (p.light.dx || 0), c.y + (p.light.dy || 0)); }
+                        if (p.light && p.visible !== false) { const c = p.getCenter(); push(p.light, c.x + (p.light.dx || 0), c.y + (p.light.dy || 0), p); }
                         if (p.interactionType === 'medbay_refill' || p.interactionType === 'vending_machine') {
                             const c = p.getCenter();
                             if (inView(c.x, c.y, 180)) {
@@ -522,55 +595,17 @@
                         }
                     }
                 }
-                const softGrad = (s, key, make) => {               // gradients are reused while the light stays put
-                    const src = s.src;
-                    if (src[key] && src[key + 'X'] === s.x && src[key + 'Y'] === s.y) return src[key];
-                    src[key + 'X'] = s.x; src[key + 'Y'] = s.y; return (src[key] = make());
-                };
-                // Area lights (w × h): a rounded rectangle with a soft edge. A band across the
-                // middle plus two half-oval end caps that share the same falloff, so no seams.
-                // stops: [[offset from the centre line 0..1, colour], …]
-                const softArea = (s, key, stops) => {
-                    const hw = s.src.w / 2, hh = s.src.h / 2, r = Math.min(hw, s.src.round ?? hh);
-                    const x0 = s.x - hw + r, x1 = s.x + hw - r;
-                    const band = softGrad(s, key + 'Band', () => {
-                        const g = lc.createLinearGradient(0, s.y - hh, 0, s.y + hh);
-                        for (const [o, c] of stops) { g.addColorStop(0.5 - o / 2, c); g.addColorStop(0.5 + o / 2, c); }
-                        return g;
-                    });
-                    lc.fillStyle = band; lc.fillRect(x0, s.y - hh, x1 - x0, hh * 2);
-                    const cap = s.src[key + 'Cap'] || (s.src[key + 'Cap'] = (() => {
-                        const g = lc.createRadialGradient(0, 0, 0, 0, 0, 1);
-                        for (const [o, c] of stops) g.addColorStop(o, c);
-                        return g;
-                    })());
-                    for (const side of [-1, 1]) {
-                        lc.save();
-                        lc.beginPath(); lc.rect(side < 0 ? x0 - r : x1, s.y - hh, r, hh * 2); lc.clip();
-                        lc.translate(side < 0 ? x0 : x1, s.y); lc.scale(r, hh);
-                        lc.fillStyle = cap; lc.beginPath(); lc.arc(0, 0, 1, 0, Math.PI * 2); lc.fill();
-                        lc.restore();
-                    }
-                };
                 for (const s of softLights) {
-                    lc.globalAlpha = Math.min(1, s.a);
-                    if (s.src.w) { softArea(s, '_hole', s.src.soft ? HOLE_AREA_SOFT : HOLE_AREA); continue; }
-                    lc.fillStyle = softGrad(s, '_holeGrad', () => {
-                        const g = lc.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
-                        g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-                        return g;
-                    });
-                    lc.beginPath(); lc.arc(s.x, s.y, s.r, 0, Math.PI * 2); lc.fill();
+                    lc.globalAlpha = Math.min(1, s.a); this._drawSoftSource(lc, s, 'hole');
                 }
                 lc.globalAlpha = 1;
 
                 // Vending machines and medbays glow (pulsing; they can be pushed, so sprites, not cached gradients)
                 const time = _frameTime;
-                const holeGlow = glowSprite('255, 255, 255', 0.4);
                 for (const g of propGlows) {
                     const offset = (g.p.id || 0) * 1337;
                     const r = 170 * (g.medbay ? 1.0 + Math.sin((time + offset) / 400) * 0.05 : 1.0 + Math.sin((time + offset) / 50) * 0.02);
-                    lc.drawImage(holeGlow, g.x - r, g.y - r, r * 2, r * 2);
+                    this._drawPropGlow(lc, g, 'hole', r);
                 }
                 
                 if (this.activeMap.id === 'moon_city_nightclub') this.clubLightLayer(lc, 'hole');   // the dance floor, through the dark
@@ -589,7 +624,7 @@
                 for (const lamp of iVisible) {
                     const sp = lamp._sprites;
                     lc.globalAlpha = 0.08 * lamp.intensity;
-                    lc.drawImage(sp.color, sp.x, sp.y, sp.d, sp.d);
+                    this._drawInteriorSource(lc, lamp, 'color');
                 }
             
                 // Lamps — the same ones lit above
@@ -608,14 +643,10 @@
                 // Neon Signs — cached gradients; the odd one buzzes
                 for (const s of this.neonSigns) {
                     if (!inView(s.x, s.y, 150)) continue;
-                    if (!s._cachedGrad) {
-                        const radius = 150;
-                        s._cachedGrad = lc.createRadialGradient(s.x, s.y, 0, s.x, s.y, radius);
-                        s._cachedGrad.addColorStop(0, s.color); s._cachedGrad.addColorStop(1, 'rgba(0,0,0,0)');
-                        s._cachedRadius = radius;
-                    }
                     lc.globalAlpha = baseAlpha * 1.5 * lampFlicker(s);
-                    lc.fillStyle = s._cachedGrad; lc.beginPath(); lc.arc(s.x, s.y, s._cachedRadius, 0, Math.PI*2); lc.fill();
+                    this._shadowSource(lc, s, 'neon', { x: s.x, y: s.y, radius: 150, color: s.color, elevation: 48, style: s.color }, 'color',
+                        (g, phase) => { if (phase !== 'color') return; const grad = g.createRadialGradient(s.x, s.y, 0, s.x, s.y, 150);
+                            grad.addColorStop(0, s.color); grad.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = grad; g.beginPath(); g.arc(s.x, s.y, 150, 0, Math.PI * 2); g.fill(); });
                 }
             
                 // Vending / medbay colour
@@ -623,21 +654,15 @@
                     const offset = (g.p.id || 0) * 1337;
                     const mod = g.medbay ? 0.9 + Math.sin((time + offset) / 400) * 0.2 : 1.0 + Math.sin((time + offset) / 50) * 0.05;
                     lc.globalAlpha = Math.min(1.0, 0.2 * mod);
-                    drawGlow(lc, g.x, g.y, 180, g.medbay ? '#00ff00' : '#00f3ff', 0.3);
+                    const holeRadius = 170 * (g.medbay ? 1.0 + Math.sin((time + offset) / 400) * 0.05 : 1.0 + Math.sin((time + offset) / 50) * 0.02);
+                    this._drawPropGlow(lc, g, 'color', holeRadius);
                 }
             
                 if (this.activeMap.id === 'moon_city_nightclub') this.clubLightLayer(lc, 'color');  // the floor's colour on whoever dances on it
 
-                // Soft light colour (the warm pool each decor light casts)
+                // Soft light colour uses the same caster mask as its illumination.
                 for (const s of softLights) {
-                    lc.globalAlpha = Math.min(1, 0.22 * s.a);
-                    if (s.src.w) { softArea(s, '_tint', [[0, s.src.color || '#ffd9b0'], [0.55, s.src.color || '#ffd9b0'], [1, 'rgba(0,0,0,0)']]); continue; }
-                    lc.fillStyle = softGrad(s, '_tintGrad', () => {
-                        const g = lc.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
-                        g.addColorStop(0, s.src.color || '#ffd9b0'); g.addColorStop(1, 'rgba(0,0,0,0)');
-                        return g;
-                    });
-                    lc.beginPath(); lc.arc(s.x, s.y, s.r, 0, Math.PI * 2); lc.fill();
+                    lc.globalAlpha = Math.min(1, 0.22 * s.a); this._drawSoftSource(lc, s, 'color');
                 }
 
                 // Fireballs and their dying flames cast a wide orange pool, not the small ordinary-shot tint.
@@ -647,12 +672,12 @@
                 const hexOr = (c, d) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : d;
                 for (const p of this.projectiles) {
                     if (p.isFireball || !inView(p.x, p.y, 40)) continue;
-                    lc.globalAlpha = 0.3; drawGlow(lc, p.x, p.y, 40, hexOr(p.color, '#ffd9a0'), 0.25);
+                    lc.globalAlpha = 0.3; this._drawTransientSource(lc, p, 'color');
                 }
                 for (const f of this.muzzleFlashes) {
                     const r = f.radius * 1.4;
                     if (!inView(f.x, f.y, r)) continue;
-                    lc.globalAlpha = 0.45 * Math.min(1, (f.life || 3) / 3); drawGlow(lc, f.x, f.y, r, hexOr(f.color, '#ffcc88'), 0.25);
+                    lc.globalAlpha = 0.45 * Math.min(1, (f.life || 3) / 3); this._drawTransientSource(lc, f, 'color', true);
                 }
 
                 // Headlight haze, and a glow at each headlamp
@@ -662,7 +687,11 @@
                     this._drawBeam(b);
                     const nx = -Math.sin(b.owner.angle), ny = Math.cos(b.owner.angle), side = (b.owner.width || 22) * 0.35;
                     lc.globalAlpha = Math.min(1, baseAlpha * 2.2 * b.haze);
-                    for (const sgn of [-1, 1]) drawGlow(lc, b.cx + nx * side * sgn, b.cy + ny * side * sgn, 22, hexOr(b.color, '#ffffdd'), 0.2);
+                    for (const sgn of [-1, 1]) {
+                        const x = b.cx + nx * side * sgn, y = b.cy + ny * side * sgn, color = hexOr(b.color, '#ffffdd');
+                        this._shadowSource(lc, b.owner, 'headlamp' + sgn, { family: 'headlight', owner: b.owner, x, y, radius: 22, elevation: 8, samePaint: true, style: color }, 'color',
+                            g => drawGlow(g, x, y, 22, color, 0.2));
+                    }
                 }
                 lc.globalAlpha = 1;
 
