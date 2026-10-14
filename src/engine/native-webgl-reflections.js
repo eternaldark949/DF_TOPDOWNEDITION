@@ -24,7 +24,7 @@ class NativeWetReflections{
     }
     get contexts(){return [this.puddle,this.mask,this.light,this.detail,this.ripple];}
     invalidate(){this.maskKey=null;for(const rec of this.captures.values())rec.last=-Infinity;}
-    bytes(){return this.targets.reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0)+this.captures.size*192*192*4;}
+    bytes(){return this.targets.reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0)+this.captures.size*192*192*4+[this.roomGlow,this.liveTarget].filter(Boolean).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0);}
     allocate(W,H,q){
         const res=Math.min(q==='medium'?.25:.5,1024/Math.max(W,H)),detailRes=q==='ultra'?Math.min(1,1536/Math.max(W,H)):res,key=[W,H,res,detailRes].join(':');if(this.size===key)return;
         this.releaseTargets();this.size=key;this.targets=[res,res,detailRes].map(resolution=>PIXI.RenderTexture.create({width:W,height:H,resolution,scaleMode:PIXI.SCALE_MODES.LINEAR}));
@@ -33,10 +33,10 @@ class NativeWetReflections{
     releaseTargets(){this.lightSprite.texture=this.detailSprite.texture=PIXI.Texture.EMPTY;for(const t of this.targets)t.destroy(true);this.targets=[];this.size=null;this.maskKey=null;this.owner.lighting.uniforms.reflectionMap=PIXI.Texture.EMPTY;}
     sync(game,view,V){
         const start=performance.now(),r=this.owner,L=r.layers,q=game.reflectQuality(),wet=game._wetHere(),surf=game._surfaces();
-        const wants=L.wetSurfaces||L.reflectionLights||L.reflectionDetail||L.puddleRipples;
-        this.stats={active:false,quality:q,wet,puddles:0,lights:0,buildings:0,detail:0,sharedBodies:0,bodyCaptures:0,dropped:0,maskRefreshes:0,bytes:this.bytes()};
+        const wants=L.wetSurfaces||L.reflectionLights||L.reflectionDetail||L.puddleRipples||L.reflectionProps||L.reflectionFoliage;
+        this.stats={active:false,quality:q,wet,puddles:0,lights:0,buildings:0,detail:0,sharedBodies:0,bodyCaptures:0,dropped:0,maskRefreshes:0,props:0,foliage:0,liveBuildings:0,bytes:this.bytes()};
         this.root.visible=!!(wants&&q&&(wet>=.02||surf));r.lighting.uniforms.reflectionGain=0;this.puddle.begin();this.ripple.begin();this.ripple.root.visible=false;
-        if(!this.root.visible){this.releaseTargets();this.trim(true);this.roomGlow?.destroy(true);this.roomGlow=null;this.stats.bytes=0;this.stats.cpuMs=performance.now()-start;return;}
+        if(!this.root.visible){this.releaseTargets();this.trim(true);this.roomGlow?.destroy(true);this.roomGlow=null;this.liveTarget?.destroy(true);this.liveTarget=null;this.stats.bytes=0;this.stats.cpuMs=performance.now()-start;return;}
         const W=game.canvas.width,H=game.canvas.height;
         const near=(x,y,pad=0)=>x>V.left-pad&&x<V.right+pad&&y>V.top-160-pad&&y<V.bottom+pad;
         this.screen.position.set(-r.world.x/view.zoom,-r.world.y/view.zoom);this.screen.scale.set(1/view.zoom);
@@ -85,12 +85,32 @@ class NativeWetReflections{
             if(surf?.glowShift&&L.glows){const c=this.light;c.current=null;const node=c.node(NativeReflectionImage);
                 // One resident GPU snapshot of the already prepared room glow,
                 // reused for its reflected pass; no second procedural art paint.
-                if(!this.roomGlow||this.roomGlow.width!==W||this.roomGlow.height!==H){this.roomGlow?.destroy(true);this.roomGlow=PIXI.RenderTexture.create({width:W,height:H,resolution:Math.min(.5,1024/Math.max(W,H))});}
+                if(!this.roomGlow||this.roomGlowSize!==W+':'+H){this.roomGlow?.destroy(true);this.roomGlow=PIXI.RenderTexture.create({width:W,height:H,resolution:Math.min(.5,1024/Math.max(W,H))});this.roomGlowSize=W+':'+H;}
                 r.renderer.render(r.emissive,{renderTexture:this.roomGlow,clear:true,transform:new PIXI.Matrix(view.zoom,0,0,view.zoom,r.world.x,r.world.y)});
                 node.shader.uniforms.image=this.roomGlow;node.shader.uniforms.opacity=2;node.blendMode=PIXI.BLEND_MODES.ADD;node.position.set(0,surf.glowShift*view.zoom);node.scale.set(W,H);c.current=null;
             }
             for(const f of game.muzzleFlashes||[])glow(f.x,f.y+16,f.color||'#fff1d0',40,60,.8);
             for(const p of game.projectiles||[])if(p.active!==false)glow(p.x,p.y+12,p.color||'#ffffff',12,26,.6);
+        }
+        if(L.reflectionLights&&L.reflectionLive&&L.glows&&night>.01&&q!=='medium'){
+            const records=[...r.nativeBuildings].filter(([b,record])=>record.glowLive?.root.visible&&record.glowLive.root.children.length&&near(b.x+b.w/2,b.y+b.h,Math.max(200,b.w/2))&&onWet(b.x+b.w/2,b.y+b.h+100,b.w)).slice(0,4);
+            if(records.length){const res=Math.min(.5,512/Math.max(W,H)),needed=Math.ceil(W*res)*Math.ceil(H*res)*4,old=this.liveTarget?this.liveTarget.baseTexture.realWidth*this.liveTarget.baseTexture.realHeight*4:0;
+                if(this.bytes()-old+needed<=24*1048576){if(!this.liveTarget||this.liveSize!==[W,H,res].join(':')){this.liveTarget?.destroy(true);this.liveTarget=PIXI.RenderTexture.create({width:W,height:H,resolution:res});this.liveSize=[W,H,res].join(':');}
+                    for(let i=0;i<records.length;i++){const [b,record]=records[i],gy=b.y+b.h,transform=new PIXI.Matrix(view.zoom,0,0,view.zoom,r.world.x,r.world.y).append(new PIXI.Matrix(1,0,0,-.75,0,gy*1.75));r.renderer.render(record.glowLive.root,{renderTexture:this.liveTarget,clear:i===0,transform});this.stats.liveBuildings++;}
+                    const node=this.light.node(NativeReflectionImage);node.shader.uniforms.image=this.liveTarget;node.shader.uniforms.opacity=.45;node.blendMode=PIXI.BLEND_MODES.ADD;node.position.set(0,0);node.scale.set(W,H);
+                }else this.stats.dropped+=records.length;
+            }
+        }
+        if(L.reflectionProps&&L.furniture&&surf?.mirror)for(const [p,record]of r.props){
+            const w=p.width||p.w||24,h=p.height||p.h||24,x=p.x+w/2,y=p.y+h;
+            if(p.visible===false||!near(x,y,Math.max(w,h))||!onWet(x,y,Math.max(w,h)))continue;if(this.stats.props>=8){this.stats.dropped++;continue;}
+            const c=this.detail;c.save();c.translate(0,y);c.scale(1,-.75);c.translate(x,-h/2);c.rotate(p.angle||0);const node=c.node(PIXI.Sprite);node.texture=record.texture;node.alpha=.42;node.transform.setFromMatrix(c.matrix.clone().append(new PIXI.Matrix(1,0,0,1,-record.texture.width/2,-record.texture.height/2)));c.restore();this.stats.props++;
+        }
+        if(L.reflectionFoliage&&L.streetDetails)for(const {item:f}of game._queryRenderFoliage({...V,top:V.top-360,bottom:V.bottom+260},this.foliageCandidates||(this.foliageCandidates=[]))){
+            if(f.visible===false||f.dead||!Number.isFinite(f.size))continue;const bush=f.type==='bush',palm=f.type==='palm',sway=Math.sin(_gameTimeSec*2+(f.phaseOffset||0))*(game.weather.wind||.3)*8*(f.swayMultiplier??1)*(game.weather.windDirection||1),cx=f.x+sway*(bush?.6:palm?.3:1),cy=foliageCanopyY(f),refY=f.y-.8*(cy-f.y);
+            if(!near(cx,refY,100)||!onWet(cx,refY,100))continue;if(this.stats.foliage>=12){this.stats.dropped++;continue;}
+            const art=floraSprite(f.type,f.size,f._variant??Math.floor((f.phaseOffset||0)*.637)%4),c=this.detail;c.save();c.globalAlpha=.52;c.translate(0,f.y);c.scale(1,-.8);
+            if(palm){c.translate(cx,cy-f.y);c.rotate(sway*.012);c.drawImage(art.cv,-art.w/2,-art.w/2);}else{c.translate(0,-f.y);c.drawImage(art.cv,cx-art.w/2,cy-art.w/2);}c.restore();this.stats.foliage++;
         }
         const movers=game._ultraReflectionMovers(near),groups=new Map();
         const visit=node=>{if(node._nativeEntity)groups.set(node._nativeEntity,node);for(const child of node.children||[])visit(child);};visit(r.peopleContext.root);
@@ -113,7 +133,7 @@ class NativeWetReflections{
             c.restore();
         }
         if(L.reflectionLights){
-            if(L.reflectionDetail){
+            if(L.reflectionDetail||L.reflectionProps||L.reflectionFoliage){
                 // Reuse the exact reflected art alpha to interrupt emitted light.
                 // Independent nodes share textures, never display-object parents.
                 for(const source of this.detail.pool){if(!source.visible||source.parent!==this.detail.root)continue;let node;
@@ -131,11 +151,11 @@ class NativeWetReflections{
         }
         for(const f of [this.lightFilter,this.detailFilter]){f.uniforms.viewport.set([W,H]);f.uniforms.wetMask=this.maskTarget;f.uniforms.clock=L.decorAnimation?_gameTimeSec:0;f.uniforms.rain=game.weather.isRaining?game.weather.intensity:0;f.uniforms.shimmer=q==='medium'?0:1;}
         const area=new PIXI.Rectangle(0,0,W,H);this.light.root.filterArea=this.detail.root.filterArea=area;
-        this.lightSprite.visible=L.reflectionLights;this.detailSprite.visible=L.reflectionDetail;
-        if(L.reflectionLights)r.renderer.render(this.light.root,{renderTexture:this.lightTarget,clear:true});if(L.reflectionDetail)r.renderer.render(this.detail.root,{renderTexture:this.detailTarget,clear:true});
+        this.lightSprite.visible=L.reflectionLights;this.detailSprite.visible=L.reflectionDetail||L.reflectionProps||L.reflectionFoliage;
+        if(L.reflectionLights)r.renderer.render(this.light.root,{renderTexture:this.lightTarget,clear:true});if(this.detailSprite.visible)r.renderer.render(this.detail.root,{renderTexture:this.detailTarget,clear:true});
         r.lighting.uniforms.reflectionMap=this.lightTarget;r.lighting.uniforms.reflectionGain=L.reflectionLights?.85:0;r.trimBuildingImages(this.light);r.trimBuildingImages(this.detail);this.trim();
-        this.stats.bytes=this.bytes()+(this.roomGlow?this.roomGlow.baseTexture.realWidth*this.roomGlow.baseTexture.realHeight*4:0);this.stats.cpuMs=performance.now()-start;
+        this.stats.bytes=this.bytes();this.stats.cpuMs=performance.now()-start;
     }
     trim(all=false){for(const [key,rec]of this.captures)if(all||rec.used<this.owner.frameId-120){rec.target.destroy(true);this.captures.delete(key);}}
-    clear(){this.releaseTargets();this.trim(true);this.roomGlow?.destroy(true);for(const c of this.contexts)c.destroy();this.lightSprite.destroy();this.detailSprite.destroy();this.lightFilter.destroy();this.detailFilter.destroy();this.rippleFilter?.destroy();this.screen.destroy();this.root.destroy();}
+    clear(){this.releaseTargets();this.trim(true);this.roomGlow?.destroy(true);this.liveTarget?.destroy(true);for(const c of this.contexts)c.destroy();this.lightSprite.destroy();this.detailSprite.destroy();this.lightFilter.destroy();this.detailFilter.destroy();this.rippleFilter?.destroy();this.screen.destroy();this.root.destroy();}
 }

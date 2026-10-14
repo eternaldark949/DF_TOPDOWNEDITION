@@ -38,8 +38,8 @@ they do not choose another rendering backend.
 
 ## Animated characters and shape shadows
 
-The build identifier is `native-webgl-surfaces-v12`. **Canvas look** enables
-all 63 switches. **Lighting + shadows** also enables continuous character
+The build identifier is `native-webgl-presentation-v13`. **Canvas look** enables
+all 83 switches. **Lighting + shadows** also enables continuous character
 animation, silhouette shadows, high shadow detail and curtains.
 
 For a controlled moving test, use the same route, view, zoom, resolution and FPS
@@ -438,3 +438,27 @@ Reflected characters / vehicles alone, then Reflected lights. Test Puddle
 ripples separately when moving through water. Walk through the apartment's
 sliding doors during rain and check the entrance pad when exiting. Compare
 Daylight, Sun cast shadows, Cloud shadows and Window daylight in daytime.
+
+
+## Gameplay presentation in v13
+
+Canvas look enables 83 switches. The 20 additions are Camera effects, Sniper
+scope, Tactical radar, Bokeh, Sound mirage, Simple sound rings, Speech bubbles,
+Player emotes, Execution cues, Flit effects, Graveyard ghosts, Special enemy
+effects, Fire light glow, Map edge veil, Glass refraction, Reflected furniture,
+Reflected foliage, Reflected landmark effects, Debug overlay and Objective /
+vehicle HUD. Their profile CPU time is `stages.presentationMs`; per-frame and
+summary `presentation` fields record paths, cached label bytes and visible
+scope/radar/speech/bokeh/ring/glass work. Reflection statistics add `props`,
+`foliage` and `liveBuildings`. GPU timing includes presentation when supported.
+
+For the A53 comparison, record Canvas look first, then disable **Glass
+refraction**, **Sound mirage**, and **Reflected landmark effects** one at a time.
+Repeat the same route and weather. Test aiming a sniper, an equipped tactical
+radar, Flit and NPC speech; check photo-mode pan and PNG capture too. Reflection
+extras require a wet city or a suitable polished/mirror floor. Debug overlay
+requires the original debug settings. These switches change rendering and do
+not disable combat, map transitions or saved equipment.
+
+See [v13 implementation and validation](native-webgl-fork.md#gameplay-presentation-and-reflection-extras-in-v13)
+for resource budgets, test evidence and the remaining visual approximations.

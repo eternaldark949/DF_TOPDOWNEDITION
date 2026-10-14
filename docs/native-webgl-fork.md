@@ -45,7 +45,7 @@ Current implementation:
   authored curtains, lamp particles/fades, and apartment glows use GPU geometry
   and cached image assets. Bloom uses the Canvas downscale scales/strengths;
   atmosphere follows the original tint setting.
-- All 63 visual switches remain independent. Fireplace flames, crafting scanline,
+- All 83 visual switches remain independent. Fireplace flames, crafting scanline,
   record sheen, tub ripple, plants and telescope accents follow their authored
   continuous clock through GPU geometry. Static segments remain cached and
   retain their drawing order; Decor animation off freezes their original art.
@@ -566,3 +566,53 @@ Reflected characters / vehicles alone, then Reflected lights. Test Puddle
 ripples separately when moving through water. Walk through the apartment's
 sliding doors during rain and check the entrance pad when exiting. Compare
 Daylight, Sun cast shadows, Cloud shadows and Window daylight in daytime.
+
+
+## Gameplay presentation and reflection extras in v13
+
+The build identifier is `native-webgl-presentation-v13`. Canvas look now enables
+83 switches. Twenty new switches restore camera effects, sniper scope, tactical
+radar, bokeh, sound mirage, simple sound rings, speech, player emotes, execution
+cues, Flit effects, graveyard ghosts, special enemy effects, fire-light glow,
+map-edge veil, glass refraction, reflected furniture/foliage/live landmarks,
+debug overlays and the objective/vehicle HUD.
+
+The original gameplay painters now submit native geometry for these cues.
+Scope raycasts still use the actual muzzle, walls, building colliders and steady
+aim. An analytic GPU veil replaces its Canvas destination-out surface. Radar
+retains its original six-wedge sweep fallback. Speech preserves roof/foliage
+hiding and original bubble timing; emoji and other Unicode labels use a bounded
+64-entry / 4 MiB bitmap cache baked only on misses. Static labels and art can
+still use Canvas at asset creation; the live scene has no Canvas renderer.
+
+Sound mirage and glass refraction sample the composed GPU scene, with no scene
+readback or Canvas upload. Mirage prioritizes player rings, caps visible rings
+at eight, and bends the four newest eligible rings. Glass supports up to 24
+intact visible window/door panels, following sliding leaves and shattered state.
+These are GPU interpretations rather than pixel-identical copies. Bokeh uses one
+resident GPU radial kernel and screen-blended sprites. Scene filtering excludes
+screen HUD and bokeh; the final browser color grade still covers the frame.
+
+Photo-mode pan, finisher zoom/offset, cutscene camera and eased driving
+look-ahead now work. Pan does not accumulate into the underlying camera. Saving
+a photo explicitly renders the current native stage before the existing PNG
+export, so an idle/discarded WebGL backbuffer cannot produce a blank photo.
+
+Reflections reuse resident furniture art on mirror floors (eight props), foliage
+sprites (12 canopies) and already prepared live landmark emissives (four visible
+landmarks). The landmark target stays within the existing 24 MiB reflection
+budget. A size-key fix prevents odd-height, half-resolution targets from being
+reallocated every frame; the same fix covers reflected room glows. Layered
+reflection work is omitted when disabled. Native map-edge patterns also retain
+their image until GPU geometry no longer references it.
+
+Validation: `tools/test-native-webgl-presentation-browser.cjs` and
+`docs/native-webgl-presentation-checks.json` cover camera math, scope alpha,
+radar/speech/emoji reuse, sound displacement and its boundary, Flit/ghost paths,
+all 20 controls, HUD hiding/restoration, photo PNG pixels, reflection extras and
+context recovery. Surface tests also exercise odd 411px viewport height: the
+warm wet-city sample has zero uploads and zero asset bakes. City travel, save
+import, driving, character/shadow ordering and color-grade regressions are
+checked separately. Desktop tests use Chromium/SwiftShader; phone performance
+still needs a device recording. Fine shadowBlur/dash accents, bounded reflection
+detail and the optical shaders remain visual approximations.

@@ -41,7 +41,7 @@ class NativeVectorContext {
         for(const n of this.pool){n.visible=false;n.mask=null;}
         this.root.removeChildren();for(const list of this.pools.values())list.used=0;this.hash=2166136261;this.gradientIndex=0;this.stack=[];this.matrix=new PIXI.Matrix();this.container=this.root;this.current=null;
         Object.assign(this,{fillStyle:'#000',strokeStyle:'#000',globalAlpha:1,globalCompositeOperation:'source-over',lineWidth:1,lineCap:'butt',lineJoin:'miter',shadowBlur:0,shadowColor:'transparent',font:'11px sans-serif',textAlign:'start',textBaseline:'alphabetic'});
-        this.beginPath();this.pathsPainted=0;
+        this.beginPath();this.pathsPainted=0;this.patternTextures=new Set();
     }
     withDepth(entity,draw){
         const parent=this.container;this.current=null;
@@ -124,6 +124,7 @@ class NativeVectorContext {
     fill(path,rule){this.withPath(path,(paths,r)=>{
         if(this.globalAlpha<=0)return;const g=this.graphics();g.lineStyle(0);const style=this.fillStyle;
         if(style?.nativeGradient){const record=this.gradient(style);g.beginTextureFill({texture:record.texture,matrix:record.matrix,alpha:this.globalAlpha});}
+        else if(style?.nativePattern){let t=this.images.get(style.image);if(!t){t=this.owner.retainImage(style.image,'edge-pattern');t.baseTexture.wrapMode=PIXI.WRAP_MODES.REPEAT;this.images.set(style.image,t);}this.patternTextures.add(t.baseTexture);g.beginTextureFill({texture:t,matrix:this.matrix.clone().append(style.matrix),alpha:this.globalAlpha});}
         else {const c=this.color(style);g.beginFill(c.color,c.alpha*this.globalAlpha);}
         this.hashPath(paths,style?.nativeGradient?JSON.stringify([style.args,style.stops,this.matrix.a,this.matrix.b,this.matrix.c,this.matrix.d,this.matrix.tx,this.matrix.ty]):style);this.polygons(g,paths,rule==='evenodd'||r==='evenodd');g.endFill();this.pathsPainted++;
     });}
@@ -154,6 +155,7 @@ class NativeVectorContext {
     }
     measureText(text){const size=Number(/([0-9.]+)px/.exec(this.font)?.[1]||11);return {width:String(text).length*size*.62};}
     fillText(text,x,y){
+        if(/[^\x20-\x7e]/.test(String(text))&&this.owner.presentation)return this.owner.presentation.text(this,text,x,y);
         this.hashValue(text);this.hashValue(this.font);this.hashValue(this.fillStyle);this.hashValue(this.globalAlpha);this.hashValue(x);this.hashValue(y);
         this.current=null;const n=this.node(PIXI.BitmapText),match=/([0-9.]+)px/.exec(this.font),size=match?Number(match[1]):11;
         n.text=String(text);n.fontSize=size;const color=this.color(this.fillStyle);n.tint=color.color;n.alpha=this.globalAlpha*color.alpha;
@@ -165,6 +167,7 @@ class NativeVectorContext {
     // The resident glyph atlas includes an outline, keeping pop-size changes
     // and moving damage text off Canvas without a bitmap for each string.
     strokeText(){}
+    createPattern(image){return {nativePattern:true,image,matrix:new PIXI.Matrix(),setTransform(m){this.matrix=new PIXI.Matrix(m.a,m.b,m.c,m.d,m.e??m.tx,m.f??m.ty);}};}
     createRadialGradient(...args){return {nativeGradient:true,type:1,args,matrix:this.matrix.clone(),stops:[],addColorStop(at,color){this.stops.push([at,color]);}};}
     createLinearGradient(...args){return {nativeGradient:true,type:0,args,matrix:this.matrix.clone(),stops:[],addColorStop(at,color){this.stops.push([at,color]);}};}
     gradient(style){

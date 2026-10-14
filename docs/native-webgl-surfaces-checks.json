@@ -77,8 +77,11 @@
       "bodyCaptures": 0,
       "dropped": 0,
       "maskRefreshes": 1,
+      "props": 0,
+      "foliage": 0,
+      "liveBuildings": 0,
       "bytes": 1450240,
-      "cpuMs": 37.3999999910593
+      "cpuMs": 37.69999998807907
     },
     "floor": 140,
     "rug": 0,
@@ -131,10 +134,13 @@
         "bodyCaptures": 0,
         "dropped": 0,
         "maskRefreshes": 0,
+        "props": 0,
+        "foliage": 9,
+        "liveBuildings": 0,
         "bytes": 1087680,
-        "cpuMs": 2.300000011920929
+        "cpuMs": 1.8999999910593033
       },
-      "cpuMs": 64.70000000298023
+      "cpuMs": 2.3999999910593033
     },
     "wet": {
       "pads": 0,
@@ -171,10 +177,13 @@
         "bodyCaptures": 0,
         "dropped": 0,
         "maskRefreshes": 0,
-        "bytes": 1087680,
-        "cpuMs": 0.7999999970197678
+        "props": 0,
+        "foliage": 9,
+        "liveBuildings": 1,
+        "bytes": 1450240,
+        "cpuMs": 14.300000011920929
       },
-      "cpuMs": 0.8999999910593033
+      "cpuMs": 14.400000005960464
     },
     "sunPixels": 6599,
     "roofPixels": 4096,
@@ -183,12 +192,12 @@
     "uploads": 0,
     "bakes": 0,
     "same": true,
-    "layers": 63
+    "layers": 83
   },
   "controls": {
     "changed": 12,
-    "total": 63,
-    "build": "native-webgl-surfaces-v12"
+    "total": 83,
+    "build": "native-webgl-presentation-v13"
   },
   "recovery": {
     "lost": false,

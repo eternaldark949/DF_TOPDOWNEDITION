@@ -4713,7 +4713,7 @@ class NativeVectorContext {
         for(const n of this.pool){n.visible=false;n.mask=null;}
         this.root.removeChildren();for(const list of this.pools.values())list.used=0;this.hash=2166136261;this.gradientIndex=0;this.stack=[];this.matrix=new PIXI.Matrix();this.container=this.root;this.current=null;
         Object.assign(this,{fillStyle:'#000',strokeStyle:'#000',globalAlpha:1,globalCompositeOperation:'source-over',lineWidth:1,lineCap:'butt',lineJoin:'miter',shadowBlur:0,shadowColor:'transparent',font:'11px sans-serif',textAlign:'start',textBaseline:'alphabetic'});
-        this.beginPath();this.pathsPainted=0;
+        this.beginPath();this.pathsPainted=0;this.patternTextures=new Set();
     }
     withDepth(entity,draw){
         const parent=this.container;this.current=null;
@@ -4796,6 +4796,7 @@ class NativeVectorContext {
     fill(path,rule){this.withPath(path,(paths,r)=>{
         if(this.globalAlpha<=0)return;const g=this.graphics();g.lineStyle(0);const style=this.fillStyle;
         if(style?.nativeGradient){const record=this.gradient(style);g.beginTextureFill({texture:record.texture,matrix:record.matrix,alpha:this.globalAlpha});}
+        else if(style?.nativePattern){let t=this.images.get(style.image);if(!t){t=this.owner.retainImage(style.image,'edge-pattern');t.baseTexture.wrapMode=PIXI.WRAP_MODES.REPEAT;this.images.set(style.image,t);}this.patternTextures.add(t.baseTexture);g.beginTextureFill({texture:t,matrix:this.matrix.clone().append(style.matrix),alpha:this.globalAlpha});}
         else {const c=this.color(style);g.beginFill(c.color,c.alpha*this.globalAlpha);}
         this.hashPath(paths,style?.nativeGradient?JSON.stringify([style.args,style.stops,this.matrix.a,this.matrix.b,this.matrix.c,this.matrix.d,this.matrix.tx,this.matrix.ty]):style);this.polygons(g,paths,rule==='evenodd'||r==='evenodd');g.endFill();this.pathsPainted++;
     });}
@@ -4826,6 +4827,7 @@ class NativeVectorContext {
     }
     measureText(text){const size=Number(/([0-9.]+)px/.exec(this.font)?.[1]||11);return {width:String(text).length*size*.62};}
     fillText(text,x,y){
+        if(/[^\x20-\x7e]/.test(String(text))&&this.owner.presentation)return this.owner.presentation.text(this,text,x,y);
         this.hashValue(text);this.hashValue(this.font);this.hashValue(this.fillStyle);this.hashValue(this.globalAlpha);this.hashValue(x);this.hashValue(y);
         this.current=null;const n=this.node(PIXI.BitmapText),match=/([0-9.]+)px/.exec(this.font),size=match?Number(match[1]):11;
         n.text=String(text);n.fontSize=size;const color=this.color(this.fillStyle);n.tint=color.color;n.alpha=this.globalAlpha*color.alpha;
@@ -4837,6 +4839,7 @@ class NativeVectorContext {
     // The resident glyph atlas includes an outline, keeping pop-size changes
     // and moving damage text off Canvas without a bitmap for each string.
     strokeText(){}
+    createPattern(image){return {nativePattern:true,image,matrix:new PIXI.Matrix(),setTransform(m){this.matrix=new PIXI.Matrix(m.a,m.b,m.c,m.d,m.e??m.tx,m.f??m.ty);}};}
     createRadialGradient(...args){return {nativeGradient:true,type:1,args,matrix:this.matrix.clone(),stops:[],addColorStop(at,color){this.stops.push([at,color]);}};}
     createLinearGradient(...args){return {nativeGradient:true,type:0,args,matrix:this.matrix.clone(),stops:[],addColorStop(at,color){this.stops.push([at,color]);}};}
     gradient(style){
@@ -58485,7 +58488,7 @@ class NativeWebGLRenderer {
                 this.lost=false;this.gpuTimer.extension=this.renderer.gl.getExtension('EXT_disjoint_timer_query_webgl2');this.contextRestores=(this.contextRestores||0)+1;
                 // Render-texture pixels cannot survive context loss. CPU geometry
                 // remains valid, but every cached GPU light image must be redrawn.
-                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;this.surfaces?.invalidate();this.crowdAtlas?.clear();this.nativeCasters?.invalidate();for(const r of this.nativeBuildings?.values()||[])r.key=r.glowKey=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,this.backdropContext,this.foliageContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
+                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;this.surfaces?.invalidate();this.presentation?.invalidate();this.crowdAtlas?.clear();this.nativeCasters?.invalidate();for(const r of this.nativeBuildings?.values()||[])r.key=r.glowKey=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,this.backdropContext,this.foliageContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
                 this.frames=[];this.warmFrames=15;this.lastStart=this.lastEnd=0;this.capture=this.completedCapture=null;this.message('');
             });
             this.gpuTimer=new NativeGpuTimer(gl);this.frameId=0;this.initLayers();this.initDetails();this.initWorld();
@@ -58546,18 +58549,12 @@ class NativeWebGLRenderer {
         const w=game.canvas.width,h=game.canvas.height;
         if(this.renderer.screen.width!==w||this.renderer.screen.height!==h)this.renderer.resize(w,h);
         this.world.filterArea.width=w;this.world.filterArea.height=h;
-        const zoom=game.camera.zoom*(game.finCam?.z||1);
-        const target=game.cutscene?.active?game.camera:game.isDriving&&game.car?game.car:game.player;
-        const dtCam=Math.min(100,Math.max(0,_frameTime-(game._nativeLeanT||_frameTime)));game._nativeLeanT=_frameTime;
-        const lookout=game.activeMap.id==='apt_949'&&this.layers.liveBackdrop&&this.layers.backdrop&&!game.isDriving&&!game.cutscene?.active?game._cityView?.lookoutLean(game.player,zoom)||0:0;
-        game.lookLeanY=game.activeMap.id==='apt_949'?(game.lookLeanY||0)+(lookout-(game.lookLeanY||0))*(1-Math.exp(-dtCam/450)):0;
-        const c=game._clampView(target.x+(game.scopeLeanX||0),target.y+(game.scopeLeanY||0)+game.lookLeanY,zoom);
-        const view=game.view={x:c.x,y:c.y,zoom,shakeX:game.camera.shakeX||0,shakeY:game.camera.shakeY||0};
+        game._renderDrawId=(game._renderDrawId||0)+1;
+        const view=game.view=nativeCameraView(game,this),zoom=view.zoom;
         const halfW=w/(2*zoom),halfH=h/(2*zoom),rect={left:view.x-halfW,right:view.x+halfW,top:view.y-halfH,bottom:view.y+halfH};
         const padded={left:rect.left-100,right:rect.right+100,top:rect.top-100,bottom:rect.bottom+100};
         game._cullBounds={view:rect,world:padded,bodies:padded,cars:padded,buildings:padded,buildingTops:padded,foliage:padded,lamps:padded,lampGlow:padded,props:padded,neonSigns:padded,headlights:padded,vehicles:padded,entities:padded};
         this.lastView={...view};
-        game.camera.x=c.x;game.camera.y=c.y;
         this.world.scale.set(zoom);this.world.position.set(w/2-(view.x-view.shakeX)*zoom,h/2-(view.y-view.shakeY)*zoom);
         _worldMatrix=new DOMMatrix([zoom,0,0,zoom,this.world.x,this.world.y]);_worldCanvas=game.canvas;
         const LZ=CONFIG.LOD_ZOOM,lodZoom=game.camera.zoom/(GameSettings.baseZoom||1);let lod=game._zoomLOD||0;
@@ -58572,12 +58569,13 @@ class NativeWebGLRenderer {
         this.syncLayers(game,view);
         this.syncDetails(game,view);this.syncWorld(game,view);this.gpuTimer.begin('surfaces',this.frameId);this.surfaces.sync(game,view);this.gpuTimer.end();
         this.gpuTimer.begin('lighting',this.frameId);this.syncLighting(game,view);this.gpuTimer.end();
+        this.gpuTimer.begin('presentation',this.frameId);this.presentation.sync(game,view);this.gpuTimer.end();
         this.syncColorGrade(game);
         const submitStart=performance.now();this.gpuTimer.begin('scene',this.frameId);this.renderer.render(this.stage);this.gpuTimer.end();
         const end=performance.now();this.layerStages.sceneSubmitMs=end-submitStart;
         const f={frame:this.frameId,at:start,intervalMs:this.lastStart?start-this.lastStart:null,gapMs:this.lastEnd?start-this.lastEnd:null,renderMs:end-start,
             uploads:this.uploads-beforeUploads,bakes:this.bakes-beforeBakes,draws:this.drawCalls-beforeDraws,bufferBytes:this.bufferBytes-beforeBuffers,
-            bakeOrigins:{...this.bakeOrigins},rain:{...this.rainStats},world:{...this.worldStats},details:structuredClone(this.detailStats),animation:{...this.actorStats},shadows:{...this.shadowStats},stages:{...this.layerStages},surfaces:structuredClone(this.surfaceStats)};this.lastStart=start;
+            bakeOrigins:{...this.bakeOrigins},rain:{...this.rainStats},world:{...this.worldStats},details:structuredClone(this.detailStats),animation:{...this.actorStats},shadows:{...this.shadowStats},stages:{...this.layerStages},surfaces:structuredClone(this.surfaceStats),presentation:structuredClone(this.presentationStats)};this.lastStart=start;
         this.lastEnd=end;
         if(this.startup&&!this.startup.ready){this.startup.firstFrames.push({...f});if(this.startup.firstFrames.length>=15)this.startup.ready=true;}
         if(this.warmFrames>0)this.warmFrames--;
@@ -58593,11 +58591,11 @@ class NativeWebGLRenderer {
     report() {
         const frames=this.frames.slice(),intervals=frames.map(f=>f.intervalMs).filter(v=>v>0),sum=intervals.reduce((a,b)=>a+b,0);
         const sorted=intervals.slice().sort((a,b)=>a-b);
-        return {renderer:'native-webgl-apartment',build:'native-webgl-surfaces-v12',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
+        return {renderer:'native-webgl-apartment',build:'native-webgl-presentation-v13',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
             settings:this.settings,resolution:[this.canvas.width,this.canvas.height],lighting:this.lightsOn,warmFramesRemaining:this.warmFrames,frames,
             animationSummary:{changedFrames:frames.filter(f=>f.animation?.changed).length,geometryMeanMs:frames.length?frames.reduce((n,f)=>n+(f.animation?.geometryMs||0),0)/frames.length:0,
                 shadowRefreshFrames:frames.filter(f=>f.shadows.dynamicRebuilds>0).length,dynamicRebuilds:frames.reduce((n,f)=>n+(f.shadows.dynamicRebuilds||0),0),staticRebuilds:frames.reduce((n,f)=>n+(f.shadows.staticRebuilds||0),0)},
-            buildingTargetBytes:this.buildingGlowBytes(),crowdTargetBytes:this.crowdAtlas?.bytes||0,rain:this.rainStats,world:this.worldStats,casters:this.nativeCasters?.report(),backdrop:this.backdropStats,colorGrade:this.colorGrade,surfaces:this.surfaceStats,textureQuality:this.textureQuality,assetDensities:[...new Set([...this.textures].map(t=>t.baseTexture.resolution))],glyphAtlasBytes:Object.values(PIXI.BitmapFont.available.NativeDetailFont.pageTextures).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),qualityReductions:this.qualityReductions,details:this.detailStats,layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
+            buildingTargetBytes:this.buildingGlowBytes(),crowdTargetBytes:this.crowdAtlas?.bytes||0,rain:this.rainStats,world:this.worldStats,casters:this.nativeCasters?.report(),backdrop:this.backdropStats,colorGrade:this.colorGrade,surfaces:this.surfaceStats,presentation:this.presentationStats,textureQuality:this.textureQuality,assetDensities:[...new Set([...this.textures].map(t=>t.baseTexture.resolution))],glyphAtlasBytes:Object.values(PIXI.BitmapFont.available.NativeDetailFont.pageTextures).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),qualityReductions:this.qualityReductions,details:this.detailStats,layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
             contextRestores:this.contextRestores||0,
             capture:this.capture?{...this.capture}:null,player:this.playerSprite?{x:this.playerSprite.x,y:this.playerSprite.y}:null,
             fps:sum?intervals.length*1000/sum:0,p95Ms:sorted[Math.ceil(sorted.length*.95)-1]||0,
@@ -58608,11 +58606,11 @@ class NativeWebGLRenderer {
             timing:this.gpuTimer.extension?'CPU submission, actual frame cadence, and optional asynchronous GPU samples':'CPU render submission and frame cadence; GPU timer unavailable',
             shadowCache:this.shadowStats,layerStages:this.layerStages,animation:this.actorStats,startup:this.startup,entryTiming:this.entryTiming,initializationMs:this.initializationMs,
             gpu:{status:this.gpuTimer.status,pending:this.gpuTimer.pending.length,samples:this.gpuTimer.samples.filter(s=>s.frame>=(frames[0]?.frame??Infinity))},
-            gradientTargetBytes:[this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,this.backdropContext,this.foliageContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext),...[...(this.nativeCasters?.entries.values()||[])].map(r=>r.ctx),...(this.surfaces?.contexts||[])].filter(Boolean).reduce((n,c)=>n+c.gradients.length*128*128*4,0),
+            gradientTargetBytes:[this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,this.backdropContext,this.foliageContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext),...[...(this.nativeCasters?.entries.values()||[])].map(r=>r.ctx),...(this.surfaces?.contexts||[]),...(this.presentation?.contexts||[])].filter(Boolean).reduce((n,c)=>n+c.gradients.length*128*128*4,0),
             veilTargetBytes:this.veilTarget?this.veilTarget.baseTexture.realWidth*this.veilTarget.baseTexture.realHeight*4:0,
             characterTargetBytes:this.actorTexture?this.actorTexture.baseTexture.realWidth*this.actorTexture.baseTexture.realHeight*4:0,
             shadowTextureBytes:this.shadowBytes(),
-            limitations:['City/interior migration; some cinematic passes remain approximate','Procedural character paths use GPU tessellation; tiny Canvas shadowBlur accents remain approximate','Furniture shadows use the original geometric footprints','Glass rain is a continuous shader interpretation; reflection detail captures and buildings have visible work budgets','Small blur/dash accents and some cinematic passes remain approximate']};
+            limitations:['GPU sound mirage and scope veil approximate Canvas; at most 8 rings and 24 refracting glass panels','Procedural character paths use GPU tessellation; tiny Canvas shadowBlur accents remain approximate','Furniture shadows use the original geometric footprints','Glass rain is a continuous shader interpretation; reflection detail captures and buildings have visible work budgets','Canvas shadowBlur and dashed strokes remain approximate; tactical radar uses its wedge fallback']};
     }
 }
 // Independently testable apartment passes. Light masks are GPU render textures;
@@ -58620,7 +58618,7 @@ class NativeWebGLRenderer {
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city',colorGrade:'Final color grade / vision',entrancePads:'Entrance pads',entranceLabels:'Entrance labels',daylight:'Daylight color / haze',sunShadows:'Sun cast shadows',cloudShadows:'Cloud shadows',windowDaylight:'Window daylight',glassRain:'Rain on glass',wetRoofs:'Wet roof highlights',wetSurfaces:'Wet ground / puddles',puddleRipples:'Puddle ripples',reflectionLights:'Reflected lights',reflectionDetail:'Reflected characters / vehicles'};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city',colorGrade:'Final color grade / vision',entrancePads:'Entrance pads',entranceLabels:'Entrance labels',daylight:'Daylight color / haze',sunShadows:'Sun cast shadows',cloudShadows:'Cloud shadows',windowDaylight:'Window daylight',glassRain:'Rain on glass',wetRoofs:'Wet roof highlights',wetSurfaces:'Wet ground / puddles',puddleRipples:'Puddle ripples',reflectionLights:'Reflected lights',reflectionDetail:'Reflected characters / vehicles',cameraEffects:'Camera effects',scopeView:'Sniper scope',radar:'Tactical radar',bokeh:'Bokeh',mirage:'Sound mirage',noiseRings:'Simple sound rings',speech:'Speech bubbles',playerEmotes:'Player emotes',executionCues:'Execution cues',flitEffects:'Flit effects',ghosts:'Graveyard ghosts',enemyEffects:'Special enemy effects',fireGlow:'Fire light glow',mapEdges:'Map edge veil',glassRefraction:'Glass refraction',reflectionProps:'Reflected furniture',reflectionFoliage:'Reflected foliage',reflectionLive:'Reflected landmark effects',debugOverlay:'Debug overlay',missionHud:'Objective / vehicle HUD'};
 const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
@@ -59224,13 +59222,13 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.foliageContext=new NativeVectorContext(this);this.world.addChild(this.foliageContext.root);
         this.cityGlowContext=new NativeVectorContext(this);this.emissive.addChild(this.cityGlowContext.root);
         this.worldCueContext=new NativeVectorContext(this);this.stage.addChild(this.worldCueContext.root);
-        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext','occupantContext','backdropContext','foliageContext'])this[key].label=key;
+        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext','occupantContext','backdropContext','foliageContext'])this[key].label=key;this.presentation=new NativePresentation(this);
     },
     clearWorld(){
         if(!this.nativeBuildings)return;
         this.surfaces.clear();
         if(this.playerSprite)this.objects.addChild(this.playerSprite);for(const r of this.fixtureNodes.values())this.fixtures.addChild(r.node);
-        this.nativeCasters.clear();
+        this.presentation.clear();this.nativeCasters.clear();
         for(const [d,r]of this.doorNodes)this.doors.addChild(r.node);for(const r of this.props.values())if(r.group)this.objects.addChild(r.group);
         this.crowdAtlas.clear();this.rainBatch.clear();
         for(const r of this.nativeBuildings.values()){this.clearBuildingGlow(r);r.base.destroy();r.top.destroy();}this.nativeBuildings.clear();
@@ -59295,7 +59293,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const crowd=GameSettings.crowdQuality;GameSettings.crowdQuality='high';
             try{
                 for(const a of new Set([...(game.npcs||[]),...(game.teammates||[]),...(game.enemies||[])])){
-                    if(!visible(a)){a.tickHidden?.();continue;}a.draw(actors,game.player);people++;
+                    if(!visible(a)){a.tickHidden?.();continue;}if(a.role==='teammate'&&game.scenes?.crewOffstage)continue;a.draw(actors,game.player);people++;
                 }
                 for(const life of [game.pedestrians,game.lobbyLife,game.clubLife,game.cafeLife]){life?.draw(actors,bounds);people+=(life?.pedestrians||life?.people||life?.walkers||[]).filter(a=>visible(a)).length;}
                 if(game.velvetCat?.visible&&!game.velvetCat.inCar&&visible(game.velvetCat))game.velvetCat.draw(actors);
@@ -59433,7 +59431,7 @@ class NativeBuildingGlowMesh extends PIXI.Mesh {
 }
 Object.assign(NativeWebGLRenderer.prototype,{
     trimBuildingImages(ctx){
-        const used=new Set(ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture));
+        const used=new Set([...(ctx.patternTextures||[]),...ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture)]);
         for(const [image,t]of ctx.images)if(!used.has(t.baseTexture)){ctx.images.delete(image);this.releaseImage(t);}
     },
     clearBuildingGlow(r){
@@ -59579,7 +59577,7 @@ class NativeCasterBodies {
         this.stats={shared:0,captures:0,refreshes:0,fallbacks:0,blocked:0,dropped:0,pairs:0,lights:0};
     }
     note(ctx,e,body){
-        if(!this.owner.layers.npcShadows||_zoomLOD>=2||e._reflectionProxy||e.inCar||e.dead||e.visible===false)return;
+        if(ctx!==this.owner.peopleContext||!this.owner.layers.npcShadows||_zoomLOD>=2||e._reflectionProxy||e.inCar||e.dead||e.visible===false)return;
         if(!this.owner.layers.shapeShadows){this.circle(e);return;}
         const m=ctx.matrix,scale=Math.hypot(m.a,m.b)||1;
         this.bodies.set(e,{...body,owner:e,x:m.tx,y:m.ty,angle:Math.atan2(m.b,m.a),scale,opacity:ctx.globalAlpha,elevation:24});
@@ -59956,7 +59954,7 @@ class NativeWetReflections{
     }
     get contexts(){return [this.puddle,this.mask,this.light,this.detail,this.ripple];}
     invalidate(){this.maskKey=null;for(const rec of this.captures.values())rec.last=-Infinity;}
-    bytes(){return this.targets.reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0)+this.captures.size*192*192*4;}
+    bytes(){return this.targets.reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0)+this.captures.size*192*192*4+[this.roomGlow,this.liveTarget].filter(Boolean).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0);}
     allocate(W,H,q){
         const res=Math.min(q==='medium'?.25:.5,1024/Math.max(W,H)),detailRes=q==='ultra'?Math.min(1,1536/Math.max(W,H)):res,key=[W,H,res,detailRes].join(':');if(this.size===key)return;
         this.releaseTargets();this.size=key;this.targets=[res,res,detailRes].map(resolution=>PIXI.RenderTexture.create({width:W,height:H,resolution,scaleMode:PIXI.SCALE_MODES.LINEAR}));
@@ -59965,10 +59963,10 @@ class NativeWetReflections{
     releaseTargets(){this.lightSprite.texture=this.detailSprite.texture=PIXI.Texture.EMPTY;for(const t of this.targets)t.destroy(true);this.targets=[];this.size=null;this.maskKey=null;this.owner.lighting.uniforms.reflectionMap=PIXI.Texture.EMPTY;}
     sync(game,view,V){
         const start=performance.now(),r=this.owner,L=r.layers,q=game.reflectQuality(),wet=game._wetHere(),surf=game._surfaces();
-        const wants=L.wetSurfaces||L.reflectionLights||L.reflectionDetail||L.puddleRipples;
-        this.stats={active:false,quality:q,wet,puddles:0,lights:0,buildings:0,detail:0,sharedBodies:0,bodyCaptures:0,dropped:0,maskRefreshes:0,bytes:this.bytes()};
+        const wants=L.wetSurfaces||L.reflectionLights||L.reflectionDetail||L.puddleRipples||L.reflectionProps||L.reflectionFoliage;
+        this.stats={active:false,quality:q,wet,puddles:0,lights:0,buildings:0,detail:0,sharedBodies:0,bodyCaptures:0,dropped:0,maskRefreshes:0,props:0,foliage:0,liveBuildings:0,bytes:this.bytes()};
         this.root.visible=!!(wants&&q&&(wet>=.02||surf));r.lighting.uniforms.reflectionGain=0;this.puddle.begin();this.ripple.begin();this.ripple.root.visible=false;
-        if(!this.root.visible){this.releaseTargets();this.trim(true);this.roomGlow?.destroy(true);this.roomGlow=null;this.stats.bytes=0;this.stats.cpuMs=performance.now()-start;return;}
+        if(!this.root.visible){this.releaseTargets();this.trim(true);this.roomGlow?.destroy(true);this.roomGlow=null;this.liveTarget?.destroy(true);this.liveTarget=null;this.stats.bytes=0;this.stats.cpuMs=performance.now()-start;return;}
         const W=game.canvas.width,H=game.canvas.height;
         const near=(x,y,pad=0)=>x>V.left-pad&&x<V.right+pad&&y>V.top-160-pad&&y<V.bottom+pad;
         this.screen.position.set(-r.world.x/view.zoom,-r.world.y/view.zoom);this.screen.scale.set(1/view.zoom);
@@ -60017,12 +60015,32 @@ class NativeWetReflections{
             if(surf?.glowShift&&L.glows){const c=this.light;c.current=null;const node=c.node(NativeReflectionImage);
                 // One resident GPU snapshot of the already prepared room glow,
                 // reused for its reflected pass; no second procedural art paint.
-                if(!this.roomGlow||this.roomGlow.width!==W||this.roomGlow.height!==H){this.roomGlow?.destroy(true);this.roomGlow=PIXI.RenderTexture.create({width:W,height:H,resolution:Math.min(.5,1024/Math.max(W,H))});}
+                if(!this.roomGlow||this.roomGlowSize!==W+':'+H){this.roomGlow?.destroy(true);this.roomGlow=PIXI.RenderTexture.create({width:W,height:H,resolution:Math.min(.5,1024/Math.max(W,H))});this.roomGlowSize=W+':'+H;}
                 r.renderer.render(r.emissive,{renderTexture:this.roomGlow,clear:true,transform:new PIXI.Matrix(view.zoom,0,0,view.zoom,r.world.x,r.world.y)});
                 node.shader.uniforms.image=this.roomGlow;node.shader.uniforms.opacity=2;node.blendMode=PIXI.BLEND_MODES.ADD;node.position.set(0,surf.glowShift*view.zoom);node.scale.set(W,H);c.current=null;
             }
             for(const f of game.muzzleFlashes||[])glow(f.x,f.y+16,f.color||'#fff1d0',40,60,.8);
             for(const p of game.projectiles||[])if(p.active!==false)glow(p.x,p.y+12,p.color||'#ffffff',12,26,.6);
+        }
+        if(L.reflectionLights&&L.reflectionLive&&L.glows&&night>.01&&q!=='medium'){
+            const records=[...r.nativeBuildings].filter(([b,record])=>record.glowLive?.root.visible&&record.glowLive.root.children.length&&near(b.x+b.w/2,b.y+b.h,Math.max(200,b.w/2))&&onWet(b.x+b.w/2,b.y+b.h+100,b.w)).slice(0,4);
+            if(records.length){const res=Math.min(.5,512/Math.max(W,H)),needed=Math.ceil(W*res)*Math.ceil(H*res)*4,old=this.liveTarget?this.liveTarget.baseTexture.realWidth*this.liveTarget.baseTexture.realHeight*4:0;
+                if(this.bytes()-old+needed<=24*1048576){if(!this.liveTarget||this.liveSize!==[W,H,res].join(':')){this.liveTarget?.destroy(true);this.liveTarget=PIXI.RenderTexture.create({width:W,height:H,resolution:res});this.liveSize=[W,H,res].join(':');}
+                    for(let i=0;i<records.length;i++){const [b,record]=records[i],gy=b.y+b.h,transform=new PIXI.Matrix(view.zoom,0,0,view.zoom,r.world.x,r.world.y).append(new PIXI.Matrix(1,0,0,-.75,0,gy*1.75));r.renderer.render(record.glowLive.root,{renderTexture:this.liveTarget,clear:i===0,transform});this.stats.liveBuildings++;}
+                    const node=this.light.node(NativeReflectionImage);node.shader.uniforms.image=this.liveTarget;node.shader.uniforms.opacity=.45;node.blendMode=PIXI.BLEND_MODES.ADD;node.position.set(0,0);node.scale.set(W,H);
+                }else this.stats.dropped+=records.length;
+            }
+        }
+        if(L.reflectionProps&&L.furniture&&surf?.mirror)for(const [p,record]of r.props){
+            const w=p.width||p.w||24,h=p.height||p.h||24,x=p.x+w/2,y=p.y+h;
+            if(p.visible===false||!near(x,y,Math.max(w,h))||!onWet(x,y,Math.max(w,h)))continue;if(this.stats.props>=8){this.stats.dropped++;continue;}
+            const c=this.detail;c.save();c.translate(0,y);c.scale(1,-.75);c.translate(x,-h/2);c.rotate(p.angle||0);const node=c.node(PIXI.Sprite);node.texture=record.texture;node.alpha=.42;node.transform.setFromMatrix(c.matrix.clone().append(new PIXI.Matrix(1,0,0,1,-record.texture.width/2,-record.texture.height/2)));c.restore();this.stats.props++;
+        }
+        if(L.reflectionFoliage&&L.streetDetails)for(const {item:f}of game._queryRenderFoliage({...V,top:V.top-360,bottom:V.bottom+260},this.foliageCandidates||(this.foliageCandidates=[]))){
+            if(f.visible===false||f.dead||!Number.isFinite(f.size))continue;const bush=f.type==='bush',palm=f.type==='palm',sway=Math.sin(_gameTimeSec*2+(f.phaseOffset||0))*(game.weather.wind||.3)*8*(f.swayMultiplier??1)*(game.weather.windDirection||1),cx=f.x+sway*(bush?.6:palm?.3:1),cy=foliageCanopyY(f),refY=f.y-.8*(cy-f.y);
+            if(!near(cx,refY,100)||!onWet(cx,refY,100))continue;if(this.stats.foliage>=12){this.stats.dropped++;continue;}
+            const art=floraSprite(f.type,f.size,f._variant??Math.floor((f.phaseOffset||0)*.637)%4),c=this.detail;c.save();c.globalAlpha=.52;c.translate(0,f.y);c.scale(1,-.8);
+            if(palm){c.translate(cx,cy-f.y);c.rotate(sway*.012);c.drawImage(art.cv,-art.w/2,-art.w/2);}else{c.translate(0,-f.y);c.drawImage(art.cv,cx-art.w/2,cy-art.w/2);}c.restore();this.stats.foliage++;
         }
         const movers=game._ultraReflectionMovers(near),groups=new Map();
         const visit=node=>{if(node._nativeEntity)groups.set(node._nativeEntity,node);for(const child of node.children||[])visit(child);};visit(r.peopleContext.root);
@@ -60045,7 +60063,7 @@ class NativeWetReflections{
             c.restore();
         }
         if(L.reflectionLights){
-            if(L.reflectionDetail){
+            if(L.reflectionDetail||L.reflectionProps||L.reflectionFoliage){
                 // Reuse the exact reflected art alpha to interrupt emitted light.
                 // Independent nodes share textures, never display-object parents.
                 for(const source of this.detail.pool){if(!source.visible||source.parent!==this.detail.root)continue;let node;
@@ -60063,13 +60081,264 @@ class NativeWetReflections{
         }
         for(const f of [this.lightFilter,this.detailFilter]){f.uniforms.viewport.set([W,H]);f.uniforms.wetMask=this.maskTarget;f.uniforms.clock=L.decorAnimation?_gameTimeSec:0;f.uniforms.rain=game.weather.isRaining?game.weather.intensity:0;f.uniforms.shimmer=q==='medium'?0:1;}
         const area=new PIXI.Rectangle(0,0,W,H);this.light.root.filterArea=this.detail.root.filterArea=area;
-        this.lightSprite.visible=L.reflectionLights;this.detailSprite.visible=L.reflectionDetail;
-        if(L.reflectionLights)r.renderer.render(this.light.root,{renderTexture:this.lightTarget,clear:true});if(L.reflectionDetail)r.renderer.render(this.detail.root,{renderTexture:this.detailTarget,clear:true});
+        this.lightSprite.visible=L.reflectionLights;this.detailSprite.visible=L.reflectionDetail||L.reflectionProps||L.reflectionFoliage;
+        if(L.reflectionLights)r.renderer.render(this.light.root,{renderTexture:this.lightTarget,clear:true});if(this.detailSprite.visible)r.renderer.render(this.detail.root,{renderTexture:this.detailTarget,clear:true});
         r.lighting.uniforms.reflectionMap=this.lightTarget;r.lighting.uniforms.reflectionGain=L.reflectionLights?.85:0;r.trimBuildingImages(this.light);r.trimBuildingImages(this.detail);this.trim();
-        this.stats.bytes=this.bytes()+(this.roomGlow?this.roomGlow.baseTexture.realWidth*this.roomGlow.baseTexture.realHeight*4:0);this.stats.cpuMs=performance.now()-start;
+        this.stats.bytes=this.bytes();this.stats.cpuMs=performance.now()-start;
     }
     trim(all=false){for(const [key,rec]of this.captures)if(all||rec.used<this.owner.frameId-120){rec.target.destroy(true);this.captures.delete(key);}}
-    clear(){this.releaseTargets();this.trim(true);this.roomGlow?.destroy(true);for(const c of this.contexts)c.destroy();this.lightSprite.destroy();this.detailSprite.destroy();this.lightFilter.destroy();this.detailFilter.destroy();this.rippleFilter?.destroy();this.screen.destroy();this.root.destroy();}
+    clear(){this.releaseTargets();this.trim(true);this.roomGlow?.destroy(true);this.liveTarget?.destroy(true);for(const c of this.contexts)c.destroy();this.lightSprite.destroy();this.detailSprite.destroy();this.lightFilter.destroy();this.detailFilter.destroy();this.rippleFilter?.destroy();this.screen.destroy();this.root.destroy();}
+}
+// Remaining gameplay and cinematic passes. World cues, lit cues and screen HUD
+// have separate homes, so a scope/radar never becomes part of the wet floor.
+function nativeGameContext(game,ctx,paint){const saved=game.ctx;game.ctx=ctx;try{return paint();}finally{game.ctx=saved;}}
+function nativeCameraView(game,r){
+    const fx=r.layers.cameraEffects,fc=fx?game.finCam:null,zoom=game.camera.zoom*(fc?.z||1);let c;
+    if(game.cutscene?.active)c=game._clampView(game.camera.x,game.camera.y,zoom);
+    else{
+        const dt=Math.min(100,Math.max(0,_frameTime-(game._nativeLeanT||_frameTime)));game._nativeLeanT=_frameTime;
+        const car=game.isDriving&&game.car,LA=CONFIG.VEHICLE_DRIVE.CAM_LOOK_AHEAD,k=1-Math.exp(-dt/LA.TAU_MS);
+        game.driveLeanX=fx?(game.driveLeanX||0)+((car?(car.vx||0)*LA.PER_SPEED:0)-(game.driveLeanX||0))*k:0;
+        game.driveLeanY=fx?(game.driveLeanY||0)+((car?(car.vy||0)*LA.PER_SPEED:0)-(game.driveLeanY||0))*k:0;
+        const city=r.layers.liveBackdrop&&r.layers.backdrop?game._cityView:null,look=city&&!car?city.lookoutLean(game.player,zoom):0;
+        game.lookLeanY=city?(game.lookLeanY||0)+(look-(game.lookLeanY||0))*(1-Math.exp(-dt/450)):0;
+        const p=car||game.player;c=game._clampView(p.x+(game.scopeLeanX||0)+game.driveLeanX,p.y+(game.scopeLeanY||0)+game.driveLeanY+game.lookLeanY,zoom);
+    }
+    game.camera.x=c.x;game.camera.y=c.y;
+    const cine=fx?game.cineCam:null;
+    if(cine||fc)c=game._clampView(c.x+(cine?.dx||0)+(fc?.dx||0),c.y+(cine?.dy||0)+(fc?.dy||0),zoom);
+    return {...c,zoom,shakeX:game.camera.shakeX||0,shakeY:game.camera.shakeY||0};
+}
+class NativeScopeVeil extends PIXI.Mesh{
+    constructor(){super(nativeSurfaceGeometry(),PIXI.Shader.from(NATIVE_SURFACE_VERTEX,`
+        precision highp float;varying vec2 uv;uniform vec2 viewport;uniform vec4 lane;uniform vec3 state;
+        void main(){vec2 d=uv*viewport-lane.xy;vec2 q=vec2(d.x*state.x+d.y*state.y,-d.x*state.y+d.y*state.x);
+            float u=q.x/max(1.,lane.z),v=q.y/max(1.,lane.w)*2.;float along=u<.06?u/.06:u>.72?(1.-u)/.28:1.;
+            float cut=step(0.,u)*step(u,1.)*max(0.,1.-v*v)*clamp(along,0.,1.);
+            float a=.55*state.z*(1.-cut);gl_FragColor=vec4(vec3(10.,6.,20.)/255.*a,a);
+        }`,{viewport:new Float32Array(2),lane:new Float32Array(4),state:new Float32Array(3)}));}
+}
+class NativeOpticsFilter extends PIXI.Filter{
+    constructor(){super(undefined,`
+        precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;uniform vec4 inputSize;uniform vec4 outputFrame;
+        uniform vec2 viewport;uniform vec4 rings[8];uniform vec4 ringStyle[8];uniform float ringCount;uniform float clock;
+        uniform vec4 glass[24];uniform float glassCount;uniform float wet;
+        void main(){vec2 p=outputFrame.xy+vTextureCoord*inputSize.xy,offset=vec2(0.);vec3 tint=vec3(0.);float tintA=0.;
+            for(int i=0;i<8;i++){if(float(i)>=ringCount)break;vec4 r=rings[i],s=ringStyle[i];vec2 d=p-r.xy;float dist=length(d);
+                if(abs(dist-r.z)>r.w*2.)continue;float angle=atan(d.y,d.x);
+                float jag=r.w*.7*(.42*sin(angle*3.+s.z+clock*5.)+.26*sin(angle*7.-s.z*1.7-clock*8.)+.16*sin(angle*17.+s.z*.6+clock*13.));
+                float band=1.-smoothstep(r.w*.4,r.w*.6,abs(dist-r.z-jag));float k=s.x;
+                float scale=1.+(.051+6.75/max(40.,r.z))*k;
+                if(s.w>.5)offset+=((d/scale-d)-vec2(1.8*k,0.))*band*min(1.,.90*k);
+                float a=(s.y>.5?.09:.04)*k*band;tint+=mix(vec3(.937,.894,1.),vec3(1.,.604,.384),s.y)*a;tintA+=a;
+            }
+            for(int i=0;i<24;i++){if(float(i)>=glassCount)break;vec4 g=glass[i];vec2 q=p-g.xy;
+                if(q.x<0.||q.y<0.||q.x>g.z||q.y>g.w)continue;
+                float edge=clamp(min(min(q.x,g.z-q.x),min(q.y,g.w-q.y)),0.,1.);
+                offset+=vec2(sin(q.y*.6+clock*.4),cos(q.x*.4-clock*.3))*(.25+wet*.85)*edge;
+            }
+            vec2 at=clamp(vTextureCoord+offset*inputSize.zw,vec2(0.),viewport*inputSize.zw);
+            vec4 c=texture2D(uSampler,at);gl_FragColor=vec4(c.rgb*(1.-min(.35,tintA))+tint*c.a,c.a);
+        }`,{viewport:new Float32Array(2),rings:new Float32Array(32),ringStyle:new Float32Array(32),ringCount:0,clock:0,glass:new Float32Array(96),glassCount:0,wet:0});this.padding=0;}
+}
+class NativePresentation{
+    constructor(owner){
+        this.owner=owner;this.texts=new Map();this.textBytes=0;
+        if(!owner.scene){owner.scene=new PIXI.Container();owner.stage.addChildAt(owner.scene,0);owner.scene.addChild(owner.world,owner.postWorld);}
+        owner.scene.addChild(owner.rainContext.root);
+        this.ground=new NativeVectorContext(owner);this.abilities=new NativeVectorContext(owner);this.lit=new NativeVectorContext(owner);this.bubbles=new NativeVectorContext(owner);this.screen=new NativeVectorContext(owner);
+        [this.ground,this.abilities,this.lit,this.bubbles,this.screen].forEach((c,i)=>c.label=['ground-cues','ability-art','lit-cues','speech','screen-hud'][i]);
+        owner.world.addChildAt(this.ground.root,owner.world.getChildIndex(owner.objects));owner.world.addChildAt(this.abilities.root,owner.world.getChildIndex(owner.roofStage));
+        owner.postWorld.addChildAt(this.lit.root,owner.postWorld.getChildIndex(owner.marker));owner.postWorld.addChildAt(this.bubbles.root,owner.postWorld.getChildIndex(owner.marker));
+        this.scope=new NativeScopeVeil();this.scopeCue=new NativeVectorContext(owner);this.scopeCue.label='scope-cue';owner.scene.addChildAt(this.scope,2);owner.scene.addChildAt(this.scopeCue.root,3);
+        this.bokeh=new PIXI.Container();owner.stage.addChildAt(this.bokeh,owner.stage.getChildIndex(owner.worldCueContext.root));owner.stage.addChild(this.screen.root);
+        this.bokehNodes=[];this.optics=new NativeOpticsFilter();
+    }
+    get contexts(){return [this.ground,this.abilities,this.lit,this.bubbles,this.screen,this.scopeCue];}
+    text(ctx,value,x,y){
+        const text=String(value),key=[text,ctx.font,ctx.fillStyle].join('|');let rec=this.texts.get(key);
+        if(!rec){const size=Number(/([0-9.]+)px/.exec(ctx.font)?.[1]||12),pad=8,probe=document.createElement('canvas').getContext('2d');probe.font=ctx.font;const W=Math.min(1024,Math.ceil(probe.measureText(text).width+pad*2)),H=Math.ceil(size*2+pad*2),bytes=W*H*4;
+            while(this.texts.size>=64||this.textBytes+bytes>4*1048576){const old=[...this.texts].find(([,v])=>v.used!==this.owner.frameId)?.[0];if(old===undefined)return;const r=this.texts.get(old);this.texts.delete(old);this.textBytes-=r.bytes;this.owner.textures.delete(r.texture);r.texture.destroy(true);}
+            const texture=this.owner.bake(W,H,c=>{c.font=ctx.font;c.textBaseline='middle';c.fillStyle=ctx.fillStyle;c.fillText(text,pad,H/2);},'unicode-label');rec={texture,bytes,W,H,pad};this.texts.set(key,rec);this.textBytes+=bytes;
+        }
+        rec.used=this.owner.frameId;
+        const dx=ctx.textAlign==='center'?-rec.W/2:ctx.textAlign==='right'||ctx.textAlign==='end'?-rec.W: -rec.pad;
+        const dy=ctx.textBaseline==='middle'?-rec.H/2:ctx.textBaseline==='top'?-rec.pad:-rec.H*.7;
+        ctx.current=null;const n=ctx.node(PIXI.Sprite);n.texture=rec.texture;n.alpha=ctx.globalAlpha;n.blendMode=PIXI.BLEND_MODES.NORMAL;n.transform.setFromMatrix(ctx.matrix.clone().append(new PIXI.Matrix(1,0,0,1,x+dx,y+dy)));ctx.hashValue(key);for(const v of [x,y,ctx.globalAlpha,ctx.matrix.a,ctx.matrix.b,ctx.matrix.c,ctx.matrix.d,ctx.matrix.tx,ctx.matrix.ty])ctx.hashValue(v);
+    }
+    syncScope(game,view){
+        const r=this.owner,k=r.layers.scopeView?game.scopeK||0:0,c=this.scopeCue;c.begin();c.canvas=game.canvas;c.setTransform(view.zoom,0,0,view.zoom,r.world.x,r.world.y);this.scope.visible=k>0;if(k<=0)return;
+        const p=game.player,t=_gameTimeSec,steady=Math.min(1,(game._scopeHeld||0)/SCOPE.STEADY),shot=p._muzzleLocal&&p._muzzleReady?aimFromMuzzle(p,p.angle):{x:p.x+Math.cos(p.angle)*6,y:p.y+Math.sin(p.angle)*6,angle:p.angle};
+        const a=shot.angle+(Math.sin(t*1.7)*.7+Math.sin(t*3.1)*.3)*SCOPE.SWAY*(1-steady);
+        const far=raycastNearest(shot.x,shot.y,shot.x+Math.cos(a)*SCOPE.RANGE,shot.y+Math.sin(a)*SCOPE.RANGE,[...(game.activeMap.walls||[]),...getColliders(game.activeMap)],SCOPE.RANGE);
+        this.scope.scale.set(game.canvas.width,game.canvas.height);const u=this.scope.shader.uniforms;u.viewport.set([game.canvas.width,game.canvas.height]);u.lane.set([shot.x*view.zoom+r.world.x,shot.y*view.zoom+r.world.y,(far+40)*view.zoom,SCOPE.WIDTH*view.zoom]);u.state.set([Math.cos(a),Math.sin(a),k]);
+        c.save();c.translate(shot.x,shot.y);c.rotate(a);c.globalAlpha=.1*k;c.globalCompositeOperation='lighter';c.drawImage(game._scopeLaneSprite(),0,-SCOPE.WIDTH/2,far+40,SCOPE.WIDTH);c.globalCompositeOperation='source-over';c.globalAlpha=(.35+.35*steady)*k;c.strokeStyle=steady>=1?'#ffd9a0':'#ff6a7a';c.lineWidth=.8;c.beginPath();c.moveTo(4,0);c.lineTo(far,0);c.stroke();c.restore();game._drawFocusArc(c,k);this.stats.scope={active:true,far,steady};
+    }
+    syncBokeh(game){
+        const r=this.owner,L=r.layers;for(const n of this.bokehNodes)n.visible=false;if(!game.bokeh)return;
+        game.bokeh.update(game.deltaTime||16);if(!L.bokeh)return;
+        if(!this.bokehTexture){this.bokehTexture=PIXI.RenderTexture.create({width:128,height:128});const c=new NativeVectorContext(r);c.fillStyle=c.createRadialGradient(64,64,0,64,64,64);for(const [p,a]of [[0,.8],[.5,.4],[1,0]])c.fillStyle.addColorStop(p,'rgba(255,255,255,'+a+')');c.fillRect(0,0,128,128);r.renderer.render(c.root,{renderTexture:this.bokehTexture,clear:true});c.destroy();}
+        let i=0;for(const c of game.bokeh.circles){const fade=Math.min(1,c.age/2000)*Math.min(1,(c.life-c.age)/2000),pulse=.7+.3*Math.sin(_frameTime*c.pulseSpeed+c.pulseOffset),alpha=c.alpha*fade*pulse;if(alpha<.005)continue;
+            let n=this.bokehNodes[i++];if(!n){n=new PIXI.Sprite(this.bokehTexture);n.anchor.set(.5);n.blendMode=PIXI.BLEND_MODES.SCREEN;this.bokeh.addChild(n);this.bokehNodes.push(n);}n.visible=true;n.tint=new PIXI.Color(c.colorBase+'1)').toNumber();n.alpha=alpha;n.position.set(c.nx*game.canvas.width,c.ny*game.canvas.height);n.width=n.height=c.radius*(.9+pulse*.1)*2;
+        }this.stats.bokeh=i;
+    }
+    syncOptics(game,view){
+        const r=this.owner,L=r.layers,u=this.optics.uniforms;u.ringCount=0;u.glassCount=0;u.clock=L.decorAnimation?_gameTimeSec:0;u.viewport.set([game.canvas.width,game.canvas.height]);u.wet=game.weather.wetness||0;
+        if(L.mirage&&(GameSettings.soundRings||'mirage')==='mirage'){
+            const rings=(game.noiseRipples||[]).slice().reverse().filter(x=>game._ringT(x)<1);rings.sort((a,b)=>(a.enemy?1e7+Math.hypot(a.x-game.player.x,a.y-game.player.y):0)-(b.enemy?1e7+Math.hypot(b.x-game.player.x,b.y-game.player.y):0));
+            for(const ring of rings.slice(0,8)){const t=game._ringT(ring),e=1-Math.pow(1-t,2),rad=(12+(ring.reach-12)*e)*view.zoom,th=Math.max(4,11*view.zoom)*(1-.82*e)*1.015*2,i=u.ringCount++;
+                u.rings.set([ring.x*view.zoom+r.world.x,ring.y*view.zoom+r.world.y,rad,th],i*4);u.ringStyle.set([(1-t)*(1-t)*(1+(ring.boost||0)),ring.enemy?1:0,ring.seed??ring.x*.013+ring.y*.017,i<4&&t<.6?1:0],i*4);
+            }this.stats.ringsDropped=Math.max(0,rings.length-8);
+        }
+        const glass=(x,y,w,h)=>{if(u.glassCount>=24)return;const sx=x*view.zoom+r.world.x,sy=y*view.zoom+r.world.y;if(sx+w*view.zoom<0||sx>game.canvas.width||sy+h*view.zoom<0||sy>game.canvas.height)return;u.glass.set([sx,sy,w*view.zoom,h*view.zoom],u.glassCount++*4);};
+        if(L.glassRefraction){if(L.windows)for(const w of game.roomSystem.windows||[])if(!w.shattered&&!(game.activeMap.id==='apt_949'&&w.y===0))glass(w.x,w.y,w.w,w.h);
+            if(L.doors)for(const d of game.roomSystem.doors||[])if(d.type==='sliding')for(const [ax,ay,bx,by]of d.leaves())d.orientation==='H'?glass(Math.min(ax,bx),d.y,Math.abs(bx-ax),d.h):glass(d.x,Math.min(ay,by),d.w,Math.abs(by-ay));}
+        const filters=[];if(u.ringCount||u.glassCount)filters.push(this.optics);if(L.bloom)filters.push(r.sceneBloom);if(L.atmosphere)filters.push(r.atmosphereFilter);r.scene.filters=filters.length?filters:null;r.scene.filterArea=new PIXI.Rectangle(0,0,game.canvas.width,game.canvas.height);r.stage.filters=null;
+        this.stats.rings=u.ringCount;this.stats.glass=u.glassCount;
+    }
+    sync(game,view){
+        const start=performance.now(),r=this.owner,L=r.layers;this.stats={scope:{active:false},bokeh:0,speech:0,radar:false};for(const c of this.contexts){c.begin();c.canvas=game.canvas;}
+        for(const c of [this.ground,this.abilities,this.lit,this.bubbles])c.sceneFrame=_worldMatrix;
+        const bounds=game._cullBounds.entities;
+        if(L.noiseRings)game.drawNoiseRipples(this.ground);if(L.executionCues)game.drawExecuteCue(this.ground);
+        if(L.enemyEffects){game.drawHunterDashes(this.ground);game.drawGunnerHeat(this.lit,bounds);game.drawHunterEyes(this.lit);}
+        if(L.flitEffects)game.drawFlitVFX(this.abilities);if(L.ghosts)game.drawGraveyardGhosts(this.abilities);
+        if(L.fireGlow)game.drawFireLightGlow(this.lit);if(L.mapEdges)game.drawMapEdge(this.lit);
+        if(L.playerEmotes)nativeGameContext(game,this.bubbles,()=>game.drawPlayerEmote());
+        if(L.speech){const list=[...(game.npcs||[]),...(game.teammates||[]),...(game.pedestrians?.pedestrians||[])].filter(n=>n.quipText&&!n.dead);
+            if(list.length){const buildings=game._prepareRenderBuildingLists(game._cullBounds);for(const n of list){if(n.x<bounds.left||n.x>bounds.right||n.y<bounds.top||n.y>bounds.bottom||game._speakerHidden(n.x,n.y,buildings,L.buildings,L.streetDetails))continue;if(this.stats.speech>=32)break;n.drawQuipBubble?.(this.bubbles);this.stats.speech++;}}
+        }
+        this.syncScope(game,view);this.syncBokeh(game);this.syncOptics(game,view);
+        if(L.radar&&game.augments?.isEquipped('radar_ext')&&!game.paused){nativeGameContext(game,this.screen,()=>nativeRadar.call(game));this.stats.radar=true;}
+        if(L.debugOverlay&&game.debugMode)nativeGameContext(game,this.lit,()=>{if(game.dbg('lights'))game.drawDebugLighting(this.lit);game.drawDebugLayers(this.lit);if(game.dbg('nav')||game.navDebug)game.drawNavDebug(this.lit);});
+        if(L.missionHud){if(this.hudOn!==true){game._objKey=null;if(game._rideState)game._rideState.on=null;}game._objectiveHud();game._rideHud();}else if(this.hudOn!==false){document.getElementById('ui-objective')?.classList.remove('show');document.getElementById('ui-ride')?.classList.remove('show');document.body.classList.remove('objective-hud');}this.hudOn=L.missionHud;
+        for(const c of this.contexts)r.trimBuildingImages(c);
+        this.stats.paths=this.contexts.reduce((n,c)=>n+c.pathsPainted,0);this.stats.textBytes=this.textBytes;this.stats.cpuMs=performance.now()-start;r.presentationStats=this.stats;r.layerStages.presentationMs=this.stats.cpuMs;
+    }
+    invalidate(){for(const c of this.contexts)for(const g of c.gradients)g.key=null;this.bokehTexture?.destroy(true);this.bokehTexture=null;for(const n of this.bokehNodes)n.texture=PIXI.Texture.EMPTY;this.bokehNodes.forEach(n=>n.destroy());this.bokehNodes=[];}
+    clear(){for(const c of this.contexts)c.destroy();this.scope.destroy();this.optics.destroy();for(const n of this.bokehNodes)n.destroy();this.bokehTexture?.destroy(true);this.bokeh.destroy();for(const rec of this.texts.values()){this.owner.textures.delete(rec.texture);rec.texture.destroy(true);}this.texts.clear();}
+}
+
+// Original radar painter; conic-gradient fallback becomes native wedges.
+function nativeRadar(){
+    if (this.augments && this.augments.isEquipped('radar_ext') && !this.paused) {
+        this.ctx.save();
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+        const RADAR_RADIUS = 60;
+        const RADAR_RANGE = 600;  // world-px detection radius
+        // Landscape: top-left under the bars, clear of the fire cluster
+        const cx = this.isLandscape ? RADAR_RADIUS + 16 : this.canvas.width - RADAR_RADIUS - 16;
+        const cy = this.isLandscape ? RADAR_RADIUS + 150 : this.canvas.height - RADAR_RADIUS - 60;
+        const playerX = this.isDriving && this.car ? this.car.x : this.player.x;
+        const playerY = this.isDriving && this.car ? this.car.y : this.player.y;
+        const scale = RADAR_RADIUS / RADAR_RANGE;
+
+        // Background disc
+        this.ctx.globalAlpha = 0.35;
+        this.ctx.fillStyle = '#0a0a18';
+        this.ctx.beginPath();
+        this.ctx.arc(cx, cy, RADAR_RADIUS, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Concentric rings
+        this.ctx.globalAlpha = 0.2;
+        this.ctx.strokeStyle = '#00f3ff';
+        this.ctx.lineWidth = 0.5;
+        for (let r = 1; r <= 3; r++) {
+            this.ctx.beginPath();
+            this.ctx.arc(cx, cy, RADAR_RADIUS * r / 3, 0, Math.PI * 2);
+            this.ctx.stroke();
+        }
+
+        // Sweep line
+        this.ctx.globalAlpha = 0.25;
+        this.ctx.strokeStyle = '#00f3ff';
+        this.ctx.lineWidth = 1;
+        const sweepAngle = (_frameTime / 1200) % (Math.PI * 2);
+        this.ctx.beginPath();
+        this.ctx.moveTo(cx, cy);
+        this.ctx.lineTo(cx + Math.cos(sweepAngle) * RADAR_RADIUS, cy + Math.sin(sweepAngle) * RADAR_RADIUS);
+        this.ctx.stroke();
+
+        // Sweep trail (fading arc behind sweep line)
+        this.ctx.globalAlpha = 1.0;
+        if (this.ctx.createConicGradient) {
+            const sweepGrad = this.ctx.createConicGradient(sweepAngle - 0.8, cx, cy);
+            sweepGrad.addColorStop(0, 'rgba(0, 243, 255, 0)');
+            sweepGrad.addColorStop(0.12, 'rgba(0, 243, 255, 0.08)');
+            sweepGrad.addColorStop(0.13, 'rgba(0, 243, 255, 0)');
+            this.ctx.fillStyle = sweepGrad;
+            this.ctx.beginPath();
+            this.ctx.arc(cx, cy, RADAR_RADIUS, 0, Math.PI * 2);
+            this.ctx.fill();
+        } else {                                                      // no conic gradients (Safari < 16.4): a fan of thin wedges
+            for (let k = 0; k < 6; k++) {
+                this.ctx.fillStyle = `rgba(0, 243, 255, ${(0.08 * (k + 1) / 6).toFixed(3)})`;
+                const a0 = sweepAngle - 0.8 + k * 0.13;
+                this.ctx.beginPath(); this.ctx.moveTo(cx, cy); this.ctx.arc(cx, cy, RADAR_RADIUS, a0, a0 + 0.13); this.ctx.closePath(); this.ctx.fill();
+            }
+        }
+
+        // Enemy blips (crimson)
+        this.ctx.globalAlpha = 0.9;
+        for (const e of this.enemies) {
+            if (e.dead || !e.active) continue;
+            const dx = (e.x - playerX) * scale;
+            const dy = (e.y - playerY) * scale;
+            if (Math.hypot(dx, dy) > RADAR_RADIUS - 2) continue;
+            this.ctx.fillStyle = '#ff2244';
+            this.ctx.shadowColor = '#ff2244';
+            this.ctx.shadowBlur = 4;
+            this.ctx.beginPath();
+            this.ctx.arc(cx + dx, cy + dy, 2.5, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+
+        // Friendly NPC blips (teal) — teammates
+        for (const n of this.npcs) {
+            if (!n.active || n.dead || n.alliance === 'hostile') continue;
+            if (!n.isRecruited) continue;
+            const dx = (n.x - playerX) * scale;
+            const dy = (n.y - playerY) * scale;
+            if (Math.hypot(dx, dy) > RADAR_RADIUS - 2) continue;
+            this.ctx.fillStyle = '#00f3ff';
+            this.ctx.shadowColor = '#00f3ff';
+            this.ctx.shadowBlur = 3;
+            this.ctx.beginPath();
+            this.ctx.arc(cx + dx, cy + dy, 2, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        this.ctx.shadowBlur = 0;
+
+        // Player dot (gold center)
+        this.ctx.globalAlpha = 1.0;
+        this.ctx.fillStyle = '#ffd700';
+        this.ctx.shadowColor = '#ffd700';
+        this.ctx.shadowBlur = 5;
+        this.ctx.beginPath();
+        this.ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.shadowBlur = 0;
+
+        // Border ring
+        this.ctx.globalAlpha = 0.5;
+        this.ctx.strokeStyle = '#00f3ff';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.beginPath();
+        this.ctx.arc(cx, cy, RADAR_RADIUS, 0, Math.PI * 2);
+        this.ctx.stroke();
+
+        // Label
+        this.ctx.globalAlpha = 0.4;
+        this.ctx.fillStyle = '#00f3ff';
+        this.ctx.font = 'bold 7px Courier New';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('ECHO PULSE', cx, cy - RADAR_RADIUS - 4);
+
+        this.ctx.restore();
+    }
+
 }
         class GameEngine {
             constructor() {
@@ -81775,6 +82044,8 @@ engineMixin({
 // Native entry points retain sandbox previews and the original save schema.
 (() => {
     const renderer=game.nativeRenderer;
+    const originalPicture=PauseMenuController.prototype.saveCinePicture;
+    PauseMenuController.prototype.saveCinePicture=function(){if(!renderer.failure&&!renderer.lost)renderer.renderer.render(renderer.stage);return originalPicture.call(this);};
     const inBodyGroup=(ctx,e,paint)=>ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.layers.depthSort&&e&&!e.dead&&!e._reflectionProxy&&ctx.container._nativeEntity!==e?ctx.withDepth(e,paint):paint();
     const liveCrowd=drawCrowdHumanoid;
     drawCrowdHumanoid=(ctx,e,c)=>{if(ctx.nativeVector&&!ctx.owner.layers.contactShadows)c={...c,noShadow:true};return inBodyGroup(ctx,e,()=>{if(ctx.nativeVector&&ctx.owner.layers.crowdSprites&&ctx.owner.crowdAtlas?.draw(ctx,e,c))return;return liveCrowd(ctx,e,c);});};
@@ -81856,7 +82127,7 @@ engineMixin({
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v12-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v13-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;

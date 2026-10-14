@@ -19,7 +19,7 @@ class NativeCasterBodies {
         this.stats={shared:0,captures:0,refreshes:0,fallbacks:0,blocked:0,dropped:0,pairs:0,lights:0};
     }
     note(ctx,e,body){
-        if(!this.owner.layers.npcShadows||_zoomLOD>=2||e._reflectionProxy||e.inCar||e.dead||e.visible===false)return;
+        if(ctx!==this.owner.peopleContext||!this.owner.layers.npcShadows||_zoomLOD>=2||e._reflectionProxy||e.inCar||e.dead||e.visible===false)return;
         if(!this.owner.layers.shapeShadows){this.circle(e);return;}
         const m=ctx.matrix,scale=Math.hypot(m.a,m.b)||1;
         this.bodies.set(e,{...body,owner:e,x:m.tx,y:m.ty,angle:Math.atan2(m.b,m.a),scale,opacity:ctx.globalAlpha,elevation:24});

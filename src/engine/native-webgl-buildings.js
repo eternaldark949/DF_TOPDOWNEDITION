@@ -13,7 +13,7 @@ class NativeBuildingGlowMesh extends PIXI.Mesh {
 }
 Object.assign(NativeWebGLRenderer.prototype,{
     trimBuildingImages(ctx){
-        const used=new Set(ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture));
+        const used=new Set([...(ctx.patternTextures||[]),...ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture)]);
         for(const [image,t]of ctx.images)if(!used.has(t.baseTexture)){ctx.images.delete(image);this.releaseImage(t);}
     },
     clearBuildingGlow(r){
