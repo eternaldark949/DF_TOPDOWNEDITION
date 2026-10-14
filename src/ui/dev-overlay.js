@@ -118,7 +118,7 @@
                 const status = mode !== 'gamma' ? (mode === 'off' ? 'Shadows off' : 'Canvas 2D')
                     : !fresh ? 'Gamma idle — no lighting pass'
                     : s.backend === 'webgl2' && s.resolves === 1 ? 'WebGL2 active'
-                    : s.backend === 'high-fallback' ? (s.reason === 'software-gpu' ? 'High fallback — software GPU' : 'High fallback — WebGL2 inactive') : 'Gamma awaiting resolve';
+                    : s.backend === 'high-fallback' ? 'High fallback — WebGL2 inactive' : 'Gamma awaiting resolve';
                 const tier = mode !== 'gamma' || !fresh ? 'idle' : s.backend === 'webgl2' && s.resolves === 1 ? 'active' : 'fallback';
                 let html = `<div class="dp-total"><span>Shadow renderer</span><b>${mode.toUpperCase()}</b></div>`
                     + `<div class="dp-shadow-status" data-state="${tier}">${status}</div>`;

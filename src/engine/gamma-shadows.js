@@ -5,17 +5,12 @@
             LIMIT: 96, active: false, records: [], frame: 0,
             stats: { backend: 'high-fallback', resolves: 0, draws: 0, uploads: 0, layerUploads: 0, contributions: 0, blurPasses: 0 },
             _init() {
-                if (this.failed || (this.software && !this.forceGPU)) return false;
+                if (this.failed) return false;
                 if (this.ready && this.gl && !this.gl.isContextLost()) return true;
                 try {
                     const cv = this.canvas = this.canvas || document.createElement('canvas');
                     const gl = this.gl = this.gl || cv.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false });
                     if (!gl) throw new Error('WebGL2 unavailable');
-                    // Software GL lost to High in the completed-frame experiment.
-                    // Only probe during initialization; tests/benchmarks can force GPU.
-                    const debug=gl.getExtension('WEBGL_debug_renderer_info');
-                    this.software=!!debug && /swiftshader|llvmpipe|softpipe|lavapipe|software rasterizer/i.test(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL));
-                    if(this.software && !this.forceGPU)return false;
                     cv.addEventListener('webglcontextlost', e => { e.preventDefault(); this.failed = true; });
                     const program = (vertex, fragment) => {
                         const p = gl.createProgram();
@@ -82,7 +77,6 @@
                 this.stats={backend:'high-fallback',resolves:0,draws:0,uploads:0,layerUploads:0,contributions:0,blurPasses:0,frameId};
                 this.active=GameSettings.lampShadows==='gamma' && this._init();
                 if(this.active){this.stats.backend='webgl2';this.target=ctx.canvas;}
-                else if(this.software && !this.forceGPU)this.stats.reason='software-gpu';
                 return this.active;
             },
             collect(ctx,s,mode) {

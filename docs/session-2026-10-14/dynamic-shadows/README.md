@@ -62,13 +62,13 @@ Soft lighting uses two separable three-tap GPU blur passes at the existing half 
 
 High's cached shadowed sprites remain in a padded atlas. It now actually holds up to 96 distinct sprites (the earlier square allocation stopped at 64), with unused-slot/LRU eviction that protects this frame's queued draws. Stationary sprites stay resident and changing sprites alone are refreshed. The usual 24 MiB CPU cache budget applies. The atlas adds about 24.4 MiB on typical devices; soft mode also allocates two light-sized RGBA8 targets. Quality/map switches release source references.
 
-Static/unshadowed/special lighting inputs remain Canvas 2D. Two full light-layer textures still upload every frame, or three when a room veil is present. Shadow preparation and final scene composition remain separate work. This is a hybrid renderer, not GPU-generated shadow maps or a depth/normal/material G-buffer. Known software GPUs (SwiftShader/llvmpipe/softpipe/lavapipe), WebGL2 absence, context loss, upload failure or interrupted GPU execution retain the High path and replay queued contributions.
+Static/unshadowed/special lighting inputs remain Canvas 2D. Two full light-layer textures still upload every frame, or three when a room veil is present. Shadow preparation and final scene composition remain separate work. This is a hybrid renderer, not GPU-generated shadow maps or a depth/normal/material G-buffer. Gamma uses WebGL2 even on known software GPUs, with no performance-based backend substitution. WebGL2 absence, context loss, upload failure or interrupted GPU execution retain the High path and replay queued contributions.
 
 ### Validation
 
 `tools/test-dynamic-shadows-browser.cjs` checks real Chromium pixels for independent lights, room veil ordering, direct GPU output, GPU blur including edge pixels, warm atlas reuse with 90 distinct sprites, single-sprite invalidation, resize, upload/resolve failures, and full apartment/nightclub scenes. The headlight fixture now restores the game's original light context; previously the scene checks rendered into that fixture's detached canvas.
 
-Results are in `gamma-batched-browser-checks.json`. The automatic software-GPU fallback also matches the full High scene (mean difference below 1/255) and executes zero GPU draws. Mean full-scene channel differences versus High are below 0.6/255 with sharp lighting and below 1.6/255 with soft lighting. Small differences are expected from 8-bit blending/blur rounding and sprite edge rasterization. All 98 game regressions pass (1,379 assertions), and the offline build is rebuilt and checked.
+Results are in `gamma-batched-browser-checks.json`. Mean full-scene channel differences versus High are below 0.6/255 with sharp lighting and below 1.6/255 with soft lighting. Small differences are expected from 8-bit blending/blur rounding and sprite edge rasterization. All 98 game regressions pass (1,379 assertions), and the offline build is rebuilt and checked.
 
 | High soft lighting | Gamma GPU soft lighting |
 |---|---|
@@ -79,7 +79,7 @@ Results are in `gamma-batched-browser-checks.json`. The automatic software-GPU f
 
 `node tools/benchmark-gamma.cjs [path-to-game.html]` compares High/Gamma in the apartment and nightclub at a 1280 × 720 viewport, with sharp/soft lighting and stationary/moving-player fixtures. Adaptive lighting is disabled. Each of three rounds uses 15 warmups and 30 samples; mode order alternates between rounds. Draw submission and completion are reported separately. Completion forces a one-pixel scene readback to avoid mistaking queued GPU commands for completed rendering; this introduces synchronization and changes Canvas behavior, so these values are not gameplay FPS predictions.
 
-The workspace uses ANGLE/Vulkan SwiftShader, a software GPU. Original/new raw results and comparisons are recorded alongside this document. The benchmark explicitly sets `GammaShadows.forceGPU = true` to measure WebGL on software GPUs; normal Gamma selects High automatically on those backends. Developer pixel checks also force WebGL after testing this automatic fallback. Runs are exploratory, not a claim that Gamma beats High on hardware GPUs. The remaining Canvas input uploads and shadow preparation still need device profiling.
+The workspace uses ANGLE/Vulkan SwiftShader, a software GPU. Original/new raw results and comparisons are recorded alongside this document. These recorded measurements explicitly forced WebGL before the software-GPU gate was removed. Gamma, the benchmark and developer pixel checks now use WebGL by default on all available renderers, without an override flag. Runs are exploratory, not a claim that Gamma beats High on hardware GPUs. The remaining Canvas input uploads and shadow preparation still need device profiling.
 
 Median completed-frame milliseconds (median of three round medians):
 
@@ -94,9 +94,9 @@ Median completed-frame milliseconds (median of three round medians):
 | Nightclub | Soft | Stationary | 125.8 | 87.3 | 33.6 |
 | Nightclub | Soft | Moving | 81.7 | 83.1 | 37.8 |
 
-Most cases reduce Gamma cost by 27–49%; the moving/soft nightclub case is effectively unchanged. High remains faster on this software GPU, which is why the normal renderer falls back there. High timings also vary between runs (especially the nightclub); geometry/setup variance and concurrent validation work make this an exploratory comparison. Raw data: `gamma-original-benchmark.json`, `gamma-batched-benchmark.json`, and `gamma-benchmark-comparison.json`.
+Most cases reduce Gamma cost by 27–49%; the moving/soft nightclub case is effectively unchanged. High remains faster on this software GPU; Gamma now deliberately runs WebGL there for experimentation. High timings also vary between runs (especially the nightclub); geometry/setup variance and concurrent validation work make this an exploratory comparison. Raw data: `gamma-original-benchmark.json`, `gamma-batched-benchmark.json`, and `gamma-benchmark-comparison.json`.
 
 
 ### Profiler status
 
-Settings → Developer → Profiler → Full reports **WebGL2 active**, **High fallback — WebGL2 inactive**, or **Gamma idle — no lighting pass**, with completed lighting resolves, actual GPU draws, queued contributions, atlas mask uploads, full Canvas layer uploads, and GPU blur passes. Known software GPUs show **High fallback — software GPU**. The panel reads existing counters and does not probe/time the GPU. Zero mask uploads only means cached sprites are resident; layer uploads remain visible. Frame stamps reject stale status on unlit frames.
+Settings → Developer → Profiler → Full reports **WebGL2 active**, **High fallback — WebGL2 inactive**, or **Gamma idle — no lighting pass**, with completed lighting resolves, actual GPU draws, queued contributions, atlas mask uploads, full Canvas layer uploads, and GPU blur passes. The panel reads existing counters and does not probe/time the GPU. Zero mask uploads only means cached sprites are resident; layer uploads remain visible. Frame stamps reject stale status on unlit frames.

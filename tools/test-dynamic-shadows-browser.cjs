@@ -15,13 +15,13 @@ const { chromium } = require('playwright');
     const page = await browser.newPage(), errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
-    const automatic = await page.evaluate(() => {
+    const defaultBackend = await page.evaluate(() => {
       GameSettings.lampShadows='gamma';
       const cv=document.createElement('canvas');const active=GammaShadows.begin(cv.getContext('2d'));
-      const result={software:GammaShadows.software,active,stats:{...GammaShadows.stats}};
-      GammaShadows.forceGPU=true;return result;
+      const gl=GammaShadows.gl,debug=gl?.getExtension('WEBGL_debug_renderer_info');
+      return {active,renderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):'unknown',stats:{...GammaShadows.stats}};
     });
-    if(automatic.software){assert.equal(automatic.active,false,'known software GPUs use High');assert.equal(automatic.stats.reason,'software-gpu');}
+    assert.equal(defaultBackend.active,true,'Gamma uses WebGL by default, including software renderers');
     const r = await page.evaluate(() => {
       game.running = false; _zoomLOD = 0; GameSettings.lampShadows = 'high';
       const left = { x: 120, y: 150, radius: 240, color: '#fff' }, right = { x: 400, y: 150, radius: 240, color: '#fff' };
@@ -213,24 +213,8 @@ const { chromium } = require('playwright');
       delete r.high;delete r.gamma;
       assert.ok(r.mean<2,`full-scene Gamma matches High: ${r.map}, soft=${r.soft}, mean=${r.mean}`);
     }
-    const softwareScene = await page.evaluate(() => {
-      if(!GammaShadows.software)return null;
-      GammaShadows.forceGPU=false;GameSettings.lampShadows='gamma';game.running=true;game.draw();
-      const fallback=game.ctx.getImageData(0,0,game.canvas.width,game.canvas.height).data;
-      const stats={...GammaShadows.stats},panel=DevOverlay._shadowLine(game);
-      GameSettings.lampShadows='high';game.draw();
-      const high=game.ctx.getImageData(0,0,game.canvas.width,game.canvas.height).data;
-      let total=0;for(let i=0;i<high.length;i++)total+=Math.abs(high[i]-fallback[i]);
-      game.running=false;return {mean:total/high.length,stats,panel};
-    });
-    if(softwareScene){
-      assert.ok(softwareScene.mean<1,'automatic software fallback preserves full-scene High pixels');
-      assert.equal(softwareScene.stats.reason,'software-gpu');
-      assert.equal(softwareScene.stats.draws,0,'software fallback does not execute GPU draws');
-      assert.ok(softwareScene.panel.includes('High fallback — software GPU'),'profiler names software fallback');
-    }
     assert.deepEqual(errors, [], 'no browser runtime errors');
-    console.log(JSON.stringify({ passed: true, pixels: r, extended, gamma, atlas, scene, profiler, sceneParity, automatic, softwareScene }, null, 2));
+    console.log(JSON.stringify({ passed: true, pixels: r, extended, gamma, atlas, scene, profiler, sceneParity, defaultBackend }, null, 2));
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

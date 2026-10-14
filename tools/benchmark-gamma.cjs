@@ -15,7 +15,6 @@ const { chromium } = require('playwright');
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     const result = await page.evaluate(() => {
-      GammaShadows.forceGPU=true; // Benchmark the experimental path even on software GL.
       game.loop = () => {}; game.running = true; game.paused = false;
       GameSettings.adaptiveLighting = false; game.getAmbientDarkness = () => .8;
       const samples = [], percentile = (a, p) => [...a].sort((a,b) => a-b)[Math.floor((a.length-1)*p)];
