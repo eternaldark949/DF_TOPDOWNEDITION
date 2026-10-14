@@ -742,6 +742,23 @@ test('Shared lamp caster shapes, quality budgets, removals and map lifecycle are
   equal(r,{shapes:true,turned:true,limited:true,removed:true,off:true,high:true,ultra:true,reset:true});
 });
 
+test('Gamma preserves High caster policy and device selection with a safe unavailable-WebGL path', env => {
+  const r=value(env, `
+    _zoomLOD=0;
+    const lamp={x:100,y:100,radius:220,color:'#ffd0a0'},body={x:170,y:100,angle:0};
+    const model={activeMap:{width:500,height:400,walls:[],buildings:[]},lamps:[lamp],roomSystem:{active:false},getAmbientDarkness:()=>.8};
+    const samples=[];
+    for(const quality of ['high','gamma']){GameSettings.lampShadows=quality;DynamicShadows.begin(model);DynamicShadows.noteHuman(body);const s=DynamicShadows.prepare(lamp);
+      samples.push({width:s.hole.width,height:s.hole.height,pairs:DynamicShadows.stats.pairs,capture:DynamicShadows.wantsSilhouette(body,{})});}
+    GameSettings.saveDensity();const saved=JSON.parse(localStorage.getItem('dfab_density')).lampShadows==='gamma';
+    GammaShadows.failed=true;const fallback=GammaShadows.begin(game.lightCtx)===false && GammaShadows.stats.backend==='high-fallback';
+    GammaShadows.reset();return {samples,saved,fallback,cleared:GammaShadows.records.length===0};
+  `);
+  equal(r.samples[0],r.samples[1],'Gamma keeps High masks and humanoid capture eligibility');
+  ok(r.samples[1].capture,'Gamma supports the captured silhouettes from High');
+  equal([r.saved,r.fallback,r.cleared],[true,true,true]);
+});
+
 test('Experimental Beta shadows raise resolution and coverage without retaining masks on mode switches', env => {
   const r=value(env, `
     _zoomLOD=0;

@@ -14,6 +14,7 @@ The shared engine owns visibility, projection, silhouette captures, bounded cach
 | Low | 24 | 8 | 4 | 12 | 128 px |
 | High | 48 | 16 | 8 | 24 | 256 px |
 | Ultra | 80 | 32 | 12 | 32 | 256 px |
+| Gamma (experimental) | 48 | 16 | 8 | 24 | 256 px |
 | Beta (experimental) | 128 | 48 | 20 | 48 | 512 px |
 
 High can capture humanoid silhouettes; other qualities use projected hulls. Ordinary elevated lights use nominal 90 px / 120 px casts on Low / High. Door leaves, Ultra casts and sources below a caster's height can block toward the source's light edge.
@@ -50,3 +51,13 @@ The extension passes 96 dependency-free regressions (1,373 assertions). Real bro
 Select **Light Shadows → Beta** in settings. Beta is opt-in and saved per device; Low remains the default. It doubles Ultra's maximum mask resolution and sample density, raises source/caster budgets, and retains full-range geometric casts and the 24 MiB cache ceiling. High remains the captured-humanoid-silhouette mode. Beta uses hulls, as Ultra does. This is a higher-cost quality experiment, not a new 3D lighting model.
 
 The renderer draws scene artwork once and accumulates per-source contributions into a Canvas 2D light layer, using darkness removal and additive colour. Each source has its own shadow mask and cached visibility. It is 2D light compositing, neither a full scene redraw per lamp nor a deferred G-buffer renderer.
+
+## Experimental Gamma: High with a tiled GPU resolve
+
+Select **Light Shadows → GAMMA (EXPERIMENTAL)**. Gamma copies High's budgets, 120 px nominal cast reach, mask density/resolution and humanoid silhouette capture policy. It changes light compositing rather than caster shape quality.
+
+High's cached shadowed hole/colour sprites are uploaded to a bounded, padded atlas. Screen tiles (32 px) list only overlapping contributions. One fullscreen WebGL2 draw evaluates those lists, multiplies hole transmission, applies the room veil and adds coloured light. There is no scene redraw for each light. Static/unshadowed and special light paths remain Canvas inputs to the resolve. Shadow preparation, uploads, the existing optional soft blur and final scene compositing remain separate work: “one pass” means one GPU lighting resolve, not one draw for the whole frame or GPU-generated shadow maps. This is a 2D deferred-style resolve, without a depth/normal/material G-buffer.
+
+Stable sprites stay resident and changing sprites alone are refreshed. At most 96 contributions enter the resolve; atlas or transform limits leave that contribution on its normal High path. The usual 24 MiB CPU mask budget still applies. The GPU atlas adds approximately 24.4 MiB on typical devices, plus three light-layer textures and the output surface. WebGL2 absence, context loss or GPU errors use High compositing. Map/quality switches release atlas source references. Low stays the default; Gamma persists per device.
+
+Real Chromium fixtures verify one GPU draw, overlapping light conservation, room veil ordering, matching High within small 8-bit rounding differences, zero warm mask uploads and unavailable-WebGL fallback. An apartment frame also resolves in one draw with cached source masks. Results are in `gamma-browser-checks.json`. These are correctness/cache checks, not evidence of improved frame rate: Canvas-to-GPU uploads/readback and the light-layer size can offset batching gains, especially on software GPUs. `GammaShadows.stats` exposes backend, draw/upload/contribution counts and maximum contributions per tile.

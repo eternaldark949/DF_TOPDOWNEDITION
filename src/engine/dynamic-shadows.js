@@ -9,6 +9,7 @@
             high: { maxSources: 48, otherLights: 8, maxLights: 16, perLight: 24, density: 0.5, side: 256, reach: 120 },
             ultra: { maxSources: 80, otherLights: 12, maxLights: 32, perLight: 32, density: 0.5, side: 256, reach: Infinity },
             // Opt-in beta: twice Ultra's raster resolution, expanded coverage; same memory ceiling.
+            gamma: { maxSources: 48, otherLights: 8, maxLights: 16, perLight: 24, density: 0.5, side: 256, reach: 120 },
             beta: { maxSources: 128, otherLights: 20, maxLights: 48, perLight: 48, density: 1, side: 512, reach: Infinity }
         };
         const DynamicShadows = {
@@ -19,6 +20,7 @@
             stats: { casters: 0, pairs: 0, blocked: 0, rays: 0, builds: 0, hits: 0, dropped: 0, captures: 0, sources: 0, doors: 0 },
 
             clear() {
+                GammaShadows.reset();
                 this.entries = new WeakMap(); this.keeps = new WeakMap(); this.sources = new WeakMap(); this.doorLeaves = new WeakMap();
                 this.lights.clear(); this.cells.clear(); this.geometry.clear(); this.wallRefs.clear(); this.wallRevision++;
                 this.casters.length = 0; this.bytes = 0; this.revision++;
@@ -143,7 +145,7 @@
             },
             reachable(light, x, y, ignoreDoor) { return this._staticReachable(light, x, y) && !this._doorBlocked(light, x, y, ignoreDoor); },
             wantsSilhouette(e, config) {
-                if (this.quality !== 'high' || config._crowdBake || config.isDriving || config.noShadow || e._reflectionProxy || _zoomLOD >= 2 || !this.map || !this.visible) return false;
+                if ((this.quality !== 'high' && this.quality !== 'gamma') || config._crowdBake || config.isDriving || config.noShadow || e._reflectionProxy || _zoomLOD >= 2 || !this.map || !this.visible) return false;
                 if (this._captureCount >= DYNAMIC_SHADOW.MAX_CAPTURES) return false;
                 const key = JSON.stringify([config.body, config.hair, config.top, config.bottom, config.shoes, config.hat, config.weapon, config.pose, config.stance]);
                 const keep = this.keeps.get(e), moving = e._gait && e._gait.speed > CONFIG.GAIT.STOP_SPEED;
@@ -354,6 +356,7 @@
             drawLight(ctx, light, mode) {
                 const s = this.prepare(light);
                 if (!s) return false;
+                if (GammaShadows.collect(ctx, s, mode)) return true;
                 ctx.drawImage(s[mode], s.x, s.y, s.w, s.h);
                 return true;
             }

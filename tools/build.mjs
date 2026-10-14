@@ -102,6 +102,7 @@ const SCRIPTS = [
     'ui/cloth.js',
     'ui/wardrobe.js',
     'ui/weapon-models.js',
+    'engine/gamma-shadows.js',
     'engine/dynamic-shadows.js',
     'ui/humanoid-render.js',
     'ui/crowd-impostors.js',

@@ -418,6 +418,7 @@
                 
                 // 1. CLEAR BUFFER
                 lc.clearRect(0, 0, lw, lh);
+                GammaShadows.begin(lc);
                 lc.save();
                 lc.scale(LS, LS);
             
@@ -611,7 +612,8 @@
                 if (this.activeMap.id === 'moon_city_nightclub') this.clubLightLayer(lc, 'hole');   // the dance floor, through the dark
 
                 // Rooms she isn't in: the veil dims their pools of light (their glow stays, below)
-                if (rsOn && ambient >= 0.5) { lc.globalCompositeOperation = 'source-over'; rs.drawVeil(lc, 1); }
+                if (GammaShadows.active) GammaShadows.split(lc, rsOn && ambient >= 0.5 ? g => rs.drawVeil(g, 1) : null);
+                else if (rsOn && ambient >= 0.5) { lc.globalCompositeOperation = 'source-over'; rs.drawVeil(lc, 1); }
 
                 // 6. COLOR PASS (Lighter Blend)
                 lc.globalCompositeOperation = 'lighter'; 
@@ -694,6 +696,8 @@
                     }
                 }
                 lc.globalAlpha = 1;
+
+                GammaShadows.finish(lc);
 
                 // Lamp contributions already include dynamic occlusion. Other lamps,
                 // headlights and transient lights can illuminate their shadows.

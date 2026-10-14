@@ -77,8 +77,47 @@ const { chromium } = require('playwright');
     assert.ok(extended.inCone.alpha > extended.outsideCone.alpha + 20, 'headlight caster darkens the beam only when inside its cone');
     assert.ok(extended.inCone.paired === 1 && extended.outsideCone.paired === 0, 'emitter is excluded and off-axis casters are filtered');
     assert.ok(extended.inCone.bytes < 100000, 'tight beam bounds and shared hole/color bitmap limit storage');
+    const gamma = await page.evaluate(() => {
+      game.running=false;_zoomLOD=0;
+      const lamps=[{x:100,y:100,radius:180,color:'#ff9d60'},{x:270,y:90,radius:170,color:'#60aaff'}];
+      const model={activeMap:{width:400,height:240,walls:[],buildings:[]},lamps,roomSystem:{active:false},getAmbientDarkness:()=>.8};
+      const body={x:180,y:100,angle:0};
+      const render=(quality,veil=false)=>{
+        GameSettings.lampShadows=quality;DynamicShadows.begin(model);DynamicShadows.noteHuman(body);
+        const cv=document.createElement('canvas');cv.width=400;cv.height=240;const c=cv.getContext('2d');GammaShadows.begin(c);
+        c.fillStyle='rgba(22,10,48,.8)';c.fillRect(0,0,400,240);c.globalCompositeOperation='destination-out';
+        for(const lamp of lamps){c.globalAlpha=.8;DynamicShadows.drawLight(c,lamp,'hole');}
+        const paintVeil=g=>{g.fillStyle='rgba(40,15,60,.3)';g.fillRect(150,0,100,240);};
+        if(GammaShadows.active)GammaShadows.split(c,veil?paintVeil:null);else if(veil){c.globalCompositeOperation='source-over';c.globalAlpha=1;paintVeil(c);}
+        c.globalCompositeOperation='lighter';for(const lamp of lamps){c.globalAlpha=.08;DynamicShadows.drawLight(c,lamp,'color');}
+        c.globalAlpha=1;GammaShadows.finish(c);
+        return {data:Array.from(c.getImageData(0,0,400,240).data),stats:{...GammaShadows.stats}};
+      };
+      const compare=veil=>{const high=render('high',veil),gamma=render('gamma',veil);let worst=0,total=0;
+        // Compare premultiplied RGB: transparent pixel readback can magnify rounding differences.
+        for(let i=0;i<high.data.length;i+=4)for(let k=0;k<4;k++){const a=k===3?high.data[i+3]:high.data[i+k]*high.data[i+3]/255,b=k===3?gamma.data[i+3]:gamma.data[i+k]*gamma.data[i+3]/255;const d=Math.abs(a-b);worst=Math.max(worst,d);total+=d;}
+        return {worst,mean:total/high.data.length,stats:gamma.stats,samples:[[20,20],[200,100],[350,200]].map(([x,y])=>({high:high.data.slice((y*400+x)*4,(y*400+x)*4+4),gamma:gamma.data.slice((y*400+x)*4,(y*400+x)*4+4)}))};};
+      const plain=compare(false),veiled=compare(true);render('gamma',true);const warm=render('gamma',true).stats;
+      GammaShadows.failed=true;const fallback=compare(true);GammaShadows.failed=false;
+      const gl=GammaShadows.gl,draw=gl.drawArrays;gl.drawArrays=()=>{throw new Error('simulate GPU failure');};const interrupted=compare(true);gl.drawArrays=draw;GammaShadows.failed=false;
+      return {plain,veiled,warm,fallback,interrupted};
+    });
+    assert.equal(gamma.plain.stats.backend,'webgl2','Gamma must run the real GPU resolve');
+    assert.equal(gamma.plain.stats.draws,1,'all shadowed light contributions resolve in ONE GPU draw');
+    assert.ok(gamma.plain.mean<1 && gamma.veiled.mean<1 && gamma.plain.worst<8 && gamma.veiled.worst<8,'Gamma preserves High pixels and room veil order');
+    assert.equal(gamma.warm.uploads,0,'stationary cached masks stay on the GPU');
+    assert.ok(gamma.interrupted.mean<1 && gamma.interrupted.stats.backend==='high-fallback','GPU failure replays queued contributions without losing lighting');
+    assert.ok(gamma.fallback.mean<1 && gamma.fallback.stats.backend==='high-fallback','unavailable WebGL falls back to High');
+    const scene = await page.evaluate(() => {
+      game.getAmbientDarkness=()=>.8;game._doLoadMap('apt_949');game.bakeStaticLighting();game.worldMinutes=22*60;game.running=true;game.paused=false;
+      GameSettings.adaptiveLighting=false;GameSettings.lampShadows='gamma';
+      for(let i=0;i<3;i++){_frameTime+=100;game.draw();}
+      return {gamma:{...GammaShadows.stats},shadows:{...DynamicShadows.stats}};
+    });
+    assert.equal(scene.gamma.backend,'webgl2','real apartment scene uses Gamma');
+    assert.equal(scene.gamma.draws,1,'real lighting engine runs a single Gamma resolve');
     assert.deepEqual(errors, [], 'no browser runtime errors');
-    console.log(JSON.stringify({ passed: true, pixels: r, extended }, null, 2));
+    console.log(JSON.stringify({ passed: true, pixels: r, extended, gamma, scene }, null, 2));
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));
