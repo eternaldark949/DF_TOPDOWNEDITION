@@ -697,7 +697,7 @@
                 }
                 lc.globalAlpha = 1;
 
-                GammaShadows.finish(lc);
+                const gammaLayer = GammaShadows.finish(lc, { direct: true, soft: GameSettings.softShadows });
 
                 // Lamp contributions already include dynamic occlusion. Other lamps,
                 // headlights and transient lights can illuminate their shadows.
@@ -708,8 +708,8 @@
                 ctx.save();
                 ctx.setTransform(1, 0, 0, 1, 0, 0); 
                 ctx.globalAlpha = finalOpacity;
-                let layer = this.lightCanvas;
-                if (GameSettings.softShadows) {
+                let layer = gammaLayer || this.lightCanvas;
+                if (GameSettings.softShadows && !gammaLayer) {
                     // Soft edges, the same in every browser and no ctx.filter (Safari before 18 has none): a separable
                     // box blur on the half-resolution light layer — three whole-pixel shifts across, then three down,
                     // each a third, added up. Six plain copies of a small canvas.
@@ -730,7 +730,7 @@
                     layer = src;
                 }
                 ctx.imageSmoothingEnabled = true;
-                if (layer === this.lightCanvas) ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
+                if (layer === this.lightCanvas || (gammaLayer && !GameSettings.softShadows)) ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
                 else ctx.drawImage(layer, 1, 1, lw - 2, lh - 2, 0, 0, this.canvas.width, this.canvas.height);   // the blur's outer pixel is half-covered: crop it
                 
                 // 8. NV SIGNAL BOOST

@@ -15,6 +15,13 @@ const { chromium } = require('playwright');
     const page = await browser.newPage(), errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    const automatic = await page.evaluate(() => {
+      GameSettings.lampShadows='gamma';
+      const cv=document.createElement('canvas');const active=GammaShadows.begin(cv.getContext('2d'));
+      const result={software:GammaShadows.software,active,stats:{...GammaShadows.stats}};
+      GammaShadows.forceGPU=true;return result;
+    });
+    if(automatic.software){assert.equal(automatic.active,false,'known software GPUs use High');assert.equal(automatic.stats.reason,'software-gpu');}
     const r = await page.evaluate(() => {
       game.running = false; _zoomLOD = 0; GameSettings.lampShadows = 'high';
       const left = { x: 120, y: 150, radius: 240, color: '#fff' }, right = { x: 400, y: 150, radius: 240, color: '#fff' };
@@ -65,7 +72,8 @@ const { chromium } = require('playwright');
         DynamicShadows.begin(game); DynamicShadows.noteVehicle(owner); DynamicShadows.noteHuman({ x: 220, y: casterY, angle: 0 });
         const cv = document.createElement('canvas'); cv.width = 600; cv.height = 350;
         const c = cv.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, 600, 350); c.globalCompositeOperation = 'destination-out';
-        game.lightCtx = c; game._drawBeam(beam);
+        const previousCtx=game.lightCtx;game.lightCtx = c;
+        try {game._drawBeam(beam);} finally {game.lightCtx=previousCtx;}
         const source = DynamicShadows.sources.get(owner).get('headlight'), state = DynamicShadows.lights.get(source);
         return { alpha: c.getImageData(320, 150, 1, 1).data[3], bytes: state ? state.bytes : 0, paired: DynamicShadows.stats.pairs };
       };
@@ -82,7 +90,7 @@ const { chromium } = require('playwright');
       const lamps=[{x:100,y:100,radius:180,color:'#ff9d60'},{x:270,y:90,radius:170,color:'#60aaff'}];
       const model={activeMap:{width:400,height:240,walls:[],buildings:[]},lamps,roomSystem:{active:false},getAmbientDarkness:()=>.8};
       const body={x:180,y:100,angle:0};
-      const render=(quality,veil=false)=>{
+      const render=(quality,veil=false,soft=false,direct=false)=>{
         GameSettings.lampShadows=quality;DynamicShadows.begin(model);DynamicShadows.noteHuman(body);
         const cv=document.createElement('canvas');cv.width=400;cv.height=240;const c=cv.getContext('2d');GammaShadows.begin(c);
         c.fillStyle='rgba(22,10,48,.8)';c.fillRect(0,0,400,240);c.globalCompositeOperation='destination-out';
@@ -90,24 +98,70 @@ const { chromium } = require('playwright');
         const paintVeil=g=>{g.fillStyle='rgba(40,15,60,.3)';g.fillRect(150,0,100,240);};
         if(GammaShadows.active)GammaShadows.split(c,veil?paintVeil:null);else if(veil){c.globalCompositeOperation='source-over';c.globalAlpha=1;paintVeil(c);}
         c.globalCompositeOperation='lighter';for(const lamp of lamps){c.globalAlpha=.08;DynamicShadows.drawLight(c,lamp,'color');}
-        c.globalAlpha=1;GammaShadows.finish(c);
+        c.globalAlpha=1;const gpu=GammaShadows.finish(c,{direct,soft});
+        if(gpu){c.globalCompositeOperation='copy';c.drawImage(gpu,0,0);}
+        else if(soft){
+          let src=cv;
+          for(let pass=0;pass<2;pass++){
+            const out=document.createElement('canvas');out.width=400;out.height=240;const g=out.getContext('2d');
+            g.globalCompositeOperation='copy';g.globalAlpha=1/3;g.drawImage(src,0,0);g.globalCompositeOperation='lighter';
+            g.drawImage(src,pass===0?-1:0,pass===1?-1:0);g.drawImage(src,pass===0?1:0,pass===1?1:0);src=out;
+          }
+          c.globalCompositeOperation='copy';c.drawImage(src,0,0);
+        }
         return {data:Array.from(c.getImageData(0,0,400,240).data),stats:{...GammaShadows.stats}};
       };
-      const compare=veil=>{const high=render('high',veil),gamma=render('gamma',veil);let worst=0,total=0;
+      const compare=(veil,soft=false,direct=false)=>{const high=render('high',veil,soft,direct),gamma=render('gamma',veil,soft,direct);let worst=0,total=0;
         // Compare premultiplied RGB: transparent pixel readback can magnify rounding differences.
         for(let i=0;i<high.data.length;i+=4)for(let k=0;k<4;k++){const a=k===3?high.data[i+3]:high.data[i+k]*high.data[i+3]/255,b=k===3?gamma.data[i+3]:gamma.data[i+k]*gamma.data[i+3]/255;const d=Math.abs(a-b);worst=Math.max(worst,d);total+=d;}
         return {worst,mean:total/high.data.length,stats:gamma.stats,samples:[[20,20],[200,100],[350,200]].map(([x,y])=>({high:high.data.slice((y*400+x)*4,(y*400+x)*4+4),gamma:gamma.data.slice((y*400+x)*4,(y*400+x)*4+4)}))};};
-      const plain=compare(false),veiled=compare(true);render('gamma',true);const warm=render('gamma',true).stats;
+      const plain=compare(false),veiled=compare(true),direct=compare(true,false,true),soft=compare(true,true,true);render('gamma',true);const warm=render('gamma',true).stats;
       GammaShadows.failed=true;const fallback=compare(true);GammaShadows.failed=false;
       const gl=GammaShadows.gl,draw=gl.drawArrays;gl.drawArrays=()=>{throw new Error('simulate GPU failure');};const interrupted=compare(true);gl.drawArrays=draw;GammaShadows.failed=false;
-      return {plain,veiled,warm,fallback,interrupted};
+      return {plain,veiled,direct,soft,warm,fallback,interrupted};
     });
     assert.equal(gamma.plain.stats.backend,'webgl2','Gamma must run the real GPU resolve');
-    assert.equal(gamma.plain.stats.draws,1,'all shadowed light contributions resolve in ONE GPU draw');
+    assert.equal(gamma.plain.stats.resolves,1,'all shadowed light contributions resolve in one GPU lighting sequence');
     assert.ok(gamma.plain.mean<1 && gamma.veiled.mean<1 && gamma.plain.worst<8 && gamma.veiled.worst<8,'Gamma preserves High pixels and room veil order');
+    assert.ok(gamma.direct.mean<1 && gamma.soft.mean<2 && gamma.soft.worst<10,'direct output and GPU blur preserve premultiplied High pixels including edges');
+    assert.equal(gamma.soft.stats.blurPasses,2,'soft Gamma uses two GPU blur passes');
+    assert.equal(gamma.plain.stats.layerUploads,2,'no room veil uploads when absent');
+    assert.equal(gamma.veiled.stats.layerUploads,3,'profiler counts all Canvas layer uploads');
     assert.equal(gamma.warm.uploads,0,'stationary cached masks stay on the GPU');
     assert.ok(gamma.interrupted.mean<1 && gamma.interrupted.stats.backend==='high-fallback','GPU failure replays queued contributions without losing lighting');
     assert.ok(gamma.fallback.mean<1 && gamma.fallback.stats.backend==='high-fallback','unavailable WebGL falls back to High');
+    const atlas = await page.evaluate(() => {
+      GameSettings.lampShadows='gamma';
+      const cv=document.createElement('canvas');cv.width=128;cv.height=96;const c=cv.getContext('2d');
+      const sprites=Array.from({length:90},(_,i)=>{
+        const light=document.createElement('canvas');light.width=16;light.height=16;
+        const g=light.getContext('2d');g.fillStyle=i%2?'rgba(80,30,10,.03)':'rgba(255,255,255,.05)';g.fillRect(0,0,16,16);
+        return {hole:light,color:light,signature:'stable',x:i%9*12+.25,y:Math.floor(i/9)*8+.5,w:20,h:20};
+      });
+      const render=()=>{
+        GammaShadows.begin(c);c.globalAlpha=1;c.globalCompositeOperation='copy';c.fillStyle='#223344';c.fillRect(0,0,128,96);
+        c.globalCompositeOperation='destination-out'; // fixtures bypass world preparation
+        for(let i=0;i<45;i++)if(!GammaShadows.collect(c,sprites[i],'hole'))throw new Error('unexpected atlas fallback');
+        GammaShadows.split(c,null);
+        for(let i=45;i<90;i++)if(!GammaShadows.collect(c,sprites[i],'color'))throw new Error('unexpected atlas fallback');
+        GammaShadows.finish(c,{direct:true,soft:true});return {...GammaShadows.stats};
+      };
+      const cold=render(),warm=render();sprites[70].signature='changed';const changed=render();
+      // A thrown Canvas-to-atlas upload must preserve queued contributions via High.
+      sprites[20].signature='changed';const gl=GammaShadows.gl,upload=gl.texSubImage2D;
+      gl.texSubImage2D=()=>{throw new Error('simulate upload failure');};
+      GammaShadows.begin(c);c.globalCompositeOperation='copy';c.fillRect(0,0,128,96);
+      GammaShadows.collect(c,sprites[0],'hole');const accepted=GammaShadows.collect(c,sprites[20],'hole');
+      GammaShadows.split(c,null);GammaShadows.finish(c);gl.texSubImage2D=upload;
+      const failed={...GammaShadows.stats};GammaShadows.failed=false;
+      return {cold,warm,changed,accepted,failed};
+    });
+    assert.equal(atlas.cold.uploads,90,'atlas fits more than 64 distinct sprites');
+    assert.equal(atlas.warm.uploads,0,'90 resident sprites survive a warm frame');
+    assert.equal(atlas.changed.uploads,1,'only changed sprite uploads');
+    assert.equal(atlas.warm.blurPasses,2,'resized GPU blur targets remain valid');
+    assert.equal(atlas.accepted,false,'failed uploads use normal Canvas drawing');
+    assert.equal(atlas.failed.backend,'high-fallback','upload failure replays queued contributions');
     const scene = await page.evaluate(() => {
       game.getAmbientDarkness=()=>.8;game._doLoadMap('apt_949');game.bakeStaticLighting();game.worldMinutes=22*60;game.running=true;game.paused=false;
       GameSettings.adaptiveLighting=false;GameSettings.lampShadows='gamma';
@@ -115,7 +169,7 @@ const { chromium } = require('playwright');
       return {gamma:{...GammaShadows.stats},shadows:{...DynamicShadows.stats}};
     });
     assert.equal(scene.gamma.backend,'webgl2','real apartment scene uses Gamma');
-    assert.equal(scene.gamma.draws,1,'real lighting engine runs a single Gamma resolve');
+    assert.equal(scene.gamma.resolves,1,'real lighting engine runs a single Gamma resolve');
     const profiler = await page.evaluate(() => {
       GameSettings.profilerMode='full';game.showProfiler=true;DevOverlay.sync(game);DevOverlay._shadowPanel(game);
       const panel=()=>document.querySelector('#dev-prof .dp-shadows').textContent;
@@ -130,8 +184,53 @@ const { chromium } = require('playwright');
     assert.ok(profiler.fallback.includes('High fallback — WebGL2 inactive'),'profiler exposes actual unavailable-WebGL fallback');
     assert.ok(profiler.idle.includes('Gamma idle') && !profiler.idle.includes('WebGL2 active'),'profiler rejects a stale rendering result');
     assert.ok(profiler.high.includes('Canvas 2D') && !profiler.high.includes('GPU resolves'),'High hides obsolete Gamma counters');
+    const sceneParity = await page.evaluate(() => {
+      game.loop=()=>{};game.running=true;game.paused=false;GameSettings.profilerMode='off';game.showProfiler=false;
+      const results=[];
+      for(const map of ['apt_949','moon_city_nightclub']){
+        game._doLoadMap(map);game.bakeStaticLighting();game.worldMinutes=22*60;
+        for(const soft of [false,true]){
+          GameSettings.softShadows=soft;
+          const images=[];
+          for(const mode of ['high','gamma']){
+            GameSettings.lampShadows=mode;game.draw();game.draw();
+            images.push({data:game.ctx.getImageData(0,0,game.canvas.width,game.canvas.height).data,png:game.canvas.toDataURL()});
+          }
+          let total=0,worst=0;
+          for(let i=0;i<images[0].data.length;i++){const d=Math.abs(images[0].data[i]-images[1].data[i]);total+=d;worst=Math.max(worst,d);}
+          results.push({map,soft,mean:total/images[0].data.length,worst,high:images[0].png,gamma:images[1].png,stats:{...GammaShadows.stats}});
+        }
+      }
+      game.running=false;return results;
+    });
+    for(const r of sceneParity){
+      assert.equal(r.stats.backend,'webgl2','scene comparison executes Gamma');
+
+      if(process.env.DFAB_PREVIEW_DIR){
+        fs.mkdirSync(process.env.DFAB_PREVIEW_DIR,{recursive:true});
+        for(const mode of ['high','gamma'])fs.writeFileSync(join(process.env.DFAB_PREVIEW_DIR,`${r.map}-${r.soft?'soft':'sharp'}-${mode}.png`),Buffer.from(r[mode].split(',')[1],'base64'));
+      }
+      delete r.high;delete r.gamma;
+      assert.ok(r.mean<2,`full-scene Gamma matches High: ${r.map}, soft=${r.soft}, mean=${r.mean}`);
+    }
+    const softwareScene = await page.evaluate(() => {
+      if(!GammaShadows.software)return null;
+      GammaShadows.forceGPU=false;GameSettings.lampShadows='gamma';game.running=true;game.draw();
+      const fallback=game.ctx.getImageData(0,0,game.canvas.width,game.canvas.height).data;
+      const stats={...GammaShadows.stats},panel=DevOverlay._shadowLine(game);
+      GameSettings.lampShadows='high';game.draw();
+      const high=game.ctx.getImageData(0,0,game.canvas.width,game.canvas.height).data;
+      let total=0;for(let i=0;i<high.length;i++)total+=Math.abs(high[i]-fallback[i]);
+      game.running=false;return {mean:total/high.length,stats,panel};
+    });
+    if(softwareScene){
+      assert.ok(softwareScene.mean<1,'automatic software fallback preserves full-scene High pixels');
+      assert.equal(softwareScene.stats.reason,'software-gpu');
+      assert.equal(softwareScene.stats.draws,0,'software fallback does not execute GPU draws');
+      assert.ok(softwareScene.panel.includes('High fallback — software GPU'),'profiler names software fallback');
+    }
     assert.deepEqual(errors, [], 'no browser runtime errors');
-    console.log(JSON.stringify({ passed: true, pixels: r, extended, gamma, scene, profiler }, null, 2));
+    console.log(JSON.stringify({ passed: true, pixels: r, extended, gamma, atlas, scene, profiler, sceneParity, automatic, softwareScene }, null, 2));
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

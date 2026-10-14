@@ -52,16 +52,51 @@ Select **Light Shadows → Beta** in settings. Beta is opt-in and saved per devi
 
 The renderer draws scene artwork once and accumulates per-source contributions into a Canvas 2D light layer, using darkness removal and additive colour. Each source has its own shadow mask and cached visibility. It is 2D light compositing, neither a full scene redraw per lamp nor a deferred G-buffer renderer.
 
-## Experimental Gamma: High with a tiled GPU resolve
+## Experimental Gamma: batched GPU lighting and blur
 
-Select **Light Shadows → GAMMA (EXPERIMENTAL)**. Gamma copies High's budgets, 120 px nominal cast reach, mask density/resolution and humanoid silhouette capture policy. It changes light compositing rather than caster shape quality.
+Select **Light Shadows → GAMMA (EXPERIMENTAL)**. Gamma retains High's source/caster budgets, 120 px nominal cast reach, mask density/resolution and humanoid silhouette capture policy. It changes compositing, not shadow shape quality.
 
-High's cached shadowed hole/colour sprites are uploaded to a bounded, padded atlas. Screen tiles (32 px) list only overlapping contributions. One fullscreen WebGL2 draw evaluates those lists, multiplies hole transmission, applies the room veil and adds coloured light. There is no scene redraw for each light. Static/unshadowed and special light paths remain Canvas inputs to the resolve. Shadow preparation, uploads, the existing optional soft blur and final scene compositing remain separate work: “one pass” means one GPU lighting resolve, not one draw for the whole frame or GPU-generated shadow maps. This is a 2D deferred-style resolve, without a depth/normal/material G-buffer.
+The original tiled fullscreen shader has been replaced by two instanced sprite batches. Hardware blending removes darkness with `ZERO / ONE_MINUS_SRC_ALPHA`, then applies the room veil with source-over, and adds colour with `ONE / ONE`. Only the rectangular footprint of each light is shaded; there is no per-pixel tile-list loop or CPU tile-list construction/upload. Normal scenes use five GPU draws, rather than one much heavier draw. A missing room veil saves a fullscreen draw and its upload.
 
-Stable sprites stay resident and changing sprites alone are refreshed. At most 96 contributions enter the resolve; atlas or transform limits leave that contribution on its normal High path. The usual 24 MiB CPU mask budget still applies. The GPU atlas adds approximately 24.4 MiB on typical devices, plus three light-layer textures and the output surface. WebGL2 absence, context loss or GPU errors use High compositing. Map/quality switches release atlas source references. Low stays the default; Gamma persists per device.
+Soft lighting uses two separable three-tap GPU blur passes at the existing half resolution. The game draws the WebGL output directly into the scene canvas, using the same crop/upscale as High. This removes the intermediate copy back into the Canvas light layer and six Canvas blur copies. The standalone `finish(ctx)` API still supports a Canvas result for pixel tests and callers that need it. The WebGL drawing buffer is not preserved across presentation; the game consumes it synchronously in the same draw call.
 
-Real Chromium fixtures verify one GPU draw, overlapping light conservation, room veil ordering, matching High within small 8-bit rounding differences, zero warm mask uploads and unavailable-WebGL fallback. An apartment frame also resolves in one draw with cached source masks. Results are in `gamma-browser-checks.json`. These are correctness/cache checks, not evidence of improved frame rate: Canvas-to-GPU uploads/readback and the light-layer size can offset batching gains, especially on software GPUs. `GammaShadows.stats` exposes backend, draw/upload/contribution counts and maximum contributions per tile.
+High's cached shadowed sprites remain in a padded atlas. It now actually holds up to 96 distinct sprites (the earlier square allocation stopped at 64), with unused-slot/LRU eviction that protects this frame's queued draws. Stationary sprites stay resident and changing sprites alone are refreshed. The usual 24 MiB CPU cache budget applies. The atlas adds about 24.4 MiB on typical devices; soft mode also allocates two light-sized RGBA8 targets. Quality/map switches release source references.
+
+Static/unshadowed/special lighting inputs remain Canvas 2D. Two full light-layer textures still upload every frame, or three when a room veil is present. Shadow preparation and final scene composition remain separate work. This is a hybrid renderer, not GPU-generated shadow maps or a depth/normal/material G-buffer. Known software GPUs (SwiftShader/llvmpipe/softpipe/lavapipe), WebGL2 absence, context loss, upload failure or interrupted GPU execution retain the High path and replay queued contributions.
+
+### Validation
+
+`tools/test-dynamic-shadows-browser.cjs` checks real Chromium pixels for independent lights, room veil ordering, direct GPU output, GPU blur including edge pixels, warm atlas reuse with 90 distinct sprites, single-sprite invalidation, resize, upload/resolve failures, and full apartment/nightclub scenes. The headlight fixture now restores the game's original light context; previously the scene checks rendered into that fixture's detached canvas.
+
+Results are in `gamma-batched-browser-checks.json`. The automatic software-GPU fallback also matches the full High scene (mean difference below 1/255) and executes zero GPU draws. Mean full-scene channel differences versus High are below 0.6/255 with sharp lighting and below 1.6/255 with soft lighting. Small differences are expected from 8-bit blending/blur rounding and sprite edge rasterization. All 98 game regressions pass (1,379 assertions), and the offline build is rebuilt and checked.
+
+| High soft lighting | Gamma GPU soft lighting |
+|---|---|
+| ![High apartment](apt_949-soft-high.png) | ![Gamma apartment](apt_949-soft-gamma.png) |
+| ![High nightclub](moon_city_nightclub-soft-high.png) | ![Gamma nightclub](moon_city_nightclub-soft-gamma.png) |
+
+### Performance experiment
+
+`node tools/benchmark-gamma.cjs [path-to-game.html]` compares High/Gamma in the apartment and nightclub at a 1280 × 720 viewport, with sharp/soft lighting and stationary/moving-player fixtures. Adaptive lighting is disabled. Each of three rounds uses 15 warmups and 30 samples; mode order alternates between rounds. Draw submission and completion are reported separately. Completion forces a one-pixel scene readback to avoid mistaking queued GPU commands for completed rendering; this introduces synchronization and changes Canvas behavior, so these values are not gameplay FPS predictions.
+
+The workspace uses ANGLE/Vulkan SwiftShader, a software GPU. Original/new raw results and comparisons are recorded alongside this document. The benchmark explicitly sets `GammaShadows.forceGPU = true` to measure WebGL on software GPUs; normal Gamma selects High automatically on those backends. Developer pixel checks also force WebGL after testing this automatic fallback. Runs are exploratory, not a claim that Gamma beats High on hardware GPUs. The remaining Canvas input uploads and shadow preparation still need device profiling.
+
+Median completed-frame milliseconds (median of three round medians):
+
+| Scene | Lighting | Player | Original Gamma | Batched Gamma | Current High |
+|---|---|---|---:|---:|---:|
+| Apartment | Sharp | Stationary | 355.8 | 261.2 | 69.3 |
+| Apartment | Sharp | Moving | 363.8 | 260.8 | 75.0 |
+| Apartment | Soft | Stationary | 173.4 | 92.0 | 31.9 |
+| Apartment | Soft | Moving | 186.8 | 96.3 | 36.7 |
+| Nightclub | Sharp | Stationary | 381.7 | 193.5 | 53.3 |
+| Nightclub | Sharp | Moving | 392.7 | 209.2 | 57.5 |
+| Nightclub | Soft | Stationary | 125.8 | 87.3 | 33.6 |
+| Nightclub | Soft | Moving | 81.7 | 83.1 | 37.8 |
+
+Most cases reduce Gamma cost by 27–49%; the moving/soft nightclub case is effectively unchanged. High remains faster on this software GPU, which is why the normal renderer falls back there. High timings also vary between runs (especially the nightclub); geometry/setup variance and concurrent validation work make this an exploratory comparison. Raw data: `gamma-original-benchmark.json`, `gamma-batched-benchmark.json`, and `gamma-benchmark-comparison.json`.
+
 
 ### Profiler status
 
-Settings → Developer → Profiler → Full shows a **Shadow renderer** section. Gamma reports **WebGL2 active**, **High fallback — WebGL2 inactive**, or **Gamma idle — no lighting pass**, plus resolves/frame, contributions, mask uploads/frame and maximum contributions per tile. It reads existing counters every 15 profiler frames without probing or timing the GPU. Zero uploads is normal for cached masks. Frame stamps prevent an earlier successful pass from being shown as active during an unlit frame. Other shadow modes show Canvas 2D or Shadows off.
+Settings → Developer → Profiler → Full reports **WebGL2 active**, **High fallback — WebGL2 inactive**, or **Gamma idle — no lighting pass**, with completed lighting resolves, actual GPU draws, queued contributions, atlas mask uploads, full Canvas layer uploads, and GPU blur passes. Known software GPUs show **High fallback — software GPU**. The panel reads existing counters and does not probe/time the GPU. Zero mask uploads only means cached sprites are resident; layer uploads remain visible. Frame stamps reject stale status on unlit frames.

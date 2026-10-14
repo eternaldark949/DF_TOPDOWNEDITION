@@ -117,15 +117,15 @@
                 const fresh = Number.isFinite(s.frameId) && s.frameId === game._renderDrawId;
                 const status = mode !== 'gamma' ? (mode === 'off' ? 'Shadows off' : 'Canvas 2D')
                     : !fresh ? 'Gamma idle — no lighting pass'
-                    : s.backend === 'webgl2' && s.draws === 1 ? 'WebGL2 active'
-                    : s.backend === 'high-fallback' ? 'High fallback — WebGL2 inactive' : 'Gamma awaiting resolve';
-                const tier = mode !== 'gamma' || !fresh ? 'idle' : s.backend === 'webgl2' && s.draws === 1 ? 'active' : 'fallback';
+                    : s.backend === 'webgl2' && s.resolves === 1 ? 'WebGL2 active'
+                    : s.backend === 'high-fallback' ? (s.reason === 'software-gpu' ? 'High fallback — software GPU' : 'High fallback — WebGL2 inactive') : 'Gamma awaiting resolve';
+                const tier = mode !== 'gamma' || !fresh ? 'idle' : s.backend === 'webgl2' && s.resolves === 1 ? 'active' : 'fallback';
                 let html = `<div class="dp-total"><span>Shadow renderer</span><b>${mode.toUpperCase()}</b></div>`
                     + `<div class="dp-shadow-status" data-state="${tier}">${status}</div>`;
-                if (mode === 'gamma' && fresh) html += `<div class="dp-counts"><span>GPU resolves <b>${s.draws}</b>/frame</span>`
+                if (mode === 'gamma' && fresh) html += `<div class="dp-counts"><span>GPU resolves <b>${s.resolves}</b>/frame</span>`
                     + `<span>contributions <b>${s.contributions}</b></span><span>mask uploads <b>${s.uploads}</b>/frame</span>`
-                    + `<span>max lights/tile <b>${s.tileMax}</b></span></div>`
-                    + '<div class="dp-shadow-note">0 mask uploads is normal when cached. Resolve count excludes shadow preparation and final compositing.</div>';
+                    + `<span>GPU draws <b>${s.draws}</b>/frame</span><span>layer uploads <b>${s.layerUploads}</b>/frame</span><span>GPU blur passes <b>${s.blurPasses}</b></span></div>`
+                    + '<div class="dp-shadow-note">Cached masks can need 0 uploads; Canvas input layers still upload. GPU blur stays on the GPU; scene composition remains Canvas 2D.</div>';
                 return html;
             },
             _shadowPanel(game) {
