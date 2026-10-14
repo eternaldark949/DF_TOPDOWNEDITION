@@ -7,7 +7,9 @@
             MAX_CAPTURES: 16, SILHOUETTE_SIDE: 40,
             low: { maxSources: 24, otherLights: 4, maxLights: 8, perLight: 12, density: 0.25, side: 128, reach: 90 },
             high: { maxSources: 48, otherLights: 8, maxLights: 16, perLight: 24, density: 0.5, side: 256, reach: 120 },
-            ultra: { maxSources: 80, otherLights: 12, maxLights: 32, perLight: 32, density: 0.5, side: 256, reach: Infinity }
+            ultra: { maxSources: 80, otherLights: 12, maxLights: 32, perLight: 32, density: 0.5, side: 256, reach: Infinity },
+            // Opt-in beta: twice Ultra's raster resolution, expanded coverage; same memory ceiling.
+            beta: { maxSources: 128, otherLights: 20, maxLights: 48, perLight: 48, density: 1, side: 512, reach: Infinity }
         };
         const DynamicShadows = {
             map: null, frame: 0, engine: null, quality: 'off', bytes: 0,
@@ -247,7 +249,7 @@
             _cast(g, light, pair, policy) {
                 const e = pair.e, d = pair.d, ang = Math.atan2(e.y - light.y, e.x - light.x);
                 const slope = e.elevation / Math.max(1, (light.elevation ?? 84) - e.elevation);
-                const full = e.fullBlocker || this.quality === 'ultra' || (light.elevation !== undefined && light.elevation <= e.elevation);
+                const full = e.fullBlocker || (this.quality === 'ultra' || this.quality === 'beta') || (light.elevation !== undefined && light.elevation <= e.elevation);
                 const len = Math.min(policy.reach, Math.max(0, light.radius - d), d * slope);
                 const keep = this.quality === 'low' ? null : this.keeps.get(e.entity);
                 g.save(); g.globalAlpha = Math.max(0, Math.min(1, e.opacity));
@@ -279,7 +281,7 @@
                 // from this one cast before unioning it with other casters' masks.
                 g.save(); g.globalAlpha = 1; g.globalCompositeOperation = 'destination-out';
                 const keep = this.quality === 'low' ? null : this.keeps.get(e.entity);
-                if (keep && keep.m && keep.angle === e.angle && this.quality !== 'ultra') {
+                if (keep && keep.m && keep.angle === e.angle && this.quality !== 'ultra' && this.quality !== 'beta') {
                     g.translate(e.x - keep.x, e.y - keep.y);
                     const m = keep.m; g.transform(m.a, m.b, m.c, m.d, m.e, m.f); g.drawImage(keep.cv, 0, 0);
                 } else {

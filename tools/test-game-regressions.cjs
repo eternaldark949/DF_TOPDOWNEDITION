@@ -742,6 +742,25 @@ test('Shared lamp caster shapes, quality budgets, removals and map lifecycle are
   equal(r,{shapes:true,turned:true,limited:true,removed:true,off:true,high:true,ultra:true,reset:true});
 });
 
+test('Experimental Beta shadows raise resolution and coverage without retaining masks on mode switches', env => {
+  const r=value(env, `
+    _zoomLOD=0;
+    const lamp={x:300,y:300,radius:300,color:'#80c0ff'},map={width:700,height:700,walls:[],buildings:[]};
+    const model={activeMap:map,lamps:[lamp],roomSystem:{active:false},getAmbientDarkness:()=>.8};
+    const bodies=Array.from({length:60},(_,i)=>({x:350+i%10,y:300+Math.floor(i/10)*8,radius:3}));
+    const populate=()=>{for(const body of bodies)DynamicShadows.note(body);};
+    GameSettings.lampShadows='ultra';DynamicShadows.begin(model);populate();const ultra=DynamicShadows.prepare(lamp),ultraWidth=ultra.hole.width,ultraPairs=DynamicShadows.stats.pairs;
+    GameSettings.lampShadows='beta';DynamicShadows.begin(model);populate();const beta=DynamicShadows.prepare(lamp);
+    const detail=beta.hole.width===512 && beta.hole.width===ultraWidth*2 && DynamicShadows.stats.pairs===48 && ultraPairs===32;
+    const bounded=DynamicShadows.bytes<=DYNAMIC_SHADOW.MAX_BYTES && beta.bytes===512*512*8;
+    GameSettings.saveDensity();const saved=JSON.parse(localStorage.getItem('dfab_density')).lampShadows==='beta';
+    DynamicShadows.begin(model);populate();DynamicShadows.prepare(lamp);const reused=DynamicShadows.stats.hits===1 && DynamicShadows.stats.builds===0;
+    GameSettings.lampShadows='low';DynamicShadows.begin(model);const cleared=DynamicShadows.bytes===0 && DynamicShadows.lights.size===0;
+    return {detail,bounded,saved,reused,cleared};
+  `);
+  equal(r,{detail:true,bounded:true,saved:true,reused:true,cleared:true});
+});
+
 test('Shared lamp shadows bound light count and reject stale cache fallbacks', env => {
   const r=value(env, `
     _zoomLOD=0;GameSettings.lampShadows='low';

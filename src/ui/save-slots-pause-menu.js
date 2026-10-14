@@ -1103,14 +1103,14 @@
                 const el = document.getElementById(id);
                 if (!el) return;
                 
-                const display = value.toUpperCase();
+                const display = id === 'set-lampshadows' && value === 'beta' ? 'BETA (EXPERIMENTAL)' : value.toUpperCase();
                 el.textContent = display;
                 
                 // Update CSS class for color coding
                 el.className = 'settings-value';
                 if (value === 'low' || value === 'off') el.classList.add('val-low');
                 else if (value === 'medium') el.classList.add('val-medium');
-                else if (value === 'ultra' || value === 'high' || value === 'on') el.classList.add('val-high');
+                else if (value === 'ultra' || value === 'high' || value === 'beta' || value === 'on') el.classList.add('val-high');
                 else if (value === 'none') el.classList.add('val-off');
             }
             
@@ -1142,7 +1142,7 @@
                     this._updateValueEl(el.id, GameSettings.reflections);
                     
                 } else if (key === 'lampShadows') {
-                    const order = ['off', 'low', 'high', 'ultra'];
+                    const order = ['off', 'low', 'high', 'ultra', 'beta'];
                     GameSettings.lampShadows = order[(order.indexOf(GameSettings.lampShadows || 'low') + 1) % order.length];
                     GameSettings.saveDensity();                                    // this device's, like the crowd's detail
                     this._updateValueEl(el.id, GameSettings.lampShadows);

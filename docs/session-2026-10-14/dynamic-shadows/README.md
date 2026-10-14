@@ -14,6 +14,7 @@ The shared engine owns visibility, projection, silhouette captures, bounded cach
 | Low | 24 | 8 | 4 | 12 | 128 px |
 | High | 48 | 16 | 8 | 24 | 256 px |
 | Ultra | 80 | 32 | 12 | 32 | 256 px |
+| Beta (experimental) | 128 | 48 | 20 | 48 | 512 px |
 
 High can capture humanoid silhouettes; other qualities use projected hulls. Ordinary elevated lights use nominal 90 px / 120 px casts on Low / High. Door leaves, Ultra casts and sources below a caster's height can block toward the source's light edge.
 Up to 256 visible casters register per frame, with a 24 MiB cap on lamp-mask caches. Budget exhaustion falls back to the lamp's normal static visibility without applying a stale mask. Stationary pairs reuse visibility and raster masks; moving entities and light sources re-plan only affected contributions. High limits captures to 16 per frame, normally refreshing moving silhouettes every 100 ms and stationary ones every second; facing and appearance changes invalidate them immediately. Cached crowd bodies use geometric fallback instead of forcing a live body capture.
@@ -43,3 +44,9 @@ Before adding doors and the additional source families, one warmed headless Chro
 The expanded scene registered 56 casters and 59 source/caster pairs, reused eight masks, performed zero visibility queries/rebuilds in the sampled stationary frame, and used 1 MiB of mask cache. These are single-machine exploratory timings, not a claim of improved frame rate across devices or moving scenes. The shared pipeline reduced cost with comparable humanoid coverage in this sample; casting from more entities increased total work. Low's budgets keep that expansion bounded. Source test data is in `browser-checks.json`.
 
 The extension passes 96 dependency-free regressions (1,373 assertions). Real browser results are in `extended-browser-checks.json`: closed door shadow alpha 255, swung clear 164, glass 195 and fully retracted 164. A real headlight adapter pairs an in-cone caster and skips an off-axis one, using a 30,000-byte buffer. These fixtures verify rendering behaviour; the earlier timing sample does not benchmark this extension.
+
+## Experimental Beta option
+
+Select **Light Shadows → Beta** in settings. Beta is opt-in and saved per device; Low remains the default. It doubles Ultra's maximum mask resolution and sample density, raises source/caster budgets, and retains full-range geometric casts and the 24 MiB cache ceiling. High remains the captured-humanoid-silhouette mode. Beta uses hulls, as Ultra does. This is a higher-cost quality experiment, not a new 3D lighting model.
+
+The renderer draws scene artwork once and accumulates per-source contributions into a Canvas 2D light layer, using darkness removal and additive colour. Each source has its own shadow mask and cached visibility. It is 2D light compositing, neither a full scene redraw per lamp nor a deferred G-buffer renderer.
