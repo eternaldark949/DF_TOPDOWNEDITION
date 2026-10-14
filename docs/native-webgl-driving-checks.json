@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "environment": "Desktop Chromium SwiftShader",
+  "entered": {
+    "driving": true,
+    "pixels": 4342,
+    "iou": 0.9988497814584771,
+    "paths": 8,
+    "stage": true,
+    "sorted": true,
+    "driverBeforeRoof": true,
+    "sortedDrive": {
+      "visible": true,
+      "correctParent": true,
+      "cameraTracks": true
+    },
+    "broadDrive": {
+      "visible": true,
+      "correctParent": true,
+      "cameraTracks": true
+    },
+    "passengerPaths": 82,
+    "hidden": true,
+    "restored": true,
+    "warmUploads": 0,
+    "warmBakes": 0
+  },
+  "recovery": {
+    "lost": false,
+    "visible": true,
+    "paths": 82
+  },
+  "exited": {
+    "driving": false,
+    "stageHidden": true,
+    "paths": 0,
+    "playerVisible": true,
+    "parent": true
+  }
+}

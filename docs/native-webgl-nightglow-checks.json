@@ -1,0 +1,301 @@
+{
+  "passed": true,
+  "environment": "Chromium SwiftShader; same cafe view, clear/dry weather, 22:00, zoom .9; decorative people/cars omitted",
+  "probeError": 1.403125,
+  "canvas": {
+    "building": {
+      "id": "cozy_cafe",
+      "x": 4715,
+      "y": 1835,
+      "w": 350,
+      "h": 350
+    },
+    "view": {
+      "x": 4890,
+      "y": 2285,
+      "zoom": 0.9,
+      "shakeX": 0,
+      "shakeY": 0
+    },
+    "size": [
+      1280,
+      720
+    ],
+    "grade": "grayscale(0%) contrast(1.35) saturate(1.4) sepia(0.18) brightness(1.1)",
+    "hour": 22,
+    "probes": [
+      [
+        119.53125,
+        87.078125,
+        58.8125
+      ],
+      [
+        152.34375,
+        109.46875,
+        51.109375
+      ],
+      [
+        130.796875,
+        93.6875,
+        54.859375
+      ],
+      [
+        81.203125,
+        57.71875,
+        40.84375
+      ],
+      [
+        78.828125,
+        55.3125,
+        38.40625
+      ]
+    ],
+    "report": null
+  },
+  "webgl": {
+    "building": {
+      "id": "cozy_cafe",
+      "x": 4715,
+      "y": 1835,
+      "w": 350,
+      "h": 350
+    },
+    "view": {
+      "x": 4890,
+      "y": 2285,
+      "zoom": 0.9,
+      "shakeX": 0,
+      "shakeY": 0
+    },
+    "size": [
+      1280,
+      720
+    ],
+    "grade": "grayscale(0%) contrast(1.35) saturate(1.4) sepia(0.18) brightness(1.1)",
+    "hour": 22,
+    "probes": [
+      [
+        122.5,
+        90.78125,
+        60.21875
+      ],
+      [
+        154.125,
+        109.28125,
+        49.8125
+      ],
+      [
+        130.421875,
+        93.15625,
+        52.71875
+      ],
+      [
+        81.703125,
+        57.53125,
+        38.65625
+      ],
+      [
+        78.125,
+        54.65625,
+        35.984375
+      ]
+    ],
+    "report": {
+      "build": "native-webgl-nightglow-v14"
+    }
+  },
+  "checks": {
+    "gradientError": 0.29199799182370445,
+    "traffic": {
+      "calls": 3,
+      "imageBytes": 616,
+      "allocationBytes": 988,
+      "groups": [
+        {
+          "origin": "test-target",
+          "kind": "allocation",
+          "width": 19,
+          "height": 13,
+          "calls": 1,
+          "estimatedBytes": 988
+        },
+        {
+          "origin": "test-art",
+          "kind": "image",
+          "width": 11,
+          "height": 7,
+          "calls": 1,
+          "estimatedBytes": 308
+        },
+        {
+          "origin": "test-art",
+          "kind": "update",
+          "width": 11,
+          "height": 7,
+          "calls": 1,
+          "estimatedBytes": 308
+        }
+      ]
+    },
+    "trafficBounds": {
+      "calls": 140,
+      "imageBytes": 9940,
+      "allocationBytes": 21000,
+      "groups": 66,
+      "summaryCalls": 500,
+      "summaryGroups": 257,
+      "summaryBytes": 2000
+    },
+    "countsMatch": true,
+    "fontsRefreshed": true,
+    "pinned": true,
+    "warm": [
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      }
+    ],
+    "high": {
+      "msaaAllocations": 1,
+      "samples": 4,
+      "textDensity": 2
+    },
+    "roaming": {
+      "calls": 25,
+      "imageBytes": 4074240,
+      "allocationBytes": 10698504,
+      "groups": [
+        {
+          "origin": "building-glow-target",
+          "kind": "allocation",
+          "width": 1395,
+          "height": 835,
+          "calls": 2,
+          "estimatedBytes": 9318600
+        },
+        {
+          "origin": "groundContext",
+          "kind": "image",
+          "width": 512,
+          "height": 512,
+          "calls": 3,
+          "estimatedBytes": 3145728
+        },
+        {
+          "origin": "static-shadow-target",
+          "kind": "allocation",
+          "width": 256,
+          "height": 256,
+          "calls": 2,
+          "estimatedBytes": 524288
+        },
+        {
+          "origin": "static-shadow-target",
+          "kind": "allocation",
+          "width": 170,
+          "height": 170,
+          "calls": 4,
+          "estimatedBytes": 462400
+        },
+        {
+          "origin": "fixture",
+          "kind": "image",
+          "width": 192,
+          "height": 192,
+          "calls": 3,
+          "estimatedBytes": 442368
+        },
+        {
+          "origin": "building-top-gradient",
+          "kind": "allocation",
+          "width": 128,
+          "height": 128,
+          "calls": 6,
+          "estimatedBytes": 393216
+        },
+        {
+          "origin": "authored-label",
+          "kind": "image",
+          "width": 236,
+          "height": 120,
+          "calls": 2,
+          "estimatedBytes": 226560
+        },
+        {
+          "origin": "authored-label",
+          "kind": "image",
+          "width": 232,
+          "height": 120,
+          "calls": 2,
+          "estimatedBytes": 222720
+        },
+        {
+          "origin": "cityGlowContext",
+          "kind": "image",
+          "width": 96,
+          "height": 96,
+          "calls": 1,
+          "estimatedBytes": 36864
+        }
+      ]
+    },
+    "stopped": [
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      }
+    ]
+  }
+}

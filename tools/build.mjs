@@ -18,7 +18,8 @@ import { dirname, join, extname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUTPUT = 'DFAB V8.html';
+const WEBGL = process.argv.includes('--webgl');
+const OUTPUT = WEBGL ? 'DFAB WebGL.html' : 'DFAB V8.html';
 
 const STYLES = [
     'styles/base.css',
@@ -205,7 +206,16 @@ const read = (p) => p === '@assets' ? assetsScript() : readFileSync(join(ROOT, '
 export function build() {
     let html = read('index.html');
     const styles = STYLES.map(read).join('');
-    const scripts = SCRIPTS.map(read).join('');
+    const order = WEBGL ? ['core/native-webgl-storage.js', 'engine/native-webgl-vector.js', ...SCRIPTS.flatMap(p => p === 'engine/game-engine.js'
+        ? ['vendor/pixi-7.4.3.min.js', 'engine/native-webgl.js', 'engine/native-webgl-layers.js', 'engine/native-webgl-details.js', 'engine/native-webgl-world.js', 'engine/native-webgl-crowd.js', 'engine/native-webgl-buildings.js', 'engine/native-webgl-rain.js', 'engine/native-webgl-parity.js', 'engine/native-webgl-surfaces.js', 'engine/native-webgl-reflections.js', 'engine/native-webgl-heat.js', 'engine/native-webgl-presentation.js', p] : [p]), 'app/native-webgl-menu.js'] : SCRIPTS;
+    const scripts = order.map(p => {
+        const source=read(p);
+        if(p==='vendor/pixi-7.4.3.min.js')return `/*\n${read('vendor/pixi-LICENSE.txt')}\n*/\n${source}`;
+        // Application storage uses direct getItem/setItem/removeItem calls.
+        // Leave the namespace adapter, embedded asset data, and vendor code intact.
+        return WEBGL && p!=='core/native-webgl-storage.js' && p!=='@assets' && !p.startsWith('vendor/')
+            ? source.replace(/\blocalStorage(?=\s*\.)/g,'NativeWebGLStorage') : source;
+    }).join('');
     const put = (marker, text) => {
         const tag = `<!-- @${marker} -->\n`;
         if (!html.includes(tag)) throw new Error(`src/index.html is missing ${tag.trim()}`);

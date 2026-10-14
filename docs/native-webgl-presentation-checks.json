@@ -1,0 +1,178 @@
+{
+  "passed": true,
+  "environment": "Chromium SwiftShader; phone performance requires device capture",
+  "camera": {
+    "pan": {
+      "x": 42,
+      "y": -18,
+      "stable": true,
+      "zoom": 1.2
+    },
+    "ahead": {
+      "x": 406.9223492129906,
+      "y": 296.53882539350474,
+      "zoom": 1,
+      "shakeX": 0,
+      "shakeY": 0
+    },
+    "off": {
+      "x": 400,
+      "y": 300,
+      "zoom": 1,
+      "shakeX": 0,
+      "shakeY": 0
+    }
+  },
+  "cues": {
+    "on": {
+      "scope": {
+        "active": true,
+        "far": 336,
+        "steady": 1
+      },
+      "bokeh": 13,
+      "speech": 1,
+      "radar": true,
+      "ringsDropped": 0,
+      "rings": 0,
+      "glass": 7,
+      "paths": 18,
+      "textBytes": 32448,
+      "cpuMs": 14.100000008940697
+    },
+    "off": {
+      "scope": {
+        "active": false
+      },
+      "bokeh": 0,
+      "speech": 0,
+      "radar": false,
+      "ringsDropped": 0,
+      "rings": 0,
+      "glass": 7,
+      "paths": 0,
+      "textBytes": 32448,
+      "cpuMs": 0.30000001192092896
+    },
+    "unchanged": true,
+    "outside": 140,
+    "inside": 0,
+    "warm": [
+      {
+        "bakes": 0,
+        "uploads": 0
+      },
+      {
+        "bakes": 0,
+        "uploads": 0
+      },
+      {
+        "bakes": 0,
+        "uploads": 0
+      },
+      {
+        "bakes": 0,
+        "uploads": 0
+      },
+      {
+        "bakes": 0,
+        "uploads": 0
+      }
+    ],
+    "noCanvasVeil": true,
+    "textEntries": 1
+  },
+  "optics": {
+    "on": {
+      "scope": {
+        "active": false
+      },
+      "bokeh": 13,
+      "speech": 0,
+      "radar": false,
+      "ringsDropped": 4,
+      "rings": 8,
+      "glass": 7,
+      "paths": 0,
+      "textBytes": 32448,
+      "cpuMs": 0.5
+    },
+    "off": {
+      "scope": {
+        "active": false
+      },
+      "bokeh": 13,
+      "speech": 0,
+      "radar": false,
+      "rings": 0,
+      "glass": 0,
+      "paths": 0,
+      "textBytes": 32448,
+      "cpuMs": 0
+    },
+    "unchanged": true,
+    "changed": 3568,
+    "outside": 0,
+    "noCanvasMirage": true
+  },
+  "abilities": {
+    "on": 29,
+    "off": 0
+  },
+  "controls": {
+    "count": 20,
+    "total": 83,
+    "build": "native-webgl-nightglow-v14"
+  },
+  "hud": {
+    "on": true,
+    "off": true,
+    "restored": true
+  },
+  "photo": {
+    "width": 880,
+    "height": 411,
+    "colored": 361680
+  },
+  "reflectionExtras": {
+    "furniture": {
+      "active": true,
+      "quality": "high",
+      "wet": 0,
+      "puddles": 0,
+      "lights": 5,
+      "buildings": 0,
+      "detail": 1,
+      "sharedBodies": 1,
+      "bodyCaptures": 0,
+      "dropped": 8,
+      "maskRefreshes": 1,
+      "props": 8,
+      "foliage": 0,
+      "liveBuildings": 0,
+      "bytes": 1450240,
+      "cpuMs": 18.700000002980232
+    },
+    "propsOff": true,
+    "city": {
+      "active": true,
+      "quality": "high",
+      "wet": 1,
+      "puddles": 9,
+      "lights": 14,
+      "buildings": 2,
+      "detail": 1,
+      "sharedBodies": 1,
+      "bodyCaptures": 0,
+      "dropped": 0,
+      "maskRefreshes": 0,
+      "props": 0,
+      "foliage": 9,
+      "liveBuildings": 1,
+      "bytes": 1450240,
+      "cpuMs": 3.5
+    },
+    "off": true
+  },
+  "recovery": true
+}

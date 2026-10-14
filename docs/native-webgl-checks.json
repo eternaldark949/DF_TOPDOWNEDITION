@@ -1,0 +1,271 @@
+{
+  "passed": true,
+  "movement": {
+    "before": 850,
+    "after": 888,
+    "sx": 440,
+    "sy": 205.5,
+    "point": {
+      "x": 440,
+      "y": 205.5
+    },
+    "roundtrip": {
+      "x": 888,
+      "y": 438.5
+    },
+    "p": {
+      "x": 888,
+      "y": 438.5
+    }
+  },
+  "zoom": {
+    "surface": [
+      640,
+      360
+    ],
+    "renderer": [
+      640,
+      360
+    ],
+    "delta": [
+      0,
+      0
+    ]
+  },
+  "cadence": {
+    "renderer": "native-webgl-apartment",
+    "build": "native-webgl-buildings-v7",
+    "pixiVersion": "7.4.3",
+    "device": {
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+    },
+    "map": "apt_949",
+    "view": {
+      "x": 590,
+      "y": 540,
+      "zoom": 1.08,
+      "shakeX": 0,
+      "shakeY": 0
+    },
+    "settings": {
+      "resolutionScale": 1,
+      "baseZoom": 1,
+      "fpsLimit": 0
+    },
+    "resolution": [
+      640,
+      360
+    ],
+    "lighting": true,
+    "warmFramesRemaining": 0,
+    "animationSummary": {
+      "changedFrames": 0,
+      "geometryMeanMs": 2.2723076924681664,
+      "shadowRefreshFrames": 0,
+      "dynamicRebuilds": 0,
+      "staticRebuilds": 0
+    },
+    "buildingTargetBytes": 0,
+    "crowdTargetBytes": 0,
+    "rain": {
+      "drops": 0,
+      "splashes": 0,
+      "paths": 0,
+      "cpuMs": 0
+    },
+    "world": {
+      "buildingCache": {
+        "hits": 0,
+        "rasterizations": 0,
+        "rasterMs": 0,
+        "livePaths": 0,
+        "fallbacks": 0,
+        "bytes": 0
+      },
+      "timings": {
+        "groundMs": 0,
+        "streetMs": 0,
+        "vehiclesMs": 0,
+        "peopleMs": 0,
+        "buildingsMs": 0.10000000149011612,
+        "markersMs": 0
+      },
+      "crowd": {
+        "hits": 0,
+        "misses": 0,
+        "atlasesBuilt": 0,
+        "spriteBodies": 0,
+        "liveBodies": 0,
+        "entries": 0,
+        "bytes": 0
+      },
+      "buildings": 0,
+      "people": 0,
+      "vehicles": 0,
+      "groundPending": 0,
+      "groundTiles": 0,
+      "paths": 0,
+      "cpuMs": 0.10000000149011612
+    },
+    "textureQuality": "standard",
+    "assetDensities": [
+      1
+    ],
+    "glyphAtlasBytes": 3145728,
+    "qualityReductions": 0,
+    "details": {
+      "decor": {
+        "visible": 0,
+        "paths": 0,
+        "cpuMs": 0
+      },
+      "effects": {
+        "projectiles": 0,
+        "muzzleFlashes": 0,
+        "particles": 0,
+        "casings": 0,
+        "paths": 0,
+        "transientSources": 0,
+        "cpuMs": 0
+      }
+    },
+    "layers": {
+      "floor": true,
+      "backdrop": true,
+      "windows": false,
+      "walls": true,
+      "doors": false,
+      "fixtures": false,
+      "furniture": true,
+      "player": true,
+      "lighting": true,
+      "colorWash": false,
+      "decorLights": false,
+      "wallOcclusion": false,
+      "propShadows": false,
+      "playerShadows": false,
+      "indicators": false,
+      "furnitureHints": false,
+      "contactShadows": false,
+      "roomVeil": false,
+      "nightTint": false,
+      "glows": false,
+      "softShadows": false,
+      "bloom": false,
+      "atmosphere": false,
+      "decorAnimation": false,
+      "characterAnimation": true,
+      "shapeShadows": false,
+      "linens": false,
+      "shadowDetail": false,
+      "projectiles": false,
+      "weaponFx": false,
+      "casings": false,
+      "impactParticles": false,
+      "decals": false,
+      "overlays": false,
+      "transientLights": false,
+      "fxGlow": false,
+      "buildings": false,
+      "people": false,
+      "vehicles": false,
+      "streetDetails": false,
+      "worldMarkers": false,
+      "rainDrops": false,
+      "rainSplashes": false,
+      "crowdSprites": false,
+      "buildingCache": false
+    },
+    "configurationId": 3,
+    "sampleDurationMs": 12250.60000000149,
+    "contextRestores": 0,
+    "capture": null,
+    "player": {
+      "x": 590,
+      "y": 540
+    },
+    "fps": 5.224233915072912,
+    "p95Ms": 279.79999999701977,
+    "stallsOver250Ms": 9,
+    "stallsOver1000Ms": 0,
+    "renderMeanMs": 4.381538461263363,
+    "textureBytes": 25769168,
+    "lightingTargetBytes": 460800,
+    "timing": "CPU render submission and frame cadence; GPU timer unavailable",
+    "shadowCache": {
+      "hits": 0,
+      "rebuilds": 0,
+      "staticRebuilds": 0,
+      "dynamicRebuilds": 0,
+      "dynamicHits": 0,
+      "silhouettePairs": 0,
+      "sources": 21,
+      "pairs": 0
+    },
+    "layerStages": {
+      "sceneLayersMs": 0,
+      "effectsMs": 0,
+      "decorMs": 0,
+      "worldMs": 0.10000000149011612,
+      "lightingMs": 0.7000000029802322,
+      "sceneSubmitMs": 1.1999999955296516
+    },
+    "animation": {
+      "revision": 9,
+      "frozen": false,
+      "changed": false,
+      "paths": 43,
+      "geometryMs": 1.1999999955296516,
+      "rasterSubmitMs": 0,
+      "position": {
+        "x": 590,
+        "y": 540,
+        "angle": 0
+      },
+      "phase": 2.571400188323215,
+      "stance": "idle"
+    },
+    "startup": {
+      "mapBuildMs": 337.6000000014901,
+      "ready": true,
+      "firstFrameCount": 15
+    },
+    "entryTiming": {
+      "pageAgeMs": 2313.5,
+      "stages": {
+        "resetMs": 5.200000002980232,
+        "mapLoadMs": 92.79999999701977,
+        "enterWorldMs": 0.5,
+        "firstDrawMs": 1107.1000000014901
+      },
+      "totalMs": 1205.6000000014901
+    },
+    "initializationMs": 306.29999999701977,
+    "gpu": {
+      "status": "GPU timer unavailable",
+      "pending": 0,
+      "samples": []
+    },
+    "gradientTargetBytes": 458752,
+    "veilTargetBytes": 38236,
+    "characterTargetBytes": 589824,
+    "shadowTextureBytes": 5785824,
+    "limitations": [
+      "City/interior migration; some cinematic passes remain approximate",
+      "Procedural character paths use GPU tessellation; tiny Canvas shadowBlur accents remain approximate",
+      "Furniture shadows use the original geometric footprints",
+      "NPC silhouette casts, window droplets and wet reflections are not migrated; small blur/dash accents remain approximate"
+    ],
+    "frameVerification": {
+      "measuredFrames": 65,
+      "uploads": 0,
+      "bakes": 0
+    }
+  },
+  "contextRestored": {
+    "held": true,
+    "restored": true
+  },
+  "screenshot": "/tmp/dfab-native-webgl-apartment.png"
+}

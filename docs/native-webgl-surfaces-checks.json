@@ -1,0 +1,219 @@
+{
+  "passed": true,
+  "environment": "Desktop Chromium SwiftShader; no phone FPS claim",
+  "pads": {
+    "pads": 1,
+    "labels": 1,
+    "transition": true,
+    "dark": 10938440,
+    "bright": 11484324,
+    "quiet": true,
+    "off": true,
+    "belowPeople": true
+  },
+  "daylight": [
+    {
+      "k": 0,
+      "golden": 0,
+      "overcast": 0,
+      "mean": 0,
+      "max": 0
+    },
+    {
+      "k": 1,
+      "golden": 0,
+      "overcast": 0,
+      "mean": 0.3586018880208333,
+      "max": 1
+    },
+    {
+      "k": 0.6,
+      "golden": 0.8,
+      "overcast": 0.2,
+      "mean": 0.3868408203125,
+      "max": 2
+    },
+    {
+      "k": 0.8,
+      "golden": 0,
+      "overcast": 1,
+      "mean": 0.3735758463541667,
+      "max": 1
+    }
+  ],
+  "glass": {
+    "count": 10,
+    "a": {
+      "alpha": 31928,
+      "hash": 1989032938
+    },
+    "b": {
+      "alpha": 34008,
+      "hash": 4148643153
+    },
+    "shattered": true,
+    "openDoor": true,
+    "off": true,
+    "dry": true
+  },
+  "windows": {
+    "day": {
+      "holes": 6,
+      "color": 5
+    },
+    "off": true,
+    "night": true
+  },
+  "polished": {
+    "active": {
+      "active": true,
+      "quality": "high",
+      "wet": 0,
+      "puddles": 0,
+      "lights": 8,
+      "buildings": 0,
+      "detail": 4,
+      "sharedBodies": 4,
+      "bodyCaptures": 0,
+      "dropped": 0,
+      "maskRefreshes": 1,
+      "props": 0,
+      "foliage": 0,
+      "liveBuildings": 0,
+      "bytes": 1450240,
+      "cpuMs": 108.29999999701977
+    },
+    "floor": 140,
+    "rug": 0,
+    "water": 249,
+    "noDetail": true,
+    "noLight": true,
+    "off": true
+  },
+  "capture": {
+    "captures": 4,
+    "opaque": 1574,
+    "unchanged": true,
+    "settingsOff": true,
+    "medium": true,
+    "ultra": true
+  },
+  "city": {
+    "day": {
+      "pads": 0,
+      "labels": 0,
+      "glass": 0,
+      "roofs": {
+        "count": 42,
+        "dropped": 0,
+        "bytes": 16384
+      },
+      "windowHoles": 0,
+      "windowColor": 0,
+      "cloudPaths": 2,
+      "daylight": {
+        "active": true,
+        "k": 0.8,
+        "golden": 0
+      },
+      "sun": {
+        "active": true,
+        "casters": 60,
+        "rebuilds": 0,
+        "staticRebuilds": 0,
+        "staticHits": 1,
+        "dynamicRebuilds": 0,
+        "staticCasters": 60,
+        "movingCasters": 0,
+        "bytes": 1121408
+      },
+      "reflections": {
+        "active": true,
+        "quality": "high",
+        "wet": 1,
+        "puddles": 9,
+        "lights": 0,
+        "buildings": 0,
+        "detail": 1,
+        "sharedBodies": 1,
+        "bodyCaptures": 0,
+        "dropped": 0,
+        "maskRefreshes": 0,
+        "props": 0,
+        "foliage": 9,
+        "liveBuildings": 0,
+        "bytes": 1087680,
+        "cpuMs": 0.5999999940395355
+      },
+      "cpuMs": 0.7999999970197678
+    },
+    "wet": {
+      "pads": 0,
+      "labels": 0,
+      "glass": 0,
+      "roofs": {
+        "count": 42,
+        "dropped": 0,
+        "bytes": 16384
+      },
+      "windowHoles": 0,
+      "windowColor": 0,
+      "cloudPaths": 0,
+      "daylight": {
+        "active": false,
+        "k": 0,
+        "golden": 0
+      },
+      "sun": {
+        "active": false,
+        "casters": 0,
+        "rebuilds": 0,
+        "staticRebuilds": 0,
+        "staticHits": 0,
+        "dynamicRebuilds": 0,
+        "staticCasters": 0,
+        "movingCasters": 0,
+        "bytes": 0
+      },
+      "reflections": {
+        "active": true,
+        "quality": "high",
+        "wet": 1,
+        "puddles": 9,
+        "lights": 14,
+        "buildings": 2,
+        "detail": 1,
+        "sharedBodies": 1,
+        "bodyCaptures": 0,
+        "dropped": 0,
+        "maskRefreshes": 0,
+        "props": 0,
+        "foliage": 9,
+        "liveBuildings": 1,
+        "bytes": 1450240,
+        "cpuMs": 14.399999991059303
+      },
+      "cpuMs": 14.5
+    },
+    "sunPixels": 6694,
+    "roofPixels": 4096,
+    "roofBatchable": true,
+    "roofOff": true,
+    "uploads": 0,
+    "bakes": 0,
+    "same": true,
+    "layers": 84
+  },
+  "controls": {
+    "changed": 12,
+    "total": 84,
+    "build": "native-webgl-travel-cache-v16"
+  },
+  "recovery": {
+    "lost": false,
+    "active": true,
+    "maskPixels": 40178,
+    "sunPixels": 6694,
+    "roofPixels": 4096
+  }
+}

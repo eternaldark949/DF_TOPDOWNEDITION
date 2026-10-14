@@ -28,14 +28,7 @@
                 ctx.restore();
             },
 
-            drawPlayer() {
-                this.ctx.save(); 
-                this.ctx.translate(this.player.x, this.player.y); 
-                this.ctx.rotate(this.player.angle); 
-                
-                // Stealth/Flit Ghosting
-                if (this.player.isHidden || this.flitState.active) this.ctx.globalAlpha = 0.5;
-            
+            playerRenderConfig() {
                 // ── Fully cosmetics-driven appearance ──
                 const cosmeticConfig = this.cosmetics.getRenderConfig();
                 
@@ -63,8 +56,7 @@
                 const outfit = cosmeticConfig.outfit;
                 const wx = weatherAt(this.player), rainOn = !!(wx && wx.rain > 0.05);
 
-                SilhouetteFX.glow = this._playerGlowOn();   // her halo (ui/silhouette-fx.js; drawn after the light)
-                drawProceduralHumanoid(this.ctx, this.player, {
+                return {
                     skinColor: cosmeticConfig.skinColor,
                     hair: cosmeticConfig.hair,
                     gender: APPEARANCES['949'].gender,
@@ -91,10 +83,15 @@
                     poseWhileMoving: pushing || this.sneaking,
                     // A drawn gun takes the hand; the umbrella waits
                     held: armed && cosmeticConfig.held && cosmeticConfig.held.type === 'umbrella' ? null : (cosmeticConfig.held || outfit.held || null)
-                });
-                SilhouetteFX.glow = false;
-                
-                this.ctx.restore();
+                };
+            },
+
+            drawPlayer() {
+                this.ctx.save();this.ctx.translate(this.player.x,this.player.y);this.ctx.rotate(this.player.angle);
+                if(this.player.isHidden||this.flitState.active)this.ctx.globalAlpha=.5;
+                SilhouetteFX.glow=this._playerGlowOn();
+                drawProceduralHumanoid(this.ctx,this.player,this.playerRenderConfig());
+                SilhouetteFX.glow=false;this.ctx.restore();
             },
 
             /** Whether she wears her halo this frame: Settings → Visibility → Player Glow, on foot and in play, as for her marker. */

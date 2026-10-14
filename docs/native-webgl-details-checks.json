@@ -1,0 +1,120 @@
+{
+  "passed": true,
+  "decor": {
+    "unique": {
+      "apt_fireplace": 64,
+      "apt_craft": 64,
+      "apt_console": 64,
+      "apt_plant": 320,
+      "apt_tub": 64,
+      "apt_telescope": 1
+    },
+    "plan": [
+      {
+        "type": "apt_fireplace",
+        "runs": 1
+      },
+      {
+        "type": "apt_craft",
+        "runs": 2
+      }
+    ],
+    "frozen": true
+  },
+  "quality": [
+    {
+      "mode": "standard",
+      "logical": [
+        216,
+        166
+      ],
+      "pixels": [
+        216,
+        166
+      ],
+      "bytes": 28423376,
+      "playerX": 620,
+      "propX": 411,
+      "propAngle": 0.27,
+      "steady": true
+    },
+    {
+      "mode": "high",
+      "logical": [
+        216,
+        166
+      ],
+      "pixels": [
+        432,
+        332
+      ],
+      "bytes": 111252368,
+      "playerX": 620,
+      "propX": 411,
+      "propAngle": 0.27,
+      "steady": true
+    },
+    {
+      "mode": "auto",
+      "logical": [
+        216,
+        166
+      ],
+      "pixels": [
+        432,
+        332
+      ],
+      "bytes": 59273168,
+      "playerX": 620,
+      "propX": 411,
+      "propAngle": 0.27,
+      "steady": true
+    },
+    {
+      "mode": "standard",
+      "logical": [
+        216,
+        166
+      ],
+      "pixels": [
+        216,
+        166
+      ],
+      "bytes": 28423376,
+      "playerX": 620,
+      "propX": 411,
+      "propAngle": 0.27,
+      "steady": true
+    }
+  ],
+  "fx": {
+    "different": 83223,
+    "atlasViews": 32,
+    "cueNodes": 1,
+    "details": {
+      "decor": {
+        "visible": 2,
+        "paths": 15,
+        "cpuMs": 0.19999999552965164
+      },
+      "effects": {
+        "projectiles": 2,
+        "muzzleFlashes": 1,
+        "particles": 2,
+        "casings": 1,
+        "paths": 17,
+        "transientSources": 3,
+        "cpuMs": 0.20000000298023224
+      }
+    },
+    "uploads": 0
+  },
+  "firing": {
+    "frames": 40,
+    "shots": 8,
+    "maxProjectiles": 3,
+    "maxCasings": 8
+  },
+  "captureQuality": "auto",
+  "contextRecovery": true
+}

@@ -1,0 +1,1031 @@
+{
+  "passed": true,
+  "layers": [
+    {
+      "key": "floor",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "backdrop",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "windows",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "walls",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "doors",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "fixtures",
+      "draws": [
+        9,
+        9,
+        9,
+        9,
+        9
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "furniture",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "player",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "lighting",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "colorWash",
+      "draws": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "decorLights",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "wallOcclusion",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "propShadows",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "playerShadows",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "indicators",
+      "draws": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "furnitureHints",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "contactShadows",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "roomVeil",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "nightTint",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "glows",
+      "draws": [
+        9,
+        9,
+        9,
+        9,
+        9
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "softShadows",
+      "draws": [
+        9,
+        9,
+        9,
+        9,
+        9
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "bloom",
+      "draws": [
+        11,
+        11,
+        11,
+        11,
+        11
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "atmosphere",
+      "draws": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "decorAnimation",
+      "draws": [
+        11,
+        11,
+        11,
+        11,
+        11
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "characterAnimation",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "shapeShadows",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "linens",
+      "draws": [
+        14,
+        14,
+        14,
+        14,
+        14
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "shadowDetail",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "projectiles",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "weaponFx",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "casings",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "impactParticles",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "decals",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "overlays",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "transientLights",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "fxGlow",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "buildings",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "people",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "vehicles",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "streetDetails",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "worldMarkers",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "rainDrops",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "rainSplashes",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "crowdSprites",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "buildingCache",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "full": {
+    "renderer": "native-webgl-apartment",
+    "build": "native-webgl-buildings-v7",
+    "pixiVersion": "7.4.3",
+    "device": {
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+    },
+    "map": "apt_949",
+    "view": {
+      "x": 590,
+      "y": 540,
+      "zoom": 1.08,
+      "shakeX": 0,
+      "shakeY": 0
+    },
+    "settings": {
+      "resolutionScale": 1,
+      "baseZoom": 1,
+      "fpsLimit": 0
+    },
+    "resolution": [
+      880,
+      411
+    ],
+    "lighting": true,
+    "warmFramesRemaining": 0,
+    "animationSummary": {
+      "changedFrames": 0,
+      "geometryMeanMs": 0.9777777791023254,
+      "shadowRefreshFrames": 0,
+      "dynamicRebuilds": 0,
+      "staticRebuilds": 0
+    },
+    "buildingTargetBytes": 0,
+    "crowdTargetBytes": 0,
+    "rain": {
+      "drops": 0,
+      "splashes": 0,
+      "paths": 0,
+      "cpuMs": 0
+    },
+    "world": {
+      "buildingCache": {
+        "hits": 0,
+        "rasterizations": 0,
+        "rasterMs": 0,
+        "livePaths": 0,
+        "fallbacks": 0,
+        "bytes": 0
+      },
+      "timings": {
+        "groundMs": 0,
+        "streetMs": 0,
+        "vehiclesMs": 0,
+        "peopleMs": 0,
+        "buildingsMs": 0,
+        "markersMs": 0
+      },
+      "crowd": {
+        "hits": 0,
+        "misses": 0,
+        "atlasesBuilt": 0,
+        "spriteBodies": 0,
+        "liveBodies": 0,
+        "entries": 0,
+        "bytes": 0
+      },
+      "buildings": 0,
+      "people": 0,
+      "vehicles": 0,
+      "groundPending": 0,
+      "groundTiles": 0,
+      "paths": 0,
+      "cpuMs": 0
+    },
+    "textureQuality": "standard",
+    "assetDensities": [
+      1
+    ],
+    "glyphAtlasBytes": 3145728,
+    "qualityReductions": 0,
+    "details": {
+      "decor": {
+        "visible": 3,
+        "paths": 17,
+        "cpuMs": 0.29999999701976776
+      },
+      "effects": {
+        "projectiles": 0,
+        "muzzleFlashes": 0,
+        "particles": 0,
+        "casings": 0,
+        "paths": 0,
+        "transientSources": 0,
+        "cpuMs": 0.10000000149011612
+      }
+    },
+    "layers": {
+      "floor": true,
+      "backdrop": true,
+      "windows": true,
+      "walls": true,
+      "doors": true,
+      "fixtures": true,
+      "furniture": true,
+      "player": true,
+      "lighting": true,
+      "colorWash": true,
+      "decorLights": true,
+      "wallOcclusion": true,
+      "propShadows": true,
+      "playerShadows": true,
+      "indicators": true,
+      "furnitureHints": true,
+      "contactShadows": true,
+      "roomVeil": true,
+      "nightTint": true,
+      "glows": true,
+      "softShadows": true,
+      "bloom": true,
+      "atmosphere": true,
+      "decorAnimation": true,
+      "characterAnimation": true,
+      "shapeShadows": true,
+      "linens": true,
+      "shadowDetail": true,
+      "projectiles": true,
+      "weaponFx": true,
+      "casings": true,
+      "impactParticles": true,
+      "decals": true,
+      "overlays": true,
+      "transientLights": true,
+      "fxGlow": true,
+      "buildings": true,
+      "people": true,
+      "vehicles": true,
+      "streetDetails": true,
+      "worldMarkers": true,
+      "rainDrops": true,
+      "rainSplashes": true,
+      "crowdSprites": true,
+      "buildingCache": true
+    },
+    "configurationId": 92,
+    "sampleDurationMs": 3871.5,
+    "contextRestores": 0,
+    "capture": null,
+    "player": {
+      "x": 590,
+      "y": 540
+    },
+    "fps": 2.0663825390675448,
+    "p95Ms": 595.4000000059605,
+    "stallsOver250Ms": 8,
+    "stallsOver1000Ms": 0,
+    "renderMeanMs": 467.0888888902134,
+    "textureBytes": 27833552,
+    "lightingTargetBytes": 725120,
+    "timing": "CPU render submission and frame cadence; GPU timer unavailable",
+    "shadowCache": {
+      "hits": 36,
+      "rebuilds": 0,
+      "staticRebuilds": 0,
+      "dynamicRebuilds": 0,
+      "dynamicHits": 7,
+      "silhouettePairs": 7,
+      "sources": 36,
+      "pairs": 0
+    },
+    "layerStages": {
+      "sceneLayersMs": 5.200000002980232,
+      "effectsMs": 0.10000000149011612,
+      "decorMs": 0.29999999701976776,
+      "worldMs": 0,
+      "lightingMs": 114.69999999552965,
+      "sceneSubmitMs": 212.30000000447035
+    },
+    "animation": {
+      "revision": 2,
+      "frozen": false,
+      "changed": false,
+      "paths": 43,
+      "geometryMs": 1.1000000014901161,
+      "rasterSubmitMs": 0,
+      "position": {
+        "x": 590,
+        "y": 540,
+        "angle": -0.7
+      },
+      "phase": 0,
+      "stance": "idle"
+    },
+    "startup": {
+      "mapBuildMs": 114.19999999552965,
+      "ready": true,
+      "firstFrameCount": 15
+    },
+    "entryTiming": {
+      "pageAgeMs": 989.3999999985099,
+      "stages": {
+        "resetMs": 3.6999999955296516,
+        "mapLoadMs": 26.5,
+        "enterWorldMs": 0.4000000059604645,
+        "firstDrawMs": 425.8999999985099
+      },
+      "totalMs": 456.5
+    },
+    "initializationMs": 109.59999999403954,
+    "gpu": {
+      "status": "GPU timer unavailable",
+      "pending": 0,
+      "samples": []
+    },
+    "gradientTargetBytes": 458752,
+    "veilTargetBytes": 38236,
+    "characterTargetBytes": 589824,
+    "shadowTextureBytes": 9008064,
+    "limitations": [
+      "City/interior migration; some cinematic passes remain approximate",
+      "Procedural character paths use GPU tessellation; tiny Canvas shadowBlur accents remain approximate",
+      "Furniture shadows use the original geometric footprints",
+      "NPC silhouette casts, window droplets and wet reflections are not migrated; small blur/dash accents remain approximate"
+    ],
+    "frameVerification": {
+      "measuredFrames": 9,
+      "uploads": 0,
+      "bakes": 0
+    }
+  },
+  "shadow": {
+    "wallCheck": {
+      "before": 186,
+      "behind": 0
+    },
+    "finite": {
+      "unshadowed": 168,
+      "shadow": 26,
+      "body": 203,
+      "beyond": 115
+    },
+    "cached": true,
+    "otherAlpha": 186
+  },
+  "controls": {
+    "checked": true,
+    "bloom": false,
+    "frames": 0
+  },
+  "recording": {
+    "immutable": true,
+    "canceled": true
+  },
+  "recordedFrames": 2
+}

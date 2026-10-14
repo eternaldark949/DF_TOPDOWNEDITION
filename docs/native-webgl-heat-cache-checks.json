@@ -1,0 +1,121 @@
+{
+  "passed": true,
+  "environment": "Chromium SwiftShader; phone frame time requires device capture",
+  "heat": {
+    "nativeCanvasCaptures": 0,
+    "first": {
+      "active": true,
+      "strength": 1,
+      "bodies": 2,
+      "forcedCaptures": 2,
+      "dropped": 0
+    },
+    "on": 2,
+    "civilianHeat": false,
+    "core": 567,
+    "halo": 917,
+    "fade": true,
+    "roofOrder": true,
+    "off": true,
+    "restored": true,
+    "warm": [
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      },
+      {
+        "uploads": 0,
+        "bakes": 0
+      }
+    ],
+    "unchanged": true,
+    "reset": true,
+    "castersNonnegative": true,
+    "totalLayers": 84
+  },
+  "vision": [
+    {
+      "strength": 0,
+      "mean": 0.10416666666666667,
+      "max": 1
+    },
+    {
+      "strength": 0.5,
+      "mean": 0.65625,
+      "max": 1
+    },
+    {
+      "strength": 1,
+      "mean": 0,
+      "max": 0
+    }
+  ],
+  "crowd": {
+    "first": {
+      "hits": 0,
+      "misses": 1,
+      "atlasesBuilt": 1,
+      "spriteBodies": 1,
+      "liveBodies": 0,
+      "posesRasterized": 1,
+      "poseMs": 3.6000000089406967,
+      "deferredPoses": 0,
+      "partialBodies": 0
+    },
+    "idleReady": 1,
+    "maxPoses": 2,
+    "unready": false,
+    "noPaintMutation": true,
+    "ready": 17,
+    "tagged": true
+  },
+  "sun": {
+    "initial": {
+      "active": true,
+      "casters": 52,
+      "rebuilds": 1,
+      "staticRebuilds": 1,
+      "staticHits": 0,
+      "dynamicRebuilds": 1,
+      "staticCasters": 51,
+      "movingCasters": 1,
+      "bytes": 1121408
+    },
+    "stationary": 0,
+    "staticMoves": 0,
+    "dynamicMoves": 8,
+    "movedMask": true,
+    "staticSame": true,
+    "panReuse": true,
+    "scrollError": 0,
+    "zoomRebuild": true,
+    "stats": {
+      "active": true,
+      "casters": 43,
+      "rebuilds": 1,
+      "staticRebuilds": 1,
+      "staticHits": 0,
+      "dynamicRebuilds": 1,
+      "staticCasters": 42,
+      "movingCasters": 1,
+      "bytes": 1121408
+    }
+  },
+  "recovery": {
+    "lost": false,
+    "heat": 1,
+    "sunPixels": 13471
+  }
+}

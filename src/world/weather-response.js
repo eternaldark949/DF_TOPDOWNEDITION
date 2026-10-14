@@ -59,7 +59,9 @@
 
         /** Draw an umbrella seen from above: a ribbed canopy (open 0…1) or a furled stick in the hand. */
         const _sheens = new Map();
-        function _umbrellaSheen(R) {
+        function _umbrellaSheen(R, ctx) {
+            if(ctx && ctx.nativeVector){const k=Math.round(R*4)/4,g=ctx.createRadialGradient(-k*.35,-k*.35,0,0,0,k);
+                g.addColorStop(0,'rgba(255,255,255,.22)');g.addColorStop(1,'rgba(255,255,255,0)');return g;}
             const k = Math.round(R * 4) / 4; let g = _sheens.get(k);
             if (!g) {
                 const c = (_sheens._c || (_sheens._c = document.createElement('canvas').getContext('2d')));
@@ -90,7 +92,7 @@
             ctx.fill();
             // Sheen on the upper panels, ribs, the tip
             // (one gradient per canopy size, made once: shifted into place, the path stays where it was built)
-            const sh = _umbrellaSheen(R);
+            const sh = _umbrellaSheen(R, ctx);
             ctx.save(); ctx.translate(cx, cy); ctx.fillStyle = sh; ctx.fill(); ctx.restore();
             ctx.strokeStyle = trim; ctx.lineWidth = 0.7; ctx.beginPath();
             for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2; ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); }

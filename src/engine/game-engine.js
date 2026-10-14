@@ -22,7 +22,10 @@
                 this.useNewCollisionSystem = true;
                 
                 this.canvas = document.getElementById('game-canvas');
-                this.ctx = this.canvas.getContext('2d');
+                // The native fork owns the visible canvas with WebGL. Legacy helpers
+                // retain a scratch 2D context for asset baking, never frame presentation.
+                this.nativeRenderer = typeof NativeWebGLRenderer !== 'undefined' ? new NativeWebGLRenderer(this.canvas) : null;
+                this.ctx = (this.nativeRenderer ? document.createElement('canvas') : this.canvas).getContext('2d');
                 
                 // Lighting Layer
                 this.lightingScale = 1.0; // 1.0 = High (Native), 0.75 = Medium, 0.5 = Low (Half-Res)

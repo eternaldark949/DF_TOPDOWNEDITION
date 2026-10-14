@@ -1,0 +1,91 @@
+{
+  "passed": true,
+  "environment": "Desktop Chromium SwiftShader; no phone FPS claim",
+  "ordering": {
+    "before": true,
+    "after": true,
+    "doorSorted": true,
+    "broad": true,
+    "guestGrouped": true
+  },
+  "bodies": {
+    "cached": {
+      "shared": 2,
+      "captures": 0,
+      "refreshes": 0,
+      "fallbacks": 0,
+      "blocked": 13,
+      "dropped": 0,
+      "pairs": 10,
+      "lights": 4,
+      "casters": 2,
+      "liveTargets": 1,
+      "bodyBytes": 147456,
+      "gradientBytes": 0
+    },
+    "live": {
+      "shared": 0,
+      "captures": 2,
+      "refreshes": 0,
+      "fallbacks": 0,
+      "blocked": 13,
+      "dropped": 0,
+      "pairs": 10,
+      "lights": 4,
+      "casters": 2,
+      "liveTargets": 2,
+      "bodyBytes": 294912,
+      "gradientBytes": 65536
+    },
+    "changed": true,
+    "blinkHidden": true,
+    "off": false
+  },
+  "projection": {
+    "original": 157,
+    "finger": 24,
+    "gap": 158,
+    "body": 189,
+    "far": 72,
+    "meshes": 2,
+    "cached": true,
+    "invalidates": true,
+    "blocked": true,
+    "vehicleChanged": 144,
+    "budget": true
+  },
+  "skyline": {
+    "moves": true,
+    "parallax": true,
+    "lean": -70.45308222273246,
+    "match": 0.3182577380952381,
+    "views": 256,
+    "frozen": true,
+    "visible": true,
+    "uploads": 0,
+    "uploadOrigins": [],
+    "bakes": 0,
+    "bakeOrigins": [],
+    "roofAboveActors": true,
+    "treesAboveRoofs": true
+  },
+  "recovery": {
+    "lost": false,
+    "backdrop": true,
+    "casters": {
+      "shared": 0,
+      "captures": 1,
+      "refreshes": 0,
+      "fallbacks": 0,
+      "blocked": 5,
+      "dropped": 0,
+      "pairs": 9,
+      "lights": 5,
+      "casters": 1,
+      "liveTargets": 1,
+      "bodyBytes": 147456,
+      "gradientBytes": 65536
+    },
+    "liveBodyPixels": 1322
+  }
+}
