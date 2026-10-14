@@ -10,16 +10,17 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.roofStage=new PIXI.Container();this.world.addChild(this.roofStage);this.roofDetailContext=new NativeVectorContext(this);this.roofStage.addChild(this.roofDetailContext.root);
         this.cityGlowContext=new NativeVectorContext(this);this.emissive.addChild(this.cityGlowContext.root);
         this.worldCueContext=new NativeVectorContext(this);this.stage.addChild(this.worldCueContext.root);
-        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.emptyRain=[];this.nativeBuildings=new Map();this.worldStats={};
+        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};
     },
     clearWorld(){
         if(!this.nativeBuildings)return;
+        this.crowdAtlas.clear();
         for(const r of this.nativeBuildings.values()){r.base.destroy();r.top.destroy();}this.nativeBuildings.clear();
         for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','rainContext','roofDetailContext'])this[key].destroy();
         this.roofStage.destroy();this.buildingBaseStage.destroy();this.nativeBuildings=null;
     },
     syncWorld(game,view){
-        const start=performance.now(),L=this.layers,map=game.activeMap;
+        const start=performance.now();let lap=start;const timings={};this.crowdAtlas.begin();const L=this.layers,map=game.activeMap;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext])ctx.canvas=game.canvas;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext])ctx.sceneFrame=_worldMatrix;
         const vw=game.canvas.width/(2*view.zoom),vh=game.canvas.height/(2*view.zoom);
@@ -32,16 +33,19 @@ Object.assign(NativeWebGLRenderer.prototype,{
             // textures when those tiles leave it, including views at other LODs.
             const keep=new Set(game.groundBaker.cache.values());for(const [image,t]of ground.images)if(!keep.has(image)){ground.images.delete(image);this.releaseImage(t);}
         }
+        timings.groundMs=performance.now()-lap;lap=performance.now();
         const street=this.streetContext;street.begin();if(L.streetDetails){
             for(const f of game.foliage||[])if(visible(f,140))f.draw(street,game.weather.wind,game.weather.windDirection,_gameTimeSec);
             for(const s of game.neonSigns||[])if(visible(s,150))s.draw(street,_frameTime);
             if(map.type==='outdoor')game.traffic?.drawSignals(street,bounds,map.crosswalks);
             game.drawDeliveryPackage(street,bounds);game.drawDropZone(street,bounds);
         }
+        timings.streetMs=performance.now()-lap;lap=performance.now();
         const traffic=this.trafficContext;traffic.begin();if(L.vehicles){
             const cars=new Set([...(game.traffic?.vehicles||[]),...(game.cars||[]),game.car,game.ownedCar,game.van,game.deliveryVehicle].filter(Boolean));
             for(const car of cars)if(visible(car,180)){traffic.save();traffic.globalAlpha=car.fade??1;car._lod=_zoomLOD>0?1:0;car.draw(traffic);traffic.restore();vehicles++;}
         }
+        timings.vehiclesMs=performance.now()-lap;lap=performance.now();
         const actors=this.peopleContext;actors.begin();this.objects.addChild(actors.root);this.objects.addChild(this.playerSprite);
         if(L.people){
             // Native actors use live geometry even when the Canvas setting chooses
@@ -56,6 +60,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 game.drawCorpses(actors,bounds);game.scenes?.drawActors(actors);
             }finally{GameSettings.crowdQuality=crowd;}
         }
+        timings.peopleMs=performance.now()-lap;lap=performance.now();
         const glow=this.cityGlowContext;glow.begin();const keep=new Set();
         const topBounds={left:view.x-vw,right:view.x+vw,top:view.y-vh,bottom:view.y+vh};
         for(const b of map.buildings||[]){
@@ -80,8 +85,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const used=new Set(ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture));
             for(const [image,t]of ctx.images)if(!used.has(t.baseTexture)){ctx.images.delete(image);this.releaseImage(t);}
         }
+        timings.buildingsMs=performance.now()-lap;lap=performance.now();
         // Markers include door destinations, pickups and mission navigation.
         const cues=this.worldCueContext;cues.begin();if(L.worldMarkers)game.drawMarkers(cues);
+        timings.markersMs=performance.now()-lap;
         const rainStart=performance.now(),rain=this.rainContext;rain.begin();const weather=game.weather;
         const rainK=map.type==='outdoor'?1:game.roomSystem.active?game.roomSystem.outdoorness:0;
         if((L.rainDrops||L.rainSplashes)&&rainK>.01&&weather.isRaining){
@@ -99,7 +106,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.rainStats={drops:L.rainDrops&&rainK>.01?weather.drops.length:0,splashes:L.rainSplashes&&rainK>.01?weather.splashes.length:0,paths:rain.pathsPainted,cpuMs:performance.now()-rainStart};
         // Bound per-map imported bitmap residency to images still referenced by
         // live contexts (ground, authored sprites and fixtures have own owners).
-        this.worldStats={buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
+        this.worldStats={timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
             paths:actors.pathsPainted+traffic.pathsPainted+street.pathsPainted,cpuMs:performance.now()-start};
         this.layerStages.worldMs=this.worldStats.cpuMs;
     }

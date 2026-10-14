@@ -45,7 +45,7 @@ Current implementation:
   authored curtains, lamp particles/fades, and apartment glows use GPU geometry
   and cached image assets. Bloom uses the Canvas downscale scales/strengths;
   atmosphere follows the original tint setting.
-- All 43 visual switches remain independent. Fireplace flames, crafting scanline,
+- All 44 visual switches remain independent. Fireplace flames, crafting scanline,
   record sheen, tub ripple, plants and telescope accents follow their authored
   continuous clock through GPU geometry. Static segments remain cached and
   retain their drawing order; Decor animation off freezes their original art.
@@ -87,7 +87,8 @@ Run `node tools/test-native-webgl-browser.cjs` and
 `node tools/test-native-webgl-layers-browser.cjs`, plus
 `node tools/test-native-webgl-character-browser.cjs` and
 `node tools/test-native-webgl-details-browser.cjs` and
-`node tools/test-native-webgl-city-browser.cjs` after building the preview.
+`node tools/test-native-webgl-city-browser.cjs` and
+`node tools/test-native-webgl-crowd-browser.cjs` after building the preview.
 Chromium checks the real WebGL surface, linked shader, warmed texture reuse,
 movement, camera/screen round trips, furniture invalidation, resize/zoom, visible
 lighting across repeated frames, the actual gameplay loop, context loss and
@@ -259,3 +260,47 @@ The A53 5G is the target device. Its complete v4 High-quality recording averaged
 reported satisfactory weapon play with a minor Anavia slowdown. City density,
 rain and live crowds add work, so v5 needs a new phone recording. First test a
 copied city save in Standard, walk/drive/fire, and record rain on/off separately.
+
+## v6: city CPU bottleneck and resident crowd animation
+
+The A53 v5 city recording averaged 3.42 FPS and 199.04ms inside rendering,
+with 48 intervals >250ms. World preparation averaged 74.92ms, rain 7.48ms
+(included in world), and lighting 6.35ms. About 35 people/24 vehicles and 1,447
+world paths were submitted each frame, with 3.91MB of buffer traffic. Only seven
+texture upload/allocation calls and four asset bakes occurred in the entire run;
+street tiles and static shadow images stayed cached. The problem was repeated
+procedural geometry and its downstream tessellation/submission, not bulk texture
+uploads. The remaining render cost was not separately timed in v5, and the
+93.01ms average gap outside rendering includes simulation/browser work; neither
+number establishes GPU execution time.
+
+v6 adds an optional GPU crowd animation cache. Eligible civilians share strips
+by appearance/configuration and wet/dry state: one idle and sixteen walk poses,
+rasterized through native paths into GPU render targets. A mesh shader samples
+and interpolates adjacent poses with correct premultiplied alpha. Positions,
+facing, contact shadows and gait timing remain live. The bake uses the original
+lighter crowd art; the player's full procedural animation/shadows are unchanged.
+Combat/dance/death/driving poses remain live. Turning the cache off restores v5's
+live crowd paths for comparison. No Canvas body capture is used.
+
+At most one new strip is built per frame, with 64 resident entries (approximately
+81MiB at maximum occupancy), evicting entries absent for at least sixty frames.
+A miss over the preparation/residency budget draws live, so people do not vanish.
+Map changes release the cache; context restoration regenerates GPU strips.
+`crowdTargetBytes` and `world.crowd` expose memory, hits/misses, builds, sprite
+bodies and eligible live fallbacks. New strips allocate GPU storage during
+warmup; ordinary warmed poses do not upload bitmaps or rebuild their geometry.
+
+A controlled 36-person browser comparison cut measured buffer traffic by about
+82% and draw calls by about 43%, with zero warmed uploads/bakes. Evidence and
+context restoration checks are in `native-webgl-crowd-checks.json`. Software
+Chromium timings are not a phone benchmark. Vehicles already use resident base
+art; their tyres/lights/reflections remain live. Rain tessellation and simulation
+remain candidates after the next recording.
+
+Per-frame `world.timings` separates ground, streets, vehicles, people, buildings
+and markers. `rain.cpuMs` is separate and included in total `world.cpuMs`.
+`stages.sceneSubmitMs` measures the final Pixi scene call, including deferred
+geometry building and driver submission, not just GPU work. For an A53 A/B,
+let the crowd cache settle, record the same city view/route with GPU crowd
+animation cache on, then off, keeping all other settings identical.

@@ -64,7 +64,7 @@ const {chromium}=require('playwright');
    const q=document.getElementById('native-texture-quality');q.value='auto';q.dispatchEvent(new Event('change'));
    [...document.querySelectorAll('#native-webgl-toolbar button')].find(b=>b.textContent==='Record 20s').click();game.nativeRenderer.capture.durationMs=1;for(let i=0;i<30;i++)game.draw();
   });const download=await downloadPromise,saved=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
-  assert.equal(saved.textureQuality,'auto');assert.ok(saved.capture.finished);assert.ok(download.suggestedFilename().startsWith('dfab-native-webgl-v5-'));
+  assert.equal(saved.textureQuality,'auto');assert.ok(saved.capture.finished);assert.ok(download.suggestedFilename().startsWith('dfab-native-webgl-v6-'));
   const recovery=await page.evaluate(()=>new Promise((resolve,reject)=>{
    const r=game.nativeRenderer,ext=r.renderer.gl.getExtension('WEBGL_lose_context');if(!ext){resolve(false);return;}
    const timeout=setTimeout(()=>reject(new Error('Detail context recovery timeout')),5000);

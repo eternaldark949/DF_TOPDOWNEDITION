@@ -58466,7 +58466,7 @@ class NativeWebGLRenderer {
                 this.lost=false;this.gpuTimer.extension=this.renderer.gl.getExtension('EXT_disjoint_timer_query_webgl2');this.contextRestores=(this.contextRestores||0)+1;
                 // Render-texture pixels cannot survive context loss. CPU geometry
                 // remains valid, but every cached GPU light image must be redrawn.
-                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;for(const r of this.nativeBuildings?.values()||[])r.key=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
+                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;this.crowdAtlas?.clear();for(const r of this.nativeBuildings?.values()||[])r.key=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
                 this.frames=[];this.warmFrames=15;this.lastStart=this.lastEnd=0;this.capture=this.completedCapture=null;this.message('');
             });
             this.gpuTimer=new NativeGpuTimer(gl);this.frameId=0;this.initLayers();this.initDetails();this.initWorld();
@@ -58544,8 +58544,8 @@ class NativeWebGLRenderer {
         this.syncLayers(game,view);
         this.syncDetails(game,view);this.syncWorld(game,view);
         this.gpuTimer.begin('lighting',this.frameId);this.syncLighting(game,view);this.gpuTimer.end();
-        this.gpuTimer.begin('scene',this.frameId);this.renderer.render(this.stage);this.gpuTimer.end();
-        const end=performance.now();
+        const submitStart=performance.now();this.gpuTimer.begin('scene',this.frameId);this.renderer.render(this.stage);this.gpuTimer.end();
+        const end=performance.now();this.layerStages.sceneSubmitMs=end-submitStart;
         const f={frame:this.frameId,at:start,intervalMs:this.lastStart?start-this.lastStart:null,gapMs:this.lastEnd?start-this.lastEnd:null,renderMs:end-start,
             uploads:this.uploads-beforeUploads,bakes:this.bakes-beforeBakes,draws:this.drawCalls-beforeDraws,bufferBytes:this.bufferBytes-beforeBuffers,
             rain:{...this.rainStats},world:{...this.worldStats},details:structuredClone(this.detailStats),animation:{...this.actorStats},shadows:{...this.shadowStats},stages:{...this.layerStages}};this.lastStart=start;
@@ -58564,11 +58564,11 @@ class NativeWebGLRenderer {
     report() {
         const frames=this.frames.slice(),intervals=frames.map(f=>f.intervalMs).filter(v=>v>0),sum=intervals.reduce((a,b)=>a+b,0);
         const sorted=intervals.slice().sort((a,b)=>a-b);
-        return {renderer:'native-webgl-apartment',build:'native-webgl-city-v5',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
+        return {renderer:'native-webgl-apartment',build:'native-webgl-city-v6',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
             settings:this.settings,resolution:[this.canvas.width,this.canvas.height],lighting:this.lightsOn,warmFramesRemaining:this.warmFrames,frames,
             animationSummary:{changedFrames:frames.filter(f=>f.animation?.changed).length,geometryMeanMs:frames.length?frames.reduce((n,f)=>n+(f.animation?.geometryMs||0),0)/frames.length:0,
                 shadowRefreshFrames:frames.filter(f=>f.shadows.dynamicRebuilds>0).length,dynamicRebuilds:frames.reduce((n,f)=>n+(f.shadows.dynamicRebuilds||0),0),staticRebuilds:frames.reduce((n,f)=>n+(f.shadows.staticRebuilds||0),0)},
-            rain:this.rainStats,world:this.worldStats,textureQuality:this.textureQuality,assetDensities:[...new Set([...this.textures].map(t=>t.baseTexture.resolution))],glyphAtlasBytes:Object.values(PIXI.BitmapFont.available.NativeDetailFont.pageTextures).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),qualityReductions:this.qualityReductions,details:this.detailStats,layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
+            crowdTargetBytes:this.crowdAtlas?.bytes||0,rain:this.rainStats,world:this.worldStats,textureQuality:this.textureQuality,assetDensities:[...new Set([...this.textures].map(t=>t.baseTexture.resolution))],glyphAtlasBytes:Object.values(PIXI.BitmapFont.available.NativeDetailFont.pageTextures).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),qualityReductions:this.qualityReductions,details:this.detailStats,layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
             contextRestores:this.contextRestores||0,
             capture:this.capture?{...this.capture}:null,player:this.playerSprite?{x:this.playerSprite.x,y:this.playerSprite.y}:null,
             fps:sum?intervals.length*1000/sum:0,p95Ms:sorted[Math.ceil(sorted.length*.95)-1]||0,
@@ -58591,7 +58591,7 @@ class NativeWebGLRenderer {
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes'};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache'};
 const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
@@ -59183,16 +59183,17 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.roofStage=new PIXI.Container();this.world.addChild(this.roofStage);this.roofDetailContext=new NativeVectorContext(this);this.roofStage.addChild(this.roofDetailContext.root);
         this.cityGlowContext=new NativeVectorContext(this);this.emissive.addChild(this.cityGlowContext.root);
         this.worldCueContext=new NativeVectorContext(this);this.stage.addChild(this.worldCueContext.root);
-        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.emptyRain=[];this.nativeBuildings=new Map();this.worldStats={};
+        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};
     },
     clearWorld(){
         if(!this.nativeBuildings)return;
+        this.crowdAtlas.clear();
         for(const r of this.nativeBuildings.values()){r.base.destroy();r.top.destroy();}this.nativeBuildings.clear();
         for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','rainContext','roofDetailContext'])this[key].destroy();
         this.roofStage.destroy();this.buildingBaseStage.destroy();this.nativeBuildings=null;
     },
     syncWorld(game,view){
-        const start=performance.now(),L=this.layers,map=game.activeMap;
+        const start=performance.now();let lap=start;const timings={};this.crowdAtlas.begin();const L=this.layers,map=game.activeMap;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext])ctx.canvas=game.canvas;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext])ctx.sceneFrame=_worldMatrix;
         const vw=game.canvas.width/(2*view.zoom),vh=game.canvas.height/(2*view.zoom);
@@ -59205,16 +59206,19 @@ Object.assign(NativeWebGLRenderer.prototype,{
             // textures when those tiles leave it, including views at other LODs.
             const keep=new Set(game.groundBaker.cache.values());for(const [image,t]of ground.images)if(!keep.has(image)){ground.images.delete(image);this.releaseImage(t);}
         }
+        timings.groundMs=performance.now()-lap;lap=performance.now();
         const street=this.streetContext;street.begin();if(L.streetDetails){
             for(const f of game.foliage||[])if(visible(f,140))f.draw(street,game.weather.wind,game.weather.windDirection,_gameTimeSec);
             for(const s of game.neonSigns||[])if(visible(s,150))s.draw(street,_frameTime);
             if(map.type==='outdoor')game.traffic?.drawSignals(street,bounds,map.crosswalks);
             game.drawDeliveryPackage(street,bounds);game.drawDropZone(street,bounds);
         }
+        timings.streetMs=performance.now()-lap;lap=performance.now();
         const traffic=this.trafficContext;traffic.begin();if(L.vehicles){
             const cars=new Set([...(game.traffic?.vehicles||[]),...(game.cars||[]),game.car,game.ownedCar,game.van,game.deliveryVehicle].filter(Boolean));
             for(const car of cars)if(visible(car,180)){traffic.save();traffic.globalAlpha=car.fade??1;car._lod=_zoomLOD>0?1:0;car.draw(traffic);traffic.restore();vehicles++;}
         }
+        timings.vehiclesMs=performance.now()-lap;lap=performance.now();
         const actors=this.peopleContext;actors.begin();this.objects.addChild(actors.root);this.objects.addChild(this.playerSprite);
         if(L.people){
             // Native actors use live geometry even when the Canvas setting chooses
@@ -59229,6 +59233,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 game.drawCorpses(actors,bounds);game.scenes?.drawActors(actors);
             }finally{GameSettings.crowdQuality=crowd;}
         }
+        timings.peopleMs=performance.now()-lap;lap=performance.now();
         const glow=this.cityGlowContext;glow.begin();const keep=new Set();
         const topBounds={left:view.x-vw,right:view.x+vw,top:view.y-vh,bottom:view.y+vh};
         for(const b of map.buildings||[]){
@@ -59253,8 +59258,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const used=new Set(ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture));
             for(const [image,t]of ctx.images)if(!used.has(t.baseTexture)){ctx.images.delete(image);this.releaseImage(t);}
         }
+        timings.buildingsMs=performance.now()-lap;lap=performance.now();
         // Markers include door destinations, pickups and mission navigation.
         const cues=this.worldCueContext;cues.begin();if(L.worldMarkers)game.drawMarkers(cues);
+        timings.markersMs=performance.now()-lap;
         const rainStart=performance.now(),rain=this.rainContext;rain.begin();const weather=game.weather;
         const rainK=map.type==='outdoor'?1:game.roomSystem.active?game.roomSystem.outdoorness:0;
         if((L.rainDrops||L.rainSplashes)&&rainK>.01&&weather.isRaining){
@@ -59272,11 +59279,66 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.rainStats={drops:L.rainDrops&&rainK>.01?weather.drops.length:0,splashes:L.rainSplashes&&rainK>.01?weather.splashes.length:0,paths:rain.pathsPainted,cpuMs:performance.now()-rainStart};
         // Bound per-map imported bitmap residency to images still referenced by
         // live contexts (ground, authored sprites and fixtures have own owners).
-        this.worldStats={buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
+        this.worldStats={timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
             paths:actors.pathsPainted+traffic.pathsPainted+street.pathsPainted,cpuMs:performance.now()-start};
         this.layerStages.worldMs=this.worldStats.cpuMs;
     }
 });
+// One GPU-resident idle + 16-phase walk strip per appearance, shared by civilians.
+// World positions/facing and gait stay live; the player's body remains procedural.
+class NativeCrowdPoseMesh extends PIXI.Mesh {
+    constructor(){
+        const g=new PIXI.Geometry().addAttribute('aVertexPosition',new Float32Array([0,0,112,0,112,112,0,112]),2)
+            .addAttribute('aUV',new Float32Array([0,0,1,0,1,1,0,1]),2).addIndex([0,1,2,0,2,3]);
+        const shader=PIXI.Shader.from(`precision highp float;attribute vec2 aVertexPosition;attribute vec2 aUV;
+            uniform mat3 projectionMatrix;uniform mat3 translationMatrix;varying vec2 uv;
+            void main(){uv=aUV;gl_Position=vec4((projectionMatrix*translationMatrix*vec3(aVertexPosition,1.0)).xy,0.,1.);}`,
+            `precision highp float;varying vec2 uv;uniform sampler2D atlas;uniform vec2 frames;uniform float blend;uniform float opacity;
+            void main(){vec4 a=texture2D(atlas,vec2((uv.x+frames.x)/17.,uv.y));vec4 b=texture2D(atlas,vec2((uv.x+frames.y)/17.,uv.y));gl_FragColor=mix(a,b,blend)*opacity;}`,
+            {atlas:PIXI.Texture.EMPTY,frames:new Float32Array(2),blend:0,opacity:1});
+        super(g,shader);
+    }
+}
+class NativeCrowdAtlas {
+    constructor(owner){this.owner=owner;this.entries=new Map();this.built=0;this.stats={};}
+    begin(){this.built=0;this.stats={hits:0,misses:0,atlasesBuilt:0,spriteBodies:0,liveBodies:0};}
+    draw(ctx,e,c){
+        if(c.pose==='dance'||c.pose==='die'||c.isDriving||c.stance&&c.stance!=='idle')return false;
+        syncHumanoidGait(e);
+        const key=(typeof weatherAt==='function'&&weatherAt(e)?.rain>.05?'wet:':'dry:')+JSON.stringify(c),owner=this.owner;let r=this.entries.get(key);
+        if(!r){this.stats.misses++;
+            if(this.built>=1){this.stats.liveBodies++;return false;}
+            if(this.entries.size>=64){const old=[...this.entries].find(([,v])=>v.used<owner.frameId-60);if(!old){this.stats.liveBodies++;return false;}this.dispose(old[1]);this.entries.delete(old[0]);}
+            r=this.build(e,c);this.entries.set(key,r);this.built++;this.stats.atlasesBuilt++;
+        }else this.stats.hits++;
+        r.used=owner.frameId;const tau=Math.PI*2,walking=(e._gait?.speed||0)>CONFIG.GAIT.STOP_SPEED;
+        const phase=walking?((e.walkPhase||0)%tau+tau)%tau/tau*16:0;
+        const a=walking?1+Math.floor(phase):0,b=walking?1+(Math.floor(phase)+1)%16:0,mix=walking?phase%1:0;
+        if(!c.noShadow&&_zoomLOD<2){const t=ctx.getTransform();_bodyRot=Math.atan2(t.b,t.a);drawHumanContactShadow(ctx,e);}
+        ctx.current=null;const mesh=ctx.node(NativeCrowdPoseMesh),u=mesh.shader.uniforms;
+        u.atlas=r.target;u.frames.set([a,b]);u.blend=mix;u.opacity=ctx.globalAlpha;
+        mesh.transform.setFromMatrix(ctx.matrix.clone().append(new PIXI.Matrix(1,0,0,1,-56,-56)));ctx.current=null;
+        RenderStats.bodies++;RenderStats.cachedBodies++;this.stats.spriteBodies++;return true;
+    }
+    build(e,c){
+        const target=PIXI.RenderTexture.create({width:112*17,height:112,resolution:1.25,scaleMode:PIXI.SCALE_MODES.LINEAR}),ctx=new NativeVectorContext(this.owner);
+        const B={x:e.x,y:e.y,angle:0,look:e.look,walkPhase:0};syncHumanoidGait(B);const G=B._gait;
+        const cfg={...c,lerpSpeed:1,noShadow:true,poseInstant:true,_crowdBake:true},saved={lite:_crowdLite,wm:_worldMatrix,wc:_worldCanvas};
+        try{_crowdLite=true;
+            for(let f=0;f<17;f++){
+                G.speed=f?2:0;G.dirX=1;G.dirY=0;G.tick=_simTick;G.prevX=B.x;G.prevY=B.y;
+                B.walkPhase=f?(f-1)/16*Math.PI*2:0;G.phasePrev=B.walkPhase;B._animState=null;
+                ctx.begin();ctx.translate(f*112+56,56);drawProceduralHumanoid(ctx,B,cfg);
+                this.owner.renderer.render(ctx.root,{renderTexture:target,clear:f===0});
+            }
+        }catch(error){target.destroy(true);throw error;}
+        finally{_crowdLite=saved.lite;_worldMatrix=saved.wm;_worldCanvas=saved.wc;ctx.destroy();}
+        return {target,used:this.owner.frameId};
+    }
+    dispose(r){r.target.destroy(true);}
+    clear(){for(const r of this.entries.values())this.dispose(r);this.entries.clear();}
+    get bytes(){return [...this.entries.values()].reduce((n,r)=>n+r.target.baseTexture.realWidth*r.target.baseTexture.realHeight*4,0);}
+}
         class GameEngine {
             constructor() {
                 
@@ -80981,6 +81043,8 @@ engineMixin({
 // Native entry points retain sandbox previews and the original save schema.
 (() => {
     const renderer=game.nativeRenderer;
+    const liveCrowd=drawCrowdHumanoid;
+    drawCrowdHumanoid=(ctx,e,c)=>{if(ctx.nativeVector&&ctx.owner.layers.crowdSprites&&ctx.owner.crowdAtlas?.draw(ctx,e,c))return;return liveCrowd(ctx,e,c);};
     const menu=document.getElementById('main-menu-list');
     const start=document.createElement('button');start.id='btn-native-apartment';start.textContent='PLAY WEBGL APARTMENT';
     start.style.cssText='padding:16px;margin:12px;color:#fff;background:#402060;border:1px solid #b78af8;font:inherit;cursor:pointer';
@@ -81038,7 +81102,7 @@ engineMixin({
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v5-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v6-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;

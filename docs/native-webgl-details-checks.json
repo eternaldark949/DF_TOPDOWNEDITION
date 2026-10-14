@@ -95,16 +95,16 @@
       "decor": {
         "visible": 2,
         "paths": 15,
-        "cpuMs": 0.10000000149011612
+        "cpuMs": 0.20000000298023224
       },
       "effects": {
         "projectiles": 2,
         "muzzleFlashes": 1,
         "particles": 2,
         "casings": 1,
-        "paths": 16,
+        "paths": 17,
         "transientSources": 3,
-        "cpuMs": 0.10000000149011612
+        "cpuMs": 0.19999999552965164
       }
     },
     "uploads": 0

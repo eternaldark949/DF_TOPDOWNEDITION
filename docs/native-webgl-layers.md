@@ -38,8 +38,8 @@ they do not choose another rendering backend.
 
 ## Animated characters and shape shadows
 
-The build identifier is `native-webgl-city-v5`. **Canvas look** enables
-all 43 switches. **Lighting + shadows** also enables continuous character
+The build identifier is `native-webgl-city-v6`. **Canvas look** enables
+all 44 switches. **Lighting + shadows** also enables continuous character
 animation, silhouette shadows, high shadow detail and curtains.
 
 For a controlled moving test, use the same route, view, zoom, resolution and FPS
@@ -98,7 +98,7 @@ samples have labels and source frame IDs; unsupported devices explicitly say
 
 ## Evidence and remaining differences
 
-The five browser suites check the real main WebGL surface, all switches,
+The six browser suites check the real main WebGL surface, all switches,
 recording/export, moving gameplay, texture reuse, context recovery, odd-size
 resize, walls, finite casts, lit bodies, overlapping light sources, continuous
 poses, and projected silhouette gaps/rotation. Pixel readback is test-only.
@@ -178,3 +178,25 @@ Record a city route in Standard with Canvas look, then repeat with Rain drops,
 Rain splashes, People / enemies, City buildings / roofs or Soft edges disabled
 one at a time. Include firing and driving in separate captures. The apartment's
 v4 phone FPS cannot establish the city's performance.
+
+## City CPU comparison in v6
+
+**GPU crowd animation cache** switches eligible civilian bodies between resident
+GPU walk strips and v5's live procedural paths. Wait for the cache to settle
+before recording; each frame prepares at most one new appearance. The cache
+uses lighter authored crowd art with sixteen interpolated walk poses. Combat,
+dance/death and driving poses still draw live, as does the player's full body.
+Movement, collisions and contact shadows continue in both variants.
+
+Repeat the same city route with only this switch changed. Inspect
+`world.crowd.spriteBodies`, `atlasesBuilt`, `liveBodies`, `crowdTargetBytes`,
+`world.timings.peopleMs`, `bufferBytes`, draw calls and `stages.sceneSubmitMs`.
+The latter includes deferred tessellation and driver submission; GPU timer
+unavailability still means there is no direct GPU execution measurement.
+`world.timings` also separates ground/street/vehicle/building/marker preparation;
+rain's own CPU time is included in total world time, so do not add it twice.
+
+The dense 36-person test checks less geometry traffic, warmed texture reuse,
+animation/movement and GPU-cache recovery after context loss. See
+`native-webgl-crowd-checks.json`. The measured workspace speedup is not a mobile
+FPS promise; the A53 v5 recording is the regression baseline.
