@@ -91,6 +91,7 @@
                ===================================================================== */
             draw() {
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
+                if (this.nativeRenderer) { this.nativeRenderer.draw(this); return; }
             
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
                 LightingProfile.begin(this);

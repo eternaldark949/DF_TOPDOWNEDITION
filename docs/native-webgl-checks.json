@@ -1,0 +1,74 @@
+{
+  "passed": true,
+  "movement": {
+    "before": 850,
+    "after": 888,
+    "sx": 440,
+    "sy": 205.5,
+    "point": {
+      "x": 440,
+      "y": 205.5
+    },
+    "roundtrip": {
+      "x": 888,
+      "y": 438.5
+    },
+    "p": {
+      "x": 888,
+      "y": 438.5
+    }
+  },
+  "zoom": {
+    "surface": [
+      640,
+      360
+    ],
+    "renderer": [
+      640,
+      360
+    ],
+    "delta": [
+      0,
+      0
+    ]
+  },
+  "cadence": {
+    "renderer": "native-webgl-apartment",
+    "pixiVersion": "7.4.3",
+    "device": {
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+    },
+    "map": "apt_949",
+    "settings": {
+      "resolutionScale": 1,
+      "baseZoom": 1,
+      "fpsLimit": 0
+    },
+    "resolution": [
+      640,
+      360
+    ],
+    "lighting": true,
+    "warmFramesRemaining": 0,
+    "fps": 14.923632971901597,
+    "p95Ms": 88.59999999962747,
+    "stallsOver250Ms": 0,
+    "stallsOver1000Ms": 0,
+    "renderMeanMs": 0.8415384616129673,
+    "textureBytes": 11980656,
+    "lightingTargetBytes": 230400,
+    "timing": "CPU render submission and frame cadence; GPU execution is not timed",
+    "limitations": [
+      "Apartment slice; static backdrop and decor animations",
+      "Eight-phase player animation",
+      "Lighting has no occlusion yet",
+      "NPCs and advanced effects not migrated"
+    ]
+  },
+  "contextRestored": {
+    "held": true,
+    "restored": true
+  },
+  "screenshot": "native-webgl-apartment.png"
+}
