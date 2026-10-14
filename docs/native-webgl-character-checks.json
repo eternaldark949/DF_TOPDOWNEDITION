@@ -3,11 +3,7 @@
   "animation": {
     "unique": 80,
     "freeze": true,
-    "resumes": true,
-    "measuredFrames": 0,
-    "steadyUploads": 0,
-    "steadyBakes": 0,
-    "shadowRefreshFrames": 0
+    "resumes": true
   },
   "parity": [
     {
