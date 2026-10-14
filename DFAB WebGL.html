@@ -4787,7 +4787,7 @@ class NativeVectorContext {
     withPath(path,fn){if(!path||typeof path==='string')return fn(this.path,path);
         const previous=this.path,part=this.part;this.beginPath();this.replay(path);const result=fn(this.path);this.path=previous;this.part=part;return result;
     }
-    graphics(){const blend=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:this.globalCompositeOperation==='destination-out'?PIXI.BLEND_MODES.ERASE:PIXI.BLEND_MODES.NORMAL;
+    graphics(){const blend=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:this.globalCompositeOperation==='destination-out'?PIXI.BLEND_MODES.ERASE:this.globalCompositeOperation==='screen'?PIXI.BLEND_MODES.SCREEN:this.globalCompositeOperation==='multiply'?PIXI.BLEND_MODES.MULTIPLY:PIXI.BLEND_MODES.NORMAL;
         if(!this.current||this.current.parent!==this.container||this.current.blendMode!==blend){this.current=this.node(PIXI.Graphics);this.current.blendMode=blend;}
         return this.current;
     }
@@ -4820,7 +4820,7 @@ class NativeVectorContext {
                 view=new PIXI.Texture(t.baseTexture,new PIXI.Rectangle(sx,sy,sw,sh));this.imageViews.set(key,view);
             }view._nativeFrame=this.owner.frameId;t=view;[x,y,w,h]=[dx,dy,dw,dh];}
         else throw new Error('Unsupported native image arguments');
-        this.current=null;const s=this.node(PIXI.Sprite);s.texture=t;s.alpha=this.globalAlpha;s.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
+        this.current=null;const s=this.node(PIXI.Sprite);s.texture=t;s.alpha=this.globalAlpha;s.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:this.globalCompositeOperation==='destination-out'?PIXI.BLEND_MODES.ERASE:this.globalCompositeOperation==='screen'?PIXI.BLEND_MODES.SCREEN:this.globalCompositeOperation==='multiply'?PIXI.BLEND_MODES.MULTIPLY:PIXI.BLEND_MODES.NORMAL;
         this.hashValue(t.baseTexture.uid);this.hashValue(this.globalAlpha);for(const v of [...args,this.matrix.a,this.matrix.b,this.matrix.c,this.matrix.d,this.matrix.tx,this.matrix.ty])this.hashValue(v);
         s.transform.setFromMatrix(this.matrix.clone().append(new PIXI.Matrix(w/t.width,0,0,h/t.height,x,y)));this.current=null;
     }
@@ -4829,7 +4829,7 @@ class NativeVectorContext {
         this.hashValue(text);this.hashValue(this.font);this.hashValue(this.fillStyle);this.hashValue(this.globalAlpha);this.hashValue(x);this.hashValue(y);
         this.current=null;const n=this.node(PIXI.BitmapText),match=/([0-9.]+)px/.exec(this.font),size=match?Number(match[1]):11;
         n.text=String(text);n.fontSize=size;const color=this.color(this.fillStyle);n.tint=color.color;n.alpha=this.globalAlpha*color.alpha;
-        n.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
+        n.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:this.globalCompositeOperation==='destination-out'?PIXI.BLEND_MODES.ERASE:this.globalCompositeOperation==='screen'?PIXI.BLEND_MODES.SCREEN:this.globalCompositeOperation==='multiply'?PIXI.BLEND_MODES.MULTIPLY:PIXI.BLEND_MODES.NORMAL;
         const width=n.textWidth,height=n.textHeight,dx=this.textAlign==='center'?-width/2:this.textAlign==='right'||this.textAlign==='end'?-width:0;
         const dy=this.textBaseline==='middle'?-height/2:this.textBaseline==='top'?0:-height*.8;
         n.transform.setFromMatrix(this.matrix.clone().append(new PIXI.Matrix(1,0,0,1,x+dx,y+dy)));this.current=null;
@@ -58431,7 +58431,8 @@ class NativeWebGLRenderer {
                 uniform vec4 inputSize;
                 uniform vec2 viewport;
                 uniform sampler2D lightMap;
-                uniform sampler2D colorMap;
+                uniform sampler2D colorMap;uniform sampler2D reflectionMap;uniform float reflectionGain;
+                ${NATIVE_DAYLIGHT_GLSL}
                 uniform float colorGain;
                 uniform float nightTint;
                 uniform sampler2D veilMap;uniform float veilGain;uniform vec3 inverseWorld;uniform vec2 veilSize;uniform vec2 mapSize;
@@ -58448,10 +58449,14 @@ class NativeWebGLRenderer {
                     vec4 veil=vec4(0.0);if(veilGain>0.0)veil=texture2D(veilMap,(screen*inverseWorld.z+inverseWorld.xy+vec2(24.0))/veilSize);
                     veil*=inMap;
                     float darkAlpha=shade*(1.0-veil.a)+veil.a;
+                    float reflectionLift=reflectionGain>0.0?1.0-texture2D(reflectionMap,screen/viewport).a*reflectionGain:1.0;darkAlpha*=reflectionLift;
                     vec3 darkRGB=vec3(.086,.039,.188)*shade*nightTint*(1.0-veil.a)+veil.rgb;
+                    darkRGB*=reflectionLift;
+                    if(lightingOn<.5){darkAlpha=0.0;darkRGB=vec3(0.0);color=vec4(0.0);}
                     vec3 shaded=scene.rgb*max(0.0,1.0-darkAlpha-color.a)+darkRGB*scene.a;
-                    gl_FragColor = vec4(shaded+color.rgb*scene.a,scene.a);
-                }`, {viewport:new Float32Array(2),lightMap:PIXI.Texture.EMPTY,colorMap:PIXI.Texture.EMPTY,colorGain:0,nightTint:0,veilMap:PIXI.Texture.EMPTY,veilGain:0,inverseWorld:new Float32Array(3),veilSize:new Float32Array([1,1]),mapSize:new Float32Array(2)});
+                    vec3 rgb=shaded+color.rgb*scene.a;
+                    gl_FragColor = vec4(daylight(rgb/max(.00001,scene.a),screen)*scene.a,scene.a);
+                }`, {lightingOn:1,sunColor:new Float32Array(3),sunGrade:new Float32Array(4),sunDirection:new Float32Array(2),reflectionMap:PIXI.Texture.EMPTY,reflectionGain:0,viewport:new Float32Array(2),lightMap:PIXI.Texture.EMPTY,colorMap:PIXI.Texture.EMPTY,colorGain:0,nightTint:0,veilMap:PIXI.Texture.EMPTY,veilGain:0,inverseWorld:new Float32Array(3),veilSize:new Float32Array([1,1]),mapSize:new Float32Array(2)});
             this.lighting.padding = 0;
             this.world.filters = [this.lighting];
             this.world.filterArea = new PIXI.Rectangle(0,0,canvas.width,canvas.height);
@@ -58480,7 +58485,7 @@ class NativeWebGLRenderer {
                 this.lost=false;this.gpuTimer.extension=this.renderer.gl.getExtension('EXT_disjoint_timer_query_webgl2');this.contextRestores=(this.contextRestores||0)+1;
                 // Render-texture pixels cannot survive context loss. CPU geometry
                 // remains valid, but every cached GPU light image must be redrawn.
-                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;this.crowdAtlas?.clear();this.nativeCasters?.invalidate();for(const r of this.nativeBuildings?.values()||[])r.key=r.glowKey=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,this.backdropContext,this.foliageContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
+                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;this.surfaces?.invalidate();this.crowdAtlas?.clear();this.nativeCasters?.invalidate();for(const r of this.nativeBuildings?.values()||[])r.key=r.glowKey=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,this.backdropContext,this.foliageContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
                 this.frames=[];this.warmFrames=15;this.lastStart=this.lastEnd=0;this.capture=this.completedCapture=null;this.message('');
             });
             this.gpuTimer=new NativeGpuTimer(gl);this.frameId=0;this.initLayers();this.initDetails();this.initWorld();
@@ -58557,20 +58562,22 @@ class NativeWebGLRenderer {
         _worldMatrix=new DOMMatrix([zoom,0,0,zoom,this.world.x,this.world.y]);_worldCanvas=game.canvas;
         const LZ=CONFIG.LOD_ZOOM,lodZoom=game.camera.zoom/(GameSettings.baseZoom||1);let lod=game._zoomLOD||0;
         while(lod<2&&lodZoom<LZ[lod].in)lod++;while(lod>0&&lodZoom>LZ[lod-1].out)lod--;game._zoomLOD=_zoomLOD=lod;
+        const sun=game.sunState(),sunStrength=this.layers.sunShadows&&game.activeMap.type==='outdoor'?sun.k*(1-.75*(sun.overcast||0)):0;
+        _sunShadow={on:sunStrength>.02,dx:sun.dx,dy:sun.dy,len:sun.len,k:sunStrength};
         this.syncProps(game);
         this.playerSprite.texture=this.pose(game);this.playerSprite.position.set(game.player.x,game.player.y);
         this.playerSprite.rotation=game.player.angle||0;this.playerSprite.visible=game.player.visible!==false;
         this.playerSprite.alpha=(game.player.isHidden||game.flitState.active) ? .5 : 1;
         this.playerSprite.visible&&=this.layers.player;
         this.syncLayers(game,view);
-        this.syncDetails(game,view);this.syncWorld(game,view);
+        this.syncDetails(game,view);this.syncWorld(game,view);this.gpuTimer.begin('surfaces',this.frameId);this.surfaces.sync(game,view);this.gpuTimer.end();
         this.gpuTimer.begin('lighting',this.frameId);this.syncLighting(game,view);this.gpuTimer.end();
         this.syncColorGrade(game);
         const submitStart=performance.now();this.gpuTimer.begin('scene',this.frameId);this.renderer.render(this.stage);this.gpuTimer.end();
         const end=performance.now();this.layerStages.sceneSubmitMs=end-submitStart;
         const f={frame:this.frameId,at:start,intervalMs:this.lastStart?start-this.lastStart:null,gapMs:this.lastEnd?start-this.lastEnd:null,renderMs:end-start,
             uploads:this.uploads-beforeUploads,bakes:this.bakes-beforeBakes,draws:this.drawCalls-beforeDraws,bufferBytes:this.bufferBytes-beforeBuffers,
-            bakeOrigins:{...this.bakeOrigins},rain:{...this.rainStats},world:{...this.worldStats},details:structuredClone(this.detailStats),animation:{...this.actorStats},shadows:{...this.shadowStats},stages:{...this.layerStages}};this.lastStart=start;
+            bakeOrigins:{...this.bakeOrigins},rain:{...this.rainStats},world:{...this.worldStats},details:structuredClone(this.detailStats),animation:{...this.actorStats},shadows:{...this.shadowStats},stages:{...this.layerStages},surfaces:structuredClone(this.surfaceStats)};this.lastStart=start;
         this.lastEnd=end;
         if(this.startup&&!this.startup.ready){this.startup.firstFrames.push({...f});if(this.startup.firstFrames.length>=15)this.startup.ready=true;}
         if(this.warmFrames>0)this.warmFrames--;
@@ -58586,11 +58593,11 @@ class NativeWebGLRenderer {
     report() {
         const frames=this.frames.slice(),intervals=frames.map(f=>f.intervalMs).filter(v=>v>0),sum=intervals.reduce((a,b)=>a+b,0);
         const sorted=intervals.slice().sort((a,b)=>a-b);
-        return {renderer:'native-webgl-apartment',build:'native-webgl-grade-v11',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
+        return {renderer:'native-webgl-apartment',build:'native-webgl-surfaces-v12',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
             settings:this.settings,resolution:[this.canvas.width,this.canvas.height],lighting:this.lightsOn,warmFramesRemaining:this.warmFrames,frames,
             animationSummary:{changedFrames:frames.filter(f=>f.animation?.changed).length,geometryMeanMs:frames.length?frames.reduce((n,f)=>n+(f.animation?.geometryMs||0),0)/frames.length:0,
                 shadowRefreshFrames:frames.filter(f=>f.shadows.dynamicRebuilds>0).length,dynamicRebuilds:frames.reduce((n,f)=>n+(f.shadows.dynamicRebuilds||0),0),staticRebuilds:frames.reduce((n,f)=>n+(f.shadows.staticRebuilds||0),0)},
-            buildingTargetBytes:this.buildingGlowBytes(),crowdTargetBytes:this.crowdAtlas?.bytes||0,rain:this.rainStats,world:this.worldStats,casters:this.nativeCasters?.report(),backdrop:this.backdropStats,colorGrade:this.colorGrade,textureQuality:this.textureQuality,assetDensities:[...new Set([...this.textures].map(t=>t.baseTexture.resolution))],glyphAtlasBytes:Object.values(PIXI.BitmapFont.available.NativeDetailFont.pageTextures).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),qualityReductions:this.qualityReductions,details:this.detailStats,layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
+            buildingTargetBytes:this.buildingGlowBytes(),crowdTargetBytes:this.crowdAtlas?.bytes||0,rain:this.rainStats,world:this.worldStats,casters:this.nativeCasters?.report(),backdrop:this.backdropStats,colorGrade:this.colorGrade,surfaces:this.surfaceStats,textureQuality:this.textureQuality,assetDensities:[...new Set([...this.textures].map(t=>t.baseTexture.resolution))],glyphAtlasBytes:Object.values(PIXI.BitmapFont.available.NativeDetailFont.pageTextures).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),qualityReductions:this.qualityReductions,details:this.detailStats,layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
             contextRestores:this.contextRestores||0,
             capture:this.capture?{...this.capture}:null,player:this.playerSprite?{x:this.playerSprite.x,y:this.playerSprite.y}:null,
             fps:sum?intervals.length*1000/sum:0,p95Ms:sorted[Math.ceil(sorted.length*.95)-1]||0,
@@ -58601,11 +58608,11 @@ class NativeWebGLRenderer {
             timing:this.gpuTimer.extension?'CPU submission, actual frame cadence, and optional asynchronous GPU samples':'CPU render submission and frame cadence; GPU timer unavailable',
             shadowCache:this.shadowStats,layerStages:this.layerStages,animation:this.actorStats,startup:this.startup,entryTiming:this.entryTiming,initializationMs:this.initializationMs,
             gpu:{status:this.gpuTimer.status,pending:this.gpuTimer.pending.length,samples:this.gpuTimer.samples.filter(s=>s.frame>=(frames[0]?.frame??Infinity))},
-            gradientTargetBytes:[this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,this.backdropContext,this.foliageContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext),...[...(this.nativeCasters?.entries.values()||[])].map(r=>r.ctx)].filter(Boolean).reduce((n,c)=>n+c.gradients.length*128*128*4,0),
+            gradientTargetBytes:[this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,this.occupantContext,this.backdropContext,this.foliageContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top,r.glowContext,r.glowLive]),...[...this.props.values()].map(r=>r.liveContext),...[...(this.nativeCasters?.entries.values()||[])].map(r=>r.ctx),...(this.surfaces?.contexts||[])].filter(Boolean).reduce((n,c)=>n+c.gradients.length*128*128*4,0),
             veilTargetBytes:this.veilTarget?this.veilTarget.baseTexture.realWidth*this.veilTarget.baseTexture.realHeight*4:0,
             characterTargetBytes:this.actorTexture?this.actorTexture.baseTexture.realWidth*this.actorTexture.baseTexture.realHeight*4:0,
             shadowTextureBytes:this.shadowBytes(),
-            limitations:['City/interior migration; some cinematic passes remain approximate','Procedural character paths use GPU tessellation; tiny Canvas shadowBlur accents remain approximate','Furniture shadows use the original geometric footprints','Window droplets and wet reflections are not migrated; small blur/dash accents remain approximate']};
+            limitations:['City/interior migration; some cinematic passes remain approximate','Procedural character paths use GPU tessellation; tiny Canvas shadowBlur accents remain approximate','Furniture shadows use the original geometric footprints','Glass rain is a continuous shader interpretation; reflection detail captures and buildings have visible work budgets','Small blur/dash accents and some cinematic passes remain approximate']};
     }
 }
 // Independently testable apartment passes. Light masks are GPU render textures;
@@ -58613,7 +58620,7 @@ class NativeWebGLRenderer {
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city',colorGrade:'Final color grade / vision'};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city',colorGrade:'Final color grade / vision',entrancePads:'Entrance pads',entranceLabels:'Entrance labels',daylight:'Daylight color / haze',sunShadows:'Sun cast shadows',cloudShadows:'Cloud shadows',windowDaylight:'Window daylight',glassRain:'Rain on glass',wetRoofs:'Wet roof highlights',wetSurfaces:'Wet ground / puddles',puddleRipples:'Puddle ripples',reflectionLights:'Reflected lights',reflectionDetail:'Reflected characters / vehicles'};
 const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
@@ -58919,7 +58926,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
     },
     syncLighting(game,view){
         const start=performance.now(),L=this.layers;this.shadowStats={hits:0,rebuilds:0,staticRebuilds:0,dynamicRebuilds:0,dynamicHits:0,silhouettePairs:0,sources:0,pairs:0};
-        this.world.filters=L.lighting?[this.lighting]:null;if(!L.lighting)return;
+        this.lighting.uniforms.lightingOn=L.lighting?1:0;this.lighting.uniforms.viewport.set([game.canvas.width,game.canvas.height]);
+        this.world.filters=L.lighting||this.daylightState?.active?[this.lighting]:null;if(!L.lighting)return;
         const w=game.canvas.width,h=game.canvas.height;
         if(!this.lightTarget||this.lightSize!==w+':'+h){
             if(this.lightTarget)this.lightTarget.destroy(true);
@@ -58971,9 +58979,9 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
         this.lighting.uniforms.colorGain=L.colorWash ? game.getAmbientDarkness() : 0;
         if(L.colorWash){
-            this.lightBase.visible=false;this.skyLight.visible=false;
+            this.lightBase.visible=false;this.skyLight.visible=false;this.surfaces.windowHole.root.visible=false;this.surfaces.windowColor.root.visible=true;
             for(let i=0;i<sources.length;i++){const s=this.lightSprites.children[i];s.tint=PIXI.Color.shared.setValue(sources[i].color).toNumber();s.alpha*=sources[i].wash;s.blendMode=PIXI.BLEND_MODES.ADD;}
-            this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.lightBase.visible=true;this.skyLight.visible=true;
+            this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
         }
         this.layerStages.lightingMs=performance.now()-start;
     }
@@ -59205,7 +59213,7 @@ class NativeFxGlowFilter extends PIXI.Filter{
 // live actors. Original simulation/save schema remain the source of truth.
 Object.assign(NativeWebGLRenderer.prototype,{
     initWorld(){
-        this.backdropPrepared=false;this.nativeCasters=new NativeCasterBodies(this);this.backdropContext=new NativeVectorContext(this);this.backdrop.addChild(this.backdropContext.root);
+        this.surfaces=new NativeWorldSurfaces(this);this.backdropPrepared=false;this.nativeCasters=new NativeCasterBodies(this);this.backdropContext=new NativeVectorContext(this);this.backdrop.addChild(this.backdropContext.root);
         this.groundContext=new NativeVectorContext(this);this.floorArt.addChild(this.groundContext.root);
         this.buildingBaseStage=new PIXI.Container();this.world.addChildAt(this.buildingBaseStage,this.world.getChildIndex(this.objects));
         this.peopleContext=new NativeVectorContext(this);this.objects.addChild(this.peopleContext.root);
@@ -59220,6 +59228,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
     },
     clearWorld(){
         if(!this.nativeBuildings)return;
+        this.surfaces.clear();
         if(this.playerSprite)this.objects.addChild(this.playerSprite);for(const r of this.fixtureNodes.values())this.fixtures.addChild(r.node);
         this.nativeCasters.clear();
         for(const [d,r]of this.doorNodes)this.doors.addChild(r.node);for(const r of this.props.values())if(r.group)this.objects.addChild(r.group);
@@ -59749,6 +59758,319 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.colorGrade={enabled:this.layers.colorGrade,filter:game.canvas.style.filter};
     }
 });
+// Native floor cues, daylight and glass. No live Canvas frame captures.
+const NATIVE_DAYLIGHT_GLSL=`
+uniform float lightingOn;uniform vec3 sunColor;uniform vec4 sunGrade;uniform vec2 sunDirection;
+vec3 softSun(vec3 b,vec3 s){vec3 d=mix(((16.0*b-12.0)*b+4.0)*b,sqrt(max(b,vec3(0.0))),step(vec3(.25),b));
+    return mix(b-(1.0-2.0*s)*b*(1.0-b),b+(2.0*s-1.0)*(d-b),step(vec3(.5),s));}
+vec3 daylight(vec3 rgb,vec2 screen){float k=sunGrade.x;if(k<=.01)return rgb;
+    float light=1.0-.6*sunGrade.y,golden=sunGrade.z;
+    rgb=mix(rgb,1.0-(1.0-rgb)*(1.0-sunColor),(.09*light+.03*golden)*k);
+    rgb=mix(rgb,softSun(rgb,sunColor),(.42+.1*golden)*k*light);
+    vec2 center=viewport*.5-sunDirection*viewport*.7;float radius=max(viewport.x,viewport.y)*1.1;
+    if(golden>.02){float a=.12*golden*k*clamp(1.0-distance(screen,center)/radius,0.0,1.0);
+        rgb=mix(rgb,1.0-(1.0-rgb)*(1.0-vec3(1.0,160.0/255.0,150.0/255.0)),a);}
+    float inner=min(viewport.x,viewport.y)*.35,outer=max(viewport.x,viewport.y)*.75;
+    float edge=clamp((distance(screen,viewport*.5)-inner)/(outer-inner),0.0,1.0);
+    return rgb*mix(vec3(1.0),mix(vec3(1.0),vec3(150.0,130.0,205.0)/255.0,edge),.3*k*edge);
+}`;
+const NATIVE_SURFACE_VERTEX=`precision highp float;attribute vec2 aVertexPosition;attribute vec2 aUV;
+uniform mat3 projectionMatrix;uniform mat3 translationMatrix;varying vec2 uv;
+void main(){uv=aUV;gl_Position=vec4((projectionMatrix*translationMatrix*vec3(aVertexPosition,1.)).xy,0.,1.);}`;
+function nativeSurfaceGeometry(){return new PIXI.Geometry().addAttribute('aVertexPosition',new Float32Array([0,0,1,0,1,1,0,1]),2)
+    .addAttribute('aUV',new Float32Array([0,0,1,0,1,1,0,1]),2).addIndex([0,1,2,0,2,3]);}
+// The same monotone-chain hull used by Canvas's sun pass.
+function nativeSunHull(points){
+    const sorted=points.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]),cross=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+    const lower=[],upper=[];for(const p of sorted){while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop();lower.push(p);}
+    for(let i=sorted.length-1;i>=0;i--){const p=sorted[i];while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop();upper.push(p);}
+    lower.pop();upper.pop();return lower.concat(upper);
+}
+class NativeEntrancePad extends PIXI.Mesh{
+    constructor(){super(nativeSurfaceGeometry(),PIXI.Shader.from(NATIVE_SURFACE_VERTEX,`
+        precision highp float;varying vec2 uv;uniform vec2 size;uniform float pulse;uniform float zoom;
+        vec4 over(vec4 a,vec3 rgb,float alpha){return vec4(a.rgb*(1.-alpha)+rgb*alpha,a.a*(1.-alpha)+alpha);}
+        void main(){vec2 p=uv*(size+40.)-20.;vec2 d=abs(p-size*.5)-size*.5;
+            float r=length(p-size*.5)/(max(size.x,size.y)*.8),a;
+            vec3 c;float mid=.1+pulse*.08;
+            if(r<.6){a=mix(.2+pulse*.12,mid,r/.6);c=mix(vec3(180.,170.,255.),vec3(200.,190.,255.),r/.6)/255.;}
+            else{a=mid*(1.-clamp((r-.6)/.4,0.,1.));c=vec3(200.,190.,255.)/255.;}
+            vec4 outColor=vec4(c*a,a);float edge=abs(max(d.x,d.y)),aa=.6/max(zoom,.1);
+            float haze=(.16+pulse*.12)*exp(-edge*edge/(32.+pulse*24.));outColor=over(outColor,vec3(180.,170.,255.)/255.,haze);
+            float inside=(1.-step(0.,max(d.x,d.y)));outColor=over(outColor,vec3(200.,190.,255.)/255.,inside*(.08+pulse*.06));
+            float border=1.-smoothstep(1.-aa,1.+aa,edge);outColor=over(outColor,vec3(200.,190.,255.)/255.,border*(.5+pulse*.35));
+            vec2 corner=min(abs(p),abs(p-size));float tick=1.-step(10.,max(corner.x,corner.y));
+            outColor=over(outColor,vec3(210.,200.,255.)/255.,tick*border*(.7+pulse*.3));gl_FragColor=outColor;
+        }`,{size:new Float32Array(2),pulse:0,zoom:1}));}
+}
+class NativeGlassRain extends PIXI.Mesh{
+    constructor(){super(nativeSurfaceGeometry(),PIXI.Shader.from(NATIVE_SURFACE_VERTEX,`
+        precision highp float;varying vec2 uv;uniform vec2 size;uniform vec2 clipSize;uniform vec2 offset;uniform float clock;uniform float wet;uniform float seed;
+        float hash(float n){return fract(sin(n*127.1+seed*311.7)*43758.5453);}
+        void main(){vec2 q=uv*clipSize,p=q+offset;float column=floor(p.x/9.),rnd=hash(column+1.);
+            float xx=mod(p.x,9.)-(1.5+rnd*6.);float span=max(10.,size.y);
+            float yy=mod(p.y+clock*(3.+rnd*8.)+rnd*span,span)-span*.5;
+            float body=exp(-xx*xx/1.2-yy*yy/(1.5+rnd*7.));
+            float tail=exp(-xx*xx/0.45)*smoothstep(-7.,-1.,yy)*(1.-smoothstep(-1.,.5,yy));
+            float shine=(body*.45+tail*.16)*wet;
+            float edge=clamp(min(min(q.x,clipSize.x-q.x),min(q.y,clipSize.y-q.y)),0.,1.);
+            float a=shine*edge;gl_FragColor=vec4(vec3(.78,.88,1.)*a,a);
+        }`,{size:new Float32Array(2),clipSize:new Float32Array(2),offset:new Float32Array(2),clock:0,wet:0,seed:0}));}
+}
+// A material highlight on the authored roof plane, without a scene capture.
+class NativeWetRoof extends PIXI.Mesh{
+    constructor(){super(new PIXI.MeshGeometry(new Float32Array(0),new Float32Array(0),new Uint16Array(0)),new PIXI.MeshMaterial(PIXI.Texture.EMPTY));this.key=null;}
+    polygon(points,key){if(this.key===key)return;this.key=key;this.geometry.getBuffer('aVertexPosition').update(new Float32Array(points.flat()));
+        this.geometry.getBuffer('aTextureCoord').update(new Float32Array(points.flatMap(([x,y])=>[x/64,y/64])));
+        const index=[];for(let i=1;i<points.length-1;i++)index.push(0,i,i+1);this.geometry.getIndex().update(new Uint16Array(index));this.size=index.length;}
+}
+class NativeWorldSurfaces{
+    constructor(owner){
+        this.owner=owner;this.pads=new Map();this.glass=new Map();this.roofs=new Map();this.doorKeys=new WeakMap();this.sunHulls=new WeakMap();this.labels=new NativeVectorContext(owner);this.labels.label='entrance-labels';
+        this.floor=new PIXI.Container();this.padStage=new PIXI.Container();this.glassStage=new PIXI.Container();
+        owner.world.addChildAt(this.floor,owner.world.getChildIndex(owner.floorArt)+1);this.floor.addChild(this.padStage,this.labels.root);
+        owner.postWorld.addChildAt(this.glassStage,owner.postWorld.getChildIndex(owner.marker));
+        this.windowHole=new NativeVectorContext(owner);this.windowColor=new NativeVectorContext(owner);this.windowHole.label='window-daylight-holes';this.windowColor.label='window-daylight-color';owner.lightStage.addChild(this.windowHole.root,this.windowColor.root);
+        this.cloudContext=new NativeVectorContext(owner);this.cloudContext.label='cloud-shadows';this.floor.addChildAt(this.cloudContext.root,0);
+        this.sunContext=new NativeVectorContext(owner);this.sunContext.label='sun-cast-shadows';this.sunSprite=new PIXI.Sprite();this.sunSprite.blendMode=PIXI.BLEND_MODES.MULTIPLY;this.floor.addChildAt(this.sunSprite,0);
+        this.sunFilter=new PIXI.Filter(undefined,`precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;uniform float strength;
+            void main(){float a=texture2D(uSampler,vTextureCoord).a*strength;gl_FragColor=vec4(vec3(92.,76.,150.)/255.*a,a);}`,{strength:0});
+        this.sunSprite.filters=[this.sunFilter];this.reflections=new NativeWetReflections(owner,this.floor);
+    }
+    get contexts(){return [this.labels,this.sunContext,this.cloudContext,this.windowHole,this.windowColor,...this.reflections.contexts];}
+    sync(game,view){
+        const start=performance.now(),r=this.owner,L=r.layers,W=game.canvas.width,H=game.canvas.height;
+        const S=game.sunState(),k=L.daylight?S.k*game._sunReach():0;
+        r.lighting.uniforms.sunColor.set((S.col||[255,248,234]).map(v=>v/255));r.lighting.uniforms.sunGrade.set([k,S.overcast||0,S.golden||0,0]);r.lighting.uniforms.sunDirection.set([S.dx||0,S.dy||0]);
+        r.daylightState={active:k>.01,k,golden:S.golden||0};
+        const hw=W/(2*view.zoom),hh=H/(2*view.zoom),V={left:view.x-hw-40,right:view.x+hw+40,top:view.y-hh-40,bottom:view.y+hh+40};
+        const visible=(x,y,w,h)=>x+w>=V.left&&x<=V.right&&y+h>=V.top&&y<=V.bottom;
+        const pulse=(Math.sin(_frameTime/200)+1)/2;let pads=0,labelCount=0,glassCount=0;
+        for(const rec of this.pads.values())rec.node.visible=false;this.labels.begin();
+        for(const t of game.activeMap.transitions||[]){
+            if(t.quiet||!(L.entrancePads||L.entranceLabels)||!visible(t.x-20,t.y-20,t.w+40,t.h+40))continue;
+            if(L.entrancePads&&pads<128){let rec=this.pads.get(t);if(!rec){rec={node:new NativeEntrancePad()};this.pads.set(t,rec);this.padStage.addChild(rec.node);}const n=rec.node;rec.used=r.frameId;n.visible=true;n.position.set(t.x-20,t.y-20);n.scale.set(t.w+40,t.h+40);n.shader.uniforms.size.set([t.w,t.h]);n.shader.uniforms.pulse=pulse;n.shader.uniforms.zoom=view.zoom;pads++;}
+            const cx=t.x+t.w/2,cy=t.y+t.h/2;
+            if(L.entranceLabels&&Math.hypot(game.player.x-cx,game.player.y-cy)<150){const c=this.labels,indoor=game.activeMap.type==='indoor';c.font='12px Orbitron';c.fillStyle='#ddd8ff';c.textAlign='center';c.textBaseline=indoor?'bottom':'top';c.fillText('ENTRANCE',cx,indoor?t.y-8:t.y+t.h+8);labelCount++;}
+        }
+        for(const [key,rec]of this.pads)if(rec.used<r.frameId-120){rec.node.destroy();this.pads.delete(key);}
+        for(const rec of this.glass.values())rec.node.visible=false;
+        const wet=L.glassRain?Math.min(1,Math.max(game.weather?.wetness||0,game.weather?.isRaining?game.weather.intensity*.8:0)):0;
+        const paintGlass=(key,x,y,w,h,originX=x,originY=y,fullW=w,fullH=h)=>{
+            if(wet<.01||glassCount>=96||!visible(x,y,w,h))return;
+            let rec=this.glass.get(key);if(!rec){rec={node:new NativeGlassRain(),seed:originX*.07+originY*.013};this.glass.set(key,rec);this.glassStage.addChild(rec.node);}
+            const n=rec.node;rec.used=r.frameId;n.visible=true;n.position.set(x,y);n.scale.set(w,h);n.shader.uniforms.size.set([fullW,fullH]);n.shader.uniforms.clipSize.set([w,h]);n.shader.uniforms.offset.set([x-originX,y-originY]);n.shader.uniforms.wet=wet;n.shader.uniforms.clock=L.decorAnimation?_gameTimeSec:0;n.shader.uniforms.seed=rec.seed;glassCount++;
+        };
+        if(L.windows)for(const w of game.roomSystem.windows||[])if(!w.shattered&&!(game.activeMap.id==='apt_949'&&w.y===0))paintGlass(w,w.x,w.y,w.w,w.h);
+        if(L.doors)for(const d of game.roomSystem.doors||[])if(d.type==='sliding'){
+            let keys=this.doorKeys.get(d);if(!keys)this.doorKeys.set(d,keys=[{},{}]);
+            const slide=d.openAmount*((d.orientation==='H'?d.w:d.h)/2+4),leaves=d.leaves();for(let i=0;i<leaves.length;i++){const [ax,ay,bx,by]=leaves[i];
+                if(d.orientation==='H')paintGlass(keys[i],Math.min(ax,bx),d.y+(d.jolt||0),Math.abs(bx-ax),d.h,d.x+(i===0?-slide:d.w/2+2+slide),d.y+(d.jolt||0),d.w/2-2,d.h);
+                else paintGlass(keys[i],d.x+(d.jolt||0),Math.min(ay,by),d.w,Math.abs(by-ay),d.x+(d.jolt||0),d.y+(i===0?-slide:d.h/2+2+slide),d.w,d.h/2-2);
+            }
+        }
+        for(const [key,rec]of this.glass)if(rec.used<r.frameId-120){rec.node.destroy();this.glass.delete(key);}
+        for(const c of [this.windowHole,this.windowColor]){c.begin();c.canvas=game.canvas;c.setTransform(view.zoom,0,0,view.zoom,r.world.x,r.world.y);}
+        if(L.windowDaylight){this.windowHole.globalCompositeOperation='screen';this.windowColor.globalCompositeOperation='lighter';game.roomSystem.drawWindowLightProjections(this.windowHole,game.dayCycle().daylight);game.roomSystem.drawWindowColorPass(this.windowColor,game.dayCycle().daylight);}
+        this.windowHole.root.visible=true;this.windowColor.root.visible=false;
+        this.cloudContext.begin();this.cloudContext.canvas=game.canvas;this.cloudContext.sceneFrame=_worldMatrix;
+        if(L.cloudShadows&&game.activeMap.type==='outdoor'&&S.k>.02)game._drawCloudShadows(this.cloudContext,V,S.k*(1-.75*S.overcast),S);
+        this.syncSun(game,view,V,S);const roofs=this.syncRoofs(game,view);this.reflections.sync(game,view,V);
+        r.surfaceStats={pads,labels:labelCount,glass:glassCount,roofs,windowHoles:this.windowHole.pathsPainted,windowColor:this.windowColor.pathsPainted,cloudPaths:this.cloudContext.pathsPainted,daylight:r.daylightState,sun:this.sunStats,reflections:this.reflections.stats,cpuMs:performance.now()-start};r.layerStages.surfacesMs=r.surfaceStats.cpuMs;
+    }
+    syncRoofs(game,view){
+        const r=this.owner,wet=r.layers.wetRoofs&&r.layers.buildings&&game.activeMap.type==='outdoor'?Math.min(1,game.weather.wetness||0):0;let count=0,dropped=0;
+        for(const rec of this.roofs.values())for(const mesh of rec.meshes)mesh.visible=false;
+        if(wet>.01&&r.nativeBuildings.size){
+            if(!this.roofTile){this.roofTile=PIXI.RenderTexture.create({width:64,height:64,resolution:1});this.roofTile.baseTexture.wrapMode=PIXI.WRAP_MODES.REPEAT;
+                this.roofTileMesh=new PIXI.Mesh(nativeSurfaceGeometry(),PIXI.Shader.from(NATIVE_SURFACE_VERTEX,`precision highp float;varying vec2 uv;uniform float clock;uniform float wet;
+                    void main(){float wave=sin(uv.x*6.2831853+uv.y*6.2831853+clock*.7),streak=pow(max(0.,wave),12.);
+                        float fleck=pow(max(0.,sin(uv.x*18.849556-uv.y*12.566371+clock*.9)),28.);float a=wet*(.008+.025*streak+.035*fleck);gl_FragColor=vec4(vec3(.68,.77,.94)*a,a);}`,{clock:0,wet:0}));
+                this.roofTileMesh.scale.set(64);this.roofTileStage=new PIXI.Container();this.roofTileStage.addChild(this.roofTileMesh);
+            }
+            const clock=r.layers.decorAnimation?_gameTimeSec:0,key=clock+':'+wet;
+            if(this.roofTileKey!==key){this.roofTileMesh.shader.uniforms.clock=clock;this.roofTileMesh.shader.uniforms.wet=wet;r.renderer.render(this.roofTileStage,{renderTexture:this.roofTile,clear:true});this.roofTileKey=key;}
+        }
+        if(wet>.01)for(const [b,record]of r.nativeBuildings){if(!b._footprint||!b._leanScale)continue;let rec=this.roofs.get(b);if(!rec)this.roofs.set(b,rec={meshes:[]});rec.used=r.frameId;
+            const k=1+b._leanScale(),key=[record.key,k].join(':');
+            for(let i=0;i<b.sections.length;i++){
+                if(count>=48){dropped++;continue;}let mesh=rec.meshes[i];if(!mesh)mesh=rec.meshes[i]=new NativeWetRoof();
+                const points=b._footprint(b.sections[i],i).map(([x,y])=>[game.camera.x+(x-game.camera.x)*k,game.camera.y+(y-game.camera.y)*k]);mesh.polygon(points,key+':'+i);
+                record.top.root.addChild(mesh);mesh.visible=true;mesh.shader.texture=this.roofTile;mesh.alpha=Math.min(b._sqFade??1,b._dnFade??1);count++;
+            }
+        }
+        for(const [b,rec]of this.roofs)if(!r.nativeBuildings.has(b)||rec.used<r.frameId-120){for(const mesh of rec.meshes)mesh.destroy();this.roofs.delete(b);}
+        return {count,dropped,bytes:this.roofTile?64*64*4:0};
+    }
+    syncSun(game,view,V,S){
+        const r=this.owner,strength=r.layers.sunShadows&&game.activeMap.type==='outdoor'?S.k*(1-.75*S.overcast):0;
+        this.sunSprite.visible=strength>.02;this.sunStats={active:this.sunSprite.visible,casters:0,rebuilds:0,bytes:this.sunTarget?this.sunTarget.baseTexture.realWidth*this.sunTarget.baseTexture.realHeight*4:0};if(!this.sunSprite.visible)return;
+        const W=game.canvas.width,H=game.canvas.height,res=Math.min(.5,1024/Math.max(W,H)),key=W+':'+H+':'+res;
+        if(this.sunSize!==key){this.sunTarget?.destroy(true);this.sunTarget=PIXI.RenderTexture.create({width:W,height:H,resolution:res});this.sunSize=key;this.sunKey=null;this.sunSprite.texture=this.sunTarget;}
+        const c=this.sunContext;c.begin();c.canvas=game.canvas;c.setTransform(view.zoom,0,0,view.zoom,r.world.x,r.world.y);c.fillStyle='#fff';c.beginPath();
+        const dx=S.dx*S.len,dy=S.dy*S.len,poly=pts=>{pts.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();this.sunStats.casters++;};
+        for(const {item:b}of game._queryRenderBuildings({...V,left:V.left-360,right:V.right+360,top:V.top-360,bottom:V.bottom+360},this.sunCandidates||(this.sunCandidates=[]))){
+            if(!b.isV2||!b.sections)continue;if(b.roundR)b._leanFaces();const h=Math.min(b.floors,CONFIG.BUILDINGS.MAX_FLOORS)*CONFIG.BUILDINGS.FLOOR_HEIGHT;
+            const key=[b.x,b.y,h,dx,dy,b.roundR,...b.sections.flatMap(s=>[s.x,s.y,s.w,s.h])].join(':');let cached=this.sunHulls.get(b);
+            if(cached?.key!==key){cached={key,hulls:b.sections.map((s,i)=>{const fp=b._footprint(s,i);return nativeSunHull(fp.concat(fp.map(([x,y])=>[x+dx*h,y+dy*h])));})};this.sunHulls.set(b,cached);}
+            for(const h of cached.hulls)poly(h);
+        }
+        for(const e of new Set([...(game.traffic?.vehicles||[]),game.car,game.ownedCar,game.deliveryVehicle].filter(Boolean))){
+            if(e.visible===false||!e.length||e.x<V.left-80||e.x>V.right+80||e.y<V.top-80||e.y>V.bottom+80)continue;
+            const ca=Math.cos(e.angle||0),sa=Math.sin(e.angle||0),ht=e.model==='truck'||/suv/.test(e.model)?17:13,pts=[];
+            for(const [a,b]of [[1,1],[1,-1],[-1,-1],[-1,1]]){const x=e.x+a*(e.length/2-3)*ca-b*(e.width/2-2)*sa,y=e.y+a*(e.length/2-3)*sa+b*(e.width/2-2)*ca;pts.push([x,y],[x+dx*ht,y+dy*ht]);}poly(nativeSunHull(pts));
+        }
+        for(const {item:f}of game._queryRenderFoliage({...V,left:V.left-120,right:V.right+120,top:V.top-120,bottom:V.bottom+120},this.sunFoliage||(this.sunFoliage=[]))){
+            const size=f.size||1,ht=(f.type==='bush'?8:34)*size,rad=(f.type==='bush'?12:f.type==='palm'?17:19)*size,rot=Math.atan2(dy,dx),N=S.len>.6?4:1;
+            for(let i=N===1?1:0;i<=N;i++){const t=i/N,cx=f.x+dx*ht*t,cy=foliageCanopyY(f)+dy*ht*t,rr=rad*(.6+.4*t),rx=rr*(1+S.len*.25*t);c.moveTo(cx+rx*Math.cos(rot),cy+rx*Math.sin(rot));c.ellipse(cx,cy,rx,rr*.8,rot,0,Math.PI*2);}this.sunStats.casters++;
+        }
+        c.fill();c.globalCompositeOperation='destination-out';game._drawFireLights(c,'hole',(x,y,rad)=>x+rad>V.left&&x-rad<V.right&&y+rad>V.top&&y-rad<V.bottom);if(this.sunKey!==c.hash){r.renderer.render(c.root,{renderTexture:this.sunTarget,clear:true});this.sunKey=c.hash;this.sunStats.rebuilds++;}this.sunSprite.position.set(-r.world.x/view.zoom,-r.world.y/view.zoom);this.sunSprite.scale.set(1/view.zoom);this.sunFilter.uniforms.strength=.62*strength;
+        this.sunStats.bytes=this.sunTarget.baseTexture.realWidth*this.sunTarget.baseTexture.realHeight*4;
+    }
+    invalidate(){this.sunKey=this.roofTileKey=null;for(const c of this.contexts)for(const g of c.gradients)g.key=null;this.reflections.invalidate();}
+    clear(){for(const rec of this.pads.values())rec.node.destroy();for(const rec of this.glass.values())rec.node.destroy();for(const rec of this.roofs.values())for(const mesh of rec.meshes)mesh.destroy();this.labels.destroy();this.sunContext.destroy();this.cloudContext.destroy();this.windowHole.destroy();this.windowColor.destroy();this.roofTile?.destroy(true);this.roofTileMesh?.destroy();this.roofTileStage?.destroy();this.sunTarget?.destroy(true);this.sunSprite.destroy();this.sunFilter.destroy();this.reflections.clear();this.floor.destroy();this.glassStage.destroy();}
+}
+// Wet material masks and reflected light/detail remain in GPU render targets.
+class NativeReflectionImage extends PIXI.Mesh{
+    constructor(){super(nativeSurfaceGeometry(),PIXI.Shader.from(NATIVE_SURFACE_VERTEX,`
+        precision highp float;varying vec2 uv;uniform sampler2D image;uniform float opacity;
+        void main(){vec4 c=texture2D(image,uv);float a=max(c.a,max(c.r,max(c.g,c.b)));gl_FragColor=vec4(c.rgb,a)*opacity;}`,{image:PIXI.Texture.EMPTY,opacity:1}));}
+}
+class NativeWetReflections{
+    constructor(owner,floor){
+        this.owner=owner;this.root=new PIXI.Container();floor.addChildAt(this.root,0);
+        this.puddle=new NativeVectorContext(owner);this.mask=new NativeVectorContext(owner);this.light=new NativeVectorContext(owner);this.detail=new NativeVectorContext(owner);this.ripple=new NativeVectorContext(owner);
+        [this.puddle,this.mask,this.light,this.detail].forEach((c,i)=>c.label=['wet-ground','wet-mask','reflected-lights','reflected-detail'][i]);
+        this.screen=new PIXI.Container();this.lightSprite=new PIXI.Sprite();this.lightSprite.blendMode=PIXI.BLEND_MODES.ADD;this.detailSprite=new PIXI.Sprite();
+        this.root.addChild(this.puddle.root,this.ripple.root,this.screen);this.screen.addChild(this.detailSprite,this.lightSprite);
+        this.targets=[];this.captures=new Map();this.stats={};
+        const makeFilter=()=>new PIXI.Filter(undefined,`precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;
+            uniform vec4 inputSize;uniform vec4 outputFrame;uniform vec2 viewport;uniform sampler2D wetMask;uniform float clock;uniform float rain;uniform float shimmer;
+            void main(){vec2 screen=outputFrame.xy+vTextureCoord*inputSize.xy;float band=floor(screen.y/viewport.y*30.);
+                float dx=(sin(clock*2.1+band*.9)*(1.2+rain*3.2)+sin(clock*5.3+band*2.7)*(1.2+rain*3.2)*.35*rain)*shimmer;
+                vec2 point=screen-vec2(dx,0.);vec4 c=texture2D(uSampler,vTextureCoord-vec2(dx*inputSize.z,0.));
+                float inside=step(0.,point.x)*(1.-step(viewport.x,point.x));
+                gl_FragColor=c*texture2D(wetMask,point/viewport).a*.95*inside;
+            }`,{viewport:new Float32Array(2),wetMask:PIXI.Texture.EMPTY,clock:0,rain:0,shimmer:1});
+        this.lightFilter=makeFilter();this.detailFilter=makeFilter();this.light.root.filters=[this.lightFilter];this.detail.root.filters=[this.detailFilter];
+    }
+    get contexts(){return [this.puddle,this.mask,this.light,this.detail,this.ripple];}
+    invalidate(){this.maskKey=null;for(const rec of this.captures.values())rec.last=-Infinity;}
+    bytes(){return this.targets.reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0)+this.captures.size*192*192*4;}
+    allocate(W,H,q){
+        const res=Math.min(q==='medium'?.25:.5,1024/Math.max(W,H)),detailRes=q==='ultra'?Math.min(1,1536/Math.max(W,H)):res,key=[W,H,res,detailRes].join(':');if(this.size===key)return;
+        this.releaseTargets();this.size=key;this.targets=[res,res,detailRes].map(resolution=>PIXI.RenderTexture.create({width:W,height:H,resolution,scaleMode:PIXI.SCALE_MODES.LINEAR}));
+        [this.maskTarget,this.lightTarget,this.detailTarget]=this.targets;this.lightSprite.texture=this.lightTarget;this.detailSprite.texture=this.detailTarget;this.maskKey=null;
+    }
+    releaseTargets(){this.lightSprite.texture=this.detailSprite.texture=PIXI.Texture.EMPTY;for(const t of this.targets)t.destroy(true);this.targets=[];this.size=null;this.maskKey=null;this.owner.lighting.uniforms.reflectionMap=PIXI.Texture.EMPTY;}
+    sync(game,view,V){
+        const start=performance.now(),r=this.owner,L=r.layers,q=game.reflectQuality(),wet=game._wetHere(),surf=game._surfaces();
+        const wants=L.wetSurfaces||L.reflectionLights||L.reflectionDetail||L.puddleRipples;
+        this.stats={active:false,quality:q,wet,puddles:0,lights:0,buildings:0,detail:0,sharedBodies:0,bodyCaptures:0,dropped:0,maskRefreshes:0,bytes:this.bytes()};
+        this.root.visible=!!(wants&&q&&(wet>=.02||surf));r.lighting.uniforms.reflectionGain=0;this.puddle.begin();this.ripple.begin();this.ripple.root.visible=false;
+        if(!this.root.visible){this.releaseTargets();this.trim(true);this.roomGlow?.destroy(true);this.roomGlow=null;this.stats.bytes=0;this.stats.cpuMs=performance.now()-start;return;}
+        const W=game.canvas.width,H=game.canvas.height;
+        const near=(x,y,pad=0)=>x>V.left-pad&&x<V.right+pad&&y>V.top-160-pad&&y<V.bottom+pad;
+        this.screen.position.set(-r.world.x/view.zoom,-r.world.y/view.zoom);this.screen.scale.set(1/view.zoom);
+        const setup=c=>{c.begin();c.canvas=game.canvas;c.setTransform(view.zoom,0,0,view.zoom,r.world.x,r.world.y);};
+        setup(this.mask);const mask=this.mask,puddle=this.puddle,boxes=[];
+        const rect=(x,y,w,h,k)=>{if(!near(x+w/2,y+h/2,Math.max(w,h)))return;mask.fillStyle='rgba(255,255,255,'+k+')';mask.fillRect(x,y,w,h);boxes.push([x,y,x+w,y+h]);};
+        if(wet>=.02){
+            if(game.activeMap.id==='hub_949')for(const road of game.traffic?.network?.roads||[]){if(!near(road.x+road.w/2,road.y+road.h/2,Math.max(road.w,road.h)))continue;mask.fillStyle='rgba(255,255,255,'+(REFLECT.ROAD*Math.min(1,wet*1.3)).toFixed(3)+')';mask.beginPath();Poly.trace(mask,road.getCorners());mask.fill();boxes.push([road.x,road.y,road.x+road.w,road.y+road.h]);}
+            for(const p of game.activeMap.pavements||[]){if(!near(p.x+p.w/2,p.y+p.h/2,Math.max(p.w,p.h)))continue;mask.fillStyle='rgba(255,255,255,'+(REFLECT.PAVE*Math.min(1,wet*1.3)).toFixed(3)+')';if(p.poly){mask.beginPath();Poly.trace(mask,p.poly);mask.fill();}else mask.fillRect(p.x,p.y,p.w,p.h);boxes.push([p.x,p.y,p.x+p.w,p.y+p.h]);}
+        }
+        if(surf){for(const [x,y,w,h,k]of surf.rects)rect(x,y,w,h,k);
+            mask.globalCompositeOperation='destination-out';mask.fillStyle='#fff';for(const [x,y,w,h]of surf.cuts||[])mask.fillRect(x,y,w,h);for(const [x,y,rad]of surf.cutCircles||[]){mask.beginPath();mask.arc(x,y,rad,0,Math.PI*2);mask.fill();}
+            mask.globalCompositeOperation='source-over';mask.fillStyle='rgba(255,255,255,.95)';for(const [x,y,rad]of surf.water||[]){mask.beginPath();mask.arc(x,y,rad,0,Math.PI*2);mask.fill();boxes.push([x-rad,y-rad,x+rad,y+rad]);}}
+        const night=Math.min(1,Math.max(0,(game.getAmbientDarkness()-.15)/.35)),day=1-night;
+        for(const {item:p}of wet>=.02?game._queryPuddleCandidates({...V,top:V.top-160},'nativePuddles'):[]){
+            if(!near(p.x,p.y,p.r))continue;const k=game._puddleK(p,wet);if(k<=0)continue;const growth=.65+.35*k;
+            _paintPuddleLobes(mask,p,growth,_puddleEdgeSprite('mask'),k);boxes.push([p.x-p.r,p.y-p.r,p.x+p.r,p.y+p.r]);this.stats.puddles++;
+            if(L.wetSurfaces){_paintPuddleLobes(puddle,p,growth,_puddleEdgeSprite('night'),.55*k*night);_paintPuddleLobes(puddle,p,growth,_puddleEdgeSprite('day'),.3*k*day);_paintPuddleLobes(puddle,p,growth,_puddleEdgeSprite('rim'),.045*k*Math.min(1,wet*1.5));}
+        }
+        if(!boxes.length){this.root.visible=false;this.releaseTargets();this.trim(true);this.stats.bytes=0;this.stats.cpuMs=performance.now()-start;return;}
+        this.allocate(W,H,q);
+        this.boxes=boxes;this.stats.active=true;
+        if(this.maskKey!==mask.hash){r.renderer.render(mask.root,{renderTexture:this.maskTarget,clear:true});this.maskKey=mask.hash;this.stats.maskRefreshes++;}
+        setup(this.light);setup(this.detail);this.light.globalCompositeOperation='lighter';
+        const onWet=(x,y,pad)=>boxes.some(b=>x+pad>b[0]&&x-pad<b[2]&&y+pad>b[1]&&y-pad<b[3]);
+        const glow=(x,y,col,w,h,a)=>{if(this.stats.lights>=192){this.stats.dropped++;return;}if(a<.01||!near(x,y,h)||!onWet(x,y,Math.max(w,h)/2))return;this.light.globalAlpha=Math.min(1,a);this.light.drawImage(puffSprite(col),x-w/2,y-h/2,w,h);this.stats.lights++;};
+        if(L.reflectionLights){
+            if(night>.01){
+                for(const {item:l}of game._queryLampCandidates({...V,left:V.left-220,right:V.right+220,top:V.top-380,bottom:V.bottom+220},'nativeReflectedLamps')){
+                    if(this.stats.lights>=192){this.stats.dropped++;continue;}const scale=LAMP_TYPE_STYLE[l.lampType]?LAMP_POST_SCALE:1,height=REFLECT.LAMP_H*scale;
+                    const k=game.roomSystem.lampLight(l)*lampFlicker(l)*night;if(k<.02)continue;const col=l.color||'#ffeebb';
+                    glow(l.x,l.y+height*1.05,col,54*scale,70*scale,k);glow(l.x,l.y+height*1.05,'#ffffff',16*scale,22*scale,.8*k);glow(l.x,l.y+height*.95,col,24*scale,height*2.6,.7*k);
+                    this.light.globalAlpha=.18*k;this.light.strokeStyle=col;this.light.lineWidth=2*scale;this.light.beginPath();this.light.moveTo(l.x,l.y+4*scale);this.light.lineTo(l.x,l.y+height*.9);this.light.stroke();
+                }
+                for(const car of new Set([...(game.traffic?.vehicles||[]),...(game.cars||[]),game.car,game.ownedCar,game.van,game.deliveryVehicle].filter(Boolean))){
+                    if(car.dead||car.visible===false||!near(car.x,car.y,60))continue;const ca=Math.cos(car.angle||0),sa=Math.sin(car.angle||0),h=(car.length||40)/2,wd=(car.width||20)/3,f=(car.fade??1)*night;
+                    for(const sign of [-1,1]){const px=-sa*wd*sign,py=ca*wd*sign;glow(car.x+ca*h+px,car.y+sa*h+py+14,car.headlightColor||'#fff2d6',12,44,.9*f);glow(car.x-ca*h+px,car.y-sa*h+py+12,'#ff3048',10,34,.75*f);}
+                }
+                if(q!=='medium'&&L.buildings)for(const [b,record]of r.nativeBuildings){
+                    const gy=b.y+b.h;if(!record.glowTarget||!record.glowMesh?.visible||!near(b.x+b.w/2,gy,Math.max(200,b.w/2))||!onWet(b.x+b.w/2,gy+100,b.w))continue;
+                    if(this.stats.buildings>=8){this.stats.dropped++;continue;}
+                    const c=this.light;c.save();c.translate(0,gy);c.scale(1,-.75);c.translate(0,-gy);const node=c.node(NativeReflectionImage);node.shader.uniforms.image=record.glowTarget;node.shader.uniforms.opacity=.45;node.blendMode=PIXI.BLEND_MODES.ADD;
+                    record.glowMesh.transform.updateLocalTransform();node.transform.setFromMatrix(c.matrix.clone().append(record.glowMesh.transform.localTransform));c.restore();this.stats.buildings++;
+                }
+            }
+            if(surf?.glowShift&&L.glows){const c=this.light;c.current=null;const node=c.node(NativeReflectionImage);
+                // One resident GPU snapshot of the already prepared room glow,
+                // reused for its reflected pass; no second procedural art paint.
+                if(!this.roomGlow||this.roomGlow.width!==W||this.roomGlow.height!==H){this.roomGlow?.destroy(true);this.roomGlow=PIXI.RenderTexture.create({width:W,height:H,resolution:Math.min(.5,1024/Math.max(W,H))});}
+                r.renderer.render(r.emissive,{renderTexture:this.roomGlow,clear:true,transform:new PIXI.Matrix(view.zoom,0,0,view.zoom,r.world.x,r.world.y)});
+                node.shader.uniforms.image=this.roomGlow;node.shader.uniforms.opacity=2;node.blendMode=PIXI.BLEND_MODES.ADD;node.position.set(0,surf.glowShift*view.zoom);node.scale.set(W,H);c.current=null;
+            }
+            for(const f of game.muzzleFlashes||[])glow(f.x,f.y+16,f.color||'#fff1d0',40,60,.8);
+            for(const p of game.projectiles||[])if(p.active!==false)glow(p.x,p.y+12,p.color||'#ffffff',12,26,.6);
+        }
+        const movers=game._ultraReflectionMovers(near),groups=new Map();
+        const visit=node=>{if(node._nativeEntity)groups.set(node._nativeEntity,node);for(const child of node.children||[])visit(child);};visit(r.peopleContext.root);
+        if(L.reflectionDetail)for(const m of movers){
+            if(this.stats.detail>=12){this.stats.dropped++;continue;}if(!onWet(m.x,m.y+20,100))continue;
+            if(m.e===game.player&&!L.player||m.kind==='car'&&!L.vehicles||m.e!==game.player&&m.kind!=='car'&&!L.people)continue;
+            if(m.kind==='car'){const c=this.detail,car=m.e;c.save();c.globalAlpha=.58*(car.fade??1);c.translate(0,car.y+(car.width||20)*.55);c.scale(1,-.8);c.translate(car.x,-(car.width||20)*.55);c.rotate(-(car.angle||0));c.scale(1,-1);
+                const art=carSprite(car),P=CAR_ART.PAD;c.drawImage(art.cv,-art.L/2-P,-art.W/2-P,art.L+P*2,art.W+P*2);c.restore();this.stats.detail++;continue;}
+            const group=groups.get(m.e),body=r.nativeCasters.bodies.get(m.e),crowd=group?.children.find(n=>n instanceof NativeCrowdPoseMesh&&n.visible);
+            let texture=m.e===game.player?r.actorTexture:body?.texture,frames=body?.frames,blend=body?.blend||0,size=body?.size||192,angle=body?.angle??m.e.angle??0;
+            if(crowd){texture=crowd.shader.uniforms.atlas;frames=[...crowd.shader.uniforms.frames];blend=crowd.shader.uniforms.blend;size=112;crowd.transform.updateLocalTransform();angle=Math.atan2(crowd.transform.localTransform.b,crowd.transform.localTransform.a);}
+            if(!texture&&group){let rec=this.captures.get(m.e);if(!rec&&this.captures.size<16){rec={target:PIXI.RenderTexture.create({width:192,height:192,resolution:1}),last:-Infinity};this.captures.set(m.e,rec);}
+                if(rec){rec.used=r.frameId;if(_frameTime-rec.last>=45&&this.stats.bodyCaptures<6){const transform=new PIXI.Matrix().append(new PIXI.Matrix(1,0,0,1,96,96)).append(new PIXI.Matrix(Math.cos(angle),-Math.sin(angle),Math.sin(angle),Math.cos(angle),0,0)).append(new PIXI.Matrix(1,0,0,1,-m.e.x,-m.e.y));
+                        r.renderer.render(group,{renderTexture:rec.target,clear:true,transform});rec.last=_frameTime;this.stats.bodyCaptures++;}if(Number.isFinite(rec.last))texture=rec.target;}
+            }
+            const c=this.detail;c.save();const gy=m.e.y+12;c.translate(m.e.x,gy);c.scale(1,-.8);c.translate(0,-12);c.rotate(-angle);c.scale(1,-1);
+            if(texture){let node;if(frames){node=c.node(NativeCrowdPoseMesh);node.shader.uniforms.atlas=texture;node.shader.uniforms.frames.set(frames);node.shader.uniforms.blend=blend;node.shader.uniforms.opacity=.58;}else{node=c.node(PIXI.Sprite);node.texture=texture;node.alpha=.58*(m.e===game.player?r.playerSprite.alpha:1);}
+                node.transform.setFromMatrix(c.matrix.clone().append(new PIXI.Matrix(1,0,0,1,-size/2,-size/2)));this.stats.sharedBodies++;this.stats.detail++;
+            }else{c.fillStyle=m.col||'#b48cff';c.globalAlpha=.25;c.beginPath();c.ellipse(0,0,6,18,0,0,Math.PI*2);c.fill();this.stats.dropped++;}
+            c.restore();
+        }
+        if(L.reflectionLights){
+            if(L.reflectionDetail){
+                // Reuse the exact reflected art alpha to interrupt emitted light.
+                // Independent nodes share textures, never display-object parents.
+                for(const source of this.detail.pool){if(!source.visible||source.parent!==this.detail.root)continue;let node;
+                    if(source instanceof NativeCrowdPoseMesh){node=this.light.node(NativeCrowdPoseMesh);const a=source.shader.uniforms,b=node.shader.uniforms;b.atlas=a.atlas;b.frames.set(a.frames);b.blend=a.blend;b.opacity=a.opacity*.85;}
+                    else if(source instanceof PIXI.Sprite){node=this.light.node(PIXI.Sprite);node.texture=source.texture;node.alpha=source.alpha*.85;}
+                    else continue;
+                    source.transform.updateLocalTransform();node.transform.setFromMatrix(source.transform.localTransform);node.blendMode=PIXI.BLEND_MODES.ERASE;
+                }
+            }else{this.light.globalCompositeOperation='destination-out';this.light.fillStyle='#000';for(const m of movers)game._reflShape(this.light,m,.85);}
+        }
+        if(L.puddleRipples&&game._ripples?.length){const ripple=this.ripple;ripple.root.visible=true;game._drawRipples(ripple,night>.5);
+            if(!this.rippleFilter){this.rippleFilter=new PIXI.Filter(undefined,`precision highp float;varying vec2 vTextureCoord;uniform sampler2D uSampler;uniform vec4 inputSize;uniform vec4 outputFrame;uniform sampler2D wetMask;uniform vec2 viewport;
+                void main(){vec2 p=(outputFrame.xy+vTextureCoord*inputSize.xy)/viewport;gl_FragColor=texture2D(uSampler,vTextureCoord)*texture2D(wetMask,p).a;}`,{wetMask:this.maskTarget,viewport:new Float32Array([W,H])});this.rippleFilter.resolution=.5;}
+            this.rippleFilter.uniforms.wetMask=this.maskTarget;this.rippleFilter.uniforms.viewport.set([W,H]);ripple.root.filters=[this.rippleFilter];ripple.root.filterArea=new PIXI.Rectangle(0,0,W,H);
+        }
+        for(const f of [this.lightFilter,this.detailFilter]){f.uniforms.viewport.set([W,H]);f.uniforms.wetMask=this.maskTarget;f.uniforms.clock=L.decorAnimation?_gameTimeSec:0;f.uniforms.rain=game.weather.isRaining?game.weather.intensity:0;f.uniforms.shimmer=q==='medium'?0:1;}
+        const area=new PIXI.Rectangle(0,0,W,H);this.light.root.filterArea=this.detail.root.filterArea=area;
+        this.lightSprite.visible=L.reflectionLights;this.detailSprite.visible=L.reflectionDetail;
+        if(L.reflectionLights)r.renderer.render(this.light.root,{renderTexture:this.lightTarget,clear:true});if(L.reflectionDetail)r.renderer.render(this.detail.root,{renderTexture:this.detailTarget,clear:true});
+        r.lighting.uniforms.reflectionMap=this.lightTarget;r.lighting.uniforms.reflectionGain=L.reflectionLights?.85:0;r.trimBuildingImages(this.light);r.trimBuildingImages(this.detail);this.trim();
+        this.stats.bytes=this.bytes()+(this.roomGlow?this.roomGlow.baseTexture.realWidth*this.roomGlow.baseTexture.realHeight*4:0);this.stats.cpuMs=performance.now()-start;
+    }
+    trim(all=false){for(const [key,rec]of this.captures)if(all||rec.used<this.owner.frameId-120){rec.target.destroy(true);this.captures.delete(key);}}
+    clear(){this.releaseTargets();this.trim(true);this.roomGlow?.destroy(true);for(const c of this.contexts)c.destroy();this.lightSprite.destroy();this.detailSprite.destroy();this.lightFilter.destroy();this.detailFilter.destroy();this.rippleFilter?.destroy();this.screen.destroy();this.root.destroy();}
+}
         class GameEngine {
             constructor() {
                 
@@ -81513,7 +81835,7 @@ engineMixin({
     const layers=document.createElement('div');layers.id='native-webgl-layers';layers.hidden=true;
     layers.style.cssText='position:fixed;top:68px;left:8px;max-width:330px;max-height:65vh;overflow:auto;background:#1b1228;color:white;border:1px solid #a887cd;padding:12px;z-index:10001;font:13px sans-serif';
     const heading=document.createElement('strong');heading.textContent='RENDER LAYERS';layers.append(heading);
-    const note=document.createElement('p');note.textContent='Changes reset the sample. Shadows require Lighting. Freeze Character animation or switch Shape-accurate shadows to compare their cost. Record 20s exports after warmup; Export repeats the finished run.';layers.append(note);
+    const note=document.createElement('p');note.textContent='Changes reset the sample. Shadows require Lighting. Freeze Character animation or switch Shape-accurate shadows to compare their cost. Wet effects respect Settings → Reflections (High/Ultra), weather wetness and authored shiny floors. Record 20s exports after warmup; Export repeats the finished run.';layers.append(note);
     const qualityRow=document.createElement('label');qualityRow.textContent='Texture quality ';const quality=document.createElement('select');quality.id='native-texture-quality';
     for(const [key,label]of [['standard','Standard'],['auto','Auto (sharper furniture)'],['high','High (2× textures)']]){const option=document.createElement('option');option.value=key;option.textContent=label;quality.append(option);}
     quality.value=renderer.textureQuality;quality.onchange=()=>renderer.setTextureQuality(quality.value);renderer.onQualityChanged=()=>quality.value=renderer.textureQuality;qualityRow.append(quality);layers.append(qualityRow);
@@ -81534,7 +81856,7 @@ engineMixin({
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v11-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v12-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;

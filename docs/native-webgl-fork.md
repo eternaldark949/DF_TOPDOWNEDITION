@@ -45,7 +45,7 @@ Current implementation:
   authored curtains, lamp particles/fades, and apartment glows use GPU geometry
   and cached image assets. Bloom uses the Canvas downscale scales/strengths;
   atmosphere follows the original tint setting.
-- All 50 visual switches remain independent. Fireplace flames, crafting scanline,
+- All 63 visual switches remain independent. Fireplace flames, crafting scanline,
   record sheen, tub ripple, plants and telescope accents follow their authored
   continuous clock through GPU geometry. Static segments remain cached and
   retain their drawing order; Decor animation off freezes their original art.
@@ -495,3 +495,74 @@ base/glow assets and the actual Canvas/native draw paths for presets, custom
 sliders and vision/story transitions, plus browser-composited color-chart pixels
 and shader map boundaries. This does not establish whole-frame pixel parity:
 the daytime sunlight wash and remaining special effects still need migration.
+
+## Entrance pads, daylight, glass and reflections in v12
+
+Twelve new independent switches default on (63 switches total): Entrance pads,
+Entrance labels, Daylight color / haze, Sun cast shadows, Cloud shadows, Window
+daylight, Rain on glass, Wet roof highlights, Wet ground / puddles, Puddle ripples, Reflected lights,
+and Reflected characters / vehicles. Canvas look enables all of them. The
+original map transitions, interaction grid, weather and save state are reused.
+Quiet entrances stay unmarked; nearby labels follow the original indoor/outdoor
+placement. The pad shader approximates Canvas's blurred border without live blur.
+
+Daylight's screen, soft-light, golden-hour haze and violet vignette calculations
+are fused into the existing scene-lighting shader. Turning off Lighting still
+allows testing Daylight independently. Sun cast shadows use the authored building
+footprints, car hulls and swept tree canopies in a bounded GPU union mask; fire
+can lift that mask locally. Original cloud-shadow painters use native geometry
+and resident gradient targets. Window daylight adds the authored light cutouts
+and colored projections. The distant veranda city retains v11's lighting boundary.
+
+Rain on glass is a continuous shader interpretation for intact indoor windows
+and sliding glass panels. It fades with weather wetness, clips to moving door
+leaves, keeps droplets attached to the panel, skips shattered windows and the
+apartment's open-air railing windows, and does not place rain in the door opening.
+Wet roof highlights add subtle moving sheen on up to 48 authored roof planes,
+attached to each building’s original roof ordering without another scene capture.
+The batchable roof geometry shares one resident 16KiB GPU material tile.
+This material layer remains available with the Reflections setting Off.
+It does not add optical scene refraction or every landmark skylight effect.
+
+Wet surfaces reuse authored roads, pavements, seeded puddle lobes, polished-floor
+rectangles, rug cutouts and fountain water. No changing puddle bitmap is baked:
+resident edge textures scale with wetness. Water ripples use their original
+simulation and the wet mask. Reflected light includes lamps, vehicle lights,
+shots, cached building emissives and a GPU snapshot of prepared room glows.
+Detailed reflections reuse player targets, crowd atlas frames and live caster
+textures; other visible bodies are captured from already prepared GPU geometry,
+without calling their animation painter again. Reflected body alpha interrupts
+reflected lights. Cars reuse their authored resident body art. Reflections stay
+below people/vehicles and use GPU wet masks and animated horizontal shimmer.
+
+The Reflections setting still applies: Off disables the wet/reflection group;
+Medium uses quarter-resolution targets, High uses half-resolution targets, and
+Ultra increases the detail target to full resolution up to 1536 pixels. Light
+and mask targets are capped at 1024 pixels per dimension. Work is bounded to
+12 detailed movers, 16 additional body targets, six body captures per frame at
+a 45ms refresh interval, eight cached reflected buildings and 192 light stamps.
+The sun mask is capped at 1024 pixels; up to 128 entrance pads and 96 glass
+panels draw in a frame. These limits can omit distant reflection detail; counts
+and dropped work are included in the report. Special live landmark beams,
+detailed reflected foliage and mirror-floor furniture still need further polish.
+
+Profiles include per-frame `surfaces` counts, CPU preparation, mask refreshes,
+body captures, target bytes and drops; supported devices also get asynchronous
+GPU samples labeled `surfaces`. Daylight's fused final pass is included in the
+scene GPU sample. Browser CSS grading still runs outside these timer regions.
+
+[Surface checks](native-webgl-surfaces-checks.json) cover entrance pulses and
+transition-grid agreement, quiet entrances, floor ordering, daytime color against
+the original Canvas painter, glass animation/open doors/shattering/drying,
+polished-floor rug and fountain masks, shared and captured reflected bodies,
+quality settings, unchanged simulation state, warmed upload/bake reuse, map
+travel and context recovery. Tested daytime color error is below 0.4/255 mean
+RGB and at most 2/255 in the chart fixture. This is not whole-scene pixel parity
+or a phone benchmark.
+
+For A53 testing, use Canvas look and Settings → Reflections → High. Record the
+same rainy city view with all three wet/reflection layers on, then disable
+Reflected characters / vehicles alone, then Reflected lights. Test Puddle
+ripples separately when moving through water. Walk through the apartment's
+sliding doors during rain and check the entrance pad when exiting. Compare
+Daylight, Sun cast shadows, Cloud shadows and Window daylight in daytime.

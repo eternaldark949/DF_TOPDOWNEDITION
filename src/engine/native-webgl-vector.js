@@ -115,7 +115,7 @@ class NativeVectorContext {
     withPath(path,fn){if(!path||typeof path==='string')return fn(this.path,path);
         const previous=this.path,part=this.part;this.beginPath();this.replay(path);const result=fn(this.path);this.path=previous;this.part=part;return result;
     }
-    graphics(){const blend=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:this.globalCompositeOperation==='destination-out'?PIXI.BLEND_MODES.ERASE:PIXI.BLEND_MODES.NORMAL;
+    graphics(){const blend=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:this.globalCompositeOperation==='destination-out'?PIXI.BLEND_MODES.ERASE:this.globalCompositeOperation==='screen'?PIXI.BLEND_MODES.SCREEN:this.globalCompositeOperation==='multiply'?PIXI.BLEND_MODES.MULTIPLY:PIXI.BLEND_MODES.NORMAL;
         if(!this.current||this.current.parent!==this.container||this.current.blendMode!==blend){this.current=this.node(PIXI.Graphics);this.current.blendMode=blend;}
         return this.current;
     }
@@ -148,7 +148,7 @@ class NativeVectorContext {
                 view=new PIXI.Texture(t.baseTexture,new PIXI.Rectangle(sx,sy,sw,sh));this.imageViews.set(key,view);
             }view._nativeFrame=this.owner.frameId;t=view;[x,y,w,h]=[dx,dy,dw,dh];}
         else throw new Error('Unsupported native image arguments');
-        this.current=null;const s=this.node(PIXI.Sprite);s.texture=t;s.alpha=this.globalAlpha;s.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
+        this.current=null;const s=this.node(PIXI.Sprite);s.texture=t;s.alpha=this.globalAlpha;s.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:this.globalCompositeOperation==='destination-out'?PIXI.BLEND_MODES.ERASE:this.globalCompositeOperation==='screen'?PIXI.BLEND_MODES.SCREEN:this.globalCompositeOperation==='multiply'?PIXI.BLEND_MODES.MULTIPLY:PIXI.BLEND_MODES.NORMAL;
         this.hashValue(t.baseTexture.uid);this.hashValue(this.globalAlpha);for(const v of [...args,this.matrix.a,this.matrix.b,this.matrix.c,this.matrix.d,this.matrix.tx,this.matrix.ty])this.hashValue(v);
         s.transform.setFromMatrix(this.matrix.clone().append(new PIXI.Matrix(w/t.width,0,0,h/t.height,x,y)));this.current=null;
     }
@@ -157,7 +157,7 @@ class NativeVectorContext {
         this.hashValue(text);this.hashValue(this.font);this.hashValue(this.fillStyle);this.hashValue(this.globalAlpha);this.hashValue(x);this.hashValue(y);
         this.current=null;const n=this.node(PIXI.BitmapText),match=/([0-9.]+)px/.exec(this.font),size=match?Number(match[1]):11;
         n.text=String(text);n.fontSize=size;const color=this.color(this.fillStyle);n.tint=color.color;n.alpha=this.globalAlpha*color.alpha;
-        n.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
+        n.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:this.globalCompositeOperation==='destination-out'?PIXI.BLEND_MODES.ERASE:this.globalCompositeOperation==='screen'?PIXI.BLEND_MODES.SCREEN:this.globalCompositeOperation==='multiply'?PIXI.BLEND_MODES.MULTIPLY:PIXI.BLEND_MODES.NORMAL;
         const width=n.textWidth,height=n.textHeight,dx=this.textAlign==='center'?-width/2:this.textAlign==='right'||this.textAlign==='end'?-width:0;
         const dy=this.textBaseline==='middle'?-height/2:this.textBaseline==='top'?0:-height*.8;
         n.transform.setFromMatrix(this.matrix.clone().append(new PIXI.Matrix(1,0,0,1,x+dx,y+dy)));this.current=null;
