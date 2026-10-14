@@ -418,7 +418,7 @@
                 
                 // 1. CLEAR BUFFER
                 lc.clearRect(0, 0, lw, lh);
-                GammaShadows.begin(lc);
+                GammaShadows.begin(lc, this._renderDrawId);
                 lc.save();
                 lc.scale(LS, LS);
             

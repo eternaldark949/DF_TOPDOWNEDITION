@@ -68,9 +68,9 @@
                 this.records.length=0;this.active=false;this.slotMap=new WeakMap();
                 for(const s of this.slots || []){s.cv=null;s.signature=null;s.at=0;}
             },
-            begin(ctx) {
+            begin(ctx, frameId = null) {
                 this.frame++;this.records.length=0;this.holeReady=false;
-                this.stats={backend:'high-fallback',draws:0,uploads:0,contributions:0,tileMax:0};
+                this.stats={backend:'high-fallback',draws:0,uploads:0,contributions:0,tileMax:0,frameId};
                 this.active=GameSettings.lampShadows==='gamma' && this._init();
                 if(this.active){this.stats.backend='webgl2';this.target=ctx.canvas;}
                 return this.active;

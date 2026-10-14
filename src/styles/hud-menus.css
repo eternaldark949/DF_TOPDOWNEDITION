@@ -1299,6 +1299,12 @@
         #dev-prof[data-tier="gold"] .dp-ms { color: var(--df-gold); }
         #dev-prof[data-tier="crimson"] .dp-ms { color: #ff6a78; }
         #dev-prof .dp-spark { width: 96px; height: 22px; align-self: center; border-left: 1px solid rgba(202, 176, 250, 0.2); padding-left: 4px; }
+        #dev-prof .dp-shadows { display: none; }
+        #dev-prof.full .dp-shadows { display: block; margin-top: 8px; }
+        #dev-prof .dp-shadow-status { font-size: max(6px, 0.6rem - var(--font-trim)); color: var(--df-lilac-grey); }
+        #dev-prof .dp-shadow-status[data-state="active"] { color: #9be8dc; }
+        #dev-prof .dp-shadow-status[data-state="fallback"] { color: #ffc248; }
+        #dev-prof .dp-shadow-note { margin-top: 5px; font-size: max(6px, 0.5rem - var(--font-trim)); color: var(--df-lilac-grey); line-height: 1.5; }
         #dev-prof .dp-rows { display: none; }
         #dev-prof.full { width: 260px; max-height: calc(100vh - 160px); overflow-y: auto; }
         #dev-prof.full .dp-rows { display: block; margin-top: 8px; }

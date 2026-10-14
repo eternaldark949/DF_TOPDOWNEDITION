@@ -34,7 +34,8 @@
         "draws": 1,
         "uploads": 4,
         "contributions": 4,
-        "tileMax": 4
+        "tileMax": 4,
+        "frameId": null
       },
       "samples": [
         {
@@ -89,7 +90,8 @@
         "draws": 1,
         "uploads": 4,
         "contributions": 4,
-        "tileMax": 4
+        "tileMax": 4,
+        "frameId": null
       },
       "samples": [
         {
@@ -141,7 +143,8 @@
       "draws": 1,
       "uploads": 0,
       "contributions": 4,
-      "tileMax": 4
+      "tileMax": 4,
+      "frameId": null
     },
     "fallback": {
       "worst": 0,
@@ -151,7 +154,8 @@
         "draws": 0,
         "uploads": 0,
         "contributions": 0,
-        "tileMax": 0
+        "tileMax": 0,
+        "frameId": null
       },
       "samples": [
         {
@@ -206,7 +210,8 @@
         "draws": 0,
         "uploads": 4,
         "contributions": 4,
-        "tileMax": 4
+        "tileMax": 4,
+        "frameId": null
       },
       "samples": [
         {
@@ -260,7 +265,8 @@
       "draws": 1,
       "uploads": 0,
       "contributions": 48,
-      "tileMax": 28
+      "tileMax": 28,
+      "frameId": 3
     },
     "shadows": {
       "casters": 64,
@@ -274,5 +280,12 @@
       "sources": 24,
       "doors": 8
     }
+  },
+  "profiler": {
+    "active": "Shadow rendererGAMMAWebGL2 activeGPU resolves 1/framecontributions 48mask uploads 0/framemax lights/tile 280 mask uploads is normal when cached. Resolve count excludes shadow preparation and final compositing.",
+    "visible": true,
+    "fallback": "Shadow rendererGAMMAHigh fallback \u2014 WebGL2 inactiveGPU resolves 0/framecontributions 0mask uploads 0/framemax lights/tile 00 mask uploads is normal when cached. Resolve count excludes shadow preparation and final compositing.",
+    "idle": "Shadow rendererGAMMAGamma idle \u2014 no lighting pass",
+    "high": "Shadow rendererHIGHCanvas 2D"
   }
 }

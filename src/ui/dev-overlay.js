@@ -37,6 +37,7 @@
                     this._prof.style.display = mode === 'off' ? 'none' : '';
                     this._prof.classList.toggle('full', mode === 'full');
                     this._report = null;
+                    if (mode === 'full') this._shadowPanel(game);
                 }
                 this._countCalls(this._wantCalls(game));
                 if (game.debugMode) this._ensureDbg();
@@ -48,7 +49,7 @@
             _ensureProf() {
                 if (this._prof) return;
                 const el = document.createElement('div'); el.id = 'dev-prof';
-                el.innerHTML = '<div class="dp-head"><b class="dp-fps">--</b><span>fps</span><b class="dp-ms">--</b><span>ms</span><canvas class="dp-spark" width="96" height="22"></canvas></div><div class="dp-rows"></div>';
+                el.innerHTML = '<div class="dp-head"><b class="dp-fps">--</b><span>fps</span><b class="dp-ms">--</b><span>ms</span><canvas class="dp-spark" width="96" height="22"></canvas></div><div class="dp-shadows" aria-label="Shadow renderer status"></div><div class="dp-rows"></div>';
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
                     GameSettings.profilerMode = GameSettings.profilerMode === 'full' ? 'compact' : 'full';
@@ -56,7 +57,7 @@
                 });
                 document.body.appendChild(el);
                 this._prof = el; this._spark = el.querySelector('.dp-spark'); this._sctx = this._spark.getContext('2d');
-                this._fpsEl = el.querySelector('.dp-fps'); this._msEl = el.querySelector('.dp-ms'); this._rowsEl = el.querySelector('.dp-rows');
+                this._fpsEl = el.querySelector('.dp-fps'); this._msEl = el.querySelector('.dp-ms'); this._rowsEl = el.querySelector('.dp-rows'); this._shadowEl = el.querySelector('.dp-shadows');
             },
 
             /** The call counter: the Full profiler with Count Canvas Calls, or Baseline's layer panel */
@@ -103,11 +104,34 @@
                 this._n++;
                 if (game.showProfiler && this._prof) {
                     if (this._n % 3 === 0) this._sparkStep(dt);
-                    if (this._n % 15 === 0) this._numbers();
+                    if (this._n % 15 === 0) { this._numbers(); if (this._prof.classList.contains('full')) this._shadowPanel(game); }
                     const rep = game.profiler.report;
                     if (rep !== this._report && this._prof.classList.contains('full')) { this._report = rep; this._rows(game, rep); }
                 }
                 if (game.debugMode && this._dbg && this._n % 30 === 0) this._counts(game);
+            },
+
+            /** Read existing counters only; no GPU probes or timings added by the panel. */
+            _shadowLine(game) {
+                const mode = GameSettings.lampShadows || 'low', s = GammaShadows.stats;
+                const fresh = Number.isFinite(s.frameId) && s.frameId === game._renderDrawId;
+                const status = mode !== 'gamma' ? (mode === 'off' ? 'Shadows off' : 'Canvas 2D')
+                    : !fresh ? 'Gamma idle — no lighting pass'
+                    : s.backend === 'webgl2' && s.draws === 1 ? 'WebGL2 active'
+                    : s.backend === 'high-fallback' ? 'High fallback — WebGL2 inactive' : 'Gamma awaiting resolve';
+                const tier = mode !== 'gamma' || !fresh ? 'idle' : s.backend === 'webgl2' && s.draws === 1 ? 'active' : 'fallback';
+                let html = `<div class="dp-total"><span>Shadow renderer</span><b>${mode.toUpperCase()}</b></div>`
+                    + `<div class="dp-shadow-status" data-state="${tier}">${status}</div>`;
+                if (mode === 'gamma' && fresh) html += `<div class="dp-counts"><span>GPU resolves <b>${s.draws}</b>/frame</span>`
+                    + `<span>contributions <b>${s.contributions}</b></span><span>mask uploads <b>${s.uploads}</b>/frame</span>`
+                    + `<span>max lights/tile <b>${s.tileMax}</b></span></div>`
+                    + '<div class="dp-shadow-note">0 mask uploads is normal when cached. Resolve count excludes shadow preparation and final compositing.</div>';
+                return html;
+            },
+            _shadowPanel(game) {
+                if (!this._shadowEl) return;
+                const html = this._shadowLine(game);
+                if (html !== this._shadowHTML) { this._shadowHTML = html; this._shadowEl.innerHTML = html; }
             },
 
             _numbers() {

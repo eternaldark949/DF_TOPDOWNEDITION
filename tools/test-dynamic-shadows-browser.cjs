@@ -116,8 +116,22 @@ const { chromium } = require('playwright');
     });
     assert.equal(scene.gamma.backend,'webgl2','real apartment scene uses Gamma');
     assert.equal(scene.gamma.draws,1,'real lighting engine runs a single Gamma resolve');
+    const profiler = await page.evaluate(() => {
+      GameSettings.profilerMode='full';game.showProfiler=true;DevOverlay.sync(game);DevOverlay._shadowPanel(game);
+      const panel=()=>document.querySelector('#dev-prof .dp-shadows').textContent;
+      const active=panel(),visible=getComputedStyle(document.querySelector('#dev-prof .dp-shadows')).display!=='none';
+      GammaShadows.failed=true;game.draw();DevOverlay._shadowPanel(game);const fallback=panel();
+      // A new frame with no light resolve must not inherit the previous backend status.
+      game._renderDrawId++;DevOverlay._shadowPanel(game);const idle=panel();
+      GameSettings.lampShadows='high';DevOverlay._shadowPanel(game);const high=panel();GammaShadows.failed=false;
+      return {active,visible,fallback,idle,high};
+    });
+    assert.ok(profiler.visible && profiler.active.includes('WebGL2 active') && profiler.active.includes('GPU resolves 1/frame'),'Full profiler shows successful WebGL resolve');
+    assert.ok(profiler.fallback.includes('High fallback — WebGL2 inactive'),'profiler exposes actual unavailable-WebGL fallback');
+    assert.ok(profiler.idle.includes('Gamma idle') && !profiler.idle.includes('WebGL2 active'),'profiler rejects a stale rendering result');
+    assert.ok(profiler.high.includes('Canvas 2D') && !profiler.high.includes('GPU resolves'),'High hides obsolete Gamma counters');
     assert.deepEqual(errors, [], 'no browser runtime errors');
-    console.log(JSON.stringify({ passed: true, pixels: r, extended, gamma, scene }, null, 2));
+    console.log(JSON.stringify({ passed: true, pixels: r, extended, gamma, scene, profiler }, null, 2));
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));
