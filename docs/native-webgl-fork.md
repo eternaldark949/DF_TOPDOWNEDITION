@@ -45,7 +45,7 @@ Current implementation:
   authored curtains, lamp particles/fades, and apartment glows use GPU geometry
   and cached image assets. Bloom uses the Canvas downscale scales/strengths;
   atmosphere follows the original tint setting.
-- All 44 visual switches remain independent. Fireplace flames, crafting scanline,
+- All 45 visual switches remain independent. Fireplace flames, crafting scanline,
   record sheen, tub ripple, plants and telescope accents follow their authored
   continuous clock through GPU geometry. Static segments remain cached and
   retain their drawing order; Decor animation off freezes their original art.
@@ -88,7 +88,8 @@ Run `node tools/test-native-webgl-browser.cjs` and
 `node tools/test-native-webgl-character-browser.cjs` and
 `node tools/test-native-webgl-details-browser.cjs` and
 `node tools/test-native-webgl-city-browser.cjs` and
-`node tools/test-native-webgl-crowd-browser.cjs` after building the preview.
+`node tools/test-native-webgl-crowd-browser.cjs` and
+`node tools/test-native-webgl-buildings-browser.cjs` after building the preview.
 Chromium checks the real WebGL surface, linked shader, warmed texture reuse,
 movement, camera/screen round trips, furniture invalidation, resize/zoom, visible
 lighting across repeated frames, the actual gameplay loop, context loss and
@@ -304,3 +305,47 @@ and markers. `rain.cpuMs` is separate and included in total `world.cpuMs`.
 geometry building and driver submission, not just GPU work. For an A53 A/B,
 let the crowd cache settle, record the same city view/route with GPU crowd
 animation cache on, then off, keeping all other settings identical.
+
+## v7: stationary building emissives
+
+The two v6 A53 samples measured roughly 15.5–17.5ms of building preparation and
+53.7–67.9ms of final scene submission per frame. They were stationary at different
+positions and had different crowd/traffic counts, so they are not a controlled
+cache comparison. Roof geometry was retained, but emissive windows, lanterns,
+neon and washes were rebuilt in a shared native path context every frame.
+
+The GPU building glow cache keeps the static emissive result in view-bounded
+render textures. It invalidates on camera position/zoom, viewport, LOD, lamp/day
+state, decor mode and quantized sky-darkness changes. Authored Silver Queen
+crown/beams/mist and Moon City beams draw live outside the snapshot. A small
+shader pulse approximates subtle static-lantern/window flicker; other captured
+small emissive animations remain approximate. The toggle restores the complete
+live v6 emissive pass. The cache does not use Canvas scene capture or readback.
+
+Snapshot rendering retains source-over coverage independently of additive RGB:
+additive draws keep destination alpha unchanged while adding color. Replaying
+the image therefore composes cached RGB plus the underlying scene multiplied by
+one minus cached coverage. Temporary blend configuration is restored before
+ordinary rendering. The dedicated pixel test compares the same fixed viewport
+and clock, with the optional pulse disabled. It uses readback only in the test.
+
+Cached targets have a 1536-pixel dimension limit and a 24MiB total budget. Budget
+misses retain live emissive drawing. Unused imported images retire from both
+static/live contexts. Camera changes redraw affected targets; map changes dispose
+them, and context restoration invalidates GPU pixels. Native view bounds now
+populate the existing drawing-helper cull contract so offscreen details can skip
+painting rather than treating the whole map as visible.
+
+The stationary browser fixture reduces geometry-buffer traffic by about 67% and
+building preparation by about 94%, while continuing live animated features.
+`native-webgl-building-checks.json` contains composition, timing/resource reuse,
+camera invalidation and recovery checks. Workspace FPS is not phone performance.
+Per-frame `world.buildingCache` exposes hits, rasterizations, raster CPU time,
+live paths, budget fallbacks and bytes; root `buildingTargetBytes` adds residency.
+`bakeOrigins` tags asset creation/import by painter/context, so repeated imports
+can be distinguished from these GPU rasterizations. A bake count includes a
+first asset import; it is not proof that its Canvas painter ran again.
+
+For the A53, leave the GPU crowd cache on and compare the same stationary camera
+with only GPU building glow cache changed. Then record walking to measure view
+invalidation. Keep texture quality, rain, crowd/traffic and other layers fixed.

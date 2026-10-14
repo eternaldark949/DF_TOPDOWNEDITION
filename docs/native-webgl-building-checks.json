@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "recovery": {
+    "lost": false,
+    "refresh": 2,
+    "hits": 2
+  },
+  "liveRevisions": 51,
+  "composition": {
+    "mean": 0.00060458600604586,
+    "max": 73,
+    "channelsOver10": 15
+  },
+  "live": {
+    "bufferMean": 571718,
+    "drawMean": 123,
+    "renderMean": 56.52666666706403,
+    "buildingMean": 19.439999999602637,
+    "rasterizations": 0,
+    "livePaths": 0,
+    "bytes": 4346496,
+    "bakes": 0,
+    "bakeOrigins": []
+  },
+  "retained": {
+    "bufferMean": 190115.6,
+    "drawMean": 82,
+    "renderMean": 18.683333333581686,
+    "buildingMean": 1.05,
+    "rasterizations": 0,
+    "livePaths": 31,
+    "bytes": 4346496,
+    "bakes": 1,
+    "bakeOrigins": [
+      {
+        "building-live": 1
+      }
+    ]
+  },
+  "moved": 2,
+  "stationary": 0
+}

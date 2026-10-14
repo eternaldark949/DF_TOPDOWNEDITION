@@ -134,7 +134,7 @@ class NativeVectorContext {
     fillRect(x,y,w,h){const old=this.path,part=this.part;this.beginPath();this.rect(x,y,w,h);this.fill();this.path=old;this.part=part;}
     strokeRect(x,y,w,h){const old=this.path,part=this.part;this.beginPath();this.rect(x,y,w,h);this.stroke();this.path=old;this.part=part;}
     drawImage(image,...args){
-        let t=this.images.get(image);if(!t){t=this.owner.retainImage(image);this.images.set(image,t);}
+        let t=this.images.get(image);if(!t){t=this.owner.retainImage(image,this.label||'imported-image');this.images.set(image,t);}
         let x,y,w,h;if(args.length===2){[x,y]=args;w=image.width;h=image.height;}else if(args.length===4)[x,y,w,h]=args;
         else if(args.length===8){const [sx,sy,sw,sh,dx,dy,dw,dh]=args,key=[t.baseTexture.uid,sx,sy,sw,sh].join(':');let view=this.imageViews.get(key);
             if(!view){view=new PIXI.Texture(t.baseTexture,new PIXI.Rectangle(sx,sy,sw,sh));this.imageViews.set(key,view);}t=view;[x,y,w,h]=[dx,dy,dw,dh];}

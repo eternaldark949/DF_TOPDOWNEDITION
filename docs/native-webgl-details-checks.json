@@ -95,7 +95,7 @@
       "decor": {
         "visible": 2,
         "paths": 15,
-        "cpuMs": 0.20000000298023224
+        "cpuMs": 0.19999999552965164
       },
       "effects": {
         "projectiles": 2,
@@ -104,7 +104,7 @@
         "casings": 1,
         "paths": 17,
         "transientSources": 3,
-        "cpuMs": 0.19999999552965164
+        "cpuMs": 0.20000000298023224
       }
     },
     "uploads": 0

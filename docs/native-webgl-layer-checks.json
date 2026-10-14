@@ -754,11 +754,28 @@
         0,
         0
       ]
+    },
+    {
+      "key": "buildingCache",
+      "draws": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "uploads": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
     }
   ],
   "full": {
     "renderer": "native-webgl-apartment",
-    "build": "native-webgl-city-v6",
+    "build": "native-webgl-buildings-v7",
     "pixiVersion": "7.4.3",
     "device": {
       "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
@@ -785,11 +802,12 @@
     "warmFramesRemaining": 0,
     "animationSummary": {
       "changedFrames": 0,
-      "geometryMeanMs": 1.411111111442248,
+      "geometryMeanMs": 0.9777777791023254,
       "shadowRefreshFrames": 0,
       "dynamicRebuilds": 0,
       "staticRebuilds": 0
     },
+    "buildingTargetBytes": 0,
     "crowdTargetBytes": 0,
     "rain": {
       "drops": 0,
@@ -798,6 +816,14 @@
       "cpuMs": 0
     },
     "world": {
+      "buildingCache": {
+        "hits": 0,
+        "rasterizations": 0,
+        "rasterMs": 0,
+        "livePaths": 0,
+        "fallbacks": 0,
+        "bytes": 0
+      },
       "timings": {
         "groundMs": 0,
         "streetMs": 0,
@@ -833,7 +859,7 @@
       "decor": {
         "visible": 3,
         "paths": 17,
-        "cpuMs": 0.19999999552965164
+        "cpuMs": 0.29999999701976776
       },
       "effects": {
         "projectiles": 0,
@@ -889,21 +915,22 @@
       "worldMarkers": true,
       "rainDrops": true,
       "rainSplashes": true,
-      "crowdSprites": true
+      "crowdSprites": true,
+      "buildingCache": true
     },
-    "configurationId": 90,
-    "sampleDurationMs": 4919.69999999553,
+    "configurationId": 92,
+    "sampleDurationMs": 3871.5,
     "contextRestores": 0,
     "capture": null,
     "player": {
       "x": 590,
       "y": 540
     },
-    "fps": 1.6261154135429536,
-    "p95Ms": 763.2999999970198,
+    "fps": 2.0663825390675448,
+    "p95Ms": 595.4000000059605,
     "stallsOver250Ms": 8,
     "stallsOver1000Ms": 0,
-    "renderMeanMs": 600.2444444439477,
+    "renderMeanMs": 467.0888888902134,
     "textureBytes": 27833552,
     "lightingTargetBytes": 725120,
     "timing": "CPU render submission and frame cadence; GPU timer unavailable",
@@ -918,19 +945,19 @@
       "pairs": 0
     },
     "layerStages": {
-      "sceneLayersMs": 1.1000000014901161,
+      "sceneLayersMs": 5.200000002980232,
       "effectsMs": 0.10000000149011612,
-      "decorMs": 0.19999999552965164,
+      "decorMs": 0.29999999701976776,
       "worldMs": 0,
-      "lightingMs": 171.19999999552965,
-      "sceneSubmitMs": 310.1000000014901
+      "lightingMs": 114.69999999552965,
+      "sceneSubmitMs": 212.30000000447035
     },
     "animation": {
       "revision": 2,
       "frozen": false,
       "changed": false,
       "paths": 43,
-      "geometryMs": 1,
+      "geometryMs": 1.1000000014901161,
       "rasterSubmitMs": 0,
       "position": {
         "x": 590,
@@ -941,21 +968,21 @@
       "stance": "idle"
     },
     "startup": {
-      "mapBuildMs": 173.39999999850988,
+      "mapBuildMs": 114.19999999552965,
       "ready": true,
       "firstFrameCount": 15
     },
     "entryTiming": {
-      "pageAgeMs": 2233.7000000029802,
+      "pageAgeMs": 989.3999999985099,
       "stages": {
-        "resetMs": 3.1999999955296516,
-        "mapLoadMs": 95.90000000596046,
-        "enterWorldMs": 0.3999999985098839,
-        "firstDrawMs": 803.6999999955297
+        "resetMs": 3.6999999955296516,
+        "mapLoadMs": 26.5,
+        "enterWorldMs": 0.4000000059604645,
+        "firstDrawMs": 425.8999999985099
       },
-      "totalMs": 903.1999999955297
+      "totalMs": 456.5
     },
-    "initializationMs": 290.19999999552965,
+    "initializationMs": 109.59999999403954,
     "gpu": {
       "status": "GPU timer unavailable",
       "pending": 0,

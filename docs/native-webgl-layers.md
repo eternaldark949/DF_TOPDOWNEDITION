@@ -38,8 +38,8 @@ they do not choose another rendering backend.
 
 ## Animated characters and shape shadows
 
-The build identifier is `native-webgl-city-v6`. **Canvas look** enables
-all 44 switches. **Lighting + shadows** also enables continuous character
+The build identifier is `native-webgl-buildings-v7`. **Canvas look** enables
+all 45 switches. **Lighting + shadows** also enables continuous character
 animation, silhouette shadows, high shadow detail and curtains.
 
 For a controlled moving test, use the same route, view, zoom, resolution and FPS
@@ -98,7 +98,7 @@ samples have labels and source frame IDs; unsupported devices explicitly say
 
 ## Evidence and remaining differences
 
-The six browser suites check the real main WebGL surface, all switches,
+The seven browser suites check the real main WebGL surface, all switches,
 recording/export, moving gameplay, texture reuse, context recovery, odd-size
 resize, walls, finite casts, lit bodies, overlapping light sources, continuous
 poses, and projected silhouette gaps/rotation. Pixel readback is test-only.
@@ -200,3 +200,24 @@ The dense 36-person test checks less geometry traffic, warmed texture reuse,
 animation/movement and GPU-cache recovery after context loss. See
 `native-webgl-crowd-checks.json`. The measured workspace speedup is not a mobile
 FPS promise; the A53 v5 recording is the regression baseline.
+
+## Building-cache comparison in v7
+
+**GPU building glow cache** retains static emissive work in GPU targets while
+major moving beams/crown/mist continue through their authored native routines.
+Subtle static-light flicker uses a lightweight shader approximation; disable the
+cache to compare the full live pass. Snapshot contents rebuild when camera,
+zoom/view size, LOD, decor/lamp state or sky-darkness bucket changes. Their total
+residency is capped at 24MiB; excess buildings draw live. All targets release on
+map changes and refresh after WebGL restoration.
+
+First stand at the same point and record with the crowd cache on, switching only
+the building cache. Then walk the same route in both variants. Compare
+`world.timings.buildingsMs`, `stages.sceneSubmitMs`, `bufferBytes`, draw calls and
+`world.buildingCache` hits/rasterizations/fallbacks/bytes. Stationary frames should
+reuse targets; movement deliberately invalidates the camera-dependent artwork.
+GPU rasterization counts are separate from `bakes`/`bakeOrigins`, which trace
+asset creation or first image imports (including building-base/top/emissive/live
+and other world contexts). Do not infer CPU Canvas repainting from imports alone.
+See `native-webgl-building-checks.json` for fixed-viewport composition and cache
+lifetime checks.

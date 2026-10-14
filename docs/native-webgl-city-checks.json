@@ -3,13 +3,21 @@
   "recovery": true,
   "map": "hub_949",
   "world": {
+    "buildingCache": {
+      "hits": 2,
+      "rasterizations": 0,
+      "rasterMs": 0,
+      "livePaths": 31,
+      "fallbacks": 0,
+      "bytes": 4346496
+    },
     "timings": {
-      "groundMs": 0.10000000149011612,
-      "streetMs": 0.10000000149011612,
-      "vehiclesMs": 0.09999999403953552,
-      "peopleMs": 0.10000000149011612,
-      "buildingsMs": 5.800000004470348,
-      "markersMs": 0.09999999403953552
+      "groundMs": 0,
+      "streetMs": 0.20000000298023224,
+      "vehiclesMs": 0.10000000149011612,
+      "peopleMs": 2.7999999970197678,
+      "buildingsMs": 0.6000000014901161,
+      "markersMs": 0.20000000298023224
     },
     "crowd": {
       "hits": 0,
@@ -26,7 +34,7 @@
     "groundPending": 0,
     "groundTiles": 6,
     "paths": 42,
-    "cpuMs": 6.399999998509884
+    "cpuMs": 4.100000001490116
   },
   "steadyUploads": 0,
   "travel": [
@@ -34,13 +42,21 @@
       "x": 4300,
       "y": 4700,
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 1,
+          "rasterMs": 40.899999998509884,
+          "livePaths": 2,
+          "fallbacks": 0,
+          "bytes": 2198064
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 1,
           "vehiclesMs": 0,
-          "peopleMs": 0.20000000298023224,
-          "buildingsMs": 1.2999999970197678,
-          "markersMs": 0.20000000298023224
+          "peopleMs": 0.10000000149011612,
+          "buildingsMs": 41.100000001490116,
+          "markersMs": 0
         },
         "crowd": {
           "hits": 0,
@@ -52,12 +68,12 @@
           "bytes": 0
         },
         "buildings": 1,
-        "people": 1,
+        "people": 0,
         "vehicles": 0,
         "groundPending": 0,
         "groundTiles": 12,
         "paths": 122,
-        "cpuMs": 9.100000001490116
+        "cpuMs": 48.70000000298023
       },
       "bytes": 15167376,
       "shadowCache": 22
@@ -66,13 +82,21 @@
       "x": 8500,
       "y": 7000,
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 1,
+          "rasterMs": 0.6999999955296516,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 2210520
+        },
         "timings": {
-          "groundMs": 0.20000000298023224,
-          "streetMs": 1.5,
+          "groundMs": 0,
+          "streetMs": 4.899999998509884,
           "vehiclesMs": 0.20000000298023224,
-          "peopleMs": 0,
-          "buildingsMs": 0.5,
-          "markersMs": 0.19999999552965164
+          "peopleMs": 0.10000000149011612,
+          "buildingsMs": 0.7999999970197678,
+          "markersMs": 0.20000000298023224
         },
         "crowd": {
           "hits": 0,
@@ -89,22 +113,30 @@
         "groundPending": 0,
         "groundTiles": 18,
         "paths": 131,
-        "cpuMs": 4.100000001490116
+        "cpuMs": 7.700000002980232
       },
-      "bytes": 21972240,
+      "bytes": 21962704,
       "shadowCache": 39
     },
     {
       "x": 11800,
       "y": 12000,
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 3,
+          "rasterMs": 8.5,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 6650280
+        },
         "timings": {
           "groundMs": 0,
-          "streetMs": 0.09999999403953552,
-          "vehiclesMs": 0.10000000149011612,
+          "streetMs": 0.29999999701976776,
+          "vehiclesMs": 0,
           "peopleMs": 0,
-          "buildingsMs": 0.8000000044703484,
-          "markersMs": 0.09999999403953552
+          "buildingsMs": 8.800000004470348,
+          "markersMs": 0.19999999552965164
         },
         "crowd": {
           "hits": 0,
@@ -121,7 +153,7 @@
         "groundPending": 0,
         "groundTiles": 27,
         "paths": 0,
-        "cpuMs": 35.69999999552965
+        "cpuMs": 10.100000001490116
       },
       "bytes": 33803344,
       "shadowCache": 50
@@ -130,13 +162,21 @@
       "x": 1200,
       "y": 550,
       "world": {
+        "buildingCache": {
+          "hits": 2,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 31,
+          "fallbacks": 0,
+          "bytes": 4446016
+        },
         "timings": {
-          "groundMs": 0.10000000149011612,
-          "streetMs": 0.10000000149011612,
-          "vehiclesMs": 0.10000000149011612,
-          "peopleMs": 1.1000000014901161,
-          "buildingsMs": 3.399999998509884,
-          "markersMs": 0.10000000149011612
+          "groundMs": 0.09999999403953552,
+          "streetMs": 0.30000000447034836,
+          "vehiclesMs": 0.29999999701976776,
+          "peopleMs": 0.7000000029802322,
+          "buildingsMs": 15.100000001490116,
+          "markersMs": 0.09999999403953552
         },
         "crowd": {
           "hits": 0,
@@ -152,8 +192,8 @@
         "vehicles": 1,
         "groundPending": 0,
         "groundTiles": 27,
-        "paths": 42,
-        "cpuMs": 43.5
+        "paths": 36,
+        "cpuMs": 103.29999999701977
       },
       "bytes": 33467992,
       "shadowCache": 50
@@ -161,16 +201,16 @@
   ],
   "rain": {
     "on": {
-      "drops": 850,
-      "splashes": 507,
-      "paths": 106,
-      "cpuMs": 1.2999999970197678
+      "drops": 845,
+      "splashes": 500,
+      "paths": 114,
+      "cpuMs": 2.2999999970197678
     },
     "off": {
       "drops": 0,
       "splashes": 0,
       "paths": 0,
-      "cpuMs": 0.10000000149011612
+      "cpuMs": 0
     },
     "restored": true
   },
@@ -197,12 +237,20 @@
     {
       "map": "apt_949",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
           "vehiclesMs": 0,
           "peopleMs": 0,
-          "buildingsMs": 0,
+          "buildingsMs": 0.09999999403953552,
           "markersMs": 0
         },
         "crowd": {
@@ -220,70 +268,20 @@
         "groundPending": 0,
         "groundTiles": 6,
         "paths": 0,
-        "cpuMs": 0
+        "cpuMs": 0.09999999403953552
       }
     },
     {
       "map": "hotel_lobby",
       "world": {
-        "timings": {
-          "groundMs": 0,
-          "streetMs": 0,
-          "vehiclesMs": 0,
-          "peopleMs": 0,
-          "buildingsMs": 0,
-          "markersMs": 0
-        },
-        "crowd": {
+        "buildingCache": {
           "hits": 0,
-          "misses": 0,
-          "atlasesBuilt": 0,
-          "spriteBodies": 0,
-          "liveBodies": 0,
-          "entries": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
           "bytes": 0
         },
-        "buildings": 0,
-        "people": 0,
-        "vehicles": 0,
-        "groundPending": 0,
-        "groundTiles": 6,
-        "paths": 0,
-        "cpuMs": 0
-      }
-    },
-    {
-      "map": "moon_city_nightclub",
-      "world": {
-        "timings": {
-          "groundMs": 0.10000000149011612,
-          "streetMs": 0,
-          "vehiclesMs": 0,
-          "peopleMs": 2.100000001490116,
-          "buildingsMs": 0,
-          "markersMs": 0
-        },
-        "crowd": {
-          "hits": 0,
-          "misses": 0,
-          "atlasesBuilt": 0,
-          "spriteBodies": 0,
-          "liveBodies": 0,
-          "entries": 0,
-          "bytes": 0
-        },
-        "buildings": 0,
-        "people": 4,
-        "vehicles": 0,
-        "groundPending": 0,
-        "groundTiles": 6,
-        "paths": 146,
-        "cpuMs": 2.2000000029802322
-      }
-    },
-    {
-      "map": "cozy_cafe_interior",
-      "world": {
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
@@ -311,13 +309,21 @@
       }
     },
     {
-      "map": "hotel_suite",
+      "map": "moon_city_nightclub",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
           "vehiclesMs": 0,
-          "peopleMs": 0,
+          "peopleMs": 3.8000000044703484,
           "buildingsMs": 0,
           "markersMs": 0
         },
@@ -331,75 +337,25 @@
           "bytes": 0
         },
         "buildings": 0,
-        "people": 0,
+        "people": 4,
         "vehicles": 0,
         "groundPending": 0,
         "groundTiles": 6,
-        "paths": 0,
-        "cpuMs": 0.09999999403953552
+        "paths": 144,
+        "cpuMs": 3.9000000059604645
       }
     },
     {
-      "map": "enni_cole_interior",
+      "map": "cozy_cafe_interior",
       "world": {
-        "timings": {
-          "groundMs": 0,
-          "streetMs": 0,
-          "vehiclesMs": 0,
-          "peopleMs": 0.10000000149011612,
-          "buildingsMs": 0,
-          "markersMs": 0
-        },
-        "crowd": {
-          "hits": 1,
-          "misses": 0,
-          "atlasesBuilt": 0,
-          "spriteBodies": 1,
-          "liveBodies": 0,
-          "entries": 1,
-          "bytes": 1332800
-        },
-        "buildings": 0,
-        "people": 1,
-        "vehicles": 0,
-        "groundPending": 0,
-        "groundTiles": 6,
-        "paths": 0,
-        "cpuMs": 0.6000000014901161
-      }
-    },
-    {
-      "map": "enni_cole_upper",
-      "world": {
-        "timings": {
-          "groundMs": 0,
-          "streetMs": 0,
-          "vehiclesMs": 0,
-          "peopleMs": 0,
-          "buildingsMs": 0.6999999955296516,
-          "markersMs": 0
-        },
-        "crowd": {
+        "buildingCache": {
           "hits": 0,
-          "misses": 0,
-          "atlasesBuilt": 0,
-          "spriteBodies": 0,
-          "liveBodies": 0,
-          "entries": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
           "bytes": 0
         },
-        "buildings": 0,
-        "people": 0,
-        "vehicles": 0,
-        "groundPending": 0,
-        "groundTiles": 6,
-        "paths": 0,
-        "cpuMs": 0.6999999955296516
-      }
-    },
-    {
-      "map": "demoness_palace",
-      "world": {
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
@@ -427,8 +383,201 @@
       }
     },
     {
+      "map": "hotel_suite",
+      "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
+        "timings": {
+          "groundMs": 0,
+          "streetMs": 0,
+          "vehiclesMs": 0,
+          "peopleMs": 0,
+          "buildingsMs": 0,
+          "markersMs": 0
+        },
+        "crowd": {
+          "hits": 0,
+          "misses": 0,
+          "atlasesBuilt": 0,
+          "spriteBodies": 0,
+          "liveBodies": 0,
+          "entries": 0,
+          "bytes": 0
+        },
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0
+      }
+    },
+    {
+      "map": "enni_cole_interior",
+      "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
+        "timings": {
+          "groundMs": 0.10000000149011612,
+          "streetMs": 0,
+          "vehiclesMs": 0,
+          "peopleMs": 0.10000000149011612,
+          "buildingsMs": 0,
+          "markersMs": 0
+        },
+        "crowd": {
+          "hits": 1,
+          "misses": 0,
+          "atlasesBuilt": 0,
+          "spriteBodies": 1,
+          "liveBodies": 0,
+          "entries": 1,
+          "bytes": 1332800
+        },
+        "buildings": 0,
+        "people": 1,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.20000000298023224
+      }
+    },
+    {
+      "map": "enni_cole_upper",
+      "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
+        "timings": {
+          "groundMs": 0,
+          "streetMs": 0,
+          "vehiclesMs": 0,
+          "peopleMs": 0.30000000447034836,
+          "buildingsMs": 0,
+          "markersMs": 0
+        },
+        "crowd": {
+          "hits": 0,
+          "misses": 0,
+          "atlasesBuilt": 0,
+          "spriteBodies": 0,
+          "liveBodies": 0,
+          "entries": 0,
+          "bytes": 0
+        },
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.30000000447034836
+      }
+    },
+    {
+      "map": "demoness_palace",
+      "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
+        "timings": {
+          "groundMs": 0,
+          "streetMs": 0,
+          "vehiclesMs": 0,
+          "peopleMs": 0,
+          "buildingsMs": 0,
+          "markersMs": 0
+        },
+        "crowd": {
+          "hits": 0,
+          "misses": 0,
+          "atlasesBuilt": 0,
+          "spriteBodies": 0,
+          "liveBodies": 0,
+          "entries": 0,
+          "bytes": 0
+        },
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.10000000149011612
+      }
+    },
+    {
       "map": "house_of_death",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
+        "timings": {
+          "groundMs": 0,
+          "streetMs": 0,
+          "vehiclesMs": 0,
+          "peopleMs": 0,
+          "buildingsMs": 0.09999999403953552,
+          "markersMs": 0
+        },
+        "crowd": {
+          "hits": 0,
+          "misses": 0,
+          "atlasesBuilt": 0,
+          "spriteBodies": 0,
+          "liveBodies": 0,
+          "entries": 0,
+          "bytes": 0
+        },
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.09999999403953552
+      }
+    },
+    {
+      "map": "medbay_sw",
+      "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 0.10000000149011612,
@@ -456,42 +605,21 @@
       }
     },
     {
-      "map": "medbay_sw",
-      "world": {
-        "timings": {
-          "groundMs": 0,
-          "streetMs": 0,
-          "vehiclesMs": 0,
-          "peopleMs": 0,
-          "buildingsMs": 0,
-          "markersMs": 0
-        },
-        "crowd": {
-          "hits": 0,
-          "misses": 0,
-          "atlasesBuilt": 0,
-          "spriteBodies": 0,
-          "liveBodies": 0,
-          "entries": 0,
-          "bytes": 0
-        },
-        "buildings": 0,
-        "people": 0,
-        "vehicles": 0,
-        "groundPending": 0,
-        "groundTiles": 6,
-        "paths": 0,
-        "cpuMs": 0
-      }
-    },
-    {
       "map": "ethereal_plane",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
           "vehiclesMs": 0,
-          "peopleMs": 0,
+          "peopleMs": 0.10000000149011612,
           "buildingsMs": 0,
           "markersMs": 0
         },
@@ -510,12 +638,20 @@
         "groundPending": 0,
         "groundTiles": 6,
         "paths": 0,
-        "cpuMs": 0
+        "cpuMs": 0.10000000149011612
       }
     },
     {
       "map": "keepers_hill",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
@@ -545,11 +681,19 @@
     {
       "map": "keepers_parlor",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
           "vehiclesMs": 0,
-          "peopleMs": 0.10000000149011612,
+          "peopleMs": 0,
           "buildingsMs": 0,
           "markersMs": 0
         },
@@ -568,43 +712,22 @@
         "groundPending": 0,
         "groundTiles": 6,
         "paths": 0,
-        "cpuMs": 0.20000000298023224
+        "cpuMs": 8.700000002980232
       }
     },
     {
       "map": "van_interior",
       "world": {
-        "timings": {
-          "groundMs": 0,
-          "streetMs": 0,
-          "vehiclesMs": 0,
-          "peopleMs": 0.09999999403953552,
-          "buildingsMs": 0,
-          "markersMs": 0
-        },
-        "crowd": {
+        "buildingCache": {
           "hits": 0,
-          "misses": 0,
-          "atlasesBuilt": 0,
-          "spriteBodies": 0,
-          "liveBodies": 0,
-          "entries": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
           "bytes": 0
         },
-        "buildings": 0,
-        "people": 0,
-        "vehicles": 0,
-        "groundPending": 0,
-        "groundTiles": 6,
-        "paths": 0,
-        "cpuMs": 0.09999999403953552
-      }
-    },
-    {
-      "map": "church_boss",
-      "world": {
         "timings": {
-          "groundMs": 0,
+          "groundMs": 0.10000000149011612,
           "streetMs": 0,
           "vehiclesMs": 0,
           "peopleMs": 0,
@@ -630,10 +753,18 @@
       }
     },
     {
-      "map": "auto_shop",
+      "map": "church_boss",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
-          "groundMs": 0,
+          "groundMs": 0.09999999403953552,
           "streetMs": 0,
           "vehiclesMs": 0,
           "peopleMs": 0,
@@ -655,12 +786,57 @@
         "groundPending": 0,
         "groundTiles": 6,
         "paths": 0,
-        "cpuMs": 0
+        "cpuMs": 0.19999999552965164
+      }
+    },
+    {
+      "map": "auto_shop",
+      "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
+        "timings": {
+          "groundMs": 0.10000000149011612,
+          "streetMs": 0,
+          "vehiclesMs": 0,
+          "peopleMs": 0,
+          "buildingsMs": 0,
+          "markersMs": 0
+        },
+        "crowd": {
+          "hits": 0,
+          "misses": 0,
+          "atlasesBuilt": 0,
+          "spriteBodies": 0,
+          "liveBodies": 0,
+          "entries": 0,
+          "bytes": 0
+        },
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.10000000149011612
       }
     },
     {
       "map": "neural_sys_interior",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
@@ -690,12 +866,20 @@
     {
       "map": "biggs_arena",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
-          "vehiclesMs": 0.10000000149011612,
-          "peopleMs": 0,
-          "buildingsMs": 0.5,
+          "vehiclesMs": 0,
+          "peopleMs": 0.10000000149011612,
+          "buildingsMs": 0,
           "markersMs": 0
         },
         "crowd": {
@@ -713,18 +897,26 @@
         "groundPending": 0,
         "groundTiles": 6,
         "paths": 0,
-        "cpuMs": 0.6000000014901161
+        "cpuMs": 0.10000000149011612
       }
     },
     {
       "map": "ollo_test",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
           "vehiclesMs": 0,
-          "peopleMs": 0,
-          "buildingsMs": 0.6000000014901161,
+          "peopleMs": 0.09999999403953552,
+          "buildingsMs": 0.4000000059604645,
           "markersMs": 0
         },
         "crowd": {
@@ -742,12 +934,20 @@
         "groundPending": 0,
         "groundTiles": 6,
         "paths": 0,
-        "cpuMs": 0.7999999970197678
+        "cpuMs": 1.2999999970197678
       }
     },
     {
       "map": "ollo_interior",
       "world": {
+        "buildingCache": {
+          "hits": 0,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 0,
+          "fallbacks": 0,
+          "bytes": 0
+        },
         "timings": {
           "groundMs": 0,
           "streetMs": 0,
@@ -777,12 +977,20 @@
     {
       "map": "hub_949",
       "world": {
+        "buildingCache": {
+          "hits": 2,
+          "rasterizations": 0,
+          "rasterMs": 0,
+          "livePaths": 31,
+          "fallbacks": 0,
+          "bytes": 4346496
+        },
         "timings": {
           "groundMs": 0.10000000149011612,
           "streetMs": 0.19999999552965164,
           "vehiclesMs": 0.10000000149011612,
           "peopleMs": 0.3999999985098839,
-          "buildingsMs": 4.800000004470348,
+          "buildingsMs": 0.6000000014901161,
           "markersMs": 0
         },
         "crowd": {
@@ -800,7 +1008,7 @@
         "groundPending": 0,
         "groundTiles": 6,
         "paths": 42,
-        "cpuMs": 7.5
+        "cpuMs": 47.899999998509884
       }
     }
   ]
