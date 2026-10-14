@@ -216,11 +216,16 @@ const { chromium } = require('playwright');
     const detailed = await page.evaluate(() => {
       game._doLoadMap('apt_949');game.bakeStaticLighting();game.running=true;game.paused=false;
       GameSettings.lampShadows='gamma';GameSettings.softShadows=true;GameSettings.profilerMode='full';game.showProfiler=true;DevOverlay.sync(game);
-      for(let i=0;i<6;i++){_frameTime+=101;game.draw();}
+      const gl=GammaShadows.gl,readError=gl.getError;let errorPolls=0;
+      gl.getError=()=>{errorPolls++;return readError.call(gl);};
+      try{for(let i=0;i<6;i++){_frameTime+=101;game.draw();}}finally{gl.getError=readError;}
+
       DevOverlay._shadowPanel(game);DevOverlay._memAt=0;
       const report=LightingProfile.snapshot(game),panel=document.querySelector('.dp-shadows').textContent;
-      return {report,panel,mode:GameSettings.profilerMode};
+      return {report,panel,mode:GameSettings.profilerMode,errorPolls};
     });
+    assert.equal(detailed.errorPolls,0,'warm Gamma frames never synchronously poll GL errors');
+    assert.equal(detailed.report.gammaErrorChecks,'initialization-only');
     assert.equal(detailed.report.latest.backend,'webgl2','detailed profiler preserves real Gamma execution');
     assert.ok(detailed.report.device.renderer,'renderer identity is reported');
     assert.ok(detailed.report.summary.some(r=>r.name==='mask uploads (CPU wait)'),'changing masks have separate upload timings');

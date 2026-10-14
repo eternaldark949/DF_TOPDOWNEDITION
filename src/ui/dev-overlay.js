@@ -144,7 +144,7 @@
                 if(f.gamma?.failure)html+=`<div class="dp-shadow-note">Failure: ${esc(f.gamma.failure)}</div>`;
                 html+=`<div class="dp-total"><span>CPU timings · ${p.history.length} frames</span></div>`;
                 for(const r of p.summary())html+=`<div class="dp-light-stage"><span>${esc(r.name)}</span><b>${ms(r.last)} ms</b><small>avg ${ms(r.mean)} · p95 ${ms(r.p95)} · peak ${ms(r.peak)} · calls ${r.calls} · max/call ${ms(r.maxCall)}</small></div>`;
-                html+='<div class="dp-shadow-note">CPU values include driver waits. Parent/child rows overlap; do not add them. No forced GPU readback.</div>';
+                html+='<div class="dp-shadow-note">CPU values include driver waits. Parent/child rows overlap; do not add them. No forced GPU readback; no per-frame gl.getError.</div>';
                 if(f.mode==='gamma'){
                     html+=`<div class="dp-total"><span>GPU execution</span></div><div class="dp-shadow-note">${esc(p.gpuStatus||'not sampled')} · ${p.pending.length} pending</div>`;
                     for(const [name,g]of Object.entries(p.gpu))html+=`<div class="dp-light-stage"><span>${esc(name)}</span><b>${ms(g.ms)} ms</b><small>sample frame ${g.frameId} · ${Math.max(0,f.frameId-g.frameId)} frames old</small></div>`;

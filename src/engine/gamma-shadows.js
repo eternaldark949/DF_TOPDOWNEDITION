@@ -87,7 +87,7 @@
                 return rows.sort((a,b)=>b.mean-a.mean);
             },
             snapshot(game) {
-                return {format:'dfab-lighting-profile-v1',createdAt:new Date().toISOString(),device:this.deviceInfo,gpuStatus:this.gpuStatus||'not sampled',gpu:{...this.gpu},gpuPending:this.pending.length,
+                return {format:'dfab-lighting-profile-v1',gammaErrorChecks:'initialization-only',createdAt:new Date().toISOString(),device:this.deviceInfo,gpuStatus:this.gpuStatus||'not sampled',gpu:{...this.gpu},gpuPending:this.pending.length,
                     jsHeapBytes:Number.isFinite(performance.memory?.usedJSHeapSize)?performance.memory.usedJSHeapSize:null,frameMs:game._renderFrameMs,pixelRatio:window.devicePixelRatio||1,map:game.activeMap?.id,zoom:game.camera.zoom,settings:{shadows:GameSettings.lampShadows,soft:GameSettings.softShadows,adaptive:GameSettings.adaptiveLighting,lightingScale:game.lightingScale,renderScale:game._renderScale||1,fpsLimit:GameSettings.fpsLimit},
                     gameSections:game.profiler?.report||[],latest:this.latest,summary:this.summary(),frames:this.history.slice(),memory:DevOverlay._canvasMB(game),note:'CPU timings are inclusive and can contain driver waits; nested rows overlap. GPU samples are asynchronous and identify their source frame. No forced readback or gl.finish.'};
             },
@@ -289,9 +289,9 @@
                         gl.bindFramebuffer(gl.FRAMEBUFFER,null);this._copy(this.textures[5],false,0,1/h);this.stats.blurPasses=2;LightingProfile.endGPU();
                     }
                     LightingProfile.end('GPU blur submission',blurTime);
-                    const checkTime=LightingProfile.start();
-                    const error=gl.getError();LightingProfile.end('GPU error check (CPU wait)',checkTime);
-                    if(error!==gl.NO_ERROR)throw new Error('Gamma GPU resolve failed');
+                    // getError is a synchronous command-stream checkpoint on some
+                    // mobile drivers. Validate initialization, not every resolve;
+                    // context loss and thrown execution failures still recover below.
                     this.stats.resolves=1;
                     if(options?.direct)result=this.canvas;
                     else {const copyTime=LightingProfile.start();ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='copy';ctx.drawImage(this.canvas,0,0);ctx.restore();LightingProfile.end('GPU to Canvas light copy',copyTime);}
