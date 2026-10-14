@@ -691,6 +691,81 @@ test('Humanoid contact and sun shadows keep their world placement as bodies turn
   equal(r,{indoor:true,day:true,placement:true,sunKept:true,suppressed:true,driver:true,far:true,balanced:true});
 }, {affine:true});
 
+test('Shared lamp shadows cache geometry, block walls and invalidate moving sources and casters', env => {
+  const r=value(env, `
+    _zoomLOD=0;GameSettings.lampShadows='low';
+    const wall={x:150,y:0,w:20,h:400}, map={width:500,height:400,walls:[wall],buildings:[]};
+    const lamp={x:100,y:180,radius:220,color:'#ffc080'}, body={x:220,y:180,radius:9,angle:0};
+    const model={activeMap:map,lamps:[lamp],roomSystem:{active:false},getAmbientDarkness:()=>.8};
+    DynamicShadows.begin(model);DynamicShadows.noteHuman(body);
+    const blocked=DynamicShadows.prepare(lamp)===null && DynamicShadows.stats.blocked===1;
+    wall.y=300;_simTick++;DynamicShadows.begin(model);DynamicShadows.noteHuman(body);
+    const open=DynamicShadows.prepare(lamp),built=!!open && DynamicShadows.stats.builds===1;
+    const ctx=game.ctx;DynamicShadows.drawLight(ctx,lamp,'hole');DynamicShadows.drawLight(ctx,lamp,'color');
+    const shared=DynamicShadows.stats.builds===1;
+    DynamicShadows.begin(model);DynamicShadows.noteHuman(body);const same=DynamicShadows.prepare(lamp);
+    const cached=same===open && DynamicShadows.stats.builds===0 && DynamicShadows.stats.hits===1 && DynamicShadows.stats.rays===0;
+    body.x+=10;DynamicShadows.begin(model);DynamicShadows.noteHuman(body);DynamicShadows.prepare(lamp);
+    const moved=DynamicShadows.stats.builds===1 && DynamicShadows.stats.rays===1;
+    lamp.y+=20;DynamicShadows.begin(model);DynamicShadows.noteHuman(body);DynamicShadows.prepare(lamp);
+    const source=DynamicShadows.stats.builds===1 && DynamicShadows.stats.rays===1;
+    model.roomSystem={active:true,doors:[{openAmount:0}],doorBlocks:()=>model.roomSystem.doors[0].openAmount<.3};
+    DynamicShadows.begin(model);DynamicShadows.noteHuman(body);const shut=DynamicShadows.prepare(lamp)===null;
+    model.roomSystem.doors[0].openAmount=1;DynamicShadows.begin(model);DynamicShadows.noteHuman(body);const doorOpen=!!DynamicShadows.prepare(lamp);
+    return {blocked,built,shared,cached,moved,source,shut,doorOpen};
+  `);
+  equal(r,{blocked:true,built:true,shared:true,cached:true,moved:true,source:true,shut:true,doorOpen:true});
+});
+
+test('Shared lamp caster shapes, quality budgets, removals and map lifecycle are bounded', env => {
+  const r=value(env, `
+    _zoomLOD=0;GameSettings.lampShadows='low';
+    const lamp={x:250,y:250,radius:240,color:'#80c0ff'},map={width:500,height:500,walls:[],buildings:[]};
+    const model={activeMap:map,lamps:[lamp],roomSystem:{active:false},getAmbientDarkness:()=>.8};
+    DynamicShadows.begin(model);
+    const car={x:310,y:240,length:60,width:25,angle:0};DynamicShadows.noteVehicle(car);DynamicShadows.noteVehicle(car);
+    DynamicShadows.noteHuman({x:280,y:240,angle:0});DynamicShadows.note({x:270,y:280,angle:0},{kind:'polygon',points:[[-5,-5],[5,-5],[0,7]],radius:7});
+    const shapes=DynamicShadows.casters.length===3 && DynamicShadows.casters[0].kind==='box';
+    DynamicShadows.prepare(lamp);car.angle=.8;DynamicShadows.begin(model);DynamicShadows.noteVehicle(car);DynamicShadows.prepare(lamp);
+    const turned=DynamicShadows.stats.builds===1;
+    DynamicShadows.begin(model);
+    for(let i=0;i<300;i++)DynamicShadows.note({x:260+i%30,y:260+Math.floor(i/30),radius:3});
+    DynamicShadows.prepare(lamp);
+    const limited=DynamicShadows.stats.casters===DYNAMIC_SHADOW.MAX_CASTERS && DynamicShadows.stats.pairs===DYNAMIC_SHADOW.low.perLight && DynamicShadows.stats.dropped>0 && DynamicShadows.bytes<=DYNAMIC_SHADOW.MAX_BYTES;
+    DynamicShadows.begin(model);const removed=DynamicShadows.prepare(lamp)===null && DynamicShadows.bytes===0;
+    GameSettings.lampShadows='off';DynamicShadows.begin(model);DynamicShadows.noteVehicle(car);const off=DynamicShadows.casters.length===0 && DynamicShadows.prepare(lamp)===null;
+    GameSettings.lampShadows='high';DynamicShadows.begin(model);DynamicShadows.noteVehicle(car);DynamicShadows.prepare(lamp);const high=DynamicShadows.stats.builds===1;
+    GameSettings.lampShadows='ultra';DynamicShadows.begin(model);DynamicShadows.noteVehicle(car);DynamicShadows.prepare(lamp);const ultra=DynamicShadows.stats.builds===1;
+    model.activeMap={...map};DynamicShadows.begin(model);const reset=DynamicShadows.bytes===0 && DynamicShadows.casters.length===0 && DynamicShadows.lights.size===0;
+    return {shapes,turned,limited,removed,off,high,ultra,reset};
+  `);
+  equal(r,{shapes:true,turned:true,limited:true,removed:true,off:true,high:true,ultra:true,reset:true});
+});
+
+test('Shared lamp shadows bound light count and reject stale cache fallbacks', env => {
+  const r=value(env, `
+    _zoomLOD=0;GameSettings.lampShadows='low';
+    const lamps=Array.from({length:12},(_,i)=>({x:100+i,y:100,radius:160,color:'#ffc080'}));
+    const model={activeMap:{width:500,height:500,walls:[],buildings:[]},lamps,roomSystem:{active:false},getAmbientDarkness:()=>.8};
+    const body={x:170,y:140,angle:0};
+    DynamicShadows.begin(model);DynamicShadows.noteHuman(body);
+    const masks=lamps.filter(l=>!!DynamicShadows.prepare(l)).length;
+    const capped=masks===DYNAMIC_SHADOW.low.maxLights && DynamicShadows.stats.builds===masks;
+    const first=lamps[0],oldMax=DYNAMIC_SHADOW.MAX_BYTES;
+    body.x+=10;DynamicShadows.begin(model);DynamicShadows.noteHuman(body);DYNAMIC_SHADOW.MAX_BYTES=0;
+    const noStale=DynamicShadows.prepare(first)===null && DynamicShadows.drawLight(game.ctx,first,'color')===false;
+    DYNAMIC_SHADOW.MAX_BYTES=oldMax;
+    DynamicShadows.begin(model);DynamicShadows.noteHuman(body);const recovered=!!DynamicShadows.prepare(first);
+    const poly={x:160,y:140,angle:0},points=[[-3,-3],[3,-3],[0,5]];
+    DynamicShadows.begin(model);DynamicShadows.note(poly,{kind:'polygon',points});DynamicShadows.prepare(first);
+    points[0][0]=-8;DynamicShadows.begin(model);DynamicShadows.note(poly,{kind:'polygon',points});DynamicShadows.prepare(first);
+    const edited=DynamicShadows.stats.builds===1;
+    const invalid=DynamicShadows.prepare({x:100,y:100,radius:Infinity})===null;
+    return {capped,noStale,recovered,edited,invalid};
+  `);
+  equal(r,{capped:true,noStale:true,recovered:true,edited:true,invalid:true});
+});
+
 test('Furniture sprites: painted runs never change over time, loops repeat per period, stamps follow state', env => {
   env.run('game.story.update=()=>{};');
   // Every painted-once run of every prop on every bundled map draws the same at any time (an animation left

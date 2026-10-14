@@ -415,9 +415,10 @@
                             g.addColorStop(0, 'rgba(255, 255, 255, 1)'); g.addColorStop(1, 'rgba(255, 255, 255, 0)');
                             lamp._holeGrad = g; lamp._holeGradX = lamp.x; lamp._holeGradY = lamp.y; lamp._holeGradRadius = lamp.radius;
                         }
+                        lamp._lightingVisibilityPath = DynamicShadows.visibilityPath(lamp) || lamp._shadowPath;
                         lc.globalAlpha = Math.min(1, lamp._litK);
                         lc.fillStyle = lamp._holeGrad;
-                        lc.fill(lamp._shadowPath);
+                        if (!DynamicShadows.drawLight(lc, lamp, 'hole')) lc.fill(lamp._lightingVisibilityPath);
                         litLamps.push(lamp);
                     }
                     lc.globalAlpha = 1;
@@ -593,12 +594,15 @@
             
                 // Lamps — the same ones lit above
                 for (const l of litLamps) {
-                    if (!l._cachedGrad) {
+                    if (!l._cachedGrad || l._cachedGradX !== l.x || l._cachedGradY !== l.y || l._cachedGradRadius !== l.radius || l._cachedGradColor !== l.color) {
                         l._cachedGrad = lc.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.radius);
+                        l._cachedGradX = l.x; l._cachedGradY = l.y; l._cachedGradRadius = l.radius; l._cachedGradColor = l.color;
                         l._cachedGrad.addColorStop(0, '#ffffff'); l._cachedGrad.addColorStop(0.1, l.color); l._cachedGrad.addColorStop(0.6, l.color); l._cachedGrad.addColorStop(1, 'rgba(0,0,0,0)');
                     }
                     lc.globalAlpha = baseAlpha * Math.min(1, l._litK);
-                    lc.fillStyle = l._cachedGrad; lc.beginPath(); lc.arc(l.x, l.y, l.radius, 0, Math.PI*2); lc.fill();
+                    if (!DynamicShadows.drawLight(lc, l, 'color')) {
+                        lc.fillStyle = l._cachedGrad; lc.fill(l._lightingVisibilityPath || l._shadowPath);
+                    }
                 }
             
                 // Neon Signs — cached gradients; the odd one buzzes
@@ -662,8 +666,8 @@
                 }
                 lc.globalAlpha = 1;
 
-                // 6b. LAMP SHADOWS — behind each person in a lamp's light, the dark and its colour come back (ui/humanoid-render.js)
-                drawLampShadowsInto(lc, tint, litLamps);
+                // Lamp contributions already include dynamic occlusion. Other lamps,
+                // headlights and transient lights can illuminate their shadows.
 
                 lc.restore();
             

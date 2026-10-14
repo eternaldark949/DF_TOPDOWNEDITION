@@ -1074,26 +1074,6 @@
             }
             return best ? { l: best, d: bd } : null;
         }
-        /** The (up to) two nearest street lamps within R of x, y, nearest first: [{ l, d }] (reused array). */
-        const _lampPair = [{ l: null, d: 0 }, { l: null, d: 0 }];
-        let _lampPairN = 0;
-        function _lampsNear2(x, y, R) {
-            _lampPairN = 0;
-            const cells = _lampCells();
-            if (!cells) return 0;
-            const cx = Math.floor(x / 200), cy = Math.floor(y / 200), A = _lampPair[0], B = _lampPair[1];
-            for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-                const c = cells.get((cx + i) + ',' + (cy + j));
-                if (c) for (const l of c) {
-                    const d = Math.hypot(l.x - x, l.y - y);
-                    if (d >= R) continue;
-                    if (!_lampPairN || d < A.d) { B.l = A.l; B.d = A.d; A.l = l; A.d = d; _lampPairN = Math.min(2, _lampPairN + 1); }
-                    else if (_lampPairN < 2 || d < B.d) { B.l = l; B.d = d; _lampPairN = 2; }
-                }
-            }
-            return _lampPairN;
-        }
-
         /**
          * The light on this body right now, in its own frame: level (0 flat · 1 limbs only · 2 all),
          * lx/ly (unit-ish toward the light, 0 when it's overhead), hl/sh (shine and shade fills),
@@ -1163,7 +1143,7 @@
                 c.fillStyle = g; c.fillRect(0, 0, 96, 96);
             }
             // Lamp shadows from dusk, while the sun's cast fades.
-            if (entity && entity.x !== undefined && _lampShadowLevel() && sunNow().night > 0.3) _noteLampShadowBody(entity, C);
+            if (entity && entity.x !== undefined) DynamicShadows.noteHuman(entity);
             ctx.save();
             // Undo the body facing once: neither the contact ellipse nor the sun's
             // anchor should acquire a rotating local offset. Keep parent scale/alpha.
@@ -1180,167 +1160,10 @@
             ctx.drawImage(_humanContactSprite, -C.CONTACT_RX, -C.CONTACT_RY, C.CONTACT_RX * 2, C.CONTACT_RY * 2);
             ctx.restore();
         }
-        /** Lamp shadows (Settings → Graphics → Lamp Shadows): cast away from the nearest burning lamps at night.
-         *   low   — a soft shade stretched away from each of the two nearest lamps, longer the farther off a
-         *           person stands (a lamp is only a few heads taller than a person), fading with the lamp's
-         *           falloff; the light layer takes the lamp's light back past the feet (cheap: a few sprites)
-         *   high  — the shade is the body's own silhouette, stretched away from the lamp: the body is drawn
-         *           into SilhouetteFX's capture and stamped back (nothing ticks twice), and the capture kept
-         *           small for the next frame's shadow (costs a capture and a copy per lit body)
-         *   ultra — and every lit lamp near a person is blocked by them, like a wall: a wedge of the dark
-         *           from the body out to the lamp's reach in the light layer (bodies × lamps, every frame)
-         *   off   — none
-         *  They lie on their own layer under everyone: a body's draw only notes that it was drawn
-         *  (_noteLampShadowBody), and draw.js paints the shadows of the bodies noted last frame, at where they
-         *  stand now, before the people pass (drawLampShadowsUnder). The light layer's half is
-         *  drawLampShadowsInto (lighting.js). */
-        const LampShadows = { frame: -1, n: 0, list: [], noted: [], drawn: [], noteFrame: -1, peds: 0, tint: null, sprite: null, ground: null,
-                              seq: 0, captures: 0, captureFrame: -1, keeps: new WeakMap(), bodies: [] };
-        const LAMP_KEEP = 40;                                                    // kept silhouette, px a side
-        /** 0 off · 1 low · 2 high · 3 ultra */
-        function _lampShadowLevel() {
-            const v = typeof GameSettings !== 'undefined' ? GameSettings.lampShadows : 'low';
-            return v === 'ultra' ? 3 : v === 'high' ? 2 : v === 'off' ? 0 : 1;
-        }
-        /** A firmer blob than the contact shadow's: a person's length of shade with a soft rim, so it reads as a shape. */
-        function _lampShadowSprite(rgb, cv) {
-            cv = cv || document.createElement('canvas'); cv.width = cv.height = 64;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-            g.addColorStop(0, `rgba(${rgb}, 1)`); g.addColorStop(0.55, `rgba(${rgb}, 0.85)`); g.addColorStop(1, `rgba(${rgb}, 0)`);
-            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            return cv;
-        }
-        function _noteLampShadowBody(entity, C) {
-            const S = LampShadows;
-            if (S.noteFrame !== _frameTime) { S.noteFrame = _frameTime; S.peds = 0; }
-            if (entity._lampShadowFrame === _frameTime) return;               // once a frame, however many times it's drawn
-            const ped = typeof Pedestrian !== 'undefined' && entity instanceof Pedestrian;
-            if ((ped && S.peds >= C.LAMP_SHADOW_PEDS) || S.noted.length >= 128) return;   // (a view that never paints them can't pile up)
-            if (ped) S.peds++;
-            entity._lampShadowFrame = _frameTime;
-            S.noted.push(entity);
-        }
-        /** High and up: should this body be drawn through the capture, so its silhouette can cast the shadow? */
-        function _lampShadowWants(entity, config) {
-            if (_lampShadowLevel() < 2 || config._crowdBake || config.isDriving || config.noShadow || entity._reflectionProxy) return false;
-            if (entity.x === undefined || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2) || typeof sunNow !== 'function' || sunNow().night <= 0.3) return false;
-            const S = LampShadows;
-            if (S.captureFrame !== _frameTime) { S.captureFrame = _frameTime; S.captures = 0; }
-            if (S.captures >= CONFIG.HUMAN_SHADE.LAMP_SHADOW_HIGH_MAX) return false;
-            if (!_lampsNear2(entity.x, entity.y, CONFIG.HUMAN_SHADE.LAMP_SHADOW_R)) return false;
-            S.captures++;
-            return true;
-        }
-        /** SilhouetteFX.end hands over a finished capture (before any tint): kept small, in the shadow's colour,
-         *  with where its pixels sit in the world, for the next frame's shadow. */
-        function keepLampSilhouette(entity, cv, ox, oy, side) {
-            const W = typeof _worldMatrix !== 'undefined' ? _worldMatrix : null;
-            if (!W || !side || typeof DOMMatrix === 'undefined') return;
-            const S = LampShadows;
-            let k = S.keeps.get(entity);
-            if (!k) {
-                const kc = document.createElement('canvas'); kc.width = kc.height = LAMP_KEEP;
-                k = { cv: kc, m: null, x: 0, y: 0, seq: -1 };
-                S.keeps.set(entity, k);
-            }
-            const g = k.cv.getContext('2d');
-            if (!g) return;
-            g.setTransform(1, 0, 0, 1, 0, 0);
-            g.globalCompositeOperation = 'copy';
-            // Only the middle LAMP_SHADOW_CAP_R round the body (her glow's capture reaches farther)
-            const half = side / 2, cut = Math.min(half, CONFIG.HUMAN_SHADE.LAMP_SHADOW_CAP_R * Math.hypot(W.a, W.b)), o = half - cut;
-            g.drawImage(cv, o, o, cut * 2, cut * 2, 0, 0, LAMP_KEEP, LAMP_KEEP);
-            g.globalCompositeOperation = 'source-in';
-            g.fillStyle = `rgb(${_SHADOW_RGB})`; g.fillRect(0, 0, LAMP_KEEP, LAMP_KEEP);
-            g.globalCompositeOperation = 'source-over';
-            // kept px → capture px → screen → world
-            const sc = cut * 2 / LAMP_KEEP;
-            k.m = new DOMMatrix([W.a, W.b, W.c, W.d, W.e, W.f]).inverse().multiply(new DOMMatrix([sc, 0, 0, sc, ox + o, oy + o]));
-            k.x = entity.x; k.y = entity.y; k.seq = S.seq;
-        }
-        /** The ground layer (draw.js, before the people pass, world transform): last frame's bodies, where they stand now. */
-        function drawLampShadowsUnder(ctx) {
-            const S = LampShadows, C = CONFIG.HUMAN_SHADE, bodies = S.noted, level = _lampShadowLevel();
-            S.noted = S.drawn; S.noted.length = 0; S.drawn = bodies;            // swap: this frame's draws note into the other list
-            S.frame = _frameTime; S.n = 0; S.bodies.length = 0; S.seq++;
-            if (!bodies.length || !level || (typeof _zoomLOD !== 'undefined' && _zoomLOD >= 2)) return;
-            const sun = sunNow();
-            if (sun.night <= 0.3) return;
-            const dusk = Math.min(1, (sun.night - 0.3) / 0.4), sp = S.ground || (S.ground = _lampShadowSprite(_SHADOW_RGB));
-            const a0 = ctx.globalAlpha, D = C.LAMP_SHADOW_DEPTH;
-            for (const e of bodies) {
-                if (e.visible === false || e.dead || e.inCar) continue;
-                const n = _lampsNear2(e.x, e.y, C.LAMP_SHADOW_R);
-                if (!n) continue;
-                S.bodies.push(e);
-                const keep = level >= 2 ? S.keeps.get(e) : null, sil = keep && keep.m && S.seq - keep.seq <= 2 ? keep : null;
-                for (let i = 0; i < n; i++) {
-                    const { l, d } = _lampPair[i];
-                    const k = lampWake(l) * lampFlicker(l) * (l.intensity ?? 1) * (1 - d / C.LAMP_SHADOW_R) * dusk;
-                    if (k < 0.03) continue;
-                    const len = Math.min(C.LAMP_SHADOW_MAX, d * C.LAMP_SHADOW_K), ang = Math.atan2(e.y - l.y, e.x - l.x);
-                    const a = Math.min(1, k * 1.6);
-                    ctx.save();
-                    ctx.translate(e.x, e.y); ctx.rotate(ang);
-                    if (sil) {
-                        // The body's silhouette, stretched away from the lamp from its near edge
-                        ctx.translate(-D / 2, 0); ctx.scale((D + len) / D, 1); ctx.translate(D / 2, 0);
-                        ctx.rotate(-ang); ctx.translate(-sil.x, -sil.y);
-                        const m = sil.m; ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
-                        ctx.globalAlpha = a0 * C.LAMP_SHADOW_A * C.LAMP_SHADOW_SIL * a;
-                        ctx.drawImage(sil.cv, 0, 0);
-                    } else {
-                        ctx.translate(len / 2 - 2, 0); ctx.scale((20 + len) / 64, (9 + len * 0.06) / 32);
-                        ctx.globalAlpha = a0 * C.LAMP_SHADOW_A * a;
-                        ctx.drawImage(sp, -32, -32);
-                    }
-                    ctx.restore();
-                    const rec = S.list[S.n] || (S.list[S.n] = {});
-                    S.n++;
-                    rec.x = e.x; rec.y = e.y; rec.ang = ang; rec.len = len; rec.a = a;
-                }
-            }
-            ctx.globalAlpha = a0;
-        }
-        /** The light layer's half (lighting.js, after its colour pass): this frame's lamp shadows, in the dark's own colour.
-         *  Ultra: each body blocks every lit lamp it stands in, out to the lamp's reach (lit: the lamps lit this frame). */
-        function drawLampShadowsInto(lc, tintRGB, lit) {
-            const S = LampShadows, C = CONFIG.HUMAN_SHADE;
-            if (S.frame !== _frameTime || !S.n || !C.LAMP_SHADOW_DARK) return;
-            const a0 = lc.globalAlpha;
-            lc.globalCompositeOperation = 'source-over';
-            if (_lampShadowLevel() >= 3 && lit && lit.length) {
-                const r = C.LAMP_BLOCK_R, dusk = Math.min(1, Math.max(0, (sunNow().night - 0.3) / 0.4));
-                for (const e of S.bodies) for (const l of lit) {
-                    const dx = e.x - l.x, dy = e.y - l.y, d = Math.hypot(dx, dy), R = l.radius;
-                    if (d <= r * 1.5 || d >= R * 0.9) continue;
-                    const k = Math.min(1, l._litK || 1) * (1 - d / R) * dusk;
-                    if (k < 0.03) continue;
-                    const ux = dx / d, uy = dy / d, nx = -uy, ny = ux, t = r / d;   // t: the spread (tan of the half-angle, near enough)
-                    const fx = l.x + ux * R, fy = l.y + uy * R, w = R * t;
-                    const g = lc.createLinearGradient(e.x, e.y, fx, fy);
-                    g.addColorStop(0, `rgba(${tintRGB}, ${(C.LAMP_BLOCK_A * k).toFixed(3)})`); g.addColorStop(1, `rgba(${tintRGB}, 0)`);
-                    lc.fillStyle = g;
-                    lc.beginPath();
-                    lc.moveTo(e.x + nx * r, e.y + ny * r); lc.lineTo(fx + nx * w, fy + ny * w);
-                    lc.lineTo(fx - nx * w, fy - ny * w); lc.lineTo(e.x - nx * r, e.y - ny * r);
-                    lc.closePath(); lc.fill();
-                }
-                lc.globalAlpha = a0;
-                return;
-            }
-            if (S.tint !== tintRGB) { S.sprite = _lampShadowSprite(tintRGB, S.sprite); S.tint = tintRGB; }    // rebuilt when the dark's colour shifts
-            for (let i = 0; i < S.n; i++) {
-                const r = S.list[i];
-                lc.save();
-                lc.translate(r.x, r.y); lc.rotate(r.ang);
-                lc.translate(r.len / 2 + 9, 0); lc.scale((10 + r.len) / 64, (11 + r.len * 0.08) / 32);   // from just past the feet
-                lc.globalAlpha = C.LAMP_SHADOW_DARK * r.a;
-                lc.drawImage(S.sprite, -32, -32);
-                lc.restore();
-            }
-            lc.globalAlpha = a0;
-        }
+        // The silhouette capture is an optional shape provider for the lighting
+        // engine. Visibility, projection and lamp compositing are shared with cars.
+        function _lampShadowWants(entity, config) { return DynamicShadows.wantsSilhouette(entity, config); }
+        function keepLampSilhouette(entity, cv, ox, oy, side) { DynamicShadows.keepSilhouette(entity, cv, ox, oy, side); }
 
         /**
          * Draw a procedural character. Builds and height (ui/bodies.js) scale the body

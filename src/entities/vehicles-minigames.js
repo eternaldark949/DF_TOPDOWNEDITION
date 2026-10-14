@@ -141,6 +141,7 @@
              */
             draw(ctx) {
                 if (!this.visible) return;
+                DynamicShadows.noteVehicle(this);
                 
                 ctx.save();
                 ctx.translate(this.x, this.y);
@@ -475,6 +476,7 @@
             
             draw(ctx) {
                 if (!this.visible) return;
+                DynamicShadows.noteVehicle(this);
                 
                 ctx.save();
                 ctx.translate(this.x, this.y);

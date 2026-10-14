@@ -237,6 +237,7 @@
 
         /** Stamp the body, then the light sliding over it. */
         function drawCarBody(ctx, v, farLOD) {
+            DynamicShadows.noteVehicle(v);
             const sp = carSprite(v), P = CAR_ART.PAD;
             drawCarFrontTyres(ctx, v);
             // The body rides on its springs: out of the turn (bodyRoll), forward under the brakes (load)

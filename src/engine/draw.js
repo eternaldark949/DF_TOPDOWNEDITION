@@ -93,6 +93,7 @@
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
+                DynamicShadows.begin(this);
                 // Baseline's layer panel (ui/render-layers.js): RL.at(layer) says whether a layer draws, and
                 // bills the canvas calls since the last ask to the layer before. Outside Baseline it's always true.
                 const RL = RenderLayers;
@@ -656,9 +657,6 @@
                 if (RL.at('combat')) this.drawHunterDashes(this.ctx);   // crimson flits (engine/palace-art.js)
                 if (RL.at('markers')) this.drawExecuteCue(this.ctx);    // a gold reticle under an unaware back (engine/executions.js)
                 
-                // Lamp shadows: their own layer, under every person (ui/humanoid-render.js)
-                if (RL.at('characters')) drawLampShadowsUnder(this.ctx);
-
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // PERFORMANCE: AABB viewport culling for entities
                 {

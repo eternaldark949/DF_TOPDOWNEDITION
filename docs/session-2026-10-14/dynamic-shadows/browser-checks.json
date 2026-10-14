@@ -1,0 +1,46 @@
+{
+  "before": {
+    "median": 21,
+    "p90": 23.299999998882413,
+    "errors": []
+  },
+  "after": {
+    "median": 22.59999999962747,
+    "p90": 25.5,
+    "stats": {
+      "casters": 56,
+      "pairs": 59,
+      "blocked": 60,
+      "rays": 0,
+      "builds": 0,
+      "hits": 8,
+      "dropped": 22,
+      "captures": 0
+    },
+    "bytes": 1048576,
+    "errors": []
+  },
+  "peopleOnly": {
+    "median": 19.40000000037253,
+    "p90": 20.90000000037253,
+    "stats": {
+      "casters": 1,
+      "pairs": 3,
+      "blocked": 4,
+      "rays": 0,
+      "builds": 0,
+      "hits": 3,
+      "dropped": 0,
+      "captures": 0
+    },
+    "bytes": 393216
+  },
+  "pixels": {
+    "leftShadowAlpha": 244,
+    "rightAlpha": 110,
+    "combinedAlpha": 105,
+    "unblockedRightReference": 110,
+    "overlapFillsShadow": true,
+    "otherLightPreserved": true
+  }
+}
