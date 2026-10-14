@@ -1,3 +1,101 @@
+        // Full-profiler diagnostics only. CPU values include browser/driver waits;
+        // GPU timer queries are asynchronous, bounded, and never force completion.
+        const LightingProfile = {
+            enabled: false, history: [], pending: [], gpu: {}, deviceInfo: null, wrapped: [],
+            start() { return this.enabled && this.recording ? performance.now() : null; },
+            end(name,t) {
+                if(t===null || !this.enabled)return;
+                const ms=Math.max(0,performance.now()-t),m=this.stages[name] || (this.stages[name]={ms:0,calls:0,maxCall:0});
+                m.ms+=ms;m.calls++;m.maxCall=Math.max(m.maxCall,ms);
+            },
+            wrap(object,key,label) {
+                const original=object[key],p=this;
+                const wrapped=object[key]=function(...args){const t=p.start();try{return original.apply(this,args);}finally{p.end(label,t);}};
+                this.wrapped.push({object,key,original,wrapped});
+            },
+            disable() {
+                for(const w of this.wrapped)if(w.object[w.key]===w.wrapped)w.object[w.key]=w.original;
+                this.wrapped.length=0;this.instrumented=false;
+                this.clearQueries();this.enabled=false;this.recording=false;this.history.length=0;this.latest=null;this.gpu={};this.key=null;
+            },
+            begin(game) {
+                const on=!!(game.showProfiler && GameSettings.profilerMode==='full');
+                if(!on){if(this.enabled)this.disable();return;}
+                const key=[game.activeMap?.id,GameSettings.lampShadows,GameSettings.softShadows,game.canvas.width,game.canvas.height,game.lightingScale].join('|');
+                if(key!==this.key){this.clearQueries();this.history.length=0;this.latest=null;this.gpu={};this.gpuStatus=this.timer?'awaiting sample':'GPU timer unavailable';}
+                this.key=key;this.enabled=on;this.recording=true;this.frameId=game._renderDrawId;this.stages={};this.bytes={mask:0,layers:0};this.churn={new:0,changed:0,evicted:0};
+                if(!this.instrumented){
+                    this.instrumented=true;
+                    for(const [key,label]of [['begin','caster registry'],['prepare','shadow preparation'],['_pairs','source/caster pairs'],['_path','visibility paths'],['keepSilhouette','silhouette cache copy']])this.wrap(DynamicShadows,key,label);
+                }
+                this.poll();
+            },
+            device(gl) {
+                if(!this.enabled || this.gl===gl)return;
+                this.clearQueries();this.gl=gl;
+                try {
+                    const d=gl.getExtension('WEBGL_debug_renderer_info');
+                    this.timer=gl.getExtension('EXT_disjoint_timer_query_webgl2');
+                    this.deviceInfo={renderer:gl.getParameter(d?d.UNMASKED_RENDERER_WEBGL:gl.RENDERER),vendor:gl.getParameter(d?d.UNMASKED_VENDOR_WEBGL:gl.VENDOR),version:gl.getParameter(gl.VERSION),maxTextureSize:gl.getParameter(gl.MAX_TEXTURE_SIZE),timerAvailable:!!this.timer};
+                    this.gpuStatus=this.timer?'awaiting sample':'GPU timer unavailable';
+                } catch(_){this.timer=null;this.gpuStatus='GPU timer unavailable';}
+            },
+            beginGPU(label) {
+                if(!this.enabled||!this.recording||!this.timer||this.activeQuery||this.pending.length>=8||this.frameId%4!==0)return false;
+                let q;
+                try {q=this.gl.createQuery();if(!q)return false;this.gl.beginQuery(this.timer.TIME_ELAPSED_EXT,q);this.activeQuery={q,label,frameId:this.frameId};return true;}
+                catch(_){if(q)try{this.gl.deleteQuery(q);}catch(_){}this.gpuStatus='GPU query unavailable';return false;}
+            },
+            endGPU() {
+                if(!this.activeQuery)return;
+                const entry=this.activeQuery;this.activeQuery=null;
+                try{this.gl.endQuery(this.timer.TIME_ELAPSED_EXT);this.pending.push(entry);}
+                catch(_){try{this.gl.deleteQuery(entry.q);}catch(_){}this.gpuStatus='GPU query interrupted';}
+            },
+            clearQueries() {
+                this.endGPU();
+                for(const p of this.pending)try{this.gl.deleteQuery(p.q);}catch(_){}
+                this.pending.length=0;
+            },
+            poll() {
+                if(!this.pending.length||!this.timer)return;
+                try {
+                    if(this.gl.isContextLost()){this.clearQueries();this.gpu={};this.gpuStatus='GPU context lost';return;}
+                    if(this.gl.getParameter(this.timer.GPU_DISJOINT_EXT)){this.clearQueries();this.gpu={};this.gpuStatus='disjoint samples discarded';return;}
+                    const keep=[];
+                    for(const p of this.pending){
+                        if(this.gl.getQueryParameter(p.q,this.gl.QUERY_RESULT_AVAILABLE)){
+                            this.gpu[p.label]={ms:this.gl.getQueryParameter(p.q,this.gl.QUERY_RESULT)/1e6,frameId:p.frameId};this.gl.deleteQuery(p.q);this.gpuStatus='asynchronous GPU samples';
+                        } else if(this.frameId-p.frameId>120){this.gl.deleteQuery(p.q);this.gpuStatus='GPU query expired';}
+                        else keep.push(p);
+                    }
+                    this.pending=keep;
+                } catch(_){this.clearQueries();this.gpu={};this.gpuStatus='GPU query unavailable';}
+            },
+            finish(game) {
+                if(!this.enabled)return;
+                const g=GammaShadows,s=g.stats,fresh=s.frameId===this.frameId;
+                this.latest={frameId:this.frameId,at:performance.now(),mode:GameSettings.lampShadows,backend:fresh?s.backend:'idle',stages:this.stages,bytes:{...this.bytes},churn:{...this.churn},shadows:{...DynamicShadows.stats},maskCacheBytes:DynamicShadows.bytes,sourceFamilies:{...DynamicShadows._families},
+                    layer:[game.lightCanvas.width,game.lightCanvas.height],scene:[game.canvas.width,game.canvas.height],lightingScale:game.lightingScale,adaptiveFactor:game._adaptiveLighting?.factor||1,soft:GameSettings.softShadows,
+                    gamma:fresh?{...s}:null,atlasSlots:g.slots?.length||0,atlasResident:g.slots?.filter(s=>s.cv).length||0,atlasBytes:g.atlasSize*g.atlasHeight*4||0,gpuTextureBytes:(g.atlasSize*g.atlasHeight*4||0)+(g.textureSizes||[]).reduce((n,s)=>{if(typeof s!=='string')return n;const [w,h]=s.split(':').map(Number);return n+(Number.isFinite(w*h)?w*h*4:0);},0)};
+                this.history.push(this.latest);if(this.history.length>60)this.history.shift();this.recording=false;
+            },
+            summary() {
+                const keys=new Set(this.history.flatMap(f=>Object.keys(f.stages))),rows=[];
+                for(const name of keys){const values=this.history.map(f=>f.stages[name]?.ms||0).sort((a,b)=>a-b),last=this.latest?.stages[name];
+                    rows.push({name,last:last?.ms||0,mean:values.reduce((a,b)=>a+b,0)/values.length,p95:values[Math.ceil(values.length*.95)-1],peak:values[values.length-1],calls:last?.calls||0,maxCall:last?.maxCall||0});}
+                return rows.sort((a,b)=>b.mean-a.mean);
+            },
+            snapshot(game) {
+                return {format:'dfab-lighting-profile-v1',createdAt:new Date().toISOString(),device:this.deviceInfo,gpuStatus:this.gpuStatus||'not sampled',gpu:{...this.gpu},gpuPending:this.pending.length,
+                    jsHeapBytes:Number.isFinite(performance.memory?.usedJSHeapSize)?performance.memory.usedJSHeapSize:null,frameMs:game._renderFrameMs,pixelRatio:window.devicePixelRatio||1,map:game.activeMap?.id,zoom:game.camera.zoom,settings:{shadows:GameSettings.lampShadows,soft:GameSettings.softShadows,adaptive:GameSettings.adaptiveLighting,lightingScale:game.lightingScale,renderScale:game._renderScale||1,fpsLimit:GameSettings.fpsLimit},
+                    gameSections:game.profiler?.report||[],latest:this.latest,summary:this.summary(),frames:this.history.slice(),memory:DevOverlay._canvasMB(game),note:'CPU timings are inclusive and can contain driver waits; nested rows overlap. GPU samples are asynchronous and identify their source frame. No forced readback or gl.finish.'};
+            },
+            download(game) {
+                const blob=new Blob([JSON.stringify(this.snapshot(game),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+                a.href=url;a.download='dfab-lighting-profile.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+            }
+        };
         // Gamma keeps High's shadow preparation, but batches cached sprites using
         // fixed-function blending. GPU blur feeds the scene directly; no tile lists
         // or intermediate WebGL -> Canvas light-layer copy on the game path.
@@ -75,11 +173,16 @@
             begin(ctx, frameId = null) {
                 this.frame++; this.records.length=0; this.holeReady=false; this.uploadFailed=false;
                 this.stats={backend:'high-fallback',resolves:0,draws:0,uploads:0,layerUploads:0,contributions:0,blurPasses:0,frameId};
+                const initTime=LightingProfile.start();
                 this.active=GameSettings.lampShadows==='gamma' && this._init();
-                if(this.active){this.stats.backend='webgl2';this.target=ctx.canvas;}
+                if(this.active){this.stats.backend='webgl2';this.target=ctx.canvas;LightingProfile.device(this.gl);}
+                LightingProfile.end('backend initialization',initTime);
                 return this.active;
             },
             collect(ctx,s,mode) {
+                const t=LightingProfile.start();try{return this._collect(ctx,s,mode);}finally{LightingProfile.end('atlas collection (includes uploads)',t);}
+            },
+            _collect(ctx,s,mode) {
                 if(!this.active||this.uploadFailed||ctx.canvas!==this.target||this.records.length>=this.LIMIT)return false;
                 const m=ctx.getTransform();
                 if(Math.abs(m.b)>1e-6||Math.abs(m.c)>1e-6||m.a<=0||m.d<=0)return false;
@@ -89,18 +192,25 @@
                     // a sprite referenced by this frame's queued draws.
                     slot=this.slots.filter(t=>t.at!==this.frame).reduce((best,t)=>!best||!t.cv||(best.cv&&t.at<best.at)?t:best,null);
                     if(!slot)return false;
-                    if(slot.cv)this.slotMap.delete(slot.cv);
+                    if(slot.cv){this.slotMap.delete(slot.cv);if(LightingProfile.enabled)LightingProfile.churn.evicted++;}
+                    if(LightingProfile.enabled)LightingProfile.churn.new++;
                     slot.cv=cv;slot.signature=null;this.slotMap.set(cv,slot);
                 }
                 slot.at=this.frame;
                 if(slot.signature!==s.signature){
+                    if(LightingProfile.enabled && slot.signature!==null)LightingProfile.churn.changed++;
                     try {
+                    const padTime=LightingProfile.start();
                     const gl=this.gl,pad=this.pad;pad.width=cv.width+2;pad.height=cv.height+2;
                     const g=pad.getContext('2d');g.drawImage(cv,1,1);
                     g.drawImage(cv,0,0,cv.width,1,1,0,cv.width,1);g.drawImage(cv,0,cv.height-1,cv.width,1,1,cv.height+1,cv.width,1);
                     g.drawImage(pad,1,0,1,pad.height,0,0,1,pad.height);g.drawImage(pad,cv.width,0,1,pad.height,cv.width+1,0,1,pad.height);
+                    LightingProfile.end('mask padding',padTime);
+                    const uploadTime=LightingProfile.start();
                     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.textures[3]);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
                     gl.texSubImage2D(gl.TEXTURE_2D,0,slot.x,slot.y,gl.RGBA,gl.UNSIGNED_BYTE,pad);
+                    LightingProfile.end('mask uploads (CPU wait)',uploadTime);
+                    if(LightingProfile.enabled)LightingProfile.bytes.mask+=pad.width*pad.height*4;
                     slot.signature=s.signature;this.stats.uploads++;
                     } catch (_) { this.uploadFailed=true; return false; }
                 }
@@ -108,6 +218,9 @@
                 this.stats.contributions=this.records.length;return true;
             },
             split(ctx,paintVeil) {
+                const t=LightingProfile.start();try{return this._split(ctx,paintVeil);}finally{LightingProfile.end('Canvas hole snapshot + room veil',t);}
+            },
+            _split(ctx,paintVeil) {
                 if(!this.active)return;
                 this.hasVeil=!!paintVeil;
                 for(const cv of this.hasVeil?[this.hole,this.veil]:[this.hole]){if(cv.width!==ctx.canvas.width)cv.width=ctx.canvas.width;if(cv.height!==ctx.canvas.height)cv.height=ctx.canvas.height;}
@@ -138,16 +251,22 @@
                 if(!this.active||!this.holeReady){this.active=false;return null;}
                 let result=null;
                 try {
+                    const setupTime=LightingProfile.start();
                     const gl=this.gl,w=ctx.canvas.width,h=ctx.canvas.height,soft=!!options?.soft;
                     if(this.uploadFailed||w>this.maxSize||h>this.maxSize||gl.isContextLost())throw new Error('Gamma surface limit');
                     if(this.canvas.width!==w)this.canvas.width=w;if(this.canvas.height!==h)this.canvas.height=h;
                     gl.viewport(0,0,w,h);gl.activeTexture(gl.TEXTURE0);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
+                    LightingProfile.end('surface setup',setupTime);
                     for(const [i,cv]of this.hasVeil?[[0,this.hole],[1,ctx.canvas],[2,this.veil]]:[[0,this.hole],[1,ctx.canvas]]){
+                        const uploadTime=LightingProfile.start();
                         gl.bindTexture(gl.TEXTURE_2D,this.textures[i]);
                         if(this.textureSizes[i]!==w+':'+h){gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,cv);this.textureSizes[i]=w+':'+h;}
                         else gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,cv);
+                        LightingProfile.end(['base darkness upload','base colour upload','room veil upload'][i],uploadTime);
+                        if(LightingProfile.enabled)LightingProfile.bytes.layers+=cv.width*cv.height*4;
                         this.stats.layerUploads++;
                     }
+                    const targetsTime=LightingProfile.start();
                     if(soft)for(let i=0;i<2;i++){
                         gl.bindTexture(gl.TEXTURE_2D,this.textures[4+i]);
                         if(this.textureSizes[4+i]!==w+':'+h){
@@ -156,20 +275,27 @@
                             if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Gamma blur target failed');
                         }
                     }
+                    LightingProfile.end('blur target allocation/setup',targetsTime);
+                    const renderTime=LightingProfile.start();LightingProfile.beginGPU('resolve');
                     gl.bindFramebuffer(gl.FRAMEBUFFER,soft?this.fbos[0]:null);gl.disable(gl.BLEND);this._copy(this.textures[0],true);
                     gl.enable(gl.BLEND);gl.blendFunc(gl.ZERO,gl.ONE_MINUS_SRC_ALPHA);this._sprites('hole',w,h);
                     if(this.hasVeil){gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);this._copy(this.textures[2],true);}
                     gl.blendFunc(gl.ONE,gl.ONE);this._copy(this.textures[1],true);this._sprites('color',w,h);
-                    gl.disable(gl.BLEND);
+                    gl.disable(gl.BLEND);LightingProfile.endGPU();LightingProfile.end('GPU resolve submission',renderTime);
+                    const blurTime=LightingProfile.start();
                     if(soft){
+                        LightingProfile.beginGPU('blur');
                         gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbos[1]);this._copy(this.textures[4],false,1/w,0);
-                        gl.bindFramebuffer(gl.FRAMEBUFFER,null);this._copy(this.textures[5],false,0,1/h);this.stats.blurPasses=2;
+                        gl.bindFramebuffer(gl.FRAMEBUFFER,null);this._copy(this.textures[5],false,0,1/h);this.stats.blurPasses=2;LightingProfile.endGPU();
                     }
-                    if(gl.getError()!==gl.NO_ERROR)throw new Error('Gamma GPU resolve failed');
+                    LightingProfile.end('GPU blur submission',blurTime);
+                    const checkTime=LightingProfile.start();
+                    const error=gl.getError();LightingProfile.end('GPU error check (CPU wait)',checkTime);
+                    if(error!==gl.NO_ERROR)throw new Error('Gamma GPU resolve failed');
                     this.stats.resolves=1;
                     if(options?.direct)result=this.canvas;
-                    else {ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='copy';ctx.drawImage(this.canvas,0,0);ctx.restore();}
-                } catch (_) {this._cpu(ctx);this.failed=true;this.stats.backend='high-fallback';}
+                    else {const copyTime=LightingProfile.start();ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='copy';ctx.drawImage(this.canvas,0,0);ctx.restore();LightingProfile.end('GPU to Canvas light copy',copyTime);}
+                } catch (error) {LightingProfile.endGPU();const t=LightingProfile.start();this._cpu(ctx);LightingProfile.end('High failure recovery',t);this.failed=true;this.stats.backend='high-fallback';this.stats.failure=String(error?.message||error);}
                 this.active=false;this.records.length=0;return result;
             }
         };

@@ -93,6 +93,7 @@
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
+                LightingProfile.begin(this);
                 DynamicShadows.begin(this);
                 // Baseline's layer panel (ui/render-layers.js): RL.at(layer) says whether a layer draws, and
                 // bills the canvas calls since the last ask to the layer before. Outside Baseline it's always true.
@@ -1347,6 +1348,7 @@
                 RL.at('frame');
                 PerfBench.draw(this.ctx, 20, this.canvas.height - 110);
                 RL.endFrame();                            // Baseline's layer panel: the frame's calls billed
+                LightingProfile.finish(this);
                 this.profiler.tick(); 
                 DevOverlay.frame(this);                   // the profiler pill and debug counts (DOM)
             },

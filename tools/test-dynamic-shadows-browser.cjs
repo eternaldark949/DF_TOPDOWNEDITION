@@ -213,8 +213,45 @@ const { chromium } = require('playwright');
       delete r.high;delete r.gamma;
       assert.ok(r.mean<2,`full-scene Gamma matches High: ${r.map}, soft=${r.soft}, mean=${r.mean}`);
     }
+    const detailed = await page.evaluate(() => {
+      game._doLoadMap('apt_949');game.bakeStaticLighting();game.running=true;game.paused=false;
+      GameSettings.lampShadows='gamma';GameSettings.softShadows=true;GameSettings.profilerMode='full';game.showProfiler=true;DevOverlay.sync(game);
+      for(let i=0;i<6;i++){_frameTime+=101;game.draw();}
+      DevOverlay._shadowPanel(game);DevOverlay._memAt=0;
+      const report=LightingProfile.snapshot(game),panel=document.querySelector('.dp-shadows').textContent;
+      return {report,panel,mode:GameSettings.profilerMode};
+    });
+    assert.equal(detailed.report.latest.backend,'webgl2','detailed profiler preserves real Gamma execution');
+    assert.ok(detailed.report.device.renderer,'renderer identity is reported');
+    assert.ok(detailed.report.summary.some(r=>r.name==='mask uploads (CPU wait)'),'changing masks have separate upload timings');
+    for(const name of ['shadow preparation','base darkness upload','base colour upload','room veil upload','GPU resolve submission','GPU blur submission','WebGL to scene Canvas copy (CPU wait)'])assert.ok(detailed.report.summary.some(r=>r.name===name),`stage recorded: ${name}`);
+    const f=detailed.report.latest;
+    assert.equal(f.bytes.layers,f.layer[0]*f.layer[1]*4*f.gamma.layerUploads,'full layer upload bytes match actual surfaces');
+    assert.ok(detailed.report.summary.every(r=>Number.isFinite(r.mean)&&Number.isFinite(r.p95)&&Number.isFinite(r.peak)),'CPU summaries stay finite');
+    assert.ok(Number.isFinite(detailed.report.memory.total),'cache accounting never emits NaN');
+    assert.ok(detailed.panel.includes('Lighting diagnostics') && detailed.panel.includes('CPU values include driver waits'),'detailed timing semantics are visible');
+    if(process.env.DFAB_PROFILE_PREVIEW){
+      await page.evaluate(()=>document.querySelector('#dev-prof').style.zIndex='2147483647'); // show above the unattended test's title screen
+      await page.locator('#dev-prof').screenshot({path:process.env.DFAB_PROFILE_PREVIEW});
+      await page.evaluate(()=>document.querySelector('#dev-prof').style.zIndex='');
+    }
+    const downloadEvent=page.waitForEvent('download');
+    await page.evaluate(()=>document.querySelector('[data-light-export]').click());
+    const download=await downloadEvent;
+    const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
+    assert.equal(exported.format,'dfab-lighting-profile-v1','report button exports usable JSON');
+    assert.equal(await page.evaluate(()=>GameSettings.profilerMode),'full','export click does not collapse the profiler');
+    const disabled = await page.evaluate(() => {
+      const before=game.ctx.getImageData(0,0,game.canvas.width,game.canvas.height).data;
+      GameSettings.profilerMode='off';game.showProfiler=false;game.draw();
+      const after=game.ctx.getImageData(0,0,game.canvas.width,game.canvas.height).data;
+      let total=0;for(let i=0;i<before.length;i++)total+=Math.abs(before[i]-after[i]);
+      return {enabled:LightingProfile.enabled,pending:LightingProfile.pending.length,history:LightingProfile.history.length,pixelMean:total/before.length};
+    });
+    assert.ok(disabled.pixelMean<1,'Full profiling preserves Gamma scene pixels');
+    assert.equal(disabled.enabled,false);assert.equal(disabled.pending,0);assert.equal(disabled.history,0,'closing Full releases queries and timing history');
     assert.deepEqual(errors, [], 'no browser runtime errors');
-    console.log(JSON.stringify({ passed: true, pixels: r, extended, gamma, atlas, scene, profiler, sceneParity, defaultBackend }, null, 2));
+    console.log(JSON.stringify({ passed: true, pixels: r, extended, gamma, atlas, scene, profiler, sceneParity, defaultBackend, detailed, disabled }, null, 2));
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

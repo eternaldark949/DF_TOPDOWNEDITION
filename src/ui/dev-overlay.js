@@ -32,6 +32,7 @@
             sync(game) {
                 game._syncProfiler();
                 const mode = game.showProfiler ? (GameSettings.profilerMode && GameSettings.profilerMode !== 'off' ? GameSettings.profilerMode : 'compact') : 'off';
+                if(mode!=='full' && LightingProfile.enabled)LightingProfile.disable();
                 if (mode !== 'off') this._ensureProf();
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
@@ -52,6 +53,8 @@
                 el.innerHTML = '<div class="dp-head"><b class="dp-fps">--</b><span>fps</span><b class="dp-ms">--</b><span>ms</span><canvas class="dp-spark" width="96" height="22"></canvas></div><div class="dp-shadows" aria-label="Shadow renderer status"></div><div class="dp-rows"></div>';
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    if(e.target.closest('[data-light-export]')){LightingProfile.download(game);return;}
+                    if(e.target.closest('details'))return;
                     GameSettings.profilerMode = GameSettings.profilerMode === 'full' ? 'compact' : 'full';
                     this.sync(game);
                 });
@@ -105,6 +108,7 @@
                 if (game.showProfiler && this._prof) {
                     if (this._n % 3 === 0) this._sparkStep(dt);
                     if (this._n % 15 === 0) { this._numbers(); if (this._prof.classList.contains('full')) this._shadowPanel(game); }
+                    if(this._prof.classList.contains('full') && now-(this._shadowAt||0)>500){this._shadowAt=now;this._numbers();this._shadowPanel(game);}
                     const rep = game.profiler.report;
                     if (rep !== this._report && this._prof.classList.contains('full')) { this._report = rep; this._rows(game, rep); }
                 }
@@ -126,12 +130,35 @@
                     + `<span>contributions <b>${s.contributions}</b></span><span>mask uploads <b>${s.uploads}</b>/frame</span>`
                     + `<span>GPU draws <b>${s.draws}</b>/frame</span><span>layer uploads <b>${s.layerUploads}</b>/frame</span><span>GPU blur passes <b>${s.blurPasses}</b></span></div>`
                     + '<div class="dp-shadow-note">Cached masks can need 0 uploads; Canvas input layers still upload. GPU blur stays on the GPU; scene composition remains Canvas 2D.</div>';
+                html += this._lightingDetails(game);
                 return html;
+            },
+            _lightingDetails(game) {
+                const p=LightingProfile,f=p.latest;
+                if(!p.enabled||!f||f.frameId!==game._renderDrawId)return '';
+                const esc=s=>String(s??'unknown').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                const ms=n=>Number.isFinite(n)?n.toFixed(2):'—',mb=n=>(n/1048576).toFixed(2);
+                let html='<details class="dp-light-detail" open><summary>Lighting diagnostics</summary><button type="button" data-light-export>Save JSON report</button>';
+                if(f.mode==='gamma' && p.deviceInfo)html+=`<div class="dp-light-device">${esc(p.deviceInfo.renderer)}<br>${esc(p.deviceInfo.vendor)} · ${esc(p.deviceInfo.version)}</div>`;
+                html+=`<div class="dp-shadow-note">Layer ${f.layer.join(' × ')} · scene ${f.scene.join(' × ')} · DPR ${window.devicePixelRatio||1}<br>Lighting scale ${f.lightingScale} · adaptive ${f.adaptiveFactor} · soft ${f.soft?'on':'off'}<br>Uploads: masks ${mb(f.bytes.mask)} MiB + layers ${mb(f.bytes.layers)} MiB/frame<br>Atlas ${f.atlasResident}/${f.atlasSlots} slots · ${mb(f.atlasBytes)} MiB · GPU textures ≈ ${mb(f.gpuTextureBytes)} MiB · new ${f.churn.new}, changed ${f.churn.changed}, evicted ${f.churn.evicted}<br>Shadow cache ${mb(f.maskCacheBytes)} MiB · builds ${f.shadows.builds}, hits ${f.shadows.hits}, captures ${f.shadows.captures}<br>Casters ${f.shadows.casters} · sources ${f.shadows.sources} · pairs ${f.shadows.pairs} · blocked ${f.shadows.blocked} · rays ${f.shadows.rays} · dropped ${f.shadows.dropped}</div>`;
+                if(f.gamma?.failure)html+=`<div class="dp-shadow-note">Failure: ${esc(f.gamma.failure)}</div>`;
+                html+=`<div class="dp-total"><span>CPU timings · ${p.history.length} frames</span></div>`;
+                for(const r of p.summary())html+=`<div class="dp-light-stage"><span>${esc(r.name)}</span><b>${ms(r.last)} ms</b><small>avg ${ms(r.mean)} · p95 ${ms(r.p95)} · peak ${ms(r.peak)} · calls ${r.calls} · max/call ${ms(r.maxCall)}</small></div>`;
+                html+='<div class="dp-shadow-note">CPU values include driver waits. Parent/child rows overlap; do not add them. No forced GPU readback.</div>';
+                if(f.mode==='gamma'){
+                    html+=`<div class="dp-total"><span>GPU execution</span></div><div class="dp-shadow-note">${esc(p.gpuStatus||'not sampled')} · ${p.pending.length} pending</div>`;
+                    for(const [name,g]of Object.entries(p.gpu))html+=`<div class="dp-light-stage"><span>${esc(name)}</span><b>${ms(g.ms)} ms</b><small>sample frame ${g.frameId} · ${Math.max(0,f.frameId-g.frameId)} frames old</small></div>`;
+                }
+                return html+'</details>';
             },
             _shadowPanel(game) {
                 if (!this._shadowEl) return;
                 const html = this._shadowLine(game);
-                if (html !== this._shadowHTML) { this._shadowHTML = html; this._shadowEl.innerHTML = html; }
+                if (html !== this._shadowHTML) {
+                    const open=this._shadowEl.querySelector('details')?.open;
+                    this._shadowHTML=html;this._shadowEl.innerHTML=html;
+                    const detail=this._shadowEl.querySelector('details');if(detail && open!==undefined)detail.open=open;
+                }
             },
 
             _numbers() {
@@ -194,7 +221,7 @@
                 const frameMs = k ? sum / k : 0, other = Math.max(0, frameMs - workMs);
                 const P = game.pedestrians, T = game.traffic;
                 const parts = [
-                    `<span>browser/GPU <b>${other.toFixed(1)}</b> ms</span>`,
+                    `<span>unattributed/wait <b>${other.toFixed(1)}</b> ms</span>`,
                     `<span>ticks/frame <b>${RenderStats.ticks}</b></span>`,
                     `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span>`,
                     `<span>live <b>${RenderStats.liveBodies}</b> / sprites <b>${RenderStats.cachedBodies}</b> / bake poses <b>${RenderStats.bakedBodies}</b></span>`,
@@ -210,7 +237,7 @@
                 const mem = this._canvasMB(game);
                 if (mem.groundN) parts.push(`<span>ground <b>${mem.groundN}</b> tiles (${mem.ground.toFixed(0)} MB)</span>`);
                 if (mem.props) parts.push(`<span>furniture sprites <b>${mem.props.toFixed(1)}</b> MB</span>`);
-                parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB</span>`);
+                parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB${mem.unknown?` (${mem.unknown} unknown entries)`:''}</span>`);
                 return parts.join('');
             },
 
@@ -219,15 +246,16 @@
             _canvasMB(game) {
                 const now = performance.now();
                 if (this._memAt && now - this._memAt < 500) return this._mem;
-                const px = (cv) => cv ? cv.width * cv.height : 0, MB = 4 / 1048576;
+                let unknown=0;
+                const px = cv => {if(!cv)return 0;const n=cv.width*cv.height;if(Number.isFinite(n)&&n>=0)return n;unknown++;return 0;}, MB = 4 / 1048576;
                 let ground = 0, groundN = 0, floors = 0, cars = 0, crowd = 0;
                 const gb = game.groundBaker;
                 if (gb) for (const cv of gb.cache.values()) { ground += px(cv); groundN++; }
                 if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
                 if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
                 if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv);
-                const props = typeof PropSprites !== 'undefined' ? PropSprites.bytes / 4 : 0;
-                this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
+                const props = typeof PropSprites !== 'undefined' && Number.isFinite(PropSprites.bytes) ? PropSprites.bytes / 4 : 0;
+                this._mem = { unknown, ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
                 this._memAt = now;
                 return this._mem;
             },

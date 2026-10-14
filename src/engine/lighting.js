@@ -380,6 +380,9 @@
             },
 
             drawLightingSystem(ctx) {
+                const t=LightingProfile.start();try{return this._drawLightingSystemProfiled(ctx);}finally{LightingProfile.end('lighting total (inclusive)',t);}
+            },
+            _drawLightingSystemProfiled(ctx) {
                 this._lightingAdaptiveScale();
                 const ambient = this.getAmbientDarkness();
                 const flash = this.weather.lightningFlash > 0 ? this.weather.lightningFlash : 0;
@@ -419,6 +422,7 @@
                 // 1. CLEAR BUFFER
                 lc.clearRect(0, 0, lw, lh);
                 GammaShadows.begin(lc, this._renderDrawId);
+                const inputsTime=LightingProfile.start();
                 lc.save();
                 lc.scale(LS, LS);
             
@@ -697,6 +701,7 @@
                 }
                 lc.globalAlpha = 1;
 
+                LightingProfile.end('Canvas inputs + shadow work (inclusive)',inputsTime);
                 const gammaLayer = GammaShadows.finish(lc, { direct: true, soft: GameSettings.softShadows });
 
                 // Lamp contributions already include dynamic occlusion. Other lamps,
@@ -708,6 +713,7 @@
                 ctx.save();
                 ctx.setTransform(1, 0, 0, 1, 0, 0); 
                 ctx.globalAlpha = finalOpacity;
+                const canvasBlurTime=LightingProfile.start();
                 let layer = gammaLayer || this.lightCanvas;
                 if (GameSettings.softShadows && !gammaLayer) {
                     // Soft edges, the same in every browser and no ctx.filter (Safari before 18 has none): a separable
@@ -729,10 +735,14 @@
                     }
                     layer = src;
                 }
+                LightingProfile.end('Canvas blur / layer selection',canvasBlurTime);
+                const sceneCopyTime=LightingProfile.start();
                 ctx.imageSmoothingEnabled = true;
                 if (layer === this.lightCanvas || (gammaLayer && !GameSettings.softShadows)) ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
                 else ctx.drawImage(layer, 1, 1, lw - 2, lh - 2, 0, 0, this.canvas.width, this.canvas.height);   // the blur's outer pixel is half-covered: crop it
                 
+                LightingProfile.end(gammaLayer?'WebGL to scene Canvas copy (CPU wait)':'Canvas to scene copy',sceneCopyTime);
+
                 // 8. NV SIGNAL BOOST
                 if (this.nvIntensity > 0.01) {
                     ctx.globalCompositeOperation = 'soft-light';

@@ -1526,8 +1526,15 @@
         #dev-prof .dp-shadow-status[data-state="active"] { color: #9be8dc; }
         #dev-prof .dp-shadow-status[data-state="fallback"] { color: #ffc248; }
         #dev-prof .dp-shadow-note { margin-top: 5px; font-size: max(6px, 0.5rem - var(--font-trim)); color: var(--df-lilac-grey); line-height: 1.5; }
+        #dev-prof .dp-light-detail { margin-top: 8px; }
+        #dev-prof .dp-light-detail summary { cursor: pointer; font-size: .65rem; color: var(--df-cream); }
+        #dev-prof .dp-light-detail button { margin: 6px 0; padding: 5px 8px; font-size: .65rem; color: var(--df-cream); background: #37223e; border: 1px solid #715379; border-radius: 5px; }
+        #dev-prof .dp-light-device { overflow-wrap: anywhere; font-size: .55rem; color: #9be8dc; }
+        #dev-prof .dp-light-stage { display: grid; grid-template-columns: 1fr auto; gap: 2px 5px; padding: 4px 0; font-size: .6rem; color: var(--df-lilac-grey); border-bottom: 1px solid #ffffff12; }
+        #dev-prof .dp-light-stage b { font-variant-numeric: tabular-nums; color: var(--df-cream); }
+        #dev-prof .dp-light-stage small { grid-column: 1 / -1; font-size: .5rem; }
         #dev-prof .dp-rows { display: none; }
-        #dev-prof.full { width: 260px; max-height: calc(100vh - 160px); overflow-y: auto; }
+        #dev-prof.full { width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 160px); overflow-y: auto; }
         #dev-prof.full .dp-rows { display: block; margin-top: 8px; }
         #dev-prof .dp-total { display: flex; justify-content: space-between; padding-bottom: 5px; margin-bottom: 4px; font-size: max(6px, 0.6rem - var(--font-trim)); letter-spacing: 2px; text-transform: uppercase; color: var(--df-cream); border-bottom: 1px solid rgba(216, 198, 162, 0.35); }
         #dev-prof .dp-row { display: grid; grid-template-columns: 1fr 38px 56px; align-items: center; gap: 6px; font-size: max(6px, 0.6rem - var(--font-trim)); line-height: 1.75; color: rgba(225, 214, 245, 0.72); }
@@ -48454,6 +48461,104 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             cache[laser ? 1 : 0] = out; _weaponSprites.set(key, cache);
             return out;
         }
+        // Full-profiler diagnostics only. CPU values include browser/driver waits;
+        // GPU timer queries are asynchronous, bounded, and never force completion.
+        const LightingProfile = {
+            enabled: false, history: [], pending: [], gpu: {}, deviceInfo: null, wrapped: [],
+            start() { return this.enabled && this.recording ? performance.now() : null; },
+            end(name,t) {
+                if(t===null || !this.enabled)return;
+                const ms=Math.max(0,performance.now()-t),m=this.stages[name] || (this.stages[name]={ms:0,calls:0,maxCall:0});
+                m.ms+=ms;m.calls++;m.maxCall=Math.max(m.maxCall,ms);
+            },
+            wrap(object,key,label) {
+                const original=object[key],p=this;
+                const wrapped=object[key]=function(...args){const t=p.start();try{return original.apply(this,args);}finally{p.end(label,t);}};
+                this.wrapped.push({object,key,original,wrapped});
+            },
+            disable() {
+                for(const w of this.wrapped)if(w.object[w.key]===w.wrapped)w.object[w.key]=w.original;
+                this.wrapped.length=0;this.instrumented=false;
+                this.clearQueries();this.enabled=false;this.recording=false;this.history.length=0;this.latest=null;this.gpu={};this.key=null;
+            },
+            begin(game) {
+                const on=!!(game.showProfiler && GameSettings.profilerMode==='full');
+                if(!on){if(this.enabled)this.disable();return;}
+                const key=[game.activeMap?.id,GameSettings.lampShadows,GameSettings.softShadows,game.canvas.width,game.canvas.height,game.lightingScale].join('|');
+                if(key!==this.key){this.clearQueries();this.history.length=0;this.latest=null;this.gpu={};this.gpuStatus=this.timer?'awaiting sample':'GPU timer unavailable';}
+                this.key=key;this.enabled=on;this.recording=true;this.frameId=game._renderDrawId;this.stages={};this.bytes={mask:0,layers:0};this.churn={new:0,changed:0,evicted:0};
+                if(!this.instrumented){
+                    this.instrumented=true;
+                    for(const [key,label]of [['begin','caster registry'],['prepare','shadow preparation'],['_pairs','source/caster pairs'],['_path','visibility paths'],['keepSilhouette','silhouette cache copy']])this.wrap(DynamicShadows,key,label);
+                }
+                this.poll();
+            },
+            device(gl) {
+                if(!this.enabled || this.gl===gl)return;
+                this.clearQueries();this.gl=gl;
+                try {
+                    const d=gl.getExtension('WEBGL_debug_renderer_info');
+                    this.timer=gl.getExtension('EXT_disjoint_timer_query_webgl2');
+                    this.deviceInfo={renderer:gl.getParameter(d?d.UNMASKED_RENDERER_WEBGL:gl.RENDERER),vendor:gl.getParameter(d?d.UNMASKED_VENDOR_WEBGL:gl.VENDOR),version:gl.getParameter(gl.VERSION),maxTextureSize:gl.getParameter(gl.MAX_TEXTURE_SIZE),timerAvailable:!!this.timer};
+                    this.gpuStatus=this.timer?'awaiting sample':'GPU timer unavailable';
+                } catch(_){this.timer=null;this.gpuStatus='GPU timer unavailable';}
+            },
+            beginGPU(label) {
+                if(!this.enabled||!this.recording||!this.timer||this.activeQuery||this.pending.length>=8||this.frameId%4!==0)return false;
+                let q;
+                try {q=this.gl.createQuery();if(!q)return false;this.gl.beginQuery(this.timer.TIME_ELAPSED_EXT,q);this.activeQuery={q,label,frameId:this.frameId};return true;}
+                catch(_){if(q)try{this.gl.deleteQuery(q);}catch(_){}this.gpuStatus='GPU query unavailable';return false;}
+            },
+            endGPU() {
+                if(!this.activeQuery)return;
+                const entry=this.activeQuery;this.activeQuery=null;
+                try{this.gl.endQuery(this.timer.TIME_ELAPSED_EXT);this.pending.push(entry);}
+                catch(_){try{this.gl.deleteQuery(entry.q);}catch(_){}this.gpuStatus='GPU query interrupted';}
+            },
+            clearQueries() {
+                this.endGPU();
+                for(const p of this.pending)try{this.gl.deleteQuery(p.q);}catch(_){}
+                this.pending.length=0;
+            },
+            poll() {
+                if(!this.pending.length||!this.timer)return;
+                try {
+                    if(this.gl.isContextLost()){this.clearQueries();this.gpu={};this.gpuStatus='GPU context lost';return;}
+                    if(this.gl.getParameter(this.timer.GPU_DISJOINT_EXT)){this.clearQueries();this.gpu={};this.gpuStatus='disjoint samples discarded';return;}
+                    const keep=[];
+                    for(const p of this.pending){
+                        if(this.gl.getQueryParameter(p.q,this.gl.QUERY_RESULT_AVAILABLE)){
+                            this.gpu[p.label]={ms:this.gl.getQueryParameter(p.q,this.gl.QUERY_RESULT)/1e6,frameId:p.frameId};this.gl.deleteQuery(p.q);this.gpuStatus='asynchronous GPU samples';
+                        } else if(this.frameId-p.frameId>120){this.gl.deleteQuery(p.q);this.gpuStatus='GPU query expired';}
+                        else keep.push(p);
+                    }
+                    this.pending=keep;
+                } catch(_){this.clearQueries();this.gpu={};this.gpuStatus='GPU query unavailable';}
+            },
+            finish(game) {
+                if(!this.enabled)return;
+                const g=GammaShadows,s=g.stats,fresh=s.frameId===this.frameId;
+                this.latest={frameId:this.frameId,at:performance.now(),mode:GameSettings.lampShadows,backend:fresh?s.backend:'idle',stages:this.stages,bytes:{...this.bytes},churn:{...this.churn},shadows:{...DynamicShadows.stats},maskCacheBytes:DynamicShadows.bytes,sourceFamilies:{...DynamicShadows._families},
+                    layer:[game.lightCanvas.width,game.lightCanvas.height],scene:[game.canvas.width,game.canvas.height],lightingScale:game.lightingScale,adaptiveFactor:game._adaptiveLighting?.factor||1,soft:GameSettings.softShadows,
+                    gamma:fresh?{...s}:null,atlasSlots:g.slots?.length||0,atlasResident:g.slots?.filter(s=>s.cv).length||0,atlasBytes:g.atlasSize*g.atlasHeight*4||0,gpuTextureBytes:(g.atlasSize*g.atlasHeight*4||0)+(g.textureSizes||[]).reduce((n,s)=>{if(typeof s!=='string')return n;const [w,h]=s.split(':').map(Number);return n+(Number.isFinite(w*h)?w*h*4:0);},0)};
+                this.history.push(this.latest);if(this.history.length>60)this.history.shift();this.recording=false;
+            },
+            summary() {
+                const keys=new Set(this.history.flatMap(f=>Object.keys(f.stages))),rows=[];
+                for(const name of keys){const values=this.history.map(f=>f.stages[name]?.ms||0).sort((a,b)=>a-b),last=this.latest?.stages[name];
+                    rows.push({name,last:last?.ms||0,mean:values.reduce((a,b)=>a+b,0)/values.length,p95:values[Math.ceil(values.length*.95)-1],peak:values[values.length-1],calls:last?.calls||0,maxCall:last?.maxCall||0});}
+                return rows.sort((a,b)=>b.mean-a.mean);
+            },
+            snapshot(game) {
+                return {format:'dfab-lighting-profile-v1',createdAt:new Date().toISOString(),device:this.deviceInfo,gpuStatus:this.gpuStatus||'not sampled',gpu:{...this.gpu},gpuPending:this.pending.length,
+                    jsHeapBytes:Number.isFinite(performance.memory?.usedJSHeapSize)?performance.memory.usedJSHeapSize:null,frameMs:game._renderFrameMs,pixelRatio:window.devicePixelRatio||1,map:game.activeMap?.id,zoom:game.camera.zoom,settings:{shadows:GameSettings.lampShadows,soft:GameSettings.softShadows,adaptive:GameSettings.adaptiveLighting,lightingScale:game.lightingScale,renderScale:game._renderScale||1,fpsLimit:GameSettings.fpsLimit},
+                    gameSections:game.profiler?.report||[],latest:this.latest,summary:this.summary(),frames:this.history.slice(),memory:DevOverlay._canvasMB(game),note:'CPU timings are inclusive and can contain driver waits; nested rows overlap. GPU samples are asynchronous and identify their source frame. No forced readback or gl.finish.'};
+            },
+            download(game) {
+                const blob=new Blob([JSON.stringify(this.snapshot(game),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+                a.href=url;a.download='dfab-lighting-profile.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+            }
+        };
         // Gamma keeps High's shadow preparation, but batches cached sprites using
         // fixed-function blending. GPU blur feeds the scene directly; no tile lists
         // or intermediate WebGL -> Canvas light-layer copy on the game path.
@@ -48531,11 +48636,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             begin(ctx, frameId = null) {
                 this.frame++; this.records.length=0; this.holeReady=false; this.uploadFailed=false;
                 this.stats={backend:'high-fallback',resolves:0,draws:0,uploads:0,layerUploads:0,contributions:0,blurPasses:0,frameId};
+                const initTime=LightingProfile.start();
                 this.active=GameSettings.lampShadows==='gamma' && this._init();
-                if(this.active){this.stats.backend='webgl2';this.target=ctx.canvas;}
+                if(this.active){this.stats.backend='webgl2';this.target=ctx.canvas;LightingProfile.device(this.gl);}
+                LightingProfile.end('backend initialization',initTime);
                 return this.active;
             },
             collect(ctx,s,mode) {
+                const t=LightingProfile.start();try{return this._collect(ctx,s,mode);}finally{LightingProfile.end('atlas collection (includes uploads)',t);}
+            },
+            _collect(ctx,s,mode) {
                 if(!this.active||this.uploadFailed||ctx.canvas!==this.target||this.records.length>=this.LIMIT)return false;
                 const m=ctx.getTransform();
                 if(Math.abs(m.b)>1e-6||Math.abs(m.c)>1e-6||m.a<=0||m.d<=0)return false;
@@ -48545,18 +48655,25 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     // a sprite referenced by this frame's queued draws.
                     slot=this.slots.filter(t=>t.at!==this.frame).reduce((best,t)=>!best||!t.cv||(best.cv&&t.at<best.at)?t:best,null);
                     if(!slot)return false;
-                    if(slot.cv)this.slotMap.delete(slot.cv);
+                    if(slot.cv){this.slotMap.delete(slot.cv);if(LightingProfile.enabled)LightingProfile.churn.evicted++;}
+                    if(LightingProfile.enabled)LightingProfile.churn.new++;
                     slot.cv=cv;slot.signature=null;this.slotMap.set(cv,slot);
                 }
                 slot.at=this.frame;
                 if(slot.signature!==s.signature){
+                    if(LightingProfile.enabled && slot.signature!==null)LightingProfile.churn.changed++;
                     try {
+                    const padTime=LightingProfile.start();
                     const gl=this.gl,pad=this.pad;pad.width=cv.width+2;pad.height=cv.height+2;
                     const g=pad.getContext('2d');g.drawImage(cv,1,1);
                     g.drawImage(cv,0,0,cv.width,1,1,0,cv.width,1);g.drawImage(cv,0,cv.height-1,cv.width,1,1,cv.height+1,cv.width,1);
                     g.drawImage(pad,1,0,1,pad.height,0,0,1,pad.height);g.drawImage(pad,cv.width,0,1,pad.height,cv.width+1,0,1,pad.height);
+                    LightingProfile.end('mask padding',padTime);
+                    const uploadTime=LightingProfile.start();
                     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.textures[3]);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
                     gl.texSubImage2D(gl.TEXTURE_2D,0,slot.x,slot.y,gl.RGBA,gl.UNSIGNED_BYTE,pad);
+                    LightingProfile.end('mask uploads (CPU wait)',uploadTime);
+                    if(LightingProfile.enabled)LightingProfile.bytes.mask+=pad.width*pad.height*4;
                     slot.signature=s.signature;this.stats.uploads++;
                     } catch (_) { this.uploadFailed=true; return false; }
                 }
@@ -48564,6 +48681,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.stats.contributions=this.records.length;return true;
             },
             split(ctx,paintVeil) {
+                const t=LightingProfile.start();try{return this._split(ctx,paintVeil);}finally{LightingProfile.end('Canvas hole snapshot + room veil',t);}
+            },
+            _split(ctx,paintVeil) {
                 if(!this.active)return;
                 this.hasVeil=!!paintVeil;
                 for(const cv of this.hasVeil?[this.hole,this.veil]:[this.hole]){if(cv.width!==ctx.canvas.width)cv.width=ctx.canvas.width;if(cv.height!==ctx.canvas.height)cv.height=ctx.canvas.height;}
@@ -48594,16 +48714,22 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if(!this.active||!this.holeReady){this.active=false;return null;}
                 let result=null;
                 try {
+                    const setupTime=LightingProfile.start();
                     const gl=this.gl,w=ctx.canvas.width,h=ctx.canvas.height,soft=!!options?.soft;
                     if(this.uploadFailed||w>this.maxSize||h>this.maxSize||gl.isContextLost())throw new Error('Gamma surface limit');
                     if(this.canvas.width!==w)this.canvas.width=w;if(this.canvas.height!==h)this.canvas.height=h;
                     gl.viewport(0,0,w,h);gl.activeTexture(gl.TEXTURE0);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
+                    LightingProfile.end('surface setup',setupTime);
                     for(const [i,cv]of this.hasVeil?[[0,this.hole],[1,ctx.canvas],[2,this.veil]]:[[0,this.hole],[1,ctx.canvas]]){
+                        const uploadTime=LightingProfile.start();
                         gl.bindTexture(gl.TEXTURE_2D,this.textures[i]);
                         if(this.textureSizes[i]!==w+':'+h){gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,cv);this.textureSizes[i]=w+':'+h;}
                         else gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,cv);
+                        LightingProfile.end(['base darkness upload','base colour upload','room veil upload'][i],uploadTime);
+                        if(LightingProfile.enabled)LightingProfile.bytes.layers+=cv.width*cv.height*4;
                         this.stats.layerUploads++;
                     }
+                    const targetsTime=LightingProfile.start();
                     if(soft)for(let i=0;i<2;i++){
                         gl.bindTexture(gl.TEXTURE_2D,this.textures[4+i]);
                         if(this.textureSizes[4+i]!==w+':'+h){
@@ -48612,20 +48738,27 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Gamma blur target failed');
                         }
                     }
+                    LightingProfile.end('blur target allocation/setup',targetsTime);
+                    const renderTime=LightingProfile.start();LightingProfile.beginGPU('resolve');
                     gl.bindFramebuffer(gl.FRAMEBUFFER,soft?this.fbos[0]:null);gl.disable(gl.BLEND);this._copy(this.textures[0],true);
                     gl.enable(gl.BLEND);gl.blendFunc(gl.ZERO,gl.ONE_MINUS_SRC_ALPHA);this._sprites('hole',w,h);
                     if(this.hasVeil){gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);this._copy(this.textures[2],true);}
                     gl.blendFunc(gl.ONE,gl.ONE);this._copy(this.textures[1],true);this._sprites('color',w,h);
-                    gl.disable(gl.BLEND);
+                    gl.disable(gl.BLEND);LightingProfile.endGPU();LightingProfile.end('GPU resolve submission',renderTime);
+                    const blurTime=LightingProfile.start();
                     if(soft){
+                        LightingProfile.beginGPU('blur');
                         gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbos[1]);this._copy(this.textures[4],false,1/w,0);
-                        gl.bindFramebuffer(gl.FRAMEBUFFER,null);this._copy(this.textures[5],false,0,1/h);this.stats.blurPasses=2;
+                        gl.bindFramebuffer(gl.FRAMEBUFFER,null);this._copy(this.textures[5],false,0,1/h);this.stats.blurPasses=2;LightingProfile.endGPU();
                     }
-                    if(gl.getError()!==gl.NO_ERROR)throw new Error('Gamma GPU resolve failed');
+                    LightingProfile.end('GPU blur submission',blurTime);
+                    const checkTime=LightingProfile.start();
+                    const error=gl.getError();LightingProfile.end('GPU error check (CPU wait)',checkTime);
+                    if(error!==gl.NO_ERROR)throw new Error('Gamma GPU resolve failed');
                     this.stats.resolves=1;
                     if(options?.direct)result=this.canvas;
-                    else {ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='copy';ctx.drawImage(this.canvas,0,0);ctx.restore();}
-                } catch (_) {this._cpu(ctx);this.failed=true;this.stats.backend='high-fallback';}
+                    else {const copyTime=LightingProfile.start();ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='copy';ctx.drawImage(this.canvas,0,0);ctx.restore();LightingProfile.end('GPU to Canvas light copy',copyTime);}
+                } catch (error) {LightingProfile.endGPU();const t=LightingProfile.start();this._cpu(ctx);LightingProfile.end('High failure recovery',t);this.failed=true;this.stats.backend='high-fallback';this.stats.failure=String(error?.message||error);}
                 this.active=false;this.records.length=0;return result;
             }
         };
@@ -48951,6 +49084,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     this.bytes -= oldest[1].bytes; this.lights.delete(oldest[0]);
                 }
                 this.bytes += bytes - s.bytes; s.bytes = bytes;
+                const rasterTime=LightingProfile.start();
                 const mask = this._mask || (this._mask = document.createElement('canvas')); mask.width = width; mask.height = height;
                 const mg = mask.getContext('2d'), x = bounds.x, y = bounds.y, sx = width / bounds.w, sy = height / bounds.h;
                 const casterMask = this._casterMask || (this._casterMask = document.createElement('canvas'));
@@ -48976,6 +49110,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     } g.restore();
                     g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'destination-out'; g.drawImage(mask, 0, 0); g.globalCompositeOperation = 'source-over';
                 }
+                LightingProfile.end('mask raster + sprite painting',rasterTime);
                 if (light.samePaint) s.color = s.hole;
                 Object.assign(s, { signature, x, y, size: R * 2, w: bounds.w, h: bounds.h, baseRef: light.baseRef, clipRef: light.clipPath, ready: true }); this.stats.builds++;
                 return s;
@@ -50180,6 +50315,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
         /** The body drawn into SilhouetteFX's capture (its contact shadow stays on the frame), then stamped back with its effect. */
         function _drawHumanoidSilhouette(ctx, entity, config, fx, lampSil) {
+            const t=lampSil?LightingProfile.start():null;
+            try{return _drawHumanoidSilhouetteBody(ctx,entity,config,fx,lampSil);}
+            finally{LightingProfile.end('silhouette body capture',t);}
+        }
+        function _drawHumanoidSilhouetteBody(ctx, entity, config, fx, lampSil) {
             // The body itself is drawn through the capture, so the capture must hold all of it: a lamp shadow
             // alone captures tightly (LAMP_SHADOW_CAP_R), unless a weapon in hand reaches past that (a sniper: ~65px)
             const armed = (entity.type === 'player' && entity._game && entity._game.currentWeapon) || (config.weapon && config.weapon.id);
@@ -60992,6 +61132,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             sync(game) {
                 game._syncProfiler();
                 const mode = game.showProfiler ? (GameSettings.profilerMode && GameSettings.profilerMode !== 'off' ? GameSettings.profilerMode : 'compact') : 'off';
+                if(mode!=='full' && LightingProfile.enabled)LightingProfile.disable();
                 if (mode !== 'off') this._ensureProf();
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
@@ -61012,6 +61153,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 el.innerHTML = '<div class="dp-head"><b class="dp-fps">--</b><span>fps</span><b class="dp-ms">--</b><span>ms</span><canvas class="dp-spark" width="96" height="22"></canvas></div><div class="dp-shadows" aria-label="Shadow renderer status"></div><div class="dp-rows"></div>';
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    if(e.target.closest('[data-light-export]')){LightingProfile.download(game);return;}
+                    if(e.target.closest('details'))return;
                     GameSettings.profilerMode = GameSettings.profilerMode === 'full' ? 'compact' : 'full';
                     this.sync(game);
                 });
@@ -61065,6 +61208,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (game.showProfiler && this._prof) {
                     if (this._n % 3 === 0) this._sparkStep(dt);
                     if (this._n % 15 === 0) { this._numbers(); if (this._prof.classList.contains('full')) this._shadowPanel(game); }
+                    if(this._prof.classList.contains('full') && now-(this._shadowAt||0)>500){this._shadowAt=now;this._numbers();this._shadowPanel(game);}
                     const rep = game.profiler.report;
                     if (rep !== this._report && this._prof.classList.contains('full')) { this._report = rep; this._rows(game, rep); }
                 }
@@ -61086,12 +61230,35 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     + `<span>contributions <b>${s.contributions}</b></span><span>mask uploads <b>${s.uploads}</b>/frame</span>`
                     + `<span>GPU draws <b>${s.draws}</b>/frame</span><span>layer uploads <b>${s.layerUploads}</b>/frame</span><span>GPU blur passes <b>${s.blurPasses}</b></span></div>`
                     + '<div class="dp-shadow-note">Cached masks can need 0 uploads; Canvas input layers still upload. GPU blur stays on the GPU; scene composition remains Canvas 2D.</div>';
+                html += this._lightingDetails(game);
                 return html;
+            },
+            _lightingDetails(game) {
+                const p=LightingProfile,f=p.latest;
+                if(!p.enabled||!f||f.frameId!==game._renderDrawId)return '';
+                const esc=s=>String(s??'unknown').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                const ms=n=>Number.isFinite(n)?n.toFixed(2):'—',mb=n=>(n/1048576).toFixed(2);
+                let html='<details class="dp-light-detail" open><summary>Lighting diagnostics</summary><button type="button" data-light-export>Save JSON report</button>';
+                if(f.mode==='gamma' && p.deviceInfo)html+=`<div class="dp-light-device">${esc(p.deviceInfo.renderer)}<br>${esc(p.deviceInfo.vendor)} · ${esc(p.deviceInfo.version)}</div>`;
+                html+=`<div class="dp-shadow-note">Layer ${f.layer.join(' × ')} · scene ${f.scene.join(' × ')} · DPR ${window.devicePixelRatio||1}<br>Lighting scale ${f.lightingScale} · adaptive ${f.adaptiveFactor} · soft ${f.soft?'on':'off'}<br>Uploads: masks ${mb(f.bytes.mask)} MiB + layers ${mb(f.bytes.layers)} MiB/frame<br>Atlas ${f.atlasResident}/${f.atlasSlots} slots · ${mb(f.atlasBytes)} MiB · GPU textures ≈ ${mb(f.gpuTextureBytes)} MiB · new ${f.churn.new}, changed ${f.churn.changed}, evicted ${f.churn.evicted}<br>Shadow cache ${mb(f.maskCacheBytes)} MiB · builds ${f.shadows.builds}, hits ${f.shadows.hits}, captures ${f.shadows.captures}<br>Casters ${f.shadows.casters} · sources ${f.shadows.sources} · pairs ${f.shadows.pairs} · blocked ${f.shadows.blocked} · rays ${f.shadows.rays} · dropped ${f.shadows.dropped}</div>`;
+                if(f.gamma?.failure)html+=`<div class="dp-shadow-note">Failure: ${esc(f.gamma.failure)}</div>`;
+                html+=`<div class="dp-total"><span>CPU timings · ${p.history.length} frames</span></div>`;
+                for(const r of p.summary())html+=`<div class="dp-light-stage"><span>${esc(r.name)}</span><b>${ms(r.last)} ms</b><small>avg ${ms(r.mean)} · p95 ${ms(r.p95)} · peak ${ms(r.peak)} · calls ${r.calls} · max/call ${ms(r.maxCall)}</small></div>`;
+                html+='<div class="dp-shadow-note">CPU values include driver waits. Parent/child rows overlap; do not add them. No forced GPU readback.</div>';
+                if(f.mode==='gamma'){
+                    html+=`<div class="dp-total"><span>GPU execution</span></div><div class="dp-shadow-note">${esc(p.gpuStatus||'not sampled')} · ${p.pending.length} pending</div>`;
+                    for(const [name,g]of Object.entries(p.gpu))html+=`<div class="dp-light-stage"><span>${esc(name)}</span><b>${ms(g.ms)} ms</b><small>sample frame ${g.frameId} · ${Math.max(0,f.frameId-g.frameId)} frames old</small></div>`;
+                }
+                return html+'</details>';
             },
             _shadowPanel(game) {
                 if (!this._shadowEl) return;
                 const html = this._shadowLine(game);
-                if (html !== this._shadowHTML) { this._shadowHTML = html; this._shadowEl.innerHTML = html; }
+                if (html !== this._shadowHTML) {
+                    const open=this._shadowEl.querySelector('details')?.open;
+                    this._shadowHTML=html;this._shadowEl.innerHTML=html;
+                    const detail=this._shadowEl.querySelector('details');if(detail && open!==undefined)detail.open=open;
+                }
             },
 
             _numbers() {
@@ -61154,7 +61321,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const frameMs = k ? sum / k : 0, other = Math.max(0, frameMs - workMs);
                 const P = game.pedestrians, T = game.traffic;
                 const parts = [
-                    `<span>browser/GPU <b>${other.toFixed(1)}</b> ms</span>`,
+                    `<span>unattributed/wait <b>${other.toFixed(1)}</b> ms</span>`,
                     `<span>ticks/frame <b>${RenderStats.ticks}</b></span>`,
                     `<span>bodies <b>${RenderStats.bodies}</b> drawn / <b>${RenderStats.culled}</b> culled</span>`,
                     `<span>live <b>${RenderStats.liveBodies}</b> / sprites <b>${RenderStats.cachedBodies}</b> / bake poses <b>${RenderStats.bakedBodies}</b></span>`,
@@ -61170,7 +61337,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const mem = this._canvasMB(game);
                 if (mem.groundN) parts.push(`<span>ground <b>${mem.groundN}</b> tiles (${mem.ground.toFixed(0)} MB)</span>`);
                 if (mem.props) parts.push(`<span>furniture sprites <b>${mem.props.toFixed(1)}</b> MB</span>`);
-                parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB</span>`);
+                parts.push(`<span>image caches ≈ <b>${mem.total.toFixed(0)}</b> MB${mem.unknown?` (${mem.unknown} unknown entries)`:''}</span>`);
                 return parts.join('');
             },
 
@@ -61179,15 +61346,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             _canvasMB(game) {
                 const now = performance.now();
                 if (this._memAt && now - this._memAt < 500) return this._mem;
-                const px = (cv) => cv ? cv.width * cv.height : 0, MB = 4 / 1048576;
+                let unknown=0;
+                const px = cv => {if(!cv)return 0;const n=cv.width*cv.height;if(Number.isFinite(n)&&n>=0)return n;unknown++;return 0;}, MB = 4 / 1048576;
                 let ground = 0, groundN = 0, floors = 0, cars = 0, crowd = 0;
                 const gb = game.groundBaker;
                 if (gb) for (const cv of gb.cache.values()) { ground += px(cv); groundN++; }
                 if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
                 if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
                 if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv);
-                const props = typeof PropSprites !== 'undefined' ? PropSprites.bytes / 4 : 0;
-                this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
+                const props = typeof PropSprites !== 'undefined' && Number.isFinite(PropSprites.bytes) ? PropSprites.bytes / 4 : 0;
+                this._mem = { unknown, ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
                 this._memAt = now;
                 return this._mem;
             },
@@ -69749,6 +69917,7 @@ engineMixin({
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
             
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
+                LightingProfile.begin(this);
                 DynamicShadows.begin(this);
                 // Baseline's layer panel (ui/render-layers.js): RL.at(layer) says whether a layer draws, and
                 // bills the canvas calls since the last ask to the layer before. Outside Baseline it's always true.
@@ -71003,6 +71172,7 @@ engineMixin({
                 RL.at('frame');
                 PerfBench.draw(this.ctx, 20, this.canvas.height - 110);
                 RL.endFrame();                            // Baseline's layer panel: the frame's calls billed
+                LightingProfile.finish(this);
                 this.profiler.tick(); 
                 DevOverlay.frame(this);                   // the profiler pill and debug counts (DOM)
             },
@@ -73386,6 +73556,9 @@ engineMixin({
             },
 
             drawLightingSystem(ctx) {
+                const t=LightingProfile.start();try{return this._drawLightingSystemProfiled(ctx);}finally{LightingProfile.end('lighting total (inclusive)',t);}
+            },
+            _drawLightingSystemProfiled(ctx) {
                 this._lightingAdaptiveScale();
                 const ambient = this.getAmbientDarkness();
                 const flash = this.weather.lightningFlash > 0 ? this.weather.lightningFlash : 0;
@@ -73425,6 +73598,7 @@ engineMixin({
                 // 1. CLEAR BUFFER
                 lc.clearRect(0, 0, lw, lh);
                 GammaShadows.begin(lc, this._renderDrawId);
+                const inputsTime=LightingProfile.start();
                 lc.save();
                 lc.scale(LS, LS);
             
@@ -73703,6 +73877,7 @@ engineMixin({
                 }
                 lc.globalAlpha = 1;
 
+                LightingProfile.end('Canvas inputs + shadow work (inclusive)',inputsTime);
                 const gammaLayer = GammaShadows.finish(lc, { direct: true, soft: GameSettings.softShadows });
 
                 // Lamp contributions already include dynamic occlusion. Other lamps,
@@ -73714,6 +73889,7 @@ engineMixin({
                 ctx.save();
                 ctx.setTransform(1, 0, 0, 1, 0, 0); 
                 ctx.globalAlpha = finalOpacity;
+                const canvasBlurTime=LightingProfile.start();
                 let layer = gammaLayer || this.lightCanvas;
                 if (GameSettings.softShadows && !gammaLayer) {
                     // Soft edges, the same in every browser and no ctx.filter (Safari before 18 has none): a separable
@@ -73735,10 +73911,14 @@ engineMixin({
                     }
                     layer = src;
                 }
+                LightingProfile.end('Canvas blur / layer selection',canvasBlurTime);
+                const sceneCopyTime=LightingProfile.start();
                 ctx.imageSmoothingEnabled = true;
                 if (layer === this.lightCanvas || (gammaLayer && !GameSettings.softShadows)) ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
                 else ctx.drawImage(layer, 1, 1, lw - 2, lh - 2, 0, 0, this.canvas.width, this.canvas.height);   // the blur's outer pixel is half-covered: crop it
                 
+                LightingProfile.end(gammaLayer?'WebGL to scene Canvas copy (CPU wait)':'Canvas to scene copy',sceneCopyTime);
+
                 // 8. NV SIGNAL BOOST
                 if (this.nvIntensity > 0.01) {
                     ctx.globalCompositeOperation = 'soft-light';

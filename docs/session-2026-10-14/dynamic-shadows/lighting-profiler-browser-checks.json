@@ -1,0 +1,1915 @@
+{
+  "passed": true,
+  "pixels": {
+    "shadow": 244,
+    "unshadowed": 178,
+    "second": 110,
+    "secondReference": 110,
+    "both": 105,
+    "body": 133,
+    "bodyReference": 134
+  },
+  "extended": {
+    "shut": 255,
+    "swung": 164,
+    "transmitted": 195,
+    "retracted": 164,
+    "inCone": {
+      "alpha": 246,
+      "bytes": 30000,
+      "paired": 1
+    },
+    "outsideCone": {
+      "alpha": 195,
+      "bytes": 0,
+      "paired": 0
+    }
+  },
+  "gamma": {
+    "plain": {
+      "worst": 3.435294117647061,
+      "mean": 0.3350237234477403,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 4,
+        "uploads": 4,
+        "layerUploads": 2,
+        "contributions": 4,
+        "blurPasses": 0,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            43,
+            43,
+            86,
+            119
+          ],
+          "gamma": [
+            43,
+            43,
+            84,
+            119
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            14,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "veiled": {
+      "worst": 3,
+      "mean": 0.3595608660131176,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 5,
+        "uploads": 4,
+        "layerUploads": 3,
+        "contributions": 4,
+        "blurPasses": 0,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            37,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            14,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "direct": {
+      "worst": 3,
+      "mean": 0.3595608660131176,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 5,
+        "uploads": 4,
+        "layerUploads": 3,
+        "contributions": 4,
+        "blurPasses": 0,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            37,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            14,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "soft": {
+      "worst": 5.396078431372548,
+      "mean": 1.3754880718953746,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 4,
+        "layerUploads": 3,
+        "contributions": 4,
+        "blurPasses": 2,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            49,
+            29,
+            53,
+            160
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            46,
+            36,
+            82,
+            168
+          ],
+          "gamma": [
+            44,
+            37,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            25,
+            17,
+            55,
+            181
+          ],
+          "gamma": [
+            24,
+            14,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "warm": {
+      "backend": "webgl2",
+      "resolves": 1,
+      "draws": 5,
+      "uploads": 0,
+      "layerUploads": 3,
+      "contributions": 4,
+      "blurPasses": 0,
+      "frameId": null
+    },
+    "fallback": {
+      "worst": 0,
+      "mean": 0,
+      "stats": {
+        "backend": "high-fallback",
+        "resolves": 0,
+        "draws": 0,
+        "uploads": 0,
+        "layerUploads": 0,
+        "contributions": 0,
+        "blurPasses": 0,
+        "frameId": null
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            35,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            16,
+            52,
+            180
+          ]
+        }
+      ]
+    },
+    "interrupted": {
+      "worst": 0,
+      "mean": 0,
+      "stats": {
+        "backend": "high-fallback",
+        "resolves": 0,
+        "draws": 0,
+        "uploads": 4,
+        "layerUploads": 3,
+        "contributions": 4,
+        "blurPasses": 0,
+        "frameId": null,
+        "failure": "simulate GPU failure"
+      },
+      "samples": [
+        {
+          "high": [
+            48,
+            26,
+            53,
+            158
+          ],
+          "gamma": [
+            48,
+            26,
+            53,
+            158
+          ]
+        },
+        {
+          "high": [
+            44,
+            35,
+            79,
+            167
+          ],
+          "gamma": [
+            44,
+            35,
+            79,
+            167
+          ]
+        },
+        {
+          "high": [
+            24,
+            16,
+            52,
+            180
+          ],
+          "gamma": [
+            24,
+            16,
+            52,
+            180
+          ]
+        }
+      ]
+    }
+  },
+  "atlas": {
+    "cold": {
+      "backend": "webgl2",
+      "resolves": 1,
+      "draws": 6,
+      "uploads": 90,
+      "layerUploads": 2,
+      "contributions": 90,
+      "blurPasses": 2,
+      "frameId": null
+    },
+    "warm": {
+      "backend": "webgl2",
+      "resolves": 1,
+      "draws": 6,
+      "uploads": 0,
+      "layerUploads": 2,
+      "contributions": 90,
+      "blurPasses": 2,
+      "frameId": null
+    },
+    "changed": {
+      "backend": "webgl2",
+      "resolves": 1,
+      "draws": 6,
+      "uploads": 1,
+      "layerUploads": 2,
+      "contributions": 90,
+      "blurPasses": 2,
+      "frameId": null
+    },
+    "accepted": false,
+    "failed": {
+      "backend": "high-fallback",
+      "resolves": 0,
+      "draws": 0,
+      "uploads": 0,
+      "layerUploads": 0,
+      "contributions": 1,
+      "blurPasses": 0,
+      "frameId": null,
+      "failure": "Gamma surface limit"
+    }
+  },
+  "scene": {
+    "gamma": {
+      "backend": "webgl2",
+      "resolves": 1,
+      "draws": 7,
+      "uploads": 0,
+      "layerUploads": 3,
+      "contributions": 48,
+      "blurPasses": 2,
+      "frameId": 3
+    },
+    "shadows": {
+      "casters": 64,
+      "pairs": 197,
+      "blocked": 122,
+      "rays": 0,
+      "builds": 0,
+      "hits": 24,
+      "dropped": 30,
+      "captures": 0,
+      "sources": 24,
+      "doors": 8
+    }
+  },
+  "profiler": {
+    "active": "Shadow rendererGAMMAWebGL2 activeGPU resolves 1/framecontributions 48mask uploads 0/frameGPU draws 7/framelayer uploads 3/frameGPU blur passes 2Cached masks can need 0 uploads; Canvas input layers still upload. GPU blur stays on the GPU; scene composition remains Canvas 2D.",
+    "visible": true,
+    "fallback": "Shadow rendererGAMMAHigh fallback \u2014 WebGL2 inactiveGPU resolves 0/framecontributions 0mask uploads 0/frameGPU draws 0/framelayer uploads 0/frameGPU blur passes 0Cached masks can need 0 uploads; Canvas input layers still upload. GPU blur stays on the GPU; scene composition remains Canvas 2D.Lighting diagnosticsSave JSON reportLayer 640 \u00d7 360 \u00b7 scene 1280 \u00d7 720 \u00b7 DPR 1Lighting scale 1 \u00b7 adaptive 1 \u00b7 soft onUploads: masks 0.00 MiB + layers 0.00 MiB/frameAtlas 48/96 slots \u00b7 24.38 MiB \u00b7 GPU textures \u2248 28.77 MiB \u00b7 new 0, changed 0, evicted 0Shadow cache 8.24 MiB \u00b7 builds 0, hits 24, captures 0Casters 64 \u00b7 sources 24 \u00b7 pairs 197 \u00b7 blocked 122 \u00b7 rays 0 \u00b7 dropped 30CPU timings \u00b7 1 frameslighting total (inclusive)23.50 msavg 23.50 \u00b7 p95 23.50 \u00b7 peak 23.50 \u00b7 calls 1 \u00b7 max/call 23.50Canvas blur / layer selection19.40 msavg 19.40 \u00b7 p95 19.40 \u00b7 peak 19.40 \u00b7 calls 1 \u00b7 max/call 19.40Canvas inputs + shadow work (inclusive)3.40 msavg 3.40 \u00b7 p95 3.40 \u00b7 peak 3.40 \u00b7 calls 1 \u00b7 max/call 3.40shadow preparation1.10 msavg 1.10 \u00b7 p95 1.10 \u00b7 peak 1.10 \u00b7 calls 90 \u00b7 max/call 0.20source/caster pairs0.90 msavg 0.90 \u00b7 p95 0.90 \u00b7 peak 0.90 \u00b7 calls 24 \u00b7 max/call 0.10Canvas to scene copy0.40 msavg 0.40 \u00b7 p95 0.40 \u00b7 peak 0.40 \u00b7 calls 1 \u00b7 max/call 0.40backend initialization0.10 msavg 0.10 \u00b7 p95 0.10 \u00b7 peak 0.10 \u00b7 calls 1 \u00b7 max/call 0.10caster registry0.10 msavg 0.10 \u00b7 p95 0.10 \u00b7 peak 0.10 \u00b7 calls 1 \u00b7 max/call 0.10visibility paths0.00 msavg 0.00 \u00b7 p95 0.00 \u00b7 peak 0.00 \u00b7 calls 49 \u00b7 max/call 0.00atlas collection (includes uploads)0.00 msavg 0.00 \u00b7 p95 0.00 \u00b7 peak 0.00 \u00b7 calls 48 \u00b7 max/call 0.00CPU values include driver waits. Parent/child rows overlap; do not add them. No forced GPU readback.GPU executionGPU timer unavailable \u00b7 0 pending",
+    "idle": "Shadow rendererGAMMAGamma idle \u2014 no lighting pass",
+    "high": "Shadow rendererHIGHCanvas 2D"
+  },
+  "sceneParity": [
+    {
+      "map": "apt_949",
+      "soft": false,
+      "mean": 0.5877232530381944,
+      "worst": 36,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 5,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 48,
+        "blurPasses": 0,
+        "frameId": 9
+      }
+    },
+    {
+      "map": "apt_949",
+      "soft": true,
+      "mean": 1.5265871853298612,
+      "worst": 9,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 48,
+        "blurPasses": 2,
+        "frameId": 13
+      }
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": false,
+      "mean": 0.5850889756944444,
+      "worst": 26,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 5,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 34,
+        "blurPasses": 0,
+        "frameId": 17
+      }
+    },
+    {
+      "map": "moon_city_nightclub",
+      "soft": true,
+      "mean": 1.4456803385416668,
+      "worst": 8,
+      "stats": {
+        "backend": "webgl2",
+        "resolves": 1,
+        "draws": 7,
+        "uploads": 0,
+        "layerUploads": 3,
+        "contributions": 34,
+        "blurPasses": 2,
+        "frameId": 21
+      }
+    }
+  ],
+  "defaultBackend": {
+    "active": true,
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "stats": {
+      "backend": "webgl2",
+      "resolves": 0,
+      "draws": 0,
+      "uploads": 0,
+      "layerUploads": 0,
+      "contributions": 0,
+      "blurPasses": 0,
+      "frameId": null
+    }
+  },
+  "detailed": {
+    "report": {
+      "format": "dfab-lighting-profile-v1",
+      "createdAt": "2026-10-14T03:20:41.905Z",
+      "device": {
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "vendor": "Google Inc. (Google)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+        "maxTextureSize": 8192,
+        "timerAvailable": false
+      },
+      "gpuStatus": "GPU timer unavailable",
+      "gpu": {},
+      "gpuPending": 0,
+      "jsHeapBytes": 59881315,
+      "pixelRatio": 1,
+      "map": "apt_949",
+      "zoom": 1,
+      "settings": {
+        "shadows": "gamma",
+        "soft": true,
+        "adaptive": false,
+        "lightingScale": 1,
+        "renderScale": 1,
+        "fpsLimit": 0
+      },
+      "gameSections": [],
+      "latest": {
+        "frameId": 27,
+        "at": 8649.100000000093,
+        "mode": "gamma",
+        "backend": "webgl2",
+        "stages": {
+          "caster registry": {
+            "ms": 0.10000000009313226,
+            "calls": 1,
+            "maxCall": 0.10000000009313226
+          },
+          "backend initialization": {
+            "ms": 0,
+            "calls": 1,
+            "maxCall": 0
+          },
+          "visibility paths": {
+            "ms": 0,
+            "calls": 49,
+            "maxCall": 0
+          },
+          "source/caster pairs": {
+            "ms": 0.6000000000931323,
+            "calls": 24,
+            "maxCall": 0.10000000009313226
+          },
+          "shadow preparation": {
+            "ms": 0.7000000001862645,
+            "calls": 90,
+            "maxCall": 0.10000000009313226
+          },
+          "atlas collection (includes uploads)": {
+            "ms": 0.10000000009313226,
+            "calls": 48,
+            "maxCall": 0.10000000009313226
+          },
+          "Canvas hole snapshot + room veil": {
+            "ms": 2.3000000002793968,
+            "calls": 1,
+            "maxCall": 2.3000000002793968
+          },
+          "Canvas inputs + shadow work (inclusive)": {
+            "ms": 3.5,
+            "calls": 1,
+            "maxCall": 3.5
+          },
+          "surface setup": {
+            "ms": 0,
+            "calls": 1,
+            "maxCall": 0
+          },
+          "base darkness upload": {
+            "ms": 0.20000000018626451,
+            "calls": 1,
+            "maxCall": 0.20000000018626451
+          },
+          "base colour upload": {
+            "ms": 3.099999999627471,
+            "calls": 1,
+            "maxCall": 3.099999999627471
+          },
+          "room veil upload": {
+            "ms": 0,
+            "calls": 1,
+            "maxCall": 0
+          },
+          "blur target allocation/setup": {
+            "ms": 0,
+            "calls": 1,
+            "maxCall": 0
+          },
+          "GPU resolve submission": {
+            "ms": 0.10000000009313226,
+            "calls": 1,
+            "maxCall": 0.10000000009313226
+          },
+          "GPU blur submission": {
+            "ms": 0,
+            "calls": 1,
+            "maxCall": 0
+          },
+          "GPU error check (CPU wait)": {
+            "ms": 0.5,
+            "calls": 1,
+            "maxCall": 0.5
+          },
+          "Canvas blur / layer selection": {
+            "ms": 0,
+            "calls": 1,
+            "maxCall": 0
+          },
+          "WebGL to scene Canvas copy (CPU wait)": {
+            "ms": 108,
+            "calls": 1,
+            "maxCall": 108
+          },
+          "lighting total (inclusive)": {
+            "ms": 115.5,
+            "calls": 1,
+            "maxCall": 115.5
+          }
+        },
+        "bytes": {
+          "mask": 0,
+          "layers": 2764800
+        },
+        "churn": {
+          "new": 0,
+          "changed": 0,
+          "evicted": 0
+        },
+        "shadows": {
+          "casters": 64,
+          "pairs": 197,
+          "blocked": 122,
+          "rays": 0,
+          "builds": 0,
+          "hits": 24,
+          "dropped": 30,
+          "captures": 0,
+          "sources": 24,
+          "doors": 8
+        },
+        "maskCacheBytes": 8644320,
+        "sourceFamilies": {
+          "lamp": 16,
+          "decor": 8
+        },
+        "layer": [
+          640,
+          360
+        ],
+        "scene": [
+          1280,
+          720
+        ],
+        "lightingScale": 1,
+        "adaptiveFactor": 1,
+        "soft": true,
+        "gamma": {
+          "backend": "webgl2",
+          "resolves": 1,
+          "draws": 7,
+          "uploads": 0,
+          "layerUploads": 3,
+          "contributions": 48,
+          "blurPasses": 2,
+          "frameId": 27
+        },
+        "atlasSlots": 96,
+        "atlasResident": 48,
+        "atlasBytes": 25560576,
+        "gpuTextureBytes": 30168576
+      },
+      "summary": [
+        {
+          "name": "lighting total (inclusive)",
+          "last": 115.5,
+          "mean": 165.4833333333178,
+          "p95": 242.5,
+          "peak": 242.5,
+          "calls": 1,
+          "maxCall": 115.5
+        },
+        {
+          "name": "WebGL to scene Canvas copy (CPU wait)",
+          "last": 108,
+          "mean": 132.66666666674428,
+          "p95": 190,
+          "peak": 190,
+          "calls": 1,
+          "maxCall": 108
+        },
+        {
+          "name": "Canvas inputs + shadow work (inclusive)",
+          "last": 3.5,
+          "mean": 18.216666666558012,
+          "p95": 91.39999999990687,
+          "peak": 91.39999999990687,
+          "calls": 1,
+          "maxCall": 3.5
+        },
+        {
+          "name": "shadow preparation",
+          "last": 0.7000000001862645,
+          "mean": 10.566666666418314,
+          "p95": 58.799999999813735,
+          "peak": 58.799999999813735,
+          "calls": 90,
+          "maxCall": 0.10000000009313226
+        },
+        {
+          "name": "mask raster + sprite painting",
+          "last": 0,
+          "mean": 8.316666666418314,
+          "p95": 49.899999998509884,
+          "peak": 49.899999998509884,
+          "calls": 0,
+          "maxCall": 0
+        },
+        {
+          "name": "base colour upload",
+          "last": 3.099999999627471,
+          "mean": 7.966666666635622,
+          "p95": 33.200000000186265,
+          "peak": 33.200000000186265,
+          "calls": 1,
+          "maxCall": 3.099999999627471
+        },
+        {
+          "name": "base darkness upload",
+          "last": 0.20000000018626451,
+          "mean": 5.200000000031044,
+          "p95": 29,
+          "peak": 29,
+          "calls": 1,
+          "maxCall": 0.20000000018626451
+        },
+        {
+          "name": "atlas collection (includes uploads)",
+          "last": 0.10000000009313226,
+          "mean": 4.183333333426465,
+          "p95": 24.700000000186265,
+          "peak": 24.700000000186265,
+          "calls": 48,
+          "maxCall": 0.10000000009313226
+        },
+        {
+          "name": "mask padding",
+          "last": 0,
+          "mean": 3.0499999999689558,
+          "p95": 18.299999999813735,
+          "peak": 18.299999999813735,
+          "calls": 0,
+          "maxCall": 0
+        },
+        {
+          "name": "Canvas hole snapshot + room veil",
+          "last": 2.3000000002793968,
+          "mean": 2.2166666668684534,
+          "p95": 3,
+          "peak": 3,
+          "calls": 1,
+          "maxCall": 2.3000000002793968
+        },
+        {
+          "name": "source/caster pairs",
+          "last": 0.6000000000931323,
+          "mean": 1.7833333333643775,
+          "p95": 7.500000000931323,
+          "peak": 7.500000000931323,
+          "calls": 24,
+          "maxCall": 0.10000000009313226
+        },
+        {
+          "name": "mask uploads (CPU wait)",
+          "last": 0,
+          "mean": 0.9166666666666666,
+          "p95": 5.5,
+          "peak": 5.5,
+          "calls": 0,
+          "maxCall": 0
+        },
+        {
+          "name": "visibility paths",
+          "last": 0,
+          "mean": 0.633333333224679,
+          "p95": 3.799999999348074,
+          "peak": 3.799999999348074,
+          "calls": 49,
+          "maxCall": 0
+        },
+        {
+          "name": "GPU error check (CPU wait)",
+          "last": 0.5,
+          "mean": 0.5833333332557231,
+          "p95": 1,
+          "peak": 1,
+          "calls": 1,
+          "maxCall": 0.5
+        },
+        {
+          "name": "GPU resolve submission",
+          "last": 0.10000000009313226,
+          "mean": 0.5,
+          "p95": 1.5,
+          "peak": 1.5,
+          "calls": 1,
+          "maxCall": 0.10000000009313226
+        },
+        {
+          "name": "caster registry",
+          "last": 0.10000000009313226,
+          "mean": 0.18333333334885538,
+          "p95": 0.39999999990686774,
+          "peak": 0.39999999990686774,
+          "calls": 1,
+          "maxCall": 0.10000000009313226
+        },
+        {
+          "name": "backend initialization",
+          "last": 0,
+          "mean": 0.13333333337989947,
+          "p95": 0.7000000001862645,
+          "peak": 0.7000000001862645,
+          "calls": 1,
+          "maxCall": 0
+        },
+        {
+          "name": "silhouette body capture",
+          "last": 0,
+          "mean": 0.13333333330228925,
+          "p95": 0.7999999998137355,
+          "peak": 0.7999999998137355,
+          "calls": 0,
+          "maxCall": 0
+        },
+        {
+          "name": "room veil upload",
+          "last": 0,
+          "mean": 0.10000000001552205,
+          "p95": 0.19999999972060323,
+          "peak": 0.19999999972060323,
+          "calls": 1,
+          "maxCall": 0
+        },
+        {
+          "name": "silhouette cache copy",
+          "last": 0,
+          "mean": 0.016666666604578495,
+          "p95": 0.09999999962747097,
+          "peak": 0.09999999962747097,
+          "calls": 0,
+          "maxCall": 0
+        },
+        {
+          "name": "surface setup",
+          "last": 0,
+          "mean": 0,
+          "p95": 0,
+          "peak": 0,
+          "calls": 1,
+          "maxCall": 0
+        },
+        {
+          "name": "blur target allocation/setup",
+          "last": 0,
+          "mean": 0,
+          "p95": 0,
+          "peak": 0,
+          "calls": 1,
+          "maxCall": 0
+        },
+        {
+          "name": "GPU blur submission",
+          "last": 0,
+          "mean": 0,
+          "p95": 0,
+          "peak": 0,
+          "calls": 1,
+          "maxCall": 0
+        },
+        {
+          "name": "Canvas blur / layer selection",
+          "last": 0,
+          "mean": 0,
+          "p95": 0,
+          "peak": 0,
+          "calls": 1,
+          "maxCall": 0
+        }
+      ],
+      "frames": [
+        {
+          "frameId": 22,
+          "at": 7811.899999999907,
+          "mode": "gamma",
+          "backend": "webgl2",
+          "stages": {
+            "caster registry": {
+              "ms": 0.39999999990686774,
+              "calls": 1,
+              "maxCall": 0.39999999990686774
+            },
+            "silhouette cache copy": {
+              "ms": 0.09999999962747097,
+              "calls": 1,
+              "maxCall": 0.09999999962747097
+            },
+            "silhouette body capture": {
+              "ms": 0.7999999998137355,
+              "calls": 1,
+              "maxCall": 0.7999999998137355
+            },
+            "backend initialization": {
+              "ms": 0.7000000001862645,
+              "calls": 1,
+              "maxCall": 0.7000000001862645
+            },
+            "visibility paths": {
+              "ms": 3.799999999348074,
+              "calls": 49,
+              "maxCall": 0.39999999990686774
+            },
+            "source/caster pairs": {
+              "ms": 7.500000000931323,
+              "calls": 24,
+              "maxCall": 4.5
+            },
+            "mask raster + sprite painting": {
+              "ms": 49.899999998509884,
+              "calls": 24,
+              "maxCall": 20.100000000093132
+            },
+            "shadow preparation": {
+              "ms": 58.799999999813735,
+              "calls": 90,
+              "maxCall": 20.200000000186265
+            },
+            "mask padding": {
+              "ms": 18.299999999813735,
+              "calls": 48,
+              "maxCall": 0.7999999998137355
+            },
+            "mask uploads (CPU wait)": {
+              "ms": 5.5,
+              "calls": 48,
+              "maxCall": 2
+            },
+            "atlas collection (includes uploads)": {
+              "ms": 24.700000000186265,
+              "calls": 48,
+              "maxCall": 2.3000000002793968
+            },
+            "Canvas hole snapshot + room veil": {
+              "ms": 3,
+              "calls": 1,
+              "maxCall": 3
+            },
+            "Canvas inputs + shadow work (inclusive)": {
+              "ms": 91.39999999990687,
+              "calls": 1,
+              "maxCall": 91.39999999990687
+            },
+            "surface setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "base darkness upload": {
+              "ms": 1.1999999997206032,
+              "calls": 1,
+              "maxCall": 1.1999999997206032
+            },
+            "base colour upload": {
+              "ms": 33.200000000186265,
+              "calls": 1,
+              "maxCall": 33.200000000186265
+            },
+            "room veil upload": {
+              "ms": 0.10000000009313226,
+              "calls": 1,
+              "maxCall": 0.10000000009313226
+            },
+            "blur target allocation/setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU resolve submission": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU blur submission": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU error check (CPU wait)": {
+              "ms": 0.6000000000931323,
+              "calls": 1,
+              "maxCall": 0.6000000000931323
+            },
+            "Canvas blur / layer selection": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "WebGL to scene Canvas copy (CPU wait)": {
+              "ms": 114.89999999990687,
+              "calls": 1,
+              "maxCall": 114.89999999990687
+            },
+            "lighting total (inclusive)": {
+              "ms": 242.5,
+              "calls": 1,
+              "maxCall": 242.5
+            }
+          },
+          "bytes": {
+            "mask": 8797088,
+            "layers": 2764800
+          },
+          "churn": {
+            "new": 48,
+            "changed": 0,
+            "evicted": 0
+          },
+          "shadows": {
+            "casters": 64,
+            "pairs": 197,
+            "blocked": 122,
+            "rays": 323,
+            "builds": 24,
+            "hits": 0,
+            "dropped": 30,
+            "captures": 1,
+            "sources": 24,
+            "doors": 8
+          },
+          "maskCacheBytes": 8644320,
+          "sourceFamilies": {
+            "lamp": 16,
+            "decor": 8
+          },
+          "layer": [
+            640,
+            360
+          ],
+          "scene": [
+            1280,
+            720
+          ],
+          "lightingScale": 1,
+          "adaptiveFactor": 1,
+          "soft": true,
+          "gamma": {
+            "backend": "webgl2",
+            "resolves": 1,
+            "draws": 7,
+            "uploads": 48,
+            "layerUploads": 3,
+            "contributions": 48,
+            "blurPasses": 2,
+            "frameId": 22
+          },
+          "atlasSlots": 96,
+          "atlasResident": 48,
+          "atlasBytes": 25560576,
+          "gpuTextureBytes": 30168576
+        },
+        {
+          "frameId": 23,
+          "at": 7947.700000000186,
+          "mode": "gamma",
+          "backend": "webgl2",
+          "stages": {
+            "caster registry": {
+              "ms": 0.10000000009313226,
+              "calls": 1,
+              "maxCall": 0.10000000009313226
+            },
+            "backend initialization": {
+              "ms": 0.10000000009313226,
+              "calls": 1,
+              "maxCall": 0.10000000009313226
+            },
+            "visibility paths": {
+              "ms": 0,
+              "calls": 49,
+              "maxCall": 0
+            },
+            "source/caster pairs": {
+              "ms": 0.5,
+              "calls": 24,
+              "maxCall": 0.10000000009313226
+            },
+            "shadow preparation": {
+              "ms": 0.9999999995343387,
+              "calls": 90,
+              "maxCall": 0.2999999998137355
+            },
+            "atlas collection (includes uploads)": {
+              "ms": 0.10000000009313226,
+              "calls": 48,
+              "maxCall": 0.10000000009313226
+            },
+            "Canvas hole snapshot + room veil": {
+              "ms": 1.900000000372529,
+              "calls": 1,
+              "maxCall": 1.900000000372529
+            },
+            "Canvas inputs + shadow work (inclusive)": {
+              "ms": 3.2999999998137355,
+              "calls": 1,
+              "maxCall": 3.2999999998137355
+            },
+            "surface setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "base darkness upload": {
+              "ms": 0.20000000018626451,
+              "calls": 1,
+              "maxCall": 0.20000000018626451
+            },
+            "base colour upload": {
+              "ms": 2.8999999999068677,
+              "calls": 1,
+              "maxCall": 2.8999999999068677
+            },
+            "room veil upload": {
+              "ms": 0.10000000009313226,
+              "calls": 1,
+              "maxCall": 0.10000000009313226
+            },
+            "blur target allocation/setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU resolve submission": {
+              "ms": 0.09999999962747097,
+              "calls": 1,
+              "maxCall": 0.09999999962747097
+            },
+            "GPU blur submission": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU error check (CPU wait)": {
+              "ms": 1,
+              "calls": 1,
+              "maxCall": 1
+            },
+            "Canvas blur / layer selection": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "WebGL to scene Canvas copy (CPU wait)": {
+              "ms": 107.90000000037253,
+              "calls": 1,
+              "maxCall": 107.90000000037253
+            },
+            "lighting total (inclusive)": {
+              "ms": 115.70000000018626,
+              "calls": 1,
+              "maxCall": 115.70000000018626
+            }
+          },
+          "bytes": {
+            "mask": 0,
+            "layers": 2764800
+          },
+          "churn": {
+            "new": 0,
+            "changed": 0,
+            "evicted": 0
+          },
+          "shadows": {
+            "casters": 64,
+            "pairs": 197,
+            "blocked": 122,
+            "rays": 0,
+            "builds": 0,
+            "hits": 24,
+            "dropped": 30,
+            "captures": 0,
+            "sources": 24,
+            "doors": 8
+          },
+          "maskCacheBytes": 8644320,
+          "sourceFamilies": {
+            "lamp": 16,
+            "decor": 8
+          },
+          "layer": [
+            640,
+            360
+          ],
+          "scene": [
+            1280,
+            720
+          ],
+          "lightingScale": 1,
+          "adaptiveFactor": 1,
+          "soft": true,
+          "gamma": {
+            "backend": "webgl2",
+            "resolves": 1,
+            "draws": 7,
+            "uploads": 0,
+            "layerUploads": 3,
+            "contributions": 48,
+            "blurPasses": 2,
+            "frameId": 23
+          },
+          "atlasSlots": 96,
+          "atlasResident": 48,
+          "atlasBytes": 25560576,
+          "gpuTextureBytes": 30168576
+        },
+        {
+          "frameId": 24,
+          "at": 8119.700000000186,
+          "mode": "gamma",
+          "backend": "webgl2",
+          "stages": {
+            "caster registry": {
+              "ms": 0.10000000009313226,
+              "calls": 1,
+              "maxCall": 0.10000000009313226
+            },
+            "backend initialization": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "visibility paths": {
+              "ms": 0,
+              "calls": 49,
+              "maxCall": 0
+            },
+            "source/caster pairs": {
+              "ms": 0.5,
+              "calls": 24,
+              "maxCall": 0.19999999972060323
+            },
+            "shadow preparation": {
+              "ms": 0.6000000000931323,
+              "calls": 90,
+              "maxCall": 0.19999999972060323
+            },
+            "atlas collection (includes uploads)": {
+              "ms": 0.10000000009313226,
+              "calls": 48,
+              "maxCall": 0.10000000009313226
+            },
+            "Canvas hole snapshot + room veil": {
+              "ms": 1.900000000372529,
+              "calls": 1,
+              "maxCall": 1.900000000372529
+            },
+            "Canvas inputs + shadow work (inclusive)": {
+              "ms": 3.099999999627471,
+              "calls": 1,
+              "maxCall": 3.099999999627471
+            },
+            "surface setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "base darkness upload": {
+              "ms": 29,
+              "calls": 1,
+              "maxCall": 29
+            },
+            "base colour upload": {
+              "ms": 3,
+              "calls": 1,
+              "maxCall": 3
+            },
+            "room veil upload": {
+              "ms": 0.10000000009313226,
+              "calls": 1,
+              "maxCall": 0.10000000009313226
+            },
+            "blur target allocation/setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU resolve submission": {
+              "ms": 1.2000000001862645,
+              "calls": 1,
+              "maxCall": 1.2000000001862645
+            },
+            "GPU blur submission": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU error check (CPU wait)": {
+              "ms": 0.19999999972060323,
+              "calls": 1,
+              "maxCall": 0.19999999972060323
+            },
+            "Canvas blur / layer selection": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "WebGL to scene Canvas copy (CPU wait)": {
+              "ms": 116.5,
+              "calls": 1,
+              "maxCall": 116.5
+            },
+            "lighting total (inclusive)": {
+              "ms": 153.09999999962747,
+              "calls": 1,
+              "maxCall": 153.09999999962747
+            }
+          },
+          "bytes": {
+            "mask": 0,
+            "layers": 2764800
+          },
+          "churn": {
+            "new": 0,
+            "changed": 0,
+            "evicted": 0
+          },
+          "shadows": {
+            "casters": 64,
+            "pairs": 197,
+            "blocked": 122,
+            "rays": 0,
+            "builds": 0,
+            "hits": 24,
+            "dropped": 30,
+            "captures": 0,
+            "sources": 24,
+            "doors": 8
+          },
+          "maskCacheBytes": 8644320,
+          "sourceFamilies": {
+            "lamp": 16,
+            "decor": 8
+          },
+          "layer": [
+            640,
+            360
+          ],
+          "scene": [
+            1280,
+            720
+          ],
+          "lightingScale": 1,
+          "adaptiveFactor": 1,
+          "soft": true,
+          "gamma": {
+            "backend": "webgl2",
+            "resolves": 1,
+            "draws": 7,
+            "uploads": 0,
+            "layerUploads": 3,
+            "contributions": 48,
+            "blurPasses": 2,
+            "frameId": 24
+          },
+          "atlasSlots": 96,
+          "atlasResident": 48,
+          "atlasBytes": 25560576,
+          "gpuTextureBytes": 30168576
+        },
+        {
+          "frameId": 25,
+          "at": 8301.899999999907,
+          "mode": "gamma",
+          "backend": "webgl2",
+          "stages": {
+            "caster registry": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "backend initialization": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "visibility paths": {
+              "ms": 0,
+              "calls": 49,
+              "maxCall": 0
+            },
+            "source/caster pairs": {
+              "ms": 0.5,
+              "calls": 24,
+              "maxCall": 0.10000000009313226
+            },
+            "shadow preparation": {
+              "ms": 0.6999999997206032,
+              "calls": 90,
+              "maxCall": 0.10000000009313226
+            },
+            "atlas collection (includes uploads)": {
+              "ms": 0,
+              "calls": 48,
+              "maxCall": 0
+            },
+            "Canvas hole snapshot + room veil": {
+              "ms": 2,
+              "calls": 1,
+              "maxCall": 2
+            },
+            "Canvas inputs + shadow work (inclusive)": {
+              "ms": 3,
+              "calls": 1,
+              "maxCall": 3
+            },
+            "surface setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "base darkness upload": {
+              "ms": 0.19999999972060323,
+              "calls": 1,
+              "maxCall": 0.19999999972060323
+            },
+            "base colour upload": {
+              "ms": 2.7000000001862645,
+              "calls": 1,
+              "maxCall": 2.7000000001862645
+            },
+            "room veil upload": {
+              "ms": 0.10000000009313226,
+              "calls": 1,
+              "maxCall": 0.10000000009313226
+            },
+            "blur target allocation/setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU resolve submission": {
+              "ms": 1.5,
+              "calls": 1,
+              "maxCall": 1.5
+            },
+            "GPU blur submission": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU error check (CPU wait)": {
+              "ms": 0.19999999972060323,
+              "calls": 1,
+              "maxCall": 0.19999999972060323
+            },
+            "Canvas blur / layer selection": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "WebGL to scene Canvas copy (CPU wait)": {
+              "ms": 158.70000000018626,
+              "calls": 1,
+              "maxCall": 158.70000000018626
+            },
+            "lighting total (inclusive)": {
+              "ms": 166.5,
+              "calls": 1,
+              "maxCall": 166.5
+            }
+          },
+          "bytes": {
+            "mask": 0,
+            "layers": 2764800
+          },
+          "churn": {
+            "new": 0,
+            "changed": 0,
+            "evicted": 0
+          },
+          "shadows": {
+            "casters": 64,
+            "pairs": 197,
+            "blocked": 122,
+            "rays": 0,
+            "builds": 0,
+            "hits": 24,
+            "dropped": 30,
+            "captures": 0,
+            "sources": 24,
+            "doors": 8
+          },
+          "maskCacheBytes": 8644320,
+          "sourceFamilies": {
+            "lamp": 16,
+            "decor": 8
+          },
+          "layer": [
+            640,
+            360
+          ],
+          "scene": [
+            1280,
+            720
+          ],
+          "lightingScale": 1,
+          "adaptiveFactor": 1,
+          "soft": true,
+          "gamma": {
+            "backend": "webgl2",
+            "resolves": 1,
+            "draws": 7,
+            "uploads": 0,
+            "layerUploads": 3,
+            "contributions": 48,
+            "blurPasses": 2,
+            "frameId": 25
+          },
+          "atlasSlots": 96,
+          "atlasResident": 48,
+          "atlasBytes": 25560576,
+          "gpuTextureBytes": 30168576
+        },
+        {
+          "frameId": 26,
+          "at": 8516.399999999907,
+          "mode": "gamma",
+          "backend": "webgl2",
+          "stages": {
+            "caster registry": {
+              "ms": 0.39999999990686774,
+              "calls": 1,
+              "maxCall": 0.39999999990686774
+            },
+            "backend initialization": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "visibility paths": {
+              "ms": 0,
+              "calls": 49,
+              "maxCall": 0
+            },
+            "source/caster pairs": {
+              "ms": 1.0999999991618097,
+              "calls": 24,
+              "maxCall": 0.6000000000931323
+            },
+            "shadow preparation": {
+              "ms": 1.5999999991618097,
+              "calls": 90,
+              "maxCall": 0.6000000000931323
+            },
+            "atlas collection (includes uploads)": {
+              "ms": 0.10000000009313226,
+              "calls": 48,
+              "maxCall": 0.10000000009313226
+            },
+            "Canvas hole snapshot + room veil": {
+              "ms": 2.2000000001862645,
+              "calls": 1,
+              "maxCall": 2.2000000001862645
+            },
+            "Canvas inputs + shadow work (inclusive)": {
+              "ms": 5,
+              "calls": 1,
+              "maxCall": 5
+            },
+            "surface setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "base darkness upload": {
+              "ms": 0.40000000037252903,
+              "calls": 1,
+              "maxCall": 0.40000000037252903
+            },
+            "base colour upload": {
+              "ms": 2.8999999999068677,
+              "calls": 1,
+              "maxCall": 2.8999999999068677
+            },
+            "room veil upload": {
+              "ms": 0.19999999972060323,
+              "calls": 1,
+              "maxCall": 0.19999999972060323
+            },
+            "blur target allocation/setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU resolve submission": {
+              "ms": 0.10000000009313226,
+              "calls": 1,
+              "maxCall": 0.10000000009313226
+            },
+            "GPU blur submission": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU error check (CPU wait)": {
+              "ms": 1,
+              "calls": 1,
+              "maxCall": 1
+            },
+            "Canvas blur / layer selection": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "WebGL to scene Canvas copy (CPU wait)": {
+              "ms": 190,
+              "calls": 1,
+              "maxCall": 190
+            },
+            "lighting total (inclusive)": {
+              "ms": 199.60000000009313,
+              "calls": 1,
+              "maxCall": 199.60000000009313
+            }
+          },
+          "bytes": {
+            "mask": 0,
+            "layers": 2764800
+          },
+          "churn": {
+            "new": 0,
+            "changed": 0,
+            "evicted": 0
+          },
+          "shadows": {
+            "casters": 64,
+            "pairs": 197,
+            "blocked": 122,
+            "rays": 0,
+            "builds": 0,
+            "hits": 24,
+            "dropped": 30,
+            "captures": 0,
+            "sources": 24,
+            "doors": 8
+          },
+          "maskCacheBytes": 8644320,
+          "sourceFamilies": {
+            "lamp": 16,
+            "decor": 8
+          },
+          "layer": [
+            640,
+            360
+          ],
+          "scene": [
+            1280,
+            720
+          ],
+          "lightingScale": 1,
+          "adaptiveFactor": 1,
+          "soft": true,
+          "gamma": {
+            "backend": "webgl2",
+            "resolves": 1,
+            "draws": 7,
+            "uploads": 0,
+            "layerUploads": 3,
+            "contributions": 48,
+            "blurPasses": 2,
+            "frameId": 26
+          },
+          "atlasSlots": 96,
+          "atlasResident": 48,
+          "atlasBytes": 25560576,
+          "gpuTextureBytes": 30168576
+        },
+        {
+          "frameId": 27,
+          "at": 8649.100000000093,
+          "mode": "gamma",
+          "backend": "webgl2",
+          "stages": {
+            "caster registry": {
+              "ms": 0.10000000009313226,
+              "calls": 1,
+              "maxCall": 0.10000000009313226
+            },
+            "backend initialization": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "visibility paths": {
+              "ms": 0,
+              "calls": 49,
+              "maxCall": 0
+            },
+            "source/caster pairs": {
+              "ms": 0.6000000000931323,
+              "calls": 24,
+              "maxCall": 0.10000000009313226
+            },
+            "shadow preparation": {
+              "ms": 0.7000000001862645,
+              "calls": 90,
+              "maxCall": 0.10000000009313226
+            },
+            "atlas collection (includes uploads)": {
+              "ms": 0.10000000009313226,
+              "calls": 48,
+              "maxCall": 0.10000000009313226
+            },
+            "Canvas hole snapshot + room veil": {
+              "ms": 2.3000000002793968,
+              "calls": 1,
+              "maxCall": 2.3000000002793968
+            },
+            "Canvas inputs + shadow work (inclusive)": {
+              "ms": 3.5,
+              "calls": 1,
+              "maxCall": 3.5
+            },
+            "surface setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "base darkness upload": {
+              "ms": 0.20000000018626451,
+              "calls": 1,
+              "maxCall": 0.20000000018626451
+            },
+            "base colour upload": {
+              "ms": 3.099999999627471,
+              "calls": 1,
+              "maxCall": 3.099999999627471
+            },
+            "room veil upload": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "blur target allocation/setup": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU resolve submission": {
+              "ms": 0.10000000009313226,
+              "calls": 1,
+              "maxCall": 0.10000000009313226
+            },
+            "GPU blur submission": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "GPU error check (CPU wait)": {
+              "ms": 0.5,
+              "calls": 1,
+              "maxCall": 0.5
+            },
+            "Canvas blur / layer selection": {
+              "ms": 0,
+              "calls": 1,
+              "maxCall": 0
+            },
+            "WebGL to scene Canvas copy (CPU wait)": {
+              "ms": 108,
+              "calls": 1,
+              "maxCall": 108
+            },
+            "lighting total (inclusive)": {
+              "ms": 115.5,
+              "calls": 1,
+              "maxCall": 115.5
+            }
+          },
+          "bytes": {
+            "mask": 0,
+            "layers": 2764800
+          },
+          "churn": {
+            "new": 0,
+            "changed": 0,
+            "evicted": 0
+          },
+          "shadows": {
+            "casters": 64,
+            "pairs": 197,
+            "blocked": 122,
+            "rays": 0,
+            "builds": 0,
+            "hits": 24,
+            "dropped": 30,
+            "captures": 0,
+            "sources": 24,
+            "doors": 8
+          },
+          "maskCacheBytes": 8644320,
+          "sourceFamilies": {
+            "lamp": 16,
+            "decor": 8
+          },
+          "layer": [
+            640,
+            360
+          ],
+          "scene": [
+            1280,
+            720
+          ],
+          "lightingScale": 1,
+          "adaptiveFactor": 1,
+          "soft": true,
+          "gamma": {
+            "backend": "webgl2",
+            "resolves": 1,
+            "draws": 7,
+            "uploads": 0,
+            "layerUploads": 3,
+            "contributions": 48,
+            "blurPasses": 2,
+            "frameId": 27
+          },
+          "atlasSlots": 96,
+          "atlasResident": 48,
+          "atlasBytes": 25560576,
+          "gpuTextureBytes": 30168576
+        }
+      ],
+      "memory": {
+        "unknown": 1,
+        "ground": 0,
+        "groundN": 0,
+        "floors": 4.8065185546875,
+        "cars": 0,
+        "crowd": 0,
+        "props": 4.16412353515625,
+        "total": 8.97064208984375
+      },
+      "note": "CPU timings are inclusive and can contain driver waits; nested rows overlap. GPU samples are asynchronous and identify their source frame. No forced readback or gl.finish."
+    },
+    "panel": "Shadow rendererGAMMAWebGL2 activeGPU resolves 1/framecontributions 48mask uploads 0/frameGPU draws 7/framelayer uploads 3/frameGPU blur passes 2Cached masks can need 0 uploads; Canvas input layers still upload. GPU blur stays on the GPU; scene composition remains Canvas 2D.Lighting diagnosticsSave JSON reportANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)Google Inc. (Google) \u00b7 WebGL 2.0 (OpenGL ES 3.0 Chromium)Layer 640 \u00d7 360 \u00b7 scene 1280 \u00d7 720 \u00b7 DPR 1Lighting scale 1 \u00b7 adaptive 1 \u00b7 soft onUploads: masks 0.00 MiB + layers 2.64 MiB/frameAtlas 48/96 slots \u00b7 24.38 MiB \u00b7 GPU textures \u2248 28.77 MiB \u00b7 new 0, changed 0, evicted 0Shadow cache 8.24 MiB \u00b7 builds 0, hits 24, captures 0Casters 64 \u00b7 sources 24 \u00b7 pairs 197 \u00b7 blocked 122 \u00b7 rays 0 \u00b7 dropped 30CPU timings \u00b7 6 frameslighting total (inclusive)115.50 msavg 165.48 \u00b7 p95 242.50 \u00b7 peak 242.50 \u00b7 calls 1 \u00b7 max/call 115.50WebGL to scene Canvas copy (CPU wait)108.00 msavg 132.67 \u00b7 p95 190.00 \u00b7 peak 190.00 \u00b7 calls 1 \u00b7 max/call 108.00Canvas inputs + shadow work (inclusive)3.50 msavg 18.22 \u00b7 p95 91.40 \u00b7 peak 91.40 \u00b7 calls 1 \u00b7 max/call 3.50shadow preparation0.70 msavg 10.57 \u00b7 p95 58.80 \u00b7 peak 58.80 \u00b7 calls 90 \u00b7 max/call 0.10mask raster + sprite painting0.00 msavg 8.32 \u00b7 p95 49.90 \u00b7 peak 49.90 \u00b7 calls 0 \u00b7 max/call 0.00base colour upload3.10 msavg 7.97 \u00b7 p95 33.20 \u00b7 peak 33.20 \u00b7 calls 1 \u00b7 max/call 3.10base darkness upload0.20 msavg 5.20 \u00b7 p95 29.00 \u00b7 peak 29.00 \u00b7 calls 1 \u00b7 max/call 0.20atlas collection (includes uploads)0.10 msavg 4.18 \u00b7 p95 24.70 \u00b7 peak 24.70 \u00b7 calls 48 \u00b7 max/call 0.10mask padding0.00 msavg 3.05 \u00b7 p95 18.30 \u00b7 peak 18.30 \u00b7 calls 0 \u00b7 max/call 0.00Canvas hole snapshot + room veil2.30 msavg 2.22 \u00b7 p95 3.00 \u00b7 peak 3.00 \u00b7 calls 1 \u00b7 max/call 2.30source/caster pairs0.60 msavg 1.78 \u00b7 p95 7.50 \u00b7 peak 7.50 \u00b7 calls 24 \u00b7 max/call 0.10mask uploads (CPU wait)0.00 msavg 0.92 \u00b7 p95 5.50 \u00b7 peak 5.50 \u00b7 calls 0 \u00b7 max/call 0.00visibility paths0.00 msavg 0.63 \u00b7 p95 3.80 \u00b7 peak 3.80 \u00b7 calls 49 \u00b7 max/call 0.00GPU error check (CPU wait)0.50 msavg 0.58 \u00b7 p95 1.00 \u00b7 peak 1.00 \u00b7 calls 1 \u00b7 max/call 0.50GPU resolve submission0.10 msavg 0.50 \u00b7 p95 1.50 \u00b7 peak 1.50 \u00b7 calls 1 \u00b7 max/call 0.10caster registry0.10 msavg 0.18 \u00b7 p95 0.40 \u00b7 peak 0.40 \u00b7 calls 1 \u00b7 max/call 0.10backend initialization0.00 msavg 0.13 \u00b7 p95 0.70 \u00b7 peak 0.70 \u00b7 calls 1 \u00b7 max/call 0.00silhouette body capture0.00 msavg 0.13 \u00b7 p95 0.80 \u00b7 peak 0.80 \u00b7 calls 0 \u00b7 max/call 0.00room veil upload0.00 msavg 0.10 \u00b7 p95 0.20 \u00b7 peak 0.20 \u00b7 calls 1 \u00b7 max/call 0.00silhouette cache copy0.00 msavg 0.02 \u00b7 p95 0.10 \u00b7 peak 0.10 \u00b7 calls 0 \u00b7 max/call 0.00surface setup0.00 msavg 0.00 \u00b7 p95 0.00 \u00b7 peak 0.00 \u00b7 calls 1 \u00b7 max/call 0.00blur target allocation/setup0.00 msavg 0.00 \u00b7 p95 0.00 \u00b7 peak 0.00 \u00b7 calls 1 \u00b7 max/call 0.00GPU blur submission0.00 msavg 0.00 \u00b7 p95 0.00 \u00b7 peak 0.00 \u00b7 calls 1 \u00b7 max/call 0.00Canvas blur / layer selection0.00 msavg 0.00 \u00b7 p95 0.00 \u00b7 peak 0.00 \u00b7 calls 1 \u00b7 max/call 0.00CPU values include driver waits. Parent/child rows overlap; do not add them. No forced GPU readback.GPU executionGPU timer unavailable \u00b7 0 pending",
+    "mode": "full"
+  },
+  "disabled": {
+    "enabled": false,
+    "pending": 0,
+    "history": 0,
+    "pixelMean": 0.0002981228298611111
+  }
+}

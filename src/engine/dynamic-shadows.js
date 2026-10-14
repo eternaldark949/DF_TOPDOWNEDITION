@@ -320,6 +320,7 @@
                     this.bytes -= oldest[1].bytes; this.lights.delete(oldest[0]);
                 }
                 this.bytes += bytes - s.bytes; s.bytes = bytes;
+                const rasterTime=LightingProfile.start();
                 const mask = this._mask || (this._mask = document.createElement('canvas')); mask.width = width; mask.height = height;
                 const mg = mask.getContext('2d'), x = bounds.x, y = bounds.y, sx = width / bounds.w, sy = height / bounds.h;
                 const casterMask = this._casterMask || (this._casterMask = document.createElement('canvas'));
@@ -345,6 +346,7 @@
                     } g.restore();
                     g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'destination-out'; g.drawImage(mask, 0, 0); g.globalCompositeOperation = 'source-over';
                 }
+                LightingProfile.end('mask raster + sprite painting',rasterTime);
                 if (light.samePaint) s.color = s.hole;
                 Object.assign(s, { signature, x, y, size: R * 2, w: bounds.w, h: bounds.h, baseRef: light.baseRef, clipRef: light.clipPath, ready: true }); this.stats.builds++;
                 return s;

@@ -1186,6 +1186,11 @@
         }
         /** The body drawn into SilhouetteFX's capture (its contact shadow stays on the frame), then stamped back with its effect. */
         function _drawHumanoidSilhouette(ctx, entity, config, fx, lampSil) {
+            const t=lampSil?LightingProfile.start():null;
+            try{return _drawHumanoidSilhouetteBody(ctx,entity,config,fx,lampSil);}
+            finally{LightingProfile.end('silhouette body capture',t);}
+        }
+        function _drawHumanoidSilhouetteBody(ctx, entity, config, fx, lampSil) {
             // The body itself is drawn through the capture, so the capture must hold all of it: a lamp shadow
             // alone captures tightly (LAMP_SHADOW_CAP_R), unless a weapon in hand reaches past that (a sniper: ~65px)
             const armed = (entity.type === 'player' && entity._game && entity._game.currentWeapon) || (config.weapon && config.weapon.id);

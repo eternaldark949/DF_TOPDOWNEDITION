@@ -97,6 +97,22 @@ Median completed-frame milliseconds (median of three round medians):
 Most cases reduce Gamma cost by 27–49%; the moving/soft nightclub case is effectively unchanged. High remains faster on this software GPU; Gamma now deliberately runs WebGL there for experimentation. High timings also vary between runs (especially the nightclub); geometry/setup variance and concurrent validation work make this an exploratory comparison. Raw data: `gamma-original-benchmark.json`, `gamma-batched-benchmark.json`, and `gamma-benchmark-comparison.json`.
 
 
-### Profiler status
+### Detailed lighting profiler
 
-Settings → Developer → Profiler → Full reports **WebGL2 active**, **High fallback — WebGL2 inactive**, or **Gamma idle — no lighting pass**, with completed lighting resolves, actual GPU draws, queued contributions, atlas mask uploads, full Canvas layer uploads, and GPU blur passes. The panel reads existing counters and does not probe/time the GPU. Zero mask uploads only means cached sprites are resident; layer uploads remain visible. Frame stamps reject stale status on unlit frames.
+Open **Settings → Developer → Profiler → Full**, reproduce the slow scene, then tap **Save JSON report** in **Lighting diagnostics**. Gamma continues to use WebGL on software GPUs; the profiler does not select a different renderer. Diagnostics run only in Full mode, and update approximately twice a second even at low frame rates. Compact/Off remove shadow timing wrappers, stop collecting samples and release pending timer queries.
+
+The panel shows the WebGL renderer/vendor/version, actual lighting/scene dimensions, device pixel ratio, selected lighting/adaptive scales, per-frame upload bytes, atlas occupancy/new/changed/evicted sprites, estimated RGBA texture storage, and source/caster/pair/capture/cache counters. Unknown cache entries no longer poison the total with NaN; the approximate cache count identifies omitted entries.
+
+CPU rows show the current frame, mean, 95th percentile, peak, call count and worst call across up to 60 frames. They separate registry work, shadow preparation and its pairing/visibility/raster stages, silhouette body capture/cache copying, atlas collection and its padding/upload stages, hole/veil snapshot, each of the three full Canvas layer uploads, surface/blur-target setup, resolve/blur command submission, the GPU error check, and final WebGL-to-scene Canvas copying. Timings include any synchronous browser/driver waits. Parent/child rows overlap and must not be summed. Samples reset when the map, shadow mode, soft-light setting, scene dimensions or selected lighting scale changes.
+
+When `EXT_disjoint_timer_query_webgl2` is available, separate **GPU execution** rows show asynchronous resolve and blur timings with their original frame ID and sample age. Sampling runs every fourth render frame, with at most eight pending queries. Results are read only when available; disjoint/context-lost/expired results are discarded and queries are cleaned up. Unsupported devices explicitly report **GPU timer unavailable**. The profiler never calls `gl.finish` or performs a forced pixel readback.
+
+The old **browser/GPU** remainder is now labelled **unattributed/wait**. It remains an estimate from frame cadence minus the game's measured work, and includes scheduling, browser work and unmeasured waits. It is not a GPU measurement.
+
+The JSON report contains device/settings information, the latest frame and up to 60 raw frames, CPU summaries, separately stamped GPU samples, game profiler sections and approximate cache/texture memory. A [sample report](lighting-profiler-sample.json) and [browser validation](lighting-profiler-browser-checks.json) are included. No save-game or player inventory is exported.
+
+![Detailed lighting profiler](lighting-profiler.png)
+
+The recorded workspace sample uses SwiftShader and lacks the GPU timer extension. Its CPU breakdown exposes the final Canvas-copy call as the dominant lighting wait; that does not distinguish pure copy cost from earlier GPU work that must complete at that call, and does not establish the bottleneck on another device. Timer lifecycle tests use controlled query results to validate asynchronous polling, source frames, disjoint rejection, queue limits, expiry, active-query cleanup and disabled-mode behavior. Real Chromium checks cover stage timings, upload-byte accounting, finite cache totals, JSON download, render parity/failure recovery and closing Full mode.
+
+Validation commands: `node tools/test-lighting-profile.cjs`, `node tools/test-dynamic-shadows-browser.cjs`, `node tools/test-game-regressions.cjs`, `node tools/build.mjs --check`, and `git diff --check`.
