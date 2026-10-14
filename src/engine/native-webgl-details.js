@@ -17,7 +17,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         return density;
     },
     releaseProp(record){
-        record.sprite.destroy();if(record.liveContext)record.liveContext.destroy();
+        record.sprite.destroy();if(record.group)record.group.destroy();if(record.liveContext)record.liveContext.destroy();
         for(const t of new Set([record.texture,...(record.runs||[])])){this.textures.delete(t);t.destroy(true);}
     },
     propCanvas(p,time,run=null){
@@ -40,12 +40,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const signature=this.propSignature(p);let r=this.props.get(p);if(p.visible===false&&!r)continue;
             if(!r||r.signature!==signature){
                 const texture=this.propCanvas(p,0);if(r)this.releaseProp(r);
-                r={texture,signature,sprite:new PIXI.Sprite(texture)};r.sprite.anchor.set(.5);this.objects.addChild(r.sprite);
+                r={texture,signature,sprite:new PIXI.Sprite(texture),group:new PIXI.Container()};r.sprite.anchor.set(.5);r.group.addChild(r.sprite);this.objects.addChild(r.group);
                 if(NATIVE_LIVE_DECOR.has(p.decorType)){
                     const first=this.propCanvas(p,0,0),plan={...this.propPlan};
                     if(plan.live){r.runs=[first];for(let i=1;i<plan.runs;i++)r.runs.push(this.propCanvas(p,0,i));}
                     else {this.textures.delete(first);first.destroy(true);r.runs=[];}
-                    r.liveContext=new NativeVectorContext(this);this.objects.addChild(r.liveContext.root);
+                    r.liveContext=new NativeVectorContext(this);r.group.addChild(r.liveContext.root);
                 }
                 this.props.set(p,r);
             }

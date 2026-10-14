@@ -3,7 +3,7 @@
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'City depth sorting'};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city'};
 const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
@@ -14,7 +14,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(this.onLayersChanged)this.onLayersChanged();
     },
     preset(name){
-        const shadows=new Set(['colorWash','decorLights','wallOcclusion','propShadows','playerShadows','contactShadows','indicators','furnitureHints','roomVeil','nightTint','glows','doors','windows','fixtures','shapeShadows','linens','shadowDetail']);
+        const shadows=new Set(['colorWash','decorLights','wallOcclusion','propShadows','playerShadows','contactShadows','indicators','furnitureHints','roomVeil','nightTint','glows','doors','windows','fixtures','shapeShadows','linens','shadowDetail','npcShadows','vehicleShadows']);
         this.setLayers(Object.fromEntries(Object.keys(this.layers).map(k=>[k,name==='canvas'||!!NATIVE_LAYER_BASELINE[k]||(name==='shadows'&&shadows.has(k))])));
     },
     initLayers(){
@@ -81,19 +81,24 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 if(z.texture==='wood'){c.fillStyle='rgba(0,0,0,.15)';for(let py=z.y;py<z.y+z.h;py+=24)c.fillRect(z.x,py,z.w,1);c.fillStyle='rgba(255,255,255,.03)';c.fillRect(z.x,z.y,z.w,z.h);}
                 else if(z.texture==='carpet'){c.fillStyle='rgba(0,0,0,.06)';c.fillRect(z.x,z.y,z.w,4);c.fillRect(z.x,z.y+z.h-4,z.w,4);c.fillRect(z.x,z.y,4,z.h);c.fillRect(z.x+z.w-4,z.y,4,z.h);}}
         })));
-        if(map.id==='apt_949'){const backdrop=new PIXI.Sprite(this.bake(map.width,map.height-top,c=>{c.translate(0,-top);game.drawApartmentBackdrop(c);}));
-        backdrop.y=top;this.backdrop.addChild(backdrop);}
+        if(map.id==='apt_949'){
+            if(!game._cityView)game._cityView=game._makeAptCityView();const city=game._cityView;
+            city.bakeBase();city.dx=city.dy=0;
+            const backdrop=new PIXI.Sprite(this.bake(city.w,city.h,c=>{c.translate(-city.x,-city.y);city._stampLayer(c,city.base,city.res);}));
+            backdrop.position.set(city.x,city.y);this.backdrop.addChild(backdrop);
+        }
         if(map.id!=='hub_949')this.floorArt.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{if(map.id==='apt_949')game.drawApartmentInterior(c);else INTERIOR_ART[map.id]?.floor?.(game,c);game.roomSystem.drawFloors(c);})));
         this.initWorld();
         this.windows.addChild(this.glassContext.root);
         this.walls.beginFill(0x222222).lineStyle(1,0x00f3ff,.3);
         for(const w of map.walls||[])this.walls.drawRect(w.x,w.y,w.w,w.h);this.walls.endFill();
         this.playerSprite=new PIXI.Sprite();this.playerSprite.anchor.set(.5);this.objects.addChild(this.playerSprite);
-        this.emissive.addChild(this.glowContext.root);this.fixtures.addChild(this.fixtureContext.root);this.world.setChildIndex(this.projectileContext.root,this.world.children.length-1);this.message('');
+        this.emissive.addChild(this.glowContext.root);this.fixtures.addChild(this.fixtureContext.root);const roofIndex=this.world.getChildIndex(this.roofStage),effectIndex=this.world.getChildIndex(this.projectileContext.root);this.world.setChildIndex(this.projectileContext.root,roofIndex-(effectIndex<roofIndex?1:0));this.message('');
     },
     syncLayers(game,view){
         const start=performance.now(),L=this.layers;
         this.postWorld.position.copyFrom(this.world.position);this.postWorld.scale.copyFrom(this.world.scale);
+        this.syncBackdrop(game);
         this.floor.visible=this.floorArt.visible=L.floor;this.backdrop.visible=L.backdrop;this.walls.visible=L.walls;
         this.windows.visible=L.windows;this.doors.visible=L.doors;
         if(L.windows){const ctx=this.glassContext;ctx.begin();for(const win of game.roomSystem.windows||[])win.draw(ctx,game.dayCycle().daylight);}
@@ -128,7 +133,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(this.veilTarget)this.lighting.uniforms.veilSize.set([this.veilTarget.width,this.veilTarget.height]);
         this.emissive.visible=L.glows;
         if(L.glows){const ctx=this.glowContext,city=game._cityView,clock=_frameTime;ctx.begin();
-            try{game._cityView=null;if(!L.decorAnimation)_frameTime=0;INTERIOR_ART[game.activeMap.id]?.glow?.(game,ctx);}finally{game._cityView=city;_frameTime=clock;}}
+            try{if(!L.liveBackdrop||!L.backdrop)game._cityView=null;if(!L.decorAnimation)_frameTime=0;INTERIOR_ART[game.activeMap.id]?.glow?.(game,ctx);}finally{game._cityView=city;_frameTime=clock;}}
         this.actorHalo.visible=L.glows&&L.player&&game._playerGlowOn();
         if(this.actorHalo.visible){this.actorHalo.shader.uniforms.body=this.actorTexture;this.actorHalo.shader.uniforms.blur=9*(game._renderScale||1)/view.zoom/192;
             this.actorHalo.position.set(game.player.x,game.player.y);this.actorHalo.rotation=game.player.angle||0;}
@@ -322,24 +327,24 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.skyLight.visible=true;this.skyLight.scale.set(view.zoom);this.skyLight.position.copyFrom(this.world.position);
         this.lightSprites.scale.set(view.zoom);this.lightSprites.position.copyFrom(this.world.position);
         const sources=(game.lamps||[]).filter(l=>l.visible!==false).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
-            color:l.color||'#ffeebb',wash:.08,alpha:(game.activeMap.type==='outdoor'&&!game.dayCycle().lampsOn?0:1)*game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
+            color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,alpha:(game.activeMap.type==='outdoor'&&!game.dayCycle().lampsOn?0:1)*game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
         if(L.decorLights){
             for(const p of game.props||[])if(p.visible!==false&&p.light){const c=p.getCenter(),q=p.light;
                 sources.push({owner:p,x:c.x+(q.dx||0),y:c.y+(q.dy||0),radius:q.radius||Math.max(q.w||0,q.h||0)/2||180,
-                    color:q.rgb?'rgb('+q.rgb+')':q.color||'#ffd2a0',wash:.22,flicker:q.flicker||0,alpha:(q.intensity??.8)*game.roomSystem.lightAt(c.x,c.y)});}
+                    color:q.rgb?'rgb('+q.rgb+')':q.color||'#ffd2a0',elevation:q.elevation??44,wash:.22,flicker:q.flicker||0,alpha:(q.intensity??.8)*game.roomSystem.lightAt(c.x,c.y)});}
             for(const q of game.activeMap.softLights||[])sources.push({owner:q,x:q.x,y:q.y,radius:q.w?Math.hypot(q.w,q.h)/2:q.radius||180,
                 w:q.w,h:q.h,cookie:q.w?this.areaCookie(game,q):null,
-                color:q.rgb?'rgb('+q.rgb+')':q.color||'#ffd2a0',wash:.22,flicker:q.flicker||0,alpha:(q.intensity??.8)*game.roomSystem.lightAt(q.x,q.y)});
+                color:q.rgb?'rgb('+q.rgb+')':q.color||'#ffd2a0',elevation:q.elevation??44,wash:.22,flicker:q.flicker||0,alpha:(q.intensity??.8)*game.roomSystem.lightAt(q.x,q.y)});
         }
         if(L.transientLights)sources.push(...this.transientSources);
         for(let i=sources.length-1;i>=0;i--){const q=sources[i];if(q.alpha<.005||Math.abs(q.x-view.x)>w/(2*view.zoom)+q.radius||Math.abs(q.y-view.y)>h/(2*view.zoom)+q.radius)sources.splice(i,1);}
         sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));sources.length=Math.min(sources.length,L.decorLights?40:24);
-        const occlusion=L.wallOcclusion||L.propShadows||L.playerShadows,casters=occlusion?this.casters(game):[],walls=getOccluders(game.activeMap);
+        const occlusion=L.wallOcclusion||L.propShadows||L.playerShadows||L.npcShadows||L.vehicleShadows,casters=occlusion?this.casters(game):[],walls=getOccluders(game.activeMap);
         const wallKey=walls.map(w=>[w.x,w.y,w.w,w.h].join(',')).join(';');
         for(let i=0;i<this.lightSprites.children.length;i++){
             const s=this.lightSprites.children[i],source=sources[i];s.visible=!!source;if(!source)continue;
             s.texture=occlusion?this.shadowTexture(source,casters,walls,wallKey):source.cookie||((source.wash??.08)===.08?this.holeGradient:this.decorGradient);
-            if(L.playerShadows&&L.shapeShadows&&game.player.visible!==false&&!game.player.dead)s.texture=this.animatedShadowTexture(source,s.texture,game.player,walls);
+            s.texture=this.multiShadowTexture(source,s.texture,game,walls);
             s.position.set(source.x,source.y);s.width=occlusion?source.radius*2:source.w||source.radius*2;s.height=occlusion?source.radius*2:source.h||source.radius*2;
             s.blendMode=PIXI.BLEND_MODES.SCREEN;const t=_frameTime/1000,pulse=(L.decorAnimation&&source.flicker) ? .82+.18*Math.sin(t*source.flicker+source.x*.7)*Math.sin(t*source.flicker*.37+source.y) : 1;
             s.tint=0xffffff;s.alpha=Math.min(1,Math.max(0,source.alpha*pulse));
@@ -347,8 +352,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
         // Visible lights touch the LRU; travelling across the city must not
         // retain every street lamp's targets for the rest of the session.
         for(const source of sources){const r=this.shadowCache.get(source.owner);if(r){this.shadowCache.delete(source.owner);this.shadowCache.set(source.owner,r);}}
-        while(this.shadowCache.size>64){const owner=this.shadowCache.keys().next().value,r=this.shadowCache.get(owner);r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}this.shadowCache.delete(owner);}
-        this.shadowStats.sources=sources.length;
+        while(this.shadowCache.size>64||this.shadowBytes()>24*1048576){const owner=this.shadowCache.keys().next().value,r=this.shadowCache.get(owner);r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}this.shadowCache.delete(owner);}
+        this.shadowStats.sources=sources.length;this.worldStats.casters=this.nativeCasters.report();
         this.lightStage.filters=L.softShadows?[this.softFilter]:null;
         this.lighting.uniforms.nightTint=L.nightTint?1:0;
         this.lighting.uniforms.viewport.set([this.lightTarget.width,this.lightTarget.height]);
@@ -410,12 +415,12 @@ class NativeActorShadowMesh extends PIXI.Mesh {
         const geometry=new PIXI.Geometry().addAttribute('aVertexPosition',[-1,-1,1,-1,1,1,-1,1],2).addIndex([0,1,2,0,2,3]);
         const shader=PIXI.Shader.from(`precision highp float;attribute vec2 aVertexPosition;uniform mat3 projectionMatrix;uniform mat3 translationMatrix;uniform vec4 bounds;varying vec2 q;
             void main(){q=(aVertexPosition+1.0)*.5*bounds.zw+bounds.xy;gl_Position=vec4((projectionMatrix*translationMatrix*vec3(q,1.0)).xy,0.0,1.0);}`,
-            `precision highp float;varying vec2 q;uniform sampler2D body;uniform vec2 direction;uniform vec2 rotation;uniform float stretch;uniform float offset;
-            float sampleBody(vec2 world){vec2 local=vec2(world.x*rotation.x+world.y*rotation.y,-world.x*rotation.y+world.y*rotation.x);vec2 uv=(local+96.0)/192.0;
-                if(uv.x<0.0||uv.y<0.0||uv.x>1.0||uv.y>1.0)return 0.0;return texture2D(body,uv).a;}
+            `precision highp float;varying vec2 q;uniform sampler2D body;uniform vec2 direction;uniform vec2 rotation;uniform float stretch;uniform float offset;uniform float bodySize;uniform vec4 frameA;uniform vec4 frameB;uniform float blend;uniform float opacity;
+            float sampleBody(vec2 world){vec2 local=vec2(world.x*rotation.x+world.y*rotation.y,-world.x*rotation.y+world.y*rotation.x);vec2 uv=(local+bodySize*.5)/bodySize;
+                if(uv.x<0.0||uv.y<0.0||uv.x>1.0||uv.y>1.0)return 0.0;return mix(texture2D(body,frameA.xy+uv*frameA.zw).a,texture2D(body,frameB.xy+uv*frameB.zw).a,blend);}
             void main(){float along=dot(q,direction);vec2 original=q+direction*((along-offset)/stretch-along);
-                float alpha=sampleBody(original)*(1.0-sampleBody(q))*.85;gl_FragColor=vec4(0.0,0.0,0.0,alpha);}`,
-            {body:PIXI.Texture.EMPTY,direction:new Float32Array(2),rotation:new Float32Array(2),stretch:1,offset:0,bounds:new Float32Array([-96,-96,192,192])});
+                float alpha=sampleBody(original)*(1.0-sampleBody(q))*opacity;gl_FragColor=vec4(0.0,0.0,0.0,alpha);}`,
+            {body:PIXI.Texture.EMPTY,bodySize:192,frameA:new Float32Array([0,0,1,1]),frameB:new Float32Array([0,0,1,1]),blend:0,opacity:.85,direction:new Float32Array(2),rotation:new Float32Array(2),stretch:1,offset:0,bounds:new Float32Array([-96,-96,192,192])});
         super(geometry,shader);this.blendMode=PIXI.BLEND_MODES.ERASE;
     }
 }

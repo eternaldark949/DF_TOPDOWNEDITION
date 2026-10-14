@@ -143,7 +143,10 @@ class NativeVectorContext {
         let t=this.images.get(image);if(!t){t=this.owner.retainImage(image,this.label||'imported-image');this.images.set(image,t);}
         let x,y,w,h;if(args.length===2){[x,y]=args;w=image.width;h=image.height;}else if(args.length===4)[x,y,w,h]=args;
         else if(args.length===8){const [sx,sy,sw,sh,dx,dy,dw,dh]=args,key=[t.baseTexture.uid,sx,sy,sw,sh].join(':');let view=this.imageViews.get(key);
-            if(!view){view=new PIXI.Texture(t.baseTexture,new PIXI.Rectangle(sx,sy,sw,sh));this.imageViews.set(key,view);}t=view;[x,y,w,h]=[dx,dy,dw,dh];}
+            if(!view){
+                if(this.imageViews.size>=256){const old=[...this.imageViews].find(([,v])=>v._nativeFrame!==this.owner.frameId);if(old){old[1].destroy(false);this.imageViews.delete(old[0]);}}
+                view=new PIXI.Texture(t.baseTexture,new PIXI.Rectangle(sx,sy,sw,sh));this.imageViews.set(key,view);
+            }view._nativeFrame=this.owner.frameId;t=view;[x,y,w,h]=[dx,dy,dw,dh];}
         else throw new Error('Unsupported native image arguments');
         this.current=null;const s=this.node(PIXI.Sprite);s.texture=t;s.alpha=this.globalAlpha;s.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
         this.hashValue(t.baseTexture.uid);this.hashValue(this.globalAlpha);for(const v of [...args,this.matrix.a,this.matrix.b,this.matrix.c,this.matrix.d,this.matrix.tx,this.matrix.ty])this.hashValue(v);

@@ -1,17 +1,30 @@
 // Native entry points retain sandbox previews and the original save schema.
 (() => {
     const renderer=game.nativeRenderer;
+    const inBodyGroup=(ctx,e,paint)=>ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.layers.depthSort&&e&&!e.dead&&!e._reflectionProxy&&ctx.container._nativeEntity!==e?ctx.withDepth(e,paint):paint();
     const liveCrowd=drawCrowdHumanoid;
-    drawCrowdHumanoid=(ctx,e,c)=>{if(ctx.nativeVector&&ctx.owner.layers.crowdSprites&&ctx.owner.crowdAtlas?.draw(ctx,e,c))return;return liveCrowd(ctx,e,c);};
+    drawCrowdHumanoid=(ctx,e,c)=>{if(ctx.nativeVector&&!ctx.owner.layers.contactShadows)c={...c,noShadow:true};return inBodyGroup(ctx,e,()=>{if(ctx.nativeVector&&ctx.owner.layers.crowdSprites&&ctx.owner.crowdAtlas?.draw(ctx,e,c))return;return liveCrowd(ctx,e,c);});};
     // Keep a body's paths and atlas mesh together before sorting by its feet.
     for(const Type of [NPC,Pedestrian,Ganger,GatlingGunner,Drone,VelvetCat,SceneActor]){
         const draw=Type.prototype.draw;if(!draw)continue;
         Type.prototype.draw=function(ctx,...args){
-            if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.layers.depthSort&&game.activeMap.type==='outdoor')
-                return ctx.withDepth(this,()=>draw.call(this,ctx,...args));
+            if(ctx.nativeVector&&ctx===ctx.owner.peopleContext){
+                const depth=ctx.owner.layers.depthSort,paths=ctx.pathsPainted,children=ctx.root.children.length;
+                const result=depth?ctx.withDepth(this,()=>draw.call(this,ctx,...args)):draw.call(this,ctx,...args);
+                const painted=depth?ctx.root.children[ctx.root.children.length-1]?.children.length>0:ctx.pathsPainted>paths||ctx.root.children.length>children;
+                if(painted)ctx.owner.nativeCasters.circle(this);return result;
+            }
             return draw.call(this,ctx,...args);
         };
     }
+    const liveHumanoid=drawProceduralHumanoid;
+    drawProceduralHumanoid=(ctx,e,c={})=>{if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&!ctx.owner.layers.contactShadows)c={...c,noShadow:true};return inBodyGroup(ctx,e,()=>{if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.nativeCasters.capture(ctx,e,c,liveHumanoid))return;const result=liveHumanoid(ctx,e,c);if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&e)ctx.owner.nativeCasters.circle(e,ctx.globalAlpha);return result;});};
+    // Source-city helpers must see the miniature city's viewport during baking.
+    const cityViewer=CityView.prototype._asViewer;
+    CityView.prototype._asViewer=function(paint){const saved=game._cullBounds;
+        try{game._cullBounds={...saved,view:{left:-300,top:-600,right:this.VW+300,bottom:this.VH+500}};return cityViewer.call(this,paint);}
+        finally{game._cullBounds=saved;}
+    };
     const menu=document.getElementById('main-menu-list');
     const start=document.createElement('button');start.id='btn-native-apartment';start.textContent='PLAY WEBGL APARTMENT';
     start.style.cssText='padding:16px;margin:12px;color:#fff;background:#402060;border:1px solid #b78af8;font:inherit;cursor:pointer';
@@ -69,7 +82,7 @@
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v9-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v10-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;

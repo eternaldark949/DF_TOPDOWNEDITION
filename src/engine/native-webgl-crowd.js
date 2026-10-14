@@ -28,9 +28,10 @@ class NativeCrowdAtlas {
         r.used=owner.frameId;const tau=Math.PI*2,walking=(e._gait?.speed||0)>CONFIG.GAIT.STOP_SPEED;
         const phase=walking?((e.walkPhase||0)%tau+tau)%tau/tau*16:0;
         const a=walking?1+Math.floor(phase):0,b=walking?1+(Math.floor(phase)+1)%16:0,mix=walking?phase%1:0;
-        if(!c.noShadow&&_zoomLOD<2){const t=ctx.getTransform();_bodyRot=Math.atan2(t.b,t.a);drawHumanContactShadow(ctx,e);}
+        if(owner.layers.contactShadows&&!c.noShadow&&_zoomLOD<2){const t=ctx.getTransform();_bodyRot=Math.atan2(t.b,t.a);drawHumanContactShadow(ctx,e);}
         ctx.current=null;const mesh=ctx.node(NativeCrowdPoseMesh),u=mesh.shader.uniforms;
         u.atlas=r.target;u.frames.set([a,b]);u.blend=mix;u.opacity=ctx.globalAlpha;
+        owner.nativeCasters.note(ctx,e,{texture:r.target,size:112,bounds:r.bounds||{x:0,y:0,width:112,height:112},frames:[a,b],blend:mix,key:r.target.baseTexture.uid+':'+a+':'+b+':'+mix});
         mesh.transform.setFromMatrix(ctx.matrix.clone().append(new PIXI.Matrix(1,0,0,1,-56,-56)));ctx.current=null;
         RenderStats.bodies++;RenderStats.cachedBodies++;this.stats.spriteBodies++;return true;
     }
@@ -38,16 +39,18 @@ class NativeCrowdAtlas {
         const target=PIXI.RenderTexture.create({width:112*17,height:112,resolution:1.25,scaleMode:PIXI.SCALE_MODES.LINEAR}),ctx=new NativeVectorContext(this.owner);
         const B={x:e.x,y:e.y,angle:0,look:e.look,walkPhase:0};syncHumanoidGait(B);const G=B._gait;
         const cfg={...c,lerpSpeed:1,noShadow:true,poseInstant:true,_crowdBake:true},saved={lite:_crowdLite,wm:_worldMatrix,wc:_worldCanvas};
+        let x0=112,y0=112,x1=0,y1=0;
         try{_crowdLite=true;
             for(let f=0;f<17;f++){
                 G.speed=f?2:0;G.dirX=1;G.dirY=0;G.tick=_simTick;G.prevX=B.x;G.prevY=B.y;
                 B.walkPhase=f?(f-1)/16*Math.PI*2:0;G.phasePrev=B.walkPhase;B._animState=null;
                 ctx.begin();ctx.translate(f*112+56,56);drawProceduralHumanoid(ctx,B,cfg);
                 this.owner.renderer.render(ctx.root,{renderTexture:target,clear:f===0});
+                const bounds=ctx.root.getLocalBounds();x0=Math.min(x0,bounds.x-f*112);y0=Math.min(y0,bounds.y);x1=Math.max(x1,bounds.x-f*112+bounds.width);y1=Math.max(y1,bounds.y+bounds.height);
             }
         }catch(error){target.destroy(true);throw error;}
         finally{_crowdLite=saved.lite;_worldMatrix=saved.wm;_worldCanvas=saved.wc;ctx.destroy();}
-        return {target,used:this.owner.frameId};
+        return {target,used:this.owner.frameId,bounds:{x:x0-1,y:y0-1,width:x1-x0+2,height:y1-y0+2}};
     }
     dispose(r){r.target.destroy(true);}
     clear(){for(const r of this.entries.values())this.dispose(r);this.entries.clear();}

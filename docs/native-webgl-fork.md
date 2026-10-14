@@ -45,7 +45,7 @@ Current implementation:
   authored curtains, lamp particles/fades, and apartment glows use GPU geometry
   and cached image assets. Bloom uses the Canvas downscale scales/strengths;
   atmosphere follows the original tint setting.
-- All 45 visual switches remain independent. Fireplace flames, crafting scanline,
+- All 50 visual switches remain independent. Fireplace flames, crafting scanline,
   record sheen, tub ripple, plants and telescope accents follow their authored
   continuous clock through GPU geometry. Static segments remain cached and
   retain their drawing order; Decor animation off freezes their original art.
@@ -74,10 +74,10 @@ Visible city buildings use their authored camera-dependent facades, roofs and
 emissives; roof geometry is retained while the camera, daylight gate and LOD
 stay fixed. World bodies and traffic use native paths. Building contexts and
 far-off prop textures are released; street-light shadow images have a 64-owner
-LRU. The apartment's distant city backdrop remains a snapshot. Detailed furniture shadows keep
+LRU and a 24MiB light-target budget. The apartment's distant city uses the original live CityView, with traffic, pedestrians, parallax and night lights. Detailed furniture shadows keep
 Canvas's geometric footprints. A few tiny shadowBlur/dash accents, glyph outlines,
 light-color falloff and the GPU halo/softness kernel remain approximate.
-NPC silhouette casts, additional combat abilities, some cinematic camera
+Additional combat abilities, some cinematic camera
 features, glass droplets and wet reflections still need dedicated passes. Character parity is measured below; complete apartment pixel
 parity and mobile performance still require comparison on the target phone.
 
@@ -411,3 +411,63 @@ remaining dynamic shadow casters, glass droplets and wet/reflection materials,
 and an audit/port of special render passes (scopes, abilities, ghosts, emotes,
 quips and cinematic effects). Those need reference captures across maps and
 states, beyond the apartment and stationary city fixtures.
+
+## Casters, scene depth and the veranda city in v10
+
+Canvas look enables all 50 switches. Three new controls default on:
+**NPC shape shadows**, **Vehicle shadows**, and **Live veranda city**.
+**Scene depth sorting** replaces the former City depth sorting label and now
+also applies indoors.
+
+NPC casts use the same interpolated GPU alpha as the visible crowd body;
+no additional bitmap capture is needed for eligible cached poses. Live poses
+render once into resident 192×192 GPU targets and display from that texture.
+Contacts remain separate. Every light masks only its own contribution, with
+finite projection, silhouette self-body exclusion, and spatial-index wall/door
+blocking. Vehicle casts retain Canvas's rotated geometric footprint and
+15-unit elevation; cat and budget-fallback casts use small geometric shapes.
+Authored lamp/decor source elevations determine cast length. Hidden, dead,
+in-car and reflection-proxy bodies do not register; blinking bodies disappear
+from the caster list when their artwork disappears.
+
+The workload is bounded: 32 live body targets (4.5MiB plus separately reported
+gradients), at most 16 live captures per frame, 16 dynamically shadowed lights,
+24 casters per light and 192 pairs per frame. Player/driven car casts take
+priority. Combined light targets use a 64-owner LRU and 24MiB ceiling.
+Overflow/fallbacks are reported; distant LOD skips other-actor casts. Static
+walls/furniture remain cached independently of moving bodies. `casters` and
+`world.casters` report shared bodies, captures/refreshes, geometric fallbacks,
+blocked/dropped pairs, target residency and memory. The `casters` count is the
+registered NPC/vehicle list; the player is added separately per light.
+
+Furniture with collision, vehicles, doors, lamps and live bodies sort by world
+Y. Each live prop's static/live segments stay together. Floor-level and fixed
+non-navigation decorations keep their floor pass. Driven occupants stay inside
+the car's composite group. Buildings/roofs sort by depth; trees retain the
+original foreground canopy pass, the Ferris wheel remains above them, and
+ordinary projectiles stay below roofs. Anonymous café/lobby/club bodies also
+participate in sorting. Turning Scene depth sorting off restores broad passes.
+
+The veranda uses the authored CityView base/glow routines: moving traffic and
+pedestrians, camera parallax and eased lookout lean, vehicle lights, signal
+cycles and roof beacons. Static city art stays cached. Its source bakers see the
+miniature city's viewport rather than the apartment viewport. The finite car/
+pedestrian asset set stays resident after first visibility; crop views retain
+at most 256 older entries per context, with an active-frame burst protected
+from premature destruction. The frozen comparison covers the 400-pixel city
+strip. No per-frame city bitmap or GPU readback is used in gameplay.
+
+[Parity evidence](native-webgl-parity-checks.json) checks multiple alpha casters,
+limb gaps, self exclusion, wall blocking, phase invalidation, vehicle casts,
+selection budgets, indoor overlaps, anonymous body groups, camera/parallax,
+asset reuse and GPU recovery including live body pixels. The tested veranda
+base differs from the authored Canvas drawing routine by approximately
+0.32/255 mean RGB channel error on the same cached source art. This is a
+specific pass comparison, not whole-game pixel parity or phone FPS evidence.
+
+For the A53, record the same city view with both caches fixed and NPC shape
+shadows changed alone, then compare Vehicle shadows. Walk around tables/doors
+and parked cars with Scene depth sorting on/off. Record the veranda while
+moving toward/along the railing; Live veranda city restores the still comparison.
+Additional special combat/cinematic passes, glass droplets and wet reflections
+remain separate migration work.
