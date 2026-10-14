@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "environment": "Desktop Chromium SwiftShader; no phone performance claim",
+  "skyline": {
+    "base": 1097885591,
+    "glow": 886389287
+  },
+  "gradeCases": 80,
+  "lighting": {
+    "level": 855309,
+    "outside": [
+      204,
+      102,
+      51,
+      255
+    ],
+    "inside": [
+      10,
+      5,
+      3,
+      255
+    ],
+    "disabled": "none",
+    "enabled": "grayscale(34%) contrast(2.35) saturate(0.49) sepia(0.06) brightness(2.51) hue-rotate(8deg) saturate(0.675) sepia(0.091) hue-rotate(-14.3deg) contrast(0.948)"
+  },
+  "browserChartMeanError": 0
+}

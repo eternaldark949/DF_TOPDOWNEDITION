@@ -139,3 +139,62 @@ Object.assign(NativeWebGLRenderer.prototype,{
         return r.dynamicTexture;
     }
 });
+
+// Mirror draw.js's final browser grade. CSS filters run on the composited WebGL
+// canvas without copying pixels to Canvas2D. Keep the original Canvas path intact.
+function nativeCanvasColorGrade() {
+    const targetNV = this.nightVision ? 1.0 : 0.0;
+    this.nvIntensity += (targetNV - this.nvIntensity) * 0.08;
+
+    // Color grade multipliers (from custom grade panel)
+    const _gg = (typeof _gameGrade !== 'undefined') ? _gameGrade : null;
+    const ggBright = _gg ? _gg.brightness / 100 : 1;
+    const ggContrast = _gg ? _gg.contrast / 100 : 1;
+    const ggSaturate = _gg ? _gg.saturate / 100 : 1;
+    const ggExposure = _gg ? (1 + _gg.exposure / 200) : 1;
+
+    let filterChain;
+    if (this.nvIntensity > 0.98) {
+        filterChain = `grayscale(100%) brightness(${(1.4 * ggBright * ggExposure).toFixed(2)}) contrast(${(1.2 * ggContrast).toFixed(2)})`;
+        // Ms. Jean Soda: pink tinge over NV
+        if (this.player.buffSystem.isActive('jeanSoda')) {
+            filterChain = `grayscale(80%) brightness(${(1.4 * ggBright * ggExposure).toFixed(2)}) contrast(${(1.2 * ggContrast).toFixed(2)}) sepia(0.3) hue-rotate(300deg) saturate(${(1.5 * ggSaturate).toFixed(2)})`;
+        }
+    } else {
+        if (this.scenes && this.scenes.running) {
+            // A scene has the stage: Stella is off-camera, so her stealth doesn't grey the story out
+            this.targetGrayscale = 0; this.visualGrayscale = 0;
+        } else if (this.player.visibility !== undefined) {
+            this.targetGrayscale = GameSettings.stealthGray === false ? 0 : (1.0 - this.player.visibility) * 100;
+            this.visualGrayscale += (this.targetGrayscale - this.visualGrayscale) * 0.05;
+            if (this.visualGrayscale < 0.5) this.visualGrayscale = 0;
+        }
+        // The grade follows the hour: the night's rich contrast, the day's softer, clearer light
+        const dayG = this.sunState().k * this._sunReach();
+        const sat = (1.4 - 0.1 * dayG) * (1.0 - this.nvIntensity) * ggSaturate;
+        const con = (1.35 - 0.08 * dayG + (0.15 * this.nvIntensity)) * ggContrast;
+        const sepia = (0.18 - 0.12 * dayG) * (1.0 - this.nvIntensity);
+        const bright = (1.1 + 0.2 * dayG + (1.4 * this.nvIntensity)) * ggBright * ggExposure;
+        // Cinematic View's "Full colour" chip lifts the stealth grey for the photo (night vision stays)
+        const stealthGray = this.cineCam && GameSettings.photoFullColour ? 0 : this.visualGrayscale;
+        const effectiveGray = Math.max(stealthGray, this.nvIntensity * 100);
+        filterChain = `grayscale(${effectiveGray.toFixed(0)}%) contrast(${con.toFixed(2)}) saturate(${sat.toFixed(2)}) sepia(${sepia.toFixed(2)}) brightness(${bright.toFixed(2)})`;
+        // Ms. Jean Soda: subtle pink warmth even outside NV
+        if (this.player.buffSystem.isActive('jeanSoda')) {
+            filterChain += ` hue-rotate(8deg)`;
+        }
+    }
+
+    // A flashback (story/scene-runner.js s.memory): cooler, softer, a little faded
+    const memK = this.scenes && this.scenes.ui ? (this.scenes.ui.memK || 0) : 0;
+    if (memK > 0.001) filterChain += ` saturate(${(1 - 0.5 * memK).toFixed(3)}) sepia(${(0.14 * memK).toFixed(3)}) hue-rotate(${(-22 * memK).toFixed(1)}deg) contrast(${(1 - 0.08 * memK).toFixed(3)})`;
+    return filterChain;
+}
+Object.assign(NativeWebGLRenderer.prototype,{
+    syncColorGrade(game){
+        const filter=nativeCanvasColorGrade.call(game);
+        const applied=this.layers.colorGrade?filter:'none';
+        if(game.canvas.style.filter!==applied)game.canvas.style.filter=applied;
+        this.colorGrade={enabled:this.layers.colorGrade,filter:game.canvas.style.filter};
+    }
+});

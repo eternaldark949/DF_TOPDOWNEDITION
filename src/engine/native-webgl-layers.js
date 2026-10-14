@@ -3,7 +3,7 @@
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city'};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city',colorGrade:'Final color grade / vision'};
 const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
@@ -319,7 +319,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             this.lightBase.clear().beginFill(0xffffff).drawRect(0,0,w,h).endFill();this.lighting.uniforms.lightMap=this.lightTarget;
             this.lighting.uniforms.colorMap=this.colorTarget;
         }
-        const level=Math.round((1-Math.min(.85,Math.max(0,game.getAmbientDarkness())))*255);this.lightBase.tint=(level<<16)|(level<<8)|level;
+        const level=Math.round((1-Math.min(1,Math.max(0,game.getAmbientDarkness())))*255);this.lightBase.tint=(level<<16)|(level<<8)|level;
         if(!this.skyLight){this.skyLight=new PIXI.Graphics();this.skyLight.blendMode=PIXI.BLEND_MODES.SCREEN;this.lightStage.addChildAt(this.skyLight,1);}
         const ambient=game.getAmbientDarkness(),sky=game.dayCycle().darkness,skyKey=[this.map.id,ambient,sky].join(':');
         if(this.skyKey!==skyKey){this.skyLight.clear();const a=ambient>0?1-Math.min(1,sky/ambient):0;
@@ -355,6 +355,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         while(this.shadowCache.size>64||this.shadowBytes()>24*1048576){const owner=this.shadowCache.keys().next().value,r=this.shadowCache.get(owner);r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}this.shadowCache.delete(owner);}
         this.shadowStats.sources=sources.length;this.worldStats.casters=this.nativeCasters.report();
         this.lightStage.filters=L.softShadows?[this.softFilter]:null;
+        this.lighting.uniforms.mapSize.set([game.activeMap.width,game.activeMap.height]);
         this.lighting.uniforms.nightTint=L.nightTint?1:0;
         this.lighting.uniforms.viewport.set([this.lightTarget.width,this.lightTarget.height]);
         this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});

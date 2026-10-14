@@ -58434,19 +58434,24 @@ class NativeWebGLRenderer {
                 uniform sampler2D colorMap;
                 uniform float colorGain;
                 uniform float nightTint;
-                uniform sampler2D veilMap;uniform float veilGain;uniform vec3 inverseWorld;uniform vec2 veilSize;
+                uniform sampler2D veilMap;uniform float veilGain;uniform vec3 inverseWorld;uniform vec2 veilSize;uniform vec2 mapSize;
                 void main() {
                     vec4 scene = texture2D(uSampler, vTextureCoord);
                     vec2 screen = outputFrame.xy + vTextureCoord * inputSize.xy;
                     vec3 illumination = texture2D(lightMap,screen/viewport).rgb;
-                    float shade=1.0-max(illumination.r,max(illumination.g,illumination.b));
+                    // Canvas paints its darkness only inside the active map. The veranda
+                    // city lives at negative Y and must retain its authored night shading.
+                    vec2 world=screen*inverseWorld.z+inverseWorld.xy;
+                    float inMap=step(0.0,world.x)*step(0.0,world.y)*(1.0-step(mapSize.x,world.x))*(1.0-step(mapSize.y,world.y));
+                    float shade=(1.0-max(illumination.r,max(illumination.g,illumination.b)))*inMap;
                     vec4 color=vec4(0.0);if(colorGain>0.0)color=texture2D(colorMap,screen/viewport)*colorGain;
                     vec4 veil=vec4(0.0);if(veilGain>0.0)veil=texture2D(veilMap,(screen*inverseWorld.z+inverseWorld.xy+vec2(24.0))/veilSize);
+                    veil*=inMap;
                     float darkAlpha=shade*(1.0-veil.a)+veil.a;
                     vec3 darkRGB=vec3(.086,.039,.188)*shade*nightTint*(1.0-veil.a)+veil.rgb;
                     vec3 shaded=scene.rgb*max(0.0,1.0-darkAlpha-color.a)+darkRGB*scene.a;
                     gl_FragColor = vec4(shaded+color.rgb*scene.a,scene.a);
-                }`, {viewport:new Float32Array(2),lightMap:PIXI.Texture.EMPTY,colorMap:PIXI.Texture.EMPTY,colorGain:0,nightTint:0,veilMap:PIXI.Texture.EMPTY,veilGain:0,inverseWorld:new Float32Array(3),veilSize:new Float32Array([1,1])});
+                }`, {viewport:new Float32Array(2),lightMap:PIXI.Texture.EMPTY,colorMap:PIXI.Texture.EMPTY,colorGain:0,nightTint:0,veilMap:PIXI.Texture.EMPTY,veilGain:0,inverseWorld:new Float32Array(3),veilSize:new Float32Array([1,1]),mapSize:new Float32Array(2)});
             this.lighting.padding = 0;
             this.world.filters = [this.lighting];
             this.world.filterArea = new PIXI.Rectangle(0,0,canvas.width,canvas.height);
@@ -58560,6 +58565,7 @@ class NativeWebGLRenderer {
         this.syncLayers(game,view);
         this.syncDetails(game,view);this.syncWorld(game,view);
         this.gpuTimer.begin('lighting',this.frameId);this.syncLighting(game,view);this.gpuTimer.end();
+        this.syncColorGrade(game);
         const submitStart=performance.now();this.gpuTimer.begin('scene',this.frameId);this.renderer.render(this.stage);this.gpuTimer.end();
         const end=performance.now();this.layerStages.sceneSubmitMs=end-submitStart;
         const f={frame:this.frameId,at:start,intervalMs:this.lastStart?start-this.lastStart:null,gapMs:this.lastEnd?start-this.lastEnd:null,renderMs:end-start,
@@ -58580,11 +58586,11 @@ class NativeWebGLRenderer {
     report() {
         const frames=this.frames.slice(),intervals=frames.map(f=>f.intervalMs).filter(v=>v>0),sum=intervals.reduce((a,b)=>a+b,0);
         const sorted=intervals.slice().sort((a,b)=>a-b);
-        return {renderer:'native-webgl-apartment',build:'native-webgl-parity-v10',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
+        return {renderer:'native-webgl-apartment',build:'native-webgl-grade-v11',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
             settings:this.settings,resolution:[this.canvas.width,this.canvas.height],lighting:this.lightsOn,warmFramesRemaining:this.warmFrames,frames,
             animationSummary:{changedFrames:frames.filter(f=>f.animation?.changed).length,geometryMeanMs:frames.length?frames.reduce((n,f)=>n+(f.animation?.geometryMs||0),0)/frames.length:0,
                 shadowRefreshFrames:frames.filter(f=>f.shadows.dynamicRebuilds>0).length,dynamicRebuilds:frames.reduce((n,f)=>n+(f.shadows.dynamicRebuilds||0),0),staticRebuilds:frames.reduce((n,f)=>n+(f.shadows.staticRebuilds||0),0)},
-            buildingTargetBytes:this.buildingGlowBytes(),crowdTargetBytes:this.crowdAtlas?.bytes||0,rain:this.rainStats,world:this.worldStats,casters:this.nativeCasters?.report(),backdrop:this.backdropStats,textureQuality:this.textureQuality,assetDensities:[...new Set([...this.textures].map(t=>t.baseTexture.resolution))],glyphAtlasBytes:Object.values(PIXI.BitmapFont.available.NativeDetailFont.pageTextures).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),qualityReductions:this.qualityReductions,details:this.detailStats,layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
+            buildingTargetBytes:this.buildingGlowBytes(),crowdTargetBytes:this.crowdAtlas?.bytes||0,rain:this.rainStats,world:this.worldStats,casters:this.nativeCasters?.report(),backdrop:this.backdropStats,colorGrade:this.colorGrade,textureQuality:this.textureQuality,assetDensities:[...new Set([...this.textures].map(t=>t.baseTexture.resolution))],glyphAtlasBytes:Object.values(PIXI.BitmapFont.available.NativeDetailFont.pageTextures).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),qualityReductions:this.qualityReductions,details:this.detailStats,layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
             contextRestores:this.contextRestores||0,
             capture:this.capture?{...this.capture}:null,player:this.playerSprite?{x:this.playerSprite.x,y:this.playerSprite.y}:null,
             fps:sum?intervals.length*1000/sum:0,p95Ms:sorted[Math.ceil(sorted.length*.95)-1]||0,
@@ -58607,7 +58613,7 @@ class NativeWebGLRenderer {
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city'};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'Scene depth sorting',npcShadows:'NPC shape shadows',vehicleShadows:'Vehicle shadows',liveBackdrop:'Live veranda city',colorGrade:'Final color grade / vision'};
 const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
@@ -58923,7 +58929,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             this.lightBase.clear().beginFill(0xffffff).drawRect(0,0,w,h).endFill();this.lighting.uniforms.lightMap=this.lightTarget;
             this.lighting.uniforms.colorMap=this.colorTarget;
         }
-        const level=Math.round((1-Math.min(.85,Math.max(0,game.getAmbientDarkness())))*255);this.lightBase.tint=(level<<16)|(level<<8)|level;
+        const level=Math.round((1-Math.min(1,Math.max(0,game.getAmbientDarkness())))*255);this.lightBase.tint=(level<<16)|(level<<8)|level;
         if(!this.skyLight){this.skyLight=new PIXI.Graphics();this.skyLight.blendMode=PIXI.BLEND_MODES.SCREEN;this.lightStage.addChildAt(this.skyLight,1);}
         const ambient=game.getAmbientDarkness(),sky=game.dayCycle().darkness,skyKey=[this.map.id,ambient,sky].join(':');
         if(this.skyKey!==skyKey){this.skyLight.clear();const a=ambient>0?1-Math.min(1,sky/ambient):0;
@@ -58959,6 +58965,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         while(this.shadowCache.size>64||this.shadowBytes()>24*1048576){const owner=this.shadowCache.keys().next().value,r=this.shadowCache.get(owner);r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}this.shadowCache.delete(owner);}
         this.shadowStats.sources=sources.length;this.worldStats.casters=this.nativeCasters.report();
         this.lightStage.filters=L.softShadows?[this.softFilter]:null;
+        this.lighting.uniforms.mapSize.set([game.activeMap.width,game.activeMap.height]);
         this.lighting.uniforms.nightTint=L.nightTint?1:0;
         this.lighting.uniforms.viewport.set([this.lightTarget.width,this.lightTarget.height]);
         this.renderer.render(this.lightStage,{renderTexture:this.lightTarget,clear:true});
@@ -59681,6 +59688,65 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.renderer.render(r.dynamicStage,{renderTexture:r.dynamicTexture,clear:true});r.dynamicKey=key;
         this.shadowStats.rebuilds++;this.shadowStats.dynamicRebuilds++;this.layerStages.animatedShadowMs=(this.layerStages.animatedShadowMs||0)+performance.now()-start;
         return r.dynamicTexture;
+    }
+});
+
+// Mirror draw.js's final browser grade. CSS filters run on the composited WebGL
+// canvas without copying pixels to Canvas2D. Keep the original Canvas path intact.
+function nativeCanvasColorGrade() {
+    const targetNV = this.nightVision ? 1.0 : 0.0;
+    this.nvIntensity += (targetNV - this.nvIntensity) * 0.08;
+
+    // Color grade multipliers (from custom grade panel)
+    const _gg = (typeof _gameGrade !== 'undefined') ? _gameGrade : null;
+    const ggBright = _gg ? _gg.brightness / 100 : 1;
+    const ggContrast = _gg ? _gg.contrast / 100 : 1;
+    const ggSaturate = _gg ? _gg.saturate / 100 : 1;
+    const ggExposure = _gg ? (1 + _gg.exposure / 200) : 1;
+
+    let filterChain;
+    if (this.nvIntensity > 0.98) {
+        filterChain = `grayscale(100%) brightness(${(1.4 * ggBright * ggExposure).toFixed(2)}) contrast(${(1.2 * ggContrast).toFixed(2)})`;
+        // Ms. Jean Soda: pink tinge over NV
+        if (this.player.buffSystem.isActive('jeanSoda')) {
+            filterChain = `grayscale(80%) brightness(${(1.4 * ggBright * ggExposure).toFixed(2)}) contrast(${(1.2 * ggContrast).toFixed(2)}) sepia(0.3) hue-rotate(300deg) saturate(${(1.5 * ggSaturate).toFixed(2)})`;
+        }
+    } else {
+        if (this.scenes && this.scenes.running) {
+            // A scene has the stage: Stella is off-camera, so her stealth doesn't grey the story out
+            this.targetGrayscale = 0; this.visualGrayscale = 0;
+        } else if (this.player.visibility !== undefined) {
+            this.targetGrayscale = GameSettings.stealthGray === false ? 0 : (1.0 - this.player.visibility) * 100;
+            this.visualGrayscale += (this.targetGrayscale - this.visualGrayscale) * 0.05;
+            if (this.visualGrayscale < 0.5) this.visualGrayscale = 0;
+        }
+        // The grade follows the hour: the night's rich contrast, the day's softer, clearer light
+        const dayG = this.sunState().k * this._sunReach();
+        const sat = (1.4 - 0.1 * dayG) * (1.0 - this.nvIntensity) * ggSaturate;
+        const con = (1.35 - 0.08 * dayG + (0.15 * this.nvIntensity)) * ggContrast;
+        const sepia = (0.18 - 0.12 * dayG) * (1.0 - this.nvIntensity);
+        const bright = (1.1 + 0.2 * dayG + (1.4 * this.nvIntensity)) * ggBright * ggExposure;
+        // Cinematic View's "Full colour" chip lifts the stealth grey for the photo (night vision stays)
+        const stealthGray = this.cineCam && GameSettings.photoFullColour ? 0 : this.visualGrayscale;
+        const effectiveGray = Math.max(stealthGray, this.nvIntensity * 100);
+        filterChain = `grayscale(${effectiveGray.toFixed(0)}%) contrast(${con.toFixed(2)}) saturate(${sat.toFixed(2)}) sepia(${sepia.toFixed(2)}) brightness(${bright.toFixed(2)})`;
+        // Ms. Jean Soda: subtle pink warmth even outside NV
+        if (this.player.buffSystem.isActive('jeanSoda')) {
+            filterChain += ` hue-rotate(8deg)`;
+        }
+    }
+
+    // A flashback (story/scene-runner.js s.memory): cooler, softer, a little faded
+    const memK = this.scenes && this.scenes.ui ? (this.scenes.ui.memK || 0) : 0;
+    if (memK > 0.001) filterChain += ` saturate(${(1 - 0.5 * memK).toFixed(3)}) sepia(${(0.14 * memK).toFixed(3)}) hue-rotate(${(-22 * memK).toFixed(1)}deg) contrast(${(1 - 0.08 * memK).toFixed(3)})`;
+    return filterChain;
+}
+Object.assign(NativeWebGLRenderer.prototype,{
+    syncColorGrade(game){
+        const filter=nativeCanvasColorGrade.call(game);
+        const applied=this.layers.colorGrade?filter:'none';
+        if(game.canvas.style.filter!==applied)game.canvas.style.filter=applied;
+        this.colorGrade={enabled:this.layers.colorGrade,filter:game.canvas.style.filter};
     }
 });
         class GameEngine {
@@ -81468,7 +81534,7 @@ engineMixin({
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v10-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v11-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;

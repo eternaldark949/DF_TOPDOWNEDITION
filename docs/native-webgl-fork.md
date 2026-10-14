@@ -471,3 +471,27 @@ and parked cars with Scene depth sorting on/off. Record the veranda while
 moving toward/along the railing; Live veranda city restores the still comparison.
 Additional special combat/cinematic passes, glass droplets and wet reflections
 remain separate migration work.
+
+## Veranda lighting and final color grade in v11
+
+The original city art was already shared, but its final presentation differed.
+Canvas paints apartment darkness only inside the map; the distant CityView
+strip at negative Y keeps its own baked night shading. The native shader now
+uses that same map boundary instead of darkening the city a second time. It
+also respects the original 95% indoor darkness rather than capping it at 85%.
+
+The native draw's early return previously skipped the original final CSS filter
+chain. v11 restores its exposure, brightness, contrast, saturation, time-of-day
+grade, stealth grayscale, night-vision grade, soda hue and memory effects. The
+existing shared temperature/tint overlay and vignette settings remain in place.
+**Final color grade / vision** toggles the final filter chain for comparisons;
+Canvas look enables it. The profile includes the applied `colorGrade.filter`.
+CSS filters work on the browser's composited WebGL canvas without per-frame
+Canvas2D copies or uploads. Browser compositor work is outside Pixi's GPU timer
+regions; compare recorded frame intervals when evaluating this switch on a phone.
+
+[Grade checks](native-webgl-grade-checks.json) compare independently baked city
+base/glow assets and the actual Canvas/native draw paths for presets, custom
+sliders and vision/story transitions, plus browser-composited color-chart pixels
+and shader map boundaries. This does not establish whole-frame pixel parity:
+the daytime sunlight wash and remaining special effects still need migration.
