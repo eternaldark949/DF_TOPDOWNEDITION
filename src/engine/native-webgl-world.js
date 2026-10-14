@@ -2,7 +2,7 @@
 // live actors. Original simulation/save schema remain the source of truth.
 Object.assign(NativeWebGLRenderer.prototype,{
     initWorld(){
-        this.surfaces=new NativeWorldSurfaces(this);this.backdropPrepared=false;this.nativeCasters=new NativeCasterBodies(this);this.backdropContext=new NativeVectorContext(this);this.backdrop.addChild(this.backdropContext.root);
+        this.nightHeat=new NativeNightHeat(this);this.surfaces=new NativeWorldSurfaces(this);this.backdropPrepared=false;this.nativeCasters=new NativeCasterBodies(this);this.backdropContext=new NativeVectorContext(this);this.backdrop.addChild(this.backdropContext.root);
         this.groundContext=new NativeVectorContext(this);this.floorArt.addChild(this.groundContext.root);
         this.buildingBaseStage=new PIXI.Container();this.world.addChildAt(this.buildingBaseStage,this.world.getChildIndex(this.objects));
         this.peopleContext=new NativeVectorContext(this);this.objects.addChild(this.peopleContext.root);
@@ -13,13 +13,13 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.foliageContext=new NativeVectorContext(this);this.world.addChild(this.foliageContext.root);
         this.cityGlowContext=new NativeVectorContext(this);this.emissive.addChild(this.cityGlowContext.root);
         this.worldCueContext=new NativeVectorContext(this);this.stage.addChild(this.worldCueContext.root);
-        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext','occupantContext','backdropContext','foliageContext'])this[key].label=key;this.presentation=new NativePresentation(this);
+        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={heat:this.nightHeat.report(),};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext','occupantContext','backdropContext','foliageContext'])this[key].label=key;this.presentation=new NativePresentation(this);
     },
     clearWorld(){
         if(!this.nativeBuildings)return;
         this.surfaces.clear();
         if(this.playerSprite)this.objects.addChild(this.playerSprite);for(const r of this.fixtureNodes.values())this.fixtures.addChild(r.node);
-        this.presentation.clear();this.nativeCasters.clear();
+        this.presentation.clear();this.nightHeat.clear();this.nativeCasters.clear();
         for(const [d,r]of this.doorNodes)this.doors.addChild(r.node);for(const r of this.props.values())if(r.group)this.objects.addChild(r.group);
         this.crowdAtlas.clear();this.rainBatch.clear();
         for(const r of this.nativeBuildings.values()){this.clearBuildingGlow(r);r.base.destroy();r.top.destroy();}this.nativeBuildings.clear();
@@ -53,7 +53,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         // A late web font must replace its fallback in retained sign geometry.
         // Release all old label pins before any new sign can enter the cache.
         if(this._fontSeen!==(this.fontRevision||0)){for(const rec of this.nativeBuildings.values()){rec.key=rec.glowKey=null;for(const c of [rec.base,rec.top,rec.glowContext,rec.glowLive])c?.releaseText();}this._fontSeen=this.fontRevision||0;}
-        const start=performance.now();let lap=start;const timings={};this.nativeCasters.begin(game);this.crowdAtlas.begin();this.buildingStats={hits:0,rasterizations:0,rasterMs:0,livePaths:0,fallbacks:0};const L=this.layers,map=game.activeMap;
+        const start=performance.now();let lap=start;const timings={};this.nightHeat.begin(game);this.nativeCasters.begin(game);this.crowdAtlas.begin();this.buildingStats={hits:0,rasterizations:0,rasterMs:0,livePaths:0,fallbacks:0};const L=this.layers,map=game.activeMap;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext,this.occupantContext,this.foliageContext])ctx.canvas=game.canvas;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext,this.occupantContext,this.foliageContext])ctx.sceneFrame=_worldMatrix;
         const vw=game.canvas.width/(2*view.zoom),vh=game.canvas.height/(2*view.zoom);
@@ -147,7 +147,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.rainStats={mode:L.rainQuads?'quads':'paths',...this.rainBatch.stats,drops:L.rainDrops&&rainK>.01?weather.drops.length:0,splashes:L.rainSplashes&&rainK>.01?weather.splashes.length:0,paths:rain.pathsPainted,cpuMs:performance.now()-rainStart};
         // Bound per-map imported bitmap residency to images still referenced by
         // live contexts (ground, authored sprites and fixtures have own owners).
-        this.worldStats={buildingCache:{...this.buildingStats,bytes:this.buildingGlowBytes()},timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
+        this.worldStats={heat:this.nightHeat.report(),buildingCache:{...this.buildingStats,bytes:this.buildingGlowBytes()},timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,
             paths:actors.pathsPainted+traffic.pathsPainted+street.pathsPainted,cpuMs:performance.now()-start};
         this.nativeCasters.trim();this.worldStats.casters=this.nativeCasters.report();
         this.layerStages.worldMs=this.worldStats.cpuMs;

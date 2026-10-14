@@ -45,7 +45,7 @@ Current implementation:
   authored curtains, lamp particles/fades, and apartment glows use GPU geometry
   and cached image assets. Bloom uses the Canvas downscale scales/strengths;
   atmosphere follows the original tint setting.
-- All 83 visual switches remain independent. Fireplace flames, crafting scanline,
+- All 84 visual switches remain independent. Fireplace flames, crafting scanline,
   record sheen, tub ripple, plants and telescope accents follow their authored
   continuous clock through GPU geometry. Static segments remain cached and
   retain their drawing order; Decor animation off freezes their original art.
@@ -670,3 +670,58 @@ text under cache pressure and actual multisample allocation in High quality.
 Separate hostile heat silhouettes, full NV/lightning lighting response and
 Golden Child attached damage orbs remain pending; v14 focuses on night haze,
 sign/edge clarity and texture traffic.
+
+
+## Hostile heat and city cache budgets in v15
+
+Build `native-webgl-heat-cache-v15` adds the independent **Night vision hostile
+heat** switch (84 switches total). Enemy bodies receive a warm white core and
+soft eight-tap halo from resident GPU body alpha. Animated crowd bodies share
+their pose atlas; uncached humanoids and Gunners share a GPU silhouette target.
+Civilian/player bodies, contact shadows and weapon cones do not enter the heat
+mask. The heat lives inside each actor's depth group, so roofs and props still
+occlude it. Reflections reuse the unheated body target. It follows the original
+NV fade, including lighting darkness suppression and the soft-light signal
+boost before the existing color grade. Heat remains available with physical
+NPC shadows disabled. No NV means no heat capture or mesh work.
+
+Heat is bounded to 24 meshes per frame and shares the existing 16 procedural
+capture limit; while NV is active, ordinary shadow captures stop at 12 to reserve
+room for hostiles. The report exposes `heat` and per-frame `world.heat`, including
+strength, bodies, forced captures and dropped work. Crowds beyond the capture
+budget can temporarily lack heat; this is visible in the counters.
+
+Crowd appearance atlases no longer paint all 17 poses when a new appearance
+arrives. One shared worker paints only requested idle/walk poses, at most two
+per frame with a 2ms soft CPU target (one pose may itself exceed that target).
+Only ready poses are sampled; while warming, animation holds/interpolates
+available poses. The full 16-phase walk interpolation becomes available as
+poses are encountered. Simulation gait state is untouched. Storage remains
+2380×140 RGBA, about 1.33MB per appearance: this reduces construction bursts,
+not atlas allocation size. `world.crowd` adds `posesRasterized`, `poseMs`,
+`deferredPoses` and `partialBodies`; texture traffic labels these allocations
+`crowd-pose-atlas`.
+
+Daylight shadows separate buildings/foliage into a static GPU mask and composite
+moving cars over it. A 128px border permits camera scrolling within a 64px cell
+without retessellating static casters. Projected sun vectors are quantized to
+1/512 world units per height unit; shadow strength remains continuous. Geometry,
+zoom, cache-cell or quantized-direction changes rebuild the static mask. Fire
+still erases the combined mask. `surfaces.sun` adds `staticRebuilds`, `staticHits`,
+`dynamicRebuilds`, `staticCasters` and `movingCasters`. The two targets use about
+1.12MB at the 880×411 fixture, an intentional memory tradeoff for less CPU work.
+
+`tools/test-native-webgl-heat-cache-browser.cjs` and
+[recorded evidence](native-webgl-heat-cache-checks.json) check hostile-only heat,
+GPU-only capture, roofs, fades, independent toggles, zero warmed uploads/bakes,
+unchanged actor state, pose budgets and context recovery. Moving the test car
+eight times produces eight composite rebuilds and zero static rebuilds; camera
+scroll reuse matches a forced rebuild exactly. Isolated NV lighting charts at
+strength 0, .5 and 1 differ from Canvas by at most 1/255 per channel.
+[Heat screenshot](native-webgl-heat.png) shows the fixture with NV enabled.
+City/save travel, crowd, surface, shadow/depth/veranda and color-grade checks
+also cover this pass. Tests use Chromium/SwiftShader, not the phone GPU.
+
+Lightning lighting response and Golden Child attached damage orbs remain
+pending, alongside previously documented fine blur/dash and optical/reflection
+approximations. NV heat and NV lighting response are now implemented.

@@ -38,8 +38,8 @@ they do not choose another rendering backend.
 
 ## Animated characters and shape shadows
 
-The build identifier is `native-webgl-nightglow-v14`. **Canvas look** enables
-all 83 switches. **Lighting + shadows** also enables continuous character
+The build identifier is `native-webgl-heat-cache-v15`. **Canvas look** enables
+all 84 switches. **Lighting + shadows** also enables continuous character
 animation, silhouette shadows, high shadow detail and curtains.
 
 For a controlled moving test, use the same route, view, zoom, resolution and FPS
@@ -485,3 +485,27 @@ look** and **Standard** texture quality. Record 20 seconds standing still, then
 from the same spot isolates the edge/text quality comparison. The origin/byte
 breakdown will show whether roaming costs come from new artwork or target
 storage. [Implementation and test evidence](native-webgl-fork.md#cozy-cafe-night-haze-and-upload-attribution-in-v14).
+
+
+## Heat and cache tests in v15
+
+**Night vision hostile heat** is the 84th switch. Enable night vision near an
+enemy, then toggle this layer: the hostile body glow should disappear while the
+night-vision color grade remains. Civilians should remain unheated. Try this
+with NPC shadows off too. The heat uses GPU body silhouettes and follows body
+animation, roof/prop ordering and NV fades.
+
+For a performance comparison with the v14 stationary capture, stand outside
+Cozy Cafe with bloom off and match the same time, weather, resolution, texture
+quality and reflection quality. Keep NV off for this comparison. Record 20s,
+then repeat the same roaming route. Finally record NV on near hostiles, with
+heat on and off under otherwise identical settings.
+
+The new crowd pose counters show construction spread over frames rather than
+17 poses painted at arrival; atlas storage allocations still occur. New
+`surfaces.sun.staticRebuilds/staticHits/dynamicRebuilds` distinguish rebuilding
+buildings/foliage from recompositing cars. `heat`/`world.heat` report bodies,
+forced captures and dropped work. These are device tests; desktop SwiftShader
+checks establish correctness, not A53 frame-rate gains.
+
+[Implementation, budgets and automated evidence](native-webgl-fork.md#hostile-heat-and-city-cache-budgets-in-v15).

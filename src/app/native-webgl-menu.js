@@ -21,6 +21,11 @@
     }
     const liveHumanoid=drawProceduralHumanoid;
     drawProceduralHumanoid=(ctx,e,c={})=>{if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&!ctx.owner.layers.contactShadows)c={...c,noShadow:true};return inBodyGroup(ctx,e,()=>{if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.nativeCasters.capture(ctx,e,c,liveHumanoid))return;const result=liveHumanoid(ctx,e,c);if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&e)ctx.owner.nativeCasters.circle(e,ctx.globalAlpha);return result;});};
+    const gunnerBody=GatlingGunner.prototype._drawGunnerBody;
+    GatlingGunner.prototype._drawGunnerBody=function(ctx){
+        if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.nightHeat.wants(this)&&ctx.owner.nativeCasters.capture(ctx,this,{noShadow:true},(c,e)=>gunnerBody.call(e,c)))return;
+        return gunnerBody.call(this,ctx);
+    };
     // Source-city helpers must see the miniature city's viewport during baking.
     const cityViewer=CityView.prototype._asViewer;
     CityView.prototype._asViewer=function(paint){const saved=game._cullBounds;
@@ -84,7 +89,7 @@
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v14-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v15-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;

@@ -120,7 +120,8 @@ class NativeWetReflections{
             if(m.kind==='car'){const c=this.detail,car=m.e;c.save();c.globalAlpha=.58*(car.fade??1);c.translate(0,car.y+(car.width||20)*.55);c.scale(1,-.8);c.translate(car.x,-(car.width||20)*.55);c.rotate(-(car.angle||0));c.scale(1,-1);
                 const art=carSprite(car),P=CAR_ART.PAD;c.drawImage(art.cv,-art.L/2-P,-art.W/2-P,art.L+P*2,art.W+P*2);c.restore();this.stats.detail++;continue;}
             const group=groups.get(m.e),body=r.nativeCasters.bodies.get(m.e),crowd=group?.children.find(n=>n instanceof NativeCrowdPoseMesh&&n.visible);
-            let texture=m.e===game.player?r.actorTexture:body?.texture,frames=body?.frames,blend=body?.blend||0,size=body?.size||192,angle=body?.angle??m.e.angle??0;
+            const captured=r.nativeCasters.entries.get(m.e),fresh=captured?.used===r.frameId?captured.target:null;
+            let texture=m.e===game.player?r.actorTexture:body?.texture||fresh,frames=body?.frames,blend=body?.blend||0,size=body?.size||192,angle=body?.angle??m.e.angle??0;
             if(crowd){texture=crowd.shader.uniforms.atlas;frames=[...crowd.shader.uniforms.frames];blend=crowd.shader.uniforms.blend;size=112;crowd.transform.updateLocalTransform();angle=Math.atan2(crowd.transform.localTransform.b,crowd.transform.localTransform.a);}
             if(!texture&&group){let rec=this.captures.get(m.e);if(!rec&&this.captures.size<16){rec={target:PIXI.RenderTexture.create({width:192,height:192,resolution:1}),last:-Infinity};this.captures.set(m.e,rec);}
                 if(rec){rec.used=r.frameId;if(_frameTime-rec.last>=45&&this.stats.bodyCaptures<6){const transform=new PIXI.Matrix().append(new PIXI.Matrix(1,0,0,1,96,96)).append(new PIXI.Matrix(Math.cos(angle),-Math.sin(angle),Math.sin(angle),Math.cos(angle),0,0)).append(new PIXI.Matrix(1,0,0,1,-m.e.x,-m.e.y));

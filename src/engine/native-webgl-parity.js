@@ -27,20 +27,23 @@ class NativeCasterBodies {
     }
     nearLight(e){return this.lights.some(l=>Math.hypot(l.x-e.x,l.y-e.y)<(l.lightRadius||l.radius||Math.hypot(l.w||0,l.h||0)/2||200));}
     capture(ctx,e,c,draw){
-        if(!this.owner.layers.lighting||_zoomLOD>=2||!this.owner.layers.npcShadows||!this.owner.layers.shapeShadows||e._reflectionProxy||e.inCar||e.dead||!this.nearLight(e)||this.captures>=16)return false;
+        const heat=this.owner.nightHeat.wants(e),shadow=this.owner.layers.lighting&&_zoomLOD<2&&this.owner.layers.npcShadows&&this.owner.layers.shapeShadows&&this.nearLight(e);
+        if((!heat&&!shadow)||e._reflectionProxy||e.inCar||e.dead)return false;
+        if(this.captures>=(heat||!this.owner.nightHeat.stats.active?16:12)){if(heat)this.owner.nightHeat.stats.dropped++;return false;}
         let r=this.entries.get(e);
         if(!r){
-            if(this.entries.size>=32){const old=[...this.entries].find(([,v])=>v.used<this.owner.frameId-2);if(!old)return false;this.dispose(old[1]);this.entries.delete(old[0]);}
-            r={ctx:new NativeVectorContext(this.owner),target:PIXI.RenderTexture.create({width:192,height:192,resolution:1,scaleMode:PIXI.SCALE_MODES.LINEAR}),hash:null,revision:0};this.entries.set(e,r);
+            if(this.entries.size>=32){const old=[...this.entries].find(([,v])=>v.used<this.owner.frameId-2);if(!old){if(heat)this.owner.nightHeat.stats.dropped++;return false;}this.dispose(old[1]);this.entries.delete(old[0]);}
+            r={ctx:new NativeVectorContext(this.owner),target:this.owner.target(PIXI.RenderTexture.create({width:192,height:192,resolution:1,scaleMode:PIXI.SCALE_MODES.LINEAR}),'body-silhouette-target'),hash:null,revision:0};this.entries.set(e,r);
         }
-        this.captures++;r.used=this.owner.frameId;r.ctx.begin();r.ctx.canvas=ctx.canvas;r.ctx.translate(96,96);
+        this.captures++;if(heat&&!shadow)this.owner.nightHeat.stats.forcedCaptures++;r.used=this.owner.frameId;r.ctx.begin();r.ctx.canvas=ctx.canvas;r.ctx.translate(96,96);
         const m=ctx.matrix;r.ctx.worldFrame=_worldMatrix.multiply(new DOMMatrix([m.a,m.b,m.c,m.d,m.tx,m.ty]));
         if(this.owner.layers.contactShadows&&!c.noShadow&&_zoomLOD<2){const t=ctx.getTransform();_bodyRot=Math.atan2(t.b,t.a);drawHumanContactShadow(ctx,e);}
         draw(r.ctx,e,{...c,noShadow:true,_crowdBake:true});
         if(r.hash!==r.ctx.hash){this.owner.renderer.render(r.ctx.root,{renderTexture:r.target,clear:true});r.hash=r.ctx.hash;r.revision++;this.stats.refreshes++;}
         ctx.current=null;const sprite=ctx.node(PIXI.Sprite);sprite.texture=r.target;sprite.alpha=ctx.globalAlpha;sprite.blendMode=ctx.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
         sprite.transform.setFromMatrix(ctx.matrix.clone().append(new PIXI.Matrix(1,0,0,1,-96,-96)));ctx.current=null;
-        this.note(ctx,e,{texture:r.target,size:192,bounds:r.ctx.root.getLocalBounds(),key:r.target.baseTexture.uid+':'+r.revision});this.stats.shared--;this.stats.captures++;
+        this.owner.nightHeat.paint(ctx,e,{texture:r.target,size:192});
+        const sharedBefore=this.stats.shared;this.note(ctx,e,{texture:r.target,size:192,bounds:r.ctx.root.getLocalBounds(),key:r.target.baseTexture.uid+':'+r.revision});this.stats.shared=sharedBefore;this.stats.captures++;
         return true;
     }
     circle(e,opacity=1){

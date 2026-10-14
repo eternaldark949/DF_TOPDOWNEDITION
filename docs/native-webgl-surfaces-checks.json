@@ -81,7 +81,7 @@
       "foliage": 0,
       "liveBuildings": 0,
       "bytes": 1450240,
-      "cpuMs": 102
+      "cpuMs": 32.400000005960464
     },
     "floor": 140,
     "rug": 0,
@@ -118,9 +118,14 @@
       },
       "sun": {
         "active": true,
-        "casters": 55,
+        "casters": 60,
         "rebuilds": 0,
-        "bytes": 362560
+        "staticRebuilds": 0,
+        "staticHits": 1,
+        "dynamicRebuilds": 0,
+        "staticCasters": 60,
+        "movingCasters": 0,
+        "bytes": 1121408
       },
       "reflections": {
         "active": true,
@@ -138,9 +143,9 @@
         "foliage": 9,
         "liveBuildings": 0,
         "bytes": 1087680,
-        "cpuMs": 2.4000000059604645
+        "cpuMs": 0.7000000029802322
       },
-      "cpuMs": 2.800000011920929
+      "cpuMs": 1.1000000089406967
     },
     "wet": {
       "pads": 0,
@@ -163,7 +168,12 @@
         "active": false,
         "casters": 0,
         "rebuilds": 0,
-        "bytes": 362560
+        "staticRebuilds": 0,
+        "staticHits": 0,
+        "dynamicRebuilds": 0,
+        "staticCasters": 0,
+        "movingCasters": 0,
+        "bytes": 0
       },
       "reflections": {
         "active": true,
@@ -181,29 +191,29 @@
         "foliage": 9,
         "liveBuildings": 1,
         "bytes": 1450240,
-        "cpuMs": 5.4000000059604645
+        "cpuMs": 1.7999999970197678
       },
-      "cpuMs": 5.5
+      "cpuMs": 2
     },
-    "sunPixels": 6599,
+    "sunPixels": 6694,
     "roofPixels": 4096,
     "roofBatchable": true,
     "roofOff": true,
     "uploads": 0,
     "bakes": 0,
     "same": true,
-    "layers": 83
+    "layers": 84
   },
   "controls": {
     "changed": 12,
-    "total": 83,
-    "build": "native-webgl-nightglow-v14"
+    "total": 84,
+    "build": "native-webgl-heat-cache-v15"
   },
   "recovery": {
     "lost": false,
     "active": true,
     "maskPixels": 40178,
-    "sunPixels": 6599,
+    "sunPixels": 6694,
     "roofPixels": 4096
   }
 }
