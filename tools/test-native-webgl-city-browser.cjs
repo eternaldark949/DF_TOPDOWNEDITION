@@ -20,7 +20,7 @@ const {chromium}=require('playwright');
   for(let i=0;i<30;i++){_frameTime+=17;game.update();game.draw();}const on={...r.rainStats},drops=w.drops,splashes=w.splashes;
   r.setLayers({rainDrops:false,rainSplashes:false});game.draw();const off={...r.rainStats};r.setLayers({rainDrops:true,rainSplashes:true});game.draw();
   return {on,off,restored:w.drops===drops&&w.splashes===splashes};
- });assert.ok(rain.on.drops>0&&rain.on.paths>0);assert.equal(rain.off.paths,0);assert.ok(rain.restored);
+ });assert.ok(rain.on.drops>0&&(rain.on.paths>0||rain.on.dropQuads>0));assert.equal(rain.off.paths,0);assert.ok(rain.restored);
  const save=await page.evaluate(()=>{game.player.x=game.activeMap.spawn.x;game.player.y=game.activeMap.spawn.y;game.currency=12345;game.scrap=678;const save=game.getSaveSchema();game.currency=1;game.scrap=0;window.localStorage.setItem('dfab_save_slot_0','canvas-original');return {game:'DFAB',slots:{0:save},activeSlot:0};});
  await page.locator('#btn-native-saves').evaluate(el=>el.click());
 

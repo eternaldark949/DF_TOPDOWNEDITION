@@ -53,7 +53,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             r.sprite.position.set(x,y);r.sprite.rotation=p.angle||0;r.sprite.visible=this.layers.furniture&&p.visible!==false;
             if(r.liveContext){r.liveContext.root.position.set(x,y);r.liveContext.root.rotation=p.angle||0;}
         }
-        this.objects.setChildIndex(this.playerSprite,this.objects.children.length-1);
+        this.objects.addChild(this.playerSprite);
     },
     syncDecor(game,view){
         const start=performance.now();let count=0,paths=0;

@@ -38,8 +38,8 @@ they do not choose another rendering backend.
 
 ## Animated characters and shape shadows
 
-The build identifier is `native-webgl-buildings-v7`. **Canvas look** enables
-all 45 switches. **Lighting + shadows** also enables continuous character
+The build identifier is `native-webgl-rain-v8`. **Canvas look** enables
+all 47 switches. **Lighting + shadows** also enables continuous character
 animation, silhouette shadows, high shadow detail and curtains.
 
 For a controlled moving test, use the same route, view, zoom, resolution and FPS
@@ -221,3 +221,38 @@ asset creation or first image imports (including building-base/top/emissive/live
 and other world contexts). Do not infer CPU Canvas repainting from imports alone.
 See `native-webgl-building-checks.json` for fixed-viewport composition and cache
 lifetime checks.
+
+## GPU rain and city depth in v8
+
+Canvas look now enables all 47 switches. **GPU rain quads** replaces rain's
+CPU-tessellated paths with two resident indexed meshes: one for drops and one
+for splashes. Fragment shaders draw soft round streaks, bright cores, colored
+lamp highlights, expanding rings and splash dots. Weather simulation, wind,
+height parallax, interpolation and indoor outdoor-room clipping remain live.
+Turn this switch off to compare the preceding native path renderer; both modes
+present through WebGL. Drop and splash switches remain independent.
+
+Profiles expose `rain.mode`, visible `dropQuads` / `splashQuads`, and packed
+`vertexBytes` alongside simulation counts and CPU time. Quad mode has zero
+rain paths; this means the shader replaced them, not that rain is missing.
+Resident buffers grow as needed, with a 16,384-quad limit per mesh. The weather
+simulation's normal particle budget is much smaller. No per-frame rain bitmap
+is painted or uploaded.
+
+**City depth sorting** groups each live person’s paths and cached body, then
+orders people, the player and lamp fixtures by world Y. Lamp particles stay
+with their fixture. Switching it off restores the preceding broad pass order.
+This addresses city lamp/body overlaps; vehicles, furniture, roof cutaways and
+indoor fixture ordering still use their existing passes and need a later pass.
+
+The controlled Chromium fixture in [rain evidence](native-webgl-rain-checks.json)
+checks visible shader output, geometry reduction, unchanged simulation arrays,
+front/behind ordering, fixture hiding, comparison controls and GPU recovery.
+It cut whole-scene geometry-buffer traffic by approximately 80% in the sampled
+stationary scene, with zero warmed bitmap uploads/bakes. Desktop SwiftShader
+timing is not a phone FPS prediction.
+
+On the A53, record the same rainy city view with both caches enabled and only
+GPU rain quads changed. Keep quality and population steady. Then walk past
+lamps with City depth sorting on and off. Window droplets and wet reflections
+are the next separate effects; NPC silhouette casts remain outstanding.

@@ -10,11 +10,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.roofStage=new PIXI.Container();this.world.addChild(this.roofStage);this.roofDetailContext=new NativeVectorContext(this);this.roofStage.addChild(this.roofDetailContext.root);
         this.cityGlowContext=new NativeVectorContext(this);this.emissive.addChild(this.cityGlowContext.root);
         this.worldCueContext=new NativeVectorContext(this);this.stage.addChild(this.worldCueContext.root);
-        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext'])this[key].label=key;
+        this.rainContext=new NativeVectorContext(this);this.stage.addChild(this.rainContext.root);this.rainBatch=new NativeRainBatch();this.emptyRain=[];this.nativeBuildings=new Map();this.crowdAtlas=new NativeCrowdAtlas(this);this.worldStats={};for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','roofDetailContext','rainContext'])this[key].label=key;
     },
     clearWorld(){
         if(!this.nativeBuildings)return;
-        this.crowdAtlas.clear();
+        if(this.playerSprite)this.objects.addChild(this.playerSprite);for(const r of this.fixtureNodes.values())this.fixtures.addChild(r.node);
+        this.crowdAtlas.clear();this.rainBatch.clear();
         for(const r of this.nativeBuildings.values()){this.clearBuildingGlow(r);r.base.destroy();r.top.destroy();}this.nativeBuildings.clear();
         for(const key of ['groundContext','peopleContext','trafficContext','streetContext','cityGlowContext','worldCueContext','rainContext','roofDetailContext'])this[key].destroy();
         this.roofStage.destroy();this.buildingBaseStage.destroy();this.nativeBuildings=null;
@@ -60,6 +61,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 game.drawCorpses(actors,bounds);game.scenes?.drawActors(actors);
             }finally{GameSettings.crowdQuality=crowd;}
         }
+        actors.root.sortableChildren=!!(L.depthSort&&map.type==='outdoor');
+        for(const r of this.fixtureNodes.values()){
+            const parent=actors.root.sortableChildren&&L.fixtures?actors.root:this.fixtures;
+            parent.addChild(r.node);
+        }
+        if(actors.root.sortableChildren){this.playerSprite.zIndex=game.player.y;actors.root.addChild(this.playerSprite);actors.root.sortChildren();}
         timings.peopleMs=performance.now()-lap;lap=performance.now();
         const glow=this.cityGlowContext;glow.begin();const keep=new Set();
         const topBounds={left:view.x-vw,right:view.x+vw,top:view.y-vh,bottom:view.y+vh};
@@ -90,7 +97,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         // Markers include door destinations, pickups and mission navigation.
         const cues=this.worldCueContext;cues.begin();if(L.worldMarkers)game.drawMarkers(cues);
         timings.markersMs=performance.now()-lap;
-        const rainStart=performance.now(),rain=this.rainContext;rain.begin();const weather=game.weather;
+        const rainStart=performance.now(),rain=this.rainContext;rain.begin();const weather=game.weather;this.rainBatch.begin();
         const rainK=map.type==='outdoor'?1:game.roomSystem.active?game.roomSystem.outdoorness:0;
         if((L.rainDrops||L.rainSplashes)&&rainK>.01&&weather.isRaining){
             rain.globalAlpha=rainK;
@@ -99,12 +106,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 for(const room of Object.values(game.roomSystem.rooms))if(room.type==='outdoor')for(const q of room.rects)rain.rect(q.x,q.y,q.w,q.h);
                 rain.clip();rain.resetTransform();
             }
-            const drops=weather.drops,splashes=weather.splashes;
+            if(L.rainQuads)this.rainBatch.draw(rain,game,view);else {const drops=weather.drops,splashes=weather.splashes;
             try{if(!L.rainDrops)weather.drops=this.emptyRain;if(!L.rainSplashes)weather.splashes=this.emptyRain;
                 weather.drawRainOverlay(rain,view,game.lamps);
-            }finally{weather.drops=drops;weather.splashes=splashes;}
+            }finally{weather.drops=drops;weather.splashes=splashes;}}
         }
-        this.rainStats={drops:L.rainDrops&&rainK>.01?weather.drops.length:0,splashes:L.rainSplashes&&rainK>.01?weather.splashes.length:0,paths:rain.pathsPainted,cpuMs:performance.now()-rainStart};
+        this.rainStats={mode:L.rainQuads?'quads':'paths',...this.rainBatch.stats,drops:L.rainDrops&&rainK>.01?weather.drops.length:0,splashes:L.rainSplashes&&rainK>.01?weather.splashes.length:0,paths:rain.pathsPainted,cpuMs:performance.now()-rainStart};
         // Bound per-map imported bitmap residency to images still referenced by
         // live contexts (ground, authored sprites and fixtures have own owners).
         this.worldStats={buildingCache:{...this.buildingStats,bytes:this.buildingGlowBytes()},timings,crowd:{...this.crowdAtlas.stats,entries:this.crowdAtlas.entries.size,bytes:this.crowdAtlas.bytes},buildings,people,vehicles,groundPending:game.groundBaker?.stats?.flat||0,groundTiles:game.groundBaker?.cache.size||0,

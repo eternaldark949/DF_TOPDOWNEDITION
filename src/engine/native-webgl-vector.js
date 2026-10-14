@@ -43,10 +43,16 @@ class NativeVectorContext {
         Object.assign(this,{fillStyle:'#000',strokeStyle:'#000',globalAlpha:1,globalCompositeOperation:'source-over',lineWidth:1,lineCap:'butt',lineJoin:'miter',shadowBlur:0,shadowColor:'transparent',font:'11px sans-serif',textAlign:'start',textBaseline:'alphabetic'});
         this.beginPath();this.pathsPainted=0;
     }
+    withDepth(entity,draw){
+        const parent=this.container;this.current=null;
+        const group=this.node(PIXI.Container);group.zIndex=entity.y||0;group._nativeEntity=entity;group.sortableChildren=false;
+        this.container=group;
+        try{return draw();}finally{this.container=parent;this.current=null;}
+    }
     destroy(){for(const n of this.pool)n.mask=null;for(const n of this.pool){if(n.parent)n.parent.removeChild(n);n.destroy();}this.root.destroy();for(const r of this.gradients){r.stage.destroy({children:true});r.texture.destroy(true);}this.gradients=[];this.pool=[];this.pools.clear();for(const t of this.images.values())this.owner.releaseImage(t);this.images.clear();for(const t of this.imageViews.values())t.destroy(false);this.imageViews.clear();}
     node(Type){let list=this.pools.get(Type);if(!list){list=[];list.used=0;this.pools.set(Type,list);}
         let n=list[list.used];if(!n){n=(Type===PIXI.BitmapText?new PIXI.BitmapText('',{fontName:'NativeDetailFont'}):new Type());list.push(n);this.pool.push(n);}list.used++;
-        n.visible=true;n.mask=null;this.container.addChild(n);if(n instanceof PIXI.Graphics)n.clear();else if(Type===PIXI.Container)n.removeChildren();return n;
+        n.visible=true;n.mask=null;this.container.addChild(n);if(n instanceof PIXI.Graphics)n.clear();else if(Type===PIXI.Container){n.removeChildren();n.zIndex=0;n._nativeEntity=null;}return n;
     }
     hashValue(v){if(typeof v==='number'){this.hash=Math.imul(this.hash^Math.round(v*1024),16777619);return;}
         const text=String(v);for(let i=0;i<text.length;i++)this.hash=Math.imul(this.hash^text.charCodeAt(i),16777619);

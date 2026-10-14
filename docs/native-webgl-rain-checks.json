@@ -1,0 +1,59 @@
+{
+  "passed": true,
+  "environment": "Desktop Chromium SwiftShader; workload comparison, not phone FPS",
+  "recovery": {
+    "lost": false,
+    "rain": {
+      "mode": "quads",
+      "dropQuads": 292,
+      "splashQuads": 141,
+      "vertexBytes": 96992,
+      "drops": 865,
+      "splashes": 515,
+      "paths": 0,
+      "cpuMs": 0.4000000059604645
+    },
+    "sorted": true
+  },
+  "paths": {
+    "mode": "paths",
+    "quads": 0,
+    "paths": 109,
+    "bufferMean": 1921716,
+    "drawMean": 88,
+    "rainMean": 3.136666666716337,
+    "bakes": 0,
+    "uploads": 0
+  },
+  "quads": {
+    "mode": "quads",
+    "quads": 600,
+    "paths": 0,
+    "bufferMean": 375276,
+    "drawMean": 89,
+    "rainMean": 1.823333332935969,
+    "bakes": 0,
+    "uploads": 0
+  },
+  "quadPixels": {
+    "alpha": 172506,
+    "pixels": 4855
+  },
+  "pathPixels": {
+    "alpha": 168728,
+    "pixels": 2699
+  },
+  "behind": {
+    "person": 0,
+    "lamp": 1,
+    "player": 3
+  },
+  "front": {
+    "person": 3,
+    "lamp": 0,
+    "player": 2
+  },
+  "legacy": true,
+  "hidden": true,
+  "simulationUnchanged": true
+}

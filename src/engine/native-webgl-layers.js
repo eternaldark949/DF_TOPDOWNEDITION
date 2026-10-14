@@ -3,7 +3,7 @@
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache'};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes',crowdSprites:'GPU crowd animation cache',buildingCache:'GPU building glow cache',rainQuads:'GPU rain quads',depthSort:'City depth sorting'};
 const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
@@ -60,6 +60,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         for(const c of [this.backdrop,this.floorArt,this.windows,this.doors,this.fixtures,this.contacts,this.veil,this.emissive]){
             for(const child of c.removeChildren())child.destroy({children:true});
         }
+        for(const r of this.fixtureNodes.values())if(!r.node.destroyed)r.node.destroy({children:true});
         this.contactSprites.clear();this.roomSprites.clear();this.doorNodes.clear();this.fixtureNodes.clear();this.fixtureAssets.clear();this.areaCookies.clear();
     },
     shadowBytes(){let bytes=0;for(const r of this.shadowCache.values())for(const t of [r.texture,r.dynamicTexture].filter(Boolean))bytes+=t.baseTexture.realWidth*t.baseTexture.realHeight*4;return bytes;},
@@ -269,12 +270,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
         }
     },
     syncFixtures(game){
-        const day=game.dayCycle(),v=game.view,particles=this.fixtureContext;particles.begin();const dots=particles.node(PIXI.Graphics);
+        const day=game.dayCycle(),v=game.view,particles=this.fixtureContext;particles.begin();
         const live=new Set(game.lamps||[]);
-        for(const [lamp,r]of this.fixtureNodes)if(!live.has(lamp)){r.off.destroy();r.on.destroy();this.fixtureNodes.delete(lamp);}
+        for(const [lamp,r]of this.fixtureNodes)if(!live.has(lamp)){r.node.destroy({children:true});this.fixtureNodes.delete(lamp);}
         for(const lamp of live){
             const inView=lamp.visible!==false&&Math.abs(lamp.x-v.x)<=game.canvas.width/(2*v.zoom)+160&&Math.abs(lamp.y-v.y)<=game.canvas.height/(2*v.zoom)+160;
-            let r=this.fixtureNodes.get(lamp);if(!inView){if(r)r.off.visible=r.on.visible=false;continue;}
+            let r=this.fixtureNodes.get(lamp);if(!inView){if(r)r.node.visible=false;continue;}
             const key=lamp.lampType+':'+lamp.color;let assets=this.fixtureAssets.get(key);
             if(!assets){assets=[];
                 for(const on of [false,true])assets.push(this.bake(192,192,c=>{
@@ -282,7 +283,8 @@ Object.assign(NativeWebGLRenderer.prototype,{
                     try{lamp.angle=0;lamp._lightK=1;lamp._forcedOff=false;lamp.visible=true;_zoomLOD=1;c.translate(96-lamp.x,96-lamp.y);lamp.draw(c,on?0:1);}
                     finally{lamp.angle=saved.angle;lamp._lightK=saved.k;lamp._forcedOff=saved.forced;lamp.visible=saved.visible;_zoomLOD=saved.lod;}
                 },'fixture'));this.fixtureAssets.set(key,assets);}
-            if(!r){r={off:new PIXI.Sprite(),on:new PIXI.Sprite()};for(const s of [r.off,r.on]){s.anchor.set(.5);this.fixtures.addChild(s);}this.fixtureNodes.set(lamp,r);}
+            if(!r){r={node:new PIXI.Container(),off:new PIXI.Sprite(),on:new PIXI.Sprite(),particles:new PIXI.Graphics()};for(const s of [r.off,r.on]){s.anchor.set(.5);r.node.addChild(s);}r.node.addChild(r.particles);this.fixtures.addChild(r.node);this.fixtureNodes.set(lamp,r);}
+            r.node.visible=true;r.node.zIndex=lamp.y;r.particles.clear();const dots=r.particles;
             lamp._lightK=game.roomSystem.lampLight(lamp)*lampFlicker(lamp);lamp._forcedOff=lamp._lightK<.02;
             const room=game.roomSystem.rooms[lamp._roomId],on=!lamp._forcedOff&&(room?.type!=='outdoor'||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
             r.off.texture=assets[0];r.on.texture=assets[1];r.off.visible=k<1;r.on.visible=k>0;r.on.alpha=k;

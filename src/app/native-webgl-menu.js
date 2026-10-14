@@ -3,6 +3,15 @@
     const renderer=game.nativeRenderer;
     const liveCrowd=drawCrowdHumanoid;
     drawCrowdHumanoid=(ctx,e,c)=>{if(ctx.nativeVector&&ctx.owner.layers.crowdSprites&&ctx.owner.crowdAtlas?.draw(ctx,e,c))return;return liveCrowd(ctx,e,c);};
+    // Keep a body's paths and atlas mesh together before sorting by its feet.
+    for(const Type of [NPC,Pedestrian,Ganger,GatlingGunner,Drone,VelvetCat,SceneActor]){
+        const draw=Type.prototype.draw;if(!draw)continue;
+        Type.prototype.draw=function(ctx,...args){
+            if(ctx.nativeVector&&ctx===ctx.owner.peopleContext&&ctx.owner.layers.depthSort&&game.activeMap.type==='outdoor')
+                return ctx.withDepth(this,()=>draw.call(this,ctx,...args));
+            return draw.call(this,ctx,...args);
+        };
+    }
     const menu=document.getElementById('main-menu-list');
     const start=document.createElement('button');start.id='btn-native-apartment';start.textContent='PLAY WEBGL APARTMENT';
     start.style.cssText='padding:16px;margin:12px;color:#fff;background:#402060;border:1px solid #b78af8;font:inherit;cursor:pointer';
@@ -60,7 +69,7 @@
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v7-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v8-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;
