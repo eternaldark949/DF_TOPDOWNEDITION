@@ -33,6 +33,7 @@
                 game._syncProfiler();
                 const mode = game.showProfiler ? (GameSettings.profilerMode && GameSettings.profilerMode !== 'off' ? GameSettings.profilerMode : 'compact') : 'off';
                 if(mode!=='full' && LightingProfile.enabled)LightingProfile.disable();
+                if(GameSettings.lampShadows!=='gamma')GammaExperiment.stop();
                 if (mode !== 'off') this._ensureProf();
                 if (this._prof) {
                     this._prof.style.display = mode === 'off' ? 'none' : '';
@@ -53,11 +54,13 @@
                 el.innerHTML = '<div class="dp-head"><b class="dp-fps">--</b><span>fps</span><b class="dp-ms">--</b><span>ms</span><canvas class="dp-spark" width="96" height="22"></canvas></div><div class="dp-shadows" aria-label="Shadow renderer status"></div><div class="dp-rows"></div>';
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    if(e.target.closest('[data-gamma-restart]')){GammaExperiment.select(GammaExperiment.mode);this._shadowPanel(game);return;}
                     if(e.target.closest('[data-light-export]')){LightingProfile.download(game);return;}
                     if(e.target.closest('details'))return;
                     GameSettings.profilerMode = GameSettings.profilerMode === 'full' ? 'compact' : 'full';
                     this.sync(game);
                 });
+                el.addEventListener('change',e=>{if(e.target.matches('[data-gamma-case]')){e.stopPropagation();GammaExperiment.select(e.target.value);e.target.blur();this._shadowPanel(game);}});
                 document.body.appendChild(el);
                 this._prof = el; this._spark = el.querySelector('.dp-spark'); this._sctx = this._spark.getContext('2d');
                 this._fpsEl = el.querySelector('.dp-fps'); this._msEl = el.querySelector('.dp-ms'); this._rowsEl = el.querySelector('.dp-rows'); this._shadowEl = el.querySelector('.dp-shadows');
@@ -135,10 +138,21 @@
             },
             _lightingDetails(game) {
                 const p=LightingProfile,f=p.latest;
-                if(!p.enabled||!f||f.frameId!==game._renderDrawId)return '';
+                if(!p.enabled||!f||f.frameId!==game._renderDrawId||f.mode!==GameSettings.lampShadows)return '';
                 const esc=s=>String(s??'unknown').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
                 const ms=n=>Number.isFinite(n)?n.toFixed(2):'—',mb=n=>(n/1048576).toFixed(2);
-                let html='<details class="dp-light-detail" open><summary>Lighting diagnostics</summary><button type="button" data-light-export>Save JSON report</button>';
+                let html='<details class="dp-light-detail" open><summary>Lighting diagnostics</summary><button type="button" data-light-export '+(GammaExperiment.current.phase==='starting'?'disabled':'')+'>Save JSON report</button>';
+                if(f.mode==='gamma'){
+                    html+=`<label class="dp-shadow-note">GPU test <select data-gamma-case>${Object.entries(GammaExperiment.modes).map(([value,label])=>`<option value="${value}" ${value===GammaExperiment.mode?'selected':''}>${label}</option>`).join('')}</select></label><button type="button" data-gamma-restart>Restart test</button>`;
+                    const e=f.experiment,starting=GammaExperiment.current.phase==='starting';
+                    html+=`<div class="dp-shadow-note">${starting?'Starting new test':e.phase==='warmup'?`Warm-up ${e.warmupCompleted}/10`:e.phase==='settling'?`Settling ${e.settlingCompleted}/5`:`Recorded ${e.sampledFrames}/60 frames${e.ready?' · ready to export':''}`} · unsaved test; leaving Full restores baseline.</div>`;
+                    if(GammaExperiment.mode.includes('freeze'))html+='<div class="dp-shadow-note">Frozen textures become stale. Keep camera/scene comparable; preparation still runs.</div>';
+                    if(GammaExperiment.mode==='simple-resolve')html+='<div class="dp-shadow-note">Draws only the base darkness texture; uploads and selected blur still run.</div>';
+                    if(GammaExperiment.mode==='overlay')html+='<div class="dp-shadow-note">Direct browser overlay: some glows/Canvas UI are shaded in a different order.</div>';
+                    html+=`<div class="dp-shadow-note">Skipped uploads: masks ${f.gamma?.frozenMasks||0}, layers ${f.gamma?.frozenLayers||0} · missing frozen sprites ${f.gamma?.missingFrozenSprites||0}</div>`;
+                }
+                const cadence=p.cadenceSummary();
+                html+=`<div class="dp-total"><span>Actual frame cadence</span><b>${ms(cadence.fps)} FPS</b></div><div class="dp-shadow-note">${cadence.intervals} intervals · mean ${ms(cadence.meanMs)} ms · p95 ${ms(cadence.p95Ms)} · peak ${ms(cadence.peakMs)}<br>Pauses &gt;250 ms: ${cadence.pausesOver250ms} · &gt;1 s: ${cadence.pausesOver1000ms}<br>Last render ${ms(f.cadence.renderMs)} ms · between renders ${ms(f.cadence.gapMs)} ms (includes logic/browser waits)</div>`;
                 if(f.mode==='gamma' && p.deviceInfo)html+=`<div class="dp-light-device">${esc(p.deviceInfo.renderer)}<br>${esc(p.deviceInfo.vendor)} · ${esc(p.deviceInfo.version)}</div>`;
                 html+=`<div class="dp-shadow-note">Layer ${f.layer.join(' × ')} · scene ${f.scene.join(' × ')} · DPR ${window.devicePixelRatio||1}<br>Lighting scale ${f.lightingScale} · adaptive ${f.adaptiveFactor} · soft ${f.soft?'on':'off'}<br>Uploads: masks ${mb(f.bytes.mask)} MiB + layers ${mb(f.bytes.layers)} MiB/frame<br>Atlas ${f.atlasResident}/${f.atlasSlots} slots · ${mb(f.atlasBytes)} MiB · GPU textures ≈ ${mb(f.gpuTextureBytes)} MiB · new ${f.churn.new}, changed ${f.churn.changed}, evicted ${f.churn.evicted}<br>Shadow cache ${mb(f.maskCacheBytes)} MiB · builds ${f.shadows.builds}, hits ${f.shadows.hits}, captures ${f.shadows.captures}<br>Casters ${f.shadows.casters} · sources ${f.shadows.sources} · pairs ${f.shadows.pairs} · blocked ${f.shadows.blocked} · rays ${f.shadows.rays} · dropped ${f.shadows.dropped}</div>`;
                 if(f.gamma?.failure)html+=`<div class="dp-shadow-note">Failure: ${esc(f.gamma.failure)}</div>`;
@@ -153,6 +167,7 @@
             },
             _shadowPanel(game) {
                 if (!this._shadowEl) return;
+                if(document.activeElement?.matches('[data-gamma-case]') && this._shadowEl.contains(document.activeElement))return;
                 const html = this._shadowLine(game);
                 if (html !== this._shadowHTML) {
                     const open=this._shadowEl.querySelector('details')?.open;

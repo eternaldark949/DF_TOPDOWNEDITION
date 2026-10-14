@@ -1,3 +1,29 @@
+        // Explicit, unsaved Full-profiler experiments. Normal rendering is baseline.
+        const GammaExperiment = {
+            modes: {baseline:'Baseline', 'no-blur':'Blur off', 'freeze-all':'Freeze all uploads', 'freeze-masks':'Freeze mask uploads', 'freeze-layers':'Freeze Canvas layer uploads', 'simple-resolve':'Simple fullscreen resolve', overlay:'Separate WebGL overlay'},
+            mode:'baseline',generation:0,warmRemaining:0,samples:0,current:{mode:'baseline',phase:'measurement'},
+            select(mode) {
+                if(!Object.hasOwn(this.modes,mode))return false;
+                this.hideOverlay();this.mode=mode;this.generation++;this.resetWarm();this.current={mode,phase:'starting'};return true;
+            },
+            resetWarm(){this.warmRemaining=10;this.settleRemaining=5;this.samples=0;this.current={mode:this.mode,phase:'warmup',noBlur:this.mode==='no-blur',simple:this.mode==='simple-resolve',overlay:this.mode==='overlay',freezeMasks:false,freezeLayers:false};},
+            stop(){this.hideOverlay();this.mode='baseline';this.signature=null;this.warmRemaining=0;this.settleRemaining=0;this.samples=0;this.current={mode:'baseline',phase:'production'};},
+            begin(game) {
+                if(GameSettings.lampShadows!=='gamma'){this.stop();return;}
+                const signature=[game.activeMap?.id,game.canvas.width,game.canvas.height,game.lightingScale,GameSettings.softShadows].join('|');
+                if(signature!==this.signature){this.signature=signature;this.hideOverlay();this.resetWarm();}
+                const warming=this.warmRemaining>0,m=this.mode;
+                this.current={mode:m,phase:warming?'warmup':this.settleRemaining>0?'settling':'measurement',noBlur:m==='no-blur',freezeMasks:!warming&&(m==='freeze-all'||m==='freeze-masks'),freezeLayers:!warming&&(m==='freeze-all'||m==='freeze-layers'),simple:m==='simple-resolve',overlay:m==='overlay'};
+            },
+            advance(){if(this.warmRemaining>0)this.warmRemaining--;else if(this.settleRemaining>0)this.settleRemaining--;else this.samples=Math.min(60,this.samples+1);return {...this.current,warmupCompleted:10-this.warmRemaining,settlingCompleted:5-(this.settleRemaining||0),sampledFrames:this.samples,ready:this.samples>=60};},
+            hideOverlay(){if(this.overlay){GammaShadows.canvas?.remove();this.overlay.remove();this.overlay=null;GammaShadows.canvas.style.cssText='';}},
+            showOverlay(game,canvas,opacity) {
+                if(!this.overlay){this.overlay=document.createElement('div');this.overlay.id='gamma-diagnostic-overlay';document.body.appendChild(this.overlay);this.overlay.appendChild(canvas);}
+                const r=game.canvas.getBoundingClientRect(),crop=GameSettings.softShadows?1:0,w=Math.max(1,canvas.width-2*crop),h=Math.max(1,canvas.height-2*crop);
+                this.overlay.style.cssText=`position:fixed;pointer-events:none;overflow:hidden;z-index:4;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;opacity:${Math.max(0,Math.min(1,opacity))};`;
+                canvas.style.cssText=`position:absolute;left:${-crop*r.width/w}px;top:${-crop*r.height/h}px;width:${canvas.width*r.width/w}px;height:${canvas.height*r.height/h}px;`;
+            }
+        };
         // Full-profiler diagnostics only. CPU values include browser/driver waits;
         // GPU timer queries are asynchronous, bounded, and never force completion.
         const LightingProfile = {
@@ -16,13 +42,18 @@
             disable() {
                 for(const w of this.wrapped)if(w.object[w.key]===w.wrapped)w.object[w.key]=w.original;
                 this.wrapped.length=0;this.instrumented=false;
+                GammaExperiment.stop();this.previousStart=null;this.previousEnd=null;
                 this.clearQueries();this.enabled=false;this.recording=false;this.history.length=0;this.latest=null;this.gpu={};this.key=null;
             },
             begin(game) {
                 const on=!!(game.showProfiler && GameSettings.profilerMode==='full');
                 if(!on){if(this.enabled)this.disable();return;}
-                const key=[game.activeMap?.id,GameSettings.lampShadows,GameSettings.softShadows,game.canvas.width,game.canvas.height,game.lightingScale].join('|');
-                if(key!==this.key){this.clearQueries();this.history.length=0;this.latest=null;this.gpu={};this.gpuStatus=this.timer?'awaiting sample':'GPU timer unavailable';}
+                GammaExperiment.begin(game);
+                const beginAt=performance.now();
+                const key=[GammaExperiment.mode,GammaExperiment.generation,GammaExperiment.current.phase,game.activeMap?.id,GameSettings.lampShadows,GameSettings.softShadows,game.canvas.width,game.canvas.height,game.lightingScale].join('|');
+                if(key!==this.key){this.clearQueries();this.history.length=0;this.latest=null;this.gpu={};this.gpuStatus=this.timer?'awaiting sample':'GPU timer unavailable';this.previousStart=null;this.previousEnd=null;}
+                this.intervalMs=Number.isFinite(this.previousStart)?beginAt-this.previousStart:null;
+                this.gapMs=Number.isFinite(this.previousEnd)?beginAt-this.previousEnd:null;this.beginAt=beginAt;this.previousStart=beginAt;
                 this.key=key;this.enabled=on;this.recording=true;this.frameId=game._renderDrawId;this.stages={};this.bytes={mask:0,layers:0};this.churn={new:0,changed:0,evicted:0};
                 if(!this.instrumented){
                     this.instrumented=true;
@@ -75,10 +106,12 @@
             finish(game) {
                 if(!this.enabled)return;
                 const g=GammaShadows,s=g.stats,fresh=s.frameId===this.frameId;
-                this.latest={frameId:this.frameId,at:performance.now(),mode:GameSettings.lampShadows,backend:fresh?s.backend:'idle',stages:this.stages,bytes:{...this.bytes},churn:{...this.churn},shadows:{...DynamicShadows.stats},maskCacheBytes:DynamicShadows.bytes,sourceFamilies:{...DynamicShadows._families},
+                const at=performance.now(),experiment=GammaExperiment.advance();
+                this.latest={frameId:this.frameId,at,experiment,cadence:{startAt:this.beginAt,intervalMs:this.intervalMs??null,renderMs:Number.isFinite(this.beginAt)?at-this.beginAt:null,gapMs:this.gapMs??null,loopMs:game._renderFrameMs??null},mode:GameSettings.lampShadows,backend:fresh?s.backend:'idle',stages:this.stages,bytes:{...this.bytes},churn:{...this.churn},shadows:{...DynamicShadows.stats},maskCacheBytes:DynamicShadows.bytes,sourceFamilies:{...DynamicShadows._families},
                     layer:[game.lightCanvas.width,game.lightCanvas.height],scene:[game.canvas.width,game.canvas.height],lightingScale:game.lightingScale,adaptiveFactor:game._adaptiveLighting?.factor||1,soft:GameSettings.softShadows,
                     gamma:fresh?{...s}:null,atlasSlots:g.slots?.length||0,atlasResident:g.slots?.filter(s=>s.cv).length||0,atlasBytes:g.atlasSize*g.atlasHeight*4||0,gpuTextureBytes:(g.atlasSize*g.atlasHeight*4||0)+(g.textureSizes||[]).reduce((n,s)=>{if(typeof s!=='string')return n;const [w,h]=s.split(':').map(Number);return n+(Number.isFinite(w*h)?w*h*4:0);},0)};
-                this.history.push(this.latest);if(this.history.length>60)this.history.shift();this.recording=false;
+                if(experiment.phase==='measurement'||experiment.phase==='production'){this.history.push(this.latest);if(this.history.length>60)this.history.shift();}
+                this.previousEnd=at;this.recording=false;
             },
             summary() {
                 const keys=new Set(this.history.flatMap(f=>Object.keys(f.stages))),rows=[];
@@ -86,14 +119,18 @@
                     rows.push({name,last:last?.ms||0,mean:values.reduce((a,b)=>a+b,0)/values.length,p95:values[Math.ceil(values.length*.95)-1],peak:values[values.length-1],calls:last?.calls||0,maxCall:last?.maxCall||0});}
                 return rows.sort((a,b)=>b.mean-a.mean);
             },
+            cadenceSummary() {
+                const values=this.history.map(f=>f.cadence?.intervalMs).filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>a-b),total=values.reduce((a,b)=>a+b,0);
+                return {intervals:values.length,fps:total?1000*values.length/total:null,meanMs:values.length?total/values.length:null,p95Ms:values.length?values[Math.ceil(values.length*.95)-1]:null,peakMs:values.length?values[values.length-1]:null,pausesOver250ms:values.filter(v=>v>250).length,pausesOver1000ms:values.filter(v=>v>1000).length};
+            },
             snapshot(game) {
-                return {format:'dfab-lighting-profile-v1',gammaErrorChecks:'initialization-only',createdAt:new Date().toISOString(),device:this.deviceInfo,gpuStatus:this.gpuStatus||'not sampled',gpu:{...this.gpu},gpuPending:this.pending.length,
+                return {format:'dfab-lighting-profile-v1',experiment:this.latest?.experiment||GammaExperiment.current,cadence:this.cadenceSummary(),gammaErrorChecks:'initialization-only',createdAt:new Date().toISOString(),device:this.deviceInfo,gpuStatus:this.gpuStatus||'not sampled',gpu:{...this.gpu},gpuPending:this.pending.length,
                     jsHeapBytes:Number.isFinite(performance.memory?.usedJSHeapSize)?performance.memory.usedJSHeapSize:null,frameMs:game._renderFrameMs,pixelRatio:window.devicePixelRatio||1,map:game.activeMap?.id,zoom:game.camera.zoom,settings:{shadows:GameSettings.lampShadows,soft:GameSettings.softShadows,adaptive:GameSettings.adaptiveLighting,lightingScale:game.lightingScale,renderScale:game._renderScale||1,fpsLimit:GameSettings.fpsLimit},
-                    gameSections:game.profiler?.report||[],latest:this.latest,summary:this.summary(),frames:this.history.slice(),memory:DevOverlay._canvasMB(game),note:'CPU timings are inclusive and can contain driver waits; nested rows overlap. GPU samples are asynchronous and identify their source frame. No forced readback or gl.finish.'};
+                    gameSections:game.profiler?.report||[],latest:this.latest,summary:this.summary(),frames:this.history.slice(),memory:DevOverlay._canvasMB(game),note:'CPU timings are inclusive and can contain driver waits; nested rows overlap. GPU samples are asynchronous and identify their source frame. No forced readback or gl.finish. Gamma experiment summaries exclude warm-up/settling; cadence includes between-render waits.'};
             },
             download(game) {
                 const blob=new Blob([JSON.stringify(this.snapshot(game),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-                a.href=url;a.download='dfab-lighting-profile.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+                a.href=url;a.download=`dfab-lighting-${this.latest?.experiment?.mode||GammaExperiment.mode}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
             }
         };
         // Gamma keeps High's shadow preparation, but batches cached sprites using
@@ -167,12 +204,13 @@
                 } catch (_) { this.failed=true; return false; }
             },
             reset() {
+                if(LightingProfile.enabled)GammaExperiment.resetWarm();GammaExperiment.hideOverlay();
                 this.records.length=0; this.active=false; this.slotMap=new WeakMap();
                 for(const s of this.slots || []){s.cv=null;s.signature=null;s.at=0;}
             },
             begin(ctx, frameId = null) {
-                this.frame++; this.records.length=0; this.holeReady=false; this.uploadFailed=false;
-                this.stats={backend:'high-fallback',resolves:0,draws:0,uploads:0,layerUploads:0,contributions:0,blurPasses:0,frameId};
+                this.frame++; this.records.length=0; this.holeReady=false; this.uploadFailed=false;this._frozenSeen=GammaExperiment.current.freezeMasks?new Set():null;
+                this.stats={backend:'high-fallback',resolves:0,draws:0,uploads:0,layerUploads:0,contributions:0,blurPasses:0,frozenMasks:0,frozenLayers:0,missingFrozenSprites:0,frameId};
                 const initTime=LightingProfile.start();
                 this.active=GameSettings.lampShadows==='gamma' && this._init();
                 if(this.active){this.stats.backend='webgl2';this.target=ctx.canvas;LightingProfile.device(this.gl);}
@@ -187,6 +225,7 @@
                 const m=ctx.getTransform();
                 if(Math.abs(m.b)>1e-6||Math.abs(m.c)>1e-6||m.a<=0||m.d<=0)return false;
                 const cv=s[mode]; let slot=this.slotMap.get(cv);
+                if(GammaExperiment.current.freezeMasks && (!slot || slot.signature===null)){if(!this._frozenSeen.has(cv)){this._frozenSeen.add(cv);this.stats.missingFrozenSprites++;}return true;}
                 if(!slot){
                     // Prefer unused slots, then least-recently-used sprites. Never evict
                     // a sprite referenced by this frame's queued draws.
@@ -197,7 +236,8 @@
                     slot.cv=cv;slot.signature=null;this.slotMap.set(cv,slot);
                 }
                 slot.at=this.frame;
-                if(slot.signature!==s.signature){
+                if(GammaExperiment.current.freezeMasks && slot.signature!==s.signature && !this._frozenSeen.has(cv)){this._frozenSeen.add(cv);this.stats.frozenMasks++;}
+                if(slot.signature!==s.signature && !GammaExperiment.current.freezeMasks){
                     if(LightingProfile.enabled && slot.signature!==null)LightingProfile.churn.changed++;
                     try {
                     const padTime=LightingProfile.start();
@@ -211,7 +251,7 @@
                     gl.texSubImage2D(gl.TEXTURE_2D,0,slot.x,slot.y,gl.RGBA,gl.UNSIGNED_BYTE,pad);
                     LightingProfile.end('mask uploads (CPU wait)',uploadTime);
                     if(LightingProfile.enabled)LightingProfile.bytes.mask+=pad.width*pad.height*4;
-                    slot.signature=s.signature;this.stats.uploads++;
+                    slot.signature=s.signature;slot.width=cv.width;slot.height=cv.height;this.stats.uploads++;
                     } catch (_) { this.uploadFailed=true; return false; }
                 }
                 this.records.push({cv,mode,alpha:ctx.globalAlpha,x:m.a*s.x+m.e,y:m.d*s.y+m.f,w:m.a*s.w,h:m.d*s.h,slot});
@@ -241,7 +281,7 @@
             },
             _sprites(mode,w,h) {
                 let n=0;
-                for(const r of this.records)if(r.mode===mode){this.recordData.set([r.x,r.y,r.w,r.h,(r.slot.x+1)/this.atlasSize,(r.slot.y+1)/this.atlasHeight,r.cv.width/this.atlasSize,r.cv.height/this.atlasHeight,r.alpha],n++*9);}
+                for(const r of this.records)if(r.mode===mode){this.recordData.set([r.x,r.y,r.w,r.h,(r.slot.x+1)/this.atlasSize,(r.slot.y+1)/this.atlasHeight,(r.slot.width||r.cv.width)/this.atlasSize,(r.slot.height||r.cv.height)/this.atlasHeight,r.alpha],n++*9);}
                 if(!n)return;
                 const gl=this.gl;gl.useProgram(this.spriteProgram);gl.bindVertexArray(this.spriteVAO);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
                 gl.bufferSubData(gl.ARRAY_BUFFER,0,this.recordData.subarray(0,n*9));gl.uniform2f(this.spriteSize,w,h);gl.bindTexture(gl.TEXTURE_2D,this.textures[3]);
@@ -252,12 +292,13 @@
                 let result=null;
                 try {
                     const setupTime=LightingProfile.start();
-                    const gl=this.gl,w=ctx.canvas.width,h=ctx.canvas.height,soft=!!options?.soft;
+                    const gl=this.gl,w=ctx.canvas.width,h=ctx.canvas.height,soft=!!options?.soft && !GammaExperiment.current.noBlur;
                     if(this.uploadFailed||w>this.maxSize||h>this.maxSize||gl.isContextLost())throw new Error('Gamma surface limit');
                     if(this.canvas.width!==w)this.canvas.width=w;if(this.canvas.height!==h)this.canvas.height=h;
                     gl.viewport(0,0,w,h);gl.activeTexture(gl.TEXTURE0);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
                     LightingProfile.end('surface setup',setupTime);
                     for(const [i,cv]of this.hasVeil?[[0,this.hole],[1,ctx.canvas],[2,this.veil]]:[[0,this.hole],[1,ctx.canvas]]){
+                        if(GammaExperiment.current.freezeLayers && this.textureSizes[i]===w+':'+h){this.stats.frozenLayers++;continue;}
                         const uploadTime=LightingProfile.start();
                         gl.bindTexture(gl.TEXTURE_2D,this.textures[i]);
                         if(this.textureSizes[i]!==w+':'+h){gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,cv);this.textureSizes[i]=w+':'+h;}
@@ -278,9 +319,11 @@
                     LightingProfile.end('blur target allocation/setup',targetsTime);
                     const renderTime=LightingProfile.start();LightingProfile.beginGPU('resolve');
                     gl.bindFramebuffer(gl.FRAMEBUFFER,soft?this.fbos[0]:null);gl.disable(gl.BLEND);this._copy(this.textures[0],true);
+                    if(!GammaExperiment.current.simple){
                     gl.enable(gl.BLEND);gl.blendFunc(gl.ZERO,gl.ONE_MINUS_SRC_ALPHA);this._sprites('hole',w,h);
                     if(this.hasVeil){gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);this._copy(this.textures[2],true);}
                     gl.blendFunc(gl.ONE,gl.ONE);this._copy(this.textures[1],true);this._sprites('color',w,h);
+                    }
                     gl.disable(gl.BLEND);LightingProfile.endGPU();LightingProfile.end('GPU resolve submission',renderTime);
                     const blurTime=LightingProfile.start();
                     if(soft){

@@ -390,7 +390,7 @@
                 const finalOpacity = ambient * (1.0 - this.nvIntensity) * (1 - 0.8 * flash);
                 
                 // Optimization: If shadows are invisible and we don't need the NV boost, stop.
-                if (finalOpacity <= 0.01 && !this.nightVision) return;
+                if (finalOpacity <= 0.01 && !this.nightVision) {GammaExperiment.hideOverlay();return;}
 
                 let scratch = this._lightingScratch;
                 if (!scratch || scratch.busy) {
@@ -738,10 +738,14 @@
                 LightingProfile.end('Canvas blur / layer selection',canvasBlurTime);
                 const sceneCopyTime=LightingProfile.start();
                 ctx.imageSmoothingEnabled = true;
+                const overlay=gammaLayer && GammaExperiment.current.overlay;
+                if(overlay)GammaExperiment.showOverlay(this,gammaLayer,finalOpacity);
+                else {GammaExperiment.hideOverlay();
                 if (layer === this.lightCanvas || (gammaLayer && !GameSettings.softShadows)) ctx.drawImage(layer, 0, 0, this.canvas.width, this.canvas.height);
                 else ctx.drawImage(layer, 1, 1, lw - 2, lh - 2, 0, 0, this.canvas.width, this.canvas.height);   // the blur's outer pixel is half-covered: crop it
                 
-                LightingProfile.end(gammaLayer?'WebGL to scene Canvas copy (CPU wait)':'Canvas to scene copy',sceneCopyTime);
+                }
+                LightingProfile.end(overlay?'WebGL overlay layout':gammaLayer?'WebGL to scene Canvas copy (CPU wait)':'Canvas to scene copy',sceneCopyTime);
 
                 // 8. NV SIGNAL BOOST
                 if (this.nvIntensity > 0.01) {

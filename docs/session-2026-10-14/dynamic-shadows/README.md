@@ -122,3 +122,29 @@ Validation commands: `node tools/test-lighting-profile.cjs`, `node tools/test-dy
 Gamma no longer calls `gl.getError()` after every lighting resolve. Initialization still validates GL errors and shader/program/framebuffer creation, and context loss or thrown upload/draw exceptions still trigger recovery. This avoids a synchronous command-stream checkpoint on mobile drivers. WebGL errors that only set the GL error flag after initialization are no longer automatically detected on each frame.
 
 New reports identify `gammaErrorChecks: "initialization-only"`. Earlier sample reports retain the measured GPU-error-check row as historical data. A long wait at `getError` can include GPU work queued before the call; removing it may relocate that wait to the final scene copy rather than reduce total frame time. Compare lighting total and scene-copy time in the next capture before claiming a speedup. Browser regressions verify zero error polls on warmed Gamma frames, preserved pixels, and exception/failure recovery.
+
+### Controlled GPU experiments
+
+Open **Light Shadows → Gamma**, then **Developer → Profiler → Full → Lighting diagnostics → GPU test**. Start with **Baseline**, **Blur off**, then **Freeze all uploads**. Keep the same camera and scene, and repeat the series separately while stationary and while moving. Do not pause the game or switch apps during a capture.
+
+Each selection/restart uses 10 warm-up frames, 5 settling frames, then a rolling 60-frame measurement window. Freeze modes upload normally during warm-up, then freeze during settling so previously queued work can drain before measurement. Wait for **Recorded 60/60 frames · ready to export**, then tap **Save JSON report**. Filenames identify the mode. Partial captures remain exportable and are labelled with their sample count and phase. Tests are not saved in device settings; leaving Full mode or switching away from Gamma restores baseline. Changing the map or resolution rewarms textures.
+
+| GPU test | Changed stage | Retained work |
+|---|---|---|
+| Baseline | None | Normal Gamma |
+| Blur off | Skips both GPU blur passes | Same soft-light layer resolution, shadow policy and uploads |
+| Freeze all uploads | Stops atlas and full Canvas texture updates after warm-up | CPU preparation, resolve, blur and scene copying |
+| Freeze mask uploads | Stops atlas updates | Full Canvas inputs, preparation, resolve and blur |
+| Freeze Canvas layer uploads | Stops darkness/colour/veil updates | Atlas updates, preparation, resolve and blur |
+| Simple fullscreen resolve | Draws only the base darkness texture, bypassing light/veil blending | All normal uploads and the selected blur |
+| Separate WebGL overlay | Lets the browser composite the WebGL canvas directly; omits the Canvas scene-copy call | Normal preparation, uploads, resolve and blur |
+
+Freeze modes deliberately display stale textures. Resident sprite UV dimensions remain those of the uploaded bitmap, and missing new sprites are counted/omitted instead of reading unrelated atlas slots. Compatible resident Canvas textures are frozen; a required missing/resized texture is bootstrapped safely. The overlay matches the scene bounds, opacity and soft-layer crop, accepts no pointer input, and is removed when tests end. It changes the ordering of some glows, Canvas HUD and post-effects, so it is a diagnostic presentation path rather than an appearance-equivalent replacement renderer.
+
+**Actual frame cadence** reports FPS from render-start intervals, mean/p95/peak interval, and pause counts above 250 ms and 1 second. Each raw frame includes start time, rendering wall time, the between-render gap (including logic/browser waits), loop interval and experiment phase. Warm-up/settling frames are excluded from summaries. FPS includes scheduling/backpressure rather than treating quick GL submission as completed rendering; it still does not measure pure GPU execution. Native game-section averages have their own reporting window and may include warm-up frames.
+
+Compare cadence and long-pause frequency first. If freezing uploads helps, separate atlas from Canvas inputs; this isolates the transfer path including any deferred Canvas rasterization it triggers, not just bandwidth. If simple resolve helps while uploads remain enabled, investigate blending/draw work and texture hazards. If only the overlay helps, investigate presentation/copy synchronization. Results depend on whether sprites are actually changing; compare mask builds, uploads and omitted-sprite counts as well as timings.
+
+`tools/test-gamma-experiments-browser.cjs` verifies each variant's actual draw/upload counts in real Chromium, unchanged resolution, warming/settling exclusion, retained CPU preparation, overlay cleanup, 60-frame readiness, selector/restart behavior and baseline restoration. Timing lifecycle tests also verify that a 1.7-second pause outside a 20 ms renderer appears in cadence. [Isolation check results](gamma-experiment-checks.json) are correctness fixtures, not a device performance benchmark.
+
+![GPU test selector and cadence panel](gamma-experiment-panel.png)

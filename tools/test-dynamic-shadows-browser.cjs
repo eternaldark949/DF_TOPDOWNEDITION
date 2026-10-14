@@ -218,7 +218,7 @@ const { chromium } = require('playwright');
       GameSettings.lampShadows='gamma';GameSettings.softShadows=true;GameSettings.profilerMode='full';game.showProfiler=true;DevOverlay.sync(game);
       const gl=GammaShadows.gl,readError=gl.getError;let errorPolls=0;
       gl.getError=()=>{errorPolls++;return readError.call(gl);};
-      try{for(let i=0;i<6;i++){_frameTime+=101;game.draw();}}finally{gl.getError=readError;}
+      try{for(let i=0;i<21;i++){_frameTime+=101;game.draw();}}finally{gl.getError=readError;}
 
       DevOverlay._shadowPanel(game);DevOverlay._memAt=0;
       const report=LightingProfile.snapshot(game),panel=document.querySelector('.dp-shadows').textContent;
