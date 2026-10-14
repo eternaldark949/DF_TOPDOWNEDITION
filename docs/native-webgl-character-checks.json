@@ -3,7 +3,11 @@
   "animation": {
     "unique": 80,
     "freeze": true,
-    "resumes": true
+    "resumes": true,
+    "measuredFrames": 0,
+    "steadyUploads": 0,
+    "steadyBakes": 0,
+    "shadowRefreshFrames": 0
   },
   "parity": [
     {
@@ -107,13 +111,10 @@
     "poseInvalidates": true,
     "rotatedGap": 25
   },
-  "movingValidation": {
-    "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "moving": {
     "frames": 80,
-    "uploads": 0,
-    "bakes": 0,
-    "animatedShadowFrames": 66,
-    "staticRebuilds": 0,
-    "note": "Real requestAnimationFrame gameplay validation on SwiftShader, not a phone performance benchmark."
+    "fps": 3.4529783030583023,
+    "cpuMs": 8.357499999925494,
+    "shadowFrames": 66
   }
 }

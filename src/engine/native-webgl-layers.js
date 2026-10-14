@@ -3,15 +3,14 @@
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows'};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow'};
 const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
     setLayers(values){
         let changed=false;for(const [k,v] of Object.entries(values))if(k in this.layers&&this.layers[k]!==!!v){this.layers[k]=!!v;changed=true;}
         if(!changed)return;
-        this.capture=this.completedCapture=null;
-        this.configurationId++;this.frames=[];this.warmFrames=15;this.lastStart=this.lastEnd=this.lastPanel=0;
+        this.resetSample();
         if(this.onLayersChanged)this.onLayersChanged();
     },
     preset(name){
@@ -70,11 +69,11 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(r){this.textures.delete(r.texture);r.texture.destroy(true);}
         const scale=.35,texture=this.bake(source.w*scale,source.h*scale,c=>{
             c.scale(scale,scale);game._paintSoftLight(c,{src:source,x:source.w/2,y:source.h/2,r:Math.hypot(source.w,source.h)/2},'hole');
-        });this.areaCookies.set(source,{key,texture});return texture;
+        },'light');this.areaCookies.set(source,{key,texture});return texture;
     },
     // Split the original floor painting into GPU-resident, independently visible assets.
     buildMap(game){
-        this.clearMap();this.map=game.activeMap;const map=this.map,top=map.cameraBounds?.top||0;
+        const capture=this.qualityRebuildPending?this.capture:null;this.clearMap();this.capture=capture;this.qualityRebuildPending=false;this.map=game.activeMap;const map=this.map,top=map.cameraBounds?.top||0;
         this.floor.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{
             c.fillStyle=map.floorColor;c.fillRect(0,0,map.width,map.height);
             for(const z of map.zones||[]){c.fillStyle=z.color;c.fillRect(z.x,z.y,z.w,z.h);
@@ -88,15 +87,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.walls.beginFill(0x222222).lineStyle(1,0x00f3ff,.3);
         for(const w of map.walls||[])this.walls.drawRect(w.x,w.y,w.w,w.h);this.walls.endFill();
         this.playerSprite=new PIXI.Sprite();this.playerSprite.anchor.set(.5);this.objects.addChild(this.playerSprite);
-        this.emissive.addChild(this.glowContext.root);this.fixtures.addChild(this.fixtureContext.root);this.message('');
-    },
-    propCanvas(p,time){
-        const pad=48,w=p.width||p.w||24,h=p.height||p.h||24;
-        return this.bake(w+pad*2,h+pad*2,c=>{
-            c.translate(pad-p.x,pad-p.y);const angle=p.angle,mode=PropPass.mode,stamp=PropSprites.stamp,seg=PropPass.seg,clock=_frameTime;
-            try{p.angle=0;PropPass.mode=1;PropPass.seg=()=>true;PropSprites.stamp=()=>false;_frameTime=time;p.draw(c);}
-            finally{p.angle=angle;PropPass.mode=mode;PropSprites.stamp=stamp;PropPass.seg=seg;_frameTime=clock;}
-        });
+        this.emissive.addChild(this.glowContext.root);this.fixtures.addChild(this.fixtureContext.root);this.world.setChildIndex(this.projectileContext.root,this.world.children.length-1);this.message('');
     },
     syncLayers(game,view){
         const start=performance.now(),L=this.layers;
@@ -108,18 +99,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(L.linens){const ctx=this.linenContext;ctx.begin();for(const linen of game.roomSystem.linens||[])linen.draw(ctx,game.weather?.wind??.3,game.weather?.windDirection??1,L.decorAnimation?_gameTimeSec:0);}
         if(L.doors)this.syncDoors(game);
         this.fixtures.visible=L.fixtures;if(L.fixtures)this.syncFixtures(game);
-        const animated=new Set(['apt_fireplace','apt_stove','apt_craft','apt_tub','apt_plant','apt_telescope']);
-        for(const [p,r] of this.props){
-            r.sprite.visible=L.furniture&&p.visible!==false;
-            if(L.decorAnimation&&animated.has(p.decorType)){
-                if(!r.animation){r.animation=[r.texture];const period=PROP_LOOP[p.decorType]?.period||Math.PI*2/2.1;
-                    for(let i=1;i<8;i++)r.animation.push(this.propCanvas(p,period*1000*i/8));r.period=period;
-                    // Pixi normally uploads on first use. Prewarm all phase images
-                    // so later animation frames never trigger deferred bitmap uploads.
-                    for(const texture of r.animation)this.renderer.texture.bind(texture);}
-                const phase=Math.floor((_frameTime/1000%r.period)/r.period*8);r.sprite.texture=r.animation[Math.max(0,phase)];
-            }else r.sprite.texture=r.texture;
-        }
+        this.syncDecor(game,view);
         this.contacts.visible=L.contactShadows;
         if(L.contactShadows){
             for(const p of [game.player,...(game.props||[])]){
@@ -190,7 +170,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
     shadowTexture(source,casters,walls,wallKey){
         const start=performance.now(),radius=source.radius,density=Math.min(this.layers.shadowDetail ? .5 : .25,(this.layers.shadowDetail?256:128)/(radius*2));
         const nearby=casters.filter(c=>c.owner!==source.owner&&Math.hypot(c.x-source.x,c.y-source.y)<radius+Math.max(c.w,c.h));
-        const key=[source.x,source.y,radius,density,source.w||0,source.h||0,source.cookie?.baseTexture.uid||0,this.layers.wallOcclusion?wallKey:'open',...nearby.map(c=>c.key)].join('|');
+        const key=[source.x,source.y,radius,source.elevation??84,density,source.w||0,source.h||0,source.cookie?.baseTexture.uid||0,this.layers.wallOcclusion?wallKey:'open',...nearby.map(c=>c.key)].join('|');
         let r=this.shadowCache.get(source.owner);
         if(r&&r.key===key){this.shadowStats.hits++;return r.texture;}
         if(!r||r.radius!==radius||r.density!==density){
@@ -217,7 +197,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const d=Math.hypot(c.x-source.x,c.y-source.y);if(d<.01||d>=radius)continue;
             const crosses=c.points.map(([x,y],i)=>{const [nx,ny]=c.points[(i+1)%c.points.length];return (nx-x)*(source.y-y)-(ny-y)*(source.x-x);});
             if(crosses.every(v=>v>=0)||crosses.every(v=>v<=0))continue;
-            const len=c.full?radius-d:Math.min(120,radius-d,d*c.elevation/Math.max(1,84-c.elevation)),scale=1+len/d;
+            const len=c.full?radius-d:Math.min(120,radius-d,d*c.elevation/Math.max(1,(source.elevation??84)-c.elevation)),scale=1+len/d;
             const hull=DynamicShadows._hull(c.points.flatMap(([x,y])=>[[x,y],[source.x+(x-source.x)*scale,source.y+(y-source.y)*scale]]));
             const local=points=>points.flatMap(([x,y])=>[x-source.x+radius,y-source.y+radius]);
             r.shadow.beginFill(0xffffff,c.full?1:.85).drawPolygon(local(hull));
@@ -244,7 +224,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             r.dynamicTexture=PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR});
         }
         r.dynamicBase.texture=base;r.dynamicBase.width=r.dynamicBase.height=source.radius*2;
-        const len=Math.min(120,source.radius-d,d*24/60),u=r.actorShadow.shader.uniforms;
+        const len=Math.min(120,source.radius-d,d*24/Math.max(1,(source.elevation??84)-24)),u=r.actorShadow.shader.uniforms;
         u.body=this.actorTexture;u.direction.set([dx/d,dy/d]);u.rotation.set([Math.cos(actor.angle||0),Math.sin(actor.angle||0)]);
         u.stretch=1+len/CONFIG.HUMAN_SHADE.LAMP_SHADOW_DEPTH;u.offset=len/2;
         // Project the body's CPU geometry bounds, not its 192px padded texture
@@ -300,7 +280,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                     const saved={angle:lamp.angle,k:lamp._lightK,forced:lamp._forcedOff,visible:lamp.visible,lod:_zoomLOD};
                     try{lamp.angle=0;lamp._lightK=1;lamp._forcedOff=false;lamp.visible=true;_zoomLOD=1;c.translate(96-lamp.x,96-lamp.y);lamp.draw(c,on?0:1);}
                     finally{lamp.angle=saved.angle;lamp._lightK=saved.k;lamp._forcedOff=saved.forced;lamp.visible=saved.visible;_zoomLOD=saved.lod;}
-                }));this.fixtureAssets.set(key,assets);}
+                },'fixture'));this.fixtureAssets.set(key,assets);}
             if(!r){r={off:new PIXI.Sprite(),on:new PIXI.Sprite()};for(const s of [r.off,r.on]){s.anchor.set(.5);this.fixtures.addChild(s);}this.fixtureNodes.set(lamp,r);}
             lamp._lightK=game.roomSystem.lampLight(lamp)*lampFlicker(lamp);lamp._forcedOff=lamp._lightK<.02;
             const room=game.roomSystem.rooms[lamp._roomId],on=!lamp._forcedOff&&(room?.type!=='outdoor'||day.lampsOn),k=on?Math.min(1,lamp._lightK):0;
@@ -348,6 +328,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 w:q.w,h:q.h,cookie:q.w?this.areaCookie(game,q):null,
                 color:q.rgb?'rgb('+q.rgb+')':q.color||'#ffd2a0',wash:.22,flicker:q.flicker||0,alpha:(q.intensity??.8)*game.roomSystem.lightAt(q.x,q.y)});
         }
+        if(L.transientLights)sources.push(...this.transientSources);
         for(let i=sources.length-1;i>=0;i--){const q=sources[i];if(q.alpha<.005||Math.abs(q.x-view.x)>w/(2*view.zoom)+q.radius||Math.abs(q.y-view.y)>h/(2*view.zoom)+q.radius)sources.splice(i,1);}
         sources.sort((a,b)=>Math.hypot(a.x-view.x,a.y-view.y)-Math.hypot(b.x-view.x,b.y-view.y));sources.length=Math.min(sources.length,L.decorLights?40:24);
         const occlusion=L.wallOcclusion||L.propShadows||L.playerShadows,casters=occlusion?this.casters(game):[],walls=getOccluders(game.activeMap);

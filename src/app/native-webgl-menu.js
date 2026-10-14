@@ -30,6 +30,10 @@
     layers.style.cssText='position:fixed;top:68px;left:8px;max-width:330px;max-height:65vh;overflow:auto;background:#1b1228;color:white;border:1px solid #a887cd;padding:12px;z-index:10001;font:13px sans-serif';
     const heading=document.createElement('strong');heading.textContent='APARTMENT LAYERS';layers.append(heading);
     const note=document.createElement('p');note.textContent='Changes reset the sample. Shadows require Lighting. Freeze Character animation or switch Shape-accurate shadows to compare their cost. Record 20s exports after warmup; Export repeats the finished run.';layers.append(note);
+    const qualityRow=document.createElement('label');qualityRow.textContent='Texture quality ';const quality=document.createElement('select');quality.id='native-texture-quality';
+    for(const [key,label]of [['standard','Standard'],['auto','Auto (sharper furniture)'],['high','High (2× textures)']]){const option=document.createElement('option');option.value=key;option.textContent=label;quality.append(option);}
+    quality.value=renderer.textureQuality;quality.onchange=()=>renderer.setTextureQuality(quality.value);renderer.onQualityChanged=()=>quality.value=renderer.textureQuality;qualityRow.append(quality);layers.append(qualityRow);
+    const qualityNote=document.createElement('p');qualityNote.textContent='Quality rebuilds cached art once. Render resolution and shadow detail remain separate.';layers.append(qualityNote);
     const presets=document.createElement('div');
     for(const [name,label] of [['baseline','Baseline'],['shadows','Lighting + shadows'],['canvas','Canvas look']]){
         const b=document.createElement('button');b.textContent=label;b.onclick=()=>renderer.preset(name);presets.append(b);
@@ -46,7 +50,7 @@
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v3-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v4-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;

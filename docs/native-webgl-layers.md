@@ -26,7 +26,8 @@ camera/player positions, device, resolution/settings, actual frame intervals,
 stalls, CPU render time, gap outside rendering, texture upload/allocation calls,
 asset bakes, draw calls, geometry buffer bytes, CPU pass times, and shadow-cache
 hits/rebuilds. The completed recording is frozen; **Export** repeats it until a
-new recording or configuration change. The rolling history holds up to 6,000
+new recording or configuration change. Texture-quality changes also reset samples;
+a recording started immediately afterward survives the one-time rebuild. The rolling history holds up to 6,000
 frames so high-refresh displays can retain a complete 20-second run.
 
 After the stationary comparison, walk around with Lighting + shadows enabled
@@ -37,8 +38,8 @@ they do not choose another rendering backend.
 
 ## Animated characters and shape shadows
 
-The build identifier is `native-webgl-silhouettes-v3`. **Canvas look** enables
-all 28 switches. **Lighting + shadows** also enables continuous character
+The build identifier is `native-webgl-details-v4`. **Canvas look** enables
+all 36 switches. **Lighting + shadows** also enables continuous character
 animation, silhouette shadows, high shadow detail and curtains.
 
 For a controlled moving test, use the same route, view, zoom, resolution and FPS
@@ -97,7 +98,7 @@ samples have labels and source frame IDs; unsupported devices explicitly say
 
 ## Evidence and remaining differences
 
-The three browser suites check the real main WebGL surface, all switches,
+The four browser suites check the real main WebGL surface, all switches,
 recording/export, moving gameplay, texture reuse, context recovery, odd-size
 resize, walls, finite casts, lit bodies, overlapping light sources, continuous
 poses, and projected silhouette gaps/rotation. Pixel readback is test-only.
@@ -107,8 +108,44 @@ Compare `native-webgl-canvas-look.png` and `native-webgl-canvas-reference.png` f
 the apartment. These are comparison evidence, not a claim of identical pixels.
 
 The city backdrop/parallax, city glow/traffic, NPCs and advanced combat/cinematic
-passes remain unported. Decor props retain phase-texture animation. Furniture
+passes remain unported. Rain is planned separately from impact particles. Furniture
 uses the original geometric shadow footprints; some tiny blur/dash accents,
 color falloff and GPU softness/halo remain approximate. Memory estimates exclude
 shared filter-pool overhead and depth/stencil storage. Workspace Chromium uses
 SwiftShader, so its frame rate is not a phone benchmark.
+
+## Continuous decor, quality and combat effects
+
+Decor animation now draws moving segments at the current clock on the GPU;
+it does not select one of eight baked frames. Freeze it to compare its cost.
+Texture quality is separate from screen resolution and shadow detail:
+
+| Quality | Cached art density |
+| --- | --- |
+| Standard | Original 1 pixel per world unit |
+| Auto | 2× furniture/fixtures, original floor/backdrop density |
+| High | 2× all cached art, with asset-budget/device-size safeguards |
+
+Changing quality rebuilds art once and releases its previous textures without
+resetting gameplay or moving furniture. Auto does not automatically lower quality
+in response to frame rate. The export identifies `textureQuality`, actual bake
+densities, `qualityReductions`, glyph-atlas bytes and physical asset bytes.
+
+Eight new switches isolate Bullet / fireball FX, Muzzle / weapon FX, Casings,
+Impact particles, Decals, Combat cues, Shot lighting and FX glow. Canvas look
+enables all eight; the other presets keep them off for controlled comparisons.
+Fireballs use cropped views of a resident atlas, and text uses resident glyphs.
+Shot lights can exercise both static and animated shadow refreshes: they are
+moving light sources, not free sprites. FX glow uses a half-resolution blur with
+fixed viewport bounds so small trail jitter does not grow its target repeatedly.
+
+Per-frame `details.decor` and `details.effects` expose paths, visible prop count,
+projectile/muzzle/particle/casing counts, transient sources and CPU submission
+stages. Check `layerStages.effectsMs`/`decorMs`, uploads, bakes and shadow rebuilds
+when disabling each group. First-use assets and target allocations are separate
+from steady-state reuse; quality changes deliberately upload replacement art.
+
+For the next phone capture, use Standard + Canvas look and walk/fire for 20s.
+Compare Auto at the same zoom, then disable Shot lighting and FX glow separately
+if cadence falls. Rain will be added as drops/splashes, glass droplets, then wet
+reflections; see [the migration order](native-webgl-fork.md#next-rain-and-remaining-visual-parity).

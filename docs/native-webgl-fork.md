@@ -43,9 +43,22 @@ Current implementation:
   authored curtains, lamp particles/fades, and apartment glows use GPU geometry
   and cached image assets. Bloom uses the Canvas downscale scales/strengths;
   atmosphere follows the original tint setting.
-- All 28 visual switches remain independent, including Character animation,
-  Shape-accurate shadows, High-resolution shadows, and Curtains. Decor props
-  still use prewarmed phase textures. Odd viewport sizes reuse allocations.
+- All 36 visual switches remain independent. Fireplace flames, crafting scanline,
+  record sheen, tub ripple, plants and telescope accents follow their authored
+  continuous clock through GPU geometry. Static segments remain cached and
+  retain their drawing order; Decor animation off freezes their original art.
+- Standard texture quality retains the original asset density. Auto doubles
+  furniture/fixture density; High doubles all cached art. Logical world sizes
+  stay unchanged. Changes rebuild and release assets once, independently of
+  screen/shadow resolution; upgrades are reduced beyond a 128 MiB asset estimate
+  or the device texture-size limit. Auto is selective quality, not an FPS governor.
+- Authored bullets, sniper/crackle trails, muzzle stars, smoke, embers, casings,
+  slashes, laser sight, impact particles, decals and combat/status cues use native
+  geometry. Fireballs blend resident atlas frames; damage text uses a prewarmed
+  GPU glyph atlas. Shot lights enter the existing lighting/shadow pipeline, with
+  a bounded pool of four flashes, four standard projectiles and two fireballs.
+  Each effects group, transient lighting and low-resolution FX glow has a switch.
+  Odd viewport sizes reuse allocations.
 - The original game loop, collision, interactions, and DOM controls remain.
   This sandbox prevents the default story step from teleporting to an unported
   scene on its first update.
@@ -55,9 +68,9 @@ Current implementation:
 
 The city backdrop is still a snapshot; its camera-dependent parallax, animated
 traffic and city emissive pass are not migrated. Detailed furniture shadows keep
-Canvas's geometric footprints. Decor phase sampling, a few tiny shadowBlur/dash
-accents, light-color falloff and the GPU halo/softness kernel remain approximate.
-NPCs, cinematic camera features and advanced combat effects are outside this
+Canvas's geometric footprints. A few tiny shadowBlur/dash accents, glyph outlines,
+light-color falloff and the GPU halo/softness kernel remain approximate.
+NPCs, cinematic camera features and additional combat abilities are outside this
 apartment slice. Character parity is measured below; complete apartment pixel
 parity and mobile performance still require comparison on the target phone.
 
@@ -65,7 +78,8 @@ parity and mobile performance still require comparison on the target phone.
 
 Run `node tools/test-native-webgl-browser.cjs` and
 `node tools/test-native-webgl-layers-browser.cjs`, plus
-`node tools/test-native-webgl-character-browser.cjs` after building the preview.
+`node tools/test-native-webgl-character-browser.cjs` and
+`node tools/test-native-webgl-details-browser.cjs` after building the preview.
 Chromium checks the real WebGL surface, linked shader, warmed texture reuse,
 movement, camera/screen round trips, furniture invalidation, resize/zoom, visible
 lighting across repeated frames, the actual gameplay loop, context loss and
@@ -81,6 +95,14 @@ gaps, self-body exclusion, finite reach, angle/pose invalidation and cache reuse
 A real requestAnimationFrame run exercises walking, continuous poses and shadow
 refreshes with zero warmed bitmap uploads or asset bakes. Static light images
 remain cached while pose-dependent images update.
+
+Details tests exercise continuous decor, all three texture qualities, preserved
+world dimensions/state, released replacement textures, warmed mixed effects,
+fireball atlas views, resident glyphs, shot lighting and real weapon simulation.
+Quality changes followed immediately by recording retain the new capture;
+context restoration rebuilds GPU-only detail resources. Evidence is in
+`native-webgl-details-checks.json`; `native-webgl-details.png` shows the mixed-FX
+fixture, not an ordinary gameplay screenshot.
 
 Warmed stationary layer tests make zero bitmap uploads. Draw counts depend on
 the enabled passes and the device's batch capacity; exports include actual counts.
@@ -181,3 +203,29 @@ time, render CPU time, uploads, draw calls, and memory. Compare with the live
 profiler panel hidden as well as visible. A faster desktop run alone does not
 establish a mobile win. The first success criterion is a measurable improvement
 in the playable apartment slice, not a promised 60 FPS or immediate visual parity.
+
+## Next: rain and remaining visual parity
+
+Rain itself is not rendered in v4. The impact-particle switch ports the existing
+spark/spray particle renderer; it does not enable rain.
+
+1. **Drops and ground splashes:** retain weather intensity, wind and simulation;
+   batch drop geometry with height/parallax on the GPU, using reusable buffers.
+   Respect the apartment roof/outdoor boundary so rain lands on the veranda,
+   rather than through the living-room roof. Render short-lived splash rings
+   with age-driven shaders. Give drops and splashes independent test switches.
+2. **Window droplets:** add a separate glass-local effect with clipped streaks
+   and highlights. Bound its resolution and update cost independently of rain
+   density; compare rain outdoors and through the apartment windows.
+3. **Wet surfaces and reflections:** use material/roof masks and selective GPU
+   scene/light targets for wet highlights and reflections. Avoid capturing the
+   live scene in Canvas or reading GPU pixels back to the CPU. Start with lamp
+   reflections, then add character/scene reflection detail only where visible.
+4. **Remaining content:** NPC animation/silhouette casts, additional abilities,
+   city parallax/emissives, traffic and cinematic passes need separate parity
+   comparisons before this becomes a renderer for the full game.
+
+For the phone, first record Standard with Canvas look while walking and firing;
+then compare Auto and the individual FX/shot-light/FX-glow switches. High has
+four times the pixels per upgraded asset, so it needs a memory and cadence check.
+The v3 phone recording (30.75 FPS) is a baseline, not a v4 performance claim.

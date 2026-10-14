@@ -14,18 +14,18 @@
 
 class NativeVectorContext {
     constructor(owner){
-        this.owner=owner;this.nativeVector=true;this.root=new PIXI.Container();this.pool=[];this.pools=new Map();this.gradients=[];this.images=new Map();this.colors=new Map();
+        this.owner=owner;this.nativeVector=true;this.root=new PIXI.Container();this.pool=[];this.pools=new Map();this.gradients=[];this.images=new Map();this.imageViews=new Map();this.colors=new Map();
         this.canvas={width:192,height:192};this.begin();
     }
     begin(){
         for(const n of this.pool){n.visible=false;n.mask=null;}
         this.root.removeChildren();for(const list of this.pools.values())list.used=0;this.hash=2166136261;this.gradientIndex=0;this.stack=[];this.matrix=new PIXI.Matrix();this.container=this.root;this.current=null;
-        Object.assign(this,{fillStyle:'#000',strokeStyle:'#000',globalAlpha:1,globalCompositeOperation:'source-over',lineWidth:1,lineCap:'butt',lineJoin:'miter',shadowBlur:0,shadowColor:'transparent'});
+        Object.assign(this,{fillStyle:'#000',strokeStyle:'#000',globalAlpha:1,globalCompositeOperation:'source-over',lineWidth:1,lineCap:'butt',lineJoin:'miter',shadowBlur:0,shadowColor:'transparent',font:'11px sans-serif',textAlign:'start',textBaseline:'alphabetic'});
         this.beginPath();this.pathsPainted=0;
     }
-    destroy(){for(const n of this.pool)n.mask=null;for(const n of this.pool){if(n.parent)n.parent.removeChild(n);n.destroy();}this.root.destroy();for(const r of this.gradients){r.stage.destroy({children:true});r.texture.destroy(true);}this.gradients=[];this.pool=[];this.pools.clear();this.images.clear();}
+    destroy(){for(const n of this.pool)n.mask=null;for(const n of this.pool){if(n.parent)n.parent.removeChild(n);n.destroy();}this.root.destroy();for(const r of this.gradients){r.stage.destroy({children:true});r.texture.destroy(true);}this.gradients=[];this.pool=[];this.pools.clear();this.images.clear();for(const t of this.imageViews.values())t.destroy(false);this.imageViews.clear();}
     node(Type){let list=this.pools.get(Type);if(!list){list=[];list.used=0;this.pools.set(Type,list);}
-        let n=list[list.used];if(!n){n=new Type();list.push(n);this.pool.push(n);}list.used++;
+        let n=list[list.used];if(!n){n=(Type===PIXI.BitmapText?new PIXI.BitmapText('',{fontName:'NativeDetailFont'}):new Type());list.push(n);this.pool.push(n);}list.used++;
         n.visible=true;n.mask=null;this.container.addChild(n);if(n instanceof PIXI.Graphics)n.clear();else if(Type===PIXI.Container)n.removeChildren();return n;
     }
     hashValue(v){if(typeof v==='number'){this.hash=Math.imul(this.hash^Math.round(v*1024),16777619);return;}
@@ -39,7 +39,7 @@ class NativeVectorContext {
         if(this.colors.size>512)this.colors.clear();this.colors.set(value,c);return c;
     }
     save(){const s={matrix:this.matrix.clone(),container:this.container};
-        for(const k of ['fillStyle','strokeStyle','globalAlpha','globalCompositeOperation','lineWidth','lineCap','lineJoin','shadowBlur','shadowColor'])s[k]=this[k];this.stack.push(s);
+        for(const k of ['fillStyle','strokeStyle','globalAlpha','globalCompositeOperation','lineWidth','lineCap','lineJoin','shadowBlur','shadowColor','font','textAlign','textBaseline'])s[k]=this[k];this.stack.push(s);
     }
     restore(){const s=this.stack.pop();if(!s)return;Object.assign(this,s);this.current=null;}
     transform(a,b,c,d,e,f){this.matrix.append(new PIXI.Matrix(a,b,c,d,e,f));}
@@ -115,11 +115,25 @@ class NativeVectorContext {
     drawImage(image,...args){
         let t=this.images.get(image);if(!t){t=this.owner.texture(image);this.images.set(image,t);}
         let x,y,w,h;if(args.length===2){[x,y]=args;w=image.width;h=image.height;}else if(args.length===4)[x,y,w,h]=args;
-        else throw new Error('Native character image cropping is not supported');
+        else if(args.length===8){const [sx,sy,sw,sh,dx,dy,dw,dh]=args,key=[t.baseTexture.uid,sx,sy,sw,sh].join(':');let view=this.imageViews.get(key);
+            if(!view){view=new PIXI.Texture(t.baseTexture,new PIXI.Rectangle(sx,sy,sw,sh));this.imageViews.set(key,view);}t=view;[x,y,w,h]=[dx,dy,dw,dh];}
+        else throw new Error('Unsupported native image arguments');
         this.current=null;const s=this.node(PIXI.Sprite);s.texture=t;s.alpha=this.globalAlpha;s.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
         this.hashValue(t.baseTexture.uid);this.hashValue(this.globalAlpha);for(const v of [...args,this.matrix.a,this.matrix.b,this.matrix.c,this.matrix.d,this.matrix.tx,this.matrix.ty])this.hashValue(v);
         s.transform.setFromMatrix(this.matrix.clone().append(new PIXI.Matrix(w/t.width,0,0,h/t.height,x,y)));this.current=null;
     }
+    fillText(text,x,y){
+        this.hashValue(text);this.hashValue(this.font);this.hashValue(this.fillStyle);this.hashValue(this.globalAlpha);this.hashValue(x);this.hashValue(y);
+        this.current=null;const n=this.node(PIXI.BitmapText),match=/([0-9.]+)px/.exec(this.font),size=match?Number(match[1]):11;
+        n.text=String(text);n.fontSize=size;const color=this.color(this.fillStyle);n.tint=color.color;n.alpha=this.globalAlpha*color.alpha;
+        n.blendMode=this.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;
+        const width=n.textWidth,height=n.textHeight,dx=this.textAlign==='center'?-width/2:this.textAlign==='right'||this.textAlign==='end'?-width:0;
+        const dy=this.textBaseline==='middle'?-height/2:this.textBaseline==='top'?0:-height*.8;
+        n.transform.setFromMatrix(this.matrix.clone().append(new PIXI.Matrix(1,0,0,1,x+dx,y+dy)));this.current=null;
+    }
+    // The resident glyph atlas includes an outline, keeping pop-size changes
+    // and moving damage text off Canvas without a bitmap for each string.
+    strokeText(){}
     createRadialGradient(...args){return {nativeGradient:true,type:1,args,matrix:this.matrix.clone(),stops:[],addColorStop(at,color){this.stops.push([at,color]);}};}
     createLinearGradient(...args){return {nativeGradient:true,type:0,args,matrix:this.matrix.clone(),stops:[],addColorStop(at,color){this.stops.push([at,color]);}};}
     gradient(style){
