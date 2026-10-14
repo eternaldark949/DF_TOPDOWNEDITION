@@ -207,7 +207,7 @@ export function build() {
     let html = read('index.html');
     const styles = STYLES.map(read).join('');
     const order = WEBGL ? ['core/native-webgl-storage.js', 'engine/native-webgl-vector.js', ...SCRIPTS.flatMap(p => p === 'engine/game-engine.js'
-        ? ['vendor/pixi-7.4.3.min.js', 'engine/native-webgl.js', 'engine/native-webgl-layers.js', 'engine/native-webgl-details.js', p] : [p]), 'app/native-webgl-menu.js'] : SCRIPTS;
+        ? ['vendor/pixi-7.4.3.min.js', 'engine/native-webgl.js', 'engine/native-webgl-layers.js', 'engine/native-webgl-details.js', 'engine/native-webgl-world.js', p] : [p]), 'app/native-webgl-menu.js'] : SCRIPTS;
     const scripts = order.map(p => {
         const source=read(p);
         if(p==='vendor/pixi-7.4.3.min.js')return `/*\n${read('vendor/pixi-LICENSE.txt')}\n*/\n${source}`;

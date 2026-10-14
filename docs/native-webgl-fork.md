@@ -1,6 +1,6 @@
 # Native WebGL fork
 
-Status: playable apartment prototype on branch `codex/native-webgl-fork`.
+Status: experimental city and interior fork on branch `codex/native-webgl-fork`.
 `DFAB WebGL.html` presents its scene through WebGL; `DFAB V8.html` retains the
 Canvas renderer. The branch starts from the Gamma diagnostics work.
 
@@ -8,8 +8,10 @@ Canvas renderer. The branch starts from the Gamma diagnostics work.
 
 Build with `node tools/build.mjs --webgl`, open `DFAB WebGL.html` in a browser,
 then choose **PLAY WEBGL APARTMENT**. Use the usual keyboard or touch controls
-to explore, interact, and move furniture. City exits and story entry points are
-disabled in this slice. **Layers** opens independent visual switches and the
+to explore, interact, and move furniture. Authored city exits are enabled. **PLAY WEBGL CITY** starts a city sandbox;
+**LOAD / IMPORT SAVES** opens the original save-slot UI. Export saves as JSON
+from the Canvas build, import them here, then choose the desired slot. Imported
+progress retains its story state; new-game story starts remain separate. **Layers** opens independent visual switches and the
 Baseline, Lighting + shadows, and Canvas look presets. **Record 20s** warms the
 selected configuration, measures it, and automatically downloads a profile.
 **Export** also downloads the latest sample. See [layer testing](native-webgl-layers.md).
@@ -43,7 +45,7 @@ Current implementation:
   authored curtains, lamp particles/fades, and apartment glows use GPU geometry
   and cached image assets. Bloom uses the Canvas downscale scales/strengths;
   atmosphere follows the original tint setting.
-- All 36 visual switches remain independent. Fireplace flames, crafting scanline,
+- All 43 visual switches remain independent. Fireplace flames, crafting scanline,
   record sheen, tub ripple, plants and telescope accents follow their authored
   continuous clock through GPU geometry. Static segments remain cached and
   retain their drawing order; Decor animation off freezes their original art.
@@ -60,18 +62,23 @@ Current implementation:
   Each effects group, transient lighting and low-resolution FX glow has a switch.
   Odd viewport sizes reuse allocations.
 - The original game loop, collision, interactions, and DOM controls remain.
-  This sandbox prevents the default story step from teleporting to an unported
-  scene on its first update.
+  The preview buttons disable story startup; imported saves restore their original
+  story data and normal map transitions.
 - WebGL initialization failures display an explicit message. Context loss stops
   drawing until Pixi and the browser restore the context. There is no Canvas
   renderer fallback in the preview.
 
-The city backdrop is still a snapshot; its camera-dependent parallax, animated
-traffic and city emissive pass are not migrated. Detailed furniture shadows keep
+City streets use the original GroundBaker's bounded 512-world-pixel tile cache,
+imported as resident GPU textures with GPU retirement tied to tile eviction.
+Visible city buildings use their authored camera-dependent facades, roofs and
+emissives; roof geometry is retained while the camera, daylight gate and LOD
+stay fixed. World bodies and traffic use native paths. Building contexts and
+far-off prop textures are released; street-light shadow images have a 64-owner
+LRU. The apartment's distant city backdrop remains a snapshot. Detailed furniture shadows keep
 Canvas's geometric footprints. A few tiny shadowBlur/dash accents, glyph outlines,
 light-color falloff and the GPU halo/softness kernel remain approximate.
-NPCs, cinematic camera features and additional combat abilities are outside this
-apartment slice. Character parity is measured below; complete apartment pixel
+NPC silhouette casts, additional combat abilities, some cinematic camera
+features, glass droplets and wet reflections still need dedicated passes. Character parity is measured below; complete apartment pixel
 parity and mobile performance still require comparison on the target phone.
 
 ## Verification
@@ -79,7 +86,8 @@ parity and mobile performance still require comparison on the target phone.
 Run `node tools/test-native-webgl-browser.cjs` and
 `node tools/test-native-webgl-layers-browser.cjs`, plus
 `node tools/test-native-webgl-character-browser.cjs` and
-`node tools/test-native-webgl-details-browser.cjs` after building the preview.
+`node tools/test-native-webgl-details-browser.cjs` and
+`node tools/test-native-webgl-city-browser.cjs` after building the preview.
 Chromium checks the real WebGL surface, linked shader, warmed texture reuse,
 movement, camera/screen round trips, furniture invalidation, resize/zoom, visible
 lighting across repeated frames, the actual gameplay loop, context loss and
@@ -204,13 +212,29 @@ profiler panel hidden as well as visible. A faster desktop run alone does not
 establish a mobile win. The first success criterion is a measurable improvement
 in the playable apartment slice, not a promised 60 FPS or immediate visual parity.
 
+## City saves and rain in v5
+
+The city suite imports a Canvas-format export through the actual file input and
+loads it through the slot card. It verifies saved position, currency/scrap and
+story data, isolated original storage, travel across distant city regions, texture
+reuse, bounded shadow caches, and normal fade transitions through the tested maps.
+See `native-webgl-city-checks.json` for the exact route/maps. This is functional
+coverage, not a claim that every story scene or interior has full pixel parity.
+
+Rain drops and splashes now reuse the original weather simulation, wind, height
+parallax, frame interpolation, lamp highlights and batched paths, rasterized as
+GPU geometry. Their switches do not stop the weather simulation or alter saved
+conditions. Indoor rain uses the original outdoor fade and clips to outdoor room
+rectangles; roof/window droplets and wet reflections remain separate work.
+Per-frame `world` and `rain` rows expose visible work and CPU submission stages.
+The city keeps GroundBaker's own full/half-density policy independently of the
+furniture texture-quality selector. Original authored landmark sprite density
+also remains unchanged.
+
 ## Next: rain and remaining visual parity
 
-Rain itself is not rendered in v4. The impact-particle switch ports the existing
-spark/spray particle renderer; it does not enable rain.
-
-1. **Drops and ground splashes:** retain weather intensity, wind and simulation;
-   batch drop geometry with height/parallax on the GPU, using reusable buffers.
+1. **Drops and ground splashes (first pass shipped):** retain weather intensity, wind and simulation;
+   batch authored drop paths with height/parallax into reusable GPU geometry.
    Respect the apartment roof/outdoor boundary so rain lands on the veranda,
    rather than through the living-room roof. Render short-lived splash rings
    with age-driven shaders. Give drops and splashes independent test switches.
@@ -221,11 +245,17 @@ spark/spray particle renderer; it does not enable rain.
    scene/light targets for wet highlights and reflections. Avoid capturing the
    live scene in Canvas or reading GPU pixels back to the CPU. Start with lamp
    reflections, then add character/scene reflection detail only where visible.
-4. **Remaining content:** NPC animation/silhouette casts, additional abilities,
-   city parallax/emissives, traffic and cinematic passes need separate parity
+4. **Remaining content:** NPC silhouette casts, additional abilities,
+   city optimization and cinematic passes need separate parity
    comparisons before this becomes a renderer for the full game.
 
 For the phone, first record Standard with Canvas look while walking and firing;
 then compare Auto and the individual FX/shot-light/FX-glow switches. High has
 four times the pixels per upgraded asset, so it needs a memory and cadence check.
 The v3 phone recording (30.75 FPS) is a baseline, not a v4 performance claim.
+
+The A53 5G is the target device. Its complete v4 High-quality recording averaged
+25.84 FPS with zero warmed uploads/bakes and no >250ms stalls; the user also
+reported satisfactory weapon play with a minor Anavia slowdown. City density,
+rain and live crowds add work, so v5 needs a new phone recording. First test a
+copied city save in Standard, walk/drive/fire, and record rain on/off separately.

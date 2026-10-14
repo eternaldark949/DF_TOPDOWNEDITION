@@ -38,8 +38,8 @@ they do not choose another rendering backend.
 
 ## Animated characters and shape shadows
 
-The build identifier is `native-webgl-details-v4`. **Canvas look** enables
-all 36 switches. **Lighting + shadows** also enables continuous character
+The build identifier is `native-webgl-city-v5`. **Canvas look** enables
+all 43 switches. **Lighting + shadows** also enables continuous character
 animation, silhouette shadows, high shadow detail and curtains.
 
 For a controlled moving test, use the same route, view, zoom, resolution and FPS
@@ -98,7 +98,7 @@ samples have labels and source frame IDs; unsupported devices explicitly say
 
 ## Evidence and remaining differences
 
-The four browser suites check the real main WebGL surface, all switches,
+The five browser suites check the real main WebGL surface, all switches,
 recording/export, moving gameplay, texture reuse, context recovery, odd-size
 resize, walls, finite casts, lit bodies, overlapping light sources, continuous
 poses, and projected silhouette gaps/rotation. Pixel readback is test-only.
@@ -107,8 +107,9 @@ poses, and projected silhouette gaps/rotation. Pixel readback is test-only.
 Compare `native-webgl-canvas-look.png` and `native-webgl-canvas-reference.png` for
 the apartment. These are comparison evidence, not a claim of identical pixels.
 
-The city backdrop/parallax, city glow/traffic, NPCs and advanced combat/cinematic
-passes remain unported. Rain is planned separately from impact particles. Furniture
+The apartment backdrop remains static; city geometry, emissives, traffic and
+live people now render natively. NPC silhouette casts, additional combat/cinematic
+passes, glass droplets and wet reflections remain unported. Furniture
 uses the original geometric shadow footprints; some tiny blur/dash accents,
 color falloff and GPU softness/halo remain approximate. Memory estimates exclude
 shared filter-pool overhead and depth/stencil storage. Workspace Chromium uses
@@ -147,5 +148,33 @@ from steady-state reuse; quality changes deliberately upload replacement art.
 
 For the next phone capture, use Standard + Canvas look and walk/fire for 20s.
 Compare Auto at the same zoom, then disable Shot lighting and FX glow separately
-if cadence falls. Rain will be added as drops/splashes, glass droplets, then wet
-reflections; see [the migration order](native-webgl-fork.md#next-rain-and-remaining-visual-parity).
+if cadence falls. Rain drops/splashes are now available; glass droplets and wet
+reflections follow; see [the migration order](native-webgl-fork.md#next-rain-and-remaining-visual-parity).
+
+## City and imported saves
+
+**PLAY WEBGL CITY** starts a story-free city preview. **LOAD / IMPORT SAVES**
+opens the original slot UI even with no fork saves yet: use Import with a JSON
+export from Canvas, then select its slot. Imports write only the WebGL namespace;
+Canvas saves are not overwritten. The toolbar's **Saves** shortcut reopens slots.
+The normal pause menu still offers saving/export. Imported progress uses the
+original migrations, inventory/equipment, vehicle, weather and story restoration.
+
+Seven additional switches control city buildings/roofs, people/enemies, vehicles,
+street details, world markers, rain drops and rain splashes. Gameplay continues
+when drawing groups are hidden. Rain switches retain the simulation's arrays and
+saved weather state; no per-frame Canvas rain bitmap is uploaded. City ground
+still uses its own bounded full/half-resolution tile policy.
+
+Per-frame `world` reports buildings, people, vehicles, ground tiles/gaps, native
+paths and CPU submission time. `rain` reports simulated drop/splash counts, paths
+and submission time (counts are not exact visible-drop counts). Imported imagery
+is reference-counted across native contexts, and unused contexts/images retire.
+Moving into new terrain can legitimately paint/upload new tiles and props;
+warmed stationary tests check reuse. Shadow images are bounded to 64 cached
+light owners, with visible sources kept recent.
+
+Record a city route in Standard with Canvas look, then repeat with Rain drops,
+Rain splashes, People / enemies, City buildings / roofs or Soft edges disabled
+one at a time. Include firing and driving in separate captures. The apartment's
+v4 phone FPS cannot establish the city's performance.

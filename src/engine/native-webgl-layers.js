@@ -3,7 +3,7 @@
 const NATIVE_LAYER_LABELS={floor:'Floor art',backdrop:'City backdrop',windows:'Window glass',walls:'Walls',doors:'Doors',fixtures:'Lamp fixtures',furniture:'Furniture',player:'Player',
     lighting:'Lighting',colorWash:'Colored light wash',decorLights:'Decor light sources',wallOcclusion:'Wall occlusion',propShadows:'Furniture shadows',
     playerShadows:'Player shadows',indicators:'Player marker',furnitureHints:'Grab hints',contactShadows:'Contact shadows',roomVeil:'Room veil',nightTint:'Night tint',
-    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow'};
+    glows:'Emissive glows',softShadows:'Soft edges',bloom:'Bloom',atmosphere:'Atmosphere',decorAnimation:'Decor animation',characterAnimation:'Character animation',shapeShadows:'Shape-accurate shadows',linens:'Curtains',shadowDetail:'High-resolution shadows',projectiles:'Bullet / fireball FX',weaponFx:'Muzzle / weapon FX',casings:'Spent casings',impactParticles:'Impact particles',decals:'Ground decals',overlays:'Combat cues',transientLights:'Shot lighting',fxGlow:'FX glow',buildings:'City buildings / roofs',people:'People / enemies',vehicles:'Vehicles',streetDetails:'Street details',worldMarkers:'World markers',rainDrops:'Rain drops',rainSplashes:'Rain splashes'};
 const NATIVE_LAYER_BASELINE={floor:true,backdrop:true,walls:true,furniture:true,player:true,lighting:true,characterAnimation:true};
 const NATIVE_LAYER_DEFAULTS=Object.fromEntries(Object.keys(NATIVE_LAYER_LABELS).map(k=>[k,true]));
 Object.assign(NativeWebGLRenderer.prototype,{
@@ -53,7 +53,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
     },
     clearLayers(){
         for(const r of this.shadowCache.values()){r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}}
-        this.shadowCache.clear();if(this.veilTarget){this.veilTarget.destroy(true);this.veilTarget=null;}this.veilKey=null;
+        this.shadowCache.clear();if(this.veilTarget){this.veilTarget.destroy(true);this.veilTarget=null;}this.veilDisplay.texture=PIXI.Texture.EMPTY;this.lighting.uniforms.veilMap=PIXI.Texture.EMPTY;this.veilKey=null;
         for(const ctx of [this.linenContext,this.glassContext,this.glowContext,this.fixtureContext]){ctx.destroy();}
         this.linenContext=new NativeVectorContext(this);this.linenStage=this.linenContext.root;this.world.addChild(this.linenStage);
         this.glassContext=new NativeVectorContext(this);this.glowContext=new NativeVectorContext(this);this.fixtureContext=new NativeVectorContext(this);
@@ -74,15 +74,16 @@ Object.assign(NativeWebGLRenderer.prototype,{
     // Split the original floor painting into GPU-resident, independently visible assets.
     buildMap(game){
         const capture=this.qualityRebuildPending?this.capture:null;this.clearMap();this.capture=capture;this.qualityRebuildPending=false;this.map=game.activeMap;const map=this.map,top=map.cameraBounds?.top||0;
-        this.floor.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{
+        if(map.id!=='hub_949')this.floor.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{
             c.fillStyle=map.floorColor;c.fillRect(0,0,map.width,map.height);
             for(const z of map.zones||[]){c.fillStyle=z.color;c.fillRect(z.x,z.y,z.w,z.h);
                 if(z.texture==='wood'){c.fillStyle='rgba(0,0,0,.15)';for(let py=z.y;py<z.y+z.h;py+=24)c.fillRect(z.x,py,z.w,1);c.fillStyle='rgba(255,255,255,.03)';c.fillRect(z.x,z.y,z.w,z.h);}
                 else if(z.texture==='carpet'){c.fillStyle='rgba(0,0,0,.06)';c.fillRect(z.x,z.y,z.w,4);c.fillRect(z.x,z.y+z.h-4,z.w,4);c.fillRect(z.x,z.y,4,z.h);c.fillRect(z.x+z.w-4,z.y,4,z.h);}}
         })));
-        const backdrop=new PIXI.Sprite(this.bake(map.width,map.height-top,c=>{c.translate(0,-top);game.drawApartmentBackdrop(c);}));
-        backdrop.y=top;this.backdrop.addChild(backdrop);
-        this.floorArt.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{game.drawApartmentInterior(c);game.roomSystem.drawFloors(c);})));
+        if(map.id==='apt_949'){const backdrop=new PIXI.Sprite(this.bake(map.width,map.height-top,c=>{c.translate(0,-top);game.drawApartmentBackdrop(c);}));
+        backdrop.y=top;this.backdrop.addChild(backdrop);}
+        if(map.id!=='hub_949')this.floorArt.addChild(new PIXI.Sprite(this.bake(map.width,map.height,c=>{if(map.id==='apt_949')game.drawApartmentInterior(c);else INTERIOR_ART[map.id]?.floor?.(game,c);game.roomSystem.drawFloors(c);})));
+        this.initWorld();
         this.windows.addChild(this.glassContext.root);
         this.walls.beginFill(0x222222).lineStyle(1,0x00f3ff,.3);
         for(const w of map.walls||[])this.walls.drawRect(w.x,w.y,w.w,w.h);this.walls.endFill();
@@ -106,11 +107,11 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 let s=this.contactSprites.get(p);if(!s){s=new PIXI.Sprite(this.lightGradient);s.anchor.set(.5);s.tint=0;s.alpha=.35;this.contacts.addChild(s);this.contactSprites.set(p,s);}
                 const player=p===game.player;s.position.set(p.x+(player?0:p.width/2),p.y+(player?0:p.height/2));
                 s.width=player?26:p.width+10;s.height=player?18:p.height+10;s.rotation=p.angle||0;
-                s.visible=p.visible!==false&&(player?L.player:L.furniture);
+                s.visible=p.visible!==false&&(player?L.player:L.furniture)&&Math.abs(s.x-view.x)<game.canvas.width/(2*view.zoom)+(p.width||24)+80&&Math.abs(s.y-view.y)<game.canvas.height/(2*view.zoom)+(p.height||24)+80;
             }
             for(const [p,s] of this.contactSprites)if(p!==game.player&&!this.props.has(p)){s.destroy();this.contactSprites.delete(p);}
         }
-        this.veil.visible=true;this.veilDisplay.visible=L.roomVeil&&(!L.lighting||game.getAmbientDarkness()<.5);
+        this.veil.visible=true;this.veilDisplay.visible=L.roomVeil&&game.roomSystem.active&&(!L.lighting||game.getAmbientDarkness()<.5);
         if(L.roomVeil&&game.roomSystem.active)for(const [id,r] of Object.entries(game.roomSystem.rooms)){
             let g=this.roomSprites.get(id);if(!g){g=new PIXI.Graphics();g.beginFill(0x100822);
                 for(const q of r.rects)g.drawRect(q.x,q.y,q.w,q.h);g.endFill();this.veil.addChild(g);this.roomSprites.set(id,g);}
@@ -121,12 +122,12 @@ Object.assign(NativeWebGLRenderer.prototype,{
                 this.veilDisplay.texture=this.veilTarget;this.veilDisplay.position.set(-24,-24);this.veil.position.set(24,24);this.lighting.uniforms.veilMap=this.veilTarget;}
             const key=[...this.roomSprites.values()].map(g=>g.alpha.toFixed(3)).join(':');if(key!==this.veilKey){this.renderer.render(this.veil,{renderTexture:this.veilTarget,clear:true});this.veilKey=key;}
         }
-        this.lighting.uniforms.veilGain=L.roomVeil&&L.lighting&&game.getAmbientDarkness()>=.5?1:0;
+        this.lighting.uniforms.veilGain=L.roomVeil&&game.roomSystem.active&&L.lighting&&game.getAmbientDarkness()>=.5?1:0;
         this.lighting.uniforms.inverseWorld.set([-this.world.x/view.zoom,-this.world.y/view.zoom,1/view.zoom]);
         if(this.veilTarget)this.lighting.uniforms.veilSize.set([this.veilTarget.width,this.veilTarget.height]);
         this.emissive.visible=L.glows;
         if(L.glows){const ctx=this.glowContext,city=game._cityView,clock=_frameTime;ctx.begin();
-            try{game._cityView=null;if(!L.decorAnimation)_frameTime=0;game.drawApartmentGlow(ctx);}finally{game._cityView=city;_frameTime=clock;}}
+            try{game._cityView=null;if(!L.decorAnimation)_frameTime=0;INTERIOR_ART[game.activeMap.id]?.glow?.(game,ctx);}finally{game._cityView=city;_frameTime=clock;}}
         this.actorHalo.visible=L.glows&&L.player&&game._playerGlowOn();
         if(this.actorHalo.visible){this.actorHalo.shader.uniforms.body=this.actorTexture;this.actorHalo.shader.uniforms.blur=9*(game._renderScale||1)/view.zoom/192;
             this.actorHalo.position.set(game.player.x,game.player.y);this.actorHalo.rotation=game.player.angle||0;}
@@ -319,7 +320,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.skyLight.visible=true;this.skyLight.scale.set(view.zoom);this.skyLight.position.copyFrom(this.world.position);
         this.lightSprites.scale.set(view.zoom);this.lightSprites.position.copyFrom(this.world.position);
         const sources=(game.lamps||[]).filter(l=>l.visible!==false).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
-            color:l.color||'#ffeebb',wash:.08,alpha:game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
+            color:l.color||'#ffeebb',wash:.08,alpha:(game.activeMap.type==='outdoor'&&!game.dayCycle().lampsOn?0:1)*game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
         if(L.decorLights){
             for(const p of game.props||[])if(p.visible!==false&&p.light){const c=p.getCenter(),q=p.light;
                 sources.push({owner:p,x:c.x+(q.dx||0),y:c.y+(q.dy||0),radius:q.radius||Math.max(q.w||0,q.h||0)/2||180,
@@ -341,6 +342,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
             s.blendMode=PIXI.BLEND_MODES.SCREEN;const t=_frameTime/1000,pulse=(L.decorAnimation&&source.flicker) ? .82+.18*Math.sin(t*source.flicker+source.x*.7)*Math.sin(t*source.flicker*.37+source.y) : 1;
             s.tint=0xffffff;s.alpha=Math.min(1,Math.max(0,source.alpha*pulse));
         }
+        // Visible lights touch the LRU; travelling across the city must not
+        // retain every street lamp's targets for the rest of the session.
+        for(const source of sources){const r=this.shadowCache.get(source.owner);if(r){this.shadowCache.delete(source.owner);this.shadowCache.set(source.owner,r);}}
+        while(this.shadowCache.size>64){const owner=this.shadowCache.keys().next().value,r=this.shadowCache.get(owner);r.stage.destroy({children:true});r.texture.destroy(true);if(r.dynamicStage){r.dynamicStage.destroy({children:true});r.dynamicTexture.destroy(true);}this.shadowCache.delete(owner);}
         this.shadowStats.sources=sources.length;
         this.lightStage.filters=L.softShadows?[this.softFilter]:null;
         this.lighting.uniforms.nightTint=L.nightTint?1:0;

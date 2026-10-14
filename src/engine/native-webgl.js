@@ -5,7 +5,7 @@ class NativeWebGLRenderer {
         const initStart=performance.now();
         this.canvas = canvas;
         this.layers={...NATIVE_LAYER_DEFAULTS};this.configurationId=0;
-        this.textures = new Set(); this.props = new Map();
+        this.imageRefs=new Map();this.textures = new Set(); this.props = new Map();
         this.frames = []; this.lastStart = 0; this.uploads = 0; this.bakes = 0;this.warmFrames=10;this.drawCalls=0;this.bufferBytes=0;
         this.textureQuality=NativeWebGLStorage.getItem('textureQuality')||'standard';this.qualityReductions=0;
         this.map = null; this.failure = null; this.lightsOn = true;
@@ -75,10 +75,10 @@ class NativeWebGLRenderer {
                 this.lost=false;this.gpuTimer.extension=this.renderer.gl.getExtension('EXT_disjoint_timer_query_webgl2');this.contextRestores=(this.contextRestores||0)+1;
                 // Render-texture pixels cannot survive context loss. CPU geometry
                 // remains valid, but every cached GPU light image must be redrawn.
-                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
+                for(const r of this.shadowCache.values()){r.key=null;r.dynamicKey=null;}this.actorHash=null;this.veilKey=null;for(const r of this.nativeBuildings?.values()||[])r.key=null;for(const ctx of [this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top]),...[...this.props.values()].map(r=>r.liveContext)])for(const r of ctx?.gradients||[])r.key=null;
                 this.frames=[];this.warmFrames=15;this.lastStart=this.lastEnd=0;this.capture=this.completedCapture=null;this.message('');
             });
-            this.gpuTimer=new NativeGpuTimer(gl);this.frameId=0;this.initLayers();this.initDetails();
+            this.gpuTimer=new NativeGpuTimer(gl);this.frameId=0;this.initLayers();this.initDetails();this.initWorld();
         } catch(e) { this.failure=String(e.message||e); }
         this.initializationMs=performance.now()-initStart;
     }
@@ -87,6 +87,8 @@ class NativeWebGLRenderer {
         const texture=PIXI.Texture.from(canvas,{resolution});if(!this.textures.has(texture)){this.textures.add(texture);this.bakes++;}
         return texture;
     }
+    retainImage(image){const t=this.texture(image);this.imageRefs.set(t,(this.imageRefs.get(t)||0)+1);return t;}
+    releaseImage(t){const count=(this.imageRefs.get(t)||1)-1;if(count>0)this.imageRefs.set(t,count);else {this.imageRefs.delete(t);this.textures.delete(t);t.destroy(true);}}
     bake(w,h,paint,kind='art') {
         const density=this.bakeDensity(w,h,kind);
         const canvas=document.createElement('canvas');canvas.width=Math.ceil(w*density);canvas.height=Math.ceil(h*density);
@@ -95,7 +97,7 @@ class NativeWebGLRenderer {
     clearMap() {
         if(this.actorContext){this.actorContext.destroy();this.actorContext=null;this.actorTexture.destroy(true);this.actorTexture=null;this.actorHash=null;}
         for(const r of this.props.values())if(r.liveContext)r.liveContext.destroy();
-        this.clearDetails();this.clearLayers();
+        this.clearWorld();this.clearDetails();this.clearLayers();
         this.floor.removeChildren(); this.objects.removeChildren(); this.walls.clear(); this.effects.clear();
         for(const t of this.textures)t.destroy(true);
         this.textures.clear();this.props.clear();
@@ -125,7 +127,7 @@ class NativeWebGLRenderer {
     }
     draw(game) {
         if(this.failure||this.lost){this.message(this.failure||'WebGL context lost.');return;}
-        if(game.activeMap?.id!=='apt_949'){this.message('This WebGL slice supports the apartment. Use Restart apartment to return.');return;}
+        if(!game.activeMap)return;
         const start=performance.now(),beforeUploads=this.uploads,beforeBakes=this.bakes,beforeDraws=this.drawCalls,beforeBuffers=this.bufferBytes;
         this.settings={resolutionScale:GameSettings.resolutionScale,baseZoom:GameSettings.baseZoom,fpsLimit:GameSettings.fpsLimit};
         this.frameId++;this.gpuTimer.poll();
@@ -134,7 +136,7 @@ class NativeWebGLRenderer {
         if(this.renderer.screen.width!==w||this.renderer.screen.height!==h)this.renderer.resize(w,h);
         this.world.filterArea.width=w;this.world.filterArea.height=h;
         const zoom=game.camera.zoom*(game.finCam?.z||1);
-        const target=game.cutscene?.active?game.camera:game.player;
+        const target=game.cutscene?.active?game.camera:game.isDriving&&game.car?game.car:game.player;
         const c=game._clampView(target.x+(game.scopeLeanX||0),target.y+(game.scopeLeanY||0),zoom);
         const view=game.view={x:c.x,y:c.y,zoom,shakeX:game.camera.shakeX||0,shakeY:game.camera.shakeY||0};
         this.lastView={...view};
@@ -149,13 +151,13 @@ class NativeWebGLRenderer {
         this.playerSprite.alpha=(game.player.isHidden||game.flitState.active) ? .5 : 1;
         this.playerSprite.visible&&=this.layers.player;
         this.syncLayers(game,view);
-        this.syncDetails(game,view);
+        this.syncDetails(game,view);this.syncWorld(game,view);
         this.gpuTimer.begin('lighting',this.frameId);this.syncLighting(game,view);this.gpuTimer.end();
         this.gpuTimer.begin('scene',this.frameId);this.renderer.render(this.stage);this.gpuTimer.end();
         const end=performance.now();
         const f={frame:this.frameId,at:start,intervalMs:this.lastStart?start-this.lastStart:null,gapMs:this.lastEnd?start-this.lastEnd:null,renderMs:end-start,
             uploads:this.uploads-beforeUploads,bakes:this.bakes-beforeBakes,draws:this.drawCalls-beforeDraws,bufferBytes:this.bufferBytes-beforeBuffers,
-            details:structuredClone(this.detailStats),animation:{...this.actorStats},shadows:{...this.shadowStats},stages:{...this.layerStages}};this.lastStart=start;
+            rain:{...this.rainStats},world:{...this.worldStats},details:structuredClone(this.detailStats),animation:{...this.actorStats},shadows:{...this.shadowStats},stages:{...this.layerStages}};this.lastStart=start;
         this.lastEnd=end;
         if(this.startup&&!this.startup.ready){this.startup.firstFrames.push({...f});if(this.startup.firstFrames.length>=15)this.startup.ready=true;}
         if(this.warmFrames>0)this.warmFrames--;
@@ -171,11 +173,11 @@ class NativeWebGLRenderer {
     report() {
         const frames=this.frames.slice(),intervals=frames.map(f=>f.intervalMs).filter(v=>v>0),sum=intervals.reduce((a,b)=>a+b,0);
         const sorted=intervals.slice().sort((a,b)=>a-b);
-        return {renderer:'native-webgl-apartment',build:'native-webgl-details-v4',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
+        return {renderer:'native-webgl-apartment',build:'native-webgl-city-v5',pixiVersion:PIXI.VERSION,device:this.device,map:this.map?.id,view:this.lastView,
             settings:this.settings,resolution:[this.canvas.width,this.canvas.height],lighting:this.lightsOn,warmFramesRemaining:this.warmFrames,frames,
             animationSummary:{changedFrames:frames.filter(f=>f.animation?.changed).length,geometryMeanMs:frames.length?frames.reduce((n,f)=>n+(f.animation?.geometryMs||0),0)/frames.length:0,
                 shadowRefreshFrames:frames.filter(f=>f.shadows.dynamicRebuilds>0).length,dynamicRebuilds:frames.reduce((n,f)=>n+(f.shadows.dynamicRebuilds||0),0),staticRebuilds:frames.reduce((n,f)=>n+(f.shadows.staticRebuilds||0),0)},
-            textureQuality:this.textureQuality,assetDensities:[...new Set([...this.textures].map(t=>t.baseTexture.resolution))],glyphAtlasBytes:Object.values(PIXI.BitmapFont.available.NativeDetailFont.pageTextures).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),qualityReductions:this.qualityReductions,details:this.detailStats,layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
+            rain:this.rainStats,world:this.worldStats,textureQuality:this.textureQuality,assetDensities:[...new Set([...this.textures].map(t=>t.baseTexture.resolution))],glyphAtlasBytes:Object.values(PIXI.BitmapFont.available.NativeDetailFont.pageTextures).reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),qualityReductions:this.qualityReductions,details:this.detailStats,layers:{...this.layers},configurationId:this.configurationId,sampleDurationMs:sum,
             contextRestores:this.contextRestores||0,
             capture:this.capture?{...this.capture}:null,player:this.playerSprite?{x:this.playerSprite.x,y:this.playerSprite.y}:null,
             fps:sum?intervals.length*1000/sum:0,p95Ms:sorted[Math.ceil(sorted.length*.95)-1]||0,
@@ -186,10 +188,10 @@ class NativeWebGLRenderer {
             timing:this.gpuTimer.extension?'CPU submission, actual frame cadence, and optional asynchronous GPU samples':'CPU render submission and frame cadence; GPU timer unavailable',
             shadowCache:this.shadowStats,layerStages:this.layerStages,animation:this.actorStats,startup:this.startup,entryTiming:this.entryTiming,initializationMs:this.initializationMs,
             gpu:{status:this.gpuTimer.status,pending:this.gpuTimer.pending.length,samples:this.gpuTimer.samples.filter(s=>s.frame>=(frames[0]?.frame??Infinity))},
-            gradientTargetBytes:[this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,...[...this.props.values()].map(r=>r.liveContext)].filter(Boolean).reduce((n,c)=>n+c.gradients.length*128*128*4,0),
+            gradientTargetBytes:[this.actorContext,this.linenContext,this.glassContext,this.glowContext,this.fixtureContext,this.groundDetailContext,this.projectileContext,this.postEffectContext,this.cueContext,this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.rainContext,this.roofDetailContext,...[...(this.nativeBuildings?.values()||[])].flatMap(r=>[r.base,r.top]),...[...this.props.values()].map(r=>r.liveContext)].filter(Boolean).reduce((n,c)=>n+c.gradients.length*128*128*4,0),
             veilTargetBytes:this.veilTarget?this.veilTarget.baseTexture.realWidth*this.veilTarget.baseTexture.realHeight*4:0,
             characterTargetBytes:this.actorTexture?this.actorTexture.baseTexture.realWidth*this.actorTexture.baseTexture.realHeight*4:0,
             shadowTextureBytes:this.shadowBytes(),
-            limitations:['Apartment slice; static city backdrop','Procedural character paths use GPU tessellation; tiny Canvas shadowBlur accents remain approximate','Furniture shadows use the original geometric footprints','NPCs, rain/reflections and cinematic overlays are not migrated; small blur/dash accents remain approximate']};
+            limitations:['City/interior migration; some cinematic passes remain approximate','Procedural character paths use GPU tessellation; tiny Canvas shadowBlur accents remain approximate','Furniture shadows use the original geometric footprints','NPC silhouette casts, window droplets and wet reflections are not migrated; small blur/dash accents remain approximate']};
     }
 }

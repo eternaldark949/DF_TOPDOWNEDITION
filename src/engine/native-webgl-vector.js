@@ -10,6 +10,26 @@
         NativeRecordedPath.prototype[name]=function(...args){this.nativeCommands.push([name,args]);return BrowserPath.prototype[name].apply(this,args);};
     }
     window.Path2D=NativeRecordedPath;
+    // Landmark caches can cross between live GPU paths and one-time Canvas
+    // sprite painters. Convert a native gradient only at the authoring boundary.
+    for(const name of ['fillStyle','strokeStyle']){
+        const descriptor=Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype,name);
+        Object.defineProperty(CanvasRenderingContext2D.prototype,name,{...descriptor,set(value){
+            if(value?.nativeGradient&&!(value instanceof CanvasGradient)){
+                const g=value.type?this.createRadialGradient(...value.args):this.createLinearGradient(...value.args);
+                for(const [at,color]of value.stops)g.addColorStop(at,color);value=g;
+            }descriptor.set.call(this,value);
+        }});
+    }
+
+    // Cached authored gradients may be created by an asset baker before a live
+    // native draw. Retain their stops while preserving real Canvas semantics.
+    for(const [name,type]of [['createLinearGradient',0],['createRadialGradient',1]]){
+        const make=CanvasRenderingContext2D.prototype[name];
+        CanvasRenderingContext2D.prototype[name]=function(...args){const g=make.apply(this,args),add=g.addColorStop.bind(g);
+            Object.assign(g,{nativeGradient:true,type,args,stops:[]});g.addColorStop=(at,color)=>{add(at,color);g.stops.push([at,color]);};return g;};
+    }
+
 })();
 
 class NativeVectorContext {
@@ -23,7 +43,7 @@ class NativeVectorContext {
         Object.assign(this,{fillStyle:'#000',strokeStyle:'#000',globalAlpha:1,globalCompositeOperation:'source-over',lineWidth:1,lineCap:'butt',lineJoin:'miter',shadowBlur:0,shadowColor:'transparent',font:'11px sans-serif',textAlign:'start',textBaseline:'alphabetic'});
         this.beginPath();this.pathsPainted=0;
     }
-    destroy(){for(const n of this.pool)n.mask=null;for(const n of this.pool){if(n.parent)n.parent.removeChild(n);n.destroy();}this.root.destroy();for(const r of this.gradients){r.stage.destroy({children:true});r.texture.destroy(true);}this.gradients=[];this.pool=[];this.pools.clear();this.images.clear();for(const t of this.imageViews.values())t.destroy(false);this.imageViews.clear();}
+    destroy(){for(const n of this.pool)n.mask=null;for(const n of this.pool){if(n.parent)n.parent.removeChild(n);n.destroy();}this.root.destroy();for(const r of this.gradients){r.stage.destroy({children:true});r.texture.destroy(true);}this.gradients=[];this.pool=[];this.pools.clear();for(const t of this.images.values())this.owner.releaseImage(t);this.images.clear();for(const t of this.imageViews.values())t.destroy(false);this.imageViews.clear();}
     node(Type){let list=this.pools.get(Type);if(!list){list=[];list.used=0;this.pools.set(Type,list);}
         let n=list[list.used];if(!n){n=(Type===PIXI.BitmapText?new PIXI.BitmapText('',{fontName:'NativeDetailFont'}):new Type());list.push(n);this.pool.push(n);}list.used++;
         n.visible=true;n.mask=null;this.container.addChild(n);if(n instanceof PIXI.Graphics)n.clear();else if(Type===PIXI.Container)n.removeChildren();return n;
@@ -51,7 +71,7 @@ class NativeVectorContext {
     // Hair and cloth still simulate in world space, even though the body raster
     // target is local. Their existing camera-cancellation contract is preserved.
     getTransform(){const m=this.matrix,b=this.worldFrame;
-        const v=b?b.multiply(new DOMMatrix([m.a,m.b,m.c,m.d,m.tx-96,m.ty-96])):m;
+        const v=this.sceneFrame?this.sceneFrame.multiply(new DOMMatrix([m.a,m.b,m.c,m.d,m.tx,m.ty])):b?b.multiply(new DOMMatrix([m.a,m.b,m.c,m.d,m.tx-96,m.ty-96])):m;
         return new DOMMatrix([v.a,v.b,v.c,v.d,v.e??v.tx,v.f??v.ty]);
     }
     setLineDash(values){this.dash=values;}
@@ -101,8 +121,9 @@ class NativeVectorContext {
         else {const c=this.color(style);g.beginFill(c.color,c.alpha*this.globalAlpha);}
         this.hashPath(paths,style?.nativeGradient?JSON.stringify([style.args,style.stops,this.matrix.a,this.matrix.b,this.matrix.c,this.matrix.d,this.matrix.tx,this.matrix.ty]):style);this.polygons(g,paths,rule==='evenodd'||r==='evenodd');g.endFill();this.pathsPainted++;
     });}
-    stroke(path){this.withPath(path,paths=>{const g=this.graphics(),c=this.color(this.strokeStyle),scale=Math.sqrt(Math.abs(this.matrix.a*this.matrix.d-this.matrix.b*this.matrix.c));
-        this.hashPath(paths,this.strokeStyle);this.hashValue(this.lineWidth);g.lineStyle({width:this.lineWidth*scale,color:c.color,alpha:c.alpha*this.globalAlpha,cap:this.lineCap,join:this.lineJoin});
+    stroke(path){this.withPath(path,paths=>{const g=this.graphics(),scale=Math.sqrt(Math.abs(this.matrix.a*this.matrix.d-this.matrix.b*this.matrix.c));
+        this.hashPath(paths,this.strokeStyle);this.hashValue(this.lineWidth);if(this.strokeStyle?.nativeGradient){const r=this.gradient(this.strokeStyle);g.lineTextureStyle({width:this.lineWidth*scale,texture:r.texture,matrix:r.matrix,alpha:this.globalAlpha,cap:this.lineCap,join:this.lineJoin});}
+        else {const c=this.color(this.strokeStyle);g.lineStyle({width:this.lineWidth*scale,color:c.color,alpha:c.alpha*this.globalAlpha,cap:this.lineCap,join:this.lineJoin});}
         for(const p of paths){if(p.points.length<4)continue;g.moveTo(p.points[0],p.points[1]);for(let i=2;i<p.points.length;i+=2)g.lineTo(p.points[i],p.points[i+1]);if(p.closed)g.closePath();}g.lineStyle(0);this.pathsPainted++;
     });}
     clip(path,rule){this.withPath(path,(paths,r)=>{
@@ -113,7 +134,7 @@ class NativeVectorContext {
     fillRect(x,y,w,h){const old=this.path,part=this.part;this.beginPath();this.rect(x,y,w,h);this.fill();this.path=old;this.part=part;}
     strokeRect(x,y,w,h){const old=this.path,part=this.part;this.beginPath();this.rect(x,y,w,h);this.stroke();this.path=old;this.part=part;}
     drawImage(image,...args){
-        let t=this.images.get(image);if(!t){t=this.owner.texture(image);this.images.set(image,t);}
+        let t=this.images.get(image);if(!t){t=this.owner.retainImage(image);this.images.set(image,t);}
         let x,y,w,h;if(args.length===2){[x,y]=args;w=image.width;h=image.height;}else if(args.length===4)[x,y,w,h]=args;
         else if(args.length===8){const [sx,sy,sw,sh,dx,dy,dw,dh]=args,key=[t.baseTexture.uid,sx,sy,sw,sh].join(':');let view=this.imageViews.get(key);
             if(!view){view=new PIXI.Texture(t.baseTexture,new PIXI.Rectangle(sx,sy,sw,sh));this.imageViews.set(key,view);}t=view;[x,y,w,h]=[dx,dy,dw,dh];}
@@ -122,6 +143,7 @@ class NativeVectorContext {
         this.hashValue(t.baseTexture.uid);this.hashValue(this.globalAlpha);for(const v of [...args,this.matrix.a,this.matrix.b,this.matrix.c,this.matrix.d,this.matrix.tx,this.matrix.ty])this.hashValue(v);
         s.transform.setFromMatrix(this.matrix.clone().append(new PIXI.Matrix(w/t.width,0,0,h/t.height,x,y)));this.current=null;
     }
+    measureText(text){const size=Number(/([0-9.]+)px/.exec(this.font)?.[1]||11);return {width:String(text).length*size*.62};}
     fillText(text,x,y){
         this.hashValue(text);this.hashValue(this.font);this.hashValue(this.fillStyle);this.hashValue(this.globalAlpha);this.hashValue(x);this.hashValue(y);
         this.current=null;const n=this.node(PIXI.BitmapText),match=/([0-9.]+)px/.exec(this.font),size=match?Number(match[1]):11;

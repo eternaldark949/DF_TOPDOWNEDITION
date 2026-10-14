@@ -1,34 +1,42 @@
-// A separate entry point avoids running unsupported story/city scenes in this slice.
+// Native entry points retain sandbox previews and the original save schema.
 (() => {
     const renderer=game.nativeRenderer;
     const menu=document.getElementById('main-menu-list');
     const start=document.createElement('button');start.id='btn-native-apartment';start.textContent='PLAY WEBGL APARTMENT';
     start.style.cssText='padding:16px;margin:12px;color:#fff;background:#402060;border:1px solid #b78af8;font:inherit;cursor:pointer';
     menu.prepend(start);
-    const description=document.createElement('p');description.textContent='Apartment preview: explore, move furniture, and compare visual layers. City and story scenes are not included yet.';
+    const description=document.createElement('p');description.textContent='Apartment preview: explore, move furniture, and compare visual layers. City travel is enabled. Import Canvas saves into the fork’s separate save slots.';
     description.style.cssText='max-width:420px;font-size:13px;color:#d9c9e5';start.after(description);
     const toolbar=document.createElement('div');toolbar.id='native-webgl-toolbar';
     toolbar.style.cssText='position:fixed;top:4px;left:4px;max-width:calc(100vw - 68px);z-index:10000;color:#eee;background:#16101e;padding:6px;font:11px monospace;display:none';
     const panel=document.createElement('span');renderer.panel=panel;toolbar.append(panel);
     const notice=document.createElement('div');renderer.notice=notice;notice.hidden=true;toolbar.append(notice);
     const button=(text,action)=>{const b=document.createElement('button');b.textContent=text;b.style.marginLeft='6px';b.onclick=action;toolbar.append(b);};
-    const launch=()=>{
+    const launch=(mapId='apt_949')=>{
         const startAt=performance.now(),entry=renderer.entryTiming={pageAgeMs:startAt,stages:{}};let lap=startAt;
         toolbar.style.display='block';
         if(renderer.failure){renderer.message('WebGL unavailable: '+renderer.failure);return;}
-        game.resetGameState();entry.stages.resetMs=performance.now()-lap;lap=performance.now();game._doLoadMap('apt_949');entry.stages.mapLoadMs=performance.now()-lap;lap=performance.now();game.player.visible=true;game.paused=false;
+        game.resetGameState();entry.stages.resetMs=performance.now()-lap;lap=performance.now();game._doLoadMap(mapId);entry.stages.mapLoadMs=performance.now()-lap;lap=performance.now();game.player.visible=true;game.paused=false;
         // Sandbox entry has no story step: the default chapter would otherwise
         // initialize on the first simulation tick and teleport into an unported scene.
         game.story.state.part=0;game.story.currentStepData=null;game.story.initializedStep=true;
         renderer.map=null;game.showProfiler=false;
         // No auto-transition to unported maps; original apartment interactions remain.
-        game.activeMap.transitions=[];
+        // Keep authored exits: the native world renderer handles arriving maps.
         game.enterWorld();entry.stages.enterWorldMs=performance.now()-lap;lap=performance.now();game.draw();entry.stages.firstDrawMs=performance.now()-lap;entry.totalMs=performance.now()-startAt;
     };
+    const city=document.createElement('button');city.id='btn-native-city';city.textContent='PLAY WEBGL CITY';city.style.cssText=start.style.cssText;start.after(city);
+    city.onclick=()=>{try{audioSys.init();}catch(e){}launch('hub_949');};
+    const saves=document.createElement('button');saves.id='btn-native-saves';saves.textContent='LOAD / IMPORT SAVES';saves.style.cssText=start.style.cssText;city.after(saves);
+    const originalLoad=game.loadGame.bind(game);
+    game.loadGame=key=>{const raw=NativeWebGLStorage.getItem(key||saveSlotManager.getActiveKey());if(!raw)return originalLoad(key);
+        try{JSON.parse(raw);}catch(e){showMessage('ERROR LOADING SAVE FILE.');return false;}
+        game.resetGameState();const ok=originalLoad(key);if(ok){renderer.map=null;toolbar.style.display='block';game.enterWorld();}return ok;};
+    saves.onclick=()=>{try{audioSys.init();}catch(e){}saveSlotManager.open('load',success=>{if(success)game.enterWorld();});};
     start.onclick=()=>{try{audioSys.init();}catch(e){}launch();};
     const layers=document.createElement('div');layers.id='native-webgl-layers';layers.hidden=true;
     layers.style.cssText='position:fixed;top:68px;left:8px;max-width:330px;max-height:65vh;overflow:auto;background:#1b1228;color:white;border:1px solid #a887cd;padding:12px;z-index:10001;font:13px sans-serif';
-    const heading=document.createElement('strong');heading.textContent='APARTMENT LAYERS';layers.append(heading);
+    const heading=document.createElement('strong');heading.textContent='RENDER LAYERS';layers.append(heading);
     const note=document.createElement('p');note.textContent='Changes reset the sample. Shadows require Lighting. Freeze Character animation or switch Shape-accurate shadows to compare their cost. Record 20s exports after warmup; Export repeats the finished run.';layers.append(note);
     const qualityRow=document.createElement('label');qualityRow.textContent='Texture quality ';const quality=document.createElement('select');quality.id='native-texture-quality';
     for(const [key,label]of [['standard','Standard'],['auto','Auto (sharper furniture)'],['high','High (2× textures)']]){const option=document.createElement('option');option.value=key;option.textContent=label;quality.append(option);}
@@ -50,7 +58,7 @@
     const download=()=>{
         const report=renderer.completedCapture||renderer.report();
         const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
-        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v4-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const a=document.createElement('a');a.href=url;a.download='dfab-native-webgl-v5-'+(report.capture?.finished?'recorded-'+Math.round(report.capture.durationMs/1000)+'s':'rolling-'+Math.round(report.sampleDurationMs/1000)+'s')+'-config-'+report.configurationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     button('Record 20s',()=>{
         layers.hidden=true;renderer.frames=[];renderer.warmFrames=15;renderer.lastStart=renderer.lastEnd=0;
@@ -58,8 +66,9 @@
     });
     renderer.onCaptureComplete=download;
     button('Export',download);
-    button('Restart apartment',launch);
+    button('Saves',()=>saveSlotManager.open('load'));
+    button('Restart apartment',()=>launch());
     document.body.append(toolbar);
-    // Keep unsupported story entry points out of the experiment's menu.
+    // New story starts stay separate; imported progress uses the original story system.
     for(const id of ['btn-new-game','btn-continue','btn-load-game']){const el=document.getElementById(id);if(el)el.style.display='none';}
 })();

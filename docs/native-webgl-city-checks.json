@@ -1,0 +1,365 @@
+{
+  "passed": true,
+  "recovery": true,
+  "map": "hub_949",
+  "world": {
+    "buildings": 2,
+    "people": 0,
+    "vehicles": 1,
+    "groundPending": 0,
+    "groundTiles": 6,
+    "paths": 42,
+    "cpuMs": 57.900000005960464
+  },
+  "steadyUploads": 0,
+  "travel": [
+    {
+      "x": 4300,
+      "y": 4700,
+      "world": {
+        "buildings": 1,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 12,
+        "paths": 122,
+        "cpuMs": 11.899999998509884
+      },
+      "bytes": 15167376,
+      "shadowCache": 22
+    },
+    {
+      "x": 8500,
+      "y": 7000,
+      "world": {
+        "buildings": 1,
+        "people": 1,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 18,
+        "paths": 122,
+        "cpuMs": 17.799999997019768
+      },
+      "bytes": 21849040,
+      "shadowCache": 39
+    },
+    {
+      "x": 11800,
+      "y": 12000,
+      "world": {
+        "buildings": 3,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 27,
+        "paths": 0,
+        "cpuMs": 4.5
+      },
+      "bytes": 33803344,
+      "shadowCache": 50
+    },
+    {
+      "x": 1200,
+      "y": 550,
+      "world": {
+        "buildings": 2,
+        "people": 0,
+        "vehicles": 1,
+        "groundPending": 0,
+        "groundTiles": 27,
+        "paths": 42,
+        "cpuMs": 4.9000000059604645
+      },
+      "bytes": 33467992,
+      "shadowCache": 50
+    }
+  ],
+  "rain": {
+    "on": {
+      "drops": 849,
+      "splashes": 496,
+      "paths": 110,
+      "cpuMs": 1.3999999985098839
+    },
+    "off": {
+      "drops": 0,
+      "splashes": 0,
+      "paths": 0,
+      "cpuMs": 0
+    },
+    "restored": true
+  },
+  "loaded": {
+    "map": "hub_949",
+    "currency": 12345,
+    "scrap": 678,
+    "x": 1200,
+    "y": 550,
+    "story": {
+      "state": {
+        "part": 0,
+        "chapter": 1,
+        "mission": 1,
+        "step": 0
+      },
+      "completedOptional": [],
+      "activeOptional": null
+    },
+    "original": "canvas-original",
+    "webgl": true
+  },
+  "interiors": [
+    {
+      "map": "apt_949",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0
+      }
+    },
+    {
+      "map": "hotel_lobby",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.10000000149011612
+      }
+    },
+    {
+      "map": "moon_city_nightclub",
+      "world": {
+        "buildings": 0,
+        "people": 4,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 146,
+        "cpuMs": 11
+      }
+    },
+    {
+      "map": "cozy_cafe_interior",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.10000000149011612
+      }
+    },
+    {
+      "map": "hotel_suite",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.10000000149011612
+      }
+    },
+    {
+      "map": "enni_cole_interior",
+      "world": {
+        "buildings": 0,
+        "people": 1,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 31,
+        "cpuMs": 0.29999999701976776
+      }
+    },
+    {
+      "map": "enni_cole_upper",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0
+      }
+    },
+    {
+      "map": "demoness_palace",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.10000000149011612
+      }
+    },
+    {
+      "map": "house_of_death",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0
+      }
+    },
+    {
+      "map": "medbay_sw",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.3999999985098839
+      }
+    },
+    {
+      "map": "ethereal_plane",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.20000000298023224
+      }
+    },
+    {
+      "map": "keepers_hill",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0
+      }
+    },
+    {
+      "map": "keepers_parlor",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.10000000149011612
+      }
+    },
+    {
+      "map": "van_interior",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.19999999552965164
+      }
+    },
+    {
+      "map": "church_boss",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.3999999985098839
+      }
+    },
+    {
+      "map": "auto_shop",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0
+      }
+    },
+    {
+      "map": "neural_sys_interior",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0
+      }
+    },
+    {
+      "map": "biggs_arena",
+      "world": {
+        "buildings": 0,
+        "people": 1,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 28,
+        "cpuMs": 0.5
+      }
+    },
+    {
+      "map": "ollo_test",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0.6000000014901161
+      }
+    },
+    {
+      "map": "ollo_interior",
+      "world": {
+        "buildings": 0,
+        "people": 0,
+        "vehicles": 0,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 0,
+        "cpuMs": 0
+      }
+    },
+    {
+      "map": "hub_949",
+      "world": {
+        "buildings": 2,
+        "people": 0,
+        "vehicles": 1,
+        "groundPending": 0,
+        "groundTiles": 6,
+        "paths": 42,
+        "cpuMs": 10.700000002980232
+      }
+    }
+  ]
+}

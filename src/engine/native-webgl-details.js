@@ -34,6 +34,9 @@ Object.assign(NativeWebGLRenderer.prototype,{
         const live=new Set(game.props||[]);
         for(const [p,r]of this.props)if(!live.has(p)){this.releaseProp(r);this.props.delete(p);}
         for(const p of live){
+            if(game.activeMap.id==='hub_949'&&game.view){const v=game.view,pad=180;
+                const out=Math.abs(p.x-v.x)>game.canvas.width/(2*v.zoom)+(p.width||24)+pad||Math.abs(p.y-v.y)>game.canvas.height/(2*v.zoom)+(p.height||24)+pad;
+                if(out){const old=this.props.get(p);if(old){this.releaseProp(old);this.props.delete(p);}continue;}}
             const signature=this.propSignature(p);let r=this.props.get(p);if(p.visible===false&&!r)continue;
             if(!r||r.signature!==signature){
                 const texture=this.propCanvas(p,0);if(r)this.releaseProp(r);
