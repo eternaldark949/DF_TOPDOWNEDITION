@@ -37,8 +37,9 @@ class NativeVectorContext {
         this.owner=owner;this.nativeVector=true;this.root=new PIXI.Container();this.pool=[];this.pools=new Map();this.gradients=[];this.images=new Map();this.imageViews=new Map();this.colors=new Map();
         this.canvas={width:192,height:192};this.begin();
     }
+    releaseText(){for(const rec of this.textRecords||[])rec.contexts.delete(this);this.textRecords?.clear();}
     begin(){
-        for(const n of this.pool){n.visible=false;n.mask=null;}
+        this.releaseText();for(const n of this.pool){n.visible=false;n.mask=null;}
         this.root.removeChildren();for(const list of this.pools.values())list.used=0;this.hash=2166136261;this.gradientIndex=0;this.stack=[];this.matrix=new PIXI.Matrix();this.container=this.root;this.current=null;
         Object.assign(this,{fillStyle:'#000',strokeStyle:'#000',globalAlpha:1,globalCompositeOperation:'source-over',lineWidth:1,lineCap:'butt',lineJoin:'miter',shadowBlur:0,shadowColor:'transparent',font:'11px sans-serif',textAlign:'start',textBaseline:'alphabetic'});
         this.beginPath();this.pathsPainted=0;this.patternTextures=new Set();
@@ -49,7 +50,7 @@ class NativeVectorContext {
         this.container=group;
         try{return draw();}finally{this.container=parent;this.current=null;}
     }
-    destroy(){for(const n of this.pool)n.mask=null;for(const n of this.pool){if(n.parent)n.parent.removeChild(n);n.destroy();}this.root.destroy();for(const r of this.gradients){r.stage.destroy({children:true});r.texture.destroy(true);}this.gradients=[];this.pool=[];this.pools.clear();for(const t of this.images.values())this.owner.releaseImage(t);this.images.clear();for(const t of this.imageViews.values())t.destroy(false);this.imageViews.clear();}
+    destroy(){this.releaseText();for(const n of this.pool)n.mask=null;for(const n of this.pool){if(n.parent)n.parent.removeChild(n);n.destroy();}this.root.destroy();for(const r of this.gradients){r.stage.destroy({children:true});r.texture.destroy(true);}this.gradients=[];this.pool=[];this.pools.clear();for(const t of this.images.values())this.owner.releaseImage(t);this.images.clear();for(const t of this.imageViews.values())t.destroy(false);this.imageViews.clear();}
     node(Type){let list=this.pools.get(Type);if(!list){list=[];list.used=0;this.pools.set(Type,list);}
         let n=list[list.used];if(!n){n=(Type===PIXI.BitmapText?new PIXI.BitmapText('',{fontName:'NativeDetailFont'}):new Type());list.push(n);this.pool.push(n);}list.used++;
         n.visible=true;n.mask=null;this.container.addChild(n);if(n instanceof PIXI.Graphics)n.clear();else if(Type===PIXI.Container){n.removeChildren();n.zIndex=0;n._nativeEntity=null;}return n;
@@ -155,7 +156,7 @@ class NativeVectorContext {
     }
     measureText(text){const size=Number(/([0-9.]+)px/.exec(this.font)?.[1]||11);return {width:String(text).length*size*.62};}
     fillText(text,x,y){
-        if(/[^\x20-\x7e]/.test(String(text))&&this.owner.presentation)return this.owner.presentation.text(this,text,x,y);
+        if((/[^\x20-\x7e]/.test(String(text))||/Great Vibes|Chancery|Z003|cursive/.test(this.font))&&this.owner.presentation&&this.owner.presentation.text(this,text,x,y)!==false)return;
         this.hashValue(text);this.hashValue(this.font);this.hashValue(this.fillStyle);this.hashValue(this.globalAlpha);this.hashValue(x);this.hashValue(y);
         this.current=null;const n=this.node(PIXI.BitmapText),match=/([0-9.]+)px/.exec(this.font),size=match?Number(match[1]):11;
         n.text=String(text);n.fontSize=size;const color=this.color(this.fillStyle);n.tint=color.color;n.alpha=this.globalAlpha*color.alpha;
@@ -182,7 +183,7 @@ class NativeVectorContext {
                     vec4 color=colors[0];for(int i=1;i<8;i++){if(float(i)<count&&t>=stops[i-1])color=mix(colors[i-1],colors[i],clamp((t-stops[i-1])/max(.000001,stops[i]-stops[i-1]),0.0,1.0));}
                     gl_FragColor=vec4(color.rgb*color.a,color.a);}`,
                 {kind:0,c0:new Float32Array(3),c1:new Float32Array(3),colors:new Float32Array(32),stops:new Float32Array(8),count:0});
-            const stage=new PIXI.Container();stage.addChild(new PIXI.Mesh(geometry,shader));r={stage,shader,texture:PIXI.RenderTexture.create({width:128,height:128}),key:null};this.gradients[index]=r;
+            const stage=new PIXI.Container();stage.addChild(new PIXI.Mesh(geometry,shader));r={stage,shader,texture:this.owner.target(PIXI.RenderTexture.create({width:128,height:128}),(this.label||'vector')+'-gradient'),key:null};this.gradients[index]=r;
         }
         const a=style.args;let ox,oy,sx,sy;
         if(style.type){ox=a[3]-a[5];oy=a[4]-a[5];sx=sy=Math.max(.001,a[5]*2);}

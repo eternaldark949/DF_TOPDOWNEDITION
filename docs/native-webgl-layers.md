@@ -38,7 +38,7 @@ they do not choose another rendering backend.
 
 ## Animated characters and shape shadows
 
-The build identifier is `native-webgl-presentation-v13`. **Canvas look** enables
+The build identifier is `native-webgl-nightglow-v14`. **Canvas look** enables
 all 83 switches. **Lighting + shadows** also enables continuous character
 animation, silhouette shadows, high shadow detail and curtains.
 
@@ -462,3 +462,26 @@ not disable combat, map transitions or saved equipment.
 
 See [v13 implementation and validation](native-webgl-fork.md#gameplay-presentation-and-reflection-extras-in-v13)
 for resource budgets, test evidence and the remaining visual approximations.
+
+
+## Cafe comparison and texture traffic in v14
+
+Night haze now follows Canvas's broad colored lamp gradient and restores bulb
+emission above darkness. Cursive signs retain their authored font at 2× density.
+High texture quality additionally enables geometry MSAA (up to 4 samples where
+supported); Standard leaves it off. Output resolution still matters when
+judging small edges and textures.
+
+Reports add `textureTraffic` at the root and on every frame. `imageBytes` counts
+estimated image/update payload; `allocationBytes` counts estimated empty texture
+storage requested. `groups` provide origin, kind, width, height, calls and
+estimatedBytes. Counts reconcile with the existing uploads counter. Allocation
+is not a CPU image transfer, and the byte estimates do not include multisample
+renderbuffers, vertex buffers or driver overhead.
+
+For the A53, use Cozy Cafe at **22:00**, fixed weather/zoom/resolution, **Canvas
+look** and **Standard** texture quality. Record 20 seconds standing still, then
+20 seconds on a short walk away and back. An optional High-quality screenshot
+from the same spot isolates the edge/text quality comparison. The origin/byte
+breakdown will show whether roaming costs come from new artwork or target
+storage. [Implementation and test evidence](native-webgl-fork.md#cozy-cafe-night-haze-and-upload-attribution-in-v14).

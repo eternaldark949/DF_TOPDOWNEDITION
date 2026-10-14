@@ -616,3 +616,57 @@ import, driving, character/shadow ordering and color-grade regressions are
 checked separately. Desktop tests use Chromium/SwiftShader; phone performance
 still needs a device recording. Fine shadowBlur/dash accents, bounded reflection
 detail and the optical shaders remain visual approximations.
+
+
+## Cozy Cafe night haze and upload attribution in v14
+
+Build `native-webgl-nightglow-v14` keeps 83 layers. The comparison fixture stands
+outside Cozy Cafe at 22:00, clear/dry weather, zoom 0.9 and a 1280×720 backing
+canvas. People, vehicles and bokeh are omitted in both renderers to isolate the
+lighting. Matching captures are `native-webgl-cafe-canvas.png` and
+`native-webgl-cafe-webgl.png`; evidence is `native-webgl-nightglow-checks.json`.
+
+The missing warm haze came from using the darkness-cutout gradient for colored
+lamp light. Canvas uses a broad plateau through 60% of the radius and an outdoor
+wash of 0.22 (indoors 0.08). A small GPU mesh now recovers visibility from the
+resident cutout and applies the original color profile, including the RGB fade
+toward transparent black. Static and moving shadows are reused; this does not
+introduce a second color-shadow cache. Street-lamp bulb emission is also restored
+above scene darkness. Five ground/haze probes differ by a mean 1.40/255 from
+Canvas; the isolated gradient chart has a mean premultiplied RGBA error 0.29/255.
+These metrics describe those probes, not pixel identity of the whole scene.
+
+Authored cursive signage now uses its original font through the bounded label
+cache, rather than the generic outlined bitmap alphabet. Labels bake at 2×
+density, share opaque RGB artwork across changing opacity, and remain pinned
+while retained geometry references them. This avoids both alpha-driven cache
+churn and eviction of still-visible building text. Late font loading invalidates
+retained signs so a fallback font does not remain stuck in the cache. High texture quality also
+requests up to four geometry samples on the lighting filter's input when
+WebGL2 supports them. Standard keeps multisampling off; filter/texture smoothing
+and overall output resolution are separate concerns. MSAA has a GPU/memory cost.
+
+`uploads` still counts texImage2D/texSubImage2D calls. Per-frame and summary
+`textureTraffic` now separate image/update payload estimates from empty texture
+allocations and group calls by origin, kind, dimensions and estimated bytes.
+Examples: building-glow-target, building-top-gradient, static-shadow-target,
+groundContext, fixture and authored-label. Other targets are labeled generically
+as gpu-render-target; attribution is not complete for every imported resource.
+The byte figures estimate the uncompressed pixel/storage payload, not driver
+memory, compressed/network bytes or total GPU bus traffic. Geometry buffers and
+multisample renderbuffers are outside this texture-call counter. A frame keeps
+at most 64 detailed groups plus overflow groups; a summary keeps 256 detailed
+groups plus overflow groups. Frame-level profiling adds no synchronous GPU
+queries/readbacks.
+
+In this fixture's 560-unit horizontal roam, 25 calls contained 11 image transfers
+(4,074,240 estimated bytes) and 14 allocations (10,698,504 bytes). The building
+allocations were six 128×128 gradient targets (393,216 bytes) plus two 1395×835
+glow targets (9,318,600 bytes). These are fixture results, not attribution of an
+older phone report. Before movement and after stopping, sampled frames have zero
+uploads/bakes. Tests also cover image updates, counter reconciliation, retained
+text under cache pressure and actual multisample allocation in High quality.
+
+Separate hostile heat silhouettes, full NV/lightning lighting response and
+Golden Child attached damage orbs remain pending; v14 focuses on night haze,
+sign/edge clarity and texture traffic.

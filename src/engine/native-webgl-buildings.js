@@ -44,7 +44,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             }finally{for(const s of saved){if(s.own)b[s.name]=s.method;else delete b[s.name];}}
             if(!r.glowTarget||r.glowSize!==w+':'+h+':'+density){
                 if(r.glowTarget)r.glowTarget.destroy(true);
-                r.glowTarget=PIXI.RenderTexture.create({width:w,height:h,resolution:density,scaleMode:PIXI.SCALE_MODES.LINEAR});r.glowSize=w+':'+h+':'+density;
+                r.glowTarget=this.target(PIXI.RenderTexture.create({width:w,height:h,resolution:density,scaleMode:PIXI.SCALE_MODES.LINEAR}),'building-glow-target');r.glowSize=w+':'+h+':'+density;
             }
             // Store source-over coverage independently of additive RGB. This
             // makes the snapshot an affine composition over the lit scene:

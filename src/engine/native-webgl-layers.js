@@ -185,7 +185,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
             const stage=new PIXI.Container(),sprite=new PIXI.Sprite(this.lightGradient),mask=new PIXI.Graphics(),shadow=new PIXI.Graphics();
             sprite.position.set(radius,radius);sprite.anchor.set(.5);sprite.width=sprite.height=radius*2;
             shadow.blendMode=PIXI.BLEND_MODES.ERASE;stage.addChild(sprite,mask,shadow);
-            const texture=PIXI.RenderTexture.create({width:radius*2,height:radius*2,resolution:density,scaleMode:PIXI.SCALE_MODES.LINEAR});
+            const texture=this.target(PIXI.RenderTexture.create({width:radius*2,height:radius*2,resolution:density,scaleMode:PIXI.SCALE_MODES.LINEAR}),'static-shadow-target');
             r={stage,sprite,mask,shadow,texture,radius,density};this.shadowCache.set(source.owner,r);
         }
         r.sprite.texture=source.cookie||((source.wash??.08)===.08?this.holeGradient:this.decorGradient);
@@ -228,7 +228,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         if(!r.dynamicStage){
             r.dynamicStage=new PIXI.Container();r.dynamicBase=new PIXI.Sprite(base);r.dynamicStage.addChild(r.dynamicBase);
             r.actorShadow=new NativeActorShadowMesh();r.dynamicStage.addChild(r.actorShadow);
-            r.dynamicTexture=PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR});
+            r.dynamicTexture=this.target(PIXI.RenderTexture.create({width:source.radius*2,height:source.radius*2,resolution:r.density,scaleMode:PIXI.SCALE_MODES.LINEAR}),'animated-shadow-target');
         }
         r.dynamicBase.texture=base;r.dynamicBase.width=r.dynamicBase.height=source.radius*2;
         const len=Math.min(120,source.radius-d,d*24/Math.max(1,(source.elevation??84)-24)),u=r.actorShadow.shader.uniforms;
@@ -310,6 +310,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
     syncLighting(game,view){
         const start=performance.now(),L=this.layers;this.shadowStats={hits:0,rebuilds:0,staticRebuilds:0,dynamicRebuilds:0,dynamicHits:0,silhouettePairs:0,sources:0,pairs:0};
         this.lighting.uniforms.lightingOn=L.lighting?1:0;this.lighting.uniforms.viewport.set([game.canvas.width,game.canvas.height]);
+        this.geometrySamples=this.textureQuality==='high'?Math.min(4,this.maxSamples):0;this.lighting.multisample=this.geometrySamples;
         this.world.filters=L.lighting||this.daylightState?.active?[this.lighting]:null;if(!L.lighting)return;
         const w=game.canvas.width,h=game.canvas.height;
         if(!this.lightTarget||this.lightSize!==w+':'+h){
@@ -328,7 +329,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.skyLight.visible=true;this.skyLight.scale.set(view.zoom);this.skyLight.position.copyFrom(this.world.position);
         this.lightSprites.scale.set(view.zoom);this.lightSprites.position.copyFrom(this.world.position);
         const sources=(game.lamps||[]).filter(l=>l.visible!==false).map(l=>({owner:l,x:l.x,y:l.y,radius:l.lightRadius||l.radius||200,
-            color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,alpha:(game.activeMap.type==='outdoor'&&!game.dayCycle().lampsOn?0:1)*game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
+            color:l.color||'#ffeebb',elevation:l.elevation??84,wash:.08,lamp:true,colorWash:game.activeMap.type==='outdoor'?.22:.08,alpha:(game.activeMap.type==='outdoor'&&!game.dayCycle().lampsOn?0:1)*game.roomSystem.lampLight(l)*lampFlicker(l)*lampWake(l)*(l.intensity??1)}));
         if(L.decorLights){
             for(const p of game.props||[])if(p.visible!==false&&p.light){const c=p.getCenter(),q=p.light;
                 sources.push({owner:p,x:c.x+(q.dx||0),y:c.y+(q.dy||0),radius:q.radius||Math.max(q.w||0,q.h||0)/2||180,
@@ -363,8 +364,10 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.lighting.uniforms.colorGain=L.colorWash ? game.getAmbientDarkness() : 0;
         if(L.colorWash){
             this.lightBase.visible=false;this.skyLight.visible=false;this.surfaces.windowHole.root.visible=false;this.surfaces.windowColor.root.visible=true;
-            for(let i=0;i<sources.length;i++){const s=this.lightSprites.children[i];s.tint=PIXI.Color.shared.setValue(sources[i].color).toNumber();s.alpha*=sources[i].wash;s.blendMode=PIXI.BLEND_MODES.ADD;}
-            this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
+            if(!this.colorSprites){this.colorSprites=new PIXI.Container();this.lightStage.addChild(this.colorSprites);}this.colorSprites.visible=true;this.colorSprites.position.copyFrom(this.lightSprites.position);this.colorSprites.scale.copyFrom(this.lightSprites.scale);this.lightSprites.visible=false;
+            for(let i=0;i<Math.max(sources.length,this.colorSprites.children.length);i++){let m=this.colorSprites.children[i];if(!m){m=new NativeLightColorMesh();this.colorSprites.addChild(m);}const source=sources[i];m.visible=!!source;if(!source)continue;const s=this.lightSprites.children[i],u=m.shader.uniforms;m.position.set(s.x-s.width/2,s.y-s.height/2);m.scale.set(s.width,s.height);u.hole=s.texture;if(m.color!==source.color){m.color=source.color;u.tint.set(new PIXI.Color(source.color).toArray().slice(0,3));}u.strength=s.alpha*(source.colorWash??source.wash);u.lamp=source.lamp?1:0;}
+
+            this.renderer.render(this.lightStage,{renderTexture:this.colorTarget,clear:true});this.colorSprites.visible=false;this.lightSprites.visible=true;this.lightBase.visible=true;this.skyLight.visible=true;this.surfaces.windowHole.root.visible=true;this.surfaces.windowColor.root.visible=false;
         }
         this.layerStages.lightingMs=performance.now()-start;
     }
@@ -439,4 +442,19 @@ class NativeActorHaloMesh extends PIXI.Mesh {
             {body:PIXI.Texture.EMPTY,blur:.03});
         super(geometry,shader);
     }
+}
+
+// Lamp color has a broad plateau; the darkness cutout falls off immediately.
+// Recover the shared visibility from the cutout and apply the authored color
+// profile, retaining the same static and animated occlusion without a second
+// shadow raster or an uploaded bitmap. The outer RGB also fades to black
+// before premultiplication, matching Canvas gradient interpolation.
+class NativeLightColorMesh extends PIXI.Mesh{
+    constructor(){super(nativeSurfaceGeometry(),PIXI.Shader.from(NATIVE_SURFACE_VERTEX,`
+        precision highp float;varying vec2 uv;uniform sampler2D hole;uniform vec3 tint;uniform float strength;uniform float lamp;
+        void main(){float a=texture2D(hole,uv).a;vec3 rgb=tint;
+            if(lamp>.5){float d=length(uv-.5)*2.;float cut=clamp((1.-d)/.96,0.,1.);
+                float broad=clamp((1.-d)/.4,0.,1.);a*=broad/max(.004,cut);rgb=mix(vec3(1.),tint,clamp(d/.1,0.,1.))*broad;}
+            a=clamp(a*strength,0.,1.);gl_FragColor=vec4(rgb*a,a);
+        }`,{hole:PIXI.Texture.EMPTY,tint:new Float32Array(3),strength:0,lamp:0}));this.blendMode=PIXI.BLEND_MODES.ADD;}
 }

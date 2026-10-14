@@ -50,6 +50,9 @@ Object.assign(NativeWebGLRenderer.prototype,{
         parent.addChild(stage);if(parent.sortableChildren)parent.sortChildren();
     },
     syncWorld(game,view){
+        // A late web font must replace its fallback in retained sign geometry.
+        // Release all old label pins before any new sign can enter the cache.
+        if(this._fontSeen!==(this.fontRevision||0)){for(const rec of this.nativeBuildings.values()){rec.key=rec.glowKey=null;for(const c of [rec.base,rec.top,rec.glowContext,rec.glowLive])c?.releaseText();}this._fontSeen=this.fontRevision||0;}
         const start=performance.now();let lap=start;const timings={};this.nativeCasters.begin(game);this.crowdAtlas.begin();this.buildingStats={hits:0,rasterizations:0,rasterMs:0,livePaths:0,fallbacks:0};const L=this.layers,map=game.activeMap;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.worldCueContext,this.roofDetailContext,this.rainContext,this.occupantContext,this.foliageContext])ctx.canvas=game.canvas;
         for(const ctx of [this.groundContext,this.peopleContext,this.trafficContext,this.streetContext,this.cityGlowContext,this.roofDetailContext,this.occupantContext,this.foliageContext])ctx.sceneFrame=_worldMatrix;
@@ -117,6 +120,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
         this.buildingBaseStage.sortableChildren=this.roofStage.sortableChildren=!!L.depthSort;
         for(const [b,r]of this.nativeBuildings)r.base.root.zIndex=r.top.root.zIndex=b.y+(b.h||b.height||0);this.roofDetailContext.root.zIndex=Infinity;
         if(L.depthSort){this.buildingBaseStage.sortChildren();this.roofStage.sortChildren();}
+        if(L.glows&&L.fixtures)for(const lamp of game.lamps||[])if(visible(lamp,180))lamp.drawEmissive?.(glow,game.dayCycle().daylight);
         this.roofStage.visible=this.buildingBaseStage.visible=L.buildings;
         for(const ctx of [street,traffic,actors,glow,roofs,foliage,this.occupantContext]){
             const used=new Set(ctx.pool.filter(n=>n.visible&&n instanceof PIXI.Sprite).map(n=>n.texture.baseTexture));

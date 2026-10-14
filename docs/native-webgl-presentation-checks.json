@@ -30,15 +30,15 @@
         "far": 336,
         "steady": 1
       },
-      "bokeh": 7,
+      "bokeh": 13,
       "speech": 1,
       "radar": true,
       "ringsDropped": 0,
       "rings": 0,
       "glass": 7,
       "paths": 18,
-      "textBytes": 8112,
-      "cpuMs": 23.900000005960464
+      "textBytes": 32448,
+      "cpuMs": 14.100000008940697
     },
     "off": {
       "scope": {
@@ -51,8 +51,8 @@
       "rings": 0,
       "glass": 7,
       "paths": 0,
-      "textBytes": 8112,
-      "cpuMs": 0.4000000059604645
+      "textBytes": 32448,
+      "cpuMs": 0.30000001192092896
     },
     "unchanged": true,
     "outside": 140,
@@ -87,28 +87,28 @@
       "scope": {
         "active": false
       },
-      "bokeh": 8,
+      "bokeh": 13,
       "speech": 0,
       "radar": false,
       "ringsDropped": 4,
       "rings": 8,
       "glass": 7,
       "paths": 0,
-      "textBytes": 8112,
-      "cpuMs": 0.7999999970197678
+      "textBytes": 32448,
+      "cpuMs": 0.5
     },
     "off": {
       "scope": {
         "active": false
       },
-      "bokeh": 9,
+      "bokeh": 13,
       "speech": 0,
       "radar": false,
       "rings": 0,
       "glass": 0,
       "paths": 0,
-      "textBytes": 8112,
-      "cpuMs": 0.20000000298023224
+      "textBytes": 32448,
+      "cpuMs": 0
     },
     "unchanged": true,
     "changed": 3568,
@@ -122,7 +122,7 @@
   "controls": {
     "count": 20,
     "total": 83,
-    "build": "native-webgl-presentation-v13"
+    "build": "native-webgl-nightglow-v14"
   },
   "hud": {
     "on": true,
@@ -132,7 +132,7 @@
   "photo": {
     "width": 880,
     "height": 411,
-    "colored": 361668
+    "colored": 361680
   },
   "reflectionExtras": {
     "furniture": {
@@ -151,7 +151,7 @@
       "foliage": 0,
       "liveBuildings": 0,
       "bytes": 1450240,
-      "cpuMs": 31.5
+      "cpuMs": 18.700000002980232
     },
     "propsOff": true,
     "city": {
@@ -170,7 +170,7 @@
       "foliage": 9,
       "liveBuildings": 1,
       "bytes": 1450240,
-      "cpuMs": 6.9000000059604645
+      "cpuMs": 3.5
     },
     "off": true
   },

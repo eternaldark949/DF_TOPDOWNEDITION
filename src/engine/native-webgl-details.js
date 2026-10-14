@@ -10,7 +10,7 @@ Object.assign(NativeWebGLRenderer.prototype,{
     },
     bakeDensity(w,h,kind){
         let density=this.textureQuality==='high'?2:this.textureQuality==='auto'&&['prop','fixture'].includes(kind)?2:1;
-        if(kind==='light')density=1;
+        if(kind==='authored-label')density=2;if(kind==='light')density=1;
         density=Math.min(density,this.maxTextureSize/Math.max(w,h));
         const used=[...this.textures].reduce((n,t)=>n+t.baseTexture.realWidth*t.baseTexture.realHeight*4,0),estimate=Math.ceil(w*density)*Math.ceil(h*density)*4;
         if(density>1&&used+estimate>128*1048576){density=1;this.qualityReductions++;}

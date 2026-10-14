@@ -65,15 +65,15 @@ class NativePresentation{
     }
     get contexts(){return [this.ground,this.abilities,this.lit,this.bubbles,this.screen,this.scopeCue];}
     text(ctx,value,x,y){
-        const text=String(value),key=[text,ctx.font,ctx.fillStyle].join('|');let rec=this.texts.get(key);
-        if(!rec){const size=Number(/([0-9.]+)px/.exec(ctx.font)?.[1]||12),pad=8,probe=document.createElement('canvas').getContext('2d');probe.font=ctx.font;const W=Math.min(1024,Math.ceil(probe.measureText(text).width+pad*2)),H=Math.ceil(size*2+pad*2),bytes=W*H*4;
-            while(this.texts.size>=64||this.textBytes+bytes>4*1048576){const old=[...this.texts].find(([,v])=>v.used!==this.owner.frameId)?.[0];if(old===undefined)return;const r=this.texts.get(old);this.texts.delete(old);this.textBytes-=r.bytes;this.owner.textures.delete(r.texture);r.texture.destroy(true);}
-            const texture=this.owner.bake(W,H,c=>{c.font=ctx.font;c.textBaseline='middle';c.fillStyle=ctx.fillStyle;c.fillText(text,pad,H/2);},'unicode-label');rec={texture,bytes,W,H,pad};this.texts.set(key,rec);this.textBytes+=bytes;
+        const text=String(value),ink=ctx.color(ctx.fillStyle),key=[this.owner.fontRevision||0,text,ctx.font,ink.color].join('|');let rec=this.texts.get(key);
+        if(!rec){const size=Number(/([0-9.]+)px/.exec(ctx.font)?.[1]||12),pad=8,probe=document.createElement('canvas').getContext('2d');probe.font=ctx.font;const W=Math.min(1024,Math.ceil(probe.measureText(text).width+pad*2)),H=Math.ceil(size*2+pad*2),density=this.owner.bakeDensity(W,H,'authored-label'),bytes=Math.ceil(W*density)*Math.ceil(H*density)*4;
+            while(this.texts.size>=64||this.textBytes+bytes>4*1048576){const old=[...this.texts].find(([,v])=>v.used!==this.owner.frameId&&!v.contexts.size)?.[0];if(old===undefined)return false;const r=this.texts.get(old);this.texts.delete(old);this.textBytes-=r.bytes;this.owner.textures.delete(r.texture);r.texture.destroy(true);}
+            const texture=this.owner.bake(W,H,c=>{c.font=ctx.font;c.textBaseline='middle';c.fillStyle='#'+ink.color.toString(16).padStart(6,'0');c.fillText(text,pad,H/2);},'authored-label');rec={texture,bytes,W,H,pad,contexts:new Set()};this.texts.set(key,rec);this.textBytes+=bytes;
         }
-        rec.used=this.owner.frameId;
+        rec.used=this.owner.frameId;rec.contexts.add(ctx);ctx.textRecords??=new Set();ctx.textRecords.add(rec);
         const dx=ctx.textAlign==='center'?-rec.W/2:ctx.textAlign==='right'||ctx.textAlign==='end'?-rec.W: -rec.pad;
         const dy=ctx.textBaseline==='middle'?-rec.H/2:ctx.textBaseline==='top'?-rec.pad:-rec.H*.7;
-        ctx.current=null;const n=ctx.node(PIXI.Sprite);n.texture=rec.texture;n.alpha=ctx.globalAlpha;n.blendMode=PIXI.BLEND_MODES.NORMAL;n.transform.setFromMatrix(ctx.matrix.clone().append(new PIXI.Matrix(1,0,0,1,x+dx,y+dy)));ctx.hashValue(key);for(const v of [x,y,ctx.globalAlpha,ctx.matrix.a,ctx.matrix.b,ctx.matrix.c,ctx.matrix.d,ctx.matrix.tx,ctx.matrix.ty])ctx.hashValue(v);
+        ctx.current=null;const n=ctx.node(PIXI.Sprite);n.texture=rec.texture;n.alpha=ctx.globalAlpha*ink.alpha;n.blendMode=ctx.globalCompositeOperation==='lighter'?PIXI.BLEND_MODES.ADD:PIXI.BLEND_MODES.NORMAL;n.transform.setFromMatrix(ctx.matrix.clone().append(new PIXI.Matrix(1,0,0,1,x+dx,y+dy)));ctx.hashValue(key);ctx.hashValue(ink.alpha);for(const v of [x,y,ctx.globalAlpha,ctx.matrix.a,ctx.matrix.b,ctx.matrix.c,ctx.matrix.d,ctx.matrix.tx,ctx.matrix.ty])ctx.hashValue(v);
     }
     syncScope(game,view){
         const r=this.owner,k=r.layers.scopeView?game.scopeK||0:0,c=this.scopeCue;c.begin();c.canvas=game.canvas;c.setTransform(view.zoom,0,0,view.zoom,r.world.x,r.world.y);this.scope.visible=k>0;if(k<=0)return;
